@@ -123,14 +123,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute inset-0" aria-hidden="true" />
 
         {/* Subtle centre glow so the form lifts off the grid */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 75% 70% at 50% 50%, rgba(30,27,25,0.55) 0%, transparent 100%)",
-          }}
-          aria-hidden="true"
-        />
+
 
         {/* Mobile logo */}
         <div className="relative z-10 mb-8 flex flex-col items-center gap-2 lg:hidden">
