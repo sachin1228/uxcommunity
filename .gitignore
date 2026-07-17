@@ -1,41 +1,123 @@
-# dependencies
+# =========================
+# Dependencies
+# =========================
 node_modules/
+.pnp
+.pnp.js
 
-# next.js build output
+# =========================
+# Build output
+# =========================
 .next/
 out/
-
-# production builds
 dist/
 build/
+coverage/
+.turbo/
 
-# environment variables (never commit secrets)
+# =========================
+# Environment files
+# =========================
 .env
 .env.local
-.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Keep example env
+!.env.example
 
-# supabase CLI (local dev stack artifacts)
-supabase/.branches
-supabase/.temp
-
-# logs
+# =========================
+# Logs
+# =========================
+logs/
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# os / editor
-.DS_Store
-*.pem
-.idea/
+# =========================
+# Cache
+# =========================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
 
-# deployment
-.vercel
+# =========================
+# Vercel
+# =========================
+.vercel/
 
-# test coverage
+# =========================
+# Supabase
+# =========================
+supabase/.temp/
+supabase/.branches/
+
+# =========================
+# Testing
+# =========================
+playwright-report/
+test-results/
 coverage/
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# IDE
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# Keep shared VS Code settings if desired
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# =========================
+# Temporary files
+# =========================
+tmp/
+temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# =========================
+# Package manager
+# =========================
+.npm/
+.pnpm-store/
+
+# =========================
+# Misc
+# =========================
+*.pid
+*.seed
+
+# =========================
+# Generated uploads
+# =========================
+uploads/
+storage/
+public/uploads/
+
+# =========================
+# Local SQLite databases
+# =========================
+*.sqlite
+*.sqlite3
+*.db
