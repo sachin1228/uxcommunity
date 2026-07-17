@@ -51,12 +51,6 @@ export default function LoginPage() {
           aria-hidden="true"
         />
 
-        {/* Orange accent glow — bottom-left corner */}
-        <div
-          className="pointer-events-none absolute -bottom-32 -left-32 h-96 w-96 rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, #FF5E1F 0%, transparent 70%)" }}
-          aria-hidden="true"
-        />
 
         {/* Logo */}
         <div className="relative z-10">
@@ -150,26 +144,11 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 w-full max-w-sm">
-          <p className="mb-3 font-mono text-[11px] uppercase tracking-wider text-overlay-muted">
-            auth / login
-          </p>
 
           {/* Card — dark surface */}
           <div className="relative overflow-hidden rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
             <CornerBrackets />
 
-            {/* Very faint dot grid inside card */}
-            <div
-              className="pointer-events-none absolute inset-0 grid-dots opacity-50"
-              style={{ "--grid-dot-color": "rgba(255,255,255,0.05)" } as React.CSSProperties}
-              aria-hidden="true"
-            />
-
-            {/* Status badge */}
-            <span className="absolute -top-3 right-6 z-10 flex items-center gap-1.5 rounded-full border border-overlay-elevated bg-overlay px-3 py-1 font-mono text-[10px] text-accent">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              editing
-            </span>
 
             <h2 className="relative font-display text-2xl font-semibold text-overlay-foreground">
               Welcome back
@@ -227,18 +206,12 @@ export default function LoginPage() {
             </div>
 
             {/* Social auth */}
-            <div className="relative flex gap-3">
+            <div className="relative flex">
               <button
                 type="button"
                 className="flex-1 rounded-md border border-overlay-elevated bg-overlay py-2.5 font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated"
               >
                 Google
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-md border border-overlay-elevated bg-overlay py-2.5 font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated"
-              >
-                Apple
               </button>
             </div>
           </div>
