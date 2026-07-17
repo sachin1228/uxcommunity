@@ -1,41 +1,42 @@
-import { neutral, purple, signal } from "../tokens/colors";
+import { neutral, orange, signal, warm } from "../tokens/colors";
 
 /**
  * Dark theme — semantic color mappings.
- * Inspired by Cloudflare's deep, rich dark mode:
- * near-black backgrounds with clear surface layering and
- * elevated accent brightness for legibility.
+ * Warm charcoal backgrounds (not cold blue-black) with orange accent.
  */
 export const darkTheme = {
   /** Page and panel backgrounds */
-  background:        neutral[1000], // #07070C — deepest dark
-  backgroundSubtle:  neutral[900],  // #0F0F16
+  background:        warm[900],     // #161413 — warm dark
+  backgroundSubtle:  warm[800],     // #1B1918
 
   /** Card / elevated surfaces */
-  surface:           neutral[900],  // #0F0F16
-  surfaceRaised:     neutral[800],  // #1A1A24 — cards, panels
+  surface:           warm[800],     // #1B1918
+  surfaceRaised:     warm[700],     // #262220 — cards, panels
 
   /** Text */
-  foreground:        neutral[100],  // #F5F5F7 — primary text
-  foregroundMuted:   neutral[400],  // #9A9AAD — secondary text
-  foregroundSubtle:  neutral[500],  // #6B6B7B — tertiary
+  foreground:        warm[100],     // #F5F2F0 — primary text
+  foregroundMuted:   warm[400],     // #7B7B7B — secondary text
+  foregroundSubtle:  neutral[500],  // #7B7B7B — tertiary
 
-  /** Accent — brighter in dark mode for legibility */
-  accent:            purple[400],   // #9B90F3
-  accentHover:       purple[300],   // #C4BCF8
-  accentSoft:        neutral[800],  // #1A1A24 with purple tint handled via CSS
+  /** Accent — slightly brighter for dark-mode legibility */
+  accent:            orange[400],   // #ff5e1f
+  accentHover:       orange[500],   // #E65012
+  accentSoft:        warm[700],     // #262220
   accentForeground:  neutral[0],    // white text on accent bg
 
   /** Borders */
-  border:            neutral[800],  // #1A1A24
-  borderSubtle:      neutral[900],  // #0F0F16
+  border:            warm[600],     // #2F2B29
+  borderSubtle:      warm[700],     // #262220
 
   /** Brand signal — stays vivid in both modes */
   signal,                           // #C8FF5B
 
   /** Always-dark overlay panel */
-  overlay:           neutral[900],  // #0F0F16
-  overlayRaised:     neutral[800],  // #1A1A24
+  overlay:           warm[900],     // #161413
+  overlayRaised:     warm[800],     // #1B1918
+  overlayElevated:   warm[700],     // #262220
+  overlayForeground: warm[100],     // #F5F2F0
+  overlayMuted:      warm[400],     // #7B7B7B
 } as const;
 
 export type DarkTheme = typeof darkTheme;

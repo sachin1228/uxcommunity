@@ -41,10 +41,11 @@ const config: Config = {
         signal:               "var(--color-signal)",
 
         // Always-dark overlay panel (left brand panel, code blocks, etc.)
-        overlay:              "var(--color-overlay)",
-        "overlay-raised":     "var(--color-overlay-raised)",
-        "overlay-foreground": "var(--color-overlay-foreground)",
-        "overlay-muted":      "var(--color-overlay-muted)",
+        overlay:               "var(--color-overlay)",
+        "overlay-raised":      "var(--color-overlay-raised)",
+        "overlay-elevated":    "var(--color-overlay-elevated)",
+        "overlay-foreground":  "var(--color-overlay-foreground)",
+        "overlay-muted":       "var(--color-overlay-muted)",
       },
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],
