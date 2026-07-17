@@ -32,6 +32,21 @@ export async function POST(request: NextRequest) {
   const { name, email, linkedin_url, portfolio_url } = parsed.data;
   const db = createServiceClient();
 
+  // Block suspended users from reapplying
+  const { data: blockedUser } = await db
+    .from("users")
+    .select("id")
+    .eq("email", email.toLowerCase())
+    .eq("is_blocked", true)
+    .maybeSingle();
+
+  if (blockedUser) {
+    return NextResponse.json(
+      { error: "This account has been suspended and cannot reapply." },
+      { status: 403 }
+    );
+  }
+
   // Check for existing pending application
   const { data: pending } = await db
     .from("applications")

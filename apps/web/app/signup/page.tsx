@@ -152,7 +152,7 @@ function SignupInner() {
         setStep2Error(data.error ?? "Failed to save profile.");
         return;
       }
-      setStep("done");
+      router.push("/dashboard");
     } catch {
       setStep2Error("Network error. Please try again.");
     } finally {

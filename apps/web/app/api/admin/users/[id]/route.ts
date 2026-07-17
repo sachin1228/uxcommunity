@@ -49,14 +49,27 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
-  // Delete profile first (cascade would handle it, but being explicit)
+  // Fetch application_id before deleting — we hard-delete it last.
+  const { data: user } = await db
+    .from("users")
+    .select("application_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  // 1. Delete designer profile
   await db.from("designer_profiles").delete().eq("user_id", id);
 
+  // 2. Delete user (must come before application due to FK ON DELETE RESTRICT)
   const { error } = await db.from("users").delete().eq("id", id);
 
   if (error) {
     console.error("[admin/users] DELETE error:", error);
     return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
+  }
+
+  // 3. Hard-delete the application so the email is completely free to reapply
+  if (user?.application_id) {
+    await db.from("applications").delete().eq("id", user.application_id);
   }
 
   return NextResponse.json({ success: true });
