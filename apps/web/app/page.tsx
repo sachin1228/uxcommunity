@@ -56,7 +56,8 @@ export default function LoginPage() {
         <div className="relative z-10">
           <span className="font-display text-xl font-semibold text-overlay-foreground">
             {APP_NAME}
-            <span className="text-accent">/</span>
+            <span className="text-accent mx-1">/</span>
+            design
           </span>
         </div>
 
