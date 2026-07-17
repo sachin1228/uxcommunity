@@ -41,7 +41,20 @@ export async function GET(
     .neq("id", id)
     .order("created_at", { ascending: false });
 
-  return NextResponse.json({ application, history: history ?? [] });
+  // Fetch invitation token if application is approved
+  let inviteToken: string | null = null;
+  if (application.status === "approved") {
+    const { data: invitation } = await db
+      .from("invitations")
+      .select("token")
+      .eq("application_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    inviteToken = invitation?.token ?? null;
+  }
+
+  return NextResponse.json({ application, history: history ?? [], inviteToken });
 }
 
 export async function PATCH(

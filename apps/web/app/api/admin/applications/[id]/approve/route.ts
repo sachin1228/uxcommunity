@@ -70,10 +70,10 @@ export async function POST(
     // Don't fail the whole request — the invitation is saved and can be resent
     return NextResponse.json({
       success: true,
-      warning: "Approved, but the invitation email failed to send. Check RESEND_API_KEY.",
+      warning: "Approved, but the invitation email failed to send. Copy the invite link below to share manually.",
       token: invitation.token,
     });
   }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, token: invitation.token });
 }

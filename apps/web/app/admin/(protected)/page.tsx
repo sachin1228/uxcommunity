@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Search, ChevronLeft, ChevronRight, ExternalLink,
-  Check, X, FileText, Tag, ChevronDown
+  Check, X, FileText, Tag, ChevronDown, Link, Copy, CheckCheck
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
@@ -53,7 +53,21 @@ function DetailModal({
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<"approve" | "reject" | null>(null);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionWarning, setActionWarning] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  const inviteLink = inviteToken ? `${appUrl}/signup?token=${inviteToken}` : null;
+
+  function copyLink() {
+    if (!inviteLink) return;
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     fetch(`/api/admin/applications/${app.id}`)
@@ -64,6 +78,7 @@ function DetailModal({
         setSelectedTags(
           (d.application?.application_tags ?? []).map((t: AppTag) => t.tag_id)
         );
+        if (d.inviteToken) setInviteToken(d.inviteToken);
       })
       .catch(() => {});
 
@@ -87,11 +102,18 @@ function DetailModal({
   async function handleAction(action: "approve" | "reject") {
     setActionLoading(action);
     setActionMsg(null);
+    setActionWarning(false);
     const res = await fetch(`/api/admin/applications/${app.id}/${action}`, { method: "POST" });
     const data = await res.json();
     setActionLoading(null);
     if (res.ok) {
-      setActionMsg(data.warning ?? `Application ${action}d successfully.`);
+      if (data.token) setInviteToken(data.token);
+      if (data.warning) {
+        setActionMsg(data.warning);
+        setActionWarning(true);
+      } else {
+        setActionMsg(`Application ${action}d successfully.`);
+      }
       onRefresh();
     } else {
       setActionMsg(data.error ?? "Action failed.");
@@ -141,8 +163,32 @@ function DetailModal({
 
         {/* Action message */}
         {actionMsg && (
-          <div className="rounded-md border border-overlay-elevated bg-overlay px-4 py-3">
+          <div className={`rounded-md border px-4 py-3 ${actionWarning ? "border-yellow-500/30 bg-yellow-500/5" : "border-overlay-elevated bg-overlay"}`}>
             <p className="font-body text-sm text-overlay-muted">{actionMsg}</p>
+          </div>
+        )}
+
+        {/* Invite link — shown for approved apps */}
+        {inviteLink && (
+          <div className="rounded-md border border-overlay-elevated bg-overlay p-4">
+            <p className="font-body text-xs font-medium text-overlay-foreground mb-2 flex items-center gap-1.5">
+              <Link size={13} /> Invitation Link
+            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-mono text-xs text-overlay-muted bg-overlay-elevated rounded px-3 py-2 flex-1 truncate select-all">
+                {inviteLink}
+              </p>
+              <button
+                onClick={copyLink}
+                className="flex items-center gap-1.5 rounded-md border border-overlay-elevated px-3 py-2 font-body text-xs text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors shrink-0"
+              >
+                {copied ? <CheckCheck size={13} className="text-green-400" /> : <Copy size={13} />}
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <p className="font-body text-[11px] text-overlay-muted mt-2">
+              Share this link with the applicant to let them create their account.
+            </p>
           </div>
         )}
 
