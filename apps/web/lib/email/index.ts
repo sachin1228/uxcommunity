@@ -8,8 +8,17 @@ function getResend() {
   if (!key) throw new Error("RESEND_API_KEY is not set");
   return new Resend(key);
 }
-const getFrom = () => process.env.RESEND_FROM_EMAIL ?? "noreply@drafthub.com";
-const getAppUrl = () => process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+const getFrom = () => {
+  const from = process.env.RESEND_FROM_EMAIL;
+  if (!from) throw new Error("RESEND_FROM_EMAIL is not set");
+  return from;
+};
+
+const getAppUrl = () => {
+  const url = process.env.NEXT_PUBLIC_APP_URL;
+  if (!url) throw new Error("NEXT_PUBLIC_APP_URL is not set");
+  return url;
+};
 
 export async function sendPasswordResetEmail(
   to: string,
