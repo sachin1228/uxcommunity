@@ -1,0 +1,12 @@
+{
+  "name": "@draft/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./css/tokens.css": "./src/css/tokens.css"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}

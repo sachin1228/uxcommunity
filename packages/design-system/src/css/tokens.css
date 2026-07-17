@@ -1,13 +1,12 @@
 /**
- * Design system CSS custom properties — inlined from @draft/design-system
+ * @draft/design-system — CSS custom properties
  *
- * Source of truth for token values lives in:
- *   packages/design-system/src/tokens/   (raw palette)
- *   packages/design-system/src/themes/   (semantic mappings)
- *   packages/design-system/src/css/tokens.css (this content)
+ * Structure mirrors Cloudflare's design language:
+ *   - semantic tokens only (no raw values in UI code)
+ *   - light mode in :root, dark mode via prefers-color-scheme
+ *   - no JS toggle required — the OS/browser decides
  *
- * Inlined here so any Next.js version (14+) can resolve it without
- * relying on CSS @import from package exports.
+ * Import this file once in your global stylesheet.
  */
 
 /* ─── Light mode (default) ─────────────────────────────────────────── */
@@ -43,7 +42,7 @@
   /* Always-dark overlay panel (brand canvas side) */
   --color-overlay:           #0F0F16;
   --color-overlay-raised:    #1A1A24;
-  --color-overlay-foreground:#F5F5F7;
+  --color-overlay-foreground: #F5F5F7;
   --color-overlay-muted:     #9A9AAD;
 
   /* Shadows */
@@ -92,38 +91,13 @@
     /* Overlay panel — same in both modes (always dark) */
     --color-overlay:           #0F0F16;
     --color-overlay-raised:    #1A1A24;
-    --color-overlay-foreground:#F5F5F7;
+    --color-overlay-foreground: #F5F5F7;
     --color-overlay-muted:     #9A9AAD;
 
-    /* Shadows — rely on border contrast on dark bg */
+    /* Shadows — subtler on dark bg (rely on border contrast instead) */
     --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.24);
     --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.32), 0 1px 2px -1px rgb(0 0 0 / 0.32);
     --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.40), 0 2px 4px -2px rgb(0 0 0 / 0.40);
     --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.32);
-  }
-}
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-html,
-body {
-  height: 100%;
-}
-
-body {
-  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
   }
 }
