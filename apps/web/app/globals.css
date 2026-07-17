@@ -141,13 +141,6 @@ body {
     background-size: var(--grid-size) var(--grid-size);
   }
 
-  /* Line grid — blueprint / engineering feel */
-  .grid-lines {
-    background-image:
-      linear-gradient(var(--grid-line-color) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line-color) 1px, transparent 1px);
-    background-size: var(--grid-size) var(--grid-size);
-  }
 
   /* Tight cross grid — for cards and detail areas */
   .grid-cross {

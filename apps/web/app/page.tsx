@@ -81,7 +81,7 @@ export default function LoginPage() {
             {/* Preview image area with gradient + grid overlay */}
             <div className="relative h-32 w-full overflow-hidden rounded-md bg-gradient-to-br from-accent to-[#9B320C]">
               <div
-                className="absolute inset-0 grid-lines opacity-25"
+                className="absolute inset-0 opacity-25"
                 style={{ "--grid-line-color": "rgba(255,255,255,0.15)" } as React.CSSProperties}
               />
             </div>
@@ -126,7 +126,7 @@ export default function LoginPage() {
       <section className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-overlay px-6 py-12 lg:w-[45%]">
 
         {/* Line grid texture */}
-        <div className="pointer-events-none absolute inset-0 grid-lines" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true" />
 
         {/* Subtle centre glow so the form lifts off the grid */}
         <div
