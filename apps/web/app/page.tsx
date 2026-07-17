@@ -57,7 +57,6 @@ export default function LoginPage() {
           <span className="font-display text-xl font-semibold text-overlay-foreground">
             {APP_NAME}
             <span className="text-accent mx-1">/</span>
-            design
           </span>
         </div>
 
