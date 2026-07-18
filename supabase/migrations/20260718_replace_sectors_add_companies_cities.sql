@@ -1,7 +1,42 @@
 -- ============================================================
--- drafthub — seed data
--- Run after schema.sql to populate master-data tables.
+-- Migration: Replace design sectors with industry sectors,
+--            and add seed data for companies and Indian cities.
+--
+-- Safe to run on a live DB:
+--   • Sectors not referenced by any designer_profile are deleted.
+--   • Sectors in use are kept (ON DELETE RESTRICT would block removal).
+--   • New sectors/companies/cities are inserted with ON CONFLICT DO NOTHING.
+--
+-- NOTE on FK sync:
+--   designer_profiles references cities, companies, and design_sectors
+--   via UUID foreign keys (ON DELETE RESTRICT). Renaming a city/company/
+--   sector is safe — the FK still points to the same row, so every profile
+--   automatically reflects the new name with no extra updates needed.
 -- ============================================================
+
+-- ─── Remove old design-discipline sectors that are not in use ───
+delete from design_sectors
+where name in (
+  'Product Design',
+  'UI Design',
+  'UX Design',
+  'UX Research',
+  'Interaction Design',
+  'Visual Design',
+  'Brand Design',
+  'Graphic Design',
+  'Motion Design',
+  'Design Systems',
+  'Service Design',
+  'Industrial Design',
+  'Accessibility',
+  'Design Operations',
+  'AI Design',
+  'Other'
+)
+and id not in (
+  select sector_id from designer_profiles where sector_id is not null
+);
 
 -- ─── Industry Sectors ───────────────────────────────────────
 insert into design_sectors (name) values
@@ -123,21 +158,4 @@ insert into cities (name) values
   ('Kochi'),
   ('Bhubaneswar'),
   ('Dehradun')
-on conflict (name) do nothing;
-
--- ─── Tags ───────────────────────────────────────────────────
-insert into tags (name) values
-  ('Top Talent'),
-  ('Strong Portfolio'),
-  ('UI Expert'),
-  ('UX Expert'),
-  ('Product Designer'),
-  ('Design Systems'),
-  ('Motion'),
-  ('Junior'),
-  ('Mid-Level'),
-  ('Senior'),
-  ('Needs Review'),
-  ('High Priority'),
-  ('Referral')
 on conflict (name) do nothing;

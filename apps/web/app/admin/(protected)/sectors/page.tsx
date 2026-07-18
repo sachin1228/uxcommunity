@@ -8,6 +8,7 @@ export default function SectorsPage() {
       title="Industry Sectors"
       entity="Sector"
       apiBase="/api/admin/sectors"
+      basePath="/admin/sectors"
     />
   );
 }

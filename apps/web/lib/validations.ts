@@ -55,6 +55,7 @@ export const signupStep2Schema = z.object({
 
 export const masterDataSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
+  image_url: z.string().url().optional().nullable(),
 });
 
 export const updateApplicationSchema = z.object({

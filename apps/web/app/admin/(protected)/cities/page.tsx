@@ -8,6 +8,7 @@ export default function CitiesPage() {
       title="Cities"
       entity="City"
       apiBase="/api/admin/cities"
+      basePath="/admin/cities"
     />
   );
 }
