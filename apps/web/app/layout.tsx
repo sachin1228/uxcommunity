@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, Inter, IBM_Plex_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@draft/shared";
 import "./globals.css";
 
-const display = Space_Grotesk({
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["500", "600", "700", "800"],
   variable: "--font-display",
 });
 
-const body = Inter({
+const body = Be_Vietnam_Pro({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
   variable: "--font-body",
