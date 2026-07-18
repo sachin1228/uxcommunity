@@ -129,11 +129,10 @@ export default function LoginPage() {
 
         <div className="relative z-10 max-w-sm">
           <h1 className="font-display text-3xl font-semibold leading-tight text-foreground">
-            Where design work finds its audience.
+            Where designers connect, share, and grow.
           </h1>
           <p className="mt-3 font-body text-sm text-foreground-muted">
-            Portfolios, feedback, and real opportunities — for UI/UX,
-            product, and social media designers.
+            Showcase your work, get meaningful feedback, join communities, and discover real opportunities — built for UI/UX, product, and visual designers.
           </p>
         </div>
       </section>
