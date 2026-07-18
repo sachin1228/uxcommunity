@@ -27,8 +27,10 @@ const config: Config = {
         "foreground-muted":   "var(--color-foreground-muted)",
         "foreground-subtle":  "var(--color-foreground-subtle)",
 
-        // Accent (draft/ purple brand)
-        accent:               "var(--color-accent)",
+        // Accent (draft/ orange brand)
+        // <alpha-value> is Tailwind's placeholder — replaced with the opacity
+        // fraction at build time so ring-accent/20, bg-accent/10, etc. work.
+        accent: "rgb(var(--color-accent-rgb) / <alpha-value>)",
         "accent-hover":       "var(--color-accent-hover)",
         "accent-soft":        "var(--color-accent-soft)",
         "accent-foreground":  "var(--color-accent-foreground)",

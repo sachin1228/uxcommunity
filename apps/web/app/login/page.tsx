@@ -97,7 +97,7 @@ export default function LoginPage() {
             <CornerBrackets variant="signal" />
 
             <div
-              className="pointer-events-none absolute inset-0 rounded-xl overflow-hidden grid-cross opacity-30"
+              className="pointer-events-none absolute inset-0 rounded-xl overflow-hidden opacity-30"
               aria-hidden="true"
             />
 

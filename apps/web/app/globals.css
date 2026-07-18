@@ -29,6 +29,7 @@
 
   /* Accent — draft/ orange brand */
   --color-accent:            #FF5E1F;
+  --color-accent-rgb:        255 94 31;     /* RGB channels for opacity modifiers (space-sep for modern rgb()) */
   --color-accent-hover:      #E65012;
   --color-accent-soft:       #FFE9DD;
   --color-accent-foreground: #FFFFFF;
@@ -84,6 +85,7 @@
 
     /* Accent — slightly brighter for dark-mode legibility */
     --color-accent:            #ff5e1f;
+    --color-accent-rgb:        255 94 31;     /* RGB channels for opacity modifiers (space-sep for modern rgb()) */
     --color-accent-hover:      #E65012;
     --color-accent-soft:       #262220;
     --color-accent-foreground: #FFFFFF;
@@ -149,6 +151,14 @@ body {
       linear-gradient(90deg, var(--grid-line-color) 1px, transparent 1px);
     background-size: 14px 14px;
   }
+}
+
+/* ─── Suppress browser's native blue focus ring on form elements ────── */
+/* Components apply the brand orange ring via Tailwind focus:ring-accent/20 */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

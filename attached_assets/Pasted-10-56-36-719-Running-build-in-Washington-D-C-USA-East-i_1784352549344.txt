@@ -1,0 +1,47 @@
+10:56:36.719 Running build in Washington, D.C., USA (East) – iad1
+10:56:36.720 Build machine configuration: 2 cores, 8 GB
+10:56:37.078 Cloning github.com/sachin1228/designhub (Branch: fix/input-focus-ring, Commit: 9f4a350)
+10:56:38.072 Cloning completed: 994.000ms
+10:56:38.405 Restored build cache from previous deployment (3muoLtKVZzzdxz21x5eigFdeCUG7)
+10:56:38.716 Running "vercel build"
+10:56:38.748 Vercel CLI 56.2.0
+10:56:39.315 Installing dependencies...
+10:56:44.151 
+10:56:44.151 changed 22 packages in 4s
+10:56:44.152 
+10:56:44.152 166 packages are looking for funding
+10:56:44.152   run `npm fund` for details
+10:56:44.203 Detected Next.js version: 16.2.10
+10:56:44.211 Running "npm run build"
+10:56:44.401 
+10:56:44.402 > web@0.1.0 build
+10:56:44.402 > next build
+10:56:44.402 
+10:56:45.484   Applying modifyConfig from Vercel
+10:56:45.596 ▲ Next.js 16.2.10 (Turbopack)
+10:56:45.597 
+10:56:45.600 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+10:56:45.649   Creating an optimized production build ...
+10:56:59.498 ✓ Compiled successfully in 13.4s
+10:56:59.504   Running TypeScript ...
+10:57:08.362 Failed to type check.
+10:57:08.363 
+10:57:08.365 ./tailwind.config.ts:33:17
+10:57:08.365 Type error: Type '({ opacityValue }: { opacityValue?: string; }) => string' is not assignable to type 'string | RecursiveKeyValuePair<string, string>'.
+10:57:08.365 
+10:57:08.365   31 |         // Function form lets opacity modifiers work (e.g. ring-accent/20, bg-accent/10)
+10:57:08.365   32 |         // by injecting rgba(var(--color-accent-rgb), opacityValue) when needed.
+10:57:08.366 > 33 |         accent: ({ opacityValue }: { opacityValue?: string }) =>
+10:57:08.366      |                 ^
+10:57:08.366   34 |           opacityValue !== undefined
+10:57:08.366   35 |             ? `rgba(var(--color-accent-rgb), ${opacityValue})`
+10:57:08.367   36 |             : "var(--color-accent)",
+10:57:08.429 Next.js build worker exited with code: 1 and signal: null
+10:57:08.493 npm error Lifecycle script `build` failed with error:
+10:57:08.493 npm error code 1
+10:57:08.493 npm error path /vercel/path0/apps/web
+10:57:08.494 npm error workspace web@0.1.0
+10:57:08.494 npm error location /vercel/path0/apps/web
+10:57:08.494 npm error command failed
+10:57:08.495 npm error command sh -c next build
+10:57:08.528 Error: Command "npm run build" exited with 1
