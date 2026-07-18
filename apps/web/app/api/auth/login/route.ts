@@ -34,11 +34,12 @@ export async function POST(request: NextRequest) {
 
   // ── Admin short-circuit ──────────────────────────────────────────────
   const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPasswordHash = process.env.ADMIN_PASSWORD;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
   if (
-    adminEmail && adminPasswordHash &&
+    adminEmail && adminPassword &&
     email.toLowerCase() === adminEmail.toLowerCase() &&
-    (await bcrypt.compare(password, adminPasswordHash))
+    password === adminPassword
   ) {
     const token = await createSession({ email: adminEmail, role: "admin" });
     const response = NextResponse.json({ success: true, redirect: "/admin" });
