@@ -20,10 +20,10 @@ export default async function DashboardPage() {
 
   return (
     <div>
-      <h1 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+      <h1 className="font-display text-2xl font-semibold text-foreground mb-1">
         Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
       </h1>
-      <p className="font-body text-sm text-overlay-muted">
+      <p className="font-body text-sm text-foreground-muted">
         You're in. More coming soon.
       </p>
     </div>

@@ -76,7 +76,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
   }
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+    "rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
 
   const fieldError = (key: string) =>
     fieldErrors[key]?.length ? (
@@ -92,16 +92,16 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
             <span className="text-2xl">🎉</span>
           </div>
-          <h3 className="font-display text-lg font-semibold text-overlay-foreground">
+          <h3 className="font-display text-lg font-semibold text-foreground">
             Application submitted!
           </h3>
-          <p className="font-body text-sm text-overlay-muted leading-relaxed">
+          <p className="font-body text-sm text-foreground-muted leading-relaxed">
             Thanks for applying. We'll review your portfolio and send you an
             invitation if you're approved.
           </p>
           <button
             onClick={handleClose}
-            className="mt-2 rounded-md bg-overlay-elevated px-6 py-2.5 font-body text-sm font-medium text-overlay-foreground transition-colors hover:bg-overlay-elevated/80"
+            className="mt-2 rounded-md bg-surface-raised px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised"
           >
             Close
           </button>
@@ -115,7 +115,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           )}
 
           <label className="flex flex-col gap-1.5">
-            <span className="font-body text-xs font-medium text-overlay-foreground">
+            <span className="font-body text-xs font-medium text-foreground">
               Full Name
             </span>
             <input
@@ -132,7 +132,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="font-body text-xs font-medium text-overlay-foreground">
+            <span className="font-body text-xs font-medium text-foreground">
               Email Address
             </span>
             <input
@@ -149,7 +149,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="font-body text-xs font-medium text-overlay-foreground">
+            <span className="font-body text-xs font-medium text-foreground">
               LinkedIn Profile URL
             </span>
             <input
@@ -165,7 +165,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="font-body text-xs font-medium text-overlay-foreground">
+            <span className="font-body text-xs font-medium text-foreground">
               Portfolio URL
             </span>
             <input
@@ -189,7 +189,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             {loading ? "Submitting…" : "Submit Application"}
           </button>
 
-          <p className="text-center font-body text-xs text-overlay-muted">
+          <p className="text-center font-body text-xs text-foreground-muted">
             We review every application manually. If approved, you'll receive an
             invitation by email.
           </p>

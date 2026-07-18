@@ -31,7 +31,7 @@ const STATUS_COLORS = {
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const cls = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "bg-overlay-elevated text-overlay-muted";
+  const cls = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "bg-surface-raised text-foreground-muted";
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 font-mono text-[11px] font-medium capitalize ${cls}`}>
       {status}
@@ -127,7 +127,7 @@ function DetailModal({
   }
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full";
+    "rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full";
 
   return (
     <Modal open onClose={onClose} maxWidth="max-w-2xl" hideCloseButton>
@@ -136,15 +136,15 @@ function DetailModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h2 className="font-display text-xl font-semibold text-overlay-foreground">{app.name}</h2>
+              <h2 className="font-display text-xl font-semibold text-foreground">{app.name}</h2>
               <StatusBadge status={app.status} />
             </div>
-            <p className="font-body text-sm text-overlay-muted">{app.email}</p>
-            <p className="font-mono text-xs text-overlay-muted mt-0.5">
+            <p className="font-body text-sm text-foreground-muted">{app.email}</p>
+            <p className="font-mono text-xs text-foreground-muted mt-0.5">
               Applied {new Date(app.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </p>
           </div>
-          <button onClick={onClose} className="text-overlay-muted hover:text-overlay-foreground transition-colors mt-1">
+          <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors mt-1">
             <X size={18} />
           </button>
         </div>
@@ -152,41 +152,41 @@ function DetailModal({
         {/* Links */}
         <div className="flex gap-3">
           <a href={app.linkedin_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-overlay-elevated bg-overlay px-3 py-2 font-body text-xs text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors">
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
             <ExternalLink size={13} /> LinkedIn
           </a>
           <a href={app.portfolio_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-overlay-elevated bg-overlay px-3 py-2 font-body text-xs text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors">
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
             <ExternalLink size={13} /> Portfolio
           </a>
         </div>
 
         {/* Action message */}
         {actionMsg && (
-          <div className={`rounded-md border px-4 py-3 ${actionWarning ? "border-yellow-500/30 bg-yellow-500/5" : "border-overlay-elevated bg-overlay"}`}>
-            <p className="font-body text-sm text-overlay-muted">{actionMsg}</p>
+          <div className={`rounded-md border px-4 py-3 ${actionWarning ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-surface"}`}>
+            <p className="font-body text-sm text-foreground-muted">{actionMsg}</p>
           </div>
         )}
 
         {/* Invite link — shown for approved apps */}
         {inviteLink && (
-          <div className="rounded-md border border-overlay-elevated bg-overlay p-4">
-            <p className="font-body text-xs font-medium text-overlay-foreground mb-2 flex items-center gap-1.5">
+          <div className="rounded-md border border-border bg-surface p-4">
+            <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
               <Link size={13} /> Invitation Link
             </p>
             <div className="flex items-center gap-2">
-              <p className="font-mono text-xs text-overlay-muted bg-overlay-elevated rounded px-3 py-2 flex-1 truncate select-all">
+              <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-3 py-2 flex-1 truncate select-all">
                 {inviteLink}
               </p>
               <button
                 onClick={copyLink}
-                className="flex items-center gap-1.5 rounded-md border border-overlay-elevated px-3 py-2 font-body text-xs text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors shrink-0"
+                className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
               >
                 {copied ? <CheckCheck size={13} className="text-green-400" /> : <Copy size={13} />}
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="font-body text-[11px] text-overlay-muted mt-2">
+            <p className="font-body text-[11px] text-foreground-muted mt-2">
               Share this link with the applicant to let them create their account.
             </p>
           </div>
@@ -216,7 +216,7 @@ function DetailModal({
 
         {/* Tags */}
         <div>
-          <p className="font-body text-xs font-medium text-overlay-foreground mb-2 flex items-center gap-1.5">
+          <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
             <Tag size={13} /> Internal Tags
           </p>
           <div className="flex flex-wrap gap-2">
@@ -229,7 +229,7 @@ function DetailModal({
                   className={`rounded-full px-3 py-1 font-body text-xs transition-colors ${
                     active
                       ? "bg-accent text-accent-foreground"
-                      : "border border-overlay-elevated bg-overlay text-overlay-muted hover:border-accent/40 hover:text-overlay-foreground"
+                      : "border border-border bg-surface text-foreground-muted hover:border-accent/40 hover:text-foreground"
                   }`}
                 >
                   {tag.name}
@@ -241,7 +241,7 @@ function DetailModal({
 
         {/* Review Notes */}
         <div>
-          <p className="font-body text-xs font-medium text-overlay-foreground mb-2 flex items-center gap-1.5">
+          <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
             <FileText size={13} /> Internal Review Notes
           </p>
           <textarea
@@ -256,7 +256,7 @@ function DetailModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center justify-center gap-2 rounded-md bg-overlay-elevated py-2.5 font-body text-sm font-medium text-overlay-foreground transition-colors hover:bg-overlay-elevated/80 disabled:opacity-60"
+          className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
         >
           {saving && <Spinner className="h-4 w-4" />}
           {saving ? "Saving…" : "Save Notes & Tags"}
@@ -267,7 +267,7 @@ function DetailModal({
           <div>
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-1 font-body text-xs text-overlay-muted hover:text-overlay-foreground transition-colors mb-3"
+              className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-3"
             >
               <ChevronDown size={14} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
               {history.length} previous application{history.length > 1 ? "s" : ""}
@@ -275,20 +275,20 @@ function DetailModal({
             {showHistory && (
               <div className="flex flex-col gap-2">
                 {history.map((h) => (
-                  <div key={h.id} className="rounded-lg border border-overlay-elevated bg-overlay p-3">
+                  <div key={h.id} className="rounded-lg border border-border bg-surface p-3">
                     <div className="flex items-center justify-between mb-2">
                       <StatusBadge status={h.status} />
-                      <span className="font-mono text-[11px] text-overlay-muted">
+                      <span className="font-mono text-[11px] text-foreground-muted">
                         {new Date(h.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </div>
                     <div className="flex gap-2 mb-2">
                       <a href={h.linkedin_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-accent hover:text-accent-hover">LinkedIn ↗</a>
-                      <span className="text-overlay-muted">·</span>
+                      <span className="text-foreground-muted">·</span>
                       <a href={h.portfolio_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-accent hover:text-accent-hover">Portfolio ↗</a>
                     </div>
                     {h.review_notes && (
-                      <p className="font-body text-xs text-overlay-muted italic">{h.review_notes}</p>
+                      <p className="font-body text-xs text-foreground-muted italic">{h.review_notes}</p>
                     )}
                   </div>
                 ))}
@@ -352,19 +352,19 @@ export default function AdminApplicationsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3 py-2 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
+    "rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-overlay-foreground">Applications</h1>
-        <span className="font-mono text-sm text-overlay-muted">{total} total</span>
+        <h1 className="font-display text-2xl font-semibold text-foreground">Applications</h1>
+        <span className="font-mono text-sm text-foreground-muted">{total} total</span>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 mb-6">
         <div className="relative flex-1 min-w-[200px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-overlay-muted" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
           <input
             type="text"
             value={search}
@@ -398,19 +398,19 @@ export default function AdminApplicationsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-white/10 bg-overlay-raised overflow-hidden mb-4">
+      <div className="rounded-xl border border-white/10 bg-surface overflow-hidden mb-4">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5 text-overlay-muted" />
+            <Spinner className="h-5 w-5 text-foreground-muted" />
           </div>
         ) : applications.length === 0 ? (
-          <p className="py-16 text-center font-body text-sm text-overlay-muted">No applications found.</p>
+          <p className="py-16 text-center font-body text-sm text-foreground-muted">No applications found.</p>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
                 {["Name", "Email", "Status", "Tags", "Applied", ""].map((h) => (
-                  <th key={h} className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">
+                  <th key={h} className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">
                     {h}
                   </th>
                 ))}
@@ -424,10 +424,10 @@ export default function AdminApplicationsPage() {
                   onClick={() => setSelectedApp(app)}
                 >
                   <td className="px-5 py-3.5">
-                    <p className="font-body text-sm font-medium text-overlay-foreground">{app.name}</p>
+                    <p className="font-body text-sm font-medium text-foreground">{app.name}</p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="font-body text-sm text-overlay-muted">{app.email}</p>
+                    <p className="font-body text-sm text-foreground-muted">{app.email}</p>
                   </td>
                   <td className="px-5 py-3.5">
                     <StatusBadge status={app.status} />
@@ -435,17 +435,17 @@ export default function AdminApplicationsPage() {
                   <td className="px-5 py-3.5">
                     <div className="flex flex-wrap gap-1">
                       {(app.application_tags ?? []).slice(0, 3).map((at) => (
-                        <span key={at.tag_id} className="rounded-full bg-overlay-elevated px-2 py-0.5 font-body text-[11px] text-overlay-muted">
+                        <span key={at.tag_id} className="rounded-full bg-surface-raised px-2 py-0.5 font-body text-[11px] text-foreground-muted">
                           {at.tags?.name}
                         </span>
                       ))}
                       {app.application_tags?.length > 3 && (
-                        <span className="font-mono text-[11px] text-overlay-muted">+{app.application_tags.length - 3}</span>
+                        <span className="font-mono text-[11px] text-foreground-muted">+{app.application_tags.length - 3}</span>
                       )}
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="font-mono text-[11px] text-overlay-muted whitespace-nowrap">
+                    <p className="font-mono text-[11px] text-foreground-muted whitespace-nowrap">
                       {new Date(app.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   </td>
@@ -462,21 +462,21 @@ export default function AdminApplicationsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-sm text-overlay-muted">
+          <p className="font-body text-sm text-foreground-muted">
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-overlay-elevated px-3 py-1.5 font-body text-sm text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
               <ChevronLeft size={14} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-overlay-elevated px-3 py-1.5 font-body text-sm text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
               Next <ChevronRight size={14} />
             </button>

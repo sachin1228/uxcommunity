@@ -78,20 +78,20 @@ export default function UsersPage() {
   }
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3 py-2 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:border-accent focus:ring-1 focus:ring-accent/20";
+    "rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-overlay-foreground">Users</h1>
-          <p className="font-body text-sm text-overlay-muted mt-0.5">{total} registered accounts</p>
+          <h1 className="font-display text-2xl font-semibold text-foreground">Users</h1>
+          <p className="font-body text-sm text-foreground-muted mt-0.5">{total} registered accounts</p>
         </div>
       </div>
 
       {/* Search */}
       <div className="relative mb-6 max-w-sm">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-overlay-muted" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
         <input
           type="text"
           value={search}
@@ -102,46 +102,46 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-overlay-elevated bg-overlay-raised overflow-hidden mb-4">
+      <div className="rounded-xl border border-border bg-surface overflow-hidden mb-4">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5 text-overlay-muted" />
+            <Spinner className="h-5 w-5 text-foreground-muted" />
           </div>
         ) : users.length === 0 ? (
-          <p className="py-16 text-center font-body text-sm text-overlay-muted">No users found.</p>
+          <p className="py-16 text-center font-body text-sm text-foreground-muted">No users found.</p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-overlay-elevated">
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Name</th>
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Email</th>
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Company</th>
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Joined</th>
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Status</th>
-                <th className="px-5 py-3 text-right font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Actions</th>
+              <tr className="border-b border-border">
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Name</th>
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Email</th>
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Company</th>
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Joined</th>
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3 text-right font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user, idx) => (
                 <tr
                   key={user.id}
-                  className={`${idx < users.length - 1 ? "border-b border-white/5" : ""} hover:bg-overlay-elevated/30 transition-colors`}
+                  className={`${idx < users.length - 1 ? "border-b border-white/5" : ""} hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-5 py-3.5">
-                    <p className={`font-body text-sm font-medium ${user.is_blocked ? "text-overlay-muted line-through" : "text-overlay-foreground"}`}>
+                    <p className={`font-body text-sm font-medium ${user.is_blocked ? "text-foreground-muted line-through" : "text-foreground"}`}>
                       {user.name}
                     </p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="font-body text-sm text-overlay-muted">{user.email}</p>
+                    <p className="font-body text-sm text-foreground-muted">{user.email}</p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="font-body text-sm text-overlay-muted">
+                    <p className="font-body text-sm text-foreground-muted">
                       {user.designer_profiles?.companies?.name ?? "—"}
                     </p>
                   </td>
                   <td className="px-5 py-3.5">
-                    <p className="font-mono text-[11px] text-overlay-muted whitespace-nowrap">
+                    <p className="font-mono text-[11px] text-foreground-muted whitespace-nowrap">
                       {new Date(user.created_at).toLocaleDateString("en-GB", {
                         day: "numeric", month: "short", year: "numeric",
                       })}
@@ -166,7 +166,7 @@ export default function UsersPage() {
                         className={`transition-colors disabled:opacity-40 ${
                           user.is_blocked
                             ? "text-green-500 hover:text-green-400"
-                            : "text-overlay-muted hover:text-red-400"
+                            : "text-foreground-muted hover:text-red-400"
                         }`}
                       >
                         {actionLoading === user.id + "-block"
@@ -182,7 +182,7 @@ export default function UsersPage() {
                         onClick={() => setConfirmDelete(user)}
                         disabled={!!actionLoading}
                         title="Delete user"
-                        className="text-overlay-muted hover:text-red-400 transition-colors disabled:opacity-40"
+                        className="text-foreground-muted hover:text-red-400 transition-colors disabled:opacity-40"
                       >
                         {actionLoading === user.id + "-delete"
                           ? <Spinner className="h-4 w-4" />
@@ -201,21 +201,21 @@ export default function UsersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-sm text-overlay-muted">
+          <p className="font-body text-sm text-foreground-muted">
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-overlay-elevated px-3 py-1.5 font-body text-sm text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
               <ChevronLeft size={14} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-overlay-elevated px-3 py-1.5 font-body text-sm text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
               Next <ChevronRight size={14} />
             </button>
@@ -226,19 +226,19 @@ export default function UsersPage() {
       {/* Delete confirm modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-sm rounded-xl border border-overlay-elevated bg-overlay-raised p-6 shadow-xl">
-            <h2 className="font-display text-lg font-semibold text-overlay-foreground mb-1">
+          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
+            <h2 className="font-display text-lg font-semibold text-foreground mb-1">
               Delete account?
             </h2>
-            <p className="font-body text-sm text-overlay-muted mb-6">
+            <p className="font-body text-sm text-foreground-muted mb-6">
               This will permanently remove{" "}
-              <span className="text-overlay-foreground font-medium">{confirmDelete.name}</span>{" "}
+              <span className="text-foreground font-medium">{confirmDelete.name}</span>{" "}
               ({confirmDelete.email}) and all their data. This cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-md border border-overlay-elevated py-2 font-body text-sm text-overlay-muted hover:bg-overlay-elevated transition-colors"
+                className="flex-1 rounded-md border border-border py-2 font-body text-sm text-foreground-muted hover:bg-surface-raised transition-colors"
               >
                 Cancel
               </button>

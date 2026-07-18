@@ -100,15 +100,15 @@ export function MasterDataPage({ title, entity, apiBase }: MasterDataPageProps) 
   }
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3 py-2 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
+    "rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-overlay-foreground">
+        <h1 className="font-display text-2xl font-semibold text-foreground">
           {title}
         </h1>
-        <label className="flex items-center gap-2 font-body text-sm text-overlay-muted cursor-pointer select-none">
+        <label className="flex items-center gap-2 font-body text-sm text-foreground-muted cursor-pointer select-none">
           <input
             type="checkbox"
             checked={showAll}
@@ -143,29 +143,29 @@ export function MasterDataPage({ title, entity, apiBase }: MasterDataPageProps) 
       )}
 
       {/* Table */}
-      <div className="rounded-xl border border-overlay-elevated bg-overlay-raised overflow-hidden">
+      <div className="rounded-xl border border-border bg-surface overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-5 w-5 text-overlay-muted" />
+            <Spinner className="h-5 w-5 text-foreground-muted" />
           </div>
         ) : items.length === 0 ? (
-          <p className="py-12 text-center font-body text-sm text-overlay-muted">
+          <p className="py-12 text-center font-body text-sm text-foreground-muted">
             No {entity.toLowerCase()}s yet.
           </p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-overlay-elevated">
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Name</th>
-                <th className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Status</th>
-                <th className="px-5 py-3 text-right font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">Actions</th>
+              <tr className="border-b border-border">
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Name</th>
+                <th className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3 text-right font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, idx) => (
                 <tr
                   key={item.id}
-                  className={`${idx < items.length - 1 ? "border-b border-white/5" : ""} hover:bg-overlay-elevated/30 transition-colors`}
+                  className={`${idx < items.length - 1 ? "border-b border-white/5" : ""} hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-5 py-3.5">
                     {editingId === item.id ? (
@@ -187,20 +187,20 @@ export function MasterDataPage({ title, entity, apiBase }: MasterDataPageProps) 
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="text-overlay-muted hover:text-overlay-foreground transition-colors"
+                          className="text-foreground-muted hover:text-foreground transition-colors"
                           aria-label="Cancel"
                         >
                           <X size={16} />
                         </button>
                       </div>
                     ) : (
-                      <span className={`font-body text-sm ${item.is_active ? "text-overlay-foreground" : "text-overlay-muted line-through"}`}>
+                      <span className={`font-body text-sm ${item.is_active ? "text-foreground" : "text-foreground-muted line-through"}`}>
                         {item.name}
                       </span>
                     )}
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${item.is_active ? "bg-green-500/10 text-green-400" : "bg-overlay-elevated text-overlay-muted"}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[11px] font-medium ${item.is_active ? "bg-green-500/10 text-green-400" : "bg-surface-raised text-foreground-muted"}`}>
                       {item.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
@@ -209,7 +209,7 @@ export function MasterDataPage({ title, entity, apiBase }: MasterDataPageProps) 
                       {editingId !== item.id && (
                         <button
                           onClick={() => { setEditingId(item.id); setEditName(item.name); }}
-                          className="text-overlay-muted hover:text-overlay-foreground transition-colors"
+                          className="text-foreground-muted hover:text-foreground transition-colors"
                           aria-label="Edit"
                         >
                           <Pencil size={15} />
@@ -217,7 +217,7 @@ export function MasterDataPage({ title, entity, apiBase }: MasterDataPageProps) 
                       )}
                       <button
                         onClick={() => handleToggle(item)}
-                        className={`transition-colors ${item.is_active ? "text-overlay-muted hover:text-red-400" : "text-overlay-muted hover:text-green-400"}`}
+                        className={`transition-colors ${item.is_active ? "text-foreground-muted hover:text-red-400" : "text-foreground-muted hover:text-green-400"}`}
                         aria-label={item.is_active ? "Deactivate" : "Activate"}
                         title={item.is_active ? "Deactivate" : "Activate"}
                       >
