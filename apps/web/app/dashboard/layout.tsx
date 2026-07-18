@@ -19,12 +19,9 @@ export default async function DashboardLayout({
       {/* Sidebar */}
       <aside className="fixed inset-y-0 left-0 flex w-56 flex-col border-r border-border bg-surface">
         {/* Brand */}
-        <div className="px-4 py-5 border-b border-border">
+        <div className="px-4 py-4 border-b border-border">
           <span className="font-display text-base font-semibold text-foreground">
             {APP_NAME}
-          </span>
-          <span className="block font-body text-xs text-foreground-muted mt-0.5">
-            Dashboard
           </span>
         </div>
 
