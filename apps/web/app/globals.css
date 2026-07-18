@@ -14,13 +14,13 @@
 :root {
   color-scheme: light dark;
 
-  /* Backgrounds */
-  --color-background:        #FFFFFF;
-  --color-background-subtle: #FAFAFA;
+  /* Backgrounds — light gray so white surfaces stand out */
+  --color-background:        #F2F2F4;
+  --color-background-subtle: #EBEBED;
 
-  /* Surfaces */
+  /* Surfaces — white cards/sidebar/topbar pop against the gray page */
   --color-surface:           #FFFFFF;
-  --color-surface-raised:    #F5F5F5;
+  --color-surface-raised:    #EBEBED;
 
   /* Foreground / text */
   --color-foreground:        #171717;
@@ -34,8 +34,8 @@
   --color-accent-foreground: #FFFFFF;
 
   /* Borders */
-  --color-border:            #ECECEC;
-  --color-border-subtle:     #F5F5F5;
+  --color-border:            #E0E0E2;
+  --color-border-subtle:     #EBEBED;
 
   /* Brand signal */
   --color-signal:            #C8FF5B;
