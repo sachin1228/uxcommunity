@@ -85,6 +85,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showApplyLink, setShowApplyLink] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
@@ -103,8 +104,10 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error ?? "Login failed. Please try again.");
+        setShowApplyLink(!!data.showApplyLink);
         return;
       }
+      setShowApplyLink(false);
 
       if (data.redirect) {
         router.push(data.redirect);
@@ -209,12 +212,14 @@ export default function LoginPage() {
               {error && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
                   <p className="font-body text-sm text-red-500">{error}</p>
-                  <Link
-                    href="/apply"
-                    className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
-                  >
-                    Apply for access →
-                  </Link>
+                  {showApplyLink && (
+                    <Link
+                      href="/apply"
+                      className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
+                    >
+                      Apply for access →
+                    </Link>
+                  )}
                 </div>
               )}
 

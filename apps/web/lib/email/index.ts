@@ -142,6 +142,64 @@ export async function sendInvitationEmail(
   });
 }
 
+export async function sendWelcomeEmail(
+  to: string,
+  name: string
+): Promise<void> {
+  const dashboardLink = `${getAppUrl()}/dashboard`;
+
+  await getResend().emails.send({
+    from: getFrom(),
+    to,
+    subject: `Welcome to ${APP_NAME} — you're officially in! 🎉`,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#161413;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="padding:32px 40px 0;background:#1B1918;">
+            <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
+              ${APP_NAME}<span style="color:#FF5E1F;">/</span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px;">
+            <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;color:#F5F2F0;">
+              You're officially in, ${name}!
+            </h1>
+            <p style="margin:0 0 16px;font-size:15px;color:#7B7B7B;line-height:1.6;">
+              Your ${APP_NAME} account is all set up. Welcome to a curated community of designers — we're glad to have you here.
+            </p>
+            <p style="margin:0 0 24px;font-size:15px;color:#7B7B7B;line-height:1.6;">
+              Head over to your dashboard to complete your profile, share your work, connect with fellow creatives, and discover new career opportunities.
+            </p>
+            <a href="${dashboardLink}"
+               style="display:inline-block;padding:12px 28px;background:#FF5E1F;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
+              Go to your dashboard
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #262220;">
+            <p style="margin:0;font-size:12px;color:#5A5A5A;">
+              © ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  });
+}
+
 export async function sendRejectionEmail(
   to: string,
   name: string

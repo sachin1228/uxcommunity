@@ -1,11 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { sendWelcomeEmail } from "@/lib/email";
 
 const BUCKET = "profile-avatars";
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is a safety cap)
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_SOURCES = ["dicebear", "boring-avatars", "upload"] as const;
+
+/**
+ * Mark the invitation as used (only on first completion) and send a welcome
+ * email. Using `is("used_at", null)` in the update ensures idempotency —
+ * the email is only sent when used_at transitions from null to a value.
+ */
+async function finaliseSignup(userId: string): Promise<void> {
+  const db = createServiceClient();
+
+  // Fetch user for application_id + name/email
+  const { data: user } = await db
+    .from("users")
+    .select("application_id, name, email")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!user?.application_id) return;
+
+  // Atomic: only update if used_at is still null (first-time completion guard)
+  const { data: updated } = await db
+    .from("invitations")
+    .update({ used_at: new Date().toISOString() })
+    .eq("application_id", user.application_id)
+    .is("used_at", null)
+    .select("id");
+
+  // Send welcome email only when we were the ones to set used_at
+  if (updated && updated.length > 0) {
+    try {
+      await sendWelcomeEmail(user.email, user.name);
+    } catch (emailErr) {
+      console.error("[signup/avatar] welcome email error:", emailErr);
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   let session: Awaited<ReturnType<typeof requireSession>>;
@@ -70,10 +106,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to save avatar." }, { status: 500 });
     }
 
+    // All 3 steps done — mark invitation used (idempotent) and send welcome email
+    await finaliseSignup(session.userId!);
+
     return NextResponse.json({ avatar_url: publicUrl });
   }
 
-  // ── Avatar URL selection path (DiceBear / Boring Avatars) ──
+  // ── Avatar URL selection path (DiceBear / Boring Avatars / Robohash) ──
   let body: unknown;
   try {
     body = await request.json();
@@ -103,6 +142,9 @@ export async function POST(request: NextRequest) {
     console.error("[signup/avatar] profile update error:", dbError);
     return NextResponse.json({ error: "Failed to save avatar." }, { status: 500 });
   }
+
+  // All 3 steps done — mark invitation used (idempotent) and send welcome email
+  await finaliseSignup(session.userId!);
 
   return NextResponse.json({ avatar_url });
 }

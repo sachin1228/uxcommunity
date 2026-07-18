@@ -105,6 +105,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Verify that the user has completed all 3 signup steps.
+  // An account is only fully active once a designer_profile with an avatar exists.
+  const { data: profile } = await db
+    .from("designer_profiles")
+    .select("id, avatar_url")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!profile || !profile.avatar_url) {
+    return NextResponse.json(
+      {
+        error:
+          "Your account setup is incomplete. Please finish signing up using the invitation link sent to your email.",
+        incompleteSignup: true,
+      },
+      { status: 403 }
+    );
+  }
+
   const token = await createSession({
     userId: user.id,
     email: user.email,

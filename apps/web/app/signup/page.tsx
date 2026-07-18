@@ -99,6 +99,8 @@ interface TokenState {
   error?: string;
   applicationId?: string;
   applicantEmail?: string;
+  /** When the server detects an incomplete signup, jump straight to this step. */
+  resumeStep?: 2 | 3;
 }
 
 type Step = 1 | 2 | 3 | "done";
@@ -286,8 +288,18 @@ function SignupInner() {
       .then((r) => r.json())
       .then((d) => {
         if (d.valid) {
-          setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail });
+          setTokenState({
+            status: "valid",
+            applicationId: d.applicationId,
+            applicantEmail: d.applicantEmail,
+            resumeStep: d.resumeStep,
+          });
           setStep1((prev) => ({ ...prev, email: d.applicantEmail ?? "" }));
+          // If the server detected an incomplete signup in progress, jump
+          // straight to the correct step (session cookie still valid from step 1).
+          if (d.resumeStep === 2 || d.resumeStep === 3) {
+            setStep(d.resumeStep as 2 | 3);
+          }
         } else {
           setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
         }

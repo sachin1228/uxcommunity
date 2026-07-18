@@ -39,28 +39,78 @@ export async function POST(request: NextRequest) {
 
   const db = createServiceClient();
 
-  // Validate invitation token
+  // Validate invitation token (must exist and not be expired)
   const { data: invitation } = await db
     .from("invitations")
     .select("id, expires_at, used_at, application_id")
     .eq("token", token)
     .maybeSingle();
 
-  if (!invitation || invitation.used_at || new Date(invitation.expires_at) < new Date()) {
+  if (!invitation) {
     return NextResponse.json(
       { error: "Invalid or expired invitation token." },
       { status: 400 }
     );
   }
 
-  // Check if user already exists for this application
-  const { data: existing } = await db
+  if (new Date(invitation.expires_at) < new Date()) {
+    return NextResponse.json(
+      { error: "This invitation link has expired. Please contact us." },
+      { status: 400 }
+    );
+  }
+
+  // Always check by application_id first — this is the single-account-per-invite
+  // guard and also handles resuming an incomplete signup (regardless of used_at).
+  const { data: existingUser } = await db
+    .from("users")
+    .select("id, name, email, password_hash")
+    .eq("application_id", invitation.application_id)
+    .maybeSingle();
+
+  if (existingUser) {
+    // A user already exists for this application — the invite was started before.
+    // Verify their password so they can restore the session and continue from step 2/3.
+    const passwordMatch = await bcrypt.compare(password, existingUser.password_hash);
+    if (!passwordMatch) {
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    const sessionToken = await createSession({
+      userId: existingUser.id,
+      email: existingUser.email,
+      role: "user",
+    });
+
+    const response = NextResponse.json({
+      success: true,
+      userId: existingUser.id,
+      name: existingUser.name,
+      resumed: true,
+    });
+    setSessionCookie(response, sessionToken);
+    return response;
+  }
+
+  // If used_at is set and no user exists, the link was genuinely fully used.
+  if (invitation.used_at) {
+    return NextResponse.json(
+      { error: "This invitation link has already been used." },
+      { status: 400 }
+    );
+  }
+
+  // Fresh signup — additionally guard against the same email from a different invite.
+  const { data: existingByEmail } = await db
     .from("users")
     .select("id")
     .eq("email", email.toLowerCase())
     .maybeSingle();
 
-  if (existing) {
+  if (existingByEmail) {
     return NextResponse.json(
       { error: "An account with this email already exists." },
       { status: 409 }
@@ -69,7 +119,8 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Create user
+  // Create the user — DO NOT mark used_at yet.
+  // used_at is set only after all 3 steps complete (avatar route).
   const { data: user, error: userError } = await db
     .from("users")
     .insert({
@@ -82,6 +133,36 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (userError) {
+    // Unique-violation on application_id (code 23505) means a concurrent
+    // request just created the user. Fetch that row and resume the session.
+    if ((userError as { code?: string }).code === "23505") {
+      const { data: raceUser } = await db
+        .from("users")
+        .select("id, name, email, password_hash")
+        .eq("application_id", invitation.application_id)
+        .maybeSingle();
+
+      if (raceUser) {
+        const match = await bcrypt.compare(password, raceUser.password_hash);
+        if (!match) {
+          return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
+        }
+        const sessionToken = await createSession({
+          userId: raceUser.id,
+          email: raceUser.email,
+          role: "user",
+        });
+        const resp = NextResponse.json({
+          success: true,
+          userId: raceUser.id,
+          name: raceUser.name,
+          resumed: true,
+        });
+        setSessionCookie(resp, sessionToken);
+        return resp;
+      }
+    }
+
     console.error("[signup/complete] user insert error:", userError);
     return NextResponse.json(
       { error: "Failed to create account. Please try again." },
@@ -89,13 +170,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Mark invitation as used
-  await db
-    .from("invitations")
-    .update({ used_at: new Date().toISOString() })
-    .eq("id", invitation.id);
-
-  // Start a session so Step 2 can use it
+  // Issue a session so steps 2 and 3 can use requireSession.
   const sessionToken = await createSession({
     userId: user.id,
     email: user.email,
