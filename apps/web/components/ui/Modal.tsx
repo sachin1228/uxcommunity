@@ -10,6 +10,8 @@ interface ModalProps {
   children: React.ReactNode;
   /** Max width class, default "max-w-lg" */
   maxWidth?: string;
+  /** Set true when the caller renders its own close button inside children */
+  hideCloseButton?: boolean;
 }
 
 export function Modal({
@@ -18,6 +20,7 @@ export function Modal({
   title,
   children,
   maxWidth = "max-w-lg",
+  hideCloseButton = false,
 }: ModalProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -53,23 +56,25 @@ export function Modal({
 
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl`}
+        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto`}
       >
         {title && (
           <div className="mb-6 flex items-start justify-between gap-4">
             <h2 className="font-display text-xl font-semibold text-overlay-foreground">
               {title}
             </h2>
-            <button
-              onClick={onClose}
-              className="flex-shrink-0 text-overlay-muted hover:text-overlay-foreground transition-colors"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
+            {!hideCloseButton && (
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 text-overlay-muted hover:text-overlay-foreground transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
         )}
-        {!title && (
+        {!title && !hideCloseButton && (
           <button
             onClick={onClose}
             className="absolute right-4 top-4 text-overlay-muted hover:text-overlay-foreground transition-colors"

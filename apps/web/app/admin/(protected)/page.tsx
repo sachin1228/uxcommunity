@@ -130,7 +130,7 @@ function DetailModal({
     "rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full";
 
   return (
-    <Modal open onClose={onClose} maxWidth="max-w-2xl">
+    <Modal open onClose={onClose} maxWidth="max-w-2xl" hideCloseButton>
       <div className="flex flex-col gap-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -398,7 +398,7 @@ export default function AdminApplicationsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-overlay-elevated bg-overlay-raised overflow-hidden mb-4">
+      <div className="rounded-xl border border-white/10 bg-overlay-raised overflow-hidden mb-4">
         {loading ? (
           <div className="flex justify-center py-16">
             <Spinner className="h-5 w-5 text-overlay-muted" />
@@ -408,7 +408,7 @@ export default function AdminApplicationsPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-overlay-elevated">
+              <tr className="border-b border-white/10">
                 {["Name", "Email", "Status", "Tags", "Applied", ""].map((h) => (
                   <th key={h} className="px-5 py-3 text-left font-body text-xs font-medium text-overlay-muted uppercase tracking-wider">
                     {h}
@@ -420,7 +420,7 @@ export default function AdminApplicationsPage() {
               {applications.map((app, idx) => (
                 <tr
                   key={app.id}
-                  className={`${idx < applications.length - 1 ? "border-b border-overlay-elevated/50" : ""} hover:bg-overlay-elevated/30 transition-colors cursor-pointer`}
+                  className={`${idx < applications.length - 1 ? "border-b border-white/[0.06]" : ""} hover:bg-white/[0.03] transition-colors cursor-pointer`}
                   onClick={() => setSelectedApp(app)}
                 >
                   <td className="px-5 py-3.5">
