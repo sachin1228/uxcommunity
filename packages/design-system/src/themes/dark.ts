@@ -29,7 +29,7 @@ export const darkTheme = {
   borderSubtle:      warm[700],     // #262220
 
   /** Brand signal — stays vivid in both modes */
-  signal,                           // #C8FF5B
+  signal,                           // #1289ff
 
   /** Always-dark overlay panel */
   overlay:           warm[900],     // #161413

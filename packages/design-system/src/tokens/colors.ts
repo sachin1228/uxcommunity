@@ -47,7 +47,7 @@ export const warm = {
 } as const;
 
 /** draft/ brand signal — keeps lime for contrast against orange */
-export const signal = "#C8FF5B" as const;
+export const signal = "#1289ff" as const;
 
 export const colors = {
   orange,

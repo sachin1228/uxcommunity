@@ -30,7 +30,7 @@ export const lightTheme = {
   borderSubtle:      neutral[100],  // #F5F5F5
 
   /** Brand signal */
-  signal,                           // #C8FF5B
+  signal,                           // #1289ff
 
   /** Always-dark overlay panel (brand canvas, code blocks, etc.) */
   overlay:           warm[900],     // #161413 — warm charcoal

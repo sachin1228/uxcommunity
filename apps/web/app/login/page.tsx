@@ -93,7 +93,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 flex flex-1 items-center">
-          <div className="relative w-[300px] -rotate-3 rounded-xl border border-border bg-background p-4 shadow-md">
+          <div className="relative w-[300px] -rotate-3 rounded-xl border border-border p-4 shadow-md">
             <CornerBrackets variant="signal" />
 
             <div

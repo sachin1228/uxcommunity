@@ -37,7 +37,7 @@
   --color-border-subtle:     #F5F5F5;
 
   /* Brand signal */
-  --color-signal:            #C8FF5B;
+  --color-signal:            #1289ff;
 
   /* Always-dark overlay panel (brand canvas side) */
   --color-overlay:            #161413;
@@ -92,7 +92,7 @@
     --color-border-subtle:     #262220;
 
     /* Signal stays vivid */
-    --color-signal:            #C8FF5B;
+    --color-signal:            #1289ff;
 
     /* Overlay panel — same in both modes (always dark) */
     --color-overlay:            #161413;
