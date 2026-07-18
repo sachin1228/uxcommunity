@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Eye, EyeOff, Heart } from "lucide-react";
 import { APP_NAME } from "@draft/shared";
-import { ApplicationModal } from "@/components/apply/ApplicationModal";
-import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 import { Spinner } from "@/components/ui/Spinner";
 
 function CornerBrackets({
@@ -39,21 +38,17 @@ function CornerBrackets({
 
 export default function LoginPage() {
   const router = useRouter();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [forgotOpen, setForgotOpen] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showApplyLink, setShowApplyLink] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setShowApplyLink(false);
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -66,7 +61,6 @@ export default function LoginPage() {
 
       if (!res.ok) {
         setError(data.error ?? "Login failed. Please try again.");
-        if (data.showApplyLink) setShowApplyLink(true);
         return;
       }
 
@@ -174,15 +168,12 @@ export default function LoginPage() {
               {error && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
                   <p className="font-body text-sm text-red-500">{error}</p>
-                  {showApplyLink && (
-                    <button
-                      type="button"
-                      onClick={() => setModalOpen(true)}
-                      className="mt-1 font-body text-xs text-accent underline hover:text-accent-hover"
-                    >
-                      Apply for access →
-                    </button>
-                  )}
+                  <Link
+                    href="/apply"
+                    className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
+                  >
+                    Apply for access →
+                  </Link>
                 </div>
               )}
 
@@ -206,13 +197,12 @@ export default function LoginPage() {
                   <span className="font-body text-xs font-medium text-foreground">
                     Password
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => setForgotOpen(true)}
+                  <Link
+                    href="/forgot-password"
                     className="font-body text-xs text-accent transition-colors hover:text-accent-hover"
                   >
                     Forgot password?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative">
                   <input
@@ -265,19 +255,15 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center font-body text-sm text-foreground-muted">
             New to {APP_NAME}?{" "}
-            <button
-              type="button"
-              onClick={() => setModalOpen(true)}
+            <Link
+              href="/apply"
               className="font-medium text-accent transition-colors hover:text-accent-hover"
             >
               Create an account
-            </button>
+            </Link>
           </p>
         </div>
       </section>
-
-      <ApplicationModal open={modalOpen} onClose={() => setModalOpen(false)} />
-      <ForgotPasswordModal open={forgotOpen} onClose={() => setForgotOpen(false)} />
     </main>
   );
 }
