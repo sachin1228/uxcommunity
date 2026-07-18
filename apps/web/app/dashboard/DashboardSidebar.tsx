@@ -22,8 +22,8 @@ export function DashboardSidebar() {
             prefetch={false}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
               active
-                ? "bg-overlay-elevated text-overlay-foreground"
-                : "text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated/50"
+                ? "bg-surface-raised text-foreground"
+                : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
             }`}
           >
             <Icon size={16} className={active ? "text-accent" : ""} />

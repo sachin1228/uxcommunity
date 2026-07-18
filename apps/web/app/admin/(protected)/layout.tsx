@@ -16,16 +16,16 @@ export default async function AdminProtectedLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-overlay text-overlay-foreground">
+    <div className="flex min-h-screen bg-background text-foreground">
       {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 flex w-56 flex-col border-r border-overlay-elevated bg-overlay-raised">
+      <aside className="fixed inset-y-0 left-0 flex w-56 flex-col border-r border-border bg-surface">
         {/* Brand */}
-        <div className="px-4 py-5 border-b border-overlay-elevated">
+        <div className="px-4 py-5 border-b border-border">
           <Link href="/admin" prefetch={false} className="block">
-            <span className="font-display text-base font-semibold text-overlay-foreground">
+            <span className="font-display text-base font-semibold text-foreground">
               {APP_NAME}
             </span>
-            <span className="block font-body text-xs text-overlay-muted mt-0.5">
+            <span className="block font-body text-xs text-foreground-muted mt-0.5">
               Admin Dashboard
             </span>
           </Link>
@@ -37,7 +37,7 @@ export default async function AdminProtectedLayout({
         </div>
 
         {/* Logout */}
-        <div className="px-4 py-4 border-t border-overlay-elevated">
+        <div className="px-4 py-4 border-t border-border">
           <LogoutButton />
         </div>
       </aside>

@@ -29,8 +29,8 @@ export function AdminSidebar() {
         prefetch={false}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
           pathname === "/admin"
-            ? "bg-overlay-elevated text-overlay-foreground"
-            : "text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated/50"
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
         <LayoutList size={16} className={pathname === "/admin" ? "text-accent" : ""} />
@@ -43,8 +43,8 @@ export function AdminSidebar() {
           onClick={() => setOpen((v) => !v)}
           className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
             masterDataActive
-              ? "bg-overlay-elevated text-overlay-foreground"
-              : "text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated/50"
+              ? "bg-surface-raised text-foreground"
+              : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
           }`}
         >
           <Database size={16} className={masterDataActive ? "text-accent" : ""} />
@@ -56,7 +56,7 @@ export function AdminSidebar() {
         </button>
 
         {open && (
-          <div className="mt-1 ml-3 flex flex-col gap-1 border-l border-overlay-elevated pl-3">
+          <div className="mt-1 ml-3 flex flex-col gap-1 border-l border-border pl-3">
             {MASTER_DATA.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
@@ -66,8 +66,8 @@ export function AdminSidebar() {
                   prefetch={false}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
                     active
-                      ? "bg-overlay-elevated text-overlay-foreground"
-                      : "text-overlay-muted hover:text-overlay-foreground hover:bg-overlay-elevated/50"
+                      ? "bg-surface-raised text-foreground"
+                      : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
                   }`}
                 >
                   <Icon size={15} className={active ? "text-accent" : ""} />

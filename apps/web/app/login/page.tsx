@@ -87,57 +87,42 @@ export default function LoginPage() {
     <main className="flex min-h-screen bg-background">
 
       {/* ── Brand / canvas panel ─────────────────────────────────────── */}
-      <section className="relative hidden w-[55%] flex-col justify-between overflow-hidden bg-overlay px-14 py-12 lg:flex">
+      <section className="relative hidden w-[55%] flex-col justify-between overflow-hidden bg-surface px-14 py-12 lg:flex border-r border-border">
 
         <div className="pointer-events-none absolute inset-0 grid-dots" aria-hidden="true" />
 
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(ellipse 70% 60% at 30% 50%, transparent 30%, rgba(22,20,19,0.7) 100%)",
-          }}
-          aria-hidden="true"
-        />
-
         <div className="relative z-10">
-          <span className="font-display text-xl font-semibold text-overlay-foreground">
+          <span className="font-display text-xl font-semibold text-foreground">
             {APP_NAME}
             <span className="text-accent mx-1">/</span>
           </span>
         </div>
 
         <div className="relative z-10 flex flex-1 items-center">
-          <div className="relative w-[300px] -rotate-3 rounded-xl border border-overlay-elevated bg-overlay-raised p-4 shadow-xl">
+          <div className="relative w-[300px] -rotate-3 rounded-xl border border-border bg-background p-4 shadow-md">
             <CornerBrackets variant="signal" />
 
             <div
-              className="pointer-events-none absolute inset-0 rounded-xl overflow-hidden grid-cross opacity-40"
-              style={{ "--grid-line-color": "rgba(255,255,255,0.06)" } as React.CSSProperties}
+              className="pointer-events-none absolute inset-0 rounded-xl overflow-hidden grid-cross opacity-30"
               aria-hidden="true"
             />
 
-            <div className="relative h-32 w-full overflow-hidden rounded-md bg-gradient-to-br from-accent to-[#9B320C]">
-              <div
-                className="absolute inset-0 opacity-25"
-                style={{ "--grid-line-color": "rgba(255,255,255,0.15)" } as React.CSSProperties}
-              />
-            </div>
+            <div className="relative h-32 w-full overflow-hidden rounded-md bg-gradient-to-br from-accent to-[#9B320C]" />
 
             <div className="mt-4 flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft font-body text-xs font-semibold text-accent">
                 JL
               </div>
               <div>
-                <p className="font-body text-sm font-medium text-overlay-foreground">
+                <p className="font-body text-sm font-medium text-foreground">
                   Jordan Lee
                 </p>
-                <p className="font-mono text-[11px] text-overlay-muted">
+                <p className="font-mono text-[11px] text-foreground-muted">
                   Product Designer
                 </p>
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-4 font-mono text-[11px] text-overlay-muted">
+            <div className="mt-4 flex items-center gap-4 font-mono text-[11px] text-foreground-muted">
               <span className="flex items-center gap-1">
                 <Eye size={12} /> 2.4k
               </span>
@@ -149,10 +134,10 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 max-w-sm">
-          <h1 className="font-display text-3xl font-semibold leading-tight text-overlay-foreground">
+          <h1 className="font-display text-3xl font-semibold leading-tight text-foreground">
             Where design work finds its audience.
           </h1>
-          <p className="mt-3 font-body text-sm text-overlay-muted">
+          <p className="mt-3 font-body text-sm text-foreground-muted">
             Portfolios, feedback, and real opportunities — for UI/UX,
             product, and social media designers.
           </p>
@@ -160,35 +145,35 @@ export default function LoginPage() {
       </section>
 
       {/* ── Login panel ──────────────────────────────────────────────── */}
-      <section className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-overlay px-6 py-12 lg:w-[45%]">
+      <section className="relative flex w-full flex-col items-center justify-center overflow-hidden bg-background px-6 py-12 lg:w-[45%]">
 
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 grid-dots opacity-40" aria-hidden="true" />
 
         <div className="relative z-10 mb-8 flex flex-col items-center gap-2 lg:hidden">
-          <span className="font-display text-xl font-semibold text-overlay-foreground">
+          <span className="font-display text-xl font-semibold text-foreground">
             {APP_NAME}
             <span className="text-accent">/</span>
           </span>
-          <p className="font-body text-sm text-overlay-muted">
+          <p className="font-body text-sm text-foreground-muted">
             For UI/UX, product &amp; social designers
           </p>
         </div>
 
         <div className="relative z-10 w-full max-w-sm">
-          <div className="relative overflow-hidden rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
+          <div className="relative overflow-hidden rounded-xl border border-border bg-surface p-8 shadow-sm">
             <CornerBrackets />
 
-            <h2 className="relative font-display text-2xl font-semibold text-overlay-foreground">
+            <h2 className="relative font-display text-2xl font-semibold text-foreground">
               Welcome back
             </h2>
-            <p className="relative mt-1 font-body text-sm text-overlay-muted">
+            <p className="relative mt-1 font-body text-sm text-foreground-muted">
               Log in to keep working on your portfolio.
             </p>
 
             <form className="relative mt-7 flex flex-col gap-5" onSubmit={handleLogin}>
               {error && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-                  <p className="font-body text-sm text-red-400">{error}</p>
+                  <p className="font-body text-sm text-red-500">{error}</p>
                   {showApplyLink && (
                     <button
                       type="button"
@@ -202,7 +187,7 @@ export default function LoginPage() {
               )}
 
               <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">
+                <span className="font-body text-xs font-medium text-foreground">
                   Email address
                 </span>
                 <input
@@ -210,7 +195,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setError(null); }}
                   placeholder="you@studio.com"
-                  className="rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                  className="rounded-md border border-border bg-background px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                   autoComplete="email"
                   required
                 />
@@ -218,7 +203,7 @@ export default function LoginPage() {
 
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-body text-xs font-medium text-overlay-foreground">
+                  <span className="font-body text-xs font-medium text-foreground">
                     Password
                   </span>
                   <button
@@ -235,14 +220,14 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(null); }}
                     placeholder="••••••••"
-                    className="w-full rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 pr-10 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+                    className="w-full rounded-md border border-border bg-background px-3.5 py-2.5 pr-10 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                     autoComplete="current-password"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-overlay-muted transition-colors hover:text-overlay-foreground"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted transition-colors hover:text-foreground"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -261,24 +246,24 @@ export default function LoginPage() {
             </form>
 
             <div className="relative my-6 flex items-center gap-3">
-              <span className="h-px flex-1 bg-overlay-elevated" />
-              <span className="font-mono text-[10px] uppercase tracking-wider text-overlay-muted">
+              <span className="h-px flex-1 bg-border" />
+              <span className="font-mono text-[10px] uppercase tracking-wider text-foreground-muted">
                 or continue with
               </span>
-              <span className="h-px flex-1 bg-overlay-elevated" />
+              <span className="h-px flex-1 bg-border" />
             </div>
 
             <div className="relative flex">
               <button
                 type="button"
-                className="flex-1 rounded-md border border-overlay-elevated bg-overlay py-2.5 font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated"
+                className="flex-1 rounded-md border border-border bg-background py-2.5 font-body text-sm text-foreground transition-colors hover:bg-surface-raised"
               >
                 Google
               </button>
             </div>
           </div>
 
-          <p className="mt-6 text-center font-body text-sm text-overlay-muted">
+          <p className="mt-6 text-center font-body text-sm text-foreground-muted">
             New to {APP_NAME}?{" "}
             <button
               type="button"
