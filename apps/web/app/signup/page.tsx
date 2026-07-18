@@ -332,11 +332,21 @@ function SignupInner() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.redirectToLogin) {
+          // Account is already fully set up — point to the login page.
+          setStep1Error(data.error ?? "Your account is already set up. Please log in.");
+          return;
+        }
         if (data.issues) setStep1FieldErrors(data.issues);
         else setStep1Error(data.error ?? "Failed to create account.");
         return;
       }
-      setStep(2);
+      // When resuming a partial signup the server tells us which step to jump to.
+      if (data.resumed && data.resumeStep) {
+        setStep(data.resumeStep as 2 | 3);
+      } else {
+        setStep(2);
+      }
     } catch {
       setStep1Error("Network error. Please try again.");
     } finally {
@@ -359,7 +369,17 @@ function SignupInner() {
         body: JSON.stringify(step2),
       });
       const data = await res.json();
-      if (!res.ok) { setStep2Error(data.error ?? "Failed to save profile."); return; }
+      if (!res.ok) {
+        if (res.status === 401) {
+          // Session expired while the user was on step 2. Send them back to
+          // step 1 so they can re-enter their password and get a fresh session.
+          setStep1Error("Your session expired. Please re-enter your password to continue.");
+          setStep(1);
+          return;
+        }
+        setStep2Error(data.error ?? "Failed to save profile.");
+        return;
+      }
       const options = getAvatarSourceOptions(step1.name);
       setActiveAvatarTab("dicebear");
       setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
@@ -405,7 +425,15 @@ function SignupInner() {
         fd.append("file", uploadedBlob, "avatar.jpg");
         const res  = await fetch("/api/signup/avatar", { method: "POST", body: fd });
         const data = await res.json();
-        if (!res.ok) { setStep3Error(data.error ?? "Upload failed."); return; }
+        if (!res.ok) {
+          if (res.status === 401) {
+            setStep1Error("Your session expired. Please re-enter your password to continue.");
+            setStep(1);
+            return;
+          }
+          setStep3Error(data.error ?? "Upload failed.");
+          return;
+        }
       } else if (selectedAvatar) {
         const res  = await fetch("/api/signup/avatar", {
           method: "POST",
@@ -413,7 +441,15 @@ function SignupInner() {
           body: JSON.stringify({ avatar_url: selectedAvatar.dbUrl, avatar_source: selectedAvatar.source }),
         });
         const data = await res.json();
-        if (!res.ok) { setStep3Error(data.error ?? "Failed to save avatar."); return; }
+        if (!res.ok) {
+          if (res.status === 401) {
+            setStep1Error("Your session expired. Please re-enter your password to continue.");
+            setStep(1);
+            return;
+          }
+          setStep3Error(data.error ?? "Failed to save avatar.");
+          return;
+        }
       }
       router.push("/dashboard");
     } catch {

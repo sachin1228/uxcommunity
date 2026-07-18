@@ -79,6 +79,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Work out which step they need to return to so the frontend can jump
+    // directly to the right step instead of always landing on step 2.
+    const { data: profile } = await db
+      .from("designer_profiles")
+      .select("id, avatar_url")
+      .eq("user_id", existingUser.id)
+      .maybeSingle();
+
+    const resumeStep: 2 | 3 | null = !profile ? 2 : !profile.avatar_url ? 3 : null;
+
+    if (resumeStep === null) {
+      // Signup was already fully completed — tell the user to log in normally.
+      return NextResponse.json(
+        {
+          error:
+            "Your account is already set up. Please log in using the login page.",
+          redirectToLogin: true,
+        },
+        { status: 409 }
+      );
+    }
+
     const sessionToken = await createSession({
       userId: existingUser.id,
       email: existingUser.email,
@@ -90,6 +112,7 @@ export async function POST(request: NextRequest) {
       userId: existingUser.id,
       name: existingUser.name,
       resumed: true,
+      resumeStep,
     });
     setSessionCookie(response, sessionToken);
     return response;

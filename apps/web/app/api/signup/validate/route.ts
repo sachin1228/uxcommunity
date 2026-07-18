@@ -89,7 +89,22 @@ export async function GET(request: NextRequest) {
   // This lets us show the correct step after a page refresh before step 3 completes.
   const resumeStep = await getResumeStep(db, invitation.application_id);
 
-  if (resumeStep !== "none" && resumeStep !== "complete") {
+  if (resumeStep === "complete") {
+    // All 3 steps were completed but finaliseSignup failed to set used_at (edge case).
+    // Set it now idempotently so future visits also reject cleanly.
+    await db
+      .from("invitations")
+      .update({ used_at: new Date().toISOString() })
+      .eq("id", invitation.id)
+      .is("used_at", null);
+
+    return NextResponse.json(
+      { valid: false, error: "This invitation link has already been used." },
+      { status: 410 }
+    );
+  }
+
+  if (resumeStep !== "none") {
     return NextResponse.json({
       valid: true,
       resumeStep,

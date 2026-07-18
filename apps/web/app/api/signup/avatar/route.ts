@@ -6,7 +6,17 @@ import { sendWelcomeEmail } from "@/lib/email";
 const BUCKET = "profile-avatars";
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is a safety cap)
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const ALLOWED_SOURCES = ["dicebear", "boring-avatars", "upload"] as const;
+// All avatar source values the UI can send. "upload" is handled by the
+// multipart path above and never reaches this validation, but keep it here
+// so the constant is a complete allowlist of every accepted value.
+const ALLOWED_SOURCES = [
+  "dicebear",
+  "boring-avatars",
+  "robohash",
+  "avataaars",
+  "multiavatar",
+  "upload",
+] as const;
 
 /**
  * Mark the invitation as used (only on first completion) and send a welcome
