@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     .from("users")
     .select(
       `id, name, email, is_blocked, created_at,
-       designer_profiles(id, experience_level,
+       designer_profiles(id, experience_level, avatar_url, avatar_source,
          companies(name), cities(name), design_sectors(name)
        )`,
       { count: "exact" }

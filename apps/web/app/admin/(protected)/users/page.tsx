@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 
 interface Profile {
   id: string;
   experience_level: string;
+  avatar_url?: string | null;
+  avatar_source?: string | null;
   companies: { name: string } | null;
   cities: { name: string } | null;
   design_sectors: { name: string } | null;
@@ -20,6 +23,29 @@ interface User {
   is_blocked: boolean;
   created_at: string;
   designer_profiles: Profile | null;
+}
+
+function AvatarThumb({ url, name }: { url?: string | null; name: string }) {
+  const initials = name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (!url) {
+    return (
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-overlay-elevated font-body text-[11px] font-medium text-overlay-muted select-none">
+        {initials}
+      </span>
+    );
+  }
+
+  return (
+    <span className="h-8 w-8 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-overlay-elevated">
+      <AvatarImg url={url} name={name} size={32} className="h-8 w-8 rounded-full object-cover" />
+    </span>
+  );
 }
 
 export default function UsersPage() {
@@ -103,9 +129,15 @@ export default function UsersPage() {
                   className={`${idx < users.length - 1 ? "border-b border-white/5" : ""} hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-5 py-3.5">
-                    <p className={`font-body text-sm font-medium ${user.is_blocked ? "text-foreground-muted line-through" : "text-foreground"}`}>
-                      {user.name}
-                    </p>
+                    <div className="flex items-center gap-3">
+                      <AvatarThumb
+                        url={user.designer_profiles?.avatar_url}
+                        name={user.name}
+                      />
+                      <p className={`font-body text-sm font-medium ${user.is_blocked ? "text-foreground-muted line-through" : "text-foreground"}`}>
+                        {user.name}
+                      </p>
+                    </div>
                   </td>
                   <td className="px-5 py-3.5">
                     <p className="font-body text-sm text-foreground-muted">{user.email}</p>
@@ -170,7 +202,6 @@ export default function UsersPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
