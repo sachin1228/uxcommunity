@@ -2,6 +2,55 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    await requireSession("admin");
+  } catch (e) {
+    return e as Response;
+  }
+
+  const { id } = await params;
+  const db = createServiceClient();
+
+  const { data: user, error } = await db
+    .from("users")
+    .select(`
+      id, name, email, is_blocked, created_at, application_id,
+      designer_profiles (
+        experience_level,
+        companies ( name ),
+        cities ( name ),
+        design_sectors ( name )
+      )
+    `)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[admin/users] GET error:", error);
+    return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
+  }
+  if (!user) {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+
+  // Fetch application URLs if linked
+  let application: { linkedin_url: string | null; portfolio_url: string | null } | null = null;
+  if (user.application_id) {
+    const { data: app } = await db
+      .from("applications")
+      .select("linkedin_url, portfolio_url")
+      .eq("id", user.application_id)
+      .maybeSingle();
+    application = app ?? null;
+  }
+
+  return NextResponse.json({ user, application });
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Trash2, ShieldOff, ShieldCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Profile {
@@ -22,13 +23,12 @@ interface User {
 }
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<User | null>(null);
 
   const PAGE_SIZE = 25;
 
@@ -51,31 +51,6 @@ export default function UsersPage() {
   useEffect(() => { setPage(1); }, [search]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  async function handleBlock(user: User) {
-    setActionLoading(user.id + "-block");
-    try {
-      await fetch(`/api/admin/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_blocked: !user.is_blocked }),
-      });
-      fetchUsers();
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleDelete(user: User) {
-    setActionLoading(user.id + "-delete");
-    try {
-      await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
-      setConfirmDelete(null);
-      fetchUsers();
-    } finally {
-      setActionLoading(null);
-    }
-  }
 
   const inputClass =
     "rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20";
@@ -156,40 +131,13 @@ export default function UsersPage() {
                       {user.is_blocked ? "Blocked" : "Active"}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-3">
-                      {/* Block / Unblock */}
-                      <button
-                        onClick={() => handleBlock(user)}
-                        disabled={!!actionLoading}
-                        title={user.is_blocked ? "Unblock user" : "Block user"}
-                        className={`transition-colors disabled:opacity-40 ${
-                          user.is_blocked
-                            ? "text-green-500 hover:text-green-400"
-                            : "text-foreground-muted hover:text-red-400"
-                        }`}
-                      >
-                        {actionLoading === user.id + "-block"
-                          ? <Spinner className="h-4 w-4" />
-                          : user.is_blocked
-                            ? <ShieldCheck size={16} />
-                            : <ShieldOff size={16} />
-                        }
-                      </button>
-
-                      {/* Delete */}
-                      <button
-                        onClick={() => setConfirmDelete(user)}
-                        disabled={!!actionLoading}
-                        title="Delete user"
-                        className="text-foreground-muted hover:text-red-400 transition-colors disabled:opacity-40"
-                      >
-                        {actionLoading === user.id + "-delete"
-                          ? <Spinner className="h-4 w-4" />
-                          : <Trash2 size={15} />
-                        }
-                      </button>
-                    </div>
+                  <td className="px-5 py-3.5 text-right">
+                    <button
+                      onClick={() => router.push(`/admin/users/${user.id}`)}
+                      className="rounded-md border border-border px-3 py-1 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                    >
+                      View
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -223,39 +171,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Delete confirm modal */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
-            <h2 className="font-display text-lg font-semibold text-foreground mb-1">
-              Delete account?
-            </h2>
-            <p className="font-body text-sm text-foreground-muted mb-6">
-              This will permanently remove{" "}
-              <span className="text-foreground font-medium">{confirmDelete.name}</span>{" "}
-              ({confirmDelete.email}) and all their data. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-md border border-border py-2 font-body text-sm text-foreground-muted hover:bg-surface-raised transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(confirmDelete)}
-                disabled={!!actionLoading}
-                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-red-600 py-2 font-body text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
-              >
-                {actionLoading === confirmDelete.id + "-delete"
-                  ? <Spinner className="h-4 w-4" />
-                  : null}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
