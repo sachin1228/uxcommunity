@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { APP_NAME } from "@draft/shared";
 import { Spinner } from "@/components/ui/Spinner";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
 
 const EXPERIENCE_LEVELS = [
   { value: "student", label: "Student" },
@@ -136,13 +137,34 @@ function SignupInner() {
     setStep2Loading(true);
     setStep2Error(null);
 
+    if (!step2.company_id) {
+      setStep2Error("Please select a company.");
+      setStep2Loading(false);
+      return;
+    }
+    if (!step2.city_id) {
+      setStep2Error("Please select a city.");
+      setStep2Loading(false);
+      return;
+    }
+    if (!step2.sector_id) {
+      setStep2Error("Please select an industry sector.");
+      setStep2Loading(false);
+      return;
+    }
+    if (!step2.experience_level) {
+      setStep2Error("Please select your experience level.");
+      setStep2Loading(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/signup/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          company_id: step2.company_id || null,
-          city_id: step2.city_id || null,
+          company_id: step2.company_id,
+          city_id: step2.city_id,
           sector_id: step2.sector_id,
           experience_level: step2.experience_level,
         }),
@@ -253,37 +275,59 @@ function SignupInner() {
                 </div>
               )}
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">Company <span className="text-overlay-muted">(optional)</span></span>
-                <select value={step2.company_id} onChange={(e) => setStep2((p) => ({ ...p, company_id: e.target.value }))} className={inputClass}>
-                  <option value="">Select a company</option>
-                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
+              <div className="flex flex-col gap-1.5">
+                <span className="font-body text-xs font-medium text-overlay-foreground">
+                  Company <span className="text-red-400">*</span>
+                </span>
+                <SearchableSelect
+                  options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                  value={step2.company_id}
+                  onChange={(v) => setStep2((p) => ({ ...p, company_id: v }))}
+                  placeholder="Select a company"
+                  allowOther
+                  otherLabel="Other"
+                />
+              </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">City <span className="text-overlay-muted">(optional)</span></span>
-                <select value={step2.city_id} onChange={(e) => setStep2((p) => ({ ...p, city_id: e.target.value }))} className={inputClass}>
-                  <option value="">Select a city</option>
-                  {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </label>
+              <div className="flex flex-col gap-1.5">
+                <span className="font-body text-xs font-medium text-overlay-foreground">
+                  City <span className="text-red-400">*</span>
+                </span>
+                <SearchableSelect
+                  options={cities.map((c) => ({ value: c.id, label: c.name }))}
+                  value={step2.city_id}
+                  onChange={(v) => setStep2((p) => ({ ...p, city_id: v }))}
+                  placeholder="Select a city"
+                  allowOther
+                  otherLabel="Other"
+                />
+              </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">Industry Sector <span className="text-red-400">*</span></span>
-                <select value={step2.sector_id} onChange={(e) => setStep2((p) => ({ ...p, sector_id: e.target.value }))} className={inputClass} required>
-                  <option value="">Select a sector</option>
-                  {sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </label>
+              <div className="flex flex-col gap-1.5">
+                <span className="font-body text-xs font-medium text-overlay-foreground">
+                  Industry Sector <span className="text-red-400">*</span>
+                </span>
+                <SearchableSelect
+                  options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+                  value={step2.sector_id}
+                  onChange={(v) => setStep2((p) => ({ ...p, sector_id: v }))}
+                  placeholder="Select a sector"
+                  allowOther
+                  otherLabel="Other"
+                />
+              </div>
 
-              <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">Experience Level <span className="text-red-400">*</span></span>
-                <select value={step2.experience_level} onChange={(e) => setStep2((p) => ({ ...p, experience_level: e.target.value }))} className={inputClass} required>
-                  <option value="">Select your level</option>
-                  {EXPERIENCE_LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-                </select>
-              </label>
+              <div className="flex flex-col gap-1.5">
+                <span className="font-body text-xs font-medium text-overlay-foreground">
+                  Experience Level <span className="text-red-400">*</span>
+                </span>
+                <SearchableSelect
+                  options={EXPERIENCE_LEVELS.map((l) => ({ value: l.value, label: l.label }))}
+                  value={step2.experience_level}
+                  onChange={(v) => setStep2((p) => ({ ...p, experience_level: v }))}
+                  placeholder="Select your level"
+                />
+              </div>
 
               <button type="submit" disabled={step2Loading} className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
                 {step2Loading && <Spinner className="h-4 w-4 text-white" />}

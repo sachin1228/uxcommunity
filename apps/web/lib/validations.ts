@@ -32,8 +32,8 @@ export const signupStep1Schema = z
   });
 
 export const signupStep2Schema = z.object({
-  company_id: z.string().uuid("Please select a company").optional().nullable(),
-  city_id: z.string().uuid("Please select a city").optional().nullable(),
+  company_id: z.string().uuid("Please select a company"),
+  city_id: z.string().uuid("Please select a city"),
   sector_id: z.string().uuid("Please select a design sector"),
   experience_level: z.enum([
     "student",
