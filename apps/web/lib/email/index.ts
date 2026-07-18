@@ -114,7 +114,7 @@ export async function sendInvitationEmail(
               Welcome, ${name}!
             </h1>
             <p style="margin:0 0 24px;font-size:15px;color:#7B7B7B;line-height:1.6;">
-              Your application has been approved. You're invited to create your ${APP_NAME} account and join a curated community of UI/UX, product, and social media designers.
+              Your application has been approved. You're invited to create your ${APP_NAME} account and join a curated community of designers — share your work, connect with other creatives, get feedback, and discover new career opportunities.
             </p>
             <a href="${link}"
                style="display:inline-block;padding:12px 28px;background:#FF5E1F;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
@@ -176,7 +176,7 @@ export async function sendRejectionEmail(
               Thank you for applying to ${APP_NAME}. After reviewing your portfolio, we weren't able to approve your application at this time.
             </p>
             <p style="margin:0 0 24px;font-size:15px;color:#7B7B7B;line-height:1.6;">
-              We know this is disappointing, but we genuinely encourage you to keep building. ${APP_NAME} is a curated community, and the bar keeps rising. Take some time to strengthen your case studies and portfolio — we'd love to see you reapply when you're ready.
+              We know this is disappointing, but we genuinely encourage you to keep building. ${APP_NAME} is a curated community for designers who share their work, connect with creatives, and grow their careers — and the bar keeps rising. Take some time to strengthen your case studies and portfolio; we'd love to see you reapply when you're ready.
             </p>
             <a href="${applyLink}"
                style="display:inline-block;padding:12px 28px;background:#262220;border:1px solid #3a3633;color:#F5F2F0;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">

@@ -302,7 +302,7 @@ function SignupInner() {
               You're in!
             </h2>
             <p className="font-body text-sm text-overlay-muted mb-6">
-              Your account and profile are set up. Welcome to {APP_NAME}.
+              Your account is ready. Start sharing work, connecting with creatives, and discovering new opportunities.
             </p>
             <a
               href="/"

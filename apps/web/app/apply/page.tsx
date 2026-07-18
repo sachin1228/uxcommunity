@@ -100,8 +100,7 @@ export default function ApplyPage() {
                 Application submitted!
               </h2>
               <p className="font-body text-sm text-foreground-muted leading-relaxed">
-                Thanks for applying. We'll review your portfolio and send you an
-                invitation if you're approved.
+                Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
               </p>
               <Link
                 href="/login"
@@ -116,7 +115,7 @@ export default function ApplyPage() {
                 Apply to {APP_NAME}
               </h1>
               <p className="mt-1 font-body text-sm text-foreground-muted">
-                We review every application manually. If approved, you'll get an invite by email.
+                Join a community of designers. We review every application manually — if approved, you'll get an invite by email.
               </p>
 
               <form onSubmit={handleSubmit} className="mt-7 flex flex-col gap-5">

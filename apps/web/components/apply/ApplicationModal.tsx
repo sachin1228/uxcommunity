@@ -96,8 +96,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             Application submitted!
           </h3>
           <p className="font-body text-sm text-foreground-muted leading-relaxed">
-            Thanks for applying. We'll review your portfolio and send you an
-            invitation if you're approved.
+            Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
           </p>
           <button
             onClick={handleClose}
@@ -190,8 +189,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           </button>
 
           <p className="text-center font-body text-xs text-foreground-muted">
-            We review every application manually. If approved, you'll receive an
-            invitation by email.
+            Join a curated community of designers — we review every application and send invitations to those who are approved.
           </p>
         </form>
       )}

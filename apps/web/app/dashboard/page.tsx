@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { APP_NAME } from "@draft/shared";
 
-export const metadata = { title: "Dashboard — Drafthub" };
+export const metadata = { title: `Dashboard — drafthub` };
 
 async function getUser(userId: string) {
   const db = createServiceClient();
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
         Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
       </h1>
       <p className="font-body text-sm text-foreground-muted">
-        You're in. More coming soon.
+        Your space to share work, connect with creatives, and discover new opportunities.
       </p>
     </div>
   );
