@@ -29,6 +29,12 @@ export async function GET(
     .eq("id", id)
     .maybeSingle();
 
+  // Fetch interests separately (join table)
+  const { data: interestRows } = await db
+    .from("user_interests")
+    .select("design_interests ( id, name )")
+    .eq("user_id", id);
+
   if (error) {
     console.error("[admin/users] GET error:", error);
     return NextResponse.json({ error: "Failed to fetch user." }, { status: 500 });
@@ -48,7 +54,14 @@ export async function GET(
     application = app ?? null;
   }
 
-  return NextResponse.json({ user, application });
+  const interests = (interestRows ?? [])
+    .map((r) => {
+      const di = r.design_interests as unknown as { id: string; name: string } | null;
+      return di ? { id: di.id, name: di.name } : null;
+    })
+    .filter(Boolean);
+
+  return NextResponse.json({ user, application, interests });
 }
 
 export async function PATCH(

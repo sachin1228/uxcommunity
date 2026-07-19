@@ -44,7 +44,7 @@ export function MasterDataPage({ title, entity, apiBase, basePath }: MasterDataP
       const res = await fetch(`${apiBase}?all=true`);
       if (!res.ok) { setItems([]); return; }
       const data = await res.json();
-      const rows: MasterItem[] = data.companies ?? data.cities ?? data.sectors ?? [];
+      const rows: MasterItem[] = data.companies ?? data.cities ?? data.sectors ?? data.interests ?? [];
       setItems(rows);
     } catch {
       setItems([]);

@@ -15,6 +15,11 @@ interface Profile {
   design_sectors: { name: string } | null;
 }
 
+interface Interest {
+  id: string;
+  name: string;
+}
+
 interface User {
   id: string;
   name: string;
@@ -69,6 +74,7 @@ export default function UserDetailPage() {
 
   const [user, setUser] = useState<User | null>(null);
   const [application, setApplication] = useState<Application | null>(null);
+  const [interests, setInterests] = useState<Interest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -83,6 +89,7 @@ export default function UserDetailPage() {
         const data = await res.json();
         setUser(data.user);
         setApplication(data.application ?? null);
+        setInterests(data.interests ?? []);
       } catch {
         setError("Failed to load user.");
       } finally {
@@ -242,6 +249,25 @@ export default function UserDetailPage() {
         <InfoRow label="Company" value={profile?.companies?.name ?? "—"} />
         <InfoRow label="City" value={profile?.cities?.name ?? "—"} />
         <InfoRow label="Industry Sector" value={profile?.design_sectors?.name ?? "—"} />
+        <InfoRow
+          label="Interests"
+          value={
+            interests.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {interests.map((i) => (
+                  <span
+                    key={i.id}
+                    className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-body text-xs text-accent"
+                  >
+                    {i.name}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <span className="text-foreground-muted">—</span>
+            )
+          }
+        />
         <InfoRow
           label="Experience Level"
           value={EXPERIENCE_LABELS[profile?.experience_level ?? ""] ?? profile?.experience_level ?? "—"}

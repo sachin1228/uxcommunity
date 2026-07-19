@@ -118,7 +118,7 @@ interface AvatarOption {
   seed: string;
 }
 
-interface MasterItem { id: string; name: string }
+interface MasterItem { id: string; name: string; image_url?: string | null }
 
 interface TokenState {
   status: "loading" | "valid" | "invalid";
@@ -126,10 +126,10 @@ interface TokenState {
   applicationId?: string;
   applicantEmail?: string;
   /** When the server detects an incomplete signup, jump straight to this step. */
-  resumeStep?: 2 | 3;
+  resumeStep?: 2 | 3 | 4;
 }
 
-type Step = 1 | 2 | 3 | "done";
+type Step = 1 | 2 | 3 | 4 | "done";
 
 type AvatarTab = AvatarSource;
 
@@ -284,6 +284,143 @@ function AvatarPreview({
   );
 }
 
+// ─── Interest emoji mapping (frontend-side) ──────────────────
+
+const INTEREST_EMOJIS: Record<string, string> = {
+  "UI / UX Design":     "🧑‍🎨",
+  "Product Design":     "📦",
+  "Graphic Design":     "✏️",
+  "Illustration":       "🖌️",
+  "Visual Design":      "👁️",
+  "Motion Design":      "🎬",
+  "Brand Identity":     "🏷️",
+  "Typography":         "🔤",
+  "Design Systems":     "🧩",
+  "User Research":      "🔍",
+  "Interaction Design": "🖱️",
+  "Accessibility":      "♿",
+  "Design Leadership":  "👥",
+  "Design Strategy":    "🗺️",
+  "Industrial Design":  "📐",
+  "Web Design":         "🌐",
+  "Game Design":        "🎮",
+  "Photography":        "📸",
+  "3D Design":          "🗿",
+  "Other":              "✨",
+};
+
+// ─── InterestsMultiSelect ─────────────────────────────────────
+
+interface InterestOption { id: string; name: string }
+
+function InterestsMultiSelect({
+  options,
+  selected,
+  onChange,
+}: {
+  options: InterestOption[];
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  function toggle(id: string) {
+    onChange(selected.includes(id) ? selected.filter((s) => s !== id) : [...selected, id]);
+  }
+  function remove(id: string) {
+    onChange(selected.filter((s) => s !== id));
+  }
+
+  const selectedOptions = options.filter((o) => selected.includes(o.id));
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Input area */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        className={`min-h-[42px] flex flex-wrap items-center gap-1.5 cursor-pointer rounded-md border px-3 py-2 transition-colors ${
+          open
+            ? "border-accent ring-2 ring-accent/20"
+            : "border-overlay-elevated hover:border-overlay-muted"
+        } bg-overlay`}
+      >
+        {selectedOptions.map((o) => (
+          <span
+            key={o.id}
+            className="inline-flex items-center gap-1 rounded-md bg-overlay-elevated px-2 py-0.5 font-body text-xs text-overlay-foreground"
+          >
+            {o.name}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); remove(o.id); }}
+              className="text-overlay-muted hover:text-overlay-foreground transition-colors ml-0.5"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <span className="flex-1 min-w-[80px] font-body text-sm text-overlay-muted select-none">
+          {selectedOptions.length === 0 ? "Select topics…" : ""}
+        </span>
+        <svg
+          className={`h-4 w-4 text-overlay-muted shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 20 20" fill="currentColor"
+        >
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-overlay-elevated bg-overlay shadow-xl overflow-hidden">
+          <div className="max-h-64 overflow-y-auto">
+            {options.map((option) => {
+              const isSelected = selected.includes(option.id);
+              const emoji = INTEREST_EMOJIS[option.name] ?? "🎨";
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => toggle(option.id)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-overlay-elevated transition-colors"
+                >
+                  <span className="text-base leading-none">{emoji}</span>
+                  <span className="flex-1 font-body text-sm text-overlay-foreground">
+                    {option.name}
+                  </span>
+                  <span
+                    className={`h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors ${
+                      isSelected ? "bg-accent" : "border border-overlay-muted"
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────
 
 function SignupInner() {
@@ -315,13 +452,19 @@ function SignupInner() {
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
 
-  // Step 3
+  // Step 3 — Interests
+  const [interestOptions, setInterestOptions] = useState<InterestOption[]>([]);
+  const [selectedInterestIds, setSelectedInterestIds] = useState<string[]>([]);
+  const [step3Loading, setStep3Loading] = useState(false);
+  const [step3Error,   setStep3Error]   = useState<string | null>(null);
+
+  // Step 4 — Avatar
   const [activeAvatarTab, setActiveAvatarTab] = useState<AvatarTab>("dicebear");
   const [selectedAvatar, setSelectedAvatar] = useState<AvatarOption | null>(null);
   const [uploadedBlob, setUploadedBlob] = useState<Blob | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
-  const [step3Loading, setStep3Loading] = useState(false);
-  const [step3Error,   setStep3Error]   = useState<string | null>(null);
+  const [step4Loading, setStep4Loading] = useState(false);
+  const [step4Error,   setStep4Error]   = useState<string | null>(null);
 
   const avatarSourceOptions = useMemo(() => getAvatarSourceOptions(step1.name), [step1.name]);
   const avatarTabs: { key: AvatarTab; label: string; count: number }[] = [
@@ -349,8 +492,8 @@ function SignupInner() {
           setStep1((prev) => ({ ...prev, email: d.applicantEmail ?? "", name: d.applicantName ?? "" }));
           // If the server detected an incomplete signup in progress, jump
           // straight to the correct step (session cookie still valid from step 1).
-          if (d.resumeStep === 2 || d.resumeStep === 3) {
-            setStep(d.resumeStep as 2 | 3);
+          if (d.resumeStep === 2 || d.resumeStep === 3 || d.resumeStep === 4) {
+            setStep(d.resumeStep as 2 | 3 | 4);
           }
         } else {
           setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
@@ -367,6 +510,15 @@ function SignupInner() {
       fetch("/api/data/cities")   .then((r) => r.json()).then((d) => setCities(d.cities ?? [])),
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
     ]).catch(() => {});
+  }, [step]);
+
+  // ── Load interests for step 3 ──────────────────────────────
+  useEffect(() => {
+    if (step !== 3) return;
+    fetch("/api/data/interests")
+      .then((r) => r.json())
+      .then((d) => setInterestOptions(d.interests ?? []))
+      .catch(() => {});
   }, [step]);
 
   // ── Handlers ───────────────────────────────────────────────
@@ -395,7 +547,7 @@ function SignupInner() {
       }
       // When resuming a partial signup the server tells us which step to jump to.
       if (data.resumed && data.resumeStep) {
-        setStep(data.resumeStep as 2 | 3);
+        setStep(data.resumeStep as 2 | 3 | 4);
       } else {
         setStep(2);
       }
@@ -432,13 +584,8 @@ function SignupInner() {
         setStep2Error(data.error ?? "Failed to save profile.");
         return;
       }
-      const options = getAvatarSourceOptions(step1.name);
-      setActiveAvatarTab("dicebear");
-      setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
-      setUploadedBlob(null);
-      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-      setUploadPreviewUrl(null);
       setStep3Error(null);
+      setSelectedInterestIds([]);
       setStep(3);
     } catch {
       setStep2Error("Network error. Please try again.");
@@ -447,11 +594,47 @@ function SignupInner() {
     }
   }
 
+  async function handleStep3() {
+    // interests are optional — allow continuing with none selected
+    setStep3Loading(true);
+    setStep3Error(null);
+    try {
+      const res = await fetch("/api/signup/interests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interest_ids: selectedInterestIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) {
+          setStep1Error("Your session expired. Please re-enter your password to continue.");
+          setStep(1);
+          return;
+        }
+        setStep3Error(data.error ?? "Failed to save interests.");
+        return;
+      }
+      // Set up avatar options before moving to step 4
+      const options = getAvatarSourceOptions(step1.name);
+      setActiveAvatarTab("dicebear");
+      setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
+      setUploadedBlob(null);
+      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+      setUploadPreviewUrl(null);
+      setStep4Error(null);
+      setStep(4);
+    } catch {
+      setStep3Error("Network error. Please try again.");
+    } finally {
+      setStep3Loading(false);
+    }
+  }
+
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    setStep3Error(null);
+    setStep4Error(null);
     try {
       const compressed = await compressImage(file);
       if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
@@ -459,18 +642,18 @@ function SignupInner() {
       setUploadPreviewUrl(URL.createObjectURL(compressed));
       setSelectedAvatar(null);
     } catch {
-      setStep3Error("Failed to process image. Please try a different file.");
+      setStep4Error("Failed to process image. Please try a different file.");
     }
   }
 
-  async function handleStep3() {
+  async function handleStep4() {
     // Require an avatar
     if (!uploadedBlob && !selectedAvatar) {
-      setStep3Error("Please choose an avatar or upload a photo.");
+      setStep4Error("Please choose an avatar or upload a photo.");
       return;
     }
-    setStep3Loading(true);
-    setStep3Error(null);
+    setStep4Loading(true);
+    setStep4Error(null);
     try {
       if (uploadedBlob) {
         const fd = new FormData();
@@ -483,7 +666,7 @@ function SignupInner() {
             setStep(1);
             return;
           }
-          setStep3Error(data.error ?? "Upload failed.");
+          setStep4Error(data.error ?? "Upload failed.");
           return;
         }
       } else if (selectedAvatar) {
@@ -499,15 +682,15 @@ function SignupInner() {
             setStep(1);
             return;
           }
-          setStep3Error(data.error ?? "Failed to save avatar.");
+          setStep4Error(data.error ?? "Failed to save avatar.");
           return;
         }
       }
       router.push("/dashboard");
     } catch {
-      setStep3Error("Network error. Please try again.");
+      setStep4Error("Network error. Please try again.");
     } finally {
-      setStep3Loading(false);
+      setStep4Loading(false);
     }
   }
 
@@ -516,6 +699,7 @@ function SignupInner() {
     setUploadedBlob(null);
     if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
     setUploadPreviewUrl(null);
+    setStep4Error(null);
   }
 
   // ── Shared styles ──────────────────────────────────────────
@@ -563,7 +747,7 @@ function SignupInner() {
               <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
                 Create your account
               </h2>
-              <p className="font-body text-sm text-overlay-muted mb-7">Step 1 of 3</p>
+              <p className="font-body text-sm text-overlay-muted mb-7">Step 1 of 4</p>
 
               <form onSubmit={handleStep1} className="flex flex-col gap-4">
                 {step1Error && (
@@ -642,7 +826,7 @@ function SignupInner() {
               <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
                 Complete your profile
               </h2>
-              <p className="font-body text-sm text-overlay-muted mb-7">Step 2 of 3</p>
+              <p className="font-body text-sm text-overlay-muted mb-7">Step 2 of 4</p>
 
               <form onSubmit={handleStep2} className="flex flex-col gap-4">
                 {step2Error && (
@@ -655,7 +839,7 @@ function SignupInner() {
                   <span className="font-body text-xs font-medium text-overlay-foreground">
                     Company <span className="text-red-400">*</span>
                   </span>
-                  <SearchableSelect options={companies.map((c) => ({ value: c.id, label: c.name }))}
+                  <SearchableSelect options={companies.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
                     value={step2.company_id} onChange={(v) => setStep2((p) => ({ ...p, company_id: v }))}
                     placeholder="Select a company" allowOther otherLabel="Other" />
                 </div>
@@ -664,7 +848,7 @@ function SignupInner() {
                   <span className="font-body text-xs font-medium text-overlay-foreground">
                     City <span className="text-red-400">*</span>
                   </span>
-                  <SearchableSelect options={cities.map((c) => ({ value: c.id, label: c.name }))}
+                  <SearchableSelect options={cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
                     value={step2.city_id} onChange={(v) => setStep2((p) => ({ ...p, city_id: v }))}
                     placeholder="Select a city" allowOther otherLabel="Other" />
                 </div>
@@ -673,7 +857,7 @@ function SignupInner() {
                   <span className="font-body text-xs font-medium text-overlay-foreground">
                     Industry Sector <span className="text-red-400">*</span>
                   </span>
-                  <SearchableSelect options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+                  <SearchableSelect options={sectors.map((s) => ({ value: s.id, label: s.name, imageUrl: s.image_url }))}
                     value={step2.sector_id} onChange={(v) => setStep2((p) => ({ ...p, sector_id: v }))}
                     placeholder="Select a sector" allowOther otherLabel="Other" />
                 </div>
@@ -696,17 +880,54 @@ function SignupInner() {
             </div>
           )}
 
-          {/* ── Step 3: Avatar ── */}
+          {/* ── Step 3: Interests ── */}
           {tokenState.status === "valid" && step === 3 && (
             <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
               <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
-                Choose your avatar
+                What are your design interests?
               </h2>
-              <p className="font-body text-sm text-overlay-muted mb-6">Step 3 of 3</p>
+              <p className="font-body text-sm text-overlay-muted mb-1">Step 3 of 4</p>
+              <p className="font-body text-xs text-overlay-muted mb-7">
+                Pick the topics you care about most. You can always update these later.
+              </p>
 
               {step3Error && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 mb-5">
                   <p className="font-body text-sm text-red-400">{step3Error}</p>
+                </div>
+              )}
+
+              <div className="mb-6">
+                <InterestsMultiSelect
+                  options={interestOptions}
+                  selected={selectedInterestIds}
+                  onChange={setSelectedInterestIds}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleStep3}
+                disabled={step3Loading}
+                className="w-full flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {step3Loading && <Spinner className="h-4 w-4 text-white" />}
+                {step3Loading ? "Saving…" : "Continue →"}
+              </button>
+            </div>
+          )}
+
+          {/* ── Step 4: Avatar ── */}
+          {tokenState.status === "valid" && step === 4 && (
+            <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
+              <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+                Choose your avatar
+              </h2>
+              <p className="font-body text-sm text-overlay-muted mb-6">Step 4 of 4</p>
+
+              {step4Error && (
+                <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 mb-5">
+                  <p className="font-body text-sm text-red-400">{step4Error}</p>
                 </div>
               )}
 
@@ -806,12 +1027,12 @@ function SignupInner() {
               {/* Save — required, no skip */}
               <button
                 type="button"
-                onClick={handleStep3}
-                disabled={step3Loading || (!selectedAvatar && !uploadedBlob)}
+                onClick={handleStep4}
+                disabled={step4Loading || (!selectedAvatar && !uploadedBlob)}
                 className="w-full flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {step3Loading && <Spinner className="h-4 w-4 text-white" />}
-                {step3Loading ? "Saving…" : "Save & go to dashboard →"}
+                {step4Loading && <Spinner className="h-4 w-4 text-white" />}
+                {step4Loading ? "Saving…" : "Save & go to dashboard →"}
               </button>
             </div>
           )}

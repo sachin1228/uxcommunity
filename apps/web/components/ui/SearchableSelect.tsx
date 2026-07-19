@@ -5,6 +5,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 interface Option {
   value: string;
   label: string;
+  imageUrl?: string | null;
 }
 
 interface SearchableSelectProps {
@@ -44,10 +45,11 @@ export function SearchableSelect({
 
   const showOther = allowOther && query.trim().length > 0 && filtered.length === 0;
 
-  const selectedLabel =
+  const selectedOption =
     value === otherValue && allowOther
-      ? otherLabel
-      : options.find((o) => o.value === value)?.label;
+      ? { label: otherLabel, imageUrl: null }
+      : options.find((o) => o.value === value) ?? null;
+  const selectedLabel = selectedOption?.label;
 
   const handleSelect = useCallback(
     (v: string) => {
@@ -104,7 +106,21 @@ export function SearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="truncate">{selectedLabel ?? placeholder}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {selectedOption?.imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={selectedOption.imageUrl}
+              alt=""
+              className="h-5 w-5 shrink-0 rounded object-cover"
+            />
+          ) : selectedLabel ? (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-overlay-elevated font-body text-[10px] font-semibold text-overlay-muted uppercase select-none">
+              {selectedLabel[0]}
+            </span>
+          ) : null}
+          <span className="truncate">{selectedLabel ?? placeholder}</span>
+        </span>
         <svg
           className={
             "ml-2 h-4 w-4 flex-shrink-0 text-overlay-muted transition-transform duration-150 " +
@@ -158,37 +174,55 @@ export function SearchableSelect({
             role="listbox"
             className="max-h-52 overflow-y-auto py-1"
           >
-            {filtered.map((option) => (
-              <li
-                key={option.value}
-                role="option"
-                aria-selected={value === option.value}
-                onClick={() => handleSelect(option.value)}
-                className={
-                  "flex cursor-pointer items-center gap-2 px-3.5 py-2 font-body text-sm transition-colors " +
-                  (value === option.value
-                    ? "bg-accent/10 text-accent"
-                    : "text-overlay-foreground hover:bg-overlay-elevated")
-                }
-              >
-                {value === option.value && (
-                  <svg
-                    className="h-3.5 w-3.5 flex-shrink-0 text-accent"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                      clipRule="evenodd"
+            {filtered.map((option) => {
+              const isSelected = value === option.value;
+              return (
+                <li
+                  key={option.value}
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => handleSelect(option.value)}
+                  className={
+                    "flex cursor-pointer items-center gap-2.5 px-3.5 py-2 font-body text-sm transition-colors " +
+                    (isSelected
+                      ? "bg-accent/10 text-accent"
+                      : "text-overlay-foreground hover:bg-overlay-elevated")
+                  }
+                >
+                  {/* Image or letter avatar */}
+                  {option.imageUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={option.imageUrl}
+                      alt=""
+                      className="h-5 w-5 shrink-0 rounded object-cover"
                     />
-                  </svg>
-                )}
-                <span className={value === option.value ? "" : "ml-5.5"}>{option.label}</span>
-              </li>
-            ))}
+                  ) : (
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-overlay-elevated font-body text-[10px] font-semibold uppercase text-overlay-muted select-none">
+                      {option.label[0]}
+                    </span>
+                  )}
+
+                  <span className="flex-1 truncate">{option.label}</span>
+
+                  {isSelected && (
+                    <svg
+                      className="h-3.5 w-3.5 shrink-0 text-accent"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                </li>
+              );
+            })}
 
             {showOther && (
               <li
