@@ -7,11 +7,16 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`login:${ip}`, 10, 900); // 10 per 15 min
-  if (!rl.success) {
+
+  // IP-level gate
+  const rlIp = rateLimit(`login:ip:${ip}`, 10, 900); // 10 per 15 min per IP
+  if (!rlIp.success) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },
-      { status: 429 }
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rlIp.resetAt - Date.now()) / 1000)) },
+      }
     );
   }
 
@@ -32,8 +37,20 @@ export async function POST(request: NextRequest) {
 
   const { email, password } = parsed.data;
 
+  // Per-account gate: prevents distributed brute-force (many IPs, one target)
+  const rlEmail = rateLimit(`login:email:${email.toLowerCase()}`, 20, 900); // 20 per 15 min per account
+  if (!rlEmail.success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rlEmail.resetAt - Date.now()) / 1000)) },
+      }
+    );
+  }
+
   // ── Admin short-circuit ──────────────────────────────────────────────
-  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminEmail    = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
   if (
@@ -49,7 +66,6 @@ export async function POST(request: NextRequest) {
 
   const db = createServiceClient();
 
-  // Look up user
   const { data: user } = await db
     .from("users")
     .select("id, name, email, password_hash, application_id, is_blocked")
@@ -57,33 +73,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (!user) {
-    // Check if there's a pending or rejected application to give a useful message
-    const { data: app } = await db
-      .from("applications")
-      .select("status")
-      .eq("applicant_email", email.toLowerCase())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (app?.status === "pending") {
-      return NextResponse.json(
-        { error: "Your application is still under review." },
-        { status: 403 }
-      );
-    }
-    if (app?.status === "rejected") {
-      return NextResponse.json(
-        {
-          error:
-            "Your application wasn't approved this time. You're welcome to improve your portfolio and apply again.",
-          showApplyLink: true,
-        },
-        { status: 403 }
-      );
-    }
-
-    // Generic error to avoid user enumeration
+    // Generic error — do NOT query the applications table here, that
+    // would reveal whether the email was used to apply (user enumeration).
     return NextResponse.json(
       { error: "Invalid email or password." },
       { status: 401 }
@@ -105,8 +96,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verify that the user has completed all 3 signup steps.
-  // An account is only fully active once a designer_profile with an avatar exists.
   const { data: profile } = await db
     .from("designer_profiles")
     .select("id, avatar_url")

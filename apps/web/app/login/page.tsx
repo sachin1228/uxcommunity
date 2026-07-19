@@ -290,11 +290,16 @@ export default function LoginPage() {
             </div>
 
             <div className="relative flex">
+              {/* L-1: Google OAuth not yet implemented — disabled to avoid misleading users */}
               <button
                 type="button"
-                className="flex-1 rounded-md border border-border bg-background py-2.5 font-body text-sm text-foreground transition-colors hover:bg-surface-raised"
+                disabled
+                className="flex-1 rounded-md border border-border bg-background py-2.5 font-body text-sm text-foreground-muted cursor-not-allowed opacity-50"
               >
-                Google
+                Google{" "}
+                <span className="font-mono text-[10px] tracking-wide">
+                  (coming soon)
+                </span>
               </button>
             </div>
           </div>

@@ -25,7 +25,10 @@ export async function POST(request: NextRequest) {
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      { status: 429 }
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      }
     );
   }
 
@@ -74,27 +77,44 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Atomic token claim (C-3: fix TOCTOU race) ───────────────────────
+  // Mark the token as used BEFORE updating the password. The IS NULL guard
+  // ensures only one concurrent request can win; if another request already
+  // claimed it, we return 410 without touching the password.
+  const { data: claimed } = await db
+    .from("password_resets")
+    .update({ used_at: new Date().toISOString() })
+    .eq("id", reset.id)
+    .is("used_at", null)
+    .select("id");
+
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json(
+      { error: "This reset link has already been used. Please request a new one." },
+      { status: 410 }
+    );
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Update password
   const { error: updateError } = await db
     .from("users")
     .update({ password_hash: passwordHash })
     .eq("id", reset.user_id);
 
   if (updateError) {
+    // Roll back the used_at claim so the user can retry
+    await db
+      .from("password_resets")
+      .update({ used_at: null })
+      .eq("id", reset.id);
+
     console.error("[reset-confirm] update error:", updateError);
     return NextResponse.json(
       { error: "Failed to update password. Please try again." },
       { status: 500 }
     );
   }
-
-  // Mark token as used
-  await db
-    .from("password_resets")
-    .update({ used_at: new Date().toISOString() })
-    .eq("id", reset.id);
 
   return NextResponse.json({ success: true });
 }

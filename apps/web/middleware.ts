@@ -25,9 +25,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Protect /dashboard/* — must be logged-in user
+  // Protect /dashboard/* — must be authenticated (any role)
+  // L-6: was `role !== "user"` which wrongly blocked admins from /dashboard
   if (pathname.startsWith("/dashboard")) {
-    if (!session || session.role !== "user") {
+    if (!session) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       return NextResponse.redirect(url);

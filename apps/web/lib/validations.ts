@@ -25,6 +25,8 @@ export const signupStep1Schema = z
       .regex(/[A-Z]/, "Must contain at least one uppercase letter")
       .regex(/[0-9]/, "Must contain at least one number"),
     confirm_password: z.string(),
+    // L-2: token validated here so the route uses parsed.data.token, not a raw cast
+    token: z.string().min(1, "Invitation token is required"),
   })
   .refine((d) => d.password === d.confirm_password, {
     message: "Passwords do not match",

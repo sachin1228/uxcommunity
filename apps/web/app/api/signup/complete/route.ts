@@ -11,7 +11,10 @@ export async function POST(request: NextRequest) {
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
-      { status: 429 }
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+      }
     );
   }
 
@@ -30,12 +33,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { name, email, password } = parsed.data;
-  const { token } = (body as { token?: string });
-
-  if (!token) {
-    return NextResponse.json({ error: "Invitation token is required." }, { status: 400 });
-  }
+  // L-2: token is now part of the schema — use the validated value, not a raw cast
+  const { name, email, password, token } = parsed.data;
 
   const db = createServiceClient();
 

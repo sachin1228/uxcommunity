@@ -8,6 +8,24 @@ const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_SOURCES = ["dicebear", "boring-avatars", "robohash", "avataaars", "multiavatar", "upload"] as const;
 
+// M-4: allowlist of trusted avatar provider domains — reject any other URL
+const ALLOWED_AVATAR_DOMAINS = new Set([
+  "api.dicebear.com",
+  "source.boringavatars.com",
+  "robohash.org",
+  "api.avataaars.io",
+  "api.multiavatar.com",
+]);
+
+function isAllowedAvatarUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return ALLOWED_AVATAR_DOMAINS.has(hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Mark the invitation as used (only on first completion) and send a welcome
  * email. Using `is("used_at", null)` in the update ensures idempotency —
@@ -130,6 +148,10 @@ export async function POST(request: NextRequest) {
   }
   if (!avatar_source || !ALLOWED_SOURCES.includes(avatar_source as never)) {
     return NextResponse.json({ error: "Invalid avatar_source." }, { status: 422 });
+  }
+  // M-4: reject URLs not from an approved provider domain (SSRF / phishing prevention)
+  if (!isAllowedAvatarUrl(avatar_url)) {
+    return NextResponse.json({ error: "Avatar URL domain is not permitted." }, { status: 422 });
   }
 
   const db = createServiceClient();
