@@ -216,7 +216,7 @@ export function CommunitiesPanel() {
       </Link>
 
       {/* Divider */}
-      <div className="mx-3 mb-1 border-t border-border" />
+      <div className="mx-3 mb-1" />
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">

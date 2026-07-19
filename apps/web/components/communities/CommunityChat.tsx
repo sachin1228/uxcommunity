@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Send, Users, ArrowLeft, Clock, CheckCheck } from "lucide-react";
+import { Users, ArrowLeft, Clock, CheckCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
 
@@ -273,10 +273,10 @@ export function CommunityChat({
             {grouped.map((group) => (
               <div key={group.date}>
                 {/* Date divider */}
-                <div className="flex items-center gap-3 py-3">
-                  <div className="flex-1 h-px bg-border" />
-                  <span className="font-body text-[10px] text-foreground-muted px-2">{group.date}</span>
-                  <div className="flex-1 h-px bg-border" />
+                <div className="flex items-center justify-center py-3">
+                  <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                    {group.date}
+                  </span>
                 </div>
 
                 {group.messages.map((msg, i) => {
@@ -329,7 +329,7 @@ export function CommunityChat({
                             {sender.name}
                           </p>
                         )}
-                        <div className="rounded-2xl rounded-tl-sm bg-surface-raised border border-border px-3 py-2">
+                        <div className="rounded-2xl rounded-tl-sm bg-surface-raised shadow-sm px-3 py-2">
                           <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">{msg.content}</p>
                         </div>
                         <p className="font-mono text-[10px] text-foreground-muted mt-0.5 ml-0.5">
@@ -344,12 +344,12 @@ export function CommunityChat({
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
-          <div className="px-5 py-3 border-t border-border bg-surface shrink-0">
+          {/* Floating Input */}
+          <div className="px-4 pb-4 pt-2 shrink-0">
             {error && (
-              <p className="font-body text-xs text-red-400 mb-2">{error}</p>
+              <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
             )}
-            <div className="relative flex items-end">
+            <div className="flex items-center gap-2 bg-surface-raised rounded-2xl shadow-md px-4 h-[52px]">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -357,23 +357,22 @@ export function CommunityChat({
                 onKeyDown={handleKeyDown}
                 placeholder={`Message ${community.name}…`}
                 rows={1}
-                className="w-full resize-none rounded-xl border border-border bg-surface-raised px-4 py-2.5 font-body text-sm text-foreground placeholder:text-foreground-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors max-h-32 overflow-y-auto"
-                style={{ lineHeight: "1.5", paddingRight: input.trim() ? "3rem" : "1rem", transition: "padding 0.15s ease" }}
+                className="flex-1 resize-none bg-transparent font-body text-sm text-foreground placeholder:text-foreground-muted outline-none max-h-32 overflow-y-auto"
+                style={{ lineHeight: "1.5" }}
               />
               {input.trim() && (
                 <button
                   onClick={handleSend}
                   disabled={sending}
-                  className="absolute right-2 bottom-1.5 h-7 w-7 flex items-center justify-center rounded-lg bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
                 >
-                  <Send size={14} />
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-[15px] h-[15px]" style={{ marginLeft: "1px" }}>
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
                 </button>
               )}
             </div>
-            <p className="font-body text-[10px] text-foreground-muted mt-1.5 ml-1">
-              Enter to send · Shift+Enter for new line
-            </p>
           </div>
         </div>
 

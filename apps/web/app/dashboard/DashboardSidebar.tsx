@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare } from "lucide-react";
+import { Home, MessagesSquare } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard",            label: "Home",        icon: Home          },
-  { href: "/dashboard/communities", label: "Communities", icon: MessageSquare },
+  { href: "/dashboard/communities", label: "Communities", icon: MessagesSquare },
 ];
 
 export function DashboardSidebar() {
@@ -25,7 +25,7 @@ export function DashboardSidebar() {
             href={href}
             prefetch={false}
             title={label}
-            className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${
+            className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
               active
                 ? "bg-surface-raised text-accent"
                 : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"

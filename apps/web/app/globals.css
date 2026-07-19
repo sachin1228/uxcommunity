@@ -161,6 +161,42 @@ select:focus-visible {
   outline: none;
 }
 
+/* ─── Custom scrollbar ───────────────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255 255 255 / 0.12) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(255 255 255 / 0.12);
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255 255 255 / 0.22);
+}
+
+@media (prefers-color-scheme: light) {
+  * {
+    scrollbar-color: rgba(0 0 0 / 0.12) transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(0 0 0 / 0.12);
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(0 0 0 / 0.22);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
