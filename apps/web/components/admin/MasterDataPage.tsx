@@ -18,9 +18,13 @@ interface MasterDataPageProps {
   entity: string;
   apiBase: string;
   basePath: string;
+  /** Key to pull the array from the API response. Defaults to auto-detect. */
+  responseKey?: string;
+  /** Hides the Add button and empty-state CTA (for fixed enums like experience levels). */
+  readOnly?: boolean;
 }
 
-export function MasterDataPage({ title, entity, apiBase, basePath }: MasterDataPageProps) {
+export function MasterDataPage({ title, entity, apiBase, basePath, responseKey, readOnly }: MasterDataPageProps) {
   const router = useRouter();
   const [items, setItems] = useState<MasterItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +48,9 @@ export function MasterDataPage({ title, entity, apiBase, basePath }: MasterDataP
       const res = await fetch(`${apiBase}?all=true`);
       if (!res.ok) { setItems([]); return; }
       const data = await res.json();
-      const rows: MasterItem[] = data.companies ?? data.cities ?? data.sectors ?? data.interests ?? [];
+      const rows: MasterItem[] = responseKey
+        ? (data[responseKey] ?? [])
+        : (data.companies ?? data.cities ?? data.sectors ?? data.interests ?? data.experience_levels ?? []);
       setItems(rows);
     } catch {
       setItems([]);
@@ -135,13 +141,15 @@ export function MasterDataPage({ title, entity, apiBase, basePath }: MasterDataP
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
-        <button
-          onClick={openModal}
-          className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-        >
-          <Plus size={13} />
-          Add {entity}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={openModal}
+            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+          >
+            <Plus size={13} />
+            Add {entity}
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -191,9 +199,11 @@ export function MasterDataPage({ title, entity, apiBase, basePath }: MasterDataP
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
             <p className="font-body text-xs text-foreground-muted">No {entity.toLowerCase()}s yet.</p>
-            <button onClick={openModal} className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors">
-              <Plus size={13} />Add your first {entity.toLowerCase()}
-            </button>
+            {!readOnly && (
+              <button onClick={openModal} className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors">
+                <Plus size={13} />Add your first {entity.toLowerCase()}
+              </button>
+            )}
           </div>
         ) : filtered.length === 0 ? (
           <p className="py-10 text-center font-body text-xs text-foreground-muted">No results for &quot;{search}&quot;</p>

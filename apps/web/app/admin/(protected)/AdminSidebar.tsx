@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles } from "lucide-react";
+import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp } from "lucide-react";
 
 const MASTER_DATA = [
-  { href: "/admin/users",     label: "Users",     icon: Users     },
-  { href: "/admin/companies", label: "Companies", icon: Building2 },
-  { href: "/admin/cities",    label: "Cities",    icon: MapPin    },
-  { href: "/admin/sectors",   label: "Industry",  icon: Layers    },
-  { href: "/admin/interests", label: "Interests", icon: Sparkles  },
+  { href: "/admin/users",             label: "Users",             icon: Users     },
+  { href: "/admin/companies",         label: "Companies",         icon: Building2 },
+  { href: "/admin/cities",            label: "Cities",            icon: MapPin    },
+  { href: "/admin/sectors",           label: "Industry",          icon: Layers    },
+  { href: "/admin/interests",         label: "Interests",         icon: Sparkles  },
+  { href: "/admin/experience-levels", label: "Experience", icon: TrendingUp },
 ];
 
 export function AdminSidebar() {

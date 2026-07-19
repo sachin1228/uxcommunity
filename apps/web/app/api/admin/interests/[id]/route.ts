@@ -17,12 +17,12 @@ export async function GET(
   const db = createServiceClient();
   const { data, error } = await db
     .from("design_interests")
-    .select("id, name, is_active, created_at, updated_at")
+    .select("id, name, image_url, is_active, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: "Failed to fetch interest." }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Interest not found." }, { status: 404 });
-  return NextResponse.json({ interest: { ...data, image_url: null } });
+  return NextResponse.json({ interest: data });
 }
 
 export async function PATCH(
@@ -38,13 +38,12 @@ export async function PATCH(
       { status: 422 }
     );
   }
-  const { image_url: _img, ...updateData } = parsed.data;
   const db = createServiceClient();
   const { data, error } = await db
     .from("design_interests")
-    .update(updateData)
+    .update(parsed.data)
     .eq("id", id)
-    .select()
+    .select("id, name, image_url, is_active, created_at, updated_at")
     .single();
   if (error) {
     if (error.code === "23505") {
@@ -52,7 +51,7 @@ export async function PATCH(
     }
     return NextResponse.json({ error: "Failed to update interest." }, { status: 500 });
   }
-  return NextResponse.json({ interest: { ...data, image_url: null } });
+  return NextResponse.json({ interest: data });
 }
 
 export async function DELETE(

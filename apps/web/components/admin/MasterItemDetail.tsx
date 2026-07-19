@@ -19,6 +19,8 @@ interface MasterItemDetailProps {
   apiBase: string;
   listPath: string;
   responseKey: string;
+  /** Hides Deactivate and Delete actions (for fixed enums like experience levels). */
+  readOnly?: boolean;
 }
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -37,7 +39,7 @@ function fmt(iso: string) {
   });
 }
 
-export function MasterItemDetail({ entity, apiBase, listPath, responseKey }: MasterItemDetailProps) {
+export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readOnly }: MasterItemDetailProps) {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
@@ -306,47 +308,51 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey }: Mas
           </div>
         </div>
 
-        {/* Toggle active */}
-        <div className="flex items-center justify-between px-5 py-3.5">
-          <div>
-            <p className="font-body text-xs font-medium text-foreground">
-              {item.is_active ? `Deactivate ${entity}` : `Activate ${entity}`}
-            </p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
-              {item.is_active
-                ? "Hide from dropdowns — existing profiles keep their reference"
-                : "Make available again in dropdowns"}
-            </p>
+        {/* Toggle active — hidden for read-only entities (e.g. experience levels) */}
+        {!readOnly && (
+          <div className="flex items-center justify-between px-5 py-3.5">
+            <div>
+              <p className="font-body text-xs font-medium text-foreground">
+                {item.is_active ? `Deactivate ${entity}` : `Activate ${entity}`}
+              </p>
+              <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+                {item.is_active
+                  ? "Hide from dropdowns — existing profiles keep their reference"
+                  : "Make available again in dropdowns"}
+              </p>
+            </div>
+            <button
+              onClick={handleToggle}
+              disabled={toggleLoading}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-body text-xs font-medium transition-colors disabled:opacity-60 ${
+                item.is_active
+                  ? "border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                  : "border-green-500/30 text-green-400 hover:bg-green-500/10"
+              }`}
+            >
+              {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              {item.is_active ? "Deactivate" : "Activate"}
+            </button>
           </div>
-          <button
-            onClick={handleToggle}
-            disabled={toggleLoading}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-body text-xs font-medium transition-colors disabled:opacity-60 ${
-              item.is_active
-                ? "border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
-                : "border-green-500/30 text-green-400 hover:bg-green-500/10"
-            }`}
-          >
-            {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
-            {item.is_active ? "Deactivate" : "Activate"}
-          </button>
-        </div>
+        )}
 
-        {/* Delete */}
-        <div className="flex items-center justify-between px-5 py-3.5">
-          <div>
-            <p className="font-body text-xs font-medium text-red-400">Delete {entity}</p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
-              Permanently removed. Blocked if linked to a designer profile.
-            </p>
+        {/* Delete — hidden for read-only entities (e.g. experience levels) */}
+        {!readOnly && (
+          <div className="flex items-center justify-between px-5 py-3.5">
+            <div>
+              <p className="font-body text-xs font-medium text-red-400">Delete {entity}</p>
+              <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+                Permanently removed. Blocked if linked to a designer profile.
+              </p>
+            </div>
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
           </div>
-          <button
-            onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
-          >
-            <Trash2 size={12} /> Delete
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Delete confirm modal */}

@@ -286,7 +286,7 @@ function AvatarPreview({
 
 // ─── Interest emoji mapping (frontend-side) ──────────────────
 
-const INTEREST_EMOJIS: Record<string, string> = {
+export const INTEREST_EMOJIS: Record<string, string> = {
   "UI / UX Design":     "🧑‍🎨",
   "Product Design":     "📦",
   "Graphic Design":     "✏️",
@@ -309,9 +309,27 @@ const INTEREST_EMOJIS: Record<string, string> = {
   "Other":              "✨",
 };
 
+// ─── InterestIcon: shows uploaded image, falls back to emoji ──
+
+function InterestIcon({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+  const [failed, setFailed] = useState(false);
+  const emoji = INTEREST_EMOJIS[name] ?? "🎨";
+  if (imageUrl && !failed) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        className="h-5 w-5 rounded object-cover shrink-0"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return <span className="text-base leading-none">{emoji}</span>;
+}
+
 // ─── InterestsMultiSelect ─────────────────────────────────────
 
-interface InterestOption { id: string; name: string }
+interface InterestOption { id: string; name: string; image_url?: string | null }
 
 function InterestsMultiSelect({
   options,
@@ -388,7 +406,6 @@ function InterestsMultiSelect({
           <div className="max-h-64 overflow-y-auto">
             {options.map((option) => {
               const isSelected = selected.includes(option.id);
-              const emoji = INTEREST_EMOJIS[option.name] ?? "🎨";
               return (
                 <button
                   key={option.id}
@@ -396,7 +413,7 @@ function InterestsMultiSelect({
                   onClick={() => toggle(option.id)}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-overlay-elevated transition-colors"
                 >
-                  <span className="text-base leading-none">{emoji}</span>
+                  <InterestIcon imageUrl={option.image_url} name={option.name} />
                   <span className="flex-1 font-body text-sm text-overlay-foreground">
                     {option.name}
                   </span>
@@ -448,6 +465,7 @@ function SignupInner() {
   const [companies, setCompanies] = useState<MasterItem[]>([]);
   const [cities,    setCities]    = useState<MasterItem[]>([]);
   const [sectors,   setSectors]   = useState<MasterItem[]>([]);
+  const [experienceLevels, setExperienceLevels] = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
   const [step2, setStep2] = useState({ company_id: "", city_id: "", sector_id: "", experience_level: "" });
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
@@ -509,6 +527,7 @@ function SignupInner() {
       fetch("/api/data/companies").then((r) => r.json()).then((d) => setCompanies(d.companies ?? [])),
       fetch("/api/data/cities")   .then((r) => r.json()).then((d) => setCities(d.cities ?? [])),
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
+      fetch("/api/data/experience-levels").then((r) => r.json()).then((d) => setExperienceLevels(d.experience_levels ?? [])),
     ]).catch(() => {});
   }, [step]);
 
@@ -686,6 +705,8 @@ function SignupInner() {
           return;
         }
       }
+      // Auto-join communities based on city / sector / interests (fire-and-forget)
+      fetch("/api/communities/auto-join", { method: "POST" }).catch(() => {});
       router.push("/dashboard");
     } catch {
       setStep4Error("Network error. Please try again.");
@@ -866,7 +887,8 @@ function SignupInner() {
                   <span className="font-body text-xs font-medium text-overlay-foreground">
                     Experience Level <span className="text-red-400">*</span>
                   </span>
-                  <SearchableSelect options={EXPERIENCE_LEVELS.map((l) => ({ value: l.value, label: l.label }))}
+                  <SearchableSelect
+                    options={experienceLevels.map((l) => ({ value: l.slug, label: l.label, imageUrl: l.image_url }))}
                     value={step2.experience_level} onChange={(v) => setStep2((p) => ({ ...p, experience_level: v }))}
                     placeholder="Select your level" />
                 </div>

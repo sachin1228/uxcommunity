@@ -11,15 +11,14 @@ export async function GET(request: NextRequest) {
 
   let query = db
     .from("design_interests")
-    .select("id, name, is_active, created_at, updated_at")
+    .select("id, name, image_url, is_active, created_at, updated_at")
     .order("name");
 
   if (!showAll) query = query.eq("is_active", true);
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Failed to fetch interests" }, { status: 500 });
-  // Return with image_url: null so MasterDataPage renders correctly
-  return NextResponse.json({ interests: data?.map((r) => ({ ...r, image_url: null })) ?? [] });
+  return NextResponse.json({ interests: data ?? [] });
 }
 
 export async function POST(request: NextRequest) {
