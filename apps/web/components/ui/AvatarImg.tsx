@@ -54,7 +54,7 @@ export function AvatarImg({
     );
   }
 
-  // Standard URL (DiceBear, Robohash, uploaded file)
+  // Standard URL (DiceBear, Robohash, Avataaars, uploaded file)
   // eslint-disable-next-line @next/next/no-img-element
   return (
     <img

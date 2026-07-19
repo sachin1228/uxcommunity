@@ -22,7 +22,6 @@ export const signupStep1Schema = z
     password: z
       .string()
       .min(8, "Password must be at least 8 characters")
-      .regex(/[A-Z]/, "Must contain at least one uppercase letter")
       .regex(/[0-9]/, "Must contain at least one number"),
     confirm_password: z.string(),
     // L-2: token validated here so the route uses parsed.data.token, not a raw cast
