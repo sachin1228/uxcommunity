@@ -116,7 +116,7 @@ export default function CommunitiesIndexPage() {
       {/* Header */}
       <div className="px-6 pt-6 pb-0 shrink-0">
         <h1 className="font-display text-xl font-semibold text-foreground mb-4">
-          Find communities
+          Explore Communities
         </h1>
 
         {/* Search */}
@@ -142,7 +142,7 @@ export default function CommunitiesIndexPage() {
               <button
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
-                className={`relative shrink-0 flex items-center gap-2 px-4 py-2.5 font-body text-sm font-normal transition-colors ${
+                className={`relative shrink-0 flex items-center gap-2 px-4 py-2.5 font-body text-xs font-normal transition-colors ${
                   isActive
                     ? "text-accent"
                     : "text-foreground-muted hover:text-foreground"

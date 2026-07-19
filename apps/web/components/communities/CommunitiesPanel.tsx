@@ -202,7 +202,7 @@ export function CommunitiesPanel() {
 
   return (
     <div className="flex flex-col h-full w-72 shrink-0 border-r border-border bg-surface">
-      {/* Find communities button */}
+      {/* Explore communities button */}
       <Link
         href="/dashboard/communities"
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors ${
@@ -212,7 +212,7 @@ export function CommunitiesPanel() {
         }`}
       >
         <Search size={13} />
-        Find &amp; all communities
+        Explore Communities
       </Link>
 
       {/* Divider */}
