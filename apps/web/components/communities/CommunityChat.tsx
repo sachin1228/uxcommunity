@@ -165,6 +165,10 @@ export function CommunityChat({
     };
     setMessages((prev) => [...prev, optimistic]);
     setInput("");
+    // Reset textarea height back to single line
+    if (inputRef.current) {
+      inputRef.current.style.height = "24px";
+    }
     inputRef.current?.focus();
 
     try {
@@ -357,16 +361,21 @@ export function CommunityChat({
             {error && (
               <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
             )}
-            <div className="flex items-center gap-2 bg-surface-raised rounded-2xl shadow-md px-4 h-[52px]">
+            <div className="flex items-end gap-2 bg-surface-raised rounded-2xl shadow-md px-4 py-3 min-h-[52px]">
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  // Auto-resize: reset height first so shrinking works
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={`Message ${community.name}…`}
                 rows={1}
-                className="flex-1 resize-none bg-transparent font-body text-sm text-foreground placeholder:text-foreground-muted outline-none max-h-32 overflow-y-auto"
-                style={{ lineHeight: "1.5" }}
+                className="flex-1 resize-none bg-transparent font-body text-sm text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
+                style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
               />
               {input.trim() && (
                 <button
