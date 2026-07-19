@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Users, ArrowLeft, Clock, CheckCheck } from "lucide-react";
+import { Users, Clock, CheckCheck, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
 
@@ -74,11 +74,23 @@ export function CommunityChat({
   const [loading, setLoading] = useState(true);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [showMembers, setShowMembers] = useState(false);
+  const [showMembersDropdown, setShowMembersDropdown] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const membersDropdownRef = useRef<HTMLDivElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (membersDropdownRef.current && !membersDropdownRef.current.contains(e.target as Node)) {
+        setShowMembersDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Load community + messages
   const fetchMessages = useCallback(async () => {
@@ -243,14 +255,10 @@ export function CommunityChat({
           </div>
         </div>
 
-        <button
-          onClick={() => setShowMembers((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-body text-xs transition-colors ${
-            showMembers ? "border-accent text-accent bg-accent/10" : "border-border text-foreground-muted hover:text-foreground"
-          }`}
-        >
-          <Users size={12} /> Members
-        </button>
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-foreground-muted" />
+          <span className="font-body text-xs text-foreground-muted">{community.member_count} member{community.member_count !== 1 ? "s" : ""}</span>
+        </div>
       </div>
 
       {/* Body: messages + optional members panel */}
@@ -376,27 +384,51 @@ export function CommunityChat({
           </div>
         </div>
 
-        {/* Members panel */}
-        {showMembers && (
-          <div className="w-56 shrink-0 border-l border-border bg-surface flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <h4 className="font-body text-xs font-semibold text-foreground-muted uppercase tracking-wider">
-                Members ({community.member_count})
-              </h4>
-              <button onClick={() => setShowMembers(false)} className="text-foreground-muted hover:text-foreground">
-                <ArrowLeft size={14} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
-              {members.map((m) => (
-                <div key={m.user_id} className="flex items-center gap-2 py-1.5">
-                  <Avatar name={m.users?.name ?? "?"} url={m.users?.avatar_url ?? null} size={7} />
-                  <span className="font-body text-xs text-foreground truncate">{m.users?.name}</span>
-                </div>
-              ))}
-            </div>
+        {/* Members panel — always visible */}
+        <div className="w-56 shrink-0 border-l border-border bg-surface flex flex-col overflow-hidden">
+          <div className="px-4 py-3 border-b border-border relative" ref={membersDropdownRef}>
+            {/* Clickable Members title with chevron */}
+            <button
+              onClick={() => setShowMembersDropdown((v) => !v)}
+              className="flex items-center gap-1.5 group"
+            >
+              <span className="font-body text-sm font-medium text-foreground-muted group-hover:text-foreground transition-colors">
+                Members
+              </span>
+              <ChevronDown
+                size={14}
+                className={`text-foreground-muted group-hover:text-foreground transition-transform duration-200 ${showMembersDropdown ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {/* Dropdown */}
+            {showMembersDropdown && (
+              <div className="absolute left-4 top-full mt-1 z-50 w-40 rounded-lg border border-border bg-surface shadow-lg py-1 overflow-hidden">
+                <button
+                  className="w-full text-left px-4 py-2.5 font-body text-sm text-foreground hover:bg-surface-raised transition-colors"
+                  onClick={() => setShowMembersDropdown(false)}
+                >
+                  Topics
+                </button>
+                <button
+                  className="w-full text-left px-4 py-2.5 font-body text-sm text-foreground hover:bg-surface-raised transition-colors"
+                  onClick={() => setShowMembersDropdown(false)}
+                >
+                  Settings
+                </button>
+              </div>
+            )}
           </div>
-        )}
+
+          <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+            {members.map((m) => (
+              <div key={m.user_id} className="flex items-center gap-2 py-1.5">
+                <Avatar name={m.users?.name ?? "?"} url={m.users?.avatar_url ?? null} size={7} />
+                <span className="font-body text-xs text-foreground truncate">{m.users?.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
