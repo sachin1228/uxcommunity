@@ -9,7 +9,7 @@ const MASTER_DATA = [
   { href: "/admin/users",     label: "Users",            icon: Users    },
   { href: "/admin/companies", label: "Companies",        icon: Building2 },
   { href: "/admin/cities",    label: "Cities",           icon: MapPin    },
-  { href: "/admin/sectors",   label: "Industry Sectors", icon: Layers    },
+  { href: "/admin/sectors",   label: "Industry", icon: Layers    },
 ];
 
 export function AdminSidebar() {
@@ -27,7 +27,7 @@ export function AdminSidebar() {
       <Link
         href="/admin"
         prefetch={false}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           pathname === "/admin"
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -41,7 +41,7 @@ export function AdminSidebar() {
       <div>
         <button
           onClick={() => setOpen((v) => !v)}
-          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
+          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
             masterDataActive
               ? "bg-surface-raised text-foreground"
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -56,7 +56,7 @@ export function AdminSidebar() {
         </button>
 
         {open && (
-          <div className="mt-1 ml-3 flex flex-col gap-1 border-l border-border pl-3">
+          <div className="mt-1 ml-2 flex flex-col gap-1 border-l border-border pl-2">
             {MASTER_DATA.map(({ href, label, icon: Icon }) => {
               const active = pathname.startsWith(href);
               return (
@@ -64,7 +64,7 @@ export function AdminSidebar() {
                   key={href}
                   href={href}
                   prefetch={false}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-sm transition-colors ${
+                  className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
                     active
                       ? "bg-surface-raised text-foreground"
                       : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"

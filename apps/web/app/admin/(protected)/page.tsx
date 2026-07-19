@@ -24,6 +24,15 @@ interface HistoryItem {
 }
 interface TagItem { id: string; name: string }
 
+type StatusFilter = "all" | "pending" | "approved" | "rejected";
+
+const STATUS_TABS: { value: StatusFilter; label: string }[] = [
+  { value: "all",      label: "All"      },
+  { value: "pending",  label: "Pending"  },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+];
+
 const STATUS_COLORS = {
   pending:  "bg-yellow-500/10 text-yellow-400",
   approved: "bg-green-500/10 text-green-400",
@@ -33,7 +42,7 @@ const STATUS_COLORS = {
 function StatusBadge({ status }: { status: string }) {
   const cls = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "bg-surface-raised text-foreground-muted";
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 font-mono text-[11px] font-medium capitalize ${cls}`}>
+    <span className={`inline-flex rounded-full px-2 py-0.5 font-mono text-[10px] font-medium capitalize ${cls}`}>
       {status}
     </span>
   );
@@ -127,66 +136,66 @@ function DetailModal({
   }
 
   const inputClass =
-    "rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full";
+    "rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full";
 
   return (
     <Modal open onClose={onClose} maxWidth="max-w-2xl" hideCloseButton>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-5">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h2 className="font-display text-xl font-semibold text-foreground">{app.name}</h2>
+            <div className="flex items-center gap-2.5 mb-0.5">
+              <h2 className="font-display text-lg font-semibold text-foreground">{app.name}</h2>
               <StatusBadge status={app.status} />
             </div>
-            <p className="font-body text-sm text-foreground-muted">{app.email}</p>
-            <p className="font-mono text-xs text-foreground-muted mt-0.5">
+            <p className="font-body text-xs text-foreground-muted">{app.email}</p>
+            <p className="font-mono text-[10px] text-foreground-muted mt-0.5">
               Applied {new Date(app.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </p>
           </div>
-          <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors mt-1">
-            <X size={18} />
+          <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors mt-0.5">
+            <X size={16} />
           </button>
         </div>
 
         {/* Links */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <a href={app.linkedin_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
-            <ExternalLink size={13} /> LinkedIn
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
+            <ExternalLink size={12} /> LinkedIn
           </a>
           <a href={app.portfolio_url} target="_blank" rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
-            <ExternalLink size={13} /> Portfolio
+            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors">
+            <ExternalLink size={12} /> Portfolio
           </a>
         </div>
 
         {/* Action message */}
         {actionMsg && (
-          <div className={`rounded-md border px-4 py-3 ${actionWarning ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-surface"}`}>
-            <p className="font-body text-sm text-foreground-muted">{actionMsg}</p>
+          <div className={`rounded-md border px-3 py-2.5 ${actionWarning ? "border-yellow-500/30 bg-yellow-500/5" : "border-border bg-surface"}`}>
+            <p className="font-body text-xs text-foreground-muted">{actionMsg}</p>
           </div>
         )}
 
-        {/* Invite link — shown for approved apps */}
+        {/* Invite link */}
         {inviteLink && (
-          <div className="rounded-md border border-border bg-surface p-4">
+          <div className="rounded-md border border-border bg-surface p-3">
             <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-              <Link size={13} /> Invitation Link
+              <Link size={12} /> Invitation Link
             </p>
             <div className="flex items-center gap-2">
-              <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-3 py-2 flex-1 truncate select-all">
+              <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-2.5 py-1.5 flex-1 truncate select-all">
                 {inviteLink}
               </p>
               <button
                 onClick={copyLink}
-                className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
+                className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
               >
-                {copied ? <CheckCheck size={13} className="text-green-400" /> : <Copy size={13} />}
+                {copied ? <CheckCheck size={12} className="text-green-400" /> : <Copy size={12} />}
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="font-body text-[11px] text-foreground-muted mt-2">
+            <p className="font-body text-[10px] text-foreground-muted mt-1.5">
               Share this link with the applicant to let them create their account.
             </p>
           </div>
@@ -194,21 +203,21 @@ function DetailModal({
 
         {/* Approve / Reject */}
         {app.status === "pending" && (
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <button
               onClick={() => handleAction("approve")}
               disabled={!!actionLoading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-green-600 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-green-600 py-2 font-body text-xs font-medium text-white transition-colors hover:bg-green-700 disabled:opacity-60"
             >
-              {actionLoading === "approve" ? <Spinner className="h-4 w-4" /> : <Check size={15} />}
+              {actionLoading === "approve" ? <Spinner className="h-3 w-3" /> : <Check size={13} />}
               Approve &amp; Send Invite
             </button>
             <button
               onClick={() => handleAction("reject")}
               disabled={!!actionLoading}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 py-2.5 font-body text-sm font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-red-500/40 bg-red-500/10 py-2 font-body text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-60"
             >
-              {actionLoading === "reject" ? <Spinner className="h-4 w-4" /> : <X size={15} />}
+              {actionLoading === "reject" ? <Spinner className="h-3 w-3" /> : <X size={13} />}
               Reject
             </button>
           </div>
@@ -217,16 +226,16 @@ function DetailModal({
         {/* Tags */}
         <div>
           <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-            <Tag size={13} /> Internal Tags
+            <Tag size={12} /> Internal Tags
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {allTags.map((tag) => {
               const active = selectedTags.includes(tag.id);
               return (
                 <button
                   key={tag.id}
                   onClick={() => toggleTag(tag.id)}
-                  className={`rounded-full px-3 py-1 font-body text-xs transition-colors ${
+                  className={`rounded-full px-2.5 py-0.5 font-body text-xs transition-colors ${
                     active
                       ? "bg-accent text-accent-foreground"
                       : "border border-border bg-surface text-foreground-muted hover:border-accent/40 hover:text-foreground"
@@ -242,12 +251,12 @@ function DetailModal({
         {/* Review Notes */}
         <div>
           <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-            <FileText size={13} /> Internal Review Notes
+            <FileText size={12} /> Internal Review Notes
           </p>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            rows={4}
+            rows={3}
             placeholder="Private notes — not visible to the applicant…"
             className={`${inputClass} resize-none`}
           />
@@ -256,9 +265,9 @@ function DetailModal({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
+          className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2 font-body text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
         >
-          {saving && <Spinner className="h-4 w-4" />}
+          {saving && <Spinner className="h-3 w-3" />}
           {saving ? "Saving…" : "Save Notes & Tags"}
         </button>
 
@@ -267,22 +276,22 @@ function DetailModal({
           <div>
             <button
               onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-3"
+              className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-2"
             >
-              <ChevronDown size={14} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
+              <ChevronDown size={13} className={`transition-transform ${showHistory ? "rotate-180" : ""}`} />
               {history.length} previous application{history.length > 1 ? "s" : ""}
             </button>
             {showHistory && (
               <div className="flex flex-col gap-2">
                 {history.map((h) => (
-                  <div key={h.id} className="rounded-lg border border-border bg-surface p-3">
-                    <div className="flex items-center justify-between mb-2">
+                  <div key={h.id} className="rounded-lg border border-border bg-surface p-2.5">
+                    <div className="flex items-center justify-between mb-1.5">
                       <StatusBadge status={h.status} />
-                      <span className="font-mono text-[11px] text-foreground-muted">
+                      <span className="font-mono text-[10px] text-foreground-muted">
                         {new Date(h.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     </div>
-                    <div className="flex gap-2 mb-2">
+                    <div className="flex gap-2 mb-1.5">
                       <a href={h.linkedin_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-accent hover:text-accent-hover">LinkedIn ↗</a>
                       <span className="text-foreground-muted">·</span>
                       <a href={h.portfolio_url} target="_blank" rel="noopener noreferrer" className="font-body text-xs text-accent hover:text-accent-hover">Portfolio ↗</a>
@@ -310,7 +319,7 @@ export default function AdminApplicationsPage() {
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
   const [allTags, setAllTags] = useState<TagItem[]>([]);
   const [tagFilter, setTagFilter] = useState("");
@@ -351,44 +360,52 @@ export default function AdminApplicationsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const inputClass =
-    "rounded-md border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20";
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-2xl font-semibold text-foreground">Applications</h1>
-        <span className="font-mono text-sm text-foreground-muted">{total} total</span>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="font-display text-xl font-semibold text-foreground">Applications</h1>
+        <span className="font-mono text-xs text-foreground-muted">{total} total</span>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+      {/* Status tabs */}
+      <div className="flex gap-0.5 mb-3 border-b border-border">
+        {STATUS_TABS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => { setStatusFilter(value); setSearch(""); }}
+            className={`px-3.5 py-2 font-body text-xs font-medium transition-colors border-b-2 -mb-px ${
+              statusFilter === value
+                ? "border-accent text-accent"
+                : "border-transparent text-foreground-muted hover:text-foreground"
+            }`}
+          >
+            {label}
+            {statusFilter === value && total > 0 && (
+              <span className="ml-1.5 rounded-full bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] text-accent">
+                {total}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Search + tag filter */}
+      <div className="flex gap-2 mb-3">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or email…"
-            className={`${inputClass} pl-9 w-full`}
+            className="w-full rounded-md border border-border bg-surface pl-8 pr-3 py-1.5 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20"
           />
         </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className={inputClass}
-        >
-          <option value="all">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-        </select>
-
         <select
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className={inputClass}
+          className="rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
         >
           <option value="">All tags</option>
           {allTags.map((t) => (
@@ -398,19 +415,19 @@ export default function AdminApplicationsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-white/10 bg-surface overflow-hidden mb-4">
+      <div className="rounded-xl border border-white/10 bg-surface overflow-hidden mb-3">
         {loading ? (
-          <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5 text-foreground-muted" />
+          <div className="flex justify-center py-12">
+            <Spinner className="h-4 w-4 text-foreground-muted" />
           </div>
         ) : applications.length === 0 ? (
-          <p className="py-16 text-center font-body text-sm text-foreground-muted">No applications found.</p>
+          <p className="py-12 text-center font-body text-xs text-foreground-muted">No applications found.</p>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
                 {["Name", "Email", "Status", "Tags", "Applied", ""].map((h) => (
-                  <th key={h} className="px-5 py-3 text-left font-body text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                  <th key={h} className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">
                     {h}
                   </th>
                 ))}
@@ -423,33 +440,33 @@ export default function AdminApplicationsPage() {
                   className={`${idx < applications.length - 1 ? "border-b border-white/[0.06]" : ""} hover:bg-white/[0.03] transition-colors cursor-pointer`}
                   onClick={() => setSelectedApp(app)}
                 >
-                  <td className="px-5 py-3.5">
-                    <p className="font-body text-sm font-medium text-foreground">{app.name}</p>
+                  <td className="px-4 py-2.5">
+                    <p className="font-body text-xs font-medium text-foreground">{app.name}</p>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <p className="font-body text-sm text-foreground-muted">{app.email}</p>
+                  <td className="px-4 py-2.5">
+                    <p className="font-body text-xs text-foreground-muted">{app.email}</p>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-2.5">
                     <StatusBadge status={app.status} />
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-4 py-2.5">
                     <div className="flex flex-wrap gap-1">
                       {(app.application_tags ?? []).slice(0, 3).map((at) => (
-                        <span key={at.tag_id} className="rounded-full bg-surface-raised px-2 py-0.5 font-body text-[11px] text-foreground-muted">
+                        <span key={at.tag_id} className="rounded-full bg-surface-raised px-1.5 py-0.5 font-body text-[10px] text-foreground-muted">
                           {at.tags?.name}
                         </span>
                       ))}
                       {app.application_tags?.length > 3 && (
-                        <span className="font-mono text-[11px] text-foreground-muted">+{app.application_tags.length - 3}</span>
+                        <span className="font-mono text-[10px] text-foreground-muted">+{app.application_tags.length - 3}</span>
                       )}
                     </div>
                   </td>
-                  <td className="px-5 py-3.5">
-                    <p className="font-mono text-[11px] text-foreground-muted whitespace-nowrap">
+                  <td className="px-4 py-2.5">
+                    <p className="font-mono text-[10px] text-foreground-muted whitespace-nowrap">
                       {new Date(app.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
                   </td>
-                  <td className="px-5 py-3.5 text-right">
+                  <td className="px-4 py-2.5 text-right">
                     <span className="font-body text-xs text-accent hover:text-accent-hover">View →</span>
                   </td>
                 </tr>
@@ -462,23 +479,23 @@ export default function AdminApplicationsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-sm text-foreground-muted">
+          <p className="font-body text-xs text-foreground-muted">
             Page {page} of {totalPages}
           </p>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              <ChevronLeft size={14} /> Prev
+              <ChevronLeft size={13} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              Next <ChevronRight size={14} />
+              Next <ChevronRight size={13} />
             </button>
           </div>
         </div>

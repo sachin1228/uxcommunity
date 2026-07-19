@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
-import { APP_NAME } from "@draft/shared";
-import { LogoutButton } from "@/app/admin/(protected)/LogoutButton";
 import { AdminSidebar } from "@/app/admin/(protected)/AdminSidebar";
+import { AdminTopbar } from "@/app/admin/(protected)/AdminTopbar";
 
 export default async function AdminProtectedLayout({
   children,
@@ -17,33 +15,18 @@ export default async function AdminProtectedLayout({
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Sidebar */}
-      <aside className="fixed inset-y-0 left-0 flex w-56 flex-col border-r border-border bg-surface">
-        {/* Brand */}
-        <div className="px-4 py-5 border-b border-border">
-          <Link href="/admin" prefetch={false} className="block">
-            <span className="font-display text-base font-semibold text-foreground">
-              {APP_NAME}
-            </span>
-            <span className="block font-body text-xs text-foreground-muted mt-0.5">
-              Admin Dashboard
-            </span>
-          </Link>
-        </div>
+      {/* Top bar — brand + sign-out */}
+      <AdminTopbar />
 
-        {/* Nav links */}
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+      {/* Sidebar — starts below the topbar */}
+      <aside className="fixed top-11 bottom-0 left-0 flex w-[12rem] flex-col overflow-y-auto border-r border-border bg-surface">
+        <div className="px-3 py-3">
           <AdminSidebar />
-        </div>
-
-        {/* Logout */}
-        <div className="px-4 py-4 border-t border-border">
-          <LogoutButton />
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="ml-56 flex-1 px-8 py-8">
+      <main className="ml-[12rem] mt-11 flex-1 px-6 py-5">
         {children}
       </main>
     </div>
