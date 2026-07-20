@@ -324,7 +324,29 @@ export default function AdminApplicationsPage() {
   const [allTags, setAllTags] = useState<TagItem[]>([]);
   const [tagFilter, setTagFilter] = useState("");
 
+  // Per-tab counts — fetched independently so every tab always shows its number
+  const [counts, setCounts] = useState<Record<StatusFilter, number>>({ all: 0, pending: 0, approved: 0, rejected: 0 });
+
   const PAGE_SIZE = 25;
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const [all, pending, approved, rejected] = await Promise.all([
+        fetch("/api/admin/applications?page=1&status=all&search=").then((r) => r.json()),
+        fetch("/api/admin/applications?page=1&status=pending&search=").then((r) => r.json()),
+        fetch("/api/admin/applications?page=1&status=approved&search=").then((r) => r.json()),
+        fetch("/api/admin/applications?page=1&status=rejected&search=").then((r) => r.json()),
+      ]);
+      setCounts({
+        all:      all.total      ?? 0,
+        pending:  pending.total  ?? 0,
+        approved: approved.total ?? 0,
+        rejected: rejected.total ?? 0,
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
@@ -346,6 +368,7 @@ export default function AdminApplicationsPage() {
     }
   }, [page, statusFilter, search, tagFilter]);
 
+  useEffect(() => { fetchCounts(); }, [fetchCounts]);
   useEffect(() => { fetchApplications(); }, [fetchApplications]);
 
   useEffect(() => {
@@ -370,24 +393,28 @@ export default function AdminApplicationsPage() {
 
       {/* Status tabs */}
       <div className="flex gap-0.5 mb-3 border-b border-border">
-        {STATUS_TABS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => { setStatusFilter(value); setSearch(""); }}
-            className={`px-3.5 py-2 font-body text-xs font-medium transition-colors border-b-2 -mb-px ${
-              statusFilter === value
-                ? "border-accent text-accent"
-                : "border-transparent text-foreground-muted hover:text-foreground"
-            }`}
-          >
-            {label}
-            {statusFilter === value && total > 0 && (
-              <span className="ml-1.5 rounded-full bg-accent/15 px-1.5 py-0.5 font-mono text-[10px] text-accent">
-                {total}
+        {STATUS_TABS.map(({ value, label }) => {
+          const count = counts[value];
+          const isActive = statusFilter === value;
+          return (
+            <button
+              key={value}
+              onClick={() => { setStatusFilter(value); setSearch(""); }}
+              className={`px-3.5 py-2 font-body text-xs font-medium transition-colors border-b-2 -mb-px ${
+                isActive
+                  ? "border-accent text-accent"
+                  : "border-transparent text-foreground-muted hover:text-foreground"
+              }`}
+            >
+              {label}
+              <span className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
+                isActive ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
+              }`}>
+                {count}
               </span>
-            )}
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
 
       {/* Search + tag filter */}
@@ -508,6 +535,7 @@ export default function AdminApplicationsPage() {
           onClose={() => setSelectedApp(null)}
           onRefresh={() => {
             fetchApplications();
+            fetchCounts();
             setSelectedApp(null);
           }}
         />
