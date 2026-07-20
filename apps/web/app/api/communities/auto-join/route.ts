@@ -66,34 +66,18 @@ export async function POST() {
   }
 
   if (profile?.experience_level) {
-    // experience_level is a PG enum — look up its UUID from the experience_levels table
+    // Look up the experience level by slug — use the admin-managed `name` directly
     const { data: expLevel } = await db
       .from("experience_levels")
-      .select("id, image_url")
+      .select("id, name, image_url")
       .eq("slug", profile.experience_level)
       .maybeSingle();
 
     if (expLevel) {
-      const levelNames: Record<string, string> = {
-        student: "Students",
-        fresher: "Freshers",
-        junior: "Junior Designers",
-        mid_level: "Mid-Level Designers",
-        senior: "Senior Designers",
-        lead: "Lead Designers",
-        principal: "Principal Designers",
-        staff: "Staff Designers",
-        design_manager: "Design Managers",
-        head_of_design: "Heads of Design",
-        director: "Design Directors",
-        vp: "VP of Design",
-        consultant: "Design Consultants",
-        freelancer: "Freelancers",
-      };
       specs.push({
         type: "experience_level",
         reference_id: expLevel.id,
-        name: levelNames[profile.experience_level] ?? profile.experience_level,
+        name: expLevel.name,
         image_url: expLevel.image_url ?? null,
       });
     }
