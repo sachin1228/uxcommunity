@@ -23,6 +23,33 @@ interface MasterItemDetailProps {
   readOnly?: boolean;
 }
 
+/** Compress + center-crop a raster image to 300×300 JPEG via Canvas (matches signup compression). */
+function compressImage(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const SIZE = 300;
+      const canvas = document.createElement("canvas");
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(objectUrl); reject(new Error("Canvas not supported")); return; }
+      const min = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth  - min) / 2;
+      const sy = (img.naturalHeight - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, SIZE, SIZE);
+      URL.revokeObjectURL(objectUrl);
+      canvas.toBlob(
+        (blob) => { if (blob) resolve(blob); else reject(new Error("Compression failed")); },
+        "image/jpeg", 0.78
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Failed to load image")); };
+    img.src = objectUrl;
+  });
+}
+
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 py-3 border-b border-border last:border-0">
@@ -126,8 +153,13 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
     setImageUploading(true);
     setImageError(null);
     try {
+      // Compress raster images before upload (skip SVG — vector files need no compression)
+      let uploadFile: File | Blob = file;
+      if (file.type !== "image/svg+xml") {
+        try { uploadFile = await compressImage(file); } catch { /* fall back to original */ }
+      }
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", uploadFile, file.name);
       const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) { setImageError(uploadData.error ?? "Upload failed."); return; }
