@@ -474,7 +474,10 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
    * Channels are torn down and re-created only when the list of joined
    * community IDs changes (not on every message or navigation).
    */
-  const communityIds = communities.map((c) => c.id).join(",");
+  // Sort IDs before joining so this string is order-independent — a re-sort
+  // of the sidebar list won't change this value and won't tear down / recreate
+  // all Supabase subscriptions unnecessarily on every new message.
+  const communityIds = [...communities].map((c) => c.id).sort().join(",");
   useEffect(() => {
     if (!communities.length) return;
 
@@ -509,29 +512,28 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
             const isActive = row.community_id === activeCommunityIdRef.current;
 
             setCommunities((prev) => {
-              const updated = prev
-                .map((c) =>
-                  c.id === row.community_id
-                    ? {
-                        ...c,
-                        last_message: {
-                          content: row.content,
-                          created_at: row.created_at,
-                          user: c.last_message?.user ?? null,
-                        },
-                        // Increment unread only for messages from others in non-active communities
-                        message_count:
-                          !isOwn && !isActive
-                            ? c.message_count + 1
-                            : c.message_count,
-                      }
-                    : c
-                )
-                .sort((a, b) => {
-                  const ta = a.last_message?.created_at ?? "";
-                  const tb = b.last_message?.created_at ?? "";
-                  return tb > ta ? 1 : -1;
-                });
+              // Only update the community that received the message — don't
+              // re-sort here. The render always sorts, so mutating the sort
+              // order in state would cause two different sort algorithms to
+              // fight each other and produce non-deterministic orderings for
+              // communities with equal or empty timestamps.
+              const updated = prev.map((c) =>
+                c.id === row.community_id
+                  ? {
+                      ...c,
+                      last_message: {
+                        content: row.content,
+                        created_at: row.created_at,
+                        user: c.last_message?.user ?? null,
+                      },
+                      // Increment unread only for messages from others in non-active communities
+                      message_count:
+                        !isOwn && !isActive
+                          ? c.message_count + 1
+                          : c.message_count,
+                    }
+                  : c
+              );
 
               if (sidebarStore.data) {
                 sidebarStore.data = { ...sidebarStore.data, communities: updated };
@@ -611,7 +613,12 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                 .sort((a, b) => {
                   const ta = a.last_message?.created_at ?? "";
                   const tb = b.last_message?.created_at ?? "";
-                  return tb.localeCompare(ta);
+                  // Primary: most-recent message first (ISO strings sort lexicographically)
+                  if (tb > ta) return 1;
+                  if (ta > tb) return -1;
+                  // Secondary: alphabetical by name — stable tiebreaker so communities
+                  // with equal/empty timestamps never jump on re-render
+                  return a.name.localeCompare(b.name);
                 })
                 .map((c) => (
                   <CommunityRow
