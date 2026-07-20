@@ -15,19 +15,20 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Fetch name + avatar from DB
+  // Fetch name + avatar from DB — run both queries in parallel
   const db = createServiceClient();
-  const { data: user } = await db
-    .from("users")
-    .select("name, email")
-    .eq("id", session.userId!)
-    .maybeSingle();
-
-  const { data: profile } = await db
-    .from("designer_profiles")
-    .select("avatar_url")
-    .eq("user_id", session.userId!)
-    .maybeSingle();
+  const [{ data: user }, { data: profile }] = await Promise.all([
+    db
+      .from("users")
+      .select("name, email")
+      .eq("id", session.userId!)
+      .maybeSingle(),
+    db
+      .from("designer_profiles")
+      .select("avatar_url")
+      .eq("user_id", session.userId!)
+      .maybeSingle(),
+  ]);
 
   const name = user?.name ?? session.email ?? "User";
   const email = user?.email ?? session.email ?? "";

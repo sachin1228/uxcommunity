@@ -28,7 +28,6 @@ export function AdminSidebar() {
       {/* Applications */}
       <Link
         href="/admin"
-        prefetch={false}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           pathname === "/admin"
             ? "bg-surface-raised text-foreground"
@@ -42,7 +41,6 @@ export function AdminSidebar() {
       {/* Loading Animations */}
       <Link
         href="/admin/lottie-animations"
-        prefetch={false}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           pathname.startsWith("/admin/lottie-animations")
             ? "bg-surface-raised text-foreground"
@@ -79,7 +77,6 @@ export function AdminSidebar() {
                 <Link
                   key={href}
                   href={href}
-                  prefetch={false}
                   className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
                     active
                       ? "bg-surface-raised text-foreground"
