@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard } from "lucide-react";
+
+function isMatch(href: string, pathname: string) {
+  return href === "/admin"
+    ? pathname === href
+    : pathname === href || pathname.startsWith(href + "/");
+}
 
 const MASTER_DATA = [
   { href: "/admin/users",             label: "Users",             icon: Users     },
@@ -16,38 +22,56 @@ const MASTER_DATA = [
 
 export function AdminSidebar() {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   const masterDataActive = MASTER_DATA.some((item) =>
     pathname.startsWith(item.href)
   );
-
   const [open, setOpen] = useState(masterDataActive);
+
+  // Clear optimistic state once the real pathname has caught up.
+  useEffect(() => {
+    if (pendingHref && isMatch(pendingHref, pathname)) {
+      setPendingHref(null);
+    }
+  }, [pathname, pendingHref]);
+
+  function active(href: string) {
+    return pendingHref ? pendingHref === href : isMatch(href, pathname);
+  }
+
+  // Master Data group is highlighted when any child is pending or active.
+  const masterGroupActive = pendingHref
+    ? MASTER_DATA.some((item) => item.href === pendingHref)
+    : masterDataActive;
 
   return (
     <nav className="flex flex-col gap-1">
       {/* Applications */}
       <Link
         href="/admin"
+        onClick={() => setPendingHref("/admin")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
-          pathname === "/admin"
+          active("/admin")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <LayoutList size={16} className={pathname === "/admin" ? "text-accent" : ""} />
+        <LayoutList size={16} className={active("/admin") ? "text-accent" : ""} />
         Applications
       </Link>
 
       {/* Loading Animations */}
       <Link
         href="/admin/lottie-animations"
+        onClick={() => setPendingHref("/admin/lottie-animations")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
-          pathname.startsWith("/admin/lottie-animations")
+          active("/admin/lottie-animations")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Clapperboard size={16} className={pathname.startsWith("/admin/lottie-animations") ? "text-accent" : ""} />
+        <Clapperboard size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
         Lottie Animations
       </Link>
 
@@ -56,12 +80,12 @@ export function AdminSidebar() {
         <button
           onClick={() => setOpen((v) => !v)}
           className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
-            masterDataActive
+            masterGroupActive
               ? "bg-surface-raised text-foreground"
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
           }`}
         >
-          <Database size={16} className={masterDataActive ? "text-accent" : ""} />
+          <Database size={16} className={masterGroupActive ? "text-accent" : ""} />
           <span className="flex-1 text-left">Master Data</span>
           <ChevronDown
             size={14}
@@ -71,23 +95,21 @@ export function AdminSidebar() {
 
         {open && (
           <div className="mt-1 ml-2 flex flex-col gap-1 border-l border-border pl-2">
-            {MASTER_DATA.map(({ href, label, icon: Icon }) => {
-              const active = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
-                    active
-                      ? "bg-surface-raised text-foreground"
-                      : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
-                  }`}
-                >
-                  <Icon size={15} className={active ? "text-accent" : ""} />
-                  {label}
-                </Link>
-              );
-            })}
+            {MASTER_DATA.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setPendingHref(href)}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+                  active(href)
+                    ? "bg-surface-raised text-foreground"
+                    : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                }`}
+              >
+                <Icon size={15} className={active(href) ? "text-accent" : ""} />
+                {label}
+              </Link>
+            ))}
           </div>
         )}
       </div>

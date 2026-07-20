@@ -13,6 +13,15 @@ export interface MasterItem {
   created_at: string;
 }
 
+// ─── Module-level cache ───────────────────────────────────────────────────────
+// Keyed by apiBase (e.g. "/api/admin/cities"). Survives SPA navigations so
+// returning to a master-data page renders instantly without a spinner.
+// Master data changes infrequently — 5 minutes TTL is safe.
+const MASTER_CACHE_TTL = 5 * 60_000;
+
+const masterCache = new Map<string, { data: MasterItem[]; fetchedAt: number }>();
+const masterInflight = new Map<string, Promise<MasterItem[]>>();
+
 interface MasterDataPageProps {
   title: string;
   entity: string;
@@ -26,8 +35,12 @@ interface MasterDataPageProps {
 
 export function MasterDataPage({ title, entity, apiBase, basePath, responseKey, readOnly }: MasterDataPageProps) {
   const router = useRouter();
-  const [items, setItems] = useState<MasterItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache synchronously — no spinner flash on revisit.
+  const [items, setItems] = useState<MasterItem[]>(() => masterCache.get(apiBase)?.data ?? []);
+  const [loading, setLoading] = useState(() => {
+    const c = masterCache.get(apiBase);
+    return !c || Date.now() - c.fetchedAt >= MASTER_CACHE_TTL;
+  });
   const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
   const [search, setSearch] = useState("");
 
@@ -42,22 +55,43 @@ export function MasterDataPage({ title, entity, apiBase, basePath, responseKey, 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${apiBase}?all=true`);
-      if (!res.ok) { setItems([]); return; }
-      const data = await res.json();
-      const rows: MasterItem[] = responseKey
-        ? (data[responseKey] ?? [])
-        : (data.companies ?? data.cities ?? data.sectors ?? data.interests ?? data.experience_levels ?? []);
-      setItems(rows);
-    } catch {
-      setItems([]);
-    } finally {
+  const load = useCallback(async (force = false) => {
+    // Serve from cache if fresh — no spinner, instant render.
+    const cached = masterCache.get(apiBase);
+    if (!force && cached && Date.now() - cached.fetchedAt < MASTER_CACHE_TTL) {
+      setItems(cached.data);
       setLoading(false);
+      return;
     }
-  }, [apiBase]);
+
+    // Deduplicate concurrent fetches (e.g. StrictMode double-mount).
+    const inflight = masterInflight.get(apiBase);
+    if (inflight) {
+      const rows = await inflight;
+      setItems(rows);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const p = fetch(`${apiBase}?all=true`)
+      .then(async (res) => {
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (responseKey
+          ? (data[responseKey] ?? [])
+          : (data.companies ?? data.cities ?? data.sectors ?? data.interests ?? data.experience_levels ?? [])) as MasterItem[];
+      })
+      .catch(() => [] as MasterItem[])
+      .finally(() => masterInflight.delete(apiBase));
+
+    masterInflight.set(apiBase, p);
+
+    const rows = await p;
+    masterCache.set(apiBase, { data: rows, fetchedAt: Date.now() });
+    setItems(rows);
+    setLoading(false);
+  }, [apiBase, responseKey]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -128,7 +162,8 @@ export function MasterDataPage({ title, entity, apiBase, basePath, responseKey, 
       const data = await res.json();
       if (!res.ok) { setAddError(data.error ?? "Failed to add."); return; }
       closeModal();
-      load();
+      masterCache.delete(apiBase); // invalidate so the new item appears immediately
+      load(true);
     } catch {
       setAddError("Network error. Please try again.");
     } finally {
