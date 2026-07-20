@@ -23,6 +23,15 @@ import {
 
 type Community = CachedSidebarCommunity;
 
+/**
+ * Fire-and-forget: update last_read_at for this community on the server.
+ * The server uses this to compute accurate unread counts on the next sidebar fetch.
+ * Runs silently — UI badge is already zeroed client-side before this resolves.
+ */
+function markReadOnServer(communityId: string) {
+  fetch(`/api/communities/${communityId}/read`, { method: "PATCH" }).catch(() => {});
+}
+
 const TYPE_EMOJI: Record<string, string> = {
   city:             "📍",
   sector:           "🏢",
@@ -348,26 +357,133 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
     if (sidebarStore.data) setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  /**
+   * Tracks whether a background unread-count revalidation is already in
+   * progress. Prevents duplicate concurrent requests on rapid navigations.
+   */
+  const revalidateInFlight = useRef(false);
 
   /**
-   * Realtime subscription — scoped to the ACTIVE community only.
+   * Background unread-count reconciliation.
    *
-   * Subscribing to every joined community (N channels) caused high WebSocket
-   * traffic and cascading re-renders on every incoming message. Now we open
-   * exactly one channel that follows the user as they switch communities.
+   * Called on every CommunitiesPanel mount when load() short-circuits because
+   * the sidebar cache is still "fresh" (< SIDEBAR_STALE_MS). During that
+   * window the user may have been on another page and messages arrived that
+   * never triggered the panel's realtime handlers (those are only active while
+   * this component is mounted). The cached message_count values are therefore
+   * stale, causing realtime increments to build on the wrong baseline.
    *
-   * Responsibilities:
-   * 1. Update the sidebar last_message preview for the active community in real time.
-   * 2. Keep sidebarStore.data in sync so the next mount reflects live data.
+   * This fetch re-asks the server for authoritative unread counts and merges
+   * them into state using Math.max so that any counts already incremented by
+   * realtime during the request are never rolled back.
    *
-   * CommunityChat has its own subscription that handles full message updates
-   * for the selected community, so we don't need to duplicate that here.
+   * Race-condition safety:
+   *   fetch starts → server count = 8
+   *   realtime fires → UI count becomes 9
+   *   fetch resolves → Math.max(8, 9) = 9  ✓  (no rollback)
    */
+  const revalidateUnreadCounts = useCallback(() => {
+    if (revalidateInFlight.current) return;
+    revalidateInFlight.current = true;
+
+    fetch("/api/communities")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (!d?.communities) return;
+        const fresh: CachedSidebarCommunity[] = d.communities;
+
+        setCommunities((prev) => {
+          const prevMap = new Map(prev.map((c) => [c.id, c]));
+          const merged = fresh.map((server) => {
+            const local = prevMap.get(server.id);
+            return {
+              ...server,
+              // Never roll back a count that realtime already incremented
+              // while this fetch was in-flight.
+              message_count: Math.max(
+                server.message_count,
+                local?.message_count ?? 0
+              ),
+            };
+          });
+          // Keep sidebarStore in sync so subsequent realtime increments and
+          // the next navigation both start from the reconciled baseline.
+          if (sidebarStore.data) {
+            sidebarStore.data = {
+              ...sidebarStore.data,
+              communities: merged,
+              fetchedAt: Date.now(),
+            };
+          }
+          return merged;
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        revalidateInFlight.current = false;
+      });
+  }, []);
+
   useEffect(() => {
+    // Remember whether the cache was already fresh before load() runs so we
+    // can decide whether a separate unread-count revalidation is needed.
+    const cacheWasFresh =
+      !!sidebarStore.data &&
+      Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS;
+
+    load();
+
+    // If load() short-circuited (cache was fresh), the sidebar data renders
+    // instantly from the module-level cache — but that cache may contain stale
+    // unread counts from before the user left the Communities page. Messages
+    // that arrived while Communities was unmounted were never handled by the
+    // panel's realtime subscriptions, so those counts were never incremented.
+    //
+    // Fix: always run a background revalidation on mount so the authoritative
+    // server counts replace the stale cached ones. If load() already fired a
+    // fresh fetch (cache was stale/missing), that fetch already returns correct
+    // counts — no need to double-fetch.
+    if (cacheWasFresh) {
+      revalidateUnreadCounts();
+    }
+  }, [load, revalidateUnreadCounts]);
+
+  /**
+   * Keep a ref to activeCommunityId so realtime callbacks always read the
+   * latest value without needing to be recreated on every navigation.
+   */
+  const activeCommunityIdRef = useRef(activeCommunityId);
+
+  // Sync the ref AND clear the unread badge whenever the active community changes.
+  useEffect(() => {
+    activeCommunityIdRef.current = activeCommunityId;
     if (!activeCommunityId) return;
+    markReadOnServer(activeCommunityId);
+    setCommunities((prev) => {
+      const updated = prev.map((c) =>
+        c.id === activeCommunityId ? { ...c, message_count: 0 } : c
+      );
+      if (sidebarStore.data) {
+        sidebarStore.data = { ...sidebarStore.data, communities: updated };
+      }
+      return updated;
+    });
+  }, [activeCommunityId]);
+
+  /**
+   * Realtime subscriptions — one channel per joined community.
+   *
+   * Each channel handles two jobs:
+   *   1. Update the last_message preview in the sidebar in real time.
+   *   2. Increment the unread badge for communities the user is NOT currently
+   *      viewing, counting only messages from other users.
+   *
+   * Channels are torn down and re-created only when the list of joined
+   * community IDs changes (not on every message or navigation).
+   */
+  const communityIds = communities.map((c) => c.id).join(",");
+  useEffect(() => {
+    if (!communities.length) return;
 
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
@@ -376,64 +492,84 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
       return;
     }
 
-    const channel = supabase
-      .channel(`panel:${activeCommunityId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "community_messages",
-          filter: `community_id=eq.${activeCommunityId}`,
-        },
-        (payload) => {
-          const row = payload.new as {
-            id: string;
-            community_id: string;
-            content: string;
-            created_at: string;
-            user_id: string;
-          };
+    const channels = communities.map((comm) =>
+      supabase
+        .channel(`panel:${comm.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "community_messages",
+            filter: `community_id=eq.${comm.id}`,
+          },
+          (payload) => {
+            const row = payload.new as {
+              id: string;
+              community_id: string;
+              content: string;
+              created_at: string;
+              user_id: string;
+            };
 
-          // Update sidebar last_message for the active community, re-sort by
-          // recency, and keep sidebarStore.data in sync for the next mount.
-          setCommunities((prev) => {
-            const updated = [...prev]
-              .map((comm) =>
-                comm.id === row.community_id
-                  ? {
-                      ...comm,
-                      last_message: {
-                        content: row.content,
-                        created_at: row.created_at,
-                        user: comm.last_message?.user ?? null,
-                      },
-                    }
-                  : comm
-              )
-              .sort((a, b) => {
-                const ta = a.last_message?.created_at ?? "";
-                const tb = b.last_message?.created_at ?? "";
-                return tb > ta ? 1 : -1;
-              });
+            const isOwn = row.user_id === userId;
+            const isActive = row.community_id === activeCommunityIdRef.current;
 
-            if (sidebarStore.data) {
-              sidebarStore.data = { ...sidebarStore.data, communities: updated };
-            }
+            setCommunities((prev) => {
+              const updated = prev
+                .map((c) =>
+                  c.id === row.community_id
+                    ? {
+                        ...c,
+                        last_message: {
+                          content: row.content,
+                          created_at: row.created_at,
+                          user: c.last_message?.user ?? null,
+                        },
+                        // Increment unread only for messages from others in non-active communities
+                        message_count:
+                          !isOwn && !isActive
+                            ? c.message_count + 1
+                            : c.message_count,
+                      }
+                    : c
+                )
+                .sort((a, b) => {
+                  const ta = a.last_message?.created_at ?? "";
+                  const tb = b.last_message?.created_at ?? "";
+                  return tb > ta ? 1 : -1;
+                });
 
-            return updated;
-          });
-        }
-      )
-      .subscribe();
+              if (sidebarStore.data) {
+                sidebarStore.data = { ...sidebarStore.data, communities: updated };
+              }
+
+              return updated;
+            });
+          }
+        )
+        .subscribe()
+    );
 
     return () => {
-      supabase.removeChannel(channel);
+      channels.forEach((ch) => supabase.removeChannel(ch));
     };
-  }, [activeCommunityId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityIds, userId]);
 
   function handleNavigate(id: string) {
-    // Navigate immediately — CommunityChat will show cached data right away
+    // Persist read timestamp so the next load won't re-show old messages
+    markReadOnServer(id);
+    // Clear badge immediately on click, before navigation completes
+    setCommunities((prev) => {
+      const updated = prev.map((c) =>
+        c.id === id ? { ...c, message_count: 0 } : c
+      );
+      if (sidebarStore.data) {
+        sidebarStore.data = { ...sidebarStore.data, communities: updated };
+      }
+      return updated;
+    });
     router.push(`/dashboard/communities/${id}`);
   }
 

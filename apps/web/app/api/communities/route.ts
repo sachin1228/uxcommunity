@@ -9,16 +9,22 @@ export async function GET() {
 
   const db = createServiceClient();
 
-  // 1. Community IDs this user belongs to
+  // 1. Community IDs this user belongs to, plus their last_read_at per community
   const { data: memberships, error: mErr } = await db
     .from("community_members")
-    .select("community_id")
+    .select("community_id, last_read_at")
     .eq("user_id", userId);
 
   if (mErr) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
   if (!memberships?.length) return NextResponse.json({ communities: [] });
 
   const ids = memberships.map((m) => m.community_id);
+
+  // Build a per-community last_read_at map for unread counting below.
+  const lastReadMap: Record<string, string | null> = {};
+  for (const m of memberships) {
+    lastReadMap[m.community_id] = (m as any).last_read_at ?? null;
+  }
 
   // 2. Community rows + all member counts + recent messages — all in parallel
   const [
@@ -29,13 +35,19 @@ export async function GET() {
     db.from("communities").select("id, name, type, image_url, reference_id").in("id", ids),
     // Single query for all member counts (replaces N individual count queries)
     db.from("community_members").select("community_id").in("community_id", ids),
-    // Single query for recent messages across all communities (replaces N queries)
+    // Fetch the latest messages across all communities.
+    // We always use a row-count limit here (not a timestamp filter) so we
+    // always capture the most recent message per community for the sidebar
+    // preview — even when the user has already read everything (last_read_at
+    // at or after the last message would produce zero rows with a timestamp
+    // filter, incorrectly showing "No messages yet").
+    // Unread counting is done in JS below using lastReadMap, which is correct.
     db
       .from("community_messages")
       .select("community_id, content, created_at, user_id")
       .in("community_id", ids)
       .order("created_at", { ascending: false })
-      .limit(ids.length * 10), // enough to guarantee ≥1 per community
+      .limit(ids.length * 10),
   ]);
 
   if (cErr) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
@@ -46,8 +58,9 @@ export async function GET() {
     countMap[m.community_id] = (countMap[m.community_id] ?? 0) + 1;
   }
 
-  // 4. Pick the latest message per community in JS
-  //    Count only messages from OTHER users (unread from others, not own messages)
+  // 4. Pick the latest message per community AND count unread messages in JS.
+  //    Unread = from another user AND created after the user's last_read_at for
+  //    that community (null last_read_at means never opened → everything counts).
   const lastMsgByComm: Record<string, { community_id: string; content: string; created_at: string; user_id: string }> = {};
   const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
@@ -55,7 +68,12 @@ export async function GET() {
       lastMsgByComm[m.community_id] = m;
     }
     if (m.user_id !== userId) {
-      msgCountMap[m.community_id] = (msgCountMap[m.community_id] ?? 0) + 1;
+      const lastRead = lastReadMap[m.community_id] ?? null;
+      // Count only messages newer than the user's last read timestamp.
+      // If lastRead is null (never opened), all messages from others count.
+      if (!lastRead || m.created_at > lastRead) {
+        msgCountMap[m.community_id] = (msgCountMap[m.community_id] ?? 0) + 1;
+      }
     }
   }
 
