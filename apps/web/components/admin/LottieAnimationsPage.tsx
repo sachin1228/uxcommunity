@@ -25,7 +25,7 @@ interface Community {
 const TYPE_CONFIG: {
   key: string;
   label: string;
-  Icon: React.ComponentType<{ size?: number; className?: string }>;
+  Icon: React.ComponentType<{ size?: number | string; className?: string }>;
 }[] = [
   { key: "company",          label: "Company",    Icon: Building2  },
   { key: "sector",           label: "Industry",   Icon: Layers     },
