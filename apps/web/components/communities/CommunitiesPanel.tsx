@@ -221,7 +221,7 @@ function CommunityRow({
               </p>
             )}
             {c.message_count > 0 && (
-              <span className="flex items-center justify-center min-w-[18px] h-5 px-1 rounded-full bg-green-500 text-white font-mono text-[11px] font-semibold shrink-0">
+              <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
                 {c.message_count > 99 ? "99+" : c.message_count}
               </span>
             )}
