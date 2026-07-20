@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp } from "lucide-react";
+import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard } from "lucide-react";
 
 const MASTER_DATA = [
   { href: "/admin/users",             label: "Users",             icon: Users     },
@@ -11,7 +11,7 @@ const MASTER_DATA = [
   { href: "/admin/cities",            label: "Cities",            icon: MapPin    },
   { href: "/admin/sectors",           label: "Industry",          icon: Layers    },
   { href: "/admin/interests",         label: "Interests",         icon: Sparkles  },
-  { href: "/admin/experience-levels", label: "Experience", icon: TrendingUp },
+  { href: "/admin/experience-levels", label: "Experience",        icon: TrendingUp },
 ];
 
 export function AdminSidebar() {
@@ -37,6 +37,20 @@ export function AdminSidebar() {
       >
         <LayoutList size={16} className={pathname === "/admin" ? "text-accent" : ""} />
         Applications
+      </Link>
+
+      {/* Loading Animations */}
+      <Link
+        href="/admin/lottie-animations"
+        prefetch={false}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          pathname.startsWith("/admin/lottie-animations")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Clapperboard size={16} className={pathname.startsWith("/admin/lottie-animations") ? "text-accent" : ""} />
+        Loading Animations
       </Link>
 
       {/* Master Data accordion */}

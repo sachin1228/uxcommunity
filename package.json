@@ -12,6 +12,7 @@
     "lint": "npm run lint --workspace=apps/web"
   },
   "dependencies": {
-    "boring-avatars": "^2.0.4"
+    "boring-avatars": "^2.0.4",
+    "lottie-react": "^2.4.1"
   }
 }
