@@ -9,23 +9,6 @@ import Avatar from "boring-avatars";
 
 // ─── Constants ────────────────────────────────────────────────
 
-const EXPERIENCE_LEVELS = [
-  { value: "student",        label: "Student" },
-  { value: "fresher",        label: "Fresher (0–1 Years)" },
-  { value: "junior",         label: "Junior Designer (1–3 Years)" },
-  { value: "mid_level",      label: "Mid-Level Designer (3–5 Years)" },
-  { value: "senior",         label: "Senior Designer (5–8 Years)" },
-  { value: "lead",           label: "Lead Designer (8–12 Years)" },
-  { value: "principal",      label: "Principal Designer" },
-  { value: "staff",          label: "Staff Designer" },
-  { value: "design_manager", label: "Design Manager" },
-  { value: "head_of_design", label: "Head of Design" },
-  { value: "director",       label: "Director of Design" },
-  { value: "vp",             label: "VP of Design" },
-  { value: "consultant",     label: "Design Consultant" },
-  { value: "freelancer",     label: "Freelancer" },
-] as const;
-
 // All DiceBear v9 sprite packs (verified working)
 const ALL_DICEBEAR_STYLES: { style: string; label: string }[] = [
   { style: "adventurer",         label: "Adventurer" },
