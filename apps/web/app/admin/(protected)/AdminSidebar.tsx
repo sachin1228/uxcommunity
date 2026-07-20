@@ -50,7 +50,7 @@ export function AdminSidebar() {
         }`}
       >
         <Clapperboard size={16} className={pathname.startsWith("/admin/lottie-animations") ? "text-accent" : ""} />
-        Loading Animations
+        Lottie Animations
       </Link>
 
       {/* Master Data accordion */}
