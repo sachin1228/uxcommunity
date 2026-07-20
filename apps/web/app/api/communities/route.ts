@@ -46,12 +46,14 @@ export async function GET() {
     countMap[m.community_id] = (countMap[m.community_id] ?? 0) + 1;
   }
 
-  // 4. Pick the latest message per community in JS
+  // 4. Pick the latest message per community in JS + count total messages
   const lastMsgByComm: Record<string, { community_id: string; content: string; created_at: string; user_id: string }> = {};
+  const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
     if (!lastMsgByComm[m.community_id]) {
       lastMsgByComm[m.community_id] = m;
     }
+    msgCountMap[m.community_id] = (msgCountMap[m.community_id] ?? 0) + 1;
   }
 
   // 5. Batch-fetch sender names for last messages (1 query instead of N)
@@ -102,6 +104,7 @@ export async function GET() {
         ...c,
         image_url: masterImageMap[c.id] ?? c.image_url ?? null,
         member_count: countMap[c.id] ?? 0,
+        message_count: msgCountMap[c.id] ?? 0,
         last_message: lastMsg
           ? {
               content: lastMsg.content,

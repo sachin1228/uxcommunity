@@ -36,6 +36,7 @@ export interface CachedSidebarCommunity {
   type: "city" | "sector" | "interest" | "company" | "experience_level";
   image_url: string | null;
   member_count: number;
+  message_count: number;
   last_message: {
     content: string;
     created_at: string;

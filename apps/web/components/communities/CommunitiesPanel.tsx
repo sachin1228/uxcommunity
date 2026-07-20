@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, MessageSquare, Search } from "lucide-react";
+import { MessageSquare, Search } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import {
@@ -178,7 +178,7 @@ function CommunityRow({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+        className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
           active
             ? "bg-accent/10 border-l-2 border-l-accent"
             : "hover:bg-surface-raised border-l-2 border-l-transparent"
@@ -218,10 +218,11 @@ function CommunityRow({
                 No messages yet
               </p>
             )}
-            <span className="flex items-center gap-0.5 text-foreground-muted shrink-0">
-              <Users size={10} />
-              <span className="font-mono text-[10px]">{c.member_count}</span>
-            </span>
+            {c.message_count > 0 && (
+              <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-green-500 text-white font-mono text-[10px] font-semibold shrink-0">
+                {c.message_count > 99 ? "99+" : c.message_count}
+              </span>
+            )}
           </div>
         </div>
       </button>
@@ -248,8 +249,8 @@ function SectionGroup({
 
   return (
     <div>
-      <div className="px-4 pt-4 pb-1">
-        <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+      <div className="px-3 pt-2 pb-0.5">
+        <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted">
           {label}
         </span>
       </div>
@@ -451,7 +452,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         Explore Communities
       </button>
 
-      <div className="mx-3 mb-1" />
+      <div className="mx-2 mb-0.5" />
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
@@ -470,7 +471,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
             </p>
           </div>
         ) : (
-          <div className="py-1">
+          <div className="py-0.5">
             {SECTIONS.map((section) => {
               const group = communities.filter((c) => c.type === section.type);
               return (
