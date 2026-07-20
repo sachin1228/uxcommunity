@@ -40,13 +40,6 @@ const TYPE_EMOJI: Record<string, string> = {
   experience_level: "🎯",
 };
 
-const SECTIONS: { label: string; type: Community["type"] }[] = [
-  { label: "Company",    type: "company"          },
-  { label: "Industry",   type: "sector"            },
-  { label: "Interest",   type: "interest"          },
-  { label: "Experience", type: "experience_level"  },
-  { label: "City",       type: "city"              },
-];
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -83,7 +76,7 @@ function CommunityAvatar({
   }
   return (
     <div
-      className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-base font-medium select-none ${
+      className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-lg font-medium select-none ${
         active ? "bg-accent/20" : "bg-surface-raised"
       }`}
     >
@@ -187,7 +180,7 @@ function CommunityRow({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
+        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
           active
             ? "bg-accent/10 border-l-2 border-l-accent"
             : "hover:bg-surface-raised border-l-2 border-l-transparent"
@@ -202,11 +195,11 @@ function CommunityRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-1 mb-0.5">
-            <span className="font-body text-xs font-medium truncate text-foreground">
+            <span className="font-body text-[13px] font-medium truncate text-foreground">
               {c.name}
             </span>
             {c.last_message && (
-              <span className="font-mono text-[10px] text-foreground-muted shrink-0">
+              <span className="font-mono text-xs text-foreground-muted shrink-0">
                 {timeAgo(c.last_message.created_at)}
               </span>
             )}
@@ -214,7 +207,7 @@ function CommunityRow({
 
           <div className="flex items-center gap-1.5">
             {c.last_message ? (
-              <p className="font-body text-[11px] text-foreground-muted truncate flex-1">
+              <p className="font-body text-xs text-foreground-muted truncate flex-1">
                 {c.last_message.user && (
                   <span className="font-medium">
                     {c.last_message.user.name.split(" ")[0]}:
@@ -223,12 +216,12 @@ function CommunityRow({
                 {c.last_message.content}
               </p>
             ) : (
-              <p className="font-body text-[11px] text-foreground-muted/60 italic flex-1">
+              <p className="font-body text-xs text-foreground-muted/60 italic flex-1">
                 No messages yet
               </p>
             )}
             {c.message_count > 0 && (
-              <span className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-green-500 text-white font-mono text-[10px] font-semibold shrink-0">
+              <span className="flex items-center justify-center min-w-[18px] h-5 px-1 rounded-full bg-green-500 text-white font-mono text-[11px] font-semibold shrink-0">
                 {c.message_count > 99 ? "99+" : c.message_count}
               </span>
             )}
@@ -263,7 +256,7 @@ function SectionGroup({
           {label}
         </span>
       </div>
-      <ul>
+      <ul className="space-y-px">
         {communities.map((c) => (
           <CommunityRow
             key={c.id}
@@ -608,20 +601,29 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
           </div>
         ) : (
           <div className="py-0.5">
-            {SECTIONS.map((section) => {
-              const group = communities.filter((c) => c.type === section.type);
-              return (
-                <SectionGroup
-                  key={section.type}
-                  label={section.label}
-                  communities={group}
-                  activeCommunityId={activeCommunityId}
-                  onNavigate={handleNavigate}
-                  onPrefetchEnter={onEnter}
-                  onPrefetchLeave={onLeave}
-                />
-              );
-            })}
+            <div className="px-3 pt-2 pb-0.5">
+              <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted">
+                All
+              </span>
+            </div>
+            <ul className="space-y-px">
+              {[...communities]
+                .sort((a, b) => {
+                  const ta = a.last_message?.created_at ?? "";
+                  const tb = b.last_message?.created_at ?? "";
+                  return tb.localeCompare(ta);
+                })
+                .map((c) => (
+                  <CommunityRow
+                    key={c.id}
+                    c={c}
+                    active={c.id === activeCommunityId}
+                    onClick={() => handleNavigate(c.id)}
+                    onMouseEnter={() => onEnter(c.id)}
+                    onMouseLeave={onLeave}
+                  />
+                ))}
+            </ul>
           </div>
         )}
       </div>

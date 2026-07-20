@@ -40,7 +40,7 @@ export default async function DashboardLayout({
       {/* Compact icon sidebar — full height, left edge */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-16 flex-col items-center border-r border-border bg-surface">
         {/* Brand dot */}
-        <div className="flex h-[57px] w-full shrink-0 items-center justify-center">
+        <div className="flex h-[52px] w-full shrink-0 items-center justify-center">
           <span className="font-display text-xl font-semibold text-foreground">d<span className="text-accent mx-1">/</span></span>
         </div>
 
@@ -53,7 +53,7 @@ export default async function DashboardLayout({
       {/* Everything to the right of the sidebar */}
       <div className="ml-16 flex flex-1 flex-col min-h-screen">
         {/* Topbar — starts after sidebar */}
-        <header className="sticky top-0 z-10 flex h-[57px] items-center justify-between border-b border-border bg-surface px-5 shrink-0">
+        <header className="sticky top-0 z-10 flex h-[52px] items-center justify-between border-b border-border bg-surface px-5 shrink-0">
           <span className="font-display text-sm font-semibold text-foreground tracking-tight">
             {APP_NAME}
           </span>

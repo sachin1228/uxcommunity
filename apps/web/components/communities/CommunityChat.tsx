@@ -398,6 +398,41 @@ export function CommunityChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // ─── Auto-focus input when chat opens / community changes ─────────────────
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [communityId]);
+
+  // ─── Redirect typing to input when focus is elsewhere ─────────────────────
+  // If the user clicks outside the textarea and starts typing, capture the
+  // keypress and redirect focus so characters land in the input — same as
+  // WhatsApp Web. Only triggers for printable characters; ignores modifier
+  // keys, shortcuts (Ctrl/Cmd/Alt), and other focusable elements (inputs etc).
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Already focused on the input — nothing to do.
+      if (document.activeElement === inputRef.current) return;
+
+      // Don't steal focus from other interactive elements (search boxes etc).
+      const tag = (document.activeElement as HTMLElement)?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        (document.activeElement as HTMLElement)?.isContentEditable
+      ) return;
+
+      // Only act on printable characters, not modifier-only or function keys.
+      if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      inputRef.current?.focus();
+      // Do NOT preventDefault — the browser will naturally deliver the
+      // character to the now-focused textarea via the subsequent keypress event.
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [communityId]);
+
   /**
    * Tracks user IDs whose profiles are currently being fetched lazily so we
    * never fire more than one request per unknown sender across rapid Realtime
@@ -918,7 +953,7 @@ export function CommunityChat({
             {error && (
               <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
             )}
-            <div className="flex items-end gap-2 bg-surface-raised rounded-2xl shadow-md px-4 py-3 min-h-[52px]">
+            <div className="flex items-center gap-2 bg-surface-raised rounded-2xl shadow-md px-4 py-3 min-h-[56px]">
               <textarea
                 ref={inputRef}
                 value={input}
