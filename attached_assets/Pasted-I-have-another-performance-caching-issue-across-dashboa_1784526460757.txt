@@ -1,0 +1,300 @@
+I have another performance/caching issue across dashboard navigation.
+
+Current behavior:
+
+1. I open Communities / Explore Communities.
+2. Explore Communities data is fetched from the API.
+3. I navigate to Home.
+4. I return to Communities / Explore Communities.
+5. The same data is fetched again and I see a loading state.
+
+A similar issue may exist with the Home feed: when I leave Home and return, previously fetched data may be discarded because the component unmounts and then fetched again when it remounts.
+
+I want dashboard navigation to feel instant.
+
+IMPORTANT:
+Do NOT add TanStack Query, SWR, IndexedDB, or any new caching library for this change.
+
+Use the same lightweight module-level/session-memory caching approach already used successfully for the Communities/chat feature.
+
+Do not modify the existing working chat message caching/SSR/Realtime architecture unless absolutely necessary.
+
+First, INVESTIGATE before making changes.
+
+Trace the current data flow and actual Network/API requests for:
+
+1. Fresh load → Home
+2. Home → Communities
+3. Communities → Explore Communities
+4. Explore → Home
+5. Home → Communities again
+6. Communities → Explore again
+
+Identify exactly:
+
+- Which API endpoints are called
+- Which endpoints are unnecessarily called again
+- Which React components/useEffects trigger them
+- Whether multiple components fetch the same data
+- Whether requests are duplicated
+- Whether data is discarded simply because a component unmounts
+- Whether any existing cache can be reused
+
+Report your findings before implementation.
+
+Then propose and implement an appropriate session-level stale-while-revalidate caching strategy.
+
+--------------------------------------------------
+EXPLORE COMMUNITIES
+--------------------------------------------------
+
+Desired behavior:
+
+FIRST VISIT:
+
+Explore Communities
+    ↓
+No cache
+    ↓
+Fetch API
+    ↓
+Store result in module-level cache
+    ↓
+Render
+
+REVISIT:
+
+Explore Communities
+    ↓
+Cache exists
+    ↓
+Render cached data IMMEDIATELY
+    ↓
+Check fetchedAt
+    ↓
+Fresh
+    → Do NOT make API request
+
+Stale
+    → Keep cached data visible
+    → Revalidate in background
+    → Update UI when fresh data arrives
+
+Requirements:
+
+- Cache the Explore Communities result at module/session level.
+- Suggested stale time: approximately 5 minutes.
+- Revisiting within the stale time should make 0 unnecessary API requests.
+- Never show the full loading spinner if usable cached data already exists.
+- Add an in-flight request registry/promise so simultaneous consumers reuse the same request.
+- Do not make duplicate requests.
+
+--------------------------------------------------
+JOINED COMMUNITIES SIDEBAR
+--------------------------------------------------
+
+Investigate whether the joined Communities sidebar is also refetched every time I navigate:
+
+Home → Communities → Home → Communities.
+
+If it is:
+
+- Reuse/cache the joined communities list.
+- Use an appropriate stale time, likely around 30–60 seconds.
+- Render cached sidebar data immediately.
+- Revalidate only when stale.
+- Keep existing Supabase Realtime sidebar updates working.
+- Do not break existing community sorting or last-message updates.
+
+If the existing community cache can safely be reused, reuse it rather than creating duplicate cache systems.
+
+--------------------------------------------------
+HOME FEED
+--------------------------------------------------
+
+Investigate whether Home has the same problem.
+
+If Home feed data is fetched again every time the route remounts:
+
+First Home visit
+    ↓
+Fetch feed
+    ↓
+Cache feed
+
+Home → Communities
+
+Return to Home
+    ↓
+Render previous feed immediately
+    ↓
+If fresh → 0 API calls
+    ↓
+If stale → background revalidation
+
+Requirements:
+
+- Restore previously loaded Home feed immediately during the same SPA session.
+- Do not show a full loading skeleton/spinner when valid cached feed data exists.
+- Preserve pagination/infinite-scroll pages correctly if the feed uses pagination.
+- Do not collapse multiple loaded pages into only the first page.
+- Preserve scroll position when returning to Home if reasonably possible without introducing significant complexity.
+- Use a shorter stale time appropriate for a social feed, approximately 30–60 seconds.
+- New posts or mutations should invalidate/update the feed cache appropriately.
+
+--------------------------------------------------
+CACHE INVALIDATION
+--------------------------------------------------
+
+This is important.
+
+When the user:
+
+- Joins a community
+- Leaves a community
+- Creates a community
+- Updates relevant community information
+
+Update or invalidate the appropriate:
+
+- Explore Communities cache
+- Joined Communities cache
+
+For example:
+
+If the user joins Community A from Explore:
+
+Explore cache:
+Community A → joined = true
+
+Joined Communities cache:
+Add Community A
+
+The UI should update immediately without requiring a full refetch if possible.
+
+Similarly, leaving a community should update both caches.
+
+--------------------------------------------------
+USER ISOLATION
+--------------------------------------------------
+
+All user-specific caches must be safely scoped.
+
+On:
+
+- Logout
+- Account change
+- Session change
+
+Clear user-specific module-level caches.
+
+Cached data belonging to User A must NEVER appear for User B.
+
+--------------------------------------------------
+REQUEST DEDUPLICATION
+--------------------------------------------------
+
+Use the same pattern as the existing chat cache:
+
+cache
++
+fetchedAt
++
+staleTime
++
+inFlightPromise
+
+If:
+
+Component A requests Explore
+and
+Component B requests Explore
+
+while the first request is still running:
+
+They should share ONE request.
+
+Not:
+
+Request 1
+Request 2
+
+--------------------------------------------------
+DO NOT BREAK EXISTING CHAT OPTIMIZATIONS
+--------------------------------------------------
+
+Preserve all existing working behavior:
+
+- msgCache
+- metaCache
+- msgFetchedAt
+- inFlightMsgFetch
+- Message stale time
+- MAX_CACHE_ENTRIES
+- Hover prefetch
+- Incremental ?after= message fetching
+- Supabase Realtime
+- Non-selected community Realtime handling
+- SSR initialMeta / initialMessages
+- SSR cold-load optimization
+- Sec-Fetch-Mode navigation detection
+- Stale-response race protection
+- Community chat instant switching
+
+Do not rewrite the chat architecture as part of this PR.
+
+--------------------------------------------------
+TESTING
+--------------------------------------------------
+
+After implementation, manually verify Network requests for:
+
+A. Fresh Home visit
+B. Home → Communities
+C. Communities → Explore
+D. Explore → Home
+E. Home → Communities again
+F. Explore again within stale time
+G. Explore again after stale time
+H. Join a community
+I. Leave a community
+
+Expected result:
+
+Previously fetched fresh data
+→ Render instantly
+→ 0 duplicate API requests
+
+Previously fetched stale data
+→ Render instantly from cache
+→ 1 background request
+
+No cached data
+→ Show loading state
+→ 1 API request
+
+Also verify:
+
+- No duplicate requests
+- No stale responses overwriting newer state
+- Join/leave state stays synchronized
+- Realtime continues working
+- User caches clear correctly on logout
+- TypeScript passes
+- Lint passes if configured
+- Production build passes
+
+Before making changes, report:
+
+1. Exact endpoints currently being unnecessarily refetched
+2. Why each refetch happens
+3. Proposed cache structure
+4. Proposed stale times
+5. Invalidation strategy
+6. How user isolation will work
+
+Wait for my approval after the analysis.
+
+After approval, implement the changes, create a new branch, commit, push, and create a PR.
+
+Do not merge the PR.

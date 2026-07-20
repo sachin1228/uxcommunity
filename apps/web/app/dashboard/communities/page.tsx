@@ -4,15 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Search } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  exploreStore,
+  EXPLORE_STALE_MS,
+  type CachedExploreCommunity,
+} from "@/lib/communities/cache";
 
-interface Community {
-  id: string;
-  name: string;
-  type: "city" | "sector" | "interest" | "company" | "experience_level";
-  image_url: string | null;
-  member_count: number;
-  joined: boolean;
-}
+type Community = CachedExploreCommunity;
 
 const TYPE_EMOJI: Record<string, string> = {
   city:             "📍",
@@ -85,22 +83,65 @@ function CommunityCard({
 
 export default function CommunitiesIndexPage() {
   const router = useRouter();
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  /**
+   * Seed state from the module-level cache on first render (synchronous).
+   * If cache exists the spinner is skipped entirely — render is instant.
+   * If cache is absent, loading=true shows the spinner until the fetch resolves.
+   *
+   * To add join/leave invalidation later, call invalidateOnJoin(id) /
+   * invalidateOnLeave(id) from cache.ts after the API call succeeds — the
+   * exploreStore will be updated in place and the next mount reflects it.
+   */
+  const [communities, setCommunities] = useState<Community[]>(
+    () => exploreStore.data?.communities ?? []
+  );
+  const [loading, setLoading] = useState(() => exploreStore.data === null);
   const [activeTab, setActiveTab] = useState<TabValue>("all");
   const [search, setSearch] = useState("");
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/communities/all");
-      if (!res.ok) return;
-      const data = await res.json();
-      setCommunities(data.communities ?? []);
-    } catch {
-      // silent
-    } finally {
+  const load = useCallback(() => {
+    // Already fresh — render the cached result, do nothing else.
+    if (
+      exploreStore.data &&
+      Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS
+    ) {
       setLoading(false);
+      return;
     }
+
+    // A fetch is already running (e.g. triggered by another tab/component).
+    // Attach to it instead of firing a duplicate request.
+    if (exploreStore.inflight) {
+      exploreStore.inflight.then(() => {
+        if (exploreStore.data) setCommunities(exploreStore.data.communities);
+        setLoading(false);
+      });
+      // Stale data is still usable — hide the spinner while we wait.
+      if (exploreStore.data) setLoading(false);
+      return;
+    }
+
+    // Kick off the fetch and register the promise so any concurrent consumer
+    // can join it rather than issuing a second identical request.
+    const p: Promise<void> = fetch("/api/communities/all")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (!d) return;
+        const fresh = d.communities ?? [];
+        exploreStore.data = { communities: fresh, fetchedAt: Date.now() };
+        setCommunities(fresh);
+      })
+      .catch(() => {})
+      .finally(() => {
+        exploreStore.inflight = null;
+        setLoading(false);
+      });
+
+    exploreStore.inflight = p;
+
+    // Stale data is already showing — keep it visible, no spinner.
+    if (exploreStore.data) setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);

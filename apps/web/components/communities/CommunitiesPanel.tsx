@@ -11,23 +11,14 @@ import {
   inFlightMsgFetch,
   evictIfNeeded,
   MSG_STALE_MS,
+  sidebarStore,
+  SIDEBAR_STALE_MS,
+  initUserCache,
   type CachedMessage,
+  type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 
-interface LastMessage {
-  content: string;
-  created_at: string;
-  user: { name: string } | null;
-}
-
-interface Community {
-  id: string;
-  name: string;
-  type: "city" | "sector" | "interest" | "company" | "experience_level";
-  image_url: string | null;
-  member_count: number;
-  last_message: LastMessage | null;
-}
+type Community = CachedSidebarCommunity;
 
 const TYPE_EMOJI: Record<string, string> = {
   city:             "📍",
@@ -249,16 +240,33 @@ function SectionGroup({
   );
 }
 
-export function CommunitiesPanel() {
+export function CommunitiesPanel({ userId }: { userId: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [loading, setLoading] = useState(true);
   const { onEnter, onLeave } = usePrefetch();
 
   const activeCommunityId = pathname.match(
     /\/dashboard\/communities\/([^/]+)/
   )?.[1];
+
+  /**
+   * Seed React state from the module-level cache synchronously during render,
+   * BEFORE any effects run.
+   *
+   * initUserCache(userId) is called here so that if the active account changed
+   * (e.g. user A logged out and user B logged in without a hard refresh), all
+   * caches are wiped before we read them — preventing data leakage.
+   */
+  const [communities, setCommunities] = useState<Community[]>(() => {
+    initUserCache(userId);
+    return sidebarStore.data?.communities ?? [];
+  });
+
+  /**
+   * Show the loading spinner only when there is NO usable cached data.
+   * On revisits the cached list renders immediately with no spinner.
+   */
+  const [loading, setLoading] = useState(() => sidebarStore.data === null);
 
   /**
    * Ref that always holds the latest activeCommunityId.
@@ -270,18 +278,54 @@ export function CommunitiesPanel() {
     activeCommunityIdRef.current = activeCommunityId;
   }, [activeCommunityId]);
 
-  // Fetch community list exactly once on mount
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/communities");
-      if (!res.ok) return;
-      const data = await res.json();
-      setCommunities(data.communities ?? []);
-    } catch {
-      // silent
-    } finally {
+  /**
+   * Stale-while-revalidate load function.
+   *
+   * - Fresh cache  → skip fetch entirely (0 API calls).
+   * - Stale cache  → render cached data immediately, revalidate in background.
+   * - No cache     → show spinner, fetch, then render.
+   * - In-flight    → attach to the existing promise, no duplicate request.
+   */
+  const load = useCallback(() => {
+    // Cache is fresh — nothing to do.
+    if (
+      sidebarStore.data &&
+      Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS
+    ) {
       setLoading(false);
+      return;
     }
+
+    // A fetch is already running — join it instead of firing a second request.
+    if (sidebarStore.inflight) {
+      sidebarStore.inflight.then(() => {
+        if (sidebarStore.data) setCommunities(sidebarStore.data.communities);
+        setLoading(false);
+      });
+      // Stale data is already showing — hide the spinner while we wait.
+      if (sidebarStore.data) setLoading(false);
+      return;
+    }
+
+    // Start a new fetch and register it so concurrent consumers can share it.
+    const p: Promise<void> = fetch("/api/communities")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (!d) return;
+        const fresh = d.communities ?? [];
+        sidebarStore.data = { communities: fresh, fetchedAt: Date.now() };
+        setCommunities(fresh);
+      })
+      .catch(() => {})
+      .finally(() => {
+        sidebarStore.inflight = null;
+        setLoading(false);
+      });
+
+    sidebarStore.inflight = p;
+
+    // Keep stale data visible during revalidation — no spinner flash.
+    if (sidebarStore.data) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -293,7 +337,8 @@ export function CommunitiesPanel() {
    *
    * Responsibilities:
    * 1. Update the sidebar last_message preview for ALL communities in real time.
-   * 2. For NON-selected communities: append the new message to msgCache so the
+   * 2. Keep sidebarStore.data in sync so the next mount reflects live data.
+   * 3. For NON-selected communities: append the new message to msgCache so the
    *    next visit renders instantly without a spinner. We store it with
    *    `users: null` (sender name not available from the raw payload); the
    *    background fetchMessages() that runs on selection will hydrate it.
@@ -336,9 +381,10 @@ export function CommunitiesPanel() {
               user_id: string;
             };
 
-            // 1. Update sidebar last_message and re-sort by recency.
-            setCommunities((prev) =>
-              [...prev]
+            // 1. Update sidebar last_message, re-sort by recency, and keep
+            //    sidebarStore.data in sync so the next mount sees fresh previews.
+            setCommunities((prev) => {
+              const updated = [...prev]
                 .map((comm) =>
                   comm.id === row.community_id
                     ? {
@@ -357,8 +403,19 @@ export function CommunitiesPanel() {
                   const ta = a.last_message?.created_at ?? "";
                   const tb = b.last_message?.created_at ?? "";
                   return tb > ta ? 1 : -1;
-                })
-            );
+                });
+
+              // Mirror Realtime updates into the module-level cache so the
+              // next panel mount renders the correct last_message preview.
+              if (sidebarStore.data) {
+                sidebarStore.data = {
+                  ...sidebarStore.data,
+                  communities: updated,
+                };
+              }
+
+              return updated;
+            });
 
             // 2. For non-selected communities: append partial message to cache.
             //    CommunityChat's own Realtime handler owns the selected community.

@@ -32,6 +32,10 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
     setLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+      // Clear all module-level caches so the next user who logs in on this
+      // tab never sees data belonging to the current user.
+      const { clearAllUserCaches } = await import("@/lib/communities/cache");
+      clearAllUserCaches();
       router.push("/login");
       router.refresh();
     } finally {
