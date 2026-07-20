@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+} from "react";
 import { Users, Clock, CheckCheck, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
@@ -15,6 +21,15 @@ import {
   type CachedMessage,
   type CachedMeta,
 } from "@/lib/communities/cache";
+
+/**
+ * useLayoutEffect runs synchronously after DOM mutations but before the browser
+ * paints — perfect for seeding React state from SSR props without a visible
+ * spinner flash.  On the server, useLayoutEffect is a no-op, so we fall back
+ * to useEffect to silence the SSR warning.
+ */
+const useIsomorphicLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type Message = CachedMessage;
 
@@ -73,11 +88,22 @@ function Avatar({ name, url, size = 8 }: { name: string; url: string | null; siz
 export function CommunityChat({
   communityId,
   currentUserId,
+  initialMeta,
+  initialMessages,
 }: {
   communityId: string;
   currentUserId: string;
+  /** Provided only on hard browser refresh (SSR). Undefined on client navigation. */
+  initialMeta?: CachedMeta;
+  /** Provided only on hard browser refresh (SSR). Undefined on client navigation. */
+  initialMessages?: CachedMessage[];
 }) {
-  // Seed state from cache immediately — no spinner if we have data
+  // ─── Initial state from module-level cache (empty on hard refresh) ────────
+  // We intentionally do NOT use initialMeta/initialMessages here to avoid
+  // hydration mismatches: the server renders the same empty-cache state as the
+  // client sees on first hydration.  SSR data is applied in the layout effect
+  // below (client-only, before first paint), which is transparent to React's
+  // hydration reconciler.
   const [community, setCommunity] = useState<Community | null>(
     metaCache.get(communityId)?.community ?? null
   );
@@ -98,12 +124,40 @@ export function CommunityChat({
 
   /**
    * Tracks the *currently mounted* communityId.
-   * Used as a stale-response guard: async fetches capture `communityId` by
-   * closure, then compare against this ref before writing to React state.
-   * If the user switched communities before the fetch finished, the ref will
-   * already point to a different id and the stale response is discarded.
+   * Stale-response guard: async fetches capture `communityId` by closure,
+   * then compare against this ref before writing React state.
    */
   const communityIdRef = useRef(communityId);
+
+  // ─── Seed cache from SSR props (hard refresh only, before first paint) ────
+  //
+  // This runs client-side only (layout effects don't execute during SSR) and
+  // fires synchronously before the browser paints — so the user sees the chat
+  // immediately without a spinner flash on hard refresh.
+  //
+  // On client-side navigation, initialMeta and initialMessages are undefined
+  // (page.tsx skips the server fetch), so this is a no-op and the existing
+  // module-level cache handles rendering as before.
+  useIsomorphicLayoutEffect(() => {
+    if (!initialMeta && !initialMessages?.length) return;
+
+    if (initialMeta && !metaCache.has(communityId)) {
+      // Use client clock so subsequent stale checks are consistent.
+      metaCache.set(communityId, { ...initialMeta, fetchedAt: Date.now() });
+      setCommunity(initialMeta.community);
+      setMembers(initialMeta.members);
+    }
+    if (initialMessages?.length && !msgCache.has(communityId)) {
+      msgCache.set(communityId, initialMessages);
+      msgFetchedAt.set(communityId, Date.now());
+      evictIfNeeded();
+      setMessages(initialMessages);
+    }
+    setLoading(false);
+    // communityId is stable for the lifetime of this component instance.
+    // initialMeta/initialMessages are never updated after mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -121,12 +175,11 @@ export function CommunityChat({
 
   // ─── Fetch community metadata only (header + members) ────────────────────
   const fetchMeta = useCallback(async () => {
-    const targetId = communityId; // captured at call time
+    const targetId = communityId;
     const res = await fetch(`/api/communities/${targetId}`);
     if (!res.ok) return;
     const d = await res.json();
 
-    // Stale-response guard: discard if community changed while we were fetching
     if (communityIdRef.current !== targetId) return;
 
     const cached: CachedMeta = {
@@ -142,11 +195,8 @@ export function CommunityChat({
   // ─── Fetch messages (full or incremental via ?after=ISO) ─────────────────
   const fetchMessages = useCallback(
     (after?: string): Promise<void> => {
-      const targetId = communityId; // captured at call time
+      const targetId = communityId;
 
-      // For full fetches: deduplicate concurrent requests.
-      // If a hover-prefetch already started a full fetch for this community,
-      // the click reuses that same promise instead of firing a second request.
       if (!after) {
         const inflight = inFlightMsgFetch.get(targetId);
         if (inflight) return inflight;
@@ -157,17 +207,12 @@ export function CommunityChat({
         : `/api/communities/${targetId}/messages`;
 
       const p: Promise<void> = fetch(url)
-        .then((res) => {
-          if (!res.ok) return;
-          return res.json();
-        })
+        .then((res) => (res.ok ? res.json() : undefined))
         .then((d) => {
           if (!d) return;
           const incoming: Message[] = d.messages ?? [];
 
           if (after) {
-            // Incremental: merge new messages into existing cache.
-            // Guard: only update React state if still on the same community.
             setMessages((prev) => {
               if (communityIdRef.current !== targetId) return prev;
               const existingIds = new Set(prev.map((m) => m.id));
@@ -184,8 +229,6 @@ export function CommunityChat({
               return merged;
             });
           } else {
-            // Full replace — update cache unconditionally (correct data for that id),
-            // but only push to React state if still on this community.
             msgCache.set(targetId, incoming);
             msgFetchedAt.set(targetId, Date.now());
             evictIfNeeded();
@@ -206,15 +249,17 @@ export function CommunityChat({
   );
 
   // ─── On communityId change: show cache instantly, fetch in background ─────
+  //
+  // The SSR seed effect (above) runs before this on the initial mount, so
+  // msgFetchedAt and metaCache will already be populated for hard-refresh
+  // loads — causing this effect to skip the API calls entirely.
   useEffect(() => {
-    // Keep the ref in sync immediately so stale-response guards work.
     communityIdRef.current = communityId;
     let cancelled = false;
 
     const cachedMsgs = msgCache.get(communityId);
     const cachedMeta = metaCache.get(communityId);
 
-    // Immediately restore whatever we have (no waiting, no spinner if cached)
     setMessages(cachedMsgs ?? []);
     if (cachedMeta) {
       setCommunity(cachedMeta.community);
@@ -228,9 +273,6 @@ export function CommunityChat({
 
     const metaIsStale =
       !cachedMeta || Date.now() - cachedMeta.fetchedAt > META_STALE_MS;
-
-    // Messages: skip background refetch if fresh (avoids a wasted request on
-    // every revisit; the Realtime subscription keeps data up-to-date instead).
     const fetchedAt = msgFetchedAt.get(communityId);
     const msgsStale = !fetchedAt || Date.now() - fetchedAt > MSG_STALE_MS;
     const hasCachedMsgs = msgCache.has(communityId);
@@ -280,13 +322,9 @@ export function CommunityChat({
             created_at: string;
           };
 
-          // Check the module-level cache (always current) for duplicates.
-          // CommunitiesPanel may have already appended this message to the
-          // cache for non-selected communities, so we deduplicate here too.
           const cached = msgCache.get(communityId) ?? [];
           if (cached.some((m) => m.id === newRow.id)) return;
 
-          // Fetch only the messages since the last real (non-optimistic) one.
           const lastReal = cached
             .filter((m) => !m.id.startsWith("temp-"))
             .at(-1);
@@ -336,7 +374,6 @@ export function CommunityChat({
       if (res.ok) {
         const { message } = await res.json();
         setMessages((prev) => {
-          // Realtime may have already added the real message — avoid duplicate
           if (prev.some((m) => m.id === message.id)) {
             const next = prev.filter((m) => m.id !== tempId);
             msgCache.set(communityId, next);
@@ -476,7 +513,6 @@ export function CommunityChat({
 
             {grouped.map((group) => (
               <div key={group.date}>
-                {/* Date divider */}
                 <div className="flex items-center justify-center py-3">
                   <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
                     {group.date}
@@ -609,7 +645,7 @@ export function CommunityChat({
           </div>
         </div>
 
-        {/* Members panel — always visible */}
+        {/* Members panel */}
         <div className="w-56 shrink-0 border-l border-border bg-surface flex flex-col overflow-hidden">
           <div
             className="px-4 py-3 border-b border-border relative"
