@@ -325,9 +325,21 @@ export function CommunityChat({
     );
 
     if (sidebarUnreadCount > 0 && unreadMsgs.length === 0) {
-      // Stale cache — fall back silently. lastReadAt is already set so the
-      // snapshot effect can compute the boundary once the fetch delivers the
-      // missing messages.
+      // Sidebar says there are unreads but they aren't in the message cache —
+      // cache is stale. Fall back to the incremental fetch path.
+      return;
+    }
+
+    if (unreadMsgs.length === 0) {
+      // Zero unread in the message cache. We can't confirm the sidebar count is
+      // accurate — it may be stale if CommunitiesPanel was unmounted while
+      // messages arrived (real-time subscriptions only run while the panel is
+      // mounted, e.g. not on /dashboard or /profile). Fall back to the
+      // incremental fetch + snapshot-effect path, which re-computes the
+      // boundary against fresh server messages. For communities that truly have
+      // 0 unreads this adds one network round-trip (~100–200 ms); for
+      // communities that DO have missed unreads this prevents the divider from
+      // silently disappearing.
       return;
     }
 

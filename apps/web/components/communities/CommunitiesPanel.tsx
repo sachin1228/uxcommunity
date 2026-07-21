@@ -418,11 +418,31 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
 
         setCommunities((prev) => {
           const prevMap = new Map(prev.map((c) => [c.id, c]));
+          // Snapshot sidebarStore communities so we can preserve optimistic
+          // last_read_at values that may be ahead of what the server returns.
+          // (markReadOnServer may still be in-flight when this fetch resolves.)
+          const storeById = new Map(
+            (sidebarStore.data?.communities ?? []).map((c) => [c.id, c])
+          );
           const currentActiveId = activeCommunityIdRef.current;
           const merged = fresh.map((server) => {
             const local = prevMap.get(server.id);
+            const stored = storeById.get(server.id);
+            // Keep the later of the server's and optimistic last_read_at so
+            // that an in-flight markReadOnServer is never rolled back.
+            const serverMs = server.last_read_at
+              ? new Date(server.last_read_at).getTime()
+              : -Infinity;
+            const storedMs = stored?.last_read_at
+              ? new Date(stored.last_read_at).getTime()
+              : -Infinity;
+            const bestLastReadAt =
+              !stored?.last_read_at || serverMs >= storedMs
+                ? server.last_read_at
+                : stored.last_read_at;
             return {
               ...server,
+              last_read_at: bestLastReadAt,
               // Active community is always 0 — user is reading it right now.
               // For others: never roll back a count already incremented by
               // realtime while this fetch was in-flight.
@@ -539,7 +559,18 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         c.id === activeCommunityId ? { ...c, message_count: 0 } : c
       );
       if (sidebarStore.data) {
-        sidebarStore.data = { ...sidebarStore.data, communities: updated };
+        // Preserve the optimistic last_read_at from sidebarStore — do not
+        // overwrite it with the stale value in React state.
+        const storeById = new Map(
+          sidebarStore.data.communities.map((c) => [c.id, c])
+        );
+        sidebarStore.data = {
+          ...sidebarStore.data,
+          communities: updated.map((c) => ({
+            ...c,
+            last_read_at: storeById.get(c.id)?.last_read_at ?? c.last_read_at,
+          })),
+        };
       }
       return updated;
     });
@@ -618,7 +649,21 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               );
 
               if (sidebarStore.data) {
-                sidebarStore.data = { ...sidebarStore.data, communities: updated };
+                // Preserve optimistic last_read_at from sidebarStore so that
+                // real-time message arrivals don't overwrite it with stale
+                // React state, which would cause the unread divider to
+                // reappear on return visits.
+                const storeById = new Map(
+                  sidebarStore.data.communities.map((c) => [c.id, c])
+                );
+                sidebarStore.data = {
+                  ...sidebarStore.data,
+                  communities: updated.map((c) => ({
+                    ...c,
+                    last_read_at:
+                      storeById.get(c.id)?.last_read_at ?? c.last_read_at,
+                  })),
+                };
               }
 
               return updated;
@@ -670,7 +715,19 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         c.id === id ? { ...c, message_count: 0 } : c
       );
       if (sidebarStore.data) {
-        sidebarStore.data = { ...sidebarStore.data, communities: updated };
+        // Merge with sidebarStore so the optimistic last_read_at advancement
+        // written above is not overwritten by the stale value in React state.
+        // Without this, every return visit would re-show the unread divider.
+        const storeById = new Map(
+          sidebarStore.data.communities.map((c) => [c.id, c])
+        );
+        sidebarStore.data = {
+          ...sidebarStore.data,
+          communities: updated.map((c) => ({
+            ...c,
+            last_read_at: storeById.get(c.id)?.last_read_at ?? c.last_read_at,
+          })),
+        };
       }
       return updated;
     });
