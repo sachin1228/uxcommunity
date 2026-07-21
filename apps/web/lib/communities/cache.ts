@@ -37,6 +37,8 @@ export interface CachedSidebarCommunity {
   image_url: string | null;
   member_count: number;
   message_count: number;
+  /** The user's last_read_at for this community, returned by /api/communities. */
+  last_read_at?: string | null;
   last_message: {
     content: string;
     created_at: string;
@@ -164,6 +166,18 @@ export function invalidateOnLeave(communityId: string): void {
 }
 
 // ─── Existing chat caches (unchanged) ─────────────────────────────────────────
+
+/**
+ * last_read_at timestamp captured by CommunitiesPanel the moment a community
+ * is activated — BEFORE last_read_at is updated on the server.  CommunityChat
+ * uses this to find the first unread message by timestamp comparison, which is
+ * immune to the count-mismatch bug (message_count only counts other users'
+ * messages, but the old index-from-end approach counted all messages).
+ *
+ * Stores `string` (ISO timestamp) or `null` (community was never read before).
+ * `undefined` (key absent) means the value has not been captured yet.
+ */
+export const lastReadAtOnOpen = new Map<string, string | null>();
 
 /** Messages keyed by communityId */
 export const msgCache = new Map<string, CachedMessage[]>();

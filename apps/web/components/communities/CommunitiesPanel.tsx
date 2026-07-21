@@ -17,6 +17,7 @@ import {
   sidebarStore,
   SIDEBAR_STALE_MS,
   initUserCache,
+  lastReadAtOnOpen,
   type CachedMeta,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
@@ -24,12 +25,28 @@ import {
 type Community = CachedSidebarCommunity;
 
 /**
- * Fire-and-forget: update last_read_at for this community on the server.
- * The server uses this to compute accurate unread counts on the next sidebar fetch.
- * Runs silently — UI badge is already zeroed client-side before this resolves.
+ * Mark a community as read on the server.
+ *
+ * The PATCH endpoint returns `previousLastReadAt` — the last_read_at value
+ * BEFORE it was overwritten.  We store it in `lastReadAtOnOpen` so that
+ * CommunityChat can position the unread divider by timestamp comparison even
+ * when sidebarStore.data was null (user arrived from another page) and the
+ * synchronous snapshot in the activeCommunityId effect couldn't be taken.
+ *
+ * We only store the async fallback if the synchronous path didn't already
+ * set the value (hasOwnProperty check via .has()).
  */
-function markReadOnServer(communityId: string) {
-  fetch(`/api/communities/${communityId}/read`, { method: "PATCH" }).catch(() => {});
+async function markReadOnServer(communityId: string) {
+  try {
+    const res = await fetch(`/api/communities/${communityId}/read`, { method: "PATCH" });
+    if (res.ok) {
+      const data = await res.json();
+      // Only use as fallback — don't overwrite a value the sync path already set.
+      if (!lastReadAtOnOpen.has(communityId) && "previousLastReadAt" in data) {
+        lastReadAtOnOpen.set(communityId, data.previousLastReadAt ?? null);
+      }
+    }
+  } catch {}
 }
 
 const TYPE_EMOJI: Record<string, string> = {
@@ -451,7 +468,40 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
   useEffect(() => {
     activeCommunityIdRef.current = activeCommunityId;
     if (!activeCommunityId) return;
-    markReadOnServer(activeCommunityId);
+
+    // Snapshot last_read_at SYNCHRONOUSLY in the effect body — NOT inside the
+    // setCommunities updater.  React calls updaters lazily during the next render,
+    // so anything written inside an updater is invisible to sibling-component
+    // effects that fire in the same flush (e.g. CommunityChat's communityId effect).
+    //
+    // We use last_read_at (not message_count) so that CommunityChat can find the
+    // first unread message by timestamp comparison.  This is immune to the
+    // count-mismatch bug where message_count only counts other users' messages
+    // but the old index-from-end approach indexed into all messages.
+    //
+    // If sidebarStore.data is null (user arrived from another page before the
+    // sidebar had a chance to load), snapshot is undefined and we can't set the
+    // value synchronously.  markReadOnServer's async fallback will store it from
+    // the PATCH response instead, and CommunityChat's late-arrival check in the
+    // scroll effect will pick it up once messages finish loading.
+    // Only capture last_read_at if handleNavigate didn't already do it
+    // synchronously (handleNavigate sets it before router.push so CommunityChat's
+    // layout effect always finds it; this effect fires later and must not overwrite).
+    if (!lastReadAtOnOpen.has(activeCommunityId)) {
+      const snapshot = sidebarStore.data?.communities.find(
+        (c) => c.id === activeCommunityId
+      );
+      if (snapshot) {
+        // "last_read_at" in snapshot only when the sidebar API has been fetched at
+        // least once; fall back gracefully if the field is absent.
+        lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
+      }
+
+      // markReadOnServer is now async and stores previousLastReadAt as a fallback
+      // for the case where the synchronous snapshot above was not available.
+      markReadOnServer(activeCommunityId);
+    }
+
     setCommunities((prev) => {
       const updated = prev.map((c) =>
         c.id === activeCommunityId ? { ...c, message_count: 0 } : c
@@ -553,9 +603,23 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
   }, [communityIds, userId]);
 
   function handleNavigate(id: string) {
-    // Persist read timestamp so the next load won't re-show old messages
-    markReadOnServer(id);
-    // Clear badge immediately on click, before navigation completes
+    // STEP 1: Capture the OLD last_read_at SYNCHRONOUSLY before anything else.
+    // This must happen before:
+    //   - message_count is cleared (badge disappears)
+    //   - markReadOnServer overwrites last_read_at on the server
+    //   - router.push triggers navigation (CommunityChat effects fire)
+    //
+    // By writing to lastReadAtOnOpen here (before router.push), the fast-path
+    // layout effect in CommunityChat will always find the value immediately —
+    // no race condition with the activeCommunityId effect below.
+    if (!lastReadAtOnOpen.has(id)) {
+      const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
+      if (snapshot) {
+        lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
+      }
+    }
+
+    // STEP 2: Clear the unread badge immediately (optimistic UI).
     setCommunities((prev) => {
       const updated = prev.map((c) =>
         c.id === id ? { ...c, message_count: 0 } : c
@@ -565,7 +629,13 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
       }
       return updated;
     });
+
+    // STEP 3: Navigate.
     router.push(`/dashboard/communities/${id}`);
+
+    // STEP 4: Persist the read state in the background — this is pure server
+    // persistence and must NOT block or influence the visual scroll position.
+    void markReadOnServer(id);
   }
 
   return (

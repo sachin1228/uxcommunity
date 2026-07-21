@@ -143,6 +143,7 @@ export async function GET() {
         image_url: masterImageMap[c.id] ?? c.image_url ?? null,
         member_count: countMap[c.id] ?? 0,
         message_count: msgCountMap[c.id] ?? 0,
+        last_read_at: lastReadMap[c.id] ?? null,
         last_message: lastMsg
           ? {
               content: lastMsg.content,

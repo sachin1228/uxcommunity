@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Fragment,
   useState,
   useEffect,
   useLayoutEffect,
@@ -21,6 +22,7 @@ import {
   META_STALE_MS,
   MSG_STALE_MS,
   sidebarStore,
+  lastReadAtOnOpen,
   type CachedMessage,
   type CachedMeta,
 } from "@/lib/communities/cache";
@@ -92,6 +94,7 @@ export function CommunityChat({
   currentUserId,
   initialMeta,
   initialMessages,
+  initialLastReadAt,
 }: {
   communityId: string;
   currentUserId: string;
@@ -99,6 +102,14 @@ export function CommunityChat({
   initialMeta?: CachedMeta;
   /** Provided only on hard browser refresh (SSR). Undefined on client navigation. */
   initialMessages?: CachedMessage[];
+  /**
+   * The user's last_read_at for this community at the time of the hard refresh.
+   * Used to position the unread divider by timestamp comparison (more reliable
+   * than count-from-end, which mismatches when the user also sent messages).
+   * null = user never opened this community before.
+   * undefined = client-side navigation; lastReadAtOnOpen map is used instead.
+   */
+  initialLastReadAt?: string | null;
 }) {
   // ─── Initial state — always start empty to avoid SSR/client hydration mismatch ──
   //
@@ -130,6 +141,52 @@ export function CommunityChat({
   const membersDropdownRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDoneRef = useRef(false);
+  const unreadDividerRef = useRef<HTMLDivElement>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  /**
+   * The last_read_at timestamp captured the moment this community was opened.
+   * Used to find the first unread message by timestamp comparison (immune to the
+   * count-mismatch bug where message_count only counted other users' messages).
+   * null  = community was never read before (all messages are "new").
+   * undefined = not yet known (divider is hidden until we get the value).
+   */
+  const [lastReadAt, setLastReadAt] = useState<string | null | undefined>(undefined);
+  /**
+   * Frozen snapshot of the unread boundary captured the moment lastReadAt is
+   * first known for this chat session.  Never mutated afterward — this is what
+   * WhatsApp calls the "unread boundary": it stays at the same chronological
+   * position regardless of new messages arriving or the server marking messages
+   * read.  null = snapshot not yet taken (divider hidden until ready).
+   */
+  const unreadAtOpenRef = useRef<{ firstMsgId: string | null; count: number } | null>(null);
+  /** Flips to true once unreadAtOpenRef has been populated, triggering a render
+   *  so the divider element appears in the DOM before the initial scroll runs. */
+  const [snapshotReady, setSnapshotReady] = useState(false);
+  /**
+   * Flips to true only after the initial message fetch (msgPromise) resolves.
+   * Used only by the FALLBACK path when the fast-path layout effect could not
+   * compute the snapshot immediately (cold cache or stale cache safety check).
+   */
+  const [initialMessagesReady, setInitialMessagesReady] = useState(false);
+  /**
+   * Controls whether the message timeline is visible. Starts false so the
+   * browser never paints messages at an incorrect scroll position. Set to true
+   * by the initial-scroll layout effect immediately after it positions the
+   * viewport — so the FIRST visible frame is already at the correct position.
+   *
+   * visibility:hidden (not display:none) is used so the DOM exists and its
+   * height/scroll metrics can be measured by the layout effect.
+   *
+   * Header, composer, and members panel remain visible throughout.
+   */
+  const [initialPositionResolved, setInitialPositionResolved] = useState(false);
+  /** Set to true by the realtime INSERT handler before calling setMessages,
+   *  so the messages-change effect knows a real insert just happened. */
+  const realtimeInsertPendingRef = useRef(false);
+  /** Captured by the INSERT handler: was the user near the bottom at that moment? */
+  const realtimeWasNearBottomRef = useRef(false);
 
   /**
    * Tracks the *currently mounted* communityId.
@@ -189,10 +246,103 @@ export function CommunityChat({
 
     if (cachedMeta || initialMeta) setLoading(false);
 
-    // communityId, initialMeta, initialMessages are stable for this component
-    // instance (they come from the page params and never change after mount).
+    // Case 2 (hard refresh): seed lastReadAt from the SSR prop so the divider
+    // is positioned correctly before lastReadAtOnOpen is populated.
+    // On client-nav the communityId effect handles this via lastReadAtOnOpen.
+    // Only seed when there are no cached messages; if the cache is warm, the
+    // communityId effect's lastReadAtOnOpen read is authoritative.
+    if (!cachedMsgs?.length && initialLastReadAt !== undefined) {
+      setLastReadAt(initialLastReadAt);
+    }
+
+    // communityId, initialMeta, initialMessages, initialLastReadAt are stable
+    // for this component instance (from page params, never change after mount).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Fast-path: compute unread snapshot from cache BEFORE first paint ─────
+  //
+  // Runs synchronously (layout phase) on every communityId change so the very
+  // first browser frame is already positioned at the unread boundary.
+  //
+  // Why layout effect?
+  //   A regular useEffect fires after the browser has had a chance to paint.
+  //   By using useIsomorphicLayoutEffect we run in the same synchronous phase as
+  //   React DOM commits — before any pixels are drawn. State updates made here
+  //   trigger a synchronous re-render (still pre-paint), so the user never sees
+  //   the intermediate "scrollTop=0" state.
+  //
+  // Fast path fires when:
+  //   1. cachedMsgs are available (warm cache from hover-prefetch or prior visit)
+  //   2. lastReadAtOnOpen has the OLD last_read_at captured by handleNavigate
+  //
+  // Safety gate: if the sidebar says message_count > 0 but the cached messages
+  // produce 0 unread (cache predates the unread messages), we don't freeze an
+  // incorrect zero snapshot. Instead we stay hidden and let the incremental
+  // fetch + fallback snapshot path handle it.
+  useIsomorphicLayoutEffect(() => {
+    // ── Reset scroll / unread / visibility state for this community ──────────
+    // These MUST be reset in the layout phase so the scroll layout effect (also
+    // in the layout phase) sees a clean slate before snapshotReady flips true.
+    initialScrollDoneRef.current = false;
+    unreadAtOpenRef.current = null;
+    setSnapshotReady(false);
+    setInitialPositionResolved(false);
+
+    const cachedMsgs = msgCache.get(communityId);
+    const hasOpeningLastReadAt = lastReadAtOnOpen.has(communityId);
+
+    if (!cachedMsgs?.length || !hasOpeningLastReadAt) {
+      // Cannot fast-path: cache is cold or opening snapshot not yet available.
+      // Messages stay hidden (initialPositionResolved=false) until the fallback
+      // path (incremental fetch → snapshot effect → scroll layout effect) runs.
+      return;
+    }
+
+    const openingLastReadAt = lastReadAtOnOpen.get(communityId) ?? null;
+    // Consume the map entry so the snapshot effect's fallback poll is skipped.
+    lastReadAtOnOpen.delete(communityId);
+    // Surface lastReadAt in state so the snapshot effect can use it if needed.
+    setLastReadAt(openingLastReadAt);
+
+    // ── Safety check ─────────────────────────────────────────────────────────
+    // If the sidebar still shows unread messages but the cached snapshot yields
+    // zero unread (e.g. the cache was fetched before those messages arrived),
+    // the cache is stale. Fall back to the incremental fetch path rather than
+    // freezing a wrong zero count. Messages stay hidden until positioned.
+    const sidebarEntry_ = sidebarStore.data?.communities.find(
+      (c) => c.id === communityId
+    );
+    const sidebarUnreadCount = sidebarEntry_?.message_count ?? 0;
+
+    const lastReadTime =
+      openingLastReadAt === null ? -Infinity : new Date(openingLastReadAt).getTime();
+    const unreadMsgs = cachedMsgs.filter(
+      (m) =>
+        !m.id.startsWith("temp-") &&
+        m.user_id !== currentUserId &&
+        new Date(m.created_at).getTime() > lastReadTime
+    );
+
+    if (sidebarUnreadCount > 0 && unreadMsgs.length === 0) {
+      // Stale cache — fall back silently. lastReadAt is already set so the
+      // snapshot effect can compute the boundary once the fetch delivers the
+      // missing messages.
+      return;
+    }
+
+    // ── Freeze the snapshot ───────────────────────────────────────────────────
+    unreadAtOpenRef.current = {
+      firstMsgId: unreadMsgs[0]?.id ?? null,
+      count: unreadMsgs.length,
+    };
+    // Trigger re-render so the divider element appears in the DOM; the scroll
+    // layout effect below will then position the viewport before paint.
+    setSnapshotReady(true);
+
+    // currentUserId is a stable prop — intentionally omitted from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -343,6 +493,12 @@ export function CommunityChat({
   // MSG_STALE_MS only gates full refetches when there is no cache at all.
   useEffect(() => {
     communityIdRef.current = communityId;
+    // scroll/unread/position state is reset in the fast-path layout effect above
+    // (which runs synchronously before this effect). Only reset the async flags
+    // that the layout effect doesn't touch.
+    setShowScrollToBottom(false);
+    setInitialMessagesReady(false);
+
     let cancelled = false;
 
     const cachedMsgs = msgCache.get(communityId);
@@ -384,7 +540,14 @@ export function CommunityChat({
         msgPromise,
         metaIsStale ? fetchMeta() : Promise.resolve(),
       ]);
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+        // Signal that initial message catch-up is complete.  The snapshot effect
+        // waits for this before freezing the unread boundary — this prevents the
+        // snapshot from being taken against stale cached messages before the
+        // incremental fetch has added any new unread messages.
+        setInitialMessagesReady(true);
+      }
     })();
 
     return () => {
@@ -393,10 +556,155 @@ export function CommunityChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId]);
 
-  // ─── Scroll to bottom on new messages ────────────────────────────────────
+  // ─── Effect 1: Unread boundary snapshot ──────────────────────────────────
+  // Runs once after BOTH lastReadAt is known AND the initial message fetch has
+  // completed (initialMessagesReady). This guarantees the snapshot is taken
+  // against the full post-catch-up message list, not stale cached data.
+  // Does NOT depend on `messages` — we intentionally avoid re-running when
+  // realtime messages arrive after the snapshot has been frozen.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!initialMessagesReady) return;
+    if (snapshotReady) return; // already done for this session
+
+    // Resolve lastReadAt if CommunitiesPanel's effect ran after ours.
+    if (lastReadAt === undefined) {
+      if (lastReadAtOnOpen.has(communityId)) {
+        setLastReadAt(lastReadAtOnOpen.get(communityId) ?? null);
+        lastReadAtOnOpen.delete(communityId);
+        // State update → re-render → this effect fires again with lastReadAt set.
+        return;
+      }
+      // PATCH still in flight — poll after a short delay then give up with null.
+      const timer = setTimeout(() => {
+        if (communityIdRef.current !== communityId) return;
+        if (lastReadAtOnOpen.has(communityId)) {
+          setLastReadAt(lastReadAtOnOpen.get(communityId) ?? null);
+          lastReadAtOnOpen.delete(communityId);
+        } else {
+          // PATCH never returned previousLastReadAt — treat as no prior reads.
+          setLastReadAt(null);
+        }
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+
+    // Compute the frozen snapshot from the messages currently in state.
+    // These are the post-catch-up messages: any unread messages that arrived
+    // while the user was away are now present.
+    const realMsgs = messages.filter((m) => !m.id.startsWith("temp-"));
+    const lastReadTime =
+      lastReadAt === null ? -Infinity : new Date(lastReadAt).getTime();
+    const unreadMsgs = realMsgs.filter(
+      (m) =>
+        m.user_id !== currentUserId &&
+        new Date(m.created_at).getTime() > lastReadTime
+    );
+    const firstMsgId = unreadMsgs[0]?.id ?? null;
+    const count = unreadMsgs.length;
+
+    console.log("[UnreadSnapshot CREATED]", {
+      communityId,
+      lastReadAt,
+      firstMsgId,
+      count,
+      messageCount: messages.length,
+      existsInMessages: firstMsgId
+        ? messages.some((m) => m.id === firstMsgId)
+        : "n/a",
+    });
+
+    unreadAtOpenRef.current = { firstMsgId, count };
+    // setSnapshotReady → re-render → divider element appears in DOM at the
+    // correct position → Effect 2 fires and performs the initial scroll.
+    setSnapshotReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessagesReady, lastReadAt, communityId, snapshotReady]);
+
+  // ─── Effect 2: Initial scroll to unread boundary (layout effect) ─────────
+  //
+  // Using useIsomorphicLayoutEffect instead of useEffect ensures this runs
+  // SYNCHRONOUSLY after the DOM is committed but BEFORE the browser paints.
+  // Combined with the fast-path layout effect above, the sequence is:
+  //
+  //   Render N   → messages + divider committed to DOM
+  //   Layout effect (fast-path) → snapshotReady = true  (re-render queued)
+  //   Render N+1 → divider element present in DOM
+  //   Layout effect (this one) → scrollTop set instantly
+  //   Layout effect → initialPositionResolved = true  (re-render queued)
+  //   Render N+2 → visibility:hidden lifted
+  //   Browser paints → user sees correct position on first frame  ✓
+  //
+  // No requestAnimationFrame, no smooth scrolling — initial positioning is
+  // always instant so there is never a visible jump.
+  useIsomorphicLayoutEffect(() => {
+    if (!snapshotReady) return;
+    if (loading) return; // messages not in DOM yet; wait for loading to clear
+    if (initialScrollDoneRef.current) return;
+
+    initialScrollDoneRef.current = true;
+
+    const container = scrollContainerRef.current;
+    if (!container) {
+      setInitialPositionResolved(true);
+      return;
+    }
+
+    const isOverflowing = container.scrollHeight > container.clientHeight;
+
+    if (!isOverflowing) {
+      // Short chat: content fits entirely in the viewport. The inner wrapper's
+      // `justify-end` already places messages at the bottom above the composer.
+      // There is nothing to scroll — just reveal.
+      setInitialPositionResolved(true);
+      return;
+    }
+
+    const divider = unreadDividerRef.current;
+    if (divider && unreadAtOpenRef.current?.firstMsgId) {
+      // Position the unread divider ~80 px below the top of the viewport —
+      // WhatsApp-style: the boundary is visible with a few read messages above
+      // for context, and the first unread messages are immediately below.
+      const dividerRect = divider.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const dividerTop = dividerRect.top - containerRect.top + container.scrollTop;
+      container.scrollTop = Math.max(0, dividerTop - 80);
+    } else {
+      // No unread boundary — jump instantly to the very bottom.
+      container.scrollTop = container.scrollHeight - container.clientHeight;
+    }
+
+    setInitialPositionResolved(true);
+  }, [snapshotReady, loading, communityId]);
+
+  // ─── Effect 3: Realtime auto-scroll ───────────────────────────────────────
+  // Fires when a realtime INSERT has just been processed (flagged by the
+  // subscription callback before calling setMessages).  Only scrolls if the
+  // user was near the bottom at the moment the message arrived — never
+  // interrupts someone reading history.  The unread snapshot is never touched.
+  useEffect(() => {
+    if (!initialScrollDoneRef.current) return;
+    if (!realtimeInsertPendingRef.current) return;
+    realtimeInsertPendingRef.current = false;
+
+    if (realtimeWasNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      setShowScrollToBottom(true);
+    }
   }, [messages]);
+
+  // ─── Show / hide scroll-to-bottom button on manual scroll ────────────────
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const onScroll = () => {
+      const dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShowScrollToBottom(dist > 80);
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, []);
+
 
   // ─── Auto-focus input when chat opens / community changes ─────────────────
   useEffect(() => {
@@ -485,6 +793,22 @@ export function CommunityChat({
             content: string;
             created_at: string;
           };
+
+          // Capture scroll position NOW — before setMessages changes the DOM.
+          // Effect 3 reads these refs after the messages state update settles.
+          if (initialScrollDoneRef.current) {
+            const container = scrollContainerRef.current;
+            if (container) {
+              const dist =
+                container.scrollHeight -
+                container.scrollTop -
+                container.clientHeight;
+              realtimeWasNearBottomRef.current = dist < 100;
+            } else {
+              realtimeWasNearBottomRef.current = false;
+            }
+            realtimeInsertPendingRef.current = true;
+          }
 
           setMessages((prev) => {
             // Already in state (optimistic send or duplicate event) — skip.
@@ -723,6 +1047,20 @@ export function CommunityChat({
     return acc;
   }, []);
 
+  // ─── Unread divider: frozen snapshot taken at open time ──────────────────
+  // firstUnreadMsgId and unreadDisplayCount come exclusively from the snapshot
+  // captured when lastReadAt was first established for this chat session.
+  // They NEVER change while this community is open — new realtime messages,
+  // server read-state updates, or anything else cannot move or hide the divider.
+  // Temp (optimistic) messages are excluded so they never act as the boundary.
+  const realMessages = messages.filter((m) => !m.id.startsWith("temp-"));
+  const firstUnreadMsgId: string | null = snapshotReady
+    ? (unreadAtOpenRef.current?.firstMsgId ?? null)
+    : null;
+  const unreadDisplayCount: number = snapshotReady
+    ? (unreadAtOpenRef.current?.count ?? 0)
+    : 0;
+
   // Resolve display data: prefer live community state, fall back to sidebar
   // cache so the header renders immediately even before fetchMeta completes.
   // This means the loader only ever appears inside the chatbox — never full-area.
@@ -812,8 +1150,8 @@ export function CommunityChat({
       {/* Body: messages + members panel */}
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto" style={{backgroundImage:"radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",backgroundSize:"24px 24px"}}>
             {/* Loading: show Lottie only inside the messages area.
                 The header, members panel, and input stay frozen from the
                 previous community so the outer frame never disappears. */}
@@ -827,9 +1165,19 @@ export function CommunityChat({
                 />
               </div>
             ) : (
-              <>
+              // Inner wrapper — two responsibilities:
+              // 1. min-h-full + flex col + justify-end: short chats sit at the bottom
+              //    above the composer without any fake spacer. Long chats overflow and
+              //    the scroll container's overflow-y-auto takes over.
+              // 2. visibility:hidden until initialPositionResolved: DOM exists so the
+              //    layout effect can measure heights and set scrollTop before paint.
+              //    Header, composer, and members panel stay visible throughout.
+              <div
+                className="min-h-full flex flex-col justify-end px-5 py-4 space-y-1"
+                style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
+              >
             {grouped.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-3 py-16">
+              <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16">
                 <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
                   {displayCommunity?.image_url ? (
                     <img
@@ -866,87 +1214,121 @@ export function CommunityChat({
                   const prev = group.messages[i - 1];
                   const isSameAuthor = prev?.user_id === msg.user_id;
                   const sender = msg.users;
+                  const isFirstUnread = firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
+
+                  // Unread divider — full-width rule with centred pill, like WhatsApp
+                  const unreadDivider = isFirstUnread ? (
+                    <div
+                      ref={unreadDividerRef}
+                      className="flex items-center gap-3 py-2 my-2 w-full"
+                    >
+                      <div className="flex-1 h-px bg-border/60" />
+                      <span className="font-body text-xs text-foreground-muted bg-accent/15 rounded-full px-4 py-1 shadow-sm select-none whitespace-nowrap">
+                        {unreadDisplayCount > 0
+                          ? `${unreadDisplayCount} unread message${unreadDisplayCount !== 1 ? "s" : ""}`
+                          : "New messages"}
+                      </span>
+                      <div className="flex-1 h-px bg-border/60" />
+                    </div>
+                  ) : null;
 
                   if (isMe) {
                     return (
-                      <div
-                        key={msg.id}
-                        className={`flex justify-end ${isSameAuthor ? "mt-0.5" : "mt-3"}`}
-                      >
-                        <div className="max-w-[65%]">
-                          <div
-                            className={`rounded-2xl rounded-tr-sm px-3 py-2 transition-opacity ${
-                              msg.status === "sending"
-                                ? "bg-accent opacity-70"
-                                : msg.status === "failed"
-                                ? "bg-red-500/80"
-                                : "bg-accent"
-                            }`}
-                          >
-                            <p className="font-body text-sm text-accent-foreground whitespace-pre-wrap break-words">
-                              {msg.content}
-                            </p>
-                          </div>
-                          <div className="flex items-center justify-end gap-1 mt-0.5 pr-1">
-                            <span className="font-mono text-[10px] text-foreground-muted">
-                              {fmtTime(msg.created_at)}
-                            </span>
-                            {msg.status === "sending" && (
-                              <Clock
-                                size={10}
-                                className="text-foreground-muted animate-pulse"
-                              />
-                            )}
-                            {(msg.status === "sent" || !msg.status) && (
-                              <CheckCheck size={11} className="text-accent" />
-                            )}
-                            {msg.status === "failed" && (
-                              <span className="text-[10px] text-red-400">!</span>
-                            )}
+                      <Fragment key={msg.id}>
+                        {unreadDivider}
+                        <div
+                          className={`flex justify-end ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
+                        >
+                          <div className="max-w-[65%]">
+                            <div
+                              className={`rounded-2xl rounded-tr-sm px-3 py-2 transition-opacity ${
+                                msg.status === "sending"
+                                  ? "bg-accent opacity-70"
+                                  : msg.status === "failed"
+                                  ? "bg-red-500/80"
+                                  : "bg-accent"
+                              }`}
+                            >
+                              <p className="font-body text-sm text-accent-foreground whitespace-pre-wrap break-words">
+                                {msg.content}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-end gap-1 mt-0.5 pr-1">
+                              <span className="font-mono text-[10px] text-foreground-muted">
+                                {fmtTime(msg.created_at)}
+                              </span>
+                              {msg.status === "sending" && (
+                                <Clock
+                                  size={10}
+                                  className="text-foreground-muted animate-pulse"
+                                />
+                              )}
+                              {(msg.status === "sent" || !msg.status) && (
+                                <CheckCheck size={11} className="text-accent" />
+                              )}
+                              {msg.status === "failed" && (
+                                <span className="text-[10px] text-red-400">!</span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </Fragment>
                     );
                   }
 
                   return (
-                    <div
-                      key={msg.id}
-                      className={`flex items-start gap-2 ${isSameAuthor ? "mt-0.5" : "mt-3"}`}
-                    >
-                      <div className="w-7 shrink-0">
-                        {!isSameAuthor && sender && (
-                          <Avatar
-                            name={sender.name}
-                            url={sender.avatar_url}
-                            size={7}
-                          />
-                        )}
-                      </div>
-                      <div className="max-w-[65%]">
-                        {!isSameAuthor && sender && (
-                          <p className="font-body text-[11px] font-medium text-foreground-muted mb-0.5 ml-0.5">
-                            {sender.name}
-                          </p>
-                        )}
-                        <div className="rounded-2xl rounded-tl-sm bg-surface-raised shadow-sm px-3 py-2">
-                          <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">
-                            {msg.content}
+                    <Fragment key={msg.id}>
+                      {unreadDivider}
+                      <div
+                        className={`flex items-start gap-2 ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
+                      >
+                        <div className="w-7 shrink-0">
+                          {!isSameAuthor && sender && (
+                            <Avatar
+                              name={sender.name}
+                              url={sender.avatar_url}
+                              size={7}
+                            />
+                          )}
+                        </div>
+                        <div className="max-w-[65%]">
+                          {!isSameAuthor && sender && (
+                            <p className="font-body text-[11px] font-medium text-foreground-muted mb-0.5 ml-0.5">
+                              {sender.name}
+                            </p>
+                          )}
+                          <div className="rounded-2xl rounded-tl-sm bg-surface-raised shadow-sm px-3 py-2">
+                            <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">
+                              {msg.content}
+                            </p>
+                          </div>
+                          <p className="font-mono text-[10px] text-foreground-muted mt-0.5 ml-0.5">
+                            {fmtTime(msg.created_at)}
                           </p>
                         </div>
-                        <p className="font-mono text-[10px] text-foreground-muted mt-0.5 ml-0.5">
-                          {fmtTime(msg.created_at)}
-                        </p>
                       </div>
-                    </div>
+                    </Fragment>
                   );
                 })}
               </div>
             ))}
             <div ref={bottomRef} />
-              </>
+              </div>
             )}
           </div>
+
+          {/* Scroll-to-bottom button — visible when user is scrolled up */}
+          {showScrollToBottom && (
+            <button
+              onClick={() => {
+                bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="absolute bottom-[72px] right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
+              aria-label="Scroll to bottom"
+            >
+              <ChevronDown size={16} />
+            </button>
+          )}
 
           {/* Floating Input */}
           <div className="px-4 pb-4 pt-2 shrink-0">

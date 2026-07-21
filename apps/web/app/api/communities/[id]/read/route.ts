@@ -26,6 +26,18 @@ export async function PATCH(
 
   const db = createServiceClient();
 
+  // Fetch the current last_read_at BEFORE overwriting it so that
+  // CommunitiesPanel can store it in lastReadAtOnOpen and CommunityChat
+  // can use it to position the unread divider by timestamp comparison.
+  const { data: prev } = await db
+    .from("community_members")
+    .select("last_read_at")
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const previousLastReadAt: string | null = (prev as any)?.last_read_at ?? null;
+
   const { error } = await db
     .from("community_members")
     .update({ last_read_at: new Date().toISOString() })
@@ -37,5 +49,5 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to mark as read." }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, previousLastReadAt });
 }

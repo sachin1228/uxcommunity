@@ -5,6 +5,13 @@ import type { CachedMeta, CachedMessage } from "./cache";
 export interface SSRCommunityData {
   meta: CachedMeta;
   messages: CachedMessage[];
+  /**
+   * The user's last_read_at timestamp for this community at the time of the
+   * hard refresh.  CommunityChat uses this to find the first unread message by
+   * timestamp comparison, which is more reliable than counting from the end.
+   * null means the user has never opened this community before.
+   */
+  lastReadAt: string | null;
 }
 
 const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
@@ -45,7 +52,7 @@ export async function fetchCommunitySSRData(
   ] = await Promise.all([
     db
       .from("community_members")
-      .select("joined_at")
+      .select("joined_at, last_read_at")
       .eq("community_id", communityId)
       .eq("user_id", userId)
       .maybeSingle(),
@@ -166,5 +173,12 @@ export async function fetchCommunitySSRData(
     fetchedAt: Date.now(),
   };
 
-  return { meta, messages };
+  // ─── Unread count ─────────────────────────────────────────────────────────
+  // Count how many of the fetched messages were sent after the user last read
+  // this community. Used by CommunityChat to position the unread divider on
+  // hard refresh (when the sidebarStore / unreadOnOpen map is not yet warm).
+  const lastReadAt: string | null =
+    (membership as unknown as { last_read_at: string | null }).last_read_at ?? null;
+
+  return { meta, messages, lastReadAt };
 }
