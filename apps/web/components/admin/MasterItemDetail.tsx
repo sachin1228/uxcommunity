@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
 
 interface MasterItem {
   id: string;
@@ -124,6 +125,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
       if (!res.ok) { setEditError(data.error ?? "Failed to save."); return; }
       setItem(data[responseKey]);
       setEditing(false);
+      invalidateMasterCache(apiBase); // keep list in sync
     } catch {
       setEditError("Network error.");
     } finally {
@@ -141,7 +143,10 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         body: JSON.stringify({ is_active: !item.is_active }),
       });
       const data = await res.json();
-      if (res.ok) setItem(data[responseKey]);
+      if (res.ok) {
+        setItem(data[responseKey]);
+        invalidateMasterCache(apiBase); // keep list in sync
+      }
     } finally {
       setToggleLoading(false);
     }
@@ -170,8 +175,12 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         body: JSON.stringify({ image_url: uploadData.url }),
       });
       const patchData = await patchRes.json();
-      if (patchRes.ok) setItem(patchData[responseKey]);
-      else setImageError(patchData.error ?? "Failed to save image.");
+      if (patchRes.ok) {
+        setItem(patchData[responseKey]);
+        invalidateMasterCache(apiBase); // keep list in sync
+      } else {
+        setImageError(patchData.error ?? "Failed to save image.");
+      }
     } catch {
       setImageError("Network error. Please try again.");
     } finally {
@@ -190,8 +199,12 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         body: JSON.stringify({ image_url: null }),
       });
       const data = await res.json();
-      if (res.ok) setItem(data[responseKey]);
-      else setImageError(data.error ?? "Failed to remove image.");
+      if (res.ok) {
+        setItem(data[responseKey]);
+        invalidateMasterCache(apiBase); // keep list in sync
+      } else {
+        setImageError(data.error ?? "Failed to remove image.");
+      }
     } catch {
       setImageError("Network error.");
     } finally {
@@ -205,6 +218,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
       const res = await fetch(`${apiBase}/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) { setDeleteError(data.error ?? "Failed to delete."); setDeleteLoading(false); return; }
+      invalidateMasterCache(apiBase); // force list to re-fetch so deleted item disappears
       router.push(listPath);
     } catch {
       setDeleteError("Network error.");

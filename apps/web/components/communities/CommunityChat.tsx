@@ -10,6 +10,7 @@ import {
 import { Users, Clock, CheckCheck, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { LottieLoader } from "@/components/ui/LottieLoader";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import {
   msgCache,
@@ -69,11 +70,10 @@ function Avatar({ name, url, size = 8 }: { name: string; url: string | null; siz
   const px = size * 4;
   if (url) {
     return (
-      <img
-        src={url}
-        alt={name}
-        width={px}
-        height={px}
+      <AvatarImg
+        url={url}
+        name={name}
+        size={px}
         className={`rounded-full object-cover h-${size} w-${size} shrink-0`}
       />
     );

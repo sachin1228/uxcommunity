@@ -688,8 +688,20 @@ function SignupInner() {
           return;
         }
       }
-      // Auto-join communities based on city / sector / interests (fire-and-forget)
-      fetch("/api/communities/auto-join", { method: "POST" }).catch(() => {});
+      // Auto-join communities based on city / sector / interests.
+      // Wait up to 4 s so the sidebar has joined communities on first load.
+      // If it times out or errors, navigation still proceeds — communities
+      // will appear after the user refreshes or revisits the page.
+      try {
+        await Promise.race([
+          fetch("/api/communities/auto-join", { method: "POST" }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("timeout")), 4000)
+          ),
+        ]);
+      } catch {
+        // Non-fatal — carry on regardless
+      }
       router.push("/dashboard");
     } catch {
       setStep4Error("Network error. Please try again.");

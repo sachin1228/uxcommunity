@@ -22,6 +22,15 @@ const MASTER_CACHE_TTL = 5 * 60_000;
 const masterCache = new Map<string, { data: MasterItem[]; fetchedAt: number }>();
 const masterInflight = new Map<string, Promise<MasterItem[]>>();
 
+/**
+ * Exported so that MasterItemDetail can invalidate the list cache after a
+ * successful delete or PATCH — ensuring the list re-fetches on next visit
+ * instead of showing stale data.
+ */
+export function invalidateMasterCache(apiBase: string): void {
+  masterCache.delete(apiBase);
+}
+
 interface MasterDataPageProps {
   title: string;
   entity: string;

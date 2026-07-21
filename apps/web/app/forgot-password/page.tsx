@@ -70,11 +70,11 @@ export default function ForgotPasswordPage() {
               </div>
               <div>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-1">
-                  Check your inbox
+                  Request received
                 </h2>
                 <p className="font-body text-sm text-foreground-muted leading-relaxed">
                   If <span className="font-medium text-foreground">{email}</span> is
-                  registered, a reset link is on its way. It expires in 1 hour.
+                  registered, a reset link will be sent shortly. It expires in 1 hour.
                 </p>
               </div>
               <Link

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 
 interface Props {
   name: string;
@@ -52,12 +53,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
         aria-label="Profile menu"
       >
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={name}
-            className="h-8 w-8 rounded-full object-cover"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
+          <AvatarImg url={avatarUrl} name={name} size={32} className="h-8 w-8 rounded-full object-cover" />
         ) : (
           <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center select-none">
             <span className="font-display text-xs font-semibold text-accent-foreground">
@@ -79,7 +75,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
               {avatarUrl ? (
-                <img src={avatarUrl} alt={name} className="h-9 w-9 rounded-full object-cover" />
+                <AvatarImg url={avatarUrl} name={name} size={36} className="h-9 w-9 rounded-full object-cover" />
               ) : (
                 <div className="h-9 w-9 rounded-full bg-accent flex items-center justify-center select-none">
                   <span className="font-display text-sm font-semibold text-accent-foreground">{initial}</span>

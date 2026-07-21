@@ -19,8 +19,11 @@ const ALLOWED_AVATAR_DOMAINS = new Set([
 
 function isAllowedAvatarUrl(url: string): boolean {
   try {
-    const { hostname } = new URL(url);
-    return ALLOWED_AVATAR_DOMAINS.has(hostname);
+    const parsed = new URL(url);
+    // boring:// is a custom internal protocol used by the boring-avatars npm package.
+    // These are rendered client-side as inline SVG — there is no external fetch.
+    if (parsed.protocol === "boring:") return true;
+    return ALLOWED_AVATAR_DOMAINS.has(parsed.hostname);
   } catch {
     return false;
   }
