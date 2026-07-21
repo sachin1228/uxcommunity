@@ -64,7 +64,31 @@ export function clearSessionCookie(res: NextResponse) {
   });
 }
 
-/** Throws a Response if session is missing or role doesn't match. */
+/**
+ * Checks the DB to confirm the user still exists and isn't blocked.
+ * Used in API routes to guard against deleted/blocked users who still hold
+ * a valid JWT (sessions are stateless, so we must verify liveness explicitly).
+ */
+async function assertUserActive(userId: string): Promise<void> {
+  // Lazy import to keep the session module edge-compatible when only the
+  // JWT helpers are used (e.g. in middleware).
+  const { createServiceClient } = await import("@/lib/supabase/service");
+  const db = createServiceClient();
+  const { data } = await db
+    .from("users")
+    .select("id, is_blocked")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (!data || data.is_blocked) {
+    throw new Response(
+      JSON.stringify({ error: "Account has been deactivated or deleted." }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+/** Throws a Response if session is missing, role doesn't match, or user is blocked/deleted. */
 export async function requireSession(
   role?: "user" | "admin"
 ): Promise<SessionPayload> {
@@ -81,5 +105,13 @@ export async function requireSession(
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // For regular users, verify they still exist and aren't blocked in the DB.
+  // Admins are not subject to this check (they won't block themselves via the
+  // admin panel, and admin account management is handled separately).
+  if (session.role === "user" && session.userId) {
+    await assertUserActive(session.userId);
+  }
+
   return session;
 }
