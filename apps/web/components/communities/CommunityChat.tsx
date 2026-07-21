@@ -1047,19 +1047,25 @@ export function CommunityChat({
     return acc;
   }, []);
 
-  // ─── Unread divider: frozen snapshot taken at open time ──────────────────
-  // firstUnreadMsgId and unreadDisplayCount come exclusively from the snapshot
-  // captured when lastReadAt was first established for this chat session.
-  // They NEVER change while this community is open — new realtime messages,
-  // server read-state updates, or anything else cannot move or hide the divider.
-  // Temp (optimistic) messages are excluded so they never act as the boundary.
+  // ─── Unread divider ───────────────────────────────────────────────────────
+  // firstUnreadMsgId is frozen at open time so the divider position never
+  // moves while you're reading. unreadDisplayCount is computed live from the
+  // current message list so it grows correctly as new messages arrive via
+  // realtime — without the double-counting bug that a setState-inside-updater
+  // approach causes in React Strict Mode.
   const realMessages = messages.filter((m) => !m.id.startsWith("temp-"));
   const firstUnreadMsgId: string | null = snapshotReady
     ? (unreadAtOpenRef.current?.firstMsgId ?? null)
     : null;
-  const unreadDisplayCount: number = snapshotReady
-    ? (unreadAtOpenRef.current?.count ?? 0)
-    : 0;
+  const unreadDisplayCount: number =
+    snapshotReady && lastReadAt !== undefined
+      ? realMessages.filter(
+          (m) =>
+            m.user_id !== currentUserId &&
+            (lastReadAt === null ||
+              new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
+        ).length
+      : 0;
 
   // Resolve display data: prefer live community state, fall back to sidebar
   // cache so the header renders immediately even before fetchMeta completes.

@@ -37,6 +37,8 @@ type Community = CachedSidebarCommunity;
  * set the value (hasOwnProperty check via .has()).
  */
 async function markReadOnServer(communityId: string) {
+  // Capture the timestamp before the fetch so it matches what the server stores.
+  const newLastReadAt = new Date().toISOString();
   try {
     const res = await fetch(`/api/communities/${communityId}/read`, { method: "PATCH" });
     if (res.ok) {
@@ -44,6 +46,18 @@ async function markReadOnServer(communityId: string) {
       // Only use as fallback — don't overwrite a value the sync path already set.
       if (!lastReadAtOnOpen.has(communityId) && "previousLastReadAt" in data) {
         lastReadAtOnOpen.set(communityId, data.previousLastReadAt ?? null);
+      }
+      // Update sidebarStore with the new last_read_at so that if the user
+      // navigates away and comes back, handleNavigate captures the updated
+      // value instead of the stale pre-read timestamp. Without this, every
+      // return visit would re-show the same unread divider.
+      if (sidebarStore.data) {
+        sidebarStore.data = {
+          ...sidebarStore.data,
+          communities: sidebarStore.data.communities.map((c) =>
+            c.id === communityId ? { ...c, last_read_at: newLastReadAt } : c
+          ),
+        };
       }
     }
   } catch {}
@@ -237,7 +251,7 @@ function CommunityRow({
                 No messages yet
               </p>
             )}
-            {c.message_count > 0 && (
+            {c.message_count > 0 && !active && (
               <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
                 {c.message_count > 99 ? "99+" : c.message_count}
               </span>
@@ -404,16 +418,18 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
 
         setCommunities((prev) => {
           const prevMap = new Map(prev.map((c) => [c.id, c]));
+          const currentActiveId = activeCommunityIdRef.current;
           const merged = fresh.map((server) => {
             const local = prevMap.get(server.id);
             return {
               ...server,
-              // Never roll back a count that realtime already incremented
-              // while this fetch was in-flight.
-              message_count: Math.max(
-                server.message_count,
-                local?.message_count ?? 0
-              ),
+              // Active community is always 0 — user is reading it right now.
+              // For others: never roll back a count already incremented by
+              // realtime while this fetch was in-flight.
+              message_count:
+                server.id === currentActiveId
+                  ? 0
+                  : Math.max(server.message_count, local?.message_count ?? 0),
             };
           });
           // Keep sidebarStore in sync so subsequent realtime increments and
@@ -495,6 +511,22 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         // "last_read_at" in snapshot only when the sidebar API has been fetched at
         // least once; fall back gracefully if the field is absent.
         lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
+
+        // Optimistically advance last_read_at in sidebarStore to NOW so that
+        // if the user returns to this community before markReadOnServer resolves,
+        // handleNavigate re-snapshots the fresh timestamp instead of the stale
+        // pre-read one — preventing the unread divider from reappearing.
+        const optimisticReadAt = new Date().toISOString();
+        if (sidebarStore.data) {
+          sidebarStore.data = {
+            ...sidebarStore.data,
+            communities: sidebarStore.data.communities.map((c) =>
+              c.id === activeCommunityId
+                ? { ...c, last_read_at: optimisticReadAt }
+                : c
+            ),
+          };
+        }
       }
 
       // markReadOnServer is now async and stores previousLastReadAt as a fallback
@@ -616,6 +648,19 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
       const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
       if (snapshot) {
         lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
+
+        // Optimistically advance last_read_at in sidebarStore to NOW so that
+        // if the user returns here before markReadOnServer resolves, the
+        // re-snapshot uses the fresh timestamp and the divider stays gone.
+        const optimisticReadAt = new Date().toISOString();
+        if (sidebarStore.data) {
+          sidebarStore.data = {
+            ...sidebarStore.data,
+            communities: sidebarStore.data.communities.map((c) =>
+              c.id === id ? { ...c, last_read_at: optimisticReadAt } : c
+            ),
+          };
+        }
       }
     }
 
