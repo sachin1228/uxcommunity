@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard } from "lucide-react";
+import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard, Wrench } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -73,6 +73,20 @@ export function AdminSidebar() {
       >
         <Clapperboard size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
         Lottie Animations
+      </Link>
+
+      {/* Tools */}
+      <Link
+        href="/admin/tools"
+        onClick={() => setPendingHref("/admin/tools")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/tools")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Wrench size={16} className={active("/admin/tools") ? "text-accent" : ""} />
+        Tools
       </Link>
 
       {/* Master Data accordion */}

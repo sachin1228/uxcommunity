@@ -6,6 +6,7 @@ import { APP_NAME } from "@draft/shared";
 import { Spinner } from "@/components/ui/Spinner";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import Avatar from "boring-avatars";
+import { compressImage } from "@/lib/compressImage";
 
 // ─── Constants ────────────────────────────────────────────────
 
@@ -206,32 +207,6 @@ function getAvatarSourceOptions(name: string) {
 }
 
 /** Compress + center-crop a file to 300×300 JPEG via Canvas. */
-async function compressImage(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const objectUrl = URL.createObjectURL(file);
-    img.onload = () => {
-      const SIZE = 300;
-      const canvas = document.createElement("canvas");
-      canvas.width = SIZE;
-      canvas.height = SIZE;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("Canvas not supported")); return; }
-      const min = Math.min(img.naturalWidth, img.naturalHeight);
-      const sx = (img.naturalWidth  - min) / 2;
-      const sy = (img.naturalHeight - min) / 2;
-      ctx.drawImage(img, sx, sy, min, min, 0, 0, SIZE, SIZE);
-      URL.revokeObjectURL(objectUrl);
-      canvas.toBlob(
-        (blob) => { if (blob) resolve(blob); else reject(new Error("Compression failed")); },
-        "image/jpeg", 0.78
-      );
-    };
-    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Failed to load image")); };
-    img.src = objectUrl;
-  });
-}
-
 // ─── Sub-components ───────────────────────────────────────────
 
 /** Renders one avatar option — inline SVG for boring-avatars, <img> for others. */
