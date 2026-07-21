@@ -1,0 +1,1 @@
+- [Profile page migration](profile-page-migration.md) — linkedin_url, portfolio_url, bio must be added to designer_profiles via migration before profile page works.

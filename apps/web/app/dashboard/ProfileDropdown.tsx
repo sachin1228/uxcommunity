@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, UserCircle } from "lucide-react";
+import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 interface Props {
@@ -90,6 +91,14 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
 
           {/* Actions */}
           <div className="py-1">
+            <Link
+              href="/dashboard/profile"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised/50 transition-colors"
+            >
+              <UserCircle size={14} />
+              My Profile
+            </Link>
             <button
               onClick={handleLogout}
               disabled={loading}

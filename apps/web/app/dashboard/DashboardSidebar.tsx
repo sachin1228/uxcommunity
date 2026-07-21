@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, MessagesSquare } from "lucide-react";
+import { Home, MessagesSquare, UserCircle } from "lucide-react";
 
 const NAV = [
-  { href: "/dashboard",            label: "Home",        icon: Home          },
+  { href: "/dashboard",             label: "Home",        icon: Home          },
   { href: "/dashboard/communities", label: "Communities", icon: MessagesSquare },
+  { href: "/dashboard/profile",     label: "Profile",     icon: UserCircle    },
 ];
 
 function isMatch(href: string, pathname: string) {
