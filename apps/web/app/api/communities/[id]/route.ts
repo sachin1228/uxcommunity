@@ -33,6 +33,7 @@ export async function GET(
       .from("communities")
       .select("id, name, type, image_url, reference_id, created_at")
       .eq("id", id)
+      .eq("is_active", true)
       .maybeSingle(),
   ]);
 
