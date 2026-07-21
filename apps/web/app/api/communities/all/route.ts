@@ -33,7 +33,10 @@ export async function GET() {
     .eq("user_id", userId);
   const joinedIds = new Set((memberships ?? []).map((m) => m.community_id));
 
-  // Resolve image_url from master tables, batched by type
+  // Resolve image_url from master tables, batched by type.
+  // Also track which community ids still have a valid master data row
+  // (reference_id exists in the corresponding table). Communities whose
+  // master row was deleted are filtered out of the response.
   const byType: Record<string, { id: string; reference_id: string }[]> = {};
   for (const c of communities) {
     if (!byType[c.type]) byType[c.type] = [];
@@ -41,26 +44,47 @@ export async function GET() {
   }
 
   const masterImageMap: Record<string, string | null> = {};
+  // Set of community IDs whose master data reference still exists
+  const validCommunityIds = new Set<string>();
+
   await Promise.all(
     Object.entries(byType).map(async ([type, items]) => {
       const lookup = TABLE_LOOKUP[type];
-      if (!lookup) return;
+      if (!lookup) {
+        // Unknown type — keep them to be safe
+        for (const item of items) validCommunityIds.add(item.id);
+        return;
+      }
       const { data: rows } = await db
         .from(lookup.table as any)
         .select(`${lookup.idCol}, image_url`)
         .in(lookup.idCol, items.map((i) => i.reference_id));
+
+      // Build a map: reference_id → image_url (only for rows that actually exist)
+      const foundRefIds = new Set((rows ?? []).map((r: any) => r[lookup.idCol]));
       const imgMap = Object.fromEntries(
         (rows ?? []).map((r: any) => [r[lookup.idCol], r.image_url ?? null])
       );
+
       for (const item of items) {
-        masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
+        if (foundRefIds.has(item.reference_id)) {
+          // Master data still exists — include this community
+          validCommunityIds.add(item.id);
+          masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
+        }
+        // If not in foundRefIds, the master row was deleted — skip (orphaned community)
       }
     })
   );
 
+  // Only communities with live master data
+  const liveCommunities = communities.filter((c) => validCommunityIds.has(c.id));
+
+  if (!liveCommunities.length) return NextResponse.json({ communities: [] });
+
   // Member counts
   const countResults = await Promise.all(
-    communities.map((c) =>
+    liveCommunities.map((c) =>
       db
         .from("community_members")
         .select("*", { count: "exact", head: true })
@@ -70,7 +94,7 @@ export async function GET() {
   );
   const countMap = Object.fromEntries(countResults.map((r) => [r.id, r.count]));
 
-  const result = communities.map((c) => ({
+  const result = liveCommunities.map((c) => ({
     id: c.id,
     name: c.name,
     type: c.type,

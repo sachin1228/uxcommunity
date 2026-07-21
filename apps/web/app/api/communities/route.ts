@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
+const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
+  city:             { table: "cities",            idCol: "id" },
+  sector:           { table: "design_sectors",    idCol: "id" },
+  interest:         { table: "design_interests",  idCol: "id" },
+  company:          { table: "companies",         idCol: "id" },
+  experience_level: { table: "experience_levels", idCol: "id" },
+};
+
 export async function GET() {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
@@ -84,41 +92,50 @@ export async function GET() {
     : { data: [] };
   const senderMap = Object.fromEntries((senderUsers ?? []).map((u) => [u.id, u.name]));
 
-  // 6. Resolve image_url from master tables, batched by type
+  // 6. Resolve image_url from master tables, batched by type.
+  //    Also track which community IDs still have a live master data row.
+  //    Communities whose master row was deleted are filtered from the sidebar
+  //    (same logic as /api/communities/all).
   const byType: Record<string, { id: string; reference_id: string }[]> = {};
   for (const c of communities ?? []) {
     if (!byType[c.type]) byType[c.type] = [];
     byType[c.type].push({ id: c.id, reference_id: c.reference_id });
   }
 
-  const tableLookup: Record<string, { table: string; idCol: string }> = {
-    city:             { table: "cities",            idCol: "id" },
-    sector:           { table: "design_sectors",    idCol: "id" },
-    interest:         { table: "design_interests",  idCol: "id" },
-    company:          { table: "companies",         idCol: "id" },
-    experience_level: { table: "experience_levels", idCol: "id" },
-  };
-
   const masterImageMap: Record<string, string | null> = {};
+  const validCommunityIds = new Set<string>();
+
   await Promise.all(
     Object.entries(byType).map(async ([type, items]) => {
-      const lookup = tableLookup[type];
-      if (!lookup) return;
+      const lookup = TABLE_LOOKUP[type];
+      if (!lookup) {
+        // Unknown type — keep as-is
+        for (const item of items) validCommunityIds.add(item.id);
+        return;
+      }
       const { data: rows } = await db
         .from(lookup.table as any)
         .select(`${lookup.idCol}, image_url`)
         .in(lookup.idCol, items.map((i) => i.reference_id));
+
+      const foundRefIds = new Set((rows ?? []).map((r: any) => r[lookup.idCol]));
       const imgMap = Object.fromEntries(
         (rows ?? []).map((r: any) => [r[lookup.idCol], r.image_url ?? null])
       );
+
       for (const item of items) {
-        masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
+        if (foundRefIds.has(item.reference_id)) {
+          validCommunityIds.add(item.id);
+          masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
+        }
+        // reference_id not found → master row deleted → skip (orphaned community)
       }
     })
   );
 
-  // 7. Assemble
+  // 7. Assemble — only communities with live master data
   const result = (communities ?? [])
+    .filter((c) => validCommunityIds.has(c.id))
     .map((c) => {
       const lastMsg = lastMsgByComm[c.id] ?? null;
       return {

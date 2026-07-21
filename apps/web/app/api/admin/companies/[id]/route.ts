@@ -61,6 +61,8 @@ export async function DELETE(
   try { await requireSession("admin"); } catch (e) { return e as Response; }
   const { id } = await params;
   const db = createServiceClient();
+
+  // Delete the master row first; only clean up the community if that succeeds.
   const { error } = await db.from("companies").delete().eq("id", id);
   if (error) {
     if (error.code === "23503") {
@@ -71,5 +73,11 @@ export async function DELETE(
     }
     return NextResponse.json({ error: "Failed to delete company." }, { status: 500 });
   }
+
+  // Master row is gone — kick off community cleanup in the background so it
+  // doesn't add latency to the admin response. The orphan filter in
+  // /api/communities/all hides it from users immediately.
+  void db.from("communities").delete().eq("type", "company").eq("reference_id", id);
+
   return NextResponse.json({ success: true });
 }
