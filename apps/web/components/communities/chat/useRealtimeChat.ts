@@ -2,7 +2,7 @@
 
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import { msgCache } from "@/lib/communities/cache";
+import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 
@@ -44,6 +44,7 @@ export function useRealtimeChat({
 
     const channel = supabase
       .channel(`community:${communityId}`)
+      // ── New messages ────────────────────────────────────────────────────
       .on(
         "postgres_changes",
         {
@@ -93,6 +94,7 @@ export function useRealtimeChat({
               user_id: newRow.user_id,
               users,
               status: "sent",
+              reactions: [],
             };
             const next = [...withoutTemp, incoming].sort(
               (a, b) =>
@@ -145,6 +147,96 @@ export function useRealtimeChat({
               pendingProfileFetchRef.current.set(targetUserId, p);
             }
 
+            return next;
+          });
+        }
+      )
+      // ── Reaction INSERT ─────────────────────────────────────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "message_reactions",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const r = payload.new as {
+            message_id: string;
+            user_id: string;
+            emoji: string;
+          };
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === r.message_id
+                ? {
+                    ...m,
+                    reactions: applyReactionInsert(
+                      m.reactions ?? [],
+                      r.emoji,
+                      r.user_id
+                    ),
+                  }
+                : m
+            );
+            msgCache.set(communityId, next);
+            return next;
+          });
+        }
+      )
+      // ── Reaction UPDATE (emoji change) ──────────────────────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "message_reactions",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const oldR = payload.old as { message_id: string; user_id: string; emoji: string };
+          const newR = payload.new as { message_id: string; user_id: string; emoji: string };
+          setMessages((prev) => {
+            const next = prev.map((m) => {
+              if (m.id !== newR.message_id) return m;
+              const afterDelete = applyReactionDelete(m.reactions ?? [], oldR.emoji, oldR.user_id);
+              const afterInsert = applyReactionInsert(afterDelete, newR.emoji, newR.user_id);
+              return { ...m, reactions: afterInsert };
+            });
+            msgCache.set(communityId, next);
+            return next;
+          });
+        }
+      )
+      // ── Reaction DELETE ─────────────────────────────────────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "message_reactions",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const r = payload.old as {
+            message_id: string;
+            user_id: string;
+            emoji: string;
+          };
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === r.message_id
+                ? {
+                    ...m,
+                    reactions: applyReactionDelete(
+                      m.reactions ?? [],
+                      r.emoji,
+                      r.user_id
+                    ),
+                  }
+                : m
+            );
+            msgCache.set(communityId, next);
             return next;
           });
         }

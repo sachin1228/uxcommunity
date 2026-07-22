@@ -32,6 +32,7 @@ interface MessageListProps {
   loading: boolean;
   displayCommunity: Community | null;
   communityId: string;
+  onMessagePress: (msg: CachedMessage) => void;
 }
 
 export function MessageList({
@@ -45,6 +46,7 @@ export function MessageList({
   loading,
   displayCommunity,
   communityId,
+  onMessagePress,
 }: MessageListProps) {
   if (loading) {
     return (
@@ -118,6 +120,8 @@ export function MessageList({
                 isSameAuthor={isSameAuthor}
                 isFirstUnread={isFirstUnread}
                 unreadDivider={dividerNode}
+                currentUserId={currentUserId}
+                onPress={onMessagePress}
               />
             );
           })}

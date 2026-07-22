@@ -4,6 +4,18 @@
  * React context, Redux, or external libraries.
  */
 
+export interface MessageReaction {
+  emoji: string;
+  user_ids: string[];
+}
+
+/** Snapshot of the message being replied to, embedded in the reply bubble. */
+export interface ReplyPreview {
+  id: string;
+  content: string;
+  user_name: string;
+}
+
 export interface CachedMessage {
   id: string;
   content: string;
@@ -11,6 +23,8 @@ export interface CachedMessage {
   user_id: string;
   users: { name: string; avatar_url: string | null } | null;
   status?: "sending" | "sent" | "failed";
+  reactions?: MessageReaction[];
+  reply_to?: ReplyPreview | null;
 }
 
 export interface CachedMeta {
@@ -37,7 +51,6 @@ export interface CachedSidebarCommunity {
   image_url: string | null;
   member_count: number;
   message_count: number;
-  /** The user's last_read_at for this community, returned by /api/communities. */
   last_read_at?: string | null;
   last_message: {
     content: string;
@@ -46,18 +59,12 @@ export interface CachedSidebarCommunity {
   } | null;
 }
 
-/**
- * Singleton cache for the joined-communities sidebar list (/api/communities).
- * Mutate `.data` and `.inflight` directly — the object reference is stable
- * so all importers always see the current values.
- */
 export const sidebarStore: {
   data: { communities: CachedSidebarCommunity[]; fetchedAt: number } | null;
   inflight: Promise<void> | null;
 } = { data: null, inflight: null };
 
-/** How long before the joined-communities sidebar is considered stale */
-export const SIDEBAR_STALE_MS = 60_000; // 1 minute
+export const SIDEBAR_STALE_MS = 60_000;
 
 // ─── Explore Communities cache ────────────────────────────────────────────────
 
@@ -70,31 +77,17 @@ export interface CachedExploreCommunity {
   joined: boolean;
 }
 
-/**
- * Singleton cache for the Explore Communities page (/api/communities/all).
- * Same mutable-object pattern as sidebarStore.
- */
 export const exploreStore: {
   data: { communities: CachedExploreCommunity[]; fetchedAt: number } | null;
   inflight: Promise<void> | null;
 } = { data: null, inflight: null };
 
-/** How long before the explore-communities list is considered stale */
-export const EXPLORE_STALE_MS = 5 * 60_000; // 5 minutes
+export const EXPLORE_STALE_MS = 5 * 60_000;
 
 // ─── User-isolation helpers ───────────────────────────────────────────────────
 
-/**
- * userId whose data currently lives in the module-level caches.
- * Checked on each CommunitiesPanel mount to detect account switches.
- */
 export let cachedUserId: string | null = null;
 
-/**
- * Call synchronously before reading any cache (e.g. in a useState initialiser).
- * If `userId` differs from `cachedUserId`, all caches are wiped first so that
- * User B never sees User A's data after an in-tab account switch.
- */
 export function initUserCache(userId: string): void {
   if (userId && cachedUserId !== userId) {
     clearAllUserCaches();
@@ -102,10 +95,6 @@ export function initUserCache(userId: string): void {
   }
 }
 
-/**
- * Wipe every module-level cache. Call on logout and whenever the active user
- * changes. After this call, all components will fetch fresh data on next mount.
- */
 export function clearAllUserCaches(): void {
   msgCache.clear();
   metaCache.clear();
@@ -120,11 +109,6 @@ export function clearAllUserCaches(): void {
 
 // ─── Cache-invalidation helpers (join / leave) ────────────────────────────────
 
-/**
- * Call after the current user successfully joins `communityId`.
- * Updates `joined` in the explore cache in place and clears the sidebar cache
- * so it refreshes with the new community on next render.
- */
 export function invalidateOnJoin(communityId: string): void {
   if (exploreStore.data) {
     exploreStore.data = {
@@ -134,16 +118,10 @@ export function invalidateOnJoin(communityId: string): void {
       ),
     };
   }
-  // Sidebar needs the new community's last_message info — easiest to refetch.
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
 }
 
-/**
- * Call after the current user successfully leaves `communityId`.
- * Updates `joined` in the explore cache in place and removes the community
- * from the sidebar cache.
- */
 export function invalidateOnLeave(communityId: string): void {
   if (exploreStore.data) {
     exploreStore.data = {
@@ -159,61 +137,59 @@ export function invalidateOnLeave(communityId: string): void {
       communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
     };
   }
-  // Also drop chat caches for the left community.
   msgCache.delete(communityId);
   metaCache.delete(communityId);
   msgFetchedAt.delete(communityId);
 }
 
-// ─── Existing chat caches (unchanged) ─────────────────────────────────────────
+// ─── Reaction helpers ─────────────────────────────────────────────────────────
 
-/**
- * last_read_at timestamp captured by CommunitiesPanel the moment a community
- * is activated — BEFORE last_read_at is updated on the server.  CommunityChat
- * uses this to find the first unread message by timestamp comparison, which is
- * immune to the count-mismatch bug (message_count only counts other users'
- * messages, but the old index-from-end approach counted all messages).
- *
- * Stores `string` (ISO timestamp) or `null` (community was never read before).
- * `undefined` (key absent) means the value has not been captured yet.
- */
+export function applyReactionInsert(
+  reactions: MessageReaction[],
+  emoji: string,
+  userId: string,
+): MessageReaction[] {
+  const without = reactions.map((r) => ({
+    ...r,
+    user_ids: r.user_ids.filter((uid) => uid !== userId),
+  })).filter((r) => r.user_ids.length > 0);
+
+  const existing = without.find((r) => r.emoji === emoji);
+  if (existing) {
+    return without.map((r) =>
+      r.emoji === emoji ? { ...r, user_ids: [...r.user_ids, userId] } : r
+    );
+  }
+  return [...without, { emoji, user_ids: [userId] }];
+}
+
+export function applyReactionDelete(
+  reactions: MessageReaction[],
+  emoji: string,
+  userId: string,
+): MessageReaction[] {
+  return reactions
+    .map((r) =>
+      r.emoji === emoji
+        ? { ...r, user_ids: r.user_ids.filter((uid) => uid !== userId) }
+        : r
+    )
+    .filter((r) => r.user_ids.length > 0);
+}
+
+// ─── Chat caches ──────────────────────────────────────────────────────────────
+
 export const lastReadAtOnOpen = new Map<string, string | null>();
-
-/** Messages keyed by communityId */
-export const msgCache = new Map<string, CachedMessage[]>();
-
-/** Community metadata (header + members panel) keyed by communityId */
-export const metaCache = new Map<string, CachedMeta>();
-
-/** Timestamp of the last successful full message fetch, keyed by communityId */
-export const msgFetchedAt = new Map<string, number>();
-
-/**
- * In-flight full-fetch promises keyed by communityId.
- * Hover prefetch and click both reuse the same promise — no duplicate requests.
- */
+export const msgCache         = new Map<string, CachedMessage[]>();
+export const metaCache        = new Map<string, CachedMeta>();
+export const msgFetchedAt     = new Map<string, number>();
 export const inFlightMsgFetch = new Map<string, Promise<void>>();
-
-/**
- * In-flight metadata-fetch promises keyed by communityId.
- * Prevents duplicate /api/communities/[id] calls when hover prefetch and
- * the CommunityChat mount both fire at the same time.
- */
 export const inFlightMetaFetch = new Map<string, Promise<void>>();
 
-/** How long before community metadata is considered stale (ms) */
-export const META_STALE_MS = 5 * 60_000; // 5 minutes
+export const META_STALE_MS      = 5 * 60_000;
+export const MSG_STALE_MS       = 3 * 60_000;
+export const MAX_CACHE_ENTRIES  = 25;
 
-/** How long before cached messages are considered stale (ms) */
-export const MSG_STALE_MS = 3 * 60_000; // 3 minutes
-
-/** Maximum number of communities to keep in each cache (FIFO eviction) */
-export const MAX_CACHE_ENTRIES = 25;
-
-/**
- * Evict the oldest entries from both caches when they exceed MAX_CACHE_ENTRIES.
- * Maps maintain insertion order, so the first key is the oldest.
- */
 export function evictIfNeeded(): void {
   while (msgCache.size > MAX_CACHE_ENTRIES) {
     const oldest = msgCache.keys().next().value;

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useLayoutEffect, useEffect, useMemo } from "react";
+import { useState, useLayoutEffect, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
-import { sidebarStore } from "@/lib/communities/cache";
-import type { CachedMessage, CachedMeta } from "@/lib/communities/cache";
+import { sidebarStore, msgCache } from "@/lib/communities/cache";
+import type { CachedMessage, CachedMeta, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MembersPanel } from "./chat/MembersPanel";
 import { MessageList } from "./chat/MessageList";
+import { MessageActionSlider } from "./chat/MessageActionSlider";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
@@ -37,6 +38,48 @@ export function CommunityChat({
 }) {
   const [hasMounted, setHasMounted] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
+
+  // ── Reply state ───────────────────────────────────────────────────────────
+  const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
+  const handleReply = useCallback((msg: CachedMessage) => {
+    setReplyTo({
+      id:        msg.id,
+      content:   msg.content,
+      user_name: msg.users?.name ?? "Unknown",
+    });
+    // Focus input after setting reply
+    setTimeout(() => {
+      document.querySelector<HTMLTextAreaElement>("[data-chat-input]")?.focus();
+    }, 50);
+  }, []);
+  const handleClearReply = useCallback(() => setReplyTo(null), []);
+
+  // ── Message action slider state ───────────────────────────────────────────
+  const [activeMessage, setActiveMessage] = useState<CachedMessage | null>(null);
+  const [sliderIsMe, setSliderIsMe]       = useState(false);
+
+  const handleMessagePress = useCallback((msg: CachedMessage) => {
+    setActiveMessage(msg);
+    setSliderIsMe(msg.user_id === currentUserId);
+  }, [currentUserId]);
+
+  const handleSliderClose = useCallback(() => setActiveMessage(null), []);
+
+  const handleCopy = useCallback((msg: CachedMessage) => {
+    navigator.clipboard.writeText(msg.content).catch(() => {});
+  }, []);
+
+  const handleReactionToggled = useCallback(
+    (msgId: string, reactions: MessageReaction[]) => {
+      setMessages((prev) => {
+        const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
+        msgCache.set(communityId, next);
+        setActiveMessage((cur) => cur?.id === msgId ? { ...cur, reactions } : cur);
+        return next;
+      });
+    },
+    [communityId]
+  );
 
   // ── Data fetching + message state ─────────────────────────────────────────
   const {
@@ -74,7 +117,7 @@ export function CommunityChat({
     initialLastReadAtFromSSR: initialLastReadAt,
   });
 
-  // ── Realtime subscription + catch-up ──────────────────────────────────────
+  // ── Realtime subscription ─────────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     fetchMessages,
@@ -87,7 +130,7 @@ export function CommunityChat({
     realtimeWasNearBottomRef,
   });
 
-  // ── Input, send, keyboard focus ───────────────────────────────────────────
+  // ── Input + send ──────────────────────────────────────────────────────────
   const {
     input,
     setInput,
@@ -101,6 +144,8 @@ export function CommunityChat({
     currentUserId,
     setMessages,
     setHideUnreadDivider,
+    replyTo,
+    onClearReply: handleClearReply,
   });
 
   // ── Group messages by date ────────────────────────────────────────────────
@@ -115,26 +160,18 @@ export function CommunityChat({
     [messages]
   );
 
-  // ── Sidebar fallback for displayCommunity ─────────────────────────────────
+  // ── Sidebar fallback ──────────────────────────────────────────────────────
   const sidebarEntry = hasMounted
     ? sidebarStore.data?.communities.find((c) => c.id === communityId)
     : undefined;
   const displayCommunity = community ?? (sidebarEntry
-    ? {
-        id: communityId,
-        name: sidebarEntry.name,
-        type: sidebarEntry.type,
-        member_count: sidebarEntry.member_count,
-        image_url: sidebarEntry.image_url,
-      }
+    ? { id: communityId, name: sidebarEntry.name, type: sidebarEntry.type, member_count: sidebarEntry.member_count, image_url: sidebarEntry.image_url }
     : null);
 
   if (!loading && !displayCommunity) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="font-body text-sm text-foreground-muted">
-          Community not found.
-        </p>
+        <p className="font-body text-sm text-foreground-muted">Community not found.</p>
       </div>
     );
   }
@@ -150,8 +187,7 @@ export function CommunityChat({
             ref={scrollContainerRef}
             className="flex-1 overflow-y-auto"
             style={{
-              backgroundImage:
-                "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
+              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
             }}
           >
@@ -166,15 +202,14 @@ export function CommunityChat({
               loading={loading}
               displayCommunity={displayCommunity}
               communityId={communityId}
+              onMessagePress={handleMessagePress}
             />
           </div>
 
           {/* Scroll-to-bottom button */}
           {showScrollToBottom && (
             <button
-              onClick={() =>
-                bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-              }
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
               className="absolute bottom-[72px] right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
               aria-label="Scroll to bottom"
             >
@@ -188,9 +223,23 @@ export function CommunityChat({
             sending={sending}
             error={error}
             placeholder={`Message ${displayCommunity?.name ?? ""}…`}
+            replyTo={replyTo}
             onChange={setInput}
             onKeyDown={handleKeyDown}
             onSend={handleSend}
+            onCancelReply={handleClearReply}
+          />
+
+          {/* Message action slider */}
+          <MessageActionSlider
+            message={activeMessage}
+            isMe={sliderIsMe}
+            currentUserId={currentUserId}
+            communityId={communityId}
+            onClose={handleSliderClose}
+            onReply={handleReply}
+            onCopy={handleCopy}
+            onReactionToggled={handleReactionToggled}
           />
         </div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { msgCache } from "@/lib/communities/cache";
-import type { CachedMessage } from "@/lib/communities/cache";
+import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
 
@@ -11,6 +11,8 @@ interface UseSendMessageOptions {
   currentUserId: string;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setHideUnreadDivider: (val: boolean) => void;
+  replyTo: ReplyPreview | null;
+  onClearReply: () => void;
 }
 
 export function useSendMessage({
@@ -18,29 +20,29 @@ export function useSendMessage({
   currentUserId,
   setMessages,
   setHideUnreadDivider,
+  replyTo,
+  onClearReply,
 }: UseSendMessageOptions) {
   const [input,   setInput]   = useState("");
   const [sending, setSending] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
 
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef   = useRef<HTMLTextAreaElement>(null);
+  // Keep a ref so handleSend always sees the latest replyTo without re-creating itself
+  const replyToRef = useRef<ReplyPreview | null>(replyTo);
+  useEffect(() => { replyToRef.current = replyTo; }, [replyTo]);
 
-  // ── Auto-focus when community changes ────────────────────────────────────
+  // Auto-focus when community changes
   useEffect(() => {
     inputRef.current?.focus();
   }, [communityId]);
 
-  // ── Global keydown → redirect stray typing into the input ─────────────────
+  // Global keydown → redirect stray typing into the input
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement === inputRef.current) return;
       const tag = (document.activeElement as HTMLElement)?.tagName;
-      if (
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        (document.activeElement as HTMLElement)?.isContentEditable
-      )
-        return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (document.activeElement as HTMLElement)?.isContentEditable) return;
       if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
       inputRef.current?.focus();
     };
@@ -48,12 +50,13 @@ export function useSendMessage({
     return () => document.removeEventListener("keydown", handleGlobalKeyDown);
   }, [communityId]);
 
-  // ── Send handler ──────────────────────────────────────────────────────────
   async function handleSend() {
     const content = input.trim();
     if (!content || sending) return;
     setSending(true);
     setError(null);
+
+    const currentReplyTo = replyToRef.current;
 
     const tempId = `temp-${Date.now()}`;
     const optimistic: Message = {
@@ -63,6 +66,8 @@ export function useSendMessage({
       user_id: currentUserId,
       users: null,
       status: "sending",
+      reactions: [],
+      reply_to: currentReplyTo ?? null,
     };
     setMessages((prev) => {
       const next = [...prev, optimistic];
@@ -70,6 +75,7 @@ export function useSendMessage({
       return next;
     });
     setInput("");
+    onClearReply();
     if (inputRef.current) inputRef.current.style.height = "24px";
     inputRef.current?.focus();
 
@@ -77,7 +83,10 @@ export function useSendMessage({
       const res = await fetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          reply_to_id: currentReplyTo?.id ?? null,
+        }),
       });
 
       if (res.ok) {
@@ -98,9 +107,7 @@ export function useSendMessage({
       } else {
         const d = await res.json();
         setMessages((prev) => {
-          const next = prev.map((m) =>
-            m.id === tempId ? { ...m, status: "failed" as const } : m
-          );
+          const next = prev.map((m) => m.id === tempId ? { ...m, status: "failed" as const } : m);
           msgCache.set(communityId, next);
           return next;
         });
@@ -108,9 +115,7 @@ export function useSendMessage({
       }
     } catch {
       setMessages((prev) => {
-        const next = prev.map((m) =>
-          m.id === tempId ? { ...m, status: "failed" as const } : m
-        );
+        const next = prev.map((m) => m.id === tempId ? { ...m, status: "failed" as const } : m);
         msgCache.set(communityId, next);
         return next;
       });
@@ -127,13 +132,5 @@ export function useSendMessage({
     }
   }
 
-  return {
-    input,
-    setInput,
-    sending,
-    error,
-    handleSend,
-    handleKeyDown,
-    inputRef,
-  };
+  return { input, setInput, sending, error, handleSend, handleKeyDown, inputRef };
 }
