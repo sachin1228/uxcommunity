@@ -14,6 +14,8 @@ interface LottieSettingRow {
   scope: "universal" | "type" | "community";
   scope_key: string;
   lottie_url: string;
+  /** Lottie JSON pre-fetched server-side to avoid browser CORS issues with R2. */
+  animation_data: object | null;
 }
 
 // Module-level cache so we don't re-fetch on every community switch
@@ -43,24 +45,24 @@ export function invalidateLottieCache() {
   settingsInflight = null;
 }
 
-function resolveUrl(
+function resolveRow(
   settings: LottieSettingRow[],
   communityId: string,
   communityType: string
-): string | null {
+): LottieSettingRow | null {
   // Priority: community-specific → type → universal → null
   const byCommunity = settings.find(
     (s) => s.scope === "community" && s.scope_key === communityId
   );
-  if (byCommunity) return byCommunity.lottie_url;
+  if (byCommunity) return byCommunity;
 
   const byType = settings.find(
     (s) => s.scope === "type" && s.scope_key === communityType
   );
-  if (byType) return byType.lottie_url;
+  if (byType) return byType;
 
   const universal = settings.find((s) => s.scope === "universal");
-  if (universal) return universal.lottie_url;
+  if (universal) return universal;
 
   return null;
 }
@@ -90,15 +92,26 @@ export function LottieLoader({
       const settings = await fetchSettings();
       if (cancelled) return;
 
-      const url = resolveUrl(settings, communityId, communityType);
-      if (!url) {
+      const row = resolveRow(settings, communityId, communityType);
+      if (!row) {
         setResolved(true);
         return;
       }
 
-      // Fetch the Lottie JSON from the CDN URL
+      // Use animation_data embedded server-side to avoid cross-origin R2 fetch.
+      // Fall back to a direct URL fetch only when animation_data is absent
+      // (e.g. older cached responses or a server-side fetch failure).
+      if (row.animation_data) {
+        if (!cancelled) {
+          setAnimationData(row.animation_data);
+          setResolved(true);
+        }
+        return;
+      }
+
+      // Fallback: try fetching the JSON directly (may fail due to CORS)
       try {
-        const res = await fetch(url);
+        const res = await fetch(row.lottie_url);
         if (!res.ok) throw new Error("fetch failed");
         const json = await res.json();
         if (!cancelled) {
