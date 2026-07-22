@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
@@ -71,6 +72,7 @@ export async function PATCH(
     .select("id, slug, name, image_url, is_active, created_at, updated_at")
     .single();
   if (error) return NextResponse.json({ error: "Failed to update experience level." }, { status: 500 });
+  revalidateTag("master-images", {});
   return NextResponse.json({ experience_level: shape(data) });
 }
 

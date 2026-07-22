@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft } from "lucide-react";
+import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2 } from "lucide-react";
 import type { RecompressResult } from "@/app/api/admin/recompress-images/route";
 import type { MigrateResult } from "@/app/api/admin/migrate-to-r2/route";
+import type { PurgeResult } from "@/app/api/admin/purge-supabase-storage/route";
 
 type Status = "idle" | "running" | "done" | "error";
 
@@ -21,6 +22,12 @@ interface MigrateSummary {
   failed: number;
   total: number;
   results: MigrateResult[];
+}
+
+interface PurgeSummary {
+  results: PurgeResult[];
+  totalDeleted: number;
+  totalFailed: number;
 }
 
 const TABLE_LABELS: Record<string, string> = {
@@ -44,6 +51,11 @@ export default function ToolsPage() {
   const [migrateSummary, setMigrateSummary] = useState<MigrateSummary | null>(null);
   const [migrateError, setMigrateError] = useState<string | null>(null);
 
+  // ── Purge state ───────────────────────────────────────────────────────────
+  const [purgeStatus, setPurgeStatus] = useState<Status>("idle");
+  const [purgeSummary, setPurgeSummary] = useState<PurgeSummary | null>(null);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
+
   async function runRecompression() {
     setRecompressStatus("running");
     setRecompressSummary(null);
@@ -61,6 +73,26 @@ export default function ToolsPage() {
     } catch {
       setRecompressError("Network error. Please try again.");
       setRecompressStatus("error");
+    }
+  }
+
+  async function runPurge() {
+    setPurgeStatus("running");
+    setPurgeSummary(null);
+    setPurgeError(null);
+    try {
+      const res = await fetch("/api/admin/purge-supabase-storage", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setPurgeError(data.error ?? "An unexpected error occurred.");
+        setPurgeStatus("error");
+        return;
+      }
+      setPurgeSummary(data);
+      setPurgeStatus("done");
+    } catch {
+      setPurgeError("Network error. Please try again.");
+      setPurgeStatus("error");
     }
   }
 
@@ -215,6 +247,84 @@ export default function ToolsPage() {
         {recompressStatus === "error" && recompressError && (
           <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
             <p className="font-body text-xs text-red-400">{recompressError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Purge Supabase Storage ────────────────────────────────────────── */}
+      <div className="rounded-xl border border-red-500/20 bg-surface p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
+            <Trash2 size={18} className="text-red-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-body text-sm font-semibold text-foreground">
+              Delete Supabase Storage files
+            </h2>
+            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+              Permanently deletes every file across all Supabase Storage buckets.
+              Run this only after the migration above is complete — all DB URLs must
+              already point to Cloudflare R2. <span className="text-red-400 font-medium">This cannot be undone.</span>
+            </p>
+
+            <button
+              onClick={runPurge}
+              disabled={purgeStatus === "running"}
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-red-500 px-3.5 py-1.5 font-body text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {purgeStatus === "running" ? (
+                <>
+                  <RefreshCw size={13} className="animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                <>
+                  <Trash2 size={13} />
+                  {purgeStatus === "done" ? "Run again" : "Delete Supabase files"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {purgeStatus === "done" && purgeSummary && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="flex gap-4 mb-4">
+              <Stat icon={<Trash2      size={13} className="text-red-400" />}          value={purgeSummary.totalDeleted} label="deleted" />
+              <Stat icon={<AlertCircle size={13} className="text-foreground-muted" />} value={purgeSummary.totalFailed}  label="failed"  />
+            </div>
+            {purgeSummary.results.length === 0 && (
+              <p className="font-body text-xs text-foreground-muted">No buckets found in Supabase Storage.</p>
+            )}
+            {purgeSummary.results.length > 0 && (
+              <div className="max-h-60 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                {purgeSummary.results.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 px-3 py-2">
+                    <span className="mt-0.5">
+                      {r.failed > 0
+                        ? <AlertCircle size={12} className="text-red-400 shrink-0" />
+                        : <CheckCircle2 size={12} className="text-green-400 shrink-0" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-body text-[11px] text-foreground">
+                        <span className="text-foreground-muted">Bucket: </span>{r.bucket}
+                        <span className="text-foreground-muted ml-2">· {r.deleted} deleted</span>
+                        {r.failed > 0 && <span className="text-red-400 ml-2">· {r.failed} failed</span>}
+                      </p>
+                      {r.errors.map((e, j) => (
+                        <p key={j} className="font-body text-[10px] text-red-400">{e}</p>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {purgeStatus === "error" && purgeError && (
+          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <p className="font-body text-xs text-red-400">{purgeError}</p>
           </div>
         )}
       </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { masterDataSchema } from "@/lib/validations";
@@ -46,5 +47,6 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ error: "Failed to create interest." }, { status: 500 });
   }
+  revalidateTag("master-images", {});
   return NextResponse.json({ interest: data }, { status: 201 });
 }
