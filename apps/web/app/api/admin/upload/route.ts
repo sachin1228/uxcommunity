@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { uploadToR2 } from "@/lib/r2";
 
-const BUCKET = "master-data-images";
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 
@@ -33,22 +32,13 @@ export async function POST(request: NextRequest) {
   }
 
   const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const key = `master-data/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-  const db = createServiceClient();
-
-  const { data, error } = await db.storage
-    .from(BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), {
-      contentType: file.type,
-      upsert: false,
-    });
-
-  if (error) {
-    console.error("[upload] Supabase storage error:", error);
+  try {
+    const url = await uploadToR2(key, Buffer.from(await file.arrayBuffer()), file.type);
+    return NextResponse.json({ url }, { status: 201 });
+  } catch (err) {
+    console.error("[upload] R2 upload error:", err);
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
-
-  const { data: { publicUrl } } = db.storage.from(BUCKET).getPublicUrl(data.path);
-  return NextResponse.json({ url: publicUrl }, { status: 201 });
 }

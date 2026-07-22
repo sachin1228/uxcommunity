@@ -3,8 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
 import { compressAvatar } from "@/lib/image-utils";
+import { uploadToR2 } from "@/lib/r2";
 
-const BUCKET = "profile-avatars";
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is a safety cap)
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_SOURCES = ["dicebear", "boring-avatars", "robohash", "avataaars", "multiavatar", "upload"] as const;
@@ -98,30 +98,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Image must be under 3 MB." }, { status: 422 });
     }
 
-    const db = createServiceClient();
-
     // Compress to WebP (max 400×400, quality 85) before storing — reduces
     // storage size ~70-85% and cuts egress every time the avatar is served.
     const raw = Buffer.from(await file.arrayBuffer());
     const compressed = await compressAvatar(raw);
-    const storagePath = `${session.userId}/${Date.now()}.${compressed.ext}`;
+    const key = `avatars/${session.userId}/${Date.now()}.${compressed.ext}`;
 
-    const { data, error: uploadError } = await db.storage
-      .from(BUCKET)
-      .upload(storagePath, compressed.data, {
-        contentType: compressed.contentType,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("[signup/avatar] storage upload error:", uploadError);
+    let publicUrl: string;
+    try {
+      publicUrl = await uploadToR2(key, compressed.data, compressed.contentType);
+    } catch (err) {
+      console.error("[signup/avatar] R2 upload error:", err);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
     }
 
-    const {
-      data: { publicUrl },
-    } = db.storage.from(BUCKET).getPublicUrl(data.path);
-
+    const db = createServiceClient();
     const { error: dbError } = await db
       .from("designer_profiles")
       .update({ avatar_url: publicUrl, avatar_source: "upload" })

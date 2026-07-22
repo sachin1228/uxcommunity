@@ -12,8 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compressAvatar } from "@/lib/image-utils";
-
-const BUCKET = "profile-avatars";
+import { uploadToR2 } from "@/lib/r2";
 
 const ALLOWED_SOURCES = [
   "dicebear",
@@ -67,7 +66,6 @@ export async function POST(request: NextRequest) {
     }
 
     const mimeType = file.type;
-    const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
     if (!["image/jpeg", "image/png", "image/webp"].includes(mimeType)) {
       return NextResponse.json({ error: "Only JPEG, PNG and WebP are accepted." }, { status: 422 });
     }
@@ -75,30 +73,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File exceeds 5 MB limit." }, { status: 413 });
     }
 
-    const db = createServiceClient();
-
     // Compress to WebP (max 400×400, quality 85) before storing — reduces
     // storage size ~70-85% and cuts egress every time the avatar is served.
     const raw = Buffer.from(await file.arrayBuffer());
     const compressed = await compressAvatar(raw);
-    const storagePath = `${session.userId}/${Date.now()}.${compressed.ext}`;
+    const key = `avatars/${session.userId}/${Date.now()}.${compressed.ext}`;
 
-    const { data, error: uploadError } = await db.storage
-      .from(BUCKET)
-      .upload(storagePath, compressed.data, {
-        contentType: compressed.contentType,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("[profile/avatar] storage upload error:", uploadError);
+    let publicUrl: string;
+    try {
+      publicUrl = await uploadToR2(key, compressed.data, compressed.contentType);
+    } catch (err) {
+      console.error("[profile/avatar] R2 upload error:", err);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
     }
 
-    const {
-      data: { publicUrl },
-    } = db.storage.from(BUCKET).getPublicUrl(data.path);
-
+    const db = createServiceClient();
     const { error: dbError } = await db
       .from("designer_profiles")
       .update({ avatar_url: publicUrl, avatar_source: "upload" })

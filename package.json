@@ -11,6 +11,10 @@
     "start": "npm run start --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web"
   },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
   "dependencies": {
     "boring-avatars": "^2.0.4",
     "lottie-react": "^2.4.1"

@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { uploadToR2 } from "@/lib/r2";
 
-const BUCKET = "master-data-images";
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB — Lottie JSON files should be small
 
 export async function POST(request: NextRequest) {
@@ -45,21 +44,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File is not valid JSON." }, { status: 422 });
   }
 
-  const path = `lottie/${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
+  const key = `lottie/${Date.now()}-${Math.random().toString(36).slice(2)}.json`;
 
-  const db = createServiceClient();
-  const { data, error } = await db.storage
-    .from(BUCKET)
-    .upload(path, Buffer.from(await file.arrayBuffer()), {
-      contentType: "application/json",
-      upsert: false,
-    });
-
-  if (error) {
-    console.error("[lottie-upload] Supabase storage error:", error);
+  try {
+    const url = await uploadToR2(key, Buffer.from(await file.arrayBuffer()), "application/json");
+    return NextResponse.json({ url }, { status: 201 });
+  } catch (err) {
+    console.error("[lottie-upload] R2 upload error:", err);
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
   }
-
-  const { data: { publicUrl } } = db.storage.from(BUCKET).getPublicUrl(data.path);
-  return NextResponse.json({ url: publicUrl }, { status: 201 });
 }
