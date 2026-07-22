@@ -7,6 +7,7 @@ import {
   useLayoutEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "react";
 import { Users, Clock, CheckCheck, ChevronDown } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -616,17 +617,6 @@ export function CommunityChat({
     const firstMsgId = unreadMsgs[0]?.id ?? null;
     const count = unreadMsgs.length;
 
-    console.log("[UnreadSnapshot CREATED]", {
-      communityId,
-      lastReadAt,
-      firstMsgId,
-      count,
-      messageCount: messages.length,
-      existsInMessages: firstMsgId
-        ? messages.some((m) => m.id === firstMsgId)
-        : "n/a",
-    });
-
     unreadAtOpenRef.current = { firstMsgId, count };
     // setSnapshotReady → re-render → divider element appears in DOM at the
     // correct position → Effect 2 fires and performs the initial scroll.
@@ -944,7 +934,9 @@ export function CommunityChat({
       fetchMessages(lastReal?.created_at ?? undefined);
     };
 
-    const id = setInterval(poll, 5000);
+    // Polling disabled for testing.
+    // const id = setInterval(poll, 5000);
+    const id = 0 as unknown as ReturnType<typeof setInterval>;
     return () => clearInterval(id);
   }, [communityId, fetchMessages]);
 
@@ -1051,16 +1043,13 @@ export function CommunityChat({
 
   // ─── Group messages by date ───────────────────────────────────────────────
   type Group = { date: string; messages: Message[] };
-  const grouped = messages.reduce<Group[]>((acc, msg) => {
+  const grouped = useMemo(() => messages.reduce<Group[]>((acc, msg) => {
     const date = fmtDate(msg.created_at);
     const last = acc[acc.length - 1];
-    if (last?.date === date) {
-      last.messages.push(msg);
-    } else {
-      acc.push({ date, messages: [msg] });
-    }
+    if (last?.date === date) last.messages.push(msg);
+    else acc.push({ date, messages: [msg] });
     return acc;
-  }, []);
+  }, []), [messages]);
 
   // ─── Unread divider ───────────────────────────────────────────────────────
   // firstUnreadMsgId is frozen at open time so the divider position never
@@ -1068,20 +1057,20 @@ export function CommunityChat({
   // current message list so it grows correctly as new messages arrive via
   // realtime — without the double-counting bug that a setState-inside-updater
   // approach causes in React Strict Mode.
-  const realMessages = messages.filter((m) => !m.id.startsWith("temp-"));
+  const realMessages = useMemo(() => messages.filter((m) => !m.id.startsWith("temp-")), [messages]);
   const firstUnreadMsgId: string | null =
     snapshotReady && !hideUnreadDivider
       ? (unreadAtOpenRef.current?.firstMsgId ?? null)
       : null;
-  const unreadDisplayCount: number =
-    snapshotReady && lastReadAt !== undefined
-      ? realMessages.filter(
-          (m) =>
-            m.user_id !== currentUserId &&
-            (lastReadAt === null ||
-              new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
-        ).length
-      : 0;
+  const unreadDisplayCount = useMemo(() => {
+    if (!snapshotReady || lastReadAt === undefined) return 0;
+    return realMessages.filter(
+      (m) =>
+        m.user_id !== currentUserId &&
+        (lastReadAt === null ||
+          new Date(m.created_at).getTime() > new Date(lastReadAt).getTime())
+    ).length;
+  }, [snapshotReady, lastReadAt, realMessages, currentUserId]);
 
   // Resolve display data: prefer live community state, fall back to sidebar
   // cache so the header renders immediately even before fetchMeta completes.
