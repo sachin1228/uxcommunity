@@ -12,6 +12,19 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { uploadToR2, parseR2Key } from "@/lib/r2";
 
+/** Parse bucket + storage path out of a Supabase public URL. */
+function parseSupabasePath(url: string): { bucket: string; storagePath: string } | null {
+  try {
+    const match = new URL(url).pathname.match(
+      /^\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/
+    );
+    if (!match) return null;
+    return { bucket: match[1], storagePath: match[2] };
+  } catch {
+    return null;
+  }
+}
+
 const MASTER_TABLES: { table: string; column: string }[] = [
   { table: "companies",         column: "image_url" },
   { table: "cities",            column: "image_url" },
@@ -55,10 +68,21 @@ function deriveR2Key(url: string, table: string, id: string | null): string {
   }
 }
 
-async function fetchBuffer(url: string): Promise<Buffer> {
+async function fetchBuffer(
+  url: string,
+  db: ReturnType<typeof createServiceClient>
+): Promise<Buffer> {
+  // Try the public URL first
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
-  return Buffer.from(await res.arrayBuffer());
+  if (res.ok) return Buffer.from(await res.arrayBuffer());
+
+  // Public fetch failed (bucket not fully public) — fall back to service-role SDK download
+  const parsed = parseSupabasePath(url);
+  if (!parsed) throw new Error(`HTTP ${res.status} fetching ${url} and URL is not a Supabase storage path`);
+
+  const { data, error } = await db.storage.from(parsed.bucket).download(parsed.storagePath);
+  if (error || !data) throw new Error(`Supabase SDK download failed: ${error?.message ?? "no data"}`);
+  return Buffer.from(await data.arrayBuffer());
 }
 
 function guessContentType(url: string): string {
@@ -109,7 +133,7 @@ export async function POST() {
       }
 
       try {
-        const buffer = await fetchBuffer(url);
+        const buffer = await fetchBuffer(url, db);
         const key = deriveR2Key(url, table, row.id);
         const newUrl = await uploadToR2(key, buffer, guessContentType(url));
 
@@ -149,7 +173,7 @@ export async function POST() {
       }
 
       try {
-        const buffer = await fetchBuffer(url);
+        const buffer = await fetchBuffer(url, db);
         const key = deriveR2Key(url, "designer_profiles", profile.user_id);
         const newUrl = await uploadToR2(key, buffer, guessContentType(url));
 
