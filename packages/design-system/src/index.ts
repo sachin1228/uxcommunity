@@ -11,7 +11,7 @@
  */
 
 // Raw primitive tokens
-export { colors, purple, neutral, signal } from "./tokens/colors";
+export { colors, blue, neutral, signal } from "./tokens/colors";
 export { typography, fontFamily, fontSize, fontWeight, lineHeight, letterSpacing } from "./tokens/typography";
 export { radius } from "./tokens/radius";
 export { shadows } from "./tokens/shadows";

@@ -1,113 +1,93 @@
 /**
  * @draft/design-system — CSS custom properties
  *
- * Structure mirrors Cloudflare's design language:
- *   - semantic tokens only (no raw values in UI code)
- *   - light mode in :root, dark mode via prefers-color-scheme
- *   - no JS toggle required — the OS/browser decides
- *
- * Import this file once in your global stylesheet.
+ * Primary accent: #0070F3. Hover: #0060D1.
  */
 
 /* ─── Light mode (default) ─────────────────────────────────────────── */
 :root {
   color-scheme: light dark;
 
-  /* Backgrounds */
-  --color-background:        #FFFFFF;
-  --color-background-subtle: #FAFAFA;
+  --color-background:        #FAFAFA;
+  --color-background-subtle: #F5F5F5;
 
-  /* Surfaces */
   --color-surface:           #FFFFFF;
   --color-surface-raised:    #F5F5F5;
 
-  /* Foreground / text */
-  --color-foreground:        #171717;
-  --color-foreground-muted:  #5A5A5A;
-  --color-foreground-subtle: #7B7B7B;
+  --color-foreground:        #0A0A0A;
+  --color-foreground-muted:  #525252;
+  --color-foreground-subtle: #737373;
 
-  /* Accent — draft/ orange brand */
-  --color-accent:            #FF5E1F;
-  --color-accent-hover:      #E65012;
-  --color-accent-soft:       #FFE9DD;
+  /* Accent */
+  --color-accent:            #0070F3;
+  --color-accent-rgb:        0 112 243;   /* RGB channels for opacity modifiers */
+  --color-accent-hover:      #0060D1;     /* darker hover shade */
+  --color-accent-soft:       #f0f8ff;     /* tinted bg */
   --color-accent-foreground: #FFFFFF;
 
-  /* Borders */
-  --color-border:            #ECECEC;
+  --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
-  /* Brand signal */
-  --color-signal:            #1289ff;
+  --color-signal:            #0070F3;
 
-  /* Always-dark overlay panel (brand canvas side) */
-  --color-overlay:            #161413;
-  --color-overlay-raised:     #1B1918;
-  --color-overlay-elevated:   #262220;
-  --color-overlay-foreground: #F5F2F0;
-  --color-overlay-muted:      #7B7B7B;
+  --color-overlay:            #0A0A0A;
+  --color-overlay-raised:     #111111;
+  --color-overlay-elevated:   #1A1A1A;
+  --color-overlay-foreground: #EDEDED;
+  --color-overlay-muted:      #737373;
 
-  /* Shadows */
-  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
-  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.08);
+  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-card: 0 0 0 1px var(--color-border), 0 2px 4px rgb(0 0 0 / 0.04);
 
-  /* Radius */
   --radius-sm:   4px;
-  --radius-md:   8px;
-  --radius-lg:   12px;
-  --radius-xl:   16px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   12px;
   --radius-full: 9999px;
 
-  /* Grid pattern variables */
-  --grid-line-color: rgba(0, 0, 0, 0.055);
+  --grid-line-color: rgba(0, 0, 0, 0.06);
   --grid-dot-color:  rgba(0, 0, 0, 0.12);
   --grid-size:       28px;
 }
 
-/* ─── Dark mode (system-driven, no toggle) ──────────────────────────── */
+/* ─── Dark mode ─────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Backgrounds */
-    --color-background:        #161413;
-    --color-background-subtle: #1B1918;
+    --color-background:        #0A0A0A;
+    --color-background-subtle: #111111;
 
-    /* Surfaces */
-    --color-surface:           #1B1918;
-    --color-surface-raised:    #262220;
+    --color-surface:           #111111;
+    --color-surface-raised:    #1A1A1A;
 
-    /* Foreground / text */
-    --color-foreground:        #F5F2F0;
-    --color-foreground-muted:  #7B7B7B;
-    --color-foreground-subtle: #5A5A5A;
+    --color-foreground:        #EDEDED;
+    --color-foreground-muted:  #737373;
+    --color-foreground-subtle: #525252;
 
-    /* Accent — slightly brighter for dark-mode legibility */
-    --color-accent:            #ff5e1f;
-    --color-accent-hover:      #E65012;
-    --color-accent-soft:       #262220;
+    /* Accent */
+    --color-accent:            #0070F3;
+    --color-accent-rgb:        0 112 243;
+    --color-accent-hover:      #0060D1;
+    --color-accent-soft:       #1A1A1A;
     --color-accent-foreground: #FFFFFF;
 
-    /* Borders */
-    --color-border:            #2F2B29;
-    --color-border-subtle:     #262220;
+    --color-border:            #2E2E2E;
+    --color-border-subtle:     #1A1A1A;
 
-    /* Signal stays vivid */
-    --color-signal:            #1289ff;
+    --color-signal:            #0070F3;
 
-    /* Overlay panel — same in both modes (always dark) */
-    --color-overlay:            #161413;
-    --color-overlay-raised:     #1B1918;
-    --color-overlay-elevated:   #262220;
-    --color-overlay-foreground: #F5F2F0;
-    --color-overlay-muted:      #7B7B7B;
+    --color-overlay:            #0A0A0A;
+    --color-overlay-raised:     #111111;
+    --color-overlay-elevated:   #1A1A1A;
+    --color-overlay-foreground: #EDEDED;
+    --color-overlay-muted:      #737373;
 
-    /* Shadows — rely on border contrast on dark bg */
-    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.30);
-    --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.40), 0 1px 2px -1px rgb(0 0 0 / 0.32);
-    --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.48), 0 2px 4px -2px rgb(0 0 0 / 0.36);
-    --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.40);
+    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
+    --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
+    --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
+    --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
 
-    /* Grid pattern — lighter lines on dark bg */
     --grid-line-color: rgba(255, 255, 255, 0.04);
     --grid-dot-color:  rgba(255, 255, 255, 0.08);
   }

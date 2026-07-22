@@ -94,7 +94,7 @@ function CommunityRow({
           <div className="flex items-center gap-2">
             <span className="font-body text-sm text-foreground">{c.name}</span>
             {!c.is_active && (
-              <span className="px-1.5 py-0.5 rounded-full font-body text-[10px] font-medium bg-orange-500/10 text-orange-400">
+              <span className="px-1.5 py-0.5 rounded-full font-body text-[10px] font-medium bg-amber-500/10 text-amber-500">
                 Deactivated
               </span>
             )}
@@ -128,7 +128,7 @@ function CommunityRow({
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-body text-[11px] font-medium ${
           c.is_active
             ? "bg-green-500/10 text-green-400"
-            : "bg-orange-500/10 text-orange-400"
+            : "bg-amber-500/10 text-amber-500"
         }`}>
           {c.is_active ? "Active" : "Deactivated"}
         </span>

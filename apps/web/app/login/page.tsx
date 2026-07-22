@@ -23,7 +23,7 @@ const AVATAR_SEEDS = [
 
 function FloatingAvatars() {
   return (
-    <div className="relative h-44 w-full overflow-hidden rounded-md bg-gradient-to-br from-accent to-[#9B320C]">
+    <div className="relative h-44 w-full overflow-hidden rounded-md bg-gradient-to-br from-accent to-[#00254d]">
       <style>{`
         @keyframes avatarRise {
           from { transform: translateY(115%); }

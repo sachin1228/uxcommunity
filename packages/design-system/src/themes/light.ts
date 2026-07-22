@@ -1,43 +1,34 @@
-import { neutral, orange, signal, warm } from "../tokens/colors";
+import { neutral, blue, signal, dark } from "../tokens/colors";
 
 /**
- * Light theme — semantic color mappings.
- * Inspired by Cloudflare's clean white-dominant light mode:
- * pure white surfaces, very dark foreground, crisp borders.
+ * Light theme — #0070F3 as primary accent, #0060D1 as hover.
  */
 export const lightTheme = {
-  /** Page and panel backgrounds */
-  background:        neutral[0],    // #FFFFFF — pure white canvas
-  backgroundSubtle:  neutral[50],   // #FAFAFA — alternate section bg
+  background:        neutral[50],
+  backgroundSubtle:  neutral[100],
 
-  /** Card / elevated surfaces */
-  surface:           neutral[0],    // #FFFFFF
-  surfaceRaised:     neutral[100],  // #F5F5F5 — slightly elevated
+  surface:           neutral[0],
+  surfaceRaised:     neutral[100],
 
-  /** Text */
-  foreground:        neutral[900],  // #171717 — primary text
-  foregroundMuted:   neutral[600],  // #5A5A5A — secondary text
-  foregroundSubtle:  neutral[500],  // #7B7B7B — placeholder / tertiary
+  foreground:        neutral[1000],
+  foregroundMuted:   neutral[600],
+  foregroundSubtle:  neutral[500],
 
-  /** Accent (draft/ orange brand) */
-  accent:            orange[500],   // #FF5E1F
-  accentHover:       orange[600],   // #E54E12
-  accentSoft:        orange[100],   // #FFE9DD — tinted bg
-  accentForeground:  neutral[0],    // white text on accent bg
+  accent:            "#0070F3" as const,
+  accentHover:       "#0060D1" as const,
+  accentSoft:        blue[1000],    // #f0f8ff — tinted bg
+  accentForeground:  neutral[0],
 
-  /** Borders */
-  border:            neutral[200],  // #ECECEC
-  borderSubtle:      neutral[100],  // #F5F5F5
+  border:            neutral[200],
+  borderSubtle:      neutral[100],
 
-  /** Brand signal */
-  signal,                           // #1289ff
+  signal,
 
-  /** Always-dark overlay panel (brand canvas, code blocks, etc.) */
-  overlay:           warm[900],     // #161413 — warm charcoal
-  overlayRaised:     warm[800],     // #1B1918
-  overlayElevated:   warm[700],     // #262220
-  overlayForeground: warm[100],     // #F5F2F0
-  overlayMuted:      warm[400],     // #7B7B7B
+  overlay:           dark[900],
+  overlayRaised:     dark[800],
+  overlayElevated:   dark[700],
+  overlayForeground: dark[100],
+  overlayMuted:      dark[400],
 } as const;
 
 export type LightTheme = typeof lightTheme;

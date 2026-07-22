@@ -272,7 +272,7 @@ export default function CommunityDetailPage() {
               {fallback} {TYPE_LABELS[community.type] ?? community.type}
             </span>
             {!community.is_active && (
-              <span className="px-2 py-0.5 rounded-full font-body text-[11px] font-medium bg-orange-500/10 text-orange-400 border border-orange-500/20">
+              <span className="px-2 py-0.5 rounded-full font-body text-[11px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
                 Deactivated
               </span>
             )}
@@ -294,7 +294,7 @@ export default function CommunityDetailPage() {
         <InfoRow label="Members"        value={community.member_count.toLocaleString()} />
         <InfoRow label="Total messages" value={community.message_count.toLocaleString()} />
         <InfoRow label="Status"         value={
-          <span className={community.is_active ? "text-green-400" : "text-orange-400"}>
+          <span className={community.is_active ? "text-green-400" : "text-amber-500"}>
             {community.is_active ? "Active" : "Deactivated"}
           </span>
         } />

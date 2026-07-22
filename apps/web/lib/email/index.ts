@@ -42,7 +42,7 @@ export async function sendPasswordResetEmail(
         <tr>
           <td style="padding:32px 40px 0;background:#1B1918;">
             <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
-              ${APP_NAME}<span style="color:#FF5E1F;">/</span>
+              ${APP_NAME}<span style="color:#0070f3;">/</span>
             </p>
           </td>
         </tr>
@@ -58,7 +58,7 @@ export async function sendPasswordResetEmail(
               Click the button below to choose a new password. This link expires in <strong style="color:#F5F2F0;">1 hour</strong> and can only be used once.
             </p>
             <a href="${link}"
-               style="display:inline-block;padding:12px 28px;background:#FF5E1F;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
+               style="display:inline-block;padding:12px 28px;background:#0070f3;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
               Reset password
             </a>
             <p style="margin:24px 0 0;font-size:13px;color:#7B7B7B;">
@@ -104,7 +104,7 @@ export async function sendInvitationEmail(
         <tr>
           <td style="padding:32px 40px 0;background:#1B1918;">
             <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
-              ${APP_NAME}<span style="color:#FF5E1F;">/</span>
+              ${APP_NAME}<span style="color:#0070f3;">/</span>
             </p>
           </td>
         </tr>
@@ -117,7 +117,7 @@ export async function sendInvitationEmail(
               Your application has been approved. You're invited to create your ${APP_NAME} account and join a curated community of designers — share your work, connect with other creatives, get feedback, and discover new career opportunities.
             </p>
             <a href="${link}"
-               style="display:inline-block;padding:12px 28px;background:#FF5E1F;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
+               style="display:inline-block;padding:12px 28px;background:#0070f3;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
               Create your account
             </a>
             <p style="margin:24px 0 0;font-size:13px;color:#7B7B7B;">
@@ -163,7 +163,7 @@ export async function sendWelcomeEmail(
         <tr>
           <td style="padding:32px 40px 0;background:#1B1918;">
             <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
-              ${APP_NAME}<span style="color:#FF5E1F;">/</span>
+              ${APP_NAME}<span style="color:#0070f3;">/</span>
             </p>
           </td>
         </tr>
@@ -179,7 +179,7 @@ export async function sendWelcomeEmail(
               Head over to your dashboard to complete your profile, share your work, connect with fellow creatives, and discover new career opportunities.
             </p>
             <a href="${dashboardLink}"
-               style="display:inline-block;padding:12px 28px;background:#FF5E1F;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
+               style="display:inline-block;padding:12px 28px;background:#0070f3;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
               Go to your dashboard
             </a>
           </td>
@@ -221,7 +221,7 @@ export async function sendRejectionEmail(
         <tr>
           <td style="padding:32px 40px 0;background:#1B1918;">
             <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
-              ${APP_NAME}<span style="color:#FF5E1F;">/</span>
+              ${APP_NAME}<span style="color:#0070f3;">/</span>
             </p>
           </td>
         </tr>
