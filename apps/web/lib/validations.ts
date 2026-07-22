@@ -36,22 +36,9 @@ export const signupStep2Schema = z.object({
   company_id: z.string().uuid("Please select a company"),
   city_id: z.string().uuid("Please select a city"),
   sector_id: z.string().uuid("Please select a design sector"),
-  experience_level: z.enum([
-    "student",
-    "fresher",
-    "junior",
-    "mid_level",
-    "senior",
-    "lead",
-    "principal",
-    "staff",
-    "design_manager",
-    "head_of_design",
-    "director",
-    "vp",
-    "consultant",
-    "freelancer",
-  ]),
+  // No longer validated against a hardcoded enum — the experience_levels table
+  // (managed via the admin panel) is the source of truth. Any non-empty slug is valid.
+  experience_level: z.string().min(1, "Please select an experience level"),
 });
 
 export const masterDataSchema = z.object({

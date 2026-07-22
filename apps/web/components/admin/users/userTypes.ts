@@ -29,6 +29,10 @@ export interface UserApplication {
   portfolio_url: string | null;
 }
 
+// Legacy label map for users who signed up before the experience_level column
+// was migrated from a PG enum to text. New signups store the slug directly from
+// the experience_levels table, so UserInfoCard falls back to the raw slug value
+// if no entry is found here.
 export const EXPERIENCE_LABELS: Record<string, string> = {
   student:        "Student",
   fresher:        "Fresher (0–1 yrs)",
