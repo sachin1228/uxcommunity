@@ -197,7 +197,7 @@ export async function POST() {
   const failed   = results.filter((r) => r.status === "failed").length;
 
   // Bust the master-image cache so community pages immediately reflect new R2 URLs
-  revalidateTag("master-images");
+  revalidateTag("master-images", {});
 
   return NextResponse.json({ migrated, skipped, failed, total: results.length, results });
 }
