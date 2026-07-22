@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { uploadToR2, parseR2Key } from "@/lib/r2";
@@ -194,6 +195,9 @@ export async function POST() {
   const migrated = results.filter((r) => r.status === "migrated").length;
   const skipped  = results.filter((r) => r.status === "skipped").length;
   const failed   = results.filter((r) => r.status === "failed").length;
+
+  // Bust the master-image cache so community pages immediately reflect new R2 URLs
+  revalidateTag("master-images");
 
   return NextResponse.json({ migrated, skipped, failed, total: results.length, results });
 }
