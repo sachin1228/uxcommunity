@@ -29,7 +29,7 @@ function ReplyBubble({ reply, isMe }: { reply: ReplyPreview; isMe: boolean }) {
         {reply.user_name}
       </p>
       <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground/70" : "text-foreground-muted"}`}>
-        {reply.content}
+        {reply.content || "📷 Image"}
       </p>
     </div>
   );
@@ -49,7 +49,6 @@ function ReactionPills({
   return (
     <div className={`flex flex-wrap gap-1 mt-1 absolute -bottom-[14px] left-[12px] ${isMe ? "justify-end" : "justify-start"}`}>
       {reactions.map(({ emoji, user_ids }) => {
-        const iMine = user_ids.includes(currentUserId);
         return (
           <span
             key={emoji}
@@ -66,6 +65,20 @@ function ReactionPills({
   );
 }
 
+/** Image rendered inside a message bubble. */
+function BubbleImage({ url, isMe }: { url: string; isMe: boolean }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={url}
+      alt="Image"
+      className={`block max-w-full rounded-xl object-cover mb-1 ${isMe ? "opacity-95" : ""}`}
+      style={{ maxHeight: 300, width: "auto" }}
+      loading="lazy"
+    />
+  );
+}
+
 export function MessageBubble({
   msg,
   isMe,
@@ -78,6 +91,7 @@ export function MessageBubble({
   const sender    = msg.users;
   const reactions = msg.reactions ?? [];
   const replyTo   = msg.reply_to ?? null;
+  const imageUrl  = msg.image_url ?? null;
 
   if (isMe) {
     return (
@@ -102,9 +116,12 @@ export function MessageBubble({
                 }`}
               >
                 {replyTo && <ReplyBubble reply={replyTo} isMe />}
-                <p className="font-body text-sm text-accent-foreground whitespace-pre-wrap break-words">
-                  {msg.content}
-                </p>
+                {imageUrl && <BubbleImage url={imageUrl} isMe />}
+                {msg.content && (
+                  <p className="font-body text-sm text-accent-foreground whitespace-pre-wrap break-words">
+                    {msg.content}
+                  </p>
+                )}
                 <div className="flex items-center justify-end gap-1 mt-1">
                   <span className="font-mono text-[10px] text-accent-foreground/60">
                     {fmtTime(msg.created_at)}
@@ -154,9 +171,12 @@ export function MessageBubble({
               className="rounded-2xl rounded-tl-sm bg-surface-raised shadow-sm px-3 pt-2 pb-1.5 cursor-pointer select-none active:scale-[0.97] transition-transform"
             >
               {replyTo && <ReplyBubble reply={replyTo} isMe={false} />}
-              <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">
-                {msg.content}
-              </p>
+              {imageUrl && <BubbleImage url={imageUrl} isMe={false} />}
+              {msg.content && (
+                <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">
+                  {msg.content}
+                </p>
+              )}
               <p className="font-mono text-[10px] text-foreground-muted text-right mt-1">
                 {fmtTime(msg.created_at)}
               </p>

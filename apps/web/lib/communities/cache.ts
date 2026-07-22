@@ -25,6 +25,7 @@ export interface CachedMessage {
   status?: "sending" | "sent" | "failed";
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
+  image_url?: string | null;
 }
 
 export interface CachedMeta {

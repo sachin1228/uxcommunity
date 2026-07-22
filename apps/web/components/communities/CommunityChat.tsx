@@ -44,7 +44,7 @@ export function CommunityChat({
   const handleReply = useCallback((msg: CachedMessage) => {
     setReplyTo({
       id:        msg.id,
-      content:   msg.content,
+      content:   msg.content || (msg.image_url ? "📷 Image" : ""),
       user_name: msg.users?.name ?? "Unknown",
     });
     // Focus input after setting reply
@@ -139,6 +139,9 @@ export function CommunityChat({
     handleSend,
     handleKeyDown,
     inputRef,
+    pendingImagePreview,
+    handleImageSelect,
+    handleImageClear,
   } = useSendMessage({
     communityId,
     currentUserId,
@@ -224,10 +227,13 @@ export function CommunityChat({
             error={error}
             placeholder={`Message ${displayCommunity?.name ?? ""}…`}
             replyTo={replyTo}
+            pendingImagePreview={pendingImagePreview}
             onChange={setInput}
             onKeyDown={handleKeyDown}
             onSend={handleSend}
             onCancelReply={handleClearReply}
+            onImageSelect={handleImageSelect}
+            onImageRemove={handleImageClear}
           />
 
           {/* Message action slider */}

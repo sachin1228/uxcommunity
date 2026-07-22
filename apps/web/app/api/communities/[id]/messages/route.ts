@@ -26,7 +26,7 @@ async function fetchReplyPreviews(
 
   const out: Record<string, ReplyPreview> = {};
   for (const m of msgs ?? []) {
-    out[m.id] = { id: m.id, content: m.content, user_name: userMap[m.user_id] ?? "Unknown" };
+    out[m.id] = { id: m.id, content: (m as any).content ?? "", user_name: userMap[m.user_id] ?? "Unknown" };
   }
   return out;
 }
@@ -47,7 +47,7 @@ export async function GET(
 
   let msgQuery = db
     .from("community_messages")
-    .select("id, content, created_at, user_id, reply_to_id")
+    .select("id, content, created_at, user_id, reply_to_id, image_url")
     .eq("community_id", communityId)
     .order("created_at", { ascending: false });
 
@@ -117,6 +117,7 @@ export async function GET(
     users:     userMap[m.user_id] ?? null,
     reactions: reactionsMap[m.id] ?? [],
     reply_to:  m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
+    image_url: (m as any).image_url ?? null,
   }));
 
   return NextResponse.json({ messages });
@@ -144,16 +145,18 @@ export async function POST(
 
   let content: string;
   let reply_to_id: string | null = null;
+  let image_url: string | null = null;
   try {
-    const body = await req.json();
+    const body  = await req.json();
     content     = (body.content ?? "").trim();
     reply_to_id = body.reply_to_id ?? null;
+    image_url   = body.image_url   ?? null;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  if (!content)              return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
-  if (content.length > 2000) return NextResponse.json({ error: "Message too long." },       { status: 422 });
+  if (!content && !image_url) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
+  if (content.length > 2000)  return NextResponse.json({ error: "Message too long." },        { status: 422 });
 
   // Validate reply_to_id belongs to this community (if provided)
   if (reply_to_id) {
@@ -168,8 +171,8 @@ export async function POST(
 
   const { data: inserted, error: insertErr } = await db
     .from("community_messages")
-    .insert({ community_id: communityId, user_id: userId, content, reply_to_id })
-    .select("id, content, created_at, user_id, reply_to_id")
+    .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
+    .select("id, content, created_at, user_id, reply_to_id, image_url")
     .single();
 
   if (insertErr || !inserted) {
@@ -190,6 +193,7 @@ export async function POST(
         users:     user ? { name: user.name, avatar_url: profile?.avatar_url ?? null } : null,
         reactions: [],
         reply_to:  reply_to_id ? (replyMap[reply_to_id] ?? null) : null,
+        image_url: inserted.image_url ?? null,
       },
     },
     { status: 201 }
