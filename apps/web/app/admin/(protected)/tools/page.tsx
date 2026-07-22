@@ -1,17 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw } from "lucide-react";
+import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft } from "lucide-react";
 import type { RecompressResult } from "@/app/api/admin/recompress-images/route";
+import type { MigrateResult } from "@/app/api/admin/migrate-to-r2/route";
 
 type Status = "idle" | "running" | "done" | "error";
 
-interface Summary {
+interface RecompressSummary {
   compressed: number;
   skipped: number;
   failed: number;
   total: number;
   results: RecompressResult[];
+}
+
+interface MigrateSummary {
+  migrated: number;
+  skipped: number;
+  failed: number;
+  total: number;
+  results: MigrateResult[];
 }
 
 const TABLE_LABELS: Record<string, string> = {
@@ -20,43 +29,134 @@ const TABLE_LABELS: Record<string, string> = {
   design_sectors:    "Industry",
   design_interests:  "Interests",
   experience_levels: "Experience",
+  communities:       "Communities",
   designer_profiles: "User Avatars",
 };
 
 export default function ToolsPage() {
-  const [status, setStatus] = useState<Status>("idle");
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // ── Recompress state ──────────────────────────────────────────────────────
+  const [recompressStatus, setRecompressStatus] = useState<Status>("idle");
+  const [recompressSummary, setRecompressSummary] = useState<RecompressSummary | null>(null);
+  const [recompressError, setRecompressError] = useState<string | null>(null);
+
+  // ── Migrate state ─────────────────────────────────────────────────────────
+  const [migrateStatus, setMigrateStatus] = useState<Status>("idle");
+  const [migrateSummary, setMigrateSummary] = useState<MigrateSummary | null>(null);
+  const [migrateError, setMigrateError] = useState<string | null>(null);
 
   async function runRecompression() {
-    setStatus("running");
-    setSummary(null);
-    setErrorMsg(null);
+    setRecompressStatus("running");
+    setRecompressSummary(null);
+    setRecompressError(null);
     try {
       const res = await fetch("/api/admin/recompress-images", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setErrorMsg(data.error ?? "An unexpected error occurred.");
-        setStatus("error");
+        setRecompressError(data.error ?? "An unexpected error occurred.");
+        setRecompressStatus("error");
         return;
       }
-      setSummary(data);
-      setStatus("done");
+      setRecompressSummary(data);
+      setRecompressStatus("done");
     } catch {
-      setErrorMsg("Network error. Please try again.");
-      setStatus("error");
+      setRecompressError("Network error. Please try again.");
+      setRecompressStatus("error");
+    }
+  }
+
+  async function runMigration() {
+    setMigrateStatus("running");
+    setMigrateSummary(null);
+    setMigrateError(null);
+    try {
+      const res = await fetch("/api/admin/migrate-to-r2", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setMigrateError(data.error ?? "An unexpected error occurred.");
+        setMigrateStatus("error");
+        return;
+      }
+      setMigrateSummary(data);
+      setMigrateStatus("done");
+    } catch {
+      setMigrateError("Network error. Please try again.");
+      setMigrateStatus("error");
     }
   }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="font-display text-xl font-semibold text-foreground mb-1">Tools</h1>
-      <p className="font-body text-xs text-foreground-muted mb-6">
-        Admin maintenance utilities. These actions are safe to run multiple times — images that are
-        already compressed will be skipped automatically.
-      </p>
+    <div className="max-w-2xl space-y-5">
+      <div>
+        <h1 className="font-display text-xl font-semibold text-foreground mb-1">Tools</h1>
+        <p className="font-body text-xs text-foreground-muted">
+          Admin maintenance utilities. These actions are safe to run multiple times.
+        </p>
+      </div>
 
-      {/* Card */}
+      {/* ── Migrate Supabase → R2 ─────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
+            <ArrowRightLeft size={18} className="text-blue-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-body text-sm font-semibold text-foreground">
+              Migrate images: Supabase → Cloudflare R2
+            </h2>
+            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+              Copies every image that still lives in Supabase Storage into R2 and
+              updates the database URL. Images already in R2 or on external providers
+              (DiceBear, Robohash, etc.) are skipped. Safe to run more than once.
+            </p>
+
+            <button
+              onClick={runMigration}
+              disabled={migrateStatus === "running"}
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-blue-500 px-3.5 py-1.5 font-body text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {migrateStatus === "running" ? (
+                <>
+                  <RefreshCw size={13} className="animate-spin" />
+                  Migrating…
+                </>
+              ) : (
+                <>
+                  <ArrowRightLeft size={13} />
+                  {migrateStatus === "done" ? "Run again" : "Run migration"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {migrateStatus === "done" && migrateSummary && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="flex gap-4 mb-4">
+              <Stat icon={<CheckCircle2 size={13} className="text-green-400" />} value={migrateSummary.migrated} label="migrated" />
+              <Stat icon={<SkipForward  size={13} className="text-foreground-muted" />} value={migrateSummary.skipped}  label="skipped"  />
+              <Stat icon={<AlertCircle  size={13} className="text-red-400" />}   value={migrateSummary.failed}   label="failed"   />
+            </div>
+            {migrateSummary.total === 0 && (
+              <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
+            )}
+            {migrateSummary.results.length > 0 && (
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                {migrateSummary.results.map((r, i) => (
+                  <ResultRow key={i} result={r} statusKey="migrated" />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {migrateStatus === "error" && migrateError && (
+          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <p className="font-body text-xs text-red-400">{migrateError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Bulk recompress ───────────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
@@ -67,18 +167,17 @@ export default function ToolsPage() {
               Bulk recompress existing images
             </h2>
             <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
-              Re-processes every uploaded image in Companies, Cities, Industry, Interests,
-              Experience, and User Avatars — resizes to 300×300 and saves as JPEG at 78%
-              quality. Images that are already at 300×300 are skipped. Old files are removed
-              after the new compressed version is saved.
+              Re-processes every uploaded image in R2 — resizes to 300×300 and saves as
+              JPEG at 78% quality. Images that are already at 300×300 are skipped. Run
+              this after the migration above to standardise all image sizes.
             </p>
 
             <button
               onClick={runRecompression}
-              disabled={status === "running"}
+              disabled={recompressStatus === "running"}
               className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {status === "running" ? (
+              {recompressStatus === "running" ? (
                 <>
                   <RefreshCw size={13} className="animate-spin" />
                   Processing…
@@ -86,40 +185,36 @@ export default function ToolsPage() {
               ) : (
                 <>
                   <ImageDown size={13} />
-                  {status === "done" ? "Run again" : "Run recompression"}
+                  {recompressStatus === "done" ? "Run again" : "Run recompression"}
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Results */}
-        {status === "done" && summary && (
+        {recompressStatus === "done" && recompressSummary && (
           <div className="mt-5 border-t border-border pt-4">
-            {/* Summary row */}
             <div className="flex gap-4 mb-4">
-              <Stat icon={<CheckCircle2 size={13} className="text-green-400" />} value={summary.compressed} label="compressed" />
-              <Stat icon={<SkipForward  size={13} className="text-foreground-muted" />} value={summary.skipped}    label="skipped"    />
-              <Stat icon={<AlertCircle  size={13} className="text-red-400" />}   value={summary.failed}     label="failed"     />
+              <Stat icon={<CheckCircle2 size={13} className="text-green-400" />} value={recompressSummary.compressed} label="compressed" />
+              <Stat icon={<SkipForward  size={13} className="text-foreground-muted" />} value={recompressSummary.skipped}    label="skipped"    />
+              <Stat icon={<AlertCircle  size={13} className="text-red-400" />}   value={recompressSummary.failed}     label="failed"     />
             </div>
-
-            {summary.total === 0 && (
+            {recompressSummary.total === 0 && (
               <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
             )}
-
-            {summary.results.length > 0 && (
+            {recompressSummary.results.length > 0 && (
               <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-                {summary.results.map((r, i) => (
-                  <ResultRow key={i} result={r} />
+                {recompressSummary.results.map((r, i) => (
+                  <ResultRow key={i} result={r} statusKey="compressed" />
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {status === "error" && errorMsg && (
+        {recompressStatus === "error" && recompressError && (
           <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
-            <p className="font-body text-xs text-red-400">{errorMsg}</p>
+            <p className="font-body text-xs text-red-400">{recompressError}</p>
           </div>
         )}
       </div>
@@ -137,11 +232,21 @@ function Stat({ icon, value, label }: { icon: React.ReactNode; value: number; la
   );
 }
 
-function ResultRow({ result }: { result: RecompressResult }) {
-  const icon =
-    result.status === "compressed" ? <CheckCircle2 size={12} className="text-green-400 shrink-0" /> :
-    result.status === "skipped"    ? <SkipForward  size={12} className="text-foreground-muted shrink-0" /> :
-                                     <AlertCircle  size={12} className="text-red-400 shrink-0" />;
+function ResultRow({
+  result,
+  statusKey,
+}: {
+  result: RecompressResult | MigrateResult;
+  statusKey: string;
+}) {
+  const isSuccess = result.status === statusKey;
+  const isSkipped = result.status === "skipped";
+
+  const icon = isSuccess
+    ? <CheckCircle2 size={12} className="text-green-400 shrink-0" />
+    : isSkipped
+    ? <SkipForward  size={12} className="text-foreground-muted shrink-0" />
+    : <AlertCircle  size={12} className="text-red-400 shrink-0" />;
 
   return (
     <div className="flex items-start gap-2 px-3 py-2">
