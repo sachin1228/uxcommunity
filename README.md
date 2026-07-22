@@ -1,109 +1,108 @@
 # draft/ — a home for designers
 
-A web platform for UI/UX, product, and social media designers. This is the
-initial project setup: a monorepo ready to grow into web + mobile, with a
-static (non-functional) login page as the first screen.
+A full-stack platform for UI/UX, product, and social media designers. Designers apply to join, admins review applications, approved members complete their profile and get access to a real-time community chat.
+
+## What the app does today
+
+| Area | What's built |
+|---|---|
+| **Application / onboarding** | Public apply form → admin review → approval email with invite link → multi-step sign-up (profile, avatar upload, interests) |
+| **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
+| **Admin panel** | Review and approve/reject applications; manage users (block/unblock); CRUD for master data: cities, companies, sectors, experience levels, interests, communities, Lottie animations. |
+| **Communities / chat** | Real-time community chat (Supabase Realtime). Members are auto-joined to communities on sign-up. Admins can delete messages. |
+| **Image uploads** | Avatar and community images uploaded via signed Supabase Storage URLs, compressed server-side with `sharp`. |
+| **Rate limiting** | Redis-backed sliding-window rate limiter (Upstash) on login (IP + email), application submission, and password-reset requests. |
 
 ## Stack
 
 - **Web app:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
-- **Database / Auth:** Supabase
-- **Shared code:** a `packages/shared` workspace for types & constants that
-  the web app uses now, and a future mobile app (React Native / Expo) can
-  import too, so both talk to the same Supabase project the same way.
+- **Database:** Supabase (PostgreSQL + Row Level Security + Realtime)
+- **Auth:** Custom JWT sessions (`jose`, `bcryptjs`) — not Supabase Auth
+- **Rate limiting:** Upstash Redis (`@upstash/ratelimit`)
+- **Email:** Resend
+- **Image processing:** `sharp`
+- **Validation:** Zod
+- **Shared code:** `packages/shared` — types & constants shared across apps
 
 ## Project structure
 
 ```
 draft/
 ├── apps/
-│   └── web/               Next.js web app
+│   └── web/                    Next.js web app
 │       ├── app/
-│       │   ├── layout.tsx
-│       │   ├── page.tsx           placeholder home page
-│       │   └── login/page.tsx     the static login page
-│       ├── lib/supabase/          Supabase client + server helpers (ready, unwired)
+│       │   ├── (auth)/         Public pages: login, apply, sign-up flow, password reset
+│       │   ├── admin/          Admin panel (protected — admin role required)
+│       │   │   └── (protected)/  applications, users, communities, master data
+│       │   ├── dashboard/      Member area (protected — user role required)
+│       │   └── api/
+│       │       ├── admin/      Admin-only API routes
+│       │       ├── auth/       login, logout, me, reset-request, reset-confirm
+│       │       ├── applications/  Public apply endpoint
+│       │       ├── communities/   Chat messages, membership, read receipts
+│       │       ├── signup/     Multi-step onboarding endpoints
+│       │       ├── profile/    Profile & interests update
+│       │       └── data/       Public reference data (cities, sectors, etc.)
+│       ├── lib/
+│       │   ├── auth/           session.ts, rate-limit.ts, middleware helpers
+│       │   ├── supabase/       service.ts (server-only), browser.ts
+│       │   └── email/          Resend templates (invite, password reset)
+│       ├── middleware.ts        Route protection: /admin and /dashboard
 │       └── .env.example
 ├── packages/
-│   └── shared/             Shared TS types & constants (used by web, and later mobile)
+│   ├── shared/                 Shared TS types, constants, Zod schemas
+│   └── design-system/          Shared UI component guidelines
 ├── supabase/
-│   └── schema.sql          Starter table for designer profiles (run when ready)
-└── package.json             npm workspaces root
+│   └── migrations/             SQL migration files (apply in order)
+└── package.json                npm workspaces root
 ```
 
-## 1. Prerequisites
+## Prerequisites
 
 - **Node.js 18.18+** (20 LTS recommended)
-- **npm 9+** (comes with Node)
+- **npm 9+**
+- A **Supabase** project (database + storage + realtime)
+- An **Upstash Redis** database (for rate limiting)
+- A **Resend** account (for transactional email)
 
-## 2. Install dependencies
-
-From the project root:
+## Local setup
 
 ```bash
+# 1. Install all workspace dependencies
 npm install
-```
 
-This installs everything for both `apps/web` and `packages/shared` in one go
-(npm workspaces).
+# 2. Copy and fill in env vars
+cp apps/web/.env.example apps/web/.env.local
 
-## 3. Set up Supabase (optional for now)
+# 3. Apply database migrations
+# Run each file in supabase/migrations/ in order via the Supabase SQL editor
 
-The login page is static right now — no network calls happen when you click
-"Log in," so you can skip this step and still run the app. When you're ready
-to wire up real auth:
-
-1. Create a project at [supabase.com](https://supabase.com).
-2. In **Project Settings → API**, copy your **Project URL** and **anon public
-   key**.
-3. Copy the env file and fill it in:
-
-   ```bash
-   cp apps/web/.env.example apps/web/.env.local
-   ```
-
-4. Paste your URL and anon key into `apps/web/.env.local`.
-5. When you're ready to add real tables, run `supabase/schema.sql` in your
-   project's SQL editor (Supabase dashboard → SQL Editor). It creates a
-   starter `profiles` table matching the `DesignerProfile` type in
-   `packages/shared`.
-
-## 4. Run it locally
-
-From the project root:
-
-```bash
+# 4. Start the dev server
 npm run dev
 ```
 
-Then open:
+Open **http://localhost:3000**.
 
-- **http://localhost:3000** — placeholder home page
-- **http://localhost:3000/login** — the login page
+## Environment variables
 
-## What's wired vs. what's static
+See `apps/web/.env.example` for the full list with comments. Summary:
 
-- The **login page** is UI only. The form doesn't submit anywhere and the
-  buttons don't do anything yet — that was intentional for this first pass.
-- `lib/supabase/client.ts` and `lib/supabase/server.ts` are ready to use
-  (standard Supabase + Next.js App Router setup) whenever you want to
-  connect the form to real sign-up/login.
+| Variable | What it's for |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key (safe to expose in browser) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key — server-only, never expose to the client |
+| `SESSION_SECRET` | Secret used to sign JWT session tokens (`openssl rand -base64 32`) |
+| `ADMIN_EMAIL` | Email address for the single built-in admin account |
+| `ADMIN_PASSWORD` | Plain-text password for the admin account |
+| `RESEND_API_KEY` | Resend API key for sending invite and password-reset emails |
+| `EMAIL_FROM` | Sender address for transactional emails |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint URL (rate limiting) |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token (rate limiting) |
 
-## Planning ahead for mobile
+## Known limitations
 
-`packages/shared` is the reuse point. It currently exports:
-
-- `APP_NAME`, `APP_TAGLINE` — brand constants
-- `DesignerRole`, `DesignerProfile` — types matching the Supabase schema
-
-When you start the mobile app (e.g. `apps/mobile` with Expo), it can install
-`@supabase/supabase-js` directly and import the same types and constants
-from `@draft/shared`, so both apps stay in sync against one Supabase
-project and one data model.
-
-## Next steps
-
-- Wire the login form up to Supabase Auth (email/password + OAuth)
-- Build the sign-up flow and a real profile table
-- Add the designer feed / portfolio pages
-- Add `apps/mobile` when you're ready to start the mobile app
+- **No automated test suite.** There are no unit or integration tests in the repo yet.
+- **No CI/CD pipeline.** Deployments are manual.
+- **Admin auth is a single env-var credential** (`ADMIN_EMAIL` + `ADMIN_PASSWORD`). There is no multi-admin system, no admin user records in the database, and no per-admin audit log.
+- **Rate limiter fails open.** If Upstash Redis is unreachable, the rate limiter allows requests through and logs an error. This keeps the app available during Redis outages but means rate limits won't be enforced in that window.

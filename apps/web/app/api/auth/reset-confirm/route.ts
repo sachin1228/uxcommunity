@@ -21,7 +21,7 @@ const schema = z
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`reset-confirm:${ip}`, 10, 3600);
+  const rl = await rateLimit(`reset-confirm:${ip}`, 10, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

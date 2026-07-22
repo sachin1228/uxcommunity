@@ -1,61 +1,79 @@
 /**
- * Simple in-memory rate limiter.
- * Resets on server restart and does not span multiple instances.
- * For production scale, replace the store with Redis (e.g. Upstash).
+ * Redis-backed sliding-window rate limiter using Upstash.
+ *
+ * Replaces the previous in-memory Map implementation, which did not work
+ * correctly in serverless / multi-instance deployments (each instance had its
+ * own memory, so attempts were spread across instances and the limit never
+ * triggered reliably).
+ *
+ * Fail-open policy: if Redis is unreachable the request is allowed through and
+ * the error is logged. This keeps the app available during Redis outages at the
+ * cost of rate-limiting not being enforced. If you prefer fail-closed, replace
+ * the catch branch with { success: false, remaining: 0, resetAt: ... }.
+ *
+ * Required env vars (see .env.example):
+ *   UPSTASH_REDIS_REST_URL
+ *   UPSTASH_REDIS_REST_TOKEN
  */
 
-interface Entry {
-  count: number;
-  resetAt: number;
-}
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
-const store = new Map<string, Entry>();
+// Cache limiter instances by "limit:windowS" so we don't re-construct on
+// every request (each construction creates a new Redis client).
+const limiterCache = new Map<string, Ratelimit>();
 
-// Prune expired entries every minute to prevent memory leaks.
-const pruneInterval =
-  typeof setInterval !== "undefined"
-    ? setInterval(() => {
-        const now = Date.now();
-        for (const [key, entry] of store) {
-          if (entry.resetAt < now) store.delete(key);
-        }
-      }, 60_000)
-    : undefined;
-
-if (pruneInterval && typeof pruneInterval === "object") {
-  // Allow Node.js to exit even if this is running.
-  (pruneInterval as ReturnType<typeof setInterval>).unref?.();
+function getLimiter(limit: number, windowS: number): Ratelimit {
+  const cacheKey = `${limit}:${windowS}`;
+  if (!limiterCache.has(cacheKey)) {
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    });
+    limiterCache.set(
+      cacheKey,
+      new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(limit, `${windowS} s`),
+        analytics: false,
+      })
+    );
+  }
+  return limiterCache.get(cacheKey)!;
 }
 
 export interface RateLimitResult {
   success: boolean;
   remaining: number;
+  /** Unix timestamp (ms) when the window resets. */
   resetAt: number;
 }
 
 /**
- * @param key      Unique identifier (e.g. IP + route).
+ * @param key      Unique identifier (e.g. "login:ip:1.2.3.4").
  * @param limit    Max requests allowed in the window.
  * @param windowS  Window duration in seconds.
  */
-export function rateLimit(
+export async function rateLimit(
   key: string,
   limit: number,
   windowS: number
-): RateLimitResult {
-  const now = Date.now();
-  const windowMs = windowS * 1000;
-
-  let entry = store.get(key);
-  if (!entry || entry.resetAt < now) {
-    entry = { count: 0, resetAt: now + windowMs };
-    store.set(key, entry);
+): Promise<RateLimitResult> {
+  try {
+    const limiter = getLimiter(limit, windowS);
+    const result = await limiter.limit(key);
+    return {
+      success: result.success,
+      remaining: result.remaining,
+      resetAt: result.reset, // Upstash returns reset as Unix ms
+    };
+  } catch (err) {
+    // Fail open — allow the request through if Redis is unavailable.
+    console.error("[rate-limit] Redis unreachable, failing open:", err);
+    return {
+      success: true,
+      remaining: 0,
+      resetAt: Date.now() + windowS * 1000,
+    };
   }
-
-  entry.count += 1;
-  return {
-    success: entry.count <= limit,
-    remaining: Math.max(0, limit - entry.count),
-    resetAt: entry.resetAt,
-  };
 }

@@ -1,0 +1,47 @@
+16:42:44.363 Running build in Washington, D.C., USA (East) – iad1
+16:42:44.364 Build machine configuration: 2 cores, 8 GB
+16:42:44.526 Cloning github.com/sachin1228/designhub (Branch: feat/redis-rate-limiter-docs-update, Commit: b4bead6)
+16:42:44.901 Cloning completed: 375.000ms
+16:42:45.885 Restored build cache from previous deployment (AP4hUCkyU8CDaWftpPDjXbYVzCji)
+16:42:46.097 Running "vercel build"
+16:42:46.119 Vercel CLI 56.5.0
+16:42:46.320 Installing dependencies...
+16:42:48.438 
+16:42:48.439 added 4 packages in 2s
+16:42:48.439 
+16:42:48.440 174 packages are looking for funding
+16:42:48.440   run `npm fund` for details
+16:42:48.469 Detected Next.js version: 16.2.10
+16:42:48.480 Running "npm run build"
+16:42:48.610 
+16:42:48.611 > web@0.1.0 build
+16:42:48.611 > next build
+16:42:48.611 
+16:42:49.193   Applying modifyConfig from Vercel
+16:42:49.271 ▲ Next.js 16.2.10 (Turbopack)
+16:42:49.272 
+16:42:49.280 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+16:42:49.317   Creating an optimized production build ...
+16:43:07.267 ✓ Compiled successfully in 17.6s
+16:43:07.280   Running TypeScript ...
+16:43:16.693 Failed to type check.
+16:43:16.693 
+16:43:16.693 ./app/api/auth/me/route.ts:10:11
+16:43:16.693 Type error: Property 'success' does not exist on type 'Promise<RateLimitResult>'.
+16:43:16.693 
+16:43:16.693    8 |   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+16:43:16.693    9 |   const rl = rateLimit(`me:ip:${ip}`, 60, 60); // 60 per minute per IP
+16:43:16.693 > 10 |   if (!rl.success) {
+16:43:16.693      |           ^
+16:43:16.693   11 |     return NextResponse.json(
+16:43:16.694   12 |       { error: "Too many requests." },
+16:43:16.694   13 |       {
+16:43:16.738 Next.js build worker exited with code: 1 and signal: null
+16:43:16.780 npm error Lifecycle script `build` failed with error:
+16:43:16.782 npm error code 1
+16:43:16.782 npm error path /vercel/path0/apps/web
+16:43:16.782 npm error workspace web@0.1.0
+16:43:16.782 npm error location /vercel/path0/apps/web
+16:43:16.783 npm error command failed
+16:43:16.783 npm error command sh -c next build
+16:43:16.802 Error: Command "npm run build" exited with 1

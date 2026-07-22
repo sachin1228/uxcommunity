@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 export async function GET(request: NextRequest) {
   // L-7: Rate-limit /me to prevent aggressive polling from hammering the DB
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`me:ip:${ip}`, 60, 60); // 60 per minute per IP
+  const rl = await rateLimit(`me:ip:${ip}`, 60, 60); // 60 per minute per IP
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests." },

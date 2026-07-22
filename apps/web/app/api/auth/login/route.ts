@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
 
   // IP-level gate
-  const rlIp = rateLimit(`login:ip:${ip}`, 10, 900); // 10 per 15 min per IP
+  const rlIp = await rateLimit(`login:ip:${ip}`, 10, 900); // 10 per 15 min per IP
   if (!rlIp.success) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   const { email, password } = parsed.data;
 
   // Per-account gate: prevents distributed brute-force (many IPs, one target)
-  const rlEmail = rateLimit(`login:email:${email.toLowerCase()}`, 20, 900); // 20 per 15 min per account
+  const rlEmail = await rateLimit(`login:email:${email.toLowerCase()}`, 20, 900); // 20 per 15 min per account
   if (!rlEmail.success) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },

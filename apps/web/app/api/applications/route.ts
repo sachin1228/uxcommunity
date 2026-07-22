@@ -6,7 +6,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 export async function POST(request: NextRequest) {
   // Rate limit: 5 submissions per IP per hour
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`apply:${ip}`, 5, 3600);
+  const rl = await rateLimit(`apply:${ip}`, 5, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
