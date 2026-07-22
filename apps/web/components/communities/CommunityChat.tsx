@@ -1241,16 +1241,32 @@ export function CommunityChat({
                   // Unread divider — full-width rule with centred pill, like WhatsApp
                   const unreadDivider = isFirstUnread ? (
                     <div
-                      ref={unreadDividerRef}
-                      className="flex items-center gap-3 py-2 my-2 w-full bg-accent/5"
-                    >
-                      <div className="flex-1 h-px border-b border-red-500" />
-                      <span className="font-body text-xs text-foreground-muted bg-accent/15 rounded-full px-4 py-1 shadow-sm select-none whitespace-nowrap">
-                        {unreadDisplayCount > 0
-                          ? `${unreadDisplayCount} unread message${unreadDisplayCount !== 1 ? "s" : ""}`
-                          : "New messages"}
-                      </span>
-                      <div className="flex-1 h-px border-b border-red-500" />
+                        ref={unreadDividerRef}
+                        className="flex items-center gap-3 py-3 my-3 w-full"
+                      >
+                        <div className="flex-1 border-t border-border" />
+
+                        <span
+                          className="
+                            rounded-full
+                            border border-border
+                            bg-surface-raised
+                            px-3 py-1
+                            font-body text-[11px] font-medium
+                            text-foreground-muted
+                            whitespace-nowrap
+                            shadow-sm
+                            select-none
+                          "
+                        >
+                          {unreadDisplayCount > 0
+                            ? `${unreadDisplayCount} unread message${
+                                unreadDisplayCount !== 1 ? "s" : ""
+                              }`
+                            : "New messages"}
+                        </span>
+
+                        <div className="flex-1 border-t border-border" />
                     </div>
                   ) : null;
 
