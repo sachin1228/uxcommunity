@@ -1,24 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Clapperboard, Upload, Trash2, RefreshCcw, X, Film, Building2, MapPin, Layers, Sparkles, TrendingUp, Globe } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Clapperboard, RefreshCcw, X, Layers, Sparkles, TrendingUp, Globe, MapPin, Building2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { invalidateLottieCache } from "@/components/ui/LottieLoader";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface LottieSetting {
-  id: string;
-  scope: "universal" | "type" | "community";
-  scope_key: string;
-  lottie_url: string;
-}
-
-interface Community {
-  id: string;
-  name: string;
-  type: string;
-}
+import { AnimationSlot, type LottieSetting } from "@/components/admin/lottie/AnimationSlot";
+import { uploadLottieFile, saveLottieSetting, deleteLottieSetting } from "@/components/admin/lottie/lottieApi";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,120 +21,10 @@ const TYPE_CONFIG: {
   { key: "city",             label: "City",       Icon: MapPin     },
 ];
 
-// ─── Upload helpers ───────────────────────────────────────────────────────────
-
-async function uploadLottieFile(
-  file: File,
-  onError: (msg: string) => void
-): Promise<string | null> {
-  if (!file.name.endsWith(".json")) {
-    onError("Please upload a .json Lottie file.");
-    return null;
-  }
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch("/api/admin/lottie-upload", { method: "POST", body: fd });
-  const data = await res.json();
-  if (!res.ok) { onError(data.error ?? "Upload failed."); return null; }
-  return data.url as string;
-}
-
-async function saveSetting(
-  scope: "universal" | "type" | "community",
-  scope_key: string,
-  lottie_url: string
-): Promise<boolean> {
-  const res = await fetch("/api/admin/lottie-settings", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ scope, scope_key, lottie_url }),
-  });
-  return res.ok;
-}
-
-async function deleteSetting(id: string): Promise<boolean> {
-  const res = await fetch(`/api/admin/lottie-settings/${id}`, { method: "DELETE" });
-  return res.ok;
-}
-
-// ─── Small reusable upload card ───────────────────────────────────────────────
-
-function AnimationSlot({
-  label,
-  setting,
-  onUpload,
-  onDelete,
-  uploading,
-}: {
-  label: string;
-  setting: LottieSetting | null;
-  onUpload: (file: File) => Promise<void>;
-  onDelete: () => Promise<void>;
-  uploading: boolean;
-}) {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  async function handleDelete() {
-    setDeleting(true);
-    await onDelete();
-    setDeleting(false);
-  }
-
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="h-9 w-9 shrink-0 rounded-lg bg-surface-raised flex items-center justify-center">
-          {setting ? (
-            <Film size={16} className="text-accent" />
-          ) : (
-            <Clapperboard size={16} className="text-foreground-muted" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="font-body text-xs font-medium text-foreground">{label}</p>
-          {setting ? (
-            <p className="font-mono text-[10px] text-foreground-muted truncate max-w-[260px]">
-              {setting.lottie_url.split("/").pop()}
-            </p>
-          ) : (
-            <p className="font-body text-[10px] text-foreground-muted">No animation set</p>
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 shrink-0">
-        {setting && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting || uploading}
-            title="Remove animation"
-            className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
-          >
-            {deleting ? <Spinner className="h-3 w-3" /> : <Trash2 size={13} />}
-          </button>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) { onUpload(file); e.target.value = ""; }
-          }}
-        />
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading || deleting}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
-        >
-          {uploading ? <Spinner className="h-3 w-3" /> : <Upload size={12} />}
-          {setting ? "Replace" : "Upload"}
-        </button>
-      </div>
-    </div>
-  );
+interface Community {
+  id: string;
+  name: string;
+  type: string;
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -189,7 +66,9 @@ export function LottieAnimationsPage() {
     return settings.find((s) => s.scope === scope && s.scope_key === scope_key) ?? null;
   }
 
-  function slotKey(scope: string, scope_key: string) { return `${scope}:${scope_key}`; }
+  function slotKey(scope: string, scope_key: string) {
+    return `${scope}:${scope_key}`;
+  }
 
   async function handleUpload(
     scope: LottieSetting["scope"],
@@ -202,7 +81,7 @@ export function LottieAnimationsPage() {
     try {
       const url = await uploadLottieFile(file, setError);
       if (!url) return;
-      const ok = await saveSetting(scope, scope_key, url);
+      const ok = await saveLottieSetting(scope, scope_key, url);
       if (!ok) { setError("Failed to save animation setting."); return; }
       invalidateLottieCache();
       await load();
@@ -215,13 +94,12 @@ export function LottieAnimationsPage() {
 
   async function handleDelete(id: string) {
     setError(null);
-    const ok = await deleteSetting(id);
+    const ok = await deleteLottieSetting(id);
     if (!ok) { setError("Failed to remove animation."); return; }
     invalidateLottieCache();
     await load();
   }
 
-  // Filtered communities for the per-community section
   const filteredCommunities = communities.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -326,7 +204,6 @@ export function LottieAnimationsPage() {
           </span>
         </div>
 
-        {/* Search */}
         <div className="relative mb-3">
           <input
             type="text"
@@ -356,11 +233,12 @@ export function LottieAnimationsPage() {
         ) : (
           <div className="space-y-2">
             {filteredCommunities.map((c) => {
-              const typeLabel = TYPE_CONFIG.find((t) => t.key === c.type)?.label ?? c.type;
+              const typeLabel =
+                TYPE_CONFIG.find((t) => t.key === c.type)?.label ?? c.type;
               return (
                 <div key={c.id}>
                   <AnimationSlot
-                    label={`${c.name}`}
+                    label={c.name}
                     setting={getSetting("community", c.id)}
                     uploading={!!uploading[slotKey("community", c.id)]}
                     onUpload={(f) => handleUpload("community", c.id, f)}

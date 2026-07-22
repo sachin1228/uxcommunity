@@ -4,16 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
-import { AvatarImg } from "@/components/ui/AvatarImg";
+import { AvatarThumb } from "@/components/admin/users/AvatarThumb";
 
-interface Profile {
-  id: string;
-  experience_level: string;
+interface UserProfile {
   avatar_url?: string | null;
-  avatar_source?: string | null;
   companies: { name: string } | null;
-  cities: { name: string } | null;
-  design_sectors: { name: string } | null;
 }
 
 interface User {
@@ -22,30 +17,7 @@ interface User {
   email: string;
   is_blocked: boolean;
   created_at: string;
-  designer_profiles: Profile | null;
-}
-
-function AvatarThumb({ url, name }: { url?: string | null; name: string }) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-  if (!url) {
-    return (
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-raised font-body text-[10px] font-medium text-foreground-muted select-none">
-        {initials}
-      </span>
-    );
-  }
-
-  return (
-    <span className="h-7 w-7 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-surface-raised">
-      <AvatarImg url={url} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
-    </span>
-  );
+  designer_profiles: UserProfile | null;
 }
 
 export default function UsersPage() {
@@ -84,13 +56,18 @@ export default function UsersPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-display text-xl font-semibold text-foreground">Users</h1>
-          <p className="font-body text-xs text-foreground-muted mt-0.5">{total} registered accounts</p>
+          <p className="font-body text-xs text-foreground-muted mt-0.5">
+            {total} registered accounts
+          </p>
         </div>
       </div>
 
       {/* Search */}
       <div className="relative mb-3 max-w-xs">
-        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+        <Search
+          size={13}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+        />
         <input
           type="text"
           value={search}
@@ -99,7 +76,10 @@ export default function UsersPage() {
           className="w-full rounded-md border border-border bg-surface pl-8 pr-8 py-1.5 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20"
         />
         {search && (
-          <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground">
+          <button
+            onClick={() => setSearch("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+          >
             <X size={12} />
           </button>
         )}
@@ -112,24 +92,32 @@ export default function UsersPage() {
             <Spinner className="h-4 w-4 text-foreground-muted" />
           </div>
         ) : users.length === 0 ? (
-          <p className="py-12 text-center font-body text-xs text-foreground-muted">No users found.</p>
+          <p className="py-12 text-center font-body text-xs text-foreground-muted">
+            No users found.
+          </p>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Name</th>
-                <th className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Email</th>
-                <th className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Company</th>
-                <th className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Joined</th>
-                <th className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Status</th>
-                <th className="px-4 py-2.5 text-right font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+                {["Name", "Email", "Company", "Joined", "Status", "Actions"].map((h, i) => (
+                  <th
+                    key={h}
+                    className={`px-4 py-2.5 font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider ${
+                      i === 5 ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {users.map((user, idx) => (
                 <tr
                   key={user.id}
-                  className={`${idx < users.length - 1 ? "border-b border-white/5" : ""} hover:bg-surface-raised transition-colors`}
+                  className={`${
+                    idx < users.length - 1 ? "border-b border-white/5" : ""
+                  } hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
@@ -137,7 +125,13 @@ export default function UsersPage() {
                         url={user.designer_profiles?.avatar_url}
                         name={user.name}
                       />
-                      <p className={`font-body text-xs font-medium ${user.is_blocked ? "text-foreground-muted line-through" : "text-foreground"}`}>
+                      <p
+                        className={`font-body text-xs font-medium ${
+                          user.is_blocked
+                            ? "text-foreground-muted line-through"
+                            : "text-foreground"
+                        }`}
+                      >
                         {user.name}
                       </p>
                     </div>
@@ -158,11 +152,13 @@ export default function UsersPage() {
                     </p>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
-                      user.is_blocked
-                        ? "bg-red-500/10 text-red-400"
-                        : "bg-green-500/10 text-green-400"
-                    }`}>
+                    <span
+                      className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
+                        user.is_blocked
+                          ? "bg-red-500/10 text-red-400"
+                          : "bg-green-500/10 text-green-400"
+                      }`}
+                    >
                       {user.is_blocked ? "Blocked" : "Active"}
                     </span>
                   </td>
