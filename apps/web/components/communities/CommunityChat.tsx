@@ -145,6 +145,7 @@ export function CommunityChat({
   const initialScrollDoneRef = useRef(false);
   const unreadDividerRef = useRef<HTMLDivElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [hideUnreadDivider, setHideUnreadDivider] = useState(false);
   /**
    * The last_read_at timestamp captured the moment this community was opened.
    * Used to find the first unread message by timestamp comparison (immune to the
@@ -286,6 +287,7 @@ export function CommunityChat({
     // in the layout phase) sees a clean slate before snapshotReady flips true.
     initialScrollDoneRef.current = false;
     unreadAtOpenRef.current = null;
+    setHideUnreadDivider(false);
     setSnapshotReady(false);
     setInitialPositionResolved(false);
 
@@ -1001,6 +1003,7 @@ export function CommunityChat({
       });
 
       if (res.ok) {
+        setHideUnreadDivider(true);
         const { message } = await res.json();
         setMessages((prev) => {
           if (prev.some((m) => m.id === message.id)) {
@@ -1066,9 +1069,10 @@ export function CommunityChat({
   // realtime — without the double-counting bug that a setState-inside-updater
   // approach causes in React Strict Mode.
   const realMessages = messages.filter((m) => !m.id.startsWith("temp-"));
-  const firstUnreadMsgId: string | null = snapshotReady
-    ? (unreadAtOpenRef.current?.firstMsgId ?? null)
-    : null;
+  const firstUnreadMsgId: string | null =
+    snapshotReady && !hideUnreadDivider
+      ? (unreadAtOpenRef.current?.firstMsgId ?? null)
+      : null;
   const unreadDisplayCount: number =
     snapshotReady && lastReadAt !== undefined
       ? realMessages.filter(
