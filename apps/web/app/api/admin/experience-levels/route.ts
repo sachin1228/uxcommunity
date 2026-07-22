@@ -27,7 +27,8 @@ export async function GET(_request: NextRequest) {
   let { data, error } = await db
     .from("experience_levels")
     .select("id, slug, name, image_url, is_active, created_at, updated_at")
-    .order("name");
+    .order("name")
+    .limit(500); // safety cap — prevents unbounded scans as data grows
 
   if (error) return NextResponse.json({ error: "Failed to fetch experience levels." }, { status: 500 });
 
@@ -40,7 +41,8 @@ export async function GET(_request: NextRequest) {
     const refetch = await db
       .from("experience_levels")
       .select("id, slug, name, image_url, is_active, created_at, updated_at")
-      .order("name");
+      .order("name")
+      .limit(500);
     data = refetch.data ?? [];
   }
 

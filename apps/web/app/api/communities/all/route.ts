@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
+import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 
 export async function GET() {
   let session;
@@ -27,17 +20,27 @@ export async function GET() {
   if (error) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
   if (!communities?.length) return NextResponse.json({ communities: [] });
 
-  // Communities this user is already in
-  const { data: memberships } = await db
-    .from("community_members")
-    .select("community_id")
-    .eq("user_id", userId);
+  // Communities this user is already in + all member counts — both in parallel,
+  // single query each (replaces N individual per-community count queries).
+  const [
+    { data: memberships },
+    { data: allMemberRows },
+  ] = await Promise.all([
+    db.from("community_members").select("community_id").eq("user_id", userId),
+    db.from("community_members").select("community_id").in("community_id", communities.map((c) => c.id)),
+  ]);
+
   const joinedIds = new Set((memberships ?? []).map((m) => m.community_id));
 
-  // Resolve image_url from master tables, batched by type.
-  // Also track which community ids still have a valid master data row
-  // (reference_id exists in the corresponding table). Communities whose
-  // master row was deleted are filtered out of the response.
+  // Count members per community in JS (1 query instead of N count queries)
+  const countMap: Record<string, number> = {};
+  for (const m of allMemberRows ?? []) {
+    countMap[m.community_id] = (countMap[m.community_id] ?? 0) + 1;
+  }
+
+  // Group communities by type so we can batch-fetch master images once per
+  // type. Results come from unstable_cache (1-hour TTL) — zero Supabase
+  // round-trips on warm cache hits.
   const byType: Record<string, { id: string; reference_id: string }[]> = {};
   for (const c of communities) {
     if (!byType[c.type]) byType[c.type] = [];
@@ -45,64 +48,40 @@ export async function GET() {
   }
 
   const masterImageMap: Record<string, string | null> = {};
-  // Set of community IDs whose master data reference still exists
   const validCommunityIds = new Set<string>();
 
   await Promise.all(
     Object.entries(byType).map(async ([type, items]) => {
-      const lookup = TABLE_LOOKUP[type];
-      if (!lookup) {
-        // Unknown type — keep them to be safe
+      if (!TABLE_LOOKUP[type]) {
+        // Unknown type — keep as-is
         for (const item of items) validCommunityIds.add(item.id);
         return;
       }
-      const { data: rows } = await db
-        .from(lookup.table as any)
-        .select(`${lookup.idCol}, image_url`)
-        .in(lookup.idCol, items.map((i) => i.reference_id));
 
-      // Build a map: reference_id → image_url (only for rows that actually exist)
-      const foundRefIds = new Set((rows ?? []).map((r: any) => r[lookup.idCol]));
-      const imgMap = Object.fromEntries(
-        (rows ?? []).map((r: any) => [r[lookup.idCol], r.image_url ?? null])
-      );
+      // Cached fetch for the entire master table (warm after first request)
+      const imgMap = await getMasterImageMap(type);
 
       for (const item of items) {
-        if (foundRefIds.has(item.reference_id)) {
-          // Master data still exists — include this community
+        if (item.reference_id in imgMap) {
           validCommunityIds.add(item.id);
           masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
         }
-        // If not in foundRefIds, the master row was deleted — skip (orphaned community)
+        // reference_id not in map → master row deleted → skip (orphaned community)
       }
     })
   );
 
-  // Only communities with live master data
-  const liveCommunities = communities.filter((c) => validCommunityIds.has(c.id));
-
-  if (!liveCommunities.length) return NextResponse.json({ communities: [] });
-
-  // Member counts
-  const countResults = await Promise.all(
-    liveCommunities.map((c) =>
-      db
-        .from("community_members")
-        .select("*", { count: "exact", head: true })
-        .eq("community_id", c.id)
-        .then(({ count }) => ({ id: c.id, count: count ?? 0 }))
-    )
-  );
-  const countMap = Object.fromEntries(countResults.map((r) => [r.id, r.count]));
-
-  const result = liveCommunities.filter((c) => (countMap[c.id] ?? 0) > 0).map((c) => ({
-    id: c.id,
-    name: c.name,
-    type: c.type,
-    image_url: masterImageMap[c.id] ?? c.image_url ?? null,
-    member_count: countMap[c.id] ?? 0,
-    joined: joinedIds.has(c.id),
-  }));
+  // Only communities with live master data and at least one member
+  const result = communities
+    .filter((c) => validCommunityIds.has(c.id) && (countMap[c.id] ?? 0) > 0)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      image_url: masterImageMap[c.id] ?? c.image_url ?? null,
+      member_count: countMap[c.id] ?? 0,
+      joined: joinedIds.has(c.id),
+    }));
 
   return NextResponse.json({ communities: result });
 }

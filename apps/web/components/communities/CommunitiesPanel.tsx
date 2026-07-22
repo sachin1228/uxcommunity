@@ -97,9 +97,14 @@ function CommunityAvatar({
   const fallback = TYPE_EMOJI[type] ?? "💬";
   if (imageUrl && !failed) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={imageUrl}
         alt={name}
+        width={40}
+        height={40}
+        loading="lazy"
+        decoding="async"
         className="h-10 w-10 rounded-full object-cover shrink-0"
         onError={() => setFailed(true)}
       />

@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getMasterImageMap } from "@/lib/master-data-cache";
 import type { CachedMeta, CachedMessage } from "./cache";
 
 export interface SSRCommunityData {
@@ -13,14 +14,6 @@ export interface SSRCommunityData {
    */
   lastReadAt: string | null;
 }
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
 
 /**
  * Fetches community metadata AND latest messages in parallel, server-side.
@@ -78,23 +71,16 @@ export async function fetchCommunitySSRData(
     user_id: string;
   }[];
   const uniqueMsgUserIds = [...new Set(msgs.map((m) => m.user_id))];
-  const lookup = TABLE_LOOKUP[community.type as string];
-
-  // ─── Round 2: image + member rows + count + msg sender info (parallel) ───
+  // ─── Round 2: image (cached) + member rows + count + msg sender info (parallel) ─
   const [
-    imageResult,
+    masterImgMap,
     { data: memberRows },
     { count: memberCount },
     { data: msgUsers },
     { data: msgProfiles },
   ] = await Promise.all([
-    lookup && community.reference_id
-      ? db
-          .from(lookup.table as any)
-          .select(`${lookup.idCol}, image_url`)
-          .eq(lookup.idCol, community.reference_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    // Cached master table lookup — zero DB round-trip on warm cache
+    getMasterImageMap(community.type as string),
     db
       .from("community_members")
       .select("user_id, joined_at")
@@ -117,7 +103,9 @@ export async function fetchCommunitySSRData(
   ]);
 
   const resolvedImageUrl: string | null =
-    (imageResult as any)?.data?.image_url ?? (community as any).image_url ?? null;
+    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ??
+    (community as any).image_url ??
+    null;
 
   // ─── Round 3: member user info (sequential after round 2) ────────────────
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);

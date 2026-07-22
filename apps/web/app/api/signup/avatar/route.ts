@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
+import { compressAvatar } from "@/lib/image-utils";
 
 const BUCKET = "profile-avatars";
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is a safety cap)
@@ -97,14 +98,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Image must be under 3 MB." }, { status: 422 });
     }
 
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const storagePath = `${session.userId}/${Date.now()}.${ext}`;
     const db = createServiceClient();
+
+    // Compress to WebP (max 400×400, quality 85) before storing — reduces
+    // storage size ~70-85% and cuts egress every time the avatar is served.
+    const raw = Buffer.from(await file.arrayBuffer());
+    const compressed = await compressAvatar(raw);
+    const storagePath = `${session.userId}/${Date.now()}.${compressed.ext}`;
 
     const { data, error: uploadError } = await db.storage
       .from(BUCKET)
-      .upload(storagePath, Buffer.from(await file.arrayBuffer()), {
-        contentType: file.type,
+      .upload(storagePath, compressed.data, {
+        contentType: compressed.contentType,
         upsert: true,
       });
 

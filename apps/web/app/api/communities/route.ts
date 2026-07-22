@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
+import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 
 export async function GET() {
   let session;
@@ -44,12 +37,6 @@ export async function GET() {
     // Single query for all member counts (replaces N individual count queries)
     db.from("community_members").select("community_id").in("community_id", ids),
     // Fetch the latest messages across all communities.
-    // We always use a row-count limit here (not a timestamp filter) so we
-    // always capture the most recent message per community for the sidebar
-    // preview — even when the user has already read everything (last_read_at
-    // at or after the last message would produce zero rows with a timestamp
-    // filter, incorrectly showing "No messages yet").
-    // Unread counting is done in JS below using lastReadMap, which is correct.
     db
       .from("community_messages")
       .select("community_id, content, created_at, user_id")
@@ -67,8 +54,6 @@ export async function GET() {
   }
 
   // 4. Pick the latest message per community AND count unread messages in JS.
-  //    Unread = from another user AND created after the user's last_read_at for
-  //    that community (null last_read_at means never opened → everything counts).
   const lastMsgByComm: Record<string, { community_id: string; content: string; created_at: string; user_id: string }> = {};
   const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
@@ -77,8 +62,6 @@ export async function GET() {
     }
     if (m.user_id !== userId) {
       const lastRead = lastReadMap[m.community_id] ?? null;
-      // Count only messages newer than the user's last read timestamp.
-      // If lastRead is null (never opened), all messages from others count.
       if (!lastRead || m.created_at > lastRead) {
         msgCountMap[m.community_id] = (msgCountMap[m.community_id] ?? 0) + 1;
       }
@@ -92,10 +75,7 @@ export async function GET() {
     : { data: [] };
   const senderMap = Object.fromEntries((senderUsers ?? []).map((u) => [u.id, u.name]));
 
-  // 6. Resolve image_url from master tables, batched by type.
-  //    Also track which community IDs still have a live master data row.
-  //    Communities whose master row was deleted are filtered from the sidebar
-  //    (same logic as /api/communities/all).
+  // 6. Resolve image_url from cached master tables (zero DB round-trip on warm cache).
   const byType: Record<string, { id: string; reference_id: string }[]> = {};
   for (const c of communities ?? []) {
     if (!byType[c.type]) byType[c.type] = [];
@@ -107,28 +87,20 @@ export async function GET() {
 
   await Promise.all(
     Object.entries(byType).map(async ([type, items]) => {
-      const lookup = TABLE_LOOKUP[type];
-      if (!lookup) {
-        // Unknown type — keep as-is
+      if (!TABLE_LOOKUP[type]) {
         for (const item of items) validCommunityIds.add(item.id);
         return;
       }
-      const { data: rows } = await db
-        .from(lookup.table as any)
-        .select(`${lookup.idCol}, image_url`)
-        .in(lookup.idCol, items.map((i) => i.reference_id));
 
-      const foundRefIds = new Set((rows ?? []).map((r: any) => r[lookup.idCol]));
-      const imgMap = Object.fromEntries(
-        (rows ?? []).map((r: any) => [r[lookup.idCol], r.image_url ?? null])
-      );
+      // Cached fetch — warm after the first request per deploy
+      const imgMap = await getMasterImageMap(type);
 
       for (const item of items) {
-        if (foundRefIds.has(item.reference_id)) {
+        if (item.reference_id in imgMap) {
           validCommunityIds.add(item.id);
           masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
         }
-        // reference_id not found → master row deleted → skip (orphaned community)
+        // reference_id not found → master row deleted → skip
       }
     })
   );

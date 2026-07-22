@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
 
   if (!showAll) query = query.eq("is_active", true);
 
-  const { data, error } = await query;
+  // Safety cap — prevents unbounded scans as data grows
+  const { data, error } = await query.limit(500);
   if (error) return NextResponse.json({ error: "Failed to fetch interests" }, { status: 500 });
   return NextResponse.json({ interests: data ?? [] });
 }

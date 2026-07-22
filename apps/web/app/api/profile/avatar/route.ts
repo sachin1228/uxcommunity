@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { compressAvatar } from "@/lib/image-utils";
 
 const BUCKET = "profile-avatars";
 
@@ -75,12 +76,17 @@ export async function POST(request: NextRequest) {
     }
 
     const db = createServiceClient();
-    const storagePath = `${session.userId}/${Date.now()}.${ext}`;
+
+    // Compress to WebP (max 400×400, quality 85) before storing — reduces
+    // storage size ~70-85% and cuts egress every time the avatar is served.
+    const raw = Buffer.from(await file.arrayBuffer());
+    const compressed = await compressAvatar(raw);
+    const storagePath = `${session.userId}/${Date.now()}.${compressed.ext}`;
 
     const { data, error: uploadError } = await db.storage
       .from(BUCKET)
-      .upload(storagePath, Buffer.from(await file.arrayBuffer()), {
-        contentType: mimeType,
+      .upload(storagePath, compressed.data, {
+        contentType: compressed.contentType,
         upsert: true,
       });
 
