@@ -9,7 +9,6 @@ import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { MembersPanel } from "./chat/MembersPanel";
 import { MessageList } from "./chat/MessageList";
-import { MessageActionSlider } from "./chat/MessageActionSlider";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
@@ -58,17 +57,6 @@ export function CommunityChat({
   }, []);
   const handleClearReply = useCallback(() => setReplyTo(null), []);
 
-  // ── Message action slider state ───────────────────────────────────────────
-  const [activeMessage, setActiveMessage] = useState<CachedMessage | null>(null);
-  const [sliderIsMe, setSliderIsMe]       = useState(false);
-
-  const handleMessagePress = useCallback((msg: CachedMessage) => {
-    setActiveMessage(msg);
-    setSliderIsMe(msg.user_id === currentUserId);
-  }, [currentUserId]);
-
-  const handleSliderClose = useCallback(() => setActiveMessage(null), []);
-
   const handleCopy = useCallback((msg: CachedMessage) => {
     navigator.clipboard.writeText(msg.content).catch(() => {});
   }, []);
@@ -78,11 +66,70 @@ export function CommunityChat({
       setMessages((prev) => {
         const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
         msgCache.set(communityId, next);
-        setActiveMessage((cur) => cur?.id === msgId ? { ...cur, reactions } : cur);
         return next;
       });
     },
     [communityId]
+  );
+
+  // ── Inline hover reaction handler ─────────────────────────────────────────
+  const handleReaction = useCallback(
+    async (msgId: string, emoji: string) => {
+      let optimisticReactions: MessageReaction[] = [];
+
+      setMessages((prev) => {
+        const msg = prev.find((m) => m.id === msgId);
+        if (!msg) return prev;
+
+        const existing = (msg.reactions ?? []).find(
+          (r) => r.emoji === emoji && r.user_ids.includes(currentUserId)
+        );
+
+        if (existing) {
+          optimisticReactions = (msg.reactions ?? [])
+            .map((r) =>
+              r.emoji === emoji
+                ? { ...r, user_ids: r.user_ids.filter((id) => id !== currentUserId) }
+                : r
+            )
+            .filter((r) => r.user_ids.length > 0);
+        } else {
+          const withoutUser = (msg.reactions ?? [])
+            .map((r) => ({ ...r, user_ids: r.user_ids.filter((id) => id !== currentUserId) }))
+            .filter((r) => r.user_ids.length > 0);
+          const group = withoutUser.find((r) => r.emoji === emoji);
+          optimisticReactions = group
+            ? withoutUser.map((r) =>
+                r.emoji === emoji ? { ...r, user_ids: [...r.user_ids, currentUserId] } : r
+              )
+            : [...withoutUser, { emoji, user_ids: [currentUserId] }];
+        }
+
+        const next = prev.map((m) =>
+          m.id === msgId ? { ...m, reactions: optimisticReactions } : m
+        );
+        msgCache.set(communityId, next);
+        return next;
+      });
+
+      try {
+        const res = await fetch(
+          `/api/communities/${communityId}/messages/${msgId}/reactions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          }
+        );
+        if (res.ok) {
+          const { reactions } = await res.json();
+          handleReactionToggled(msgId, reactions);
+        }
+      } catch {
+        // Network error — realtime will correct state when reconnected
+      }
+    },
+    [communityId, currentUserId, handleReactionToggled]
   );
 
   // ── Data fetching + message state ─────────────────────────────────────────
@@ -155,6 +202,7 @@ export function CommunityChat({
     handleSend,
     handleKeyDown,
     handleCancelSend,
+    handleRetrySend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,
@@ -223,9 +271,12 @@ export function CommunityChat({
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
-              onMessagePress={handleMessagePress}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
+              onRetrySend={handleRetrySend}
+              onReaction={handleReaction}
+              onReply={handleReply}
+              onCopy={handleCopy}
             />
           </div>
 
@@ -256,17 +307,6 @@ export function CommunityChat({
             onImageRemove={handleImageClear}
           />
 
-          {/* Message action slider */}
-          <MessageActionSlider
-            message={activeMessage}
-            isMe={sliderIsMe}
-            currentUserId={currentUserId}
-            communityId={communityId}
-            onClose={handleSliderClose}
-            onReply={handleReply}
-            onCopy={handleCopy}
-            onReactionToggled={handleReactionToggled}
-          />
         </div>
 
         <MembersPanel members={members} />

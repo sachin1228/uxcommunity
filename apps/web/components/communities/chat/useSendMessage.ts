@@ -15,6 +15,12 @@ interface UseSendMessageOptions {
   onClearReply: () => void;
 }
 
+type RetryData = {
+  file: File | null;
+  content: string;
+  replyTo: ReplyPreview | null;
+};
+
 export function useSendMessage({
   communityId,
   currentUserId,
@@ -32,6 +38,10 @@ export function useSendMessage({
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Stores retry data (file + content + replyTo) keyed by tempId so failed
+  // messages can be retried without losing the original payload.
+  const failedRetryDataRef = useRef<Map<string, RetryData>>(new Map());
 
   const replyToRef = useRef<ReplyPreview | null>(replyTo);
   useEffect(() => {
@@ -106,37 +116,44 @@ export function useSendMessage({
   const handleCancelSend = useCallback((tempId: string) => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    setMessages((prev) => {
-      const next = prev.filter((m) => m.id !== tempId);
-      msgCache.set(communityId, next);
-      return next;
-    });
+
+    // For image sends: the AbortError catch in runSend will mark the message
+    // as "failed" so the user can retry — don't remove the message here.
+    // For text-only sends: no retry data stored, so remove immediately.
+    const retryData = failedRetryDataRef.current.get(tempId);
+    if (!retryData?.file) {
+      setMessages((prev) => {
+        const next = prev.filter((m) => m.id !== tempId);
+        msgCache.set(communityId, next);
+        return next;
+      });
+      failedRetryDataRef.current.delete(tempId);
+    }
   }, [communityId, setMessages]);
 
-  async function handleSend() {
-    const content = input.trim();
-    const imageFile = pendingImageFile;
-    // Capture blob URL BEFORE clearing so we can keep it alive during upload
-    const imagePreviewUrl = pendingImagePreview;
-
-    if ((!content && !imageFile) || sending) return;
-
-    setSending(true);
-    setError(null);
-
-    const currentReplyTo = replyToRef.current;
-    const tempId = `temp-${Date.now()}`;
-
-    // Clear input state WITHOUT revoking the blob URL (we need it for display)
-    setPendingImagePreview(null);
-    setPendingImageFile(null);
-    setInput("");
-    onClearReply();
-
-    if (inputRef.current) {
-      inputRef.current.style.height = "24px";
-    }
-    inputRef.current?.focus();
+  /**
+   * Core send logic, shared by handleSend and handleRetrySend.
+   * Caller is responsible for setting setSending(true) and clearing UI state.
+   */
+  async function runSend({
+    content,
+    imageFile,
+    imagePreviewUrl,
+    replyTo: msgReplyTo,
+    tempId,
+  }: {
+    content: string;
+    imageFile: File | null;
+    imagePreviewUrl: string | null;
+    replyTo: ReplyPreview | null;
+    tempId: string;
+  }) {
+    // Persist retry data before any async work
+    failedRetryDataRef.current.set(tempId, {
+      file: imageFile,
+      content,
+      replyTo: msgReplyTo,
+    });
 
     const optimistic: Message = {
       id: tempId,
@@ -146,7 +163,7 @@ export function useSendMessage({
       users: null,
       status: "sending",
       reactions: [],
-      reply_to: currentReplyTo ?? null,
+      reply_to: msgReplyTo ?? null,
       image_url: imagePreviewUrl,
     };
 
@@ -185,7 +202,7 @@ export function useSendMessage({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          reply_to_id: currentReplyTo?.id ?? null,
+          reply_to_id: msgReplyTo?.id ?? null,
           image_url: uploadedImageUrl,
         }),
         signal: abortController.signal,
@@ -216,6 +233,9 @@ export function useSendMessage({
           msgCache.set(communityId, next);
           return next;
         });
+
+        // Sent successfully — clear retry data
+        failedRetryDataRef.current.delete(tempId);
       } else if (res.status === 202) {
         setMessages((prev) => {
           const next = prev.filter((m) => m.id !== tempId);
@@ -224,6 +244,7 @@ export function useSendMessage({
         });
 
         setError(data.error ?? "Your message has been sent for moderator review.");
+        failedRetryDataRef.current.delete(tempId);
       } else {
         setMessages((prev) => {
           const next = prev.map((m) =>
@@ -237,9 +258,28 @@ export function useSendMessage({
       }
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        // Cancelled by handleCancelSend — message already removed, no error shown
+        const retryData = failedRetryDataRef.current.get(tempId);
+        if (retryData?.file) {
+          // Image upload was cancelled — keep bubble in "failed" state for retry
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === tempId ? { ...m, status: "failed" as const } : m
+            );
+            msgCache.set(communityId, next);
+            return next;
+          });
+        } else {
+          // Text-only cancel — remove the optimistic message
+          setMessages((prev) => {
+            const next = prev.filter((m) => m.id !== tempId);
+            msgCache.set(communityId, next);
+            return next;
+          });
+          failedRetryDataRef.current.delete(tempId);
+        }
         return;
       }
+
       setMessages((prev) => {
         const next = prev.map((m) =>
           m.id === tempId ? { ...m, status: "failed" as const } : m
@@ -256,6 +296,75 @@ export function useSendMessage({
     }
   }
 
+  async function handleSend() {
+    const content = input.trim();
+    const imageFile = pendingImageFile;
+    // Capture blob URL BEFORE clearing so we can keep it alive during upload
+    const imagePreviewUrl = pendingImagePreview;
+
+    if ((!content && !imageFile) || sending) return;
+
+    setSending(true);
+    setError(null);
+
+    const currentReplyTo = replyToRef.current;
+    const tempId = `temp-${Date.now()}`;
+
+    // Clear input state WITHOUT revoking the blob URL (runSend will revoke in finally)
+    setPendingImagePreview(null);
+    setPendingImageFile(null);
+    setInput("");
+    onClearReply();
+
+    if (inputRef.current) {
+      inputRef.current.style.height = "24px";
+    }
+    inputRef.current?.focus();
+
+    await runSend({
+      content,
+      imageFile,
+      imagePreviewUrl,
+      replyTo: currentReplyTo,
+      tempId,
+    });
+  }
+
+  /**
+   * Retries a failed send. Removes the old failed bubble, creates a fresh
+   * optimistic one, and re-runs the upload + message flow.
+   */
+  const handleRetrySend = useCallback(async (failedTempId: string) => {
+    const retryData = failedRetryDataRef.current.get(failedTempId);
+    if (!retryData || sending) return;
+
+    // Remove the failed message before re-queueing
+    setMessages((prev) => {
+      const next = prev.filter((m) => m.id !== failedTempId);
+      msgCache.set(communityId, next);
+      return next;
+    });
+    failedRetryDataRef.current.delete(failedTempId);
+
+    setSending(true);
+    setError(null);
+
+    const tempId = `temp-${Date.now()}`;
+    // Create a fresh blob URL from the stored File for the new optimistic preview
+    const imagePreviewUrl = retryData.file
+      ? URL.createObjectURL(retryData.file)
+      : null;
+
+    await runSend({
+      content: retryData.content,
+      imageFile: retryData.file,
+      imagePreviewUrl,
+      replyTo: retryData.replyTo,
+      tempId,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, sending, setMessages]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -271,6 +380,7 @@ export function useSendMessage({
     handleSend,
     handleKeyDown,
     handleCancelSend,
+    handleRetrySend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,

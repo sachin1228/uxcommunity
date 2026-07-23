@@ -5,7 +5,7 @@ import { LottieLoader } from "@/components/ui/LottieLoader";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { TYPE_EMOJI } from "./chatUtils";
-import type { CachedMessage } from "@/lib/communities/cache";
+import type { CachedMessage, MessageReaction } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
 
@@ -33,9 +33,12 @@ interface MessageListProps {
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
-  onMessagePress: (msg: CachedMessage) => void;
   onReplyClick: (replyId: string) => void;
   onCancelSend: (msgId: string) => void;
+  onRetrySend: (msgId: string) => void;
+  onReaction: (msgId: string, emoji: string) => void;
+  onReply: (msg: CachedMessage) => void;
+  onCopy: (msg: CachedMessage) => void;
 }
 
 export function MessageList({
@@ -50,9 +53,12 @@ export function MessageList({
   displayCommunity,
   communityId,
   highlightedMsgId,
-  onMessagePress,
   onReplyClick,
   onCancelSend,
+  onRetrySend,
+  onReaction,
+  onReply,
+  onCopy,
 }: MessageListProps) {
   if (loading) {
     return (
@@ -128,9 +134,12 @@ export function MessageList({
                 unreadDivider={dividerNode}
                 currentUserId={currentUserId}
                 highlighted={highlightedMsgId === msg.id}
-                onPress={onMessagePress}
                 onReplyClick={onReplyClick}
                 onCancelSend={onCancelSend}
+                onRetrySend={onRetrySend}
+                onReaction={onReaction}
+                onReply={onReply}
+                onCopy={onCopy}
               />
             );
           })}
