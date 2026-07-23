@@ -9,8 +9,8 @@ function getResend() {
   return new Resend(key);
 }
 const getFrom = () => {
-  const from = process.env.RESEND_FROM_EMAIL;
-  if (!from) throw new Error("RESEND_FROM_EMAIL is not set");
+  const from = process.env.EMAIL_FROM;
+  if (!from) throw new Error("EMAIL_FROM is not set");
   return from;
 };
 
