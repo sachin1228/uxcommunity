@@ -216,6 +216,48 @@ export function CommunityChat({
     onClearReply: handleClearReply,
   });
 
+  // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
+  // When the input area grows (reply bar, image preview), the scroll container
+  // shrinks. The browser keeps scrollTop unchanged, so the last messages slide
+  // out of view, leaving a black gap.
+  //
+  // Strategy: track prevDist via a scroll listener so we always know the user's
+  // scroll position BEFORE the resize fires. Only snap back to bottom if the
+  // user was genuinely at the bottom (≤ 10 px) before the resize — this avoids
+  // the wrong behaviour of snapping users who intentionally scrolled up to read
+  // an older message before hitting Reply.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Initialise with the current distance from the bottom
+    let prevDist =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+
+    // Keep prevDist fresh whenever the user scrolls manually
+    const onScroll = () => {
+      prevDist =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+    };
+
+    const observer = new ResizeObserver(() => {
+      // prevDist was captured before this resize → safe to use as "was at bottom"
+      if (prevDist <= 10) {
+        container.scrollTop = container.scrollHeight - container.clientHeight;
+      }
+      // Update prevDist to reflect the post-snap position
+      prevDist =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+    });
+
+    container.addEventListener("scroll", onScroll, { passive: true });
+    observer.observe(container);
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      observer.disconnect();
+    };
+  }, [scrollContainerRef]);
+
   // ── Group messages by date ────────────────────────────────────────────────
   const grouped = useMemo<DateGroup[]>(() =>
     messages.reduce<DateGroup[]>((acc, msg) => {
@@ -280,32 +322,35 @@ export function CommunityChat({
             />
           </div>
 
-          {/* Scroll-to-bottom button */}
-          {showScrollToBottom && (
-            <button
-              onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-              className="absolute bottom-[72px] right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
-              aria-label="Scroll to bottom"
-            >
-              <ChevronDown size={16} />
-            </button>
-          )}
+          {/* Input wrapper — `relative` so the ↓ button is always anchored just
+              above this box, regardless of reply-bar / image-preview height.   */}
+          <div className="relative shrink-0">
+            {showScrollToBottom && (
+              <button
+                onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
+                className="absolute -top-10 right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
+                aria-label="Scroll to bottom"
+              >
+                <ChevronDown size={16} />
+              </button>
+            )}
 
-          <ChatInput
-            ref={inputRef}
-            input={input}
-            sending={sending}
-            error={error}
-            placeholder={`Message ${displayCommunity?.name ?? ""}…`}
-            replyTo={replyTo}
-            pendingImagePreview={pendingImagePreview}
-            onChange={setInput}
-            onKeyDown={handleKeyDown}
-            onSend={handleSend}
-            onCancelReply={handleClearReply}
-            onImageSelect={handleImageSelect}
-            onImageRemove={handleImageClear}
-          />
+            <ChatInput
+              ref={inputRef}
+              input={input}
+              sending={sending}
+              error={error}
+              placeholder={`Message ${displayCommunity?.name ?? ""}…`}
+              replyTo={replyTo}
+              pendingImagePreview={pendingImagePreview}
+              onChange={setInput}
+              onKeyDown={handleKeyDown}
+              onSend={handleSend}
+              onCancelReply={handleClearReply}
+              onImageSelect={handleImageSelect}
+              onImageRemove={handleImageClear}
+            />
+          </div>
 
         </div>
 
