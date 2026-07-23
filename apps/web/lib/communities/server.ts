@@ -22,13 +22,13 @@ export async function fetchCommunitySSRData(
   ] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     db.from("communities").select("id, name, type, image_url, reference_id, created_at").eq("id", communityId).maybeSingle(),
-    db.from("community_messages").select("id, content, created_at, user_id, reply_to_id, image_url").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+    db.from("community_messages").select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
   ]);
 
   if (!membership || !community) return null;
 
   const msgs = (msgRows ?? []) as {
-    id: string; content: string; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null;
+    id: string; content: string; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null; deleted_at: string | null;
   }[];
   const uniqueMsgUserIds = [...new Set(msgs.map((m) => m.user_id))];
   const messageIds       = msgs.map((m) => m.id);

@@ -26,6 +26,7 @@ export interface CachedMessage {
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
   image_url?: string | null;
+  deleted_at?: string | null;
 }
 
 export interface CachedMeta {

@@ -52,7 +52,7 @@ export async function GET(
 
   let msgQuery = db
     .from("community_messages")
-    .select("id, content, created_at, user_id, reply_to_id, image_url")
+    .select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at")
     .eq("community_id", communityId)
     .order("created_at", { ascending: false });
 
@@ -119,10 +119,11 @@ export async function GET(
 
   const messages = rows.reverse().map((m) => ({
     ...m,
-    users:     userMap[m.user_id] ?? null,
-    reactions: reactionsMap[m.id] ?? [],
-    reply_to:  m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
-    image_url: (m as any).image_url ?? null,
+    users:      userMap[m.user_id] ?? null,
+    reactions:  reactionsMap[m.id] ?? [],
+    reply_to:   m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
+    image_url:  (m as any).image_url  ?? null,
+    deleted_at: (m as any).deleted_at ?? null,
   }));
 
   return NextResponse.json({ messages });

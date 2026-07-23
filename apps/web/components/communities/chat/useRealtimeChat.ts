@@ -212,6 +212,35 @@ export function useRealtimeChat({
           });
         }
       )
+      // ── Message soft-delete (UPDATE with deleted_at set) ─────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "community_messages",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const updated = payload.new as {
+            id: string;
+            deleted_at: string | null;
+          };
+          // Only care about soft-deletes; ignore other updates.
+          if (!updated.deleted_at) return;
+
+          setMessages((prev) => {
+            if (!prev.some((m) => m.id === updated.id)) return prev;
+            const next = prev.map((m) =>
+              m.id === updated.id
+                ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
+                : m
+            );
+            msgCache.set(communityId, next);
+            return next;
+          });
+        }
+      )
       // ── Reaction INSERT ─────────────────────────────────────────────────
       .on(
         "postgres_changes",

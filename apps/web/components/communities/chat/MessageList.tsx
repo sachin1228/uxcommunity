@@ -39,6 +39,7 @@ interface MessageListProps {
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
+  onDelete: (msgId: string) => void;
 }
 
 export function MessageList({
@@ -59,6 +60,7 @@ export function MessageList({
   onReaction,
   onReply,
   onCopy,
+  onDelete,
 }: MessageListProps) {
   if (loading) {
     return (
@@ -140,6 +142,7 @@ export function MessageList({
                 onReaction={onReaction}
                 onReply={onReply}
                 onCopy={onCopy}
+                onDelete={onDelete}
               />
             );
           })}
