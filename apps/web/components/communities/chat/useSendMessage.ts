@@ -221,7 +221,13 @@ export function useSendMessage({
 
         setMessages((prev) => {
           if (prev.some((m) => m.id === message.id)) {
-            const next = prev.filter((m) => m.id !== tempId);
+            // Realtime beat the API response — the existing entry lacks reply_to
+            // and image_url. Replace it with the full server payload.
+            const next = prev
+              .filter((m) => m.id !== tempId)
+              .map((m) =>
+                m.id === message.id ? { ...message, status: "sent" as const } : m
+              );
             msgCache.set(communityId, next);
             return next;
           }

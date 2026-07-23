@@ -60,6 +60,8 @@ export function useRealtimeChat({
             user_id: string;
             content: string;
             created_at: string;
+            reply_to_id: string | null;
+            image_url: string | null;
           };
 
           // Capture scroll position before state update
@@ -95,6 +97,8 @@ export function useRealtimeChat({
               users,
               status: "sent",
               reactions: [],
+              reply_to: null,
+              image_url: newRow.image_url ?? null,
             };
             const next = [...withoutTemp, incoming].sort(
               (a, b) =>
@@ -102,6 +106,55 @@ export function useRealtimeChat({
                 new Date(b.created_at).getTime()
             );
             msgCache.set(communityId, next);
+
+            // Fetch reply preview asynchronously if this message is a reply.
+            // First try local state (parent is usually already loaded); fall
+            // back to the lightweight single-message API endpoint.
+            if (newRow.reply_to_id) {
+              const targetCommunityId = communityId;
+              const targetMsgId       = newRow.id;
+              const targetReplyToId   = newRow.reply_to_id;
+
+              // Check local state synchronously inside the setter to avoid a
+              // stale-closure race; if found, patch in one go.
+              setMessages((prev2) => {
+                const parentInState = prev2.find((m) => m.id === targetReplyToId);
+                if (parentInState) {
+                  const preview = {
+                    id:        parentInState.id,
+                    content:   parentInState.content ?? "",
+                    user_name: parentInState.users?.name ?? "Unknown",
+                  };
+                  const next2 = prev2.map((m) =>
+                    m.id === targetMsgId ? { ...m, reply_to: preview } : m
+                  );
+                  msgCache.set(targetCommunityId, next2);
+                  return next2;
+                }
+                // Parent not in local state — kick off async fetch below.
+                return prev2;
+              });
+
+              // Async fallback: fetch the parent message from the server.
+              fetch(`/api/communities/${targetCommunityId}/messages/${targetReplyToId}`)
+                .then((r) => (r.ok ? r.json() : null))
+                .then((preview: { id: string; content: string | null; user_name: string } | null) => {
+                  if (!preview) return;
+                  setMessages((prev2) => {
+                    // Skip if already resolved by the synchronous path above.
+                    const msg = prev2.find((m) => m.id === targetMsgId);
+                    if (!msg || msg.reply_to) return prev2;
+                    const next2 = prev2.map((m) =>
+                      m.id === targetMsgId
+                        ? { ...m, reply_to: { id: preview.id, content: preview.content ?? "", user_name: preview.user_name } }
+                        : m
+                    );
+                    msgCache.set(targetCommunityId, next2);
+                    return next2;
+                  });
+                })
+                .catch(() => {});
+            }
 
             // Lazy-load profile for unknown senders
             if (
