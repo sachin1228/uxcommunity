@@ -219,10 +219,14 @@ export function useRealtimeChat({
         },
         (payload) => {
           const r = payload.old as {
-            message_id: string;
-            user_id: string;
-            emoji: string;
+            message_id?: string;
+            user_id?: string;
+            emoji?: string;
           };
+          // Guard: message_id / user_id / emoji are only present when the table
+          // has REPLICA IDENTITY FULL. Without the migration applied they will
+          // be undefined, so skip the update to avoid corrupting local state.
+          if (!r.message_id || !r.user_id || !r.emoji) return;
           setMessages((prev) => {
             const next = prev.map((m) =>
               m.id === r.message_id
@@ -230,8 +234,8 @@ export function useRealtimeChat({
                     ...m,
                     reactions: applyReactionDelete(
                       m.reactions ?? [],
-                      r.emoji,
-                      r.user_id
+                      r.emoji!,
+                      r.user_id!
                     ),
                   }
                 : m
