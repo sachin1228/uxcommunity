@@ -3,7 +3,7 @@
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedMessage } from "@/lib/communities/cache";
+import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 
 type Message = CachedMessage;
@@ -81,6 +81,12 @@ export function useRealtimeChat({
 
           setMessages((prev) => {
             if (prev.some((m) => m.id === newRow.id)) return prev;
+
+            // Capture the temp message being replaced so we can inherit its
+            // reply_to — this avoids a second setMessages call (and render).
+            const matchedTemp = prev.find(
+              (m) => m.id.startsWith("temp-") && m.user_id === newRow.user_id
+            );
             const withoutTemp = prev.filter(
               (m) =>
                 !(m.id.startsWith("temp-") && m.user_id === newRow.user_id)
@@ -89,6 +95,29 @@ export function useRealtimeChat({
               (m) => m.user_id === newRow.user_id
             );
             const users = senderMember?.users ?? null;
+
+            // Resolve reply_to in this same state update to avoid a flicker:
+            //   1. Inherit from the replaced temp message (sender's own send).
+            //   2. Build from parent already in local state (other user's msg).
+            //   3. null for now — async fallback fetch below fills it in later.
+            let replyTo: ReplyPreview | null = null;
+            if (newRow.reply_to_id) {
+              if (matchedTemp?.reply_to) {
+                // Sender path: temp message already had the full preview.
+                replyTo = matchedTemp.reply_to;
+              } else {
+                // Receiver path: look for the parent in the already-loaded list.
+                const parentInState = prev.find((m) => m.id === newRow.reply_to_id);
+                if (parentInState) {
+                  replyTo = {
+                    id:        parentInState.id,
+                    content:   parentInState.content ?? "",
+                    user_name: parentInState.users?.name ?? "Unknown",
+                  };
+                }
+              }
+            }
+
             const incoming: Message = {
               id: newRow.id,
               content: newRow.content,
@@ -97,7 +126,7 @@ export function useRealtimeChat({
               users,
               status: "sent",
               reactions: [],
-              reply_to: null,
+              reply_to: replyTo,
               image_url: newRow.image_url ?? null,
             };
             const next = [...withoutTemp, incoming].sort(
@@ -107,41 +136,20 @@ export function useRealtimeChat({
             );
             msgCache.set(communityId, next);
 
-            // Fetch reply preview asynchronously if this message is a reply.
-            // First try local state (parent is usually already loaded); fall
-            // back to the lightweight single-message API endpoint.
-            if (newRow.reply_to_id) {
+            // Async fallback: only needed when reply_to_id is set but the
+            // parent message is not in local state (e.g. very old message).
+            // This fires after the state update so it never causes a flicker
+            // on the common path — it only runs in the rare edge case.
+            if (newRow.reply_to_id && !replyTo) {
               const targetCommunityId = communityId;
               const targetMsgId       = newRow.id;
               const targetReplyToId   = newRow.reply_to_id;
 
-              // Check local state synchronously inside the setter to avoid a
-              // stale-closure race; if found, patch in one go.
-              setMessages((prev2) => {
-                const parentInState = prev2.find((m) => m.id === targetReplyToId);
-                if (parentInState) {
-                  const preview = {
-                    id:        parentInState.id,
-                    content:   parentInState.content ?? "",
-                    user_name: parentInState.users?.name ?? "Unknown",
-                  };
-                  const next2 = prev2.map((m) =>
-                    m.id === targetMsgId ? { ...m, reply_to: preview } : m
-                  );
-                  msgCache.set(targetCommunityId, next2);
-                  return next2;
-                }
-                // Parent not in local state — kick off async fetch below.
-                return prev2;
-              });
-
-              // Async fallback: fetch the parent message from the server.
               fetch(`/api/communities/${targetCommunityId}/messages/${targetReplyToId}`)
                 .then((r) => (r.ok ? r.json() : null))
                 .then((preview: { id: string; content: string | null; user_name: string } | null) => {
                   if (!preview) return;
                   setMessages((prev2) => {
-                    // Skip if already resolved by the synchronous path above.
                     const msg = prev2.find((m) => m.id === targetMsgId);
                     if (!msg || msg.reply_to) return prev2;
                     const next2 = prev2.map((m) =>
