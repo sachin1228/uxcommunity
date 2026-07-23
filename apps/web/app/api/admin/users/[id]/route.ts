@@ -111,10 +111,11 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
-  // Fetch application_id before deleting — we hard-delete it last.
+  // Fetch application_id + email before deleting — needed to clean up the
+  // application record so the email is free to reapply afterward.
   const { data: user } = await db
     .from("users")
-    .select("application_id")
+    .select("application_id, email")
     .eq("id", id)
     .maybeSingle();
 
@@ -129,9 +130,25 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
   }
 
-  // 3. Hard-delete the application so the email is completely free to reapply
+  // 3. Hard-delete the application so the email is completely free to reapply.
+  // Delete by application_id first (precise); then fall back to email to catch
+  // any orphaned rows where application_id was null or not linked correctly.
   if (user?.application_id) {
     await db.from("applications").delete().eq("id", user.application_id);
+  } else if (user?.email) {
+    await db
+      .from("applications")
+      .delete()
+      .eq("applicant_email", user.email.toLowerCase());
+  }
+
+  // Guarantee: even if application_id was set and deleted above, also sweep by
+  // email to remove any duplicate / orphaned application rows for this address.
+  if (user?.application_id && user?.email) {
+    await db
+      .from("applications")
+      .delete()
+      .eq("applicant_email", user.email.toLowerCase());
   }
 
   return NextResponse.json({ success: true });
