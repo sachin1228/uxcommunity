@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard, Wrench, MessagesSquare } from "lucide-react";
+import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard, Wrench, MessagesSquare, ShieldCheck } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -32,7 +32,7 @@ export function AdminSidebar() {
   // Clear optimistic state once the real pathname has caught up.
   useEffect(() => {
     if (pendingHref && isMatch(pendingHref, pathname)) {
-      setPendingHref(null);
+      queueMicrotask(() => setPendingHref(null));
     }
   }, [pathname, pendingHref]);
 
@@ -87,6 +87,20 @@ export function AdminSidebar() {
       >
         <MessagesSquare size={16} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
+      </Link>
+
+      {/* Moderation */}
+      <Link
+        href="/admin/moderation"
+        onClick={() => setPendingHref("/admin/moderation")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/moderation")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <ShieldCheck size={16} className={active("/admin/moderation") ? "text-accent" : ""} />
+        Moderation
       </Link>
 
       {/* Tools */}

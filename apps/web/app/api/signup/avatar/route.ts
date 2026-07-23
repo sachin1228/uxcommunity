@@ -4,6 +4,9 @@ import { requireSession } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
 import { compressAvatar } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
+import { validateAndModerateImage } from "@/lib/moderation/image";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
 
 const MAX_BYTES = 3 * 1024 * 1024; // 3 MB (client compresses first, so this is a safety cap)
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -100,8 +103,16 @@ export async function POST(request: NextRequest) {
 
     // Compress to WebP (max 400×400, quality 85) before storing — reduces
     // storage size ~70-85% and cuts egress every time the avatar is served.
-    const raw = Buffer.from(await file.arrayBuffer());
-    const compressed = await compressAvatar(raw);
+    const db = createServiceClient();
+    const moderation = await validateAndModerateImage(file);
+    await logModerationDecision(db, {
+      userId: session.userId!,
+      contentType: "image_upload",
+      decision: moderation.decision,
+    });
+    if (!moderation.decision.allowed || !moderation.buffer) return moderationFailureResponse(moderation.decision);
+
+    const compressed = await compressAvatar(moderation.buffer);
     const key = `avatars/${session.userId}/${Date.now()}.${compressed.ext}`;
 
     let publicUrl: string;
@@ -112,7 +123,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
     }
 
-    const db = createServiceClient();
     const { error: dbError } = await db
       .from("designer_profiles")
       .update({ avatar_url: publicUrl, avatar_source: "upload" })

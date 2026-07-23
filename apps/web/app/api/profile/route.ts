@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { moderateText } from "@/lib/moderation/text";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
+import { contentHash } from "@/lib/moderation/normalize";
 
 export async function GET() {
   let session: Awaited<ReturnType<typeof requireSession>>;
@@ -62,14 +66,21 @@ export async function PATCH(request: NextRequest) {
   const db = createServiceClient();
   const userId = session.userId!;
 
-  const updates: Record<string, string | undefined>[] = [];
-
   // Update user name if provided
   if (typeof body.name === "string") {
     const trimmed = body.name.trim();
     if (!trimmed) {
       return NextResponse.json({ error: "Name cannot be empty." }, { status: 422 });
     }
+    const decision = await moderateText({ content: trimmed, contentType: "username", userId });
+    await logModerationDecision(db, {
+      userId,
+      contentType: "username",
+      contentHash: contentHash(trimmed),
+      decision,
+    });
+    if (!decision.allowed) return moderationFailureResponse(decision);
+
     const { error } = await db.from("users").update({ name: trimmed }).eq("id", userId);
     if (error) {
       console.error("[profile PATCH] name update error:", error);
@@ -79,7 +90,20 @@ export async function PATCH(request: NextRequest) {
 
   // Update profile fields if provided
   const profilePatch: Record<string, string | null> = {};
-  if (typeof body.bio === "string") profilePatch.bio = body.bio.trim() || null;
+  if (typeof body.bio === "string") {
+    const bio = body.bio.trim();
+    if (bio) {
+      const decision = await moderateText({ content: bio, contentType: "user_bio", userId });
+      await logModerationDecision(db, {
+        userId,
+        contentType: "user_bio",
+        contentHash: contentHash(bio),
+        decision,
+      });
+      if (!decision.allowed) return moderationFailureResponse(decision);
+    }
+    profilePatch.bio = bio || null;
+  }
   if (typeof body.linkedin_url === "string") profilePatch.linkedin_url = body.linkedin_url.trim() || null;
   if (typeof body.portfolio_url === "string") profilePatch.portfolio_url = body.portfolio_url.trim() || null;
 

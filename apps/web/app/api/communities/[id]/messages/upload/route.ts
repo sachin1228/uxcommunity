@@ -3,17 +3,16 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compressChatImage } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
+import { validateAndModerateImage } from "@/lib/moderation/image";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
 
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
-  "image/gif",
-  "image/heic",
-  "image/heif",
 ]);
 
 export async function POST(
@@ -50,19 +49,25 @@ export async function POST(
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
 
-  if (!ALLOWED_TYPES.has(file.type) && !file.name.match(/\.(jpe?g|png|webp|gif|heic|heif)$/i)) {
-    return NextResponse.json({ error: "Only image files are allowed." }, { status: 422 });
+  if (!ALLOWED_TYPES.has(file.type)) {
+    return NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed." }, { status: 422 });
   }
 
   if (file.size > MAX_INPUT_BYTES) {
     return NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const moderation = await validateAndModerateImage(file);
+  await logModerationDecision(db, {
+    userId,
+    contentType: "image_upload",
+    decision: moderation.decision,
+  });
+  if (!moderation.decision.allowed || !moderation.buffer) return moderationFailureResponse(moderation.decision);
 
   let compressed;
   try {
-    compressed = await compressChatImage(buffer);
+    compressed = await compressChatImage(moderation.buffer);
   } catch {
     return NextResponse.json({ error: "Failed to process image." }, { status: 422 });
   }

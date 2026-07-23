@@ -4,6 +4,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { signupStep1Schema } from "@/lib/validations";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { moderateText } from "@/lib/moderation/text";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
+import { contentHash } from "@/lib/moderation/normalize";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -37,6 +41,13 @@ export async function POST(request: NextRequest) {
   const { name, email, password, token } = parsed.data;
 
   const db = createServiceClient();
+  const nameDecision = await moderateText({ content: name, contentType: "username" });
+  await logModerationDecision(db, {
+    contentType: "username",
+    contentHash: contentHash(name),
+    decision: nameDecision,
+  });
+  if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
   // Validate invitation token (must exist and not be expired)
   const { data: invitation } = await db

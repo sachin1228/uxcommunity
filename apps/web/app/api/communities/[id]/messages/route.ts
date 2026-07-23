@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import { rateLimit } from "@/lib/auth/rate-limit";
+import { moderateText } from "@/lib/moderation/text";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
+import { contentHash } from "@/lib/moderation/normalize";
 
 const PAGE_SIZE = 50;
 
@@ -133,6 +138,21 @@ export async function POST(
   const { id: communityId } = await params;
 
   const db = createServiceClient();
+  const burst = await rateLimit(`moderation:chat:${userId}:10s`, 5, 10);
+  if (!burst.success) {
+    return NextResponse.json(
+      { error: "Too many messages. Please slow down." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((burst.resetAt - Date.now()) / 1000)) } },
+    );
+  }
+
+  const minute = await rateLimit(`moderation:chat:${userId}:60s`, 20, 60);
+  if (!minute.success) {
+    return NextResponse.json(
+      { error: "Too many messages. Please try again shortly." },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((minute.resetAt - Date.now()) / 1000)) } },
+    );
+  }
 
   const { data: membership } = await db
     .from("community_members")
@@ -158,6 +178,19 @@ export async function POST(
   if (!content && !image_url) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
   if (content.length > 2000)  return NextResponse.json({ error: "Message too long." },        { status: 422 });
 
+  const textDecision = content
+    ? await moderateText({ content, contentType: "chat_message", userId })
+    : null;
+  if (textDecision && !textDecision.allowed) {
+    await logModerationDecision(db, {
+      userId,
+      contentType: "chat_message",
+      contentHash: contentHash(content),
+      decision: textDecision,
+    });
+    return moderationFailureResponse(textDecision);
+  }
+
   // Validate reply_to_id belongs to this community (if provided)
   if (reply_to_id) {
     const { data: parent } = await db
@@ -178,6 +211,16 @@ export async function POST(
   if (insertErr || !inserted) {
     console.error("[POST message] insert error:", insertErr);
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
+  }
+
+  if (textDecision) {
+    await logModerationDecision(db, {
+      userId,
+      contentType: "chat_message",
+      contentRefId: inserted.id,
+      contentHash: contentHash(content),
+      decision: textDecision,
+    });
   }
 
   const [{ data: user }, { data: profile }, replyMap] = await Promise.all([
