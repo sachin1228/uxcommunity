@@ -9,7 +9,7 @@ interface UnreadDividerProps {
 export const UnreadDivider = forwardRef<HTMLDivElement, UnreadDividerProps>(
   function UnreadDivider({ count }, ref) {
     return (
-      <div ref={ref} className="flex items-center gap-3 py-3 my-3 w-full">
+      <div ref={ref} className="flex items-center gap-3 py-3 my-3">
         <div className="flex-1 border-t border-border" />
         <span
           className="

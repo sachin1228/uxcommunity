@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useLayoutEffect, useEffect, useCallback, useMemo } from "react";
+import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import { sidebarStore, msgCache } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
@@ -38,6 +38,10 @@ export function CommunityChat({
 }) {
   const [hasMounted, setHasMounted] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
+
+  // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
+  const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Reply state ───────────────────────────────────────────────────────────
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
@@ -117,6 +121,18 @@ export function CommunityChat({
     initialLastReadAtFromSSR: initialLastReadAt,
   });
 
+  // ── Scroll-to-reply handler (needs scrollContainerRef from above) ─────────
+  const handleReplyClick = useCallback((replyId: string) => {
+    const el = scrollContainerRef.current?.querySelector<HTMLElement>(
+      `[data-message-id="${replyId}"]`
+    );
+    if (!el) return;
+    el.scrollIntoView({ behavior: "instant", block: "center" });
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedMsgId(replyId);
+    highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
+  }, [scrollContainerRef]);
+
   // ── Realtime subscription ─────────────────────────────────────────────────
   useRealtimeChat({
     communityId,
@@ -138,6 +154,7 @@ export function CommunityChat({
     error,
     handleSend,
     handleKeyDown,
+    handleCancelSend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,
@@ -205,7 +222,10 @@ export function CommunityChat({
               loading={loading}
               displayCommunity={displayCommunity}
               communityId={communityId}
+              highlightedMsgId={highlightedMsgId}
               onMessagePress={handleMessagePress}
+              onReplyClick={handleReplyClick}
+              onCancelSend={handleCancelSend}
             />
           </div>
 

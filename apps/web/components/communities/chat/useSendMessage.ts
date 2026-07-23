@@ -31,6 +31,7 @@ export function useSendMessage({
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const replyToRef = useRef<ReplyPreview | null>(replyTo);
   useEffect(() => {
@@ -102,9 +103,21 @@ export function useSendMessage({
     setPendingImageFile(null);
   }, []);
 
+  const handleCancelSend = useCallback((tempId: string) => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setMessages((prev) => {
+      const next = prev.filter((m) => m.id !== tempId);
+      msgCache.set(communityId, next);
+      return next;
+    });
+  }, [communityId, setMessages]);
+
   async function handleSend() {
     const content = input.trim();
     const imageFile = pendingImageFile;
+    // Capture blob URL BEFORE clearing so we can keep it alive during upload
+    const imagePreviewUrl = pendingImagePreview;
 
     if ((!content && !imageFile) || sending) return;
 
@@ -112,8 +125,18 @@ export function useSendMessage({
     setError(null);
 
     const currentReplyTo = replyToRef.current;
-
     const tempId = `temp-${Date.now()}`;
+
+    // Clear input state WITHOUT revoking the blob URL (we need it for display)
+    setPendingImagePreview(null);
+    setPendingImageFile(null);
+    setInput("");
+    onClearReply();
+
+    if (inputRef.current) {
+      inputRef.current.style.height = "24px";
+    }
+    inputRef.current?.focus();
 
     const optimistic: Message = {
       id: tempId,
@@ -124,7 +147,7 @@ export function useSendMessage({
       status: "sending",
       reactions: [],
       reply_to: currentReplyTo ?? null,
-      image_url: pendingImagePreview,
+      image_url: imagePreviewUrl,
     };
 
     setMessages((prev) => {
@@ -133,15 +156,8 @@ export function useSendMessage({
       return next;
     });
 
-    setInput("");
-    handleImageClear();
-    onClearReply();
-
-    if (inputRef.current) {
-      inputRef.current.style.height = "24px";
-    }
-
-    inputRef.current?.focus();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
 
     try {
       let uploadedImageUrl: string | null = null;
@@ -152,10 +168,7 @@ export function useSendMessage({
 
         const uploadRes = await fetch(
           `/api/communities/${communityId}/messages/upload`,
-          {
-            method: "POST",
-            body: fd,
-          }
+          { method: "POST", body: fd, signal: abortController.signal }
         );
 
         if (!uploadRes.ok) {
@@ -169,14 +182,13 @@ export function useSendMessage({
 
       const res = await fetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
           reply_to_id: currentReplyTo?.id ?? null,
           image_url: uploadedImageUrl,
         }),
+        signal: abortController.signal,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -198,9 +210,7 @@ export function useSendMessage({
           }
 
           const next = prev.map((m) =>
-            m.id === tempId
-              ? { ...message, status: "sent" as const }
-              : m
+            m.id === tempId ? { ...message, status: "sent" as const } : m
           );
 
           msgCache.set(communityId, next);
@@ -217,11 +227,8 @@ export function useSendMessage({
       } else {
         setMessages((prev) => {
           const next = prev.map((m) =>
-            m.id === tempId
-              ? { ...m, status: "failed" as const }
-              : m
+            m.id === tempId ? { ...m, status: "failed" as const } : m
           );
-
           msgCache.set(communityId, next);
           return next;
         });
@@ -229,20 +236,23 @@ export function useSendMessage({
         setError(data.error ?? "Failed to send.");
       }
     } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        // Cancelled by handleCancelSend — message already removed, no error shown
+        return;
+      }
       setMessages((prev) => {
         const next = prev.map((m) =>
-          m.id === tempId
-            ? { ...m, status: "failed" as const }
-            : m
+          m.id === tempId ? { ...m, status: "failed" as const } : m
         );
-
         msgCache.set(communityId, next);
         return next;
       });
-
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       setSending(false);
+      abortControllerRef.current = null;
+      // Revoke the blob URL now that upload is done (success, fail, or cancel)
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }
   }
 
@@ -260,6 +270,7 @@ export function useSendMessage({
     error,
     handleSend,
     handleKeyDown,
+    handleCancelSend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,

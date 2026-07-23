@@ -32,7 +32,10 @@ interface MessageListProps {
   loading: boolean;
   displayCommunity: Community | null;
   communityId: string;
+  highlightedMsgId: string | null;
   onMessagePress: (msg: CachedMessage) => void;
+  onReplyClick: (replyId: string) => void;
+  onCancelSend: (msgId: string) => void;
 }
 
 export function MessageList({
@@ -46,7 +49,10 @@ export function MessageList({
   loading,
   displayCommunity,
   communityId,
+  highlightedMsgId,
   onMessagePress,
+  onReplyClick,
+  onCancelSend,
 }: MessageListProps) {
   if (loading) {
     return (
@@ -63,12 +69,12 @@ export function MessageList({
 
   return (
     <div
-      className="min-h-full flex flex-col justify-end px-5 py-4 space-y-1"
+      className="min-h-full flex flex-col justify-end py-4 space-y-1"
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
       {/* Empty state */}
       {grouped.length === 0 && (
-        <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16">
+        <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
             {displayCommunity?.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -96,7 +102,7 @@ export function MessageList({
       {grouped.map((group) => (
         <div key={group.date}>
           {/* Date divider */}
-          <div className="flex items-center justify-center py-3">
+          <div className="flex items-center justify-center py-3 px-5">
             <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
               {group.date}
             </span>
@@ -121,7 +127,10 @@ export function MessageList({
                 isFirstUnread={isFirstUnread}
                 unreadDivider={dividerNode}
                 currentUserId={currentUserId}
+                highlighted={highlightedMsgId === msg.id}
                 onPress={onMessagePress}
+                onReplyClick={onReplyClick}
+                onCancelSend={onCancelSend}
               />
             );
           })}
