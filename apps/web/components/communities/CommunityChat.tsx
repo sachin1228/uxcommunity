@@ -13,6 +13,8 @@ import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
+import { TypingIndicator } from "./chat/TypingIndicator";
+import { useTypingPresence } from "./chat/useTypingPresence";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -171,6 +173,15 @@ export function CommunityChat({
     }
   }, [communityId, fetchMessages, setMessages]);
 
+  const currentUserName =
+    members.find((member) => member.user_id === currentUserId)?.users?.name ??
+    "Someone";
+  const { typingUsers, setTyping } = useTypingPresence({
+    communityId,
+    currentUserId,
+    currentUserName,
+  });
+
   // ── Scroll positioning + unread boundary ──────────────────────────────────
   const {
     bottomRef,
@@ -240,6 +251,31 @@ export function CommunityChat({
     replyTo,
     onClearReply: handleClearReply,
   });
+
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setInput(value);
+      setTyping(value.trim().length > 0);
+    },
+    [setInput, setTyping],
+  );
+
+  const handleInputBlur = useCallback(() => {
+    setTyping(false);
+  }, [setTyping]);
+
+  const handleInputSend = useCallback(() => {
+    setTyping(false);
+    void handleSend();
+  }, [handleSend, setTyping]);
+
+  const handleInputKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === "Enter" && !event.shiftKey) setTyping(false);
+      handleKeyDown(event);
+    },
+    [handleKeyDown, setTyping],
+  );
 
   // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
   // When the input area grows (reply bar, image preview), the scroll container
@@ -362,6 +398,7 @@ export function CommunityChat({
               </button>
             )}
 
+            <TypingIndicator users={typingUsers} />
             <ChatInput
               ref={inputRef}
               input={input}
@@ -370,9 +407,10 @@ export function CommunityChat({
               placeholder={`Message ${displayCommunity?.name ?? ""}…`}
               replyTo={replyTo}
               pendingImagePreview={pendingImagePreview}
-              onChange={setInput}
-              onKeyDown={handleKeyDown}
-              onSend={handleSend}
+              onChange={handleInputChange}
+              onKeyDown={handleInputKeyDown}
+              onSend={handleInputSend}
+              onBlur={handleInputBlur}
               onCancelReply={handleClearReply}
               onImageSelect={handleImageSelect}
               onImageRemove={handleImageClear}

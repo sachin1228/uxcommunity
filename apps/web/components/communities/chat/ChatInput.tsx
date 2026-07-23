@@ -17,6 +17,7 @@ interface ChatInputProps {
   onCancelReply: () => void;
   onImageSelect: (file: File) => void;
   onImageRemove: () => void;
+  onBlur?: () => void;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -25,7 +26,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       input, sending, error, placeholder, replyTo,
       pendingImagePreview,
       onChange, onKeyDown, onSend, onCancelReply,
-      onImageSelect, onImageRemove,
+      onImageSelect, onImageRemove, onBlur,
     },
     ref
   ) {
@@ -117,6 +118,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
             }}
             onKeyDown={onKeyDown}
+            onBlur={onBlur}
             placeholder={placeholder}
             rows={1}
             className="flex-1 resize-none bg-transparent font-body text-sm text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
