@@ -35,7 +35,7 @@ export async function sendPasswordResetEmail(
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background:#161413;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
@@ -97,7 +97,7 @@ export async function sendInvitationEmail(
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background:#161413;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
@@ -156,7 +156,7 @@ export async function sendWelcomeEmail(
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background:#161413;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
@@ -214,7 +214,7 @@ export async function sendRejectionEmail(
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
-<body style="margin:0;padding:0;background:#161413;font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">

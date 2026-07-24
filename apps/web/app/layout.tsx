@@ -1,23 +1,17 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Be_Vietnam_Pro, IBM_Plex_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@draft/shared";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
+const geist = Geist({
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-display",
 });
 
-const body = Be_Vietnam_Pro({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-body",
-});
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-mono",
 });
 
@@ -34,7 +28,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${body.variable} ${mono.variable}`}
+      className={`${geist.variable} ${geistMono.variable}`}
     >
       <body className="bg-background text-foreground antialiased">
         {children}
