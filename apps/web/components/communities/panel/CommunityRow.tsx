@@ -61,7 +61,7 @@ export function CommunityRow({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+        className={`w-full flex items-center gap-4 px-4 py-2.5 text-left transition-colors ${
           active
             ? "bg-accent/10 border-l-2 border-l-accent"
             : "hover:bg-surface-raised border-l-2 border-l-transparent"
@@ -77,7 +77,7 @@ export function CommunityRow({
         <div className="flex-1 min-w-0">
           {/* Community name + timestamp */}
           <div className="flex items-center justify-between gap-1 mb-0.5">
-            <span className="font-body text-[13px] font-medium truncate text-foreground">
+            <span className="font-body text-[14px] font-medium truncate text-foreground">
               {c.name}
             </span>
             {c.last_message && !typingText && (
@@ -91,13 +91,13 @@ export function CommunityRow({
           <div className="flex items-center gap-1.5">
             {typingText ? (
               /* Typing — highest priority */
-              <p className="font-body text-xs text-accent truncate flex-1 italic">
+              <p className="font-body text-[13px] text-accent truncate flex-1 italic">
                 {typingText}
               </p>
 
             ) : lastReaction ? (
               /* Reaction preview: "You reacted 👍 to: "message"" */
-              <p className="font-body text-xs text-foreground-muted truncate flex-1">
+              <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
                 {lastReaction.isOwn ? " reacted " : " reacted "}
                 <span>{lastReaction.emoji}</span>
@@ -108,7 +108,7 @@ export function CommunityRow({
             ) : preview ? (
               /* Standard message preview */
               <p
-                className={`font-body text-xs truncate flex-1 ${
+                className={`font-body text-[13px] truncate flex-1 ${
                   preview.italic
                     ? "text-foreground-muted/60 italic"
                     : "text-foreground-muted"
@@ -121,7 +121,7 @@ export function CommunityRow({
               </p>
 
             ) : (
-              <p className="font-body text-xs text-foreground-muted/60 italic flex-1">
+              <p className="font-body text-[13px] text-foreground-muted flex-1">
                 No messages yet
               </p>
             )}

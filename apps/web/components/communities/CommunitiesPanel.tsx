@@ -27,7 +27,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
   });
 
   return (
-    <div className="flex flex-col h-full w-72 shrink-0 border-r border-border bg-surface">
+    <div className="flex flex-col h-full w-80 shrink-0 border-r border-border bg-surface">
       <button
         onClick={() => router.push("/dashboard/communities")}
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors text-left ${
@@ -60,11 +60,11 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         ) : (
           <div className="py-0.5">
             <div className="px-3 pt-2 pb-0.5">
-              <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
                 All
               </span>
             </div>
-            <ul className="space-y-px">
+            <ul className="space-y-1">
               {sorted.map((c) => (
                 <CommunityRow
                   key={c.id}
