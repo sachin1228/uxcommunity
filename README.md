@@ -1,4 +1,4 @@
-# drafthub/ — a home for designer
+# drafthub/ — a home for designers
 
 A full-stack platform for UI/UX, product, and social media designers. Designers apply to join, admins review applications, approved members complete their profile and get access to a real-time community chat.
 

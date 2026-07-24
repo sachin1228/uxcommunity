@@ -378,6 +378,88 @@ export function useSendMessage({
     }
   }
 
+  /**
+   * Send a GIF or sticker directly from an external URL (GIPHY).
+   * No file upload needed — the URL is stored as image_url directly.
+   */
+  const handleGifSend = useCallback(async (gifUrl: string) => {
+    if (sending) return;
+    setSending(true);
+    setError(null);
+
+    const tempId = `temp-${Date.now()}`;
+
+    const optimistic: Message = {
+      id: tempId,
+      content: "",
+      created_at: new Date().toISOString(),
+      user_id: currentUserId,
+      users: null,
+      status: "sending",
+      reactions: [],
+      reply_to: null,
+      image_url: gifUrl,
+    };
+
+    setMessages((prev) => {
+      const next = [...prev, optimistic];
+      msgCache.set(communityId, next);
+      return next;
+    });
+
+    try {
+      const res = await fetch(`/api/communities/${communityId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "", image_url: gifUrl }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 201) {
+        setHideUnreadDivider(true);
+        const message = data.message;
+        if (!message) throw new Error("No message in response");
+
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === message.id)) {
+            const next = prev
+              .filter((m) => m.id !== tempId)
+              .map((m) => (m.id === message.id ? { ...message, status: "sent" as const } : m));
+            msgCache.set(communityId, next);
+            return next;
+          }
+          const next = prev.map((m) =>
+            m.id === tempId ? { ...message, status: "sent" as const } : m,
+          );
+          msgCache.set(communityId, next);
+          return next;
+        });
+      } else {
+        setMessages((prev) => {
+          const next = prev.map((m) =>
+            m.id === tempId ? { ...m, status: "failed" as const } : m,
+          );
+          msgCache.set(communityId, next);
+          return next;
+        });
+        setError((data as { error?: string }).error ?? "Failed to send.");
+      }
+    } catch {
+      setMessages((prev) => {
+        const next = prev.map((m) =>
+          m.id === tempId ? { ...m, status: "failed" as const } : m,
+        );
+        msgCache.set(communityId, next);
+        return next;
+      });
+      setError("Network error.");
+    } finally {
+      setSending(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId, currentUserId, sending, setMessages]);
+
   return {
     input,
     setInput,
@@ -387,6 +469,7 @@ export function useSendMessage({
     handleKeyDown,
     handleCancelSend,
     handleRetrySend,
+    handleGifSend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,

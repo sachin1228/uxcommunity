@@ -9,7 +9,7 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@draft/shared", "@draft/design-system"],
-  allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "127.0.0.1"],
+  allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],
   images: {
     // Allow Next.js <Image> to optimise images from Supabase storage and the
     // external avatar providers (DiceBear, Robohash, etc.).
@@ -33,6 +33,13 @@ const nextConfig = {
       { protocol: "https", hostname: "api.multiavatar.com" },
       // Boring Avatars CDN
       { protocol: "https", hostname: "source.boringavatars.com" },
+      // GIPHY CDN (for GIF and sticker messages)
+      { protocol: "https", hostname: "media.giphy.com" },
+      { protocol: "https", hostname: "media0.giphy.com" },
+      { protocol: "https", hostname: "media1.giphy.com" },
+      { protocol: "https", hostname: "media2.giphy.com" },
+      { protocol: "https", hostname: "media3.giphy.com" },
+      { protocol: "https", hostname: "media4.giphy.com" },
     ],
   },
 };

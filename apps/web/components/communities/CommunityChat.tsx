@@ -239,6 +239,7 @@ export function CommunityChat({
     handleKeyDown,
     handleCancelSend,
     handleRetrySend,
+    handleGifSend,
     inputRef,
     pendingImagePreview,
     handleImageSelect,
@@ -251,6 +252,28 @@ export function CommunityChat({
     replyTo,
     onClearReply: handleClearReply,
   });
+
+  // Insert emoji at the cursor position in the textarea
+  const handleEmojiSelect = useCallback(
+    (emoji: string) => {
+      const textarea = inputRef.current;
+      if (textarea) {
+        const start = textarea.selectionStart ?? input.length;
+        const end   = textarea.selectionEnd   ?? input.length;
+        const next  = input.slice(0, start) + emoji + input.slice(end);
+        setInput(next);
+        // Restore cursor after the inserted emoji
+        requestAnimationFrame(() => {
+          textarea.selectionStart = start + emoji.length;
+          textarea.selectionEnd   = start + emoji.length;
+          textarea.focus();
+        });
+      } else {
+        setInput((prev) => prev + emoji);
+      }
+    },
+    [input, inputRef, setInput],
+  );
 
   const handleInputChange = useCallback(
     (value: string) => {
@@ -414,6 +437,8 @@ export function CommunityChat({
               onCancelReply={handleClearReply}
               onImageSelect={handleImageSelect}
               onImageRemove={handleImageClear}
+              onEmojiSelect={handleEmojiSelect}
+              onGifSelect={handleGifSend}
             />
           </div>
 

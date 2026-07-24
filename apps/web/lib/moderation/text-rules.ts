@@ -49,7 +49,8 @@ export function moderateWithLocalTextRules(input: TextModerationInput): Moderati
   if (raw.length > config.text.maxLength) return emptyDecision("rejected", "Text exceeds maximum length.");
 
   const normalized = normalizeText(raw);
-  if (!normalized) return emptyDecision("rejected", "Text cannot be empty.");
+  // If raw has content but normalizes to empty, the message is emoji/symbol-only — allow it.
+  if (!normalized) return emptyDecision("approved", "");
 
   const hits: RuleHit[] = [];
   const scores: Record<string, number> = {};
