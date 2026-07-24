@@ -10,7 +10,7 @@ export default async function CommunitiesLayout({
   const userId = (session as { userId?: string } | null)?.userId ?? "";
 
   return (
-    <div className="-mx-8 -my-8 flex overflow-hidden" style={{ height: "calc(100vh - 57px)" }}>
+    <div className="-mx-8 -my-8 flex overflow-hidden" style={{ height: "calc(100vh - 48px)" }}>
       <CommunitiesPanel userId={userId} />
       <div className="flex-1 flex flex-col overflow-hidden">
         {children}

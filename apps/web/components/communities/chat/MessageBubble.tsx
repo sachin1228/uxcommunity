@@ -450,7 +450,7 @@ function MessageHoverActions({
             </span>
 
             <div
-              className="overflow-hidden rounded-xl border border-white/[0.1] bg-[#1c1c1e]/85 backdrop-blur-md shadow-2xl"
+              className="overflow-hidden rounded-xl border border-white/[0.1] bg-surface-raised shadow-2xl"
               role="menu"
             >
               <button
