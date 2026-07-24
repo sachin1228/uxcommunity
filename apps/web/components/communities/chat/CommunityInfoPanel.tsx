@@ -25,7 +25,7 @@ const STATIC_ABOUT = {
     "A community for designers working at Amazon across India to connect, share, and grow together.",
   location: "Pune, India",
   createdAt: "23 May 2024",
-  tags: ["Design", "Amazon", "Product Design", "+2"],
+  tags: ["Design", "Amazon", "Product Design"],
 };
 
 const STATIC_EVENT = {

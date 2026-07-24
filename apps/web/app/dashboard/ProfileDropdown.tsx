@@ -50,13 +50,13 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
       {/* Avatar trigger */}
       <button
         onClick={() => setOpen((v) => !v)}
-        className="h-8 w-8 rounded-full overflow-hidden shrink-0 focus:outline-none ring-2 ring-transparent hover:ring-accent/40 transition-all"
+        className="h-7 w-7 rounded-full overflow-hidden shrink-0 focus:outline-none ring-2 ring-transparent hover:ring-accent/40 transition-all"
         aria-label="Profile menu"
       >
         {avatarUrl ? (
-          <AvatarImg url={avatarUrl} name={name} size={32} className="h-8 w-8 rounded-full object-cover" />
+          <AvatarImg url={avatarUrl} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
         ) : (
-          <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center select-none">
+          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center select-none">
             <span className="font-display text-xs font-semibold text-accent-foreground">
               {initial}
             </span>

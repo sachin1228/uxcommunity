@@ -33,7 +33,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors text-left ${
           pathname === "/dashboard/communities"
             ? "bg-accent/10 text-accent"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            : "text-foreground-muted hover:text-foreground bg-surface-raised hover:bg-surface-raised-hover"
         }`}
       >
         <Search size={13} />
@@ -64,7 +64,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                 All
               </span>
             </div>
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {sorted.map((c) => (
                 <CommunityRow
                   key={c.id}

@@ -38,19 +38,19 @@ export default async function DashboardLayout({
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       {/* Full-width topbar */}
-      <header className="sticky top-0 z-20 flex h-[52px] items-center border-b border-border px-5 shrink-0">
+      <header className="sticky top-0 z-20 flex h-12 items-center border-b border-border px-4 shrink-0">
         {/* Nav items — left */}
         <DashboardTopNav />
 
         {/* Right side */}
-        <div className="ml-auto flex items-center gap-1">
-          <button className="flex items-center justify-center w-8 h-8 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors" aria-label="Direct messages">
-            <MessageCircle size={18} />
+        <div className="ml-auto flex items-center gap-0.5">
+          <button className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors" aria-label="Direct messages">
+            <MessageCircle size={16} />
           </button>
-          <button className="flex items-center justify-center w-8 h-8 rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors" aria-label="Notifications">
-            <Bell size={18} />
+          <button className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors" aria-label="Notifications">
+            <Bell size={16} />
           </button>
-          <div className="mx-1 h-5 w-px bg-border shrink-0" />
+          <div className="mx-1 h-4 w-px bg-border shrink-0" />
           <ProfileDropdown
             name={name}
             email={email}

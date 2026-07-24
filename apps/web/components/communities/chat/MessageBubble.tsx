@@ -35,6 +35,8 @@ const REACTIONS = [
   { emoji: "🔥", label: "Fire",    bg: "bg-blue-500"   },
 ];
 
+const EMOJI_MESSAGE_SIZE = 32;
+
 function ReplyBubble({
   reply,
   isMe,
@@ -725,7 +727,7 @@ export function MessageBubble({
                   />
                   <div className="relative">
                     <div className="flex flex-col items-end select-none">
-                      <span style={{ fontSize: 52, lineHeight: 1.1 }}>{msg.content}</span>
+                      <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
                       <div className="flex items-center gap-1 mt-0.5">
                         <span className="font-mono text-[10px] text-foreground-muted/70">
                           {fmtTime(msg.created_at)}
@@ -865,7 +867,7 @@ export function MessageBubble({
             <div className="group flex items-center gap-1">
               <div className="relative">
                 <div className="flex flex-col items-start select-none">
-                  <span style={{ fontSize: 52, lineHeight: 1.1 }}>{msg.content}</span>
+                  <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
                   <span className="font-mono text-[10px] text-foreground-muted/70 mt-0.5">
                     {fmtTime(msg.created_at)}
                   </span>
