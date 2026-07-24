@@ -1,9 +1,10 @@
 "use client";
 
 import { forwardRef, useRef, useState, useEffect } from "react";
-import { X, CornerUpLeft, ImageIcon, Smile } from "lucide-react";
+import { X, CornerUpLeft, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
+import { LinkPreview } from "./LinkPreview";
 
 interface ChatInputProps {
   input: string;
@@ -12,6 +13,8 @@ interface ChatInputProps {
   placeholder: string;
   replyTo: ReplyPreview | null;
   pendingImagePreview: string | null;
+  /** First URL detected in the current input, or null. */
+  linkPreviewUrl?: string | null;
   onChange: (value: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSend: () => void;
@@ -27,7 +30,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
       input, sending, error, placeholder, replyTo,
-      pendingImagePreview,
+      pendingImagePreview, linkPreviewUrl,
       onChange, onKeyDown, onSend, onCancelReply,
       onImageSelect, onImageRemove, onBlur,
       onEmojiSelect, onGifSelect,
@@ -37,7 +40,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const fileInputRef = useRef<HTMLInputElement>(null);
     const pickerContainerRef = useRef<HTMLDivElement>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
     const canSend = !!input.trim() || !!pendingImagePreview;
+
+    // Reset dismissed state whenever the URL changes to something new
+    useEffect(() => {
+      if (dismissedUrl && linkPreviewUrl !== dismissedUrl) {
+        setDismissedUrl(null);
+      }
+    }, [linkPreviewUrl, dismissedUrl]);
+
+    const showLinkPreview =
+      !!linkPreviewUrl && linkPreviewUrl !== dismissedUrl;
 
     // Close picker when clicking outside
     useEffect(() => {
@@ -121,6 +135,27 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             >
               <X size={14} />
             </button>
+          </div>
+        )}
+
+        {/* Link preview bar — shown while composing if a URL is detected */}
+        {showLinkPreview && (
+          <div className="relative mb-1">
+            {/* Header row: link icon + domain label + dismiss */}
+            <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
+              <Link size={11} className="text-foreground-muted/60 shrink-0" />
+              <p className="font-body text-[10px] text-foreground-muted/70 truncate flex-1">
+                {(() => { try { return new URL(linkPreviewUrl!).hostname.replace(/^www\./, ""); } catch { return linkPreviewUrl; } })()}
+              </p>
+              <button
+                onClick={() => setDismissedUrl(linkPreviewUrl!)}
+                className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-surface"
+                aria-label="Dismiss link preview"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <LinkPreview url={linkPreviewUrl!} isMe={false} />
           </div>
         )}
 

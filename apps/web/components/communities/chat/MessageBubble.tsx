@@ -5,6 +5,8 @@ import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, Chevr
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import { LinkPreview } from "./LinkPreview";
+import { extractFirstUrl } from "@/lib/communities/linkPreview";
 
 type MenuPlacement = "above" | "below";
 
@@ -503,6 +505,63 @@ function MessageHoverActions({
   );
 }
 
+/**
+ * Renders message text with URLs converted to clickable anchors.
+ * Shows a WhatsApp-style link-preview card for the first URL found.
+ * Only rendered for non-deleted, non-pending messages.
+ */
+function MessageContent({
+  content,
+  isMe,
+  showPreview,
+}: {
+  content: string;
+  isMe: boolean;
+  showPreview: boolean;
+}) {
+  const previewUrl = showPreview ? extractFirstUrl(content) : null;
+
+  // Split text on URLs so we can wrap each URL in an <a>.
+  const URL_RE = /https?:\/\/[^\s<>"'()[\]{}]+/gi;
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(content)) !== null) {
+    const url = m[0].replace(/[.,;:!?)]+$/, "");
+    if (m.index > last) parts.push(content.slice(last, m.index));
+    parts.push(
+      <a
+        key={m.index}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className={`underline underline-offset-2 break-all ${
+          isMe ? "text-accent-foreground/90 hover:text-accent-foreground" : "text-foreground hover:opacity-80"
+        }`}
+      >
+        {url}
+      </a>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < content.length) parts.push(content.slice(last));
+
+  return (
+    <>
+      <p
+        className={`font-body text-sm whitespace-pre-wrap break-words ${
+          isMe ? "text-accent-foreground" : "text-foreground"
+        }`}
+      >
+        {parts}
+      </p>
+      {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
+    </>
+  );
+}
+
 /** Placeholder shown for soft-deleted messages. */
 function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
   return (
@@ -624,9 +683,11 @@ export function MessageBubble({
                         />
                       )}
                       {msg.content && (
-                        <p className="font-body text-sm text-accent-foreground whitespace-pre-wrap break-words">
-                          {msg.content}
-                        </p>
+                        <MessageContent
+                          content={msg.content}
+                          isMe={true}
+                          showPreview={msg.status !== "failed"}
+                        />
                       )}
                       <div className="flex items-center justify-end gap-1 mt-1">
                         <span className="font-mono text-[10px] text-accent-foreground/60">
@@ -716,9 +777,11 @@ export function MessageBubble({
                     />
                   )}
                   {msg.content && (
-                    <p className="font-body text-sm text-foreground whitespace-pre-wrap break-words">
-                      {msg.content}
-                    </p>
+                    <MessageContent
+                      content={msg.content}
+                      isMe={false}
+                      showPreview={true}
+                    />
                   )}
                   <p className="font-mono text-[10px] text-foreground-muted text-right mt-1">
                     {fmtTime(msg.created_at)}

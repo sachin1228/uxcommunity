@@ -15,6 +15,7 @@ import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { useTypingPresence } from "./chat/useTypingPresence";
+import { extractFirstUrl } from "@/lib/communities/linkPreview";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -430,6 +431,7 @@ export function CommunityChat({
               placeholder={`Message ${displayCommunity?.name ?? ""}…`}
               replyTo={replyTo}
               pendingImagePreview={pendingImagePreview}
+              linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
               onChange={handleInputChange}
               onKeyDown={handleInputKeyDown}
               onSend={handleInputSend}
