@@ -10,6 +10,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
     communities,
     loading,
     activeCommunityId,
+    typingMap,
     handleNavigate,
     onEnter,
     onLeave,
@@ -69,6 +70,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                   key={c.id}
                   c={c}
                   active={c.id === activeCommunityId}
+                  typingText={typingMap.get(c.id)}
                   onClick={() => handleNavigate(c.id)}
                   onMouseEnter={() => onEnter(c.id)}
                   onMouseLeave={onLeave}

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import {
   sidebarStore,
   SIDEBAR_STALE_MS,
@@ -12,6 +11,8 @@ import {
 } from "@/lib/communities/cache";
 import { usePrefetch } from "./usePrefetch";
 import { markReadOnServer } from "./markReadOnServer";
+import { useSidebarRealtime } from "./useSidebarRealtime";
+import { useSidebarTyping } from "./useSidebarTyping";
 
 type Community = CachedSidebarCommunity;
 
@@ -174,81 +175,9 @@ export function useSidebarCommunities(userId: string) {
     });
   }, [activeCommunityId]);
 
-  // ── Realtime subscriptions — one channel per joined community ────────────
-  const communityIds = [...communities].map((c) => c.id).sort().join(",");
-  useEffect(() => {
-    if (!communities.length) return;
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
-
-    const channels = communities.map((comm) =>
-      supabase
-        .channel(`panel:${comm.id}`)
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "community_messages",
-            filter: `community_id=eq.${comm.id}`,
-          },
-          (payload) => {
-            const row = payload.new as {
-              id: string;
-              community_id: string;
-              content: string;
-              created_at: string;
-              user_id: string;
-            };
-            const isOwn    = row.user_id === userId;
-            const isActive = row.community_id === activeCommunityIdRef.current;
-
-            setCommunities((prev) => {
-              const updated = prev.map((c) =>
-                c.id === row.community_id
-                  ? {
-                      ...c,
-                      last_message: {
-                        content: row.content,
-                        created_at: row.created_at,
-                        user: c.last_message?.user ?? null,
-                      },
-                      message_count:
-                        !isOwn && !isActive
-                          ? c.message_count + 1
-                          : c.message_count,
-                    }
-                  : c
-              );
-              if (sidebarStore.data) {
-                const storeById = new Map(
-                  sidebarStore.data.communities.map((c) => [c.id, c])
-                );
-                sidebarStore.data = {
-                  ...sidebarStore.data,
-                  communities: updated.map((c) => ({
-                    ...c,
-                    last_read_at:
-                      storeById.get(c.id)?.last_read_at ?? c.last_read_at,
-                  })),
-                };
-              }
-              return updated;
-            });
-          }
-        )
-        .subscribe()
-    );
-
-    return () => {
-      channels.forEach((ch) => supabase.removeChannel(ch));
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId]);
+  // ── Realtime: message changes + typing indicators ────────────────────────
+  useSidebarRealtime({ communities, userId, activeCommunityIdRef, setCommunities });
+  const typingMap = useSidebarTyping({ communities, userId });
 
   // ── Navigation handler ────────────────────────────────────────────────────
   function handleNavigate(id: string) {
@@ -295,6 +224,7 @@ export function useSidebarCommunities(userId: string) {
     communities,
     loading,
     activeCommunityId,
+    typingMap,
     handleNavigate,
     onEnter,
     onLeave,

@@ -1,0 +1,47 @@
+11:25:57.784 Running build in Washington, D.C., USA (East) – iad1
+11:25:57.785 Build machine configuration: 2 cores, 8 GB
+11:25:57.907 Cloning github.com/sachin1228/designhub (Branch: feature/community-sidebar-realtime, Commit: 370a99f)
+11:25:59.139 Cloning completed: 1.232s
+11:25:59.276 Restored build cache from previous deployment (FyDuc9yqr4YYju6hkEFbAenuehPd)
+11:25:59.489 Running "vercel build"
+11:25:59.506 Vercel CLI 56.5.0
+11:26:00.726 Installing dependencies...
+11:26:02.227 
+11:26:02.227 changed 2 packages in 1s
+11:26:02.227 
+11:26:02.228 173 packages are looking for funding
+11:26:02.228   run `npm fund` for details
+11:26:02.258 Detected Next.js version: 16.2.11
+11:26:02.271 Running "npm run build"
+11:26:02.410 
+11:26:02.410 > web@0.1.0 build
+11:26:02.411 > next build
+11:26:02.411 
+11:26:03.032   Applying modifyConfig from Vercel
+11:26:03.104 ▲ Next.js 16.2.11 (Turbopack)
+11:26:03.104 
+11:26:03.113 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+11:26:03.154   Creating an optimized production build ...
+11:26:21.312 ✓ Compiled successfully in 17.8s
+11:26:21.317   Running TypeScript ...
+11:26:33.347 Failed to type check.
+11:26:33.348 
+11:26:33.349 ./app/api/communities/route.ts:121:27
+11:26:33.349 Type error: Property 'id' does not exist on type '{ community_id: string; content: string; created_at: string; user_id: string; }'.
+11:26:33.349 
+11:26:33.349   119 |         last_message: lastMsg
+11:26:33.349   120 |           ? {
+11:26:33.350 > 121 |               id: lastMsg.id,
+11:26:33.350       |                           ^
+11:26:33.350   122 |               content: lastMsg.content,
+11:26:33.350   123 |               created_at: lastMsg.created_at,
+11:26:33.350   124 |               user: { name: senderMap[lastMsg.user_id] ?? "Unknown" },
+11:26:33.437 Next.js build worker exited with code: 1 and signal: null
+11:26:33.485 npm error Lifecycle script `build` failed with error:
+11:26:33.487 npm error code 1
+11:26:33.488 npm error path /vercel/path0/apps/web
+11:26:33.489 npm error workspace web@0.1.0
+11:26:33.489 npm error location /vercel/path0/apps/web
+11:26:33.489 npm error command failed
+11:26:33.489 npm error command sh -c next build
+11:26:33.521 Error: Command "npm run build" exited with 1
