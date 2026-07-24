@@ -162,7 +162,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {/* Picker popup — full width, anchored above the input row */}
         <div className="relative" ref={pickerContainerRef}>
           {pickerOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <div className="absolute bottom-full left-0 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
               <EmojiGifPicker
                 onEmojiSelect={handleEmojiSelect}
                 onGifSelect={handleGifSelect}
@@ -223,13 +223,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               onBlur={onBlur}
               placeholder={placeholder}
               rows={1}
-              className="flex-1 resize-none bg-transparent font-body text-sm text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
+              className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
               style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
             />
 
             {canSend && (
               <button
-                onClick={onSend}
+                onClick={() => { setPickerOpen(false); onSend(); }}
                 disabled={sending}
                 className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                 aria-label="Send"

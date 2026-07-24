@@ -506,7 +506,41 @@ function MessageHoverActions({
 }
 
 /**
- * Renders message text with URLs converted to clickable anchors.
+ * Splits a plain text chunk into alternating text/emoji nodes so emoji
+ * glyphs can be rendered at a larger size than the surrounding text,
+ * matching WhatsApp's mixed-content style.
+ */
+function renderTextWithEmoji(text: string, key: string | number): React.ReactNode {
+  const EMOJI_CLUSTER =
+    /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
+
+  const segments: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  EMOJI_CLUSTER.lastIndex = 0;
+
+  while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
+    if (m.index > last) segments.push(text.slice(last, m.index));
+    segments.push(
+      <span
+        key={`e-${m.index}`}
+        style={{ fontSize: "1.35em", lineHeight: 1, verticalAlign: "-0.15em", display: "inline-block" }}
+      >
+        {m[0]}
+      </span>,
+    );
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push(text.slice(last));
+
+  // If no emoji was found just return the string (avoids wrapping in a Fragment).
+  if (segments.length === 1 && typeof segments[0] === "string") return segments[0];
+  return <Fragment key={key}>{segments}</Fragment>;
+}
+
+/**
+ * Renders message text with URLs converted to clickable anchors and emoji
+ * glyphs enlarged to WhatsApp-style proportions.
  * Shows a WhatsApp-style link-preview card for the first URL found.
  * Only rendered for non-deleted, non-pending messages.
  */
@@ -529,7 +563,8 @@ function MessageContent({
   URL_RE.lastIndex = 0;
   while ((m = URL_RE.exec(content)) !== null) {
     const url = m[0].replace(/[.,;:!?)]+$/, "");
-    if (m.index > last) parts.push(content.slice(last, m.index));
+    // Enlarge emoji in the plain-text segment before this URL.
+    if (m.index > last) parts.push(renderTextWithEmoji(content.slice(last, m.index), last));
     parts.push(
       <a
         key={m.index}
@@ -546,7 +581,8 @@ function MessageContent({
     );
     last = m.index + m[0].length;
   }
-  if (last < content.length) parts.push(content.slice(last));
+  // Enlarge emoji in the trailing plain-text segment.
+  if (last < content.length) parts.push(renderTextWithEmoji(content.slice(last), last));
 
   return (
     <>
@@ -560,6 +596,26 @@ function MessageContent({
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );
+}
+
+/**
+ * Returns true when the entire message text is 1–3 emoji with no other content.
+ * Handles ZWJ sequences, skin-tone modifiers, variation selectors, and keycap combiners.
+ */
+function isEmojiOnly(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // Each "cluster" is one rendered emoji glyph, including ZWJ chains like 👨‍👩‍👧.
+  const EMOJI_CLUSTER =
+    /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
+
+  const clusters = [...trimmed.matchAll(EMOJI_CLUSTER)];
+  if (clusters.length === 0 || clusters.length > 3) return false;
+
+  // After stripping matched clusters and whitespace, nothing should be left.
+  const remainder = trimmed.replace(EMOJI_CLUSTER, "").replace(/\s/g, "");
+  return remainder.length === 0;
 }
 
 /** Placeholder shown for soft-deleted messages. */
@@ -610,6 +666,14 @@ export function MessageBubble({
   const failed    = msg.status === "failed";
   const isDeleted = !!msg.deleted_at;
 
+  // Show as a large bubble-free emoji when the entire message is 1–3 emoji glyphs.
+  const isEmojiMsg =
+    !isDeleted &&
+    !imageUrl &&
+    !replyTo &&
+    !!msg.content &&
+    isEmojiOnly(msg.content);
+
   const rowHighlight = highlighted ? "bg-black/60" : "";
 
   const handleDeleteConfirm = () => {
@@ -643,6 +707,42 @@ export function MessageBubble({
                 /* Deleted placeholder — no hover actions */
                 <div className="flex justify-end">
                   <DeletedBubble isMe createdAt={msg.created_at} />
+                </div>
+              ) : isEmojiMsg ? (
+                /* ── Big emoji (WhatsApp-style) — no bubble background ── */
+                <div className="group flex items-center gap-1 justify-end">
+                  <MessageHoverActions
+                    msg={msg}
+                    isMe
+                    isDeleted={isDeleted}
+                    currentUserId={currentUserId}
+                    onReaction={onReaction}
+                    onReply={onReply}
+                    onCopy={onCopy}
+                    onDeleteClick={() => setDeleteConfirmOpen(true)}
+                    menuOpen={menuOpen}
+                    onMenuOpenChange={setMenuOpen}
+                  />
+                  <div className="relative">
+                    <div className="flex flex-col items-end select-none">
+                      <span style={{ fontSize: 52, lineHeight: 1.1 }}>{msg.content}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="font-mono text-[10px] text-foreground-muted/70">
+                          {fmtTime(msg.created_at)}
+                        </span>
+                        {msg.status === "sending" && (
+                          <Clock size={10} className="text-foreground-muted/60 animate-pulse" />
+                        )}
+                        {(msg.status === "sent" || !msg.status) && (
+                          <CheckCheck size={11} className="text-foreground-muted/70" />
+                        )}
+                        {msg.status === "failed" && (
+                          <span className="text-[10px] text-red-400">!</span>
+                        )}
+                      </div>
+                    </div>
+                    <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe msgId={msg.id} onReaction={onReaction} />
+                  </div>
                 </div>
               ) : (
                 /* group scoped here — hover only triggers on [actions + bubble], not the full row */
@@ -760,6 +860,31 @@ export function MessageBubble({
 
           {isDeleted ? (
             <DeletedBubble isMe={false} createdAt={msg.created_at} />
+          ) : isEmojiMsg ? (
+            /* ── Big emoji (WhatsApp-style) — no bubble background ── */
+            <div className="group flex items-center gap-1">
+              <div className="relative">
+                <div className="flex flex-col items-start select-none">
+                  <span style={{ fontSize: 52, lineHeight: 1.1 }}>{msg.content}</span>
+                  <span className="font-mono text-[10px] text-foreground-muted/70 mt-0.5">
+                    {fmtTime(msg.created_at)}
+                  </span>
+                </div>
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={false} msgId={msg.id} onReaction={onReaction} />
+              </div>
+              <MessageHoverActions
+                msg={msg}
+                isMe={false}
+                isDeleted={isDeleted}
+                currentUserId={currentUserId}
+                onReaction={onReaction}
+                onReply={onReply}
+                onCopy={onCopy}
+                onDeleteClick={() => setDeleteConfirmOpen(true)}
+                menuOpen={menuOpen}
+                onMenuOpenChange={setMenuOpen}
+              />
+            </div>
           ) : (
             /* group scoped here — hover only triggers on [bubble + actions], not the full row */
             <div className="group flex items-center gap-1">

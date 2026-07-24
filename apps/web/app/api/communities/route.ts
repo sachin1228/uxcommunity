@@ -70,10 +70,46 @@ export async function GET() {
 
   // 5. Batch-fetch sender names for last messages (1 query instead of N)
   const senderIds = [...new Set(Object.values(lastMsgByComm).map((m) => m.user_id))];
-  const { data: senderUsers } = senderIds.length
-    ? await db.from("users").select("id, name").in("id", senderIds)
-    : { data: [] };
+
+  // 5b. Fetch the most recent reaction on each community's last message so
+  //     the sidebar can show "You reacted 🔥 to: …" after a page refresh.
+  const lastMsgIds = Object.values(lastMsgByComm).map((m) => m.id);
+  const [{ data: senderUsers }, { data: recentReactions }] = await Promise.all([
+    senderIds.length
+      ? db.from("users").select("id, name").in("id", senderIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    lastMsgIds.length
+      ? db
+          .from("message_reactions")
+          .select("message_id, user_id, emoji, created_at")
+          .in("message_id", lastMsgIds)
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string; created_at: string }[] }),
+  ]);
+
+  // Pick the most-recent reaction per last message
+  const latestReactionByMsg: Record<string, { user_id: string; emoji: string }> = {};
+  for (const r of recentReactions ?? []) {
+    if (!latestReactionByMsg[r.message_id]) {
+      latestReactionByMsg[r.message_id] = { user_id: r.user_id, emoji: r.emoji };
+    }
+  }
+
+  // Fetch names for reactors not already in senderIds
+  const reactorIds = [
+    ...new Set(
+      Object.values(latestReactionByMsg)
+        .map((r) => r.user_id)
+        .filter((id) => !senderIds.includes(id)),
+    ),
+  ];
+  const { data: reactorUsers } = reactorIds.length
+    ? await db.from("users").select("id, name").in("id", reactorIds)
+    : { data: [] as { id: string; name: string }[] };
+
   const senderMap = Object.fromEntries((senderUsers ?? []).map((u) => [u.id, u.name]));
+  // Merge reactor names into senderMap for convenient lookup
+  for (const u of reactorUsers ?? []) senderMap[u.id] = u.name;
 
   // 6. Resolve image_url from cached master tables (zero DB round-trip on warm cache).
   const byType: Record<string, { id: string; reference_id: string }[]> = {};
@@ -110,6 +146,23 @@ export async function GET() {
     .filter((c) => validCommunityIds.has(c.id))
     .map((c) => {
       const lastMsg = lastMsgByComm[c.id] ?? null;
+      const latestReaction = lastMsg ? latestReactionByMsg[lastMsg.id] : undefined;
+
+      // Reconstruct the sidebar lastReaction preview so it survives page refresh.
+      const lastReaction = latestReaction
+        ? {
+            emoji: latestReaction.emoji,
+            firstName:
+              latestReaction.user_id === userId
+                ? "You"
+                : (senderMap[latestReaction.user_id]?.split(" ")[0] ?? "Someone"),
+            isOwn: latestReaction.user_id === userId,
+            messagePreview: lastMsg?.content
+              ? `"${lastMsg.content.slice(0, 40)}${lastMsg.content.length > 40 ? "…" : ""}"`
+              : "📷 Photo",
+          }
+        : null;
+
       return {
         ...c,
         image_url: masterImageMap[c.id] ?? c.image_url ?? null,
@@ -124,6 +177,7 @@ export async function GET() {
               user: { name: senderMap[lastMsg.user_id] ?? "Unknown" },
             }
           : null,
+        lastReaction,
       };
     })
     .sort((a, b) => {

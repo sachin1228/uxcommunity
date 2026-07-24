@@ -159,8 +159,8 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
 
   return (
     <div
-      className="flex flex-col w-full bg-surface border border-border rounded-xl overflow-hidden shadow-md"
-      style={{ height: 340 }}
+      className="flex flex-col bg-surface border border-border rounded-xl overflow-hidden shadow-md"
+      style={{ height: 440, width: 340 }}
     >
       {/* ── Content ── */}
       <div className="flex-1 min-h-0">
