@@ -6,50 +6,24 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 
 const TYPING_IDLE_MS = 1600;
 const TYPING_EXPIRY_MS = 3500;
-const TYPING_HEARTBEAT_MS = 1000;
+const TYPING_THROTTLE_MS = 1000;
 
 export interface TypingUser {
   id: string;
   name: string;
 }
 
-interface TypingPresence {
-  user_id?: unknown;
-  name?: unknown;
-  typing?: unknown;
-  last_seen?: unknown;
-}
-
-function readTypingUsers(
-  channel: RealtimeChannel,
-  currentUserId: string,
-): TypingUser[] {
-  const state = channel.presenceState() as Record<string, TypingPresence[]>;
-  const users = new Map<string, TypingUser>();
-  const now = Date.now();
-
-  for (const presences of Object.values(state)) {
-    for (const presence of presences) {
-      const id = typeof presence.user_id === "string" ? presence.user_id : "";
-      if (!id || id === currentUserId || presence.typing !== true) continue;
-
-      const lastSeen =
-        typeof presence.last_seen === "number" ? presence.last_seen : 0;
-      if (now - lastSeen > TYPING_EXPIRY_MS) continue;
-
-      const name = typeof presence.name === "string" ? presence.name : "Someone";
-      if (!users.has(id)) users.set(id, { id, name });
-    }
-  }
-
-  return [...users.values()].sort((a, b) => a.name.localeCompare(b.name));
-}
-
 /**
- * Publishes ephemeral typing state over Supabase Presence.
+ * Broadcasts ephemeral typing state over Supabase Broadcast.
  *
- * Typing is deliberately not persisted or sent through the messages API:
- * it is a short-lived UI signal and expires locally if a client disappears.
+ * Broadcast is used instead of Presence because Presence relies on a stateful
+ * channel state machine that silently stops accepting `track()` calls after the
+ * channel has been idle for a while (requires a full page refresh to recover).
+ * Broadcast is a simple fire-and-forget event bus with no persistent state,
+ * making it immune to that class of drift/reconnect bugs.
+ *
+ * Each typing user is tracked locally with a `lastSeen` timestamp; the expiry
+ * timer removes anyone who hasn't sent a heartbeat in TYPING_EXPIRY_MS ms.
  */
 export function useTypingPresence({
   communityId,
@@ -64,60 +38,87 @@ export function useTypingPresence({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const typingRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPublishedTypingRef = useRef<boolean | null>(null);
-  const lastPublishedAtRef = useRef(0);
+  // Tracks when we last broadcast a "typing: true" so we can throttle heartbeats
+  const lastSentAtRef = useRef(0);
   const identityRef = useRef({ user_id: currentUserId, name: currentUserName });
   identityRef.current = { user_id: currentUserId, name: currentUserName };
 
-  const refreshTypingUsers = useCallback(
-    (channel: RealtimeChannel) => {
-      setTypingUsers(readTypingUsers(channel, currentUserId));
-    },
-    [currentUserId],
+  // Local map: user_id → { name, lastSeen }
+  // Managed entirely on the client — no dependency on Supabase's presence state.
+  const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(
+    new Map(),
   );
 
-  const publishTyping = useCallback((typing: boolean) => {
-    const channel = channelRef.current;
-    if (!channel) return;
-
+  /** Expire stale entries and push the updated list into React state. */
+  const flushTypingUsers = useCallback(() => {
     const now = Date.now();
-    const shouldThrottle =
-      typing &&
-      lastPublishedTypingRef.current === true &&
-      now - lastPublishedAtRef.current < TYPING_HEARTBEAT_MS;
-    if (!shouldThrottle && lastPublishedTypingRef.current !== typing) {
-      lastPublishedTypingRef.current = typing;
-      lastPublishedAtRef.current = now;
-      void channel.track({
-        ...identityRef.current,
-        typing,
-        last_seen: now,
-      });
-    } else if (typing && !shouldThrottle) {
-      lastPublishedAtRef.current = now;
-      void channel.track({
-        ...identityRef.current,
-        typing: true,
-        last_seen: now,
-      });
+    let changed = false;
+    for (const [id, entry] of typingMapRef.current.entries()) {
+      if (now - entry.lastSeen > TYPING_EXPIRY_MS) {
+        typingMapRef.current.delete(id);
+        changed = true;
+      }
+    }
+    // Always call setTypingUsers on expiry runs so the UI stays correct even
+    // if a broadcast "stop typing" message was missed (e.g. the sender closed
+    // their tab mid-session).
+    if (changed || true) {
+      const users = [...typingMapRef.current.entries()]
+        .map(([id, { name }]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setTypingUsers(users);
     }
   }, []);
+
+  /**
+   * Send a broadcast typing event.
+   *
+   * - State transitions (false→true, true→false) are always sent immediately.
+   * - Repeated "still typing" heartbeats are throttled to once per TYPING_THROTTLE_MS.
+   * - Resetting lastSentAtRef to 0 on "stopped typing" ensures the very next
+   *   "started typing" event is never accidentally throttled.
+   */
+  const broadcast = useCallback(
+    (typing: boolean) => {
+      const channel = channelRef.current;
+      if (!channel) return;
+
+      const now = Date.now();
+
+      // Only throttle repeated heartbeats while still typing
+      if (typing && now - lastSentAtRef.current < TYPING_THROTTLE_MS) return;
+
+      // Reset to 0 when stopped so the next "typing: true" is never throttled
+      lastSentAtRef.current = typing ? now : 0;
+
+      void channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: {
+          ...identityRef.current,
+          typing,
+          ts: now,
+        },
+      });
+    },
+    [],
+  );
 
   const setTyping = useCallback(
     (typing: boolean) => {
       typingRef.current = typing;
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
 
-      publishTyping(typing);
+      broadcast(typing);
 
       if (typing) {
         idleTimerRef.current = setTimeout(() => {
           typingRef.current = false;
-          publishTyping(false);
+          broadcast(false);
         }, TYPING_IDLE_MS);
       }
     },
-    [publishTyping],
+    [broadcast],
   );
 
   useEffect(() => {
@@ -128,40 +129,57 @@ export function useTypingPresence({
       return;
     }
 
-    const channel = supabase.channel(`community-typing:${communityId}`);
+    typingMapRef.current.clear();
+    setTypingUsers([]);
+
+    const channel = supabase.channel(`community-typing:${communityId}`, {
+      config: {
+        broadcast: { ack: false, self: false },
+      },
+    });
     channelRef.current = channel;
-    lastPublishedTypingRef.current = null;
-    lastPublishedAtRef.current = 0;
+    lastSentAtRef.current = 0;
 
-    const refresh = () => refreshTypingUsers(channel);
     channel
-      .on("presence", { event: "sync" }, refresh)
-      .on("presence", { event: "join" }, refresh)
-      .on("presence", { event: "leave" }, refresh)
-      .subscribe(async (status) => {
-        if (status !== "SUBSCRIBED") return;
-        // Force the first publish for this channel even when the user was
-        // already typing before the subscription finished.
-        lastPublishedTypingRef.current = null;
-        lastPublishedAtRef.current = 0;
-        publishTyping(typingRef.current);
-        refresh();
-      });
+      .on(
+        "broadcast",
+        { event: "typing" },
+        ({ payload }: { payload: Record<string, unknown> }) => {
+          const userId =
+            typeof payload?.user_id === "string" ? payload.user_id : "";
+          const name =
+            typeof payload?.name === "string" ? payload.name : "Someone";
+          const typing = payload?.typing === true;
+          const ts =
+            typeof payload?.ts === "number" ? payload.ts : Date.now();
 
-    const expiryTimer = window.setInterval(refresh, 1000);
+          if (!userId || userId === currentUserId) return;
+
+          if (typing) {
+            typingMapRef.current.set(userId, { name, lastSeen: ts });
+          } else {
+            typingMapRef.current.delete(userId);
+          }
+          flushTypingUsers();
+        },
+      )
+      .subscribe();
+
+    // Sweep the local map every second to expire anyone who went silent
+    // without sending an explicit "typing: false" (e.g. closed the tab).
+    const expiryTimer = window.setInterval(flushTypingUsers, 1000);
 
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       typingRef.current = false;
       channelRef.current = null;
-      lastPublishedTypingRef.current = null;
-      lastPublishedAtRef.current = 0;
+      lastSentAtRef.current = 0;
       window.clearInterval(expiryTimer);
-      void channel.untrack();
+      typingMapRef.current.clear();
       supabase.removeChannel(channel);
       setTypingUsers([]);
     };
-  }, [communityId, publishTyping, refreshTypingUsers]);
+  }, [communityId, currentUserId, flushTypingUsers]);
 
   return { typingUsers, setTyping };
 }
