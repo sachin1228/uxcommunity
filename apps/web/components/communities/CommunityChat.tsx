@@ -7,7 +7,7 @@ import type { CachedMessage, CachedMeta, MessageReaction, ReplyPreview } from "@
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
-import { MembersPanel } from "./chat/MembersPanel";
+import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
@@ -372,10 +372,11 @@ export function CommunityChat({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <ChatHeader community={displayCommunity} />
+    <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ChatHeader community={displayCommunity} />
 
-      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Scrollable message area */}
           <div
@@ -445,9 +446,10 @@ export function CommunityChat({
           </div>
 
         </div>
-
-        <MembersPanel members={members} />
+        </div>
       </div>
+
+      <CommunityInfoPanel members={members} community={displayCommunity} />
     </div>
   );
 }

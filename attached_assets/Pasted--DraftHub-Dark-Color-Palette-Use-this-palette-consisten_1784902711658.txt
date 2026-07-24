@@ -1,0 +1,92 @@
+# DraftHub Dark Color Palette
+
+> Use this palette consistently across the entire application. The goal is a premium, modern dark UI with subtle elevation and low-contrast borders. Avoid pure black (#000000) and avoid high-contrast gray borders.
+
+---
+
+## Backgrounds
+
+| Token | Color | Usage |
+|-------|--------|------|
+| `--background` | `#09090B` | App background |
+| `--sidebar` | `#0E0E10` | Left & right sidebars |
+| `--surface` | `#121214` | Cards, panels |
+| `--surface-hover` | `#17171A` | Hover states |
+| `--surface-elevated` | `#1B1B1F` | Modals, dropdowns, popovers |
+| `--input-background` | `#151517` | Inputs & textareas |
+
+---
+
+## Borders
+
+Borders should be subtle and almost disappear into the background.
+
+| Token | Color | Usage |
+|-------|--------|------|
+| `--border-soft` | `#1D1D21` | Section dividers |
+| `--border` | `#252529` | Default borders |
+| `--border-strong` | `#2D2D34` | Active components |
+| `--input-border` | `#303036` | Input fields |
+
+Avoid thick or high-contrast borders.
+
+---
+
+## Navigation
+
+| Token | Color | Usage |
+|-------|--------|------|
+| `--nav-hover` | `#17171A` | Sidebar hover |
+| `--nav-active` | `#18243D` | Active navigation item |
+| `--nav-active-hover` | `#1D2A46` | Hovered active item |
+
+---
+
+## Buttons (Neutral)
+
+| Token | Color | Usage |
+|-------|--------|------|
+| `--button-secondary` | `#1A1A1E` | Secondary buttons |
+| `--button-secondary-hover` | `#232329` | Secondary hover |
+| `--button-secondary-active` | `#2A2A31` | Pressed state |
+
+---
+
+## Recommended CSS Variables
+
+```css
+:root {
+  /* Backgrounds */
+  --background: #09090B;
+  --sidebar: #0E0E10;
+  --surface: #121214;
+  --surface-hover: #17171A;
+  --surface-elevated: #1B1B1F;
+  --input-background: #151517;
+
+  /* Borders */
+  --border-soft: #1D1D21;
+  --border: #252529;
+  --border-strong: #2D2D34;
+  --input-border: #303036;
+
+  /* Navigation */
+  --nav-hover: #17171A;
+  --nav-active: #18243D;
+  --nav-active-hover: #1D2A46;
+
+  /* Neutral Buttons */
+  --button-secondary: #1A1A1E;
+  --button-secondary-hover: #232329;
+  --button-secondary-active: #2A2A31;
+}
+```
+
+## Design Principles
+
+- Never use pure black (`#000000`).
+- Never use light gray backgrounds.
+- Keep elevation subtle by changing background color instead of adding shadows.
+- Borders should be low-contrast and primarily used to separate content.
+- Use hover states with slightly lighter surfaces rather than changing border colors.
+- Maintain a clean, minimal, premium aesthetic with restrained contrast.

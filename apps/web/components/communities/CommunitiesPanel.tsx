@@ -27,7 +27,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
   });
 
   return (
-    <div className="flex flex-col h-full w-80 shrink-0 border-r border-border bg-surface">
+    <div className="flex flex-col h-full w-80 shrink-0 border-r border-border">
       <button
         onClick={() => router.push("/dashboard/communities")}
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors text-left ${

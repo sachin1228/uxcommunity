@@ -55,11 +55,14 @@
 /* ─── Dark mode ─────────────────────────────────────────────────────── */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-background:        #0A0A0A;
-    --color-background-subtle: #111111;
+    /* Backgrounds */
+    --color-background:        #09090B;
+    --color-background-subtle: #0E0E10;  /* sidebars */
 
-    --color-surface:           #111111;
-    --color-surface-raised:    #1A1A1A;
+    --color-surface:           #121214;
+    --color-surface-raised:    #1B1B1F;  /* modals, dropdowns, popovers */
+    --color-surface-hover:     #17171A;  /* hover states */
+    --color-input-background:  #151517;  /* inputs & textareas */
 
     --color-foreground:        #EDEDED;
     --color-foreground-muted:  #737373;
@@ -69,17 +72,30 @@
     --color-accent:            #0070F3;
     --color-accent-rgb:        0 112 243;
     --color-accent-hover:      #0060D1;
-    --color-accent-soft:       #1A1A1A;
+    --color-accent-soft:       #18243D;
     --color-accent-foreground: #FFFFFF;
 
-    --color-border:            #2E2E2E;
-    --color-border-subtle:     #1A1A1A;
+    /* Borders */
+    --color-border:            #202024;
+    --color-border-subtle:     #1D1D21;  /* section dividers */
+    --color-border-strong:     #2D2D34;  /* active components */
+    --color-input-border:      #303036;  /* input fields */
 
     --color-signal:            #0070F3;
 
-    --color-overlay:            #0A0A0A;
-    --color-overlay-raised:     #111111;
-    --color-overlay-elevated:   #1A1A1A;
+    /* Navigation */
+    --color-nav-hover:         #17171A;
+    --color-nav-active:        #18243D;
+    --color-nav-active-hover:  #1D2A46;
+
+    /* Neutral buttons */
+    --color-button-secondary:        #1A1A1E;
+    --color-button-secondary-hover:  #232329;
+    --color-button-secondary-active: #2A2A31;
+
+    --color-overlay:            #09090B;
+    --color-overlay-raised:     #121214;
+    --color-overlay-elevated:   #1B1B1F;
     --color-overlay-foreground: #EDEDED;
     --color-overlay-muted:      #737373;
 

@@ -17,7 +17,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ community }: ChatHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-surface shrink-0">
+    <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
       {community ? (
         <>
           <div className="flex items-center gap-3">
