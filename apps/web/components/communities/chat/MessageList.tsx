@@ -4,8 +4,10 @@ import { RefObject } from "react";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
+import { TypingIndicator } from "./TypingIndicator";
 import { TYPE_EMOJI } from "./chatUtils";
 import type { CachedMessage, MessageReaction } from "@/lib/communities/cache";
+import type { TypingUser } from "./useTypingPresence";
 
 type Message = CachedMessage;
 
@@ -33,6 +35,7 @@ interface MessageListProps {
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
+  typingUsers: TypingUser[];
   onReplyClick: (replyId: string) => void;
   onCancelSend: (msgId: string) => void;
   onRetrySend: (msgId: string) => void;
@@ -54,6 +57,7 @@ export function MessageList({
   displayCommunity,
   communityId,
   highlightedMsgId,
+  typingUsers,
   onReplyClick,
   onCancelSend,
   onRetrySend,
@@ -148,6 +152,9 @@ export function MessageList({
           })}
         </div>
       ))}
+
+      {/* WhatsApp-style typing bubble — rendered inside the scroll area */}
+      <TypingIndicator users={typingUsers} />
 
       <div ref={bottomRef} />
     </div>

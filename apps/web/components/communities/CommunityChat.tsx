@@ -13,7 +13,6 @@ import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
-import { TypingIndicator } from "./chat/TypingIndicator";
 import { useTypingPresence } from "./chat/useTypingPresence";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 
@@ -377,12 +376,13 @@ export function CommunityChat({
         <ChatHeader community={displayCommunity} />
 
         <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Scrollable message area */}
+        <div className="flex-1 overflow-hidden relative">
+          {/* Scrollable message area — full height, padded at bottom so messages
+              don't hide behind the floating input bar.                           */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="flex-1 overflow-y-auto"
+            className="absolute inset-0 overflow-y-auto pb-24"
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
@@ -400,6 +400,7 @@ export function CommunityChat({
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
+              typingUsers={typingUsers}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}
@@ -410,39 +411,43 @@ export function CommunityChat({
             />
           </div>
 
-          {/* Input wrapper — `relative` so the ↓ button is always anchored just
-              above this box, regardless of reply-bar / image-preview height.   */}
-          <div className="relative shrink-0">
+          {/* Floating input — sits above the scroll area */}
+          <div className="absolute bottom-0 left-0 right-0 z-10">
+            {/* Gradient fade so messages dissolve into the input bar */}
+            <div className="h-10 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+
+            {/* Scroll-to-bottom button */}
             {showScrollToBottom && (
               <button
                 onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-                className="absolute -top-10 right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
+                className="absolute bottom-[calc(100%-8px)] right-4 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Scroll to bottom"
               >
                 <ChevronDown size={16} />
               </button>
             )}
 
-            <TypingIndicator users={typingUsers} />
-            <ChatInput
-              ref={inputRef}
-              input={input}
-              sending={sending}
-              error={error}
-              placeholder={`Message ${displayCommunity?.name ?? ""}…`}
-              replyTo={replyTo}
-              pendingImagePreview={pendingImagePreview}
-              linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
-              onChange={handleInputChange}
-              onKeyDown={handleInputKeyDown}
-              onSend={handleInputSend}
-              onBlur={handleInputBlur}
-              onCancelReply={handleClearReply}
-              onImageSelect={handleImageSelect}
-              onImageRemove={handleImageClear}
-              onEmojiSelect={handleEmojiSelect}
-              onGifSelect={handleGifSend}
-            />
+            <div className="bg-black/40 backdrop-blur-sm">
+              <ChatInput
+                ref={inputRef}
+                input={input}
+                sending={sending}
+                error={error}
+                placeholder={`Message ${displayCommunity?.name ?? ""}…`}
+                replyTo={replyTo}
+                pendingImagePreview={pendingImagePreview}
+                linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                onSend={handleInputSend}
+                onBlur={handleInputBlur}
+                onCancelReply={handleClearReply}
+                onImageSelect={handleImageSelect}
+                onImageRemove={handleImageClear}
+                onEmojiSelect={handleEmojiSelect}
+                onGifSelect={handleGifSend}
+              />
+            </div>
           </div>
 
         </div>

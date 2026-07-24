@@ -683,154 +683,8 @@ export function MessageBubble({
     onDelete(msg.id);
   };
 
-  if (isMe) {
-    return (
-      <Fragment>
-        {unreadDivider}
-        {deleteConfirmOpen && (
-          <DeleteConfirmDialog
-            isMe={isMe}
-            onConfirm={handleDeleteConfirm}
-            onCancel={() => setDeleteConfirmOpen(false)}
-          />
-        )}
-        <div
-          data-message-id={msg.id}
-          className={`flex flex-col items-end w-full px-5 transition-colors duration-300 ${rowHighlight} ${
-            isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
-          }`}
-        >
-          <div className="flex items-center justify-end gap-2 w-full">
-            {failed && (
-              <RetryIndicator onRetry={() => onRetrySend(msg.id)} />
-            )}
-            <div className="max-w-[65%]">
-              {isDeleted ? (
-                /* Deleted placeholder — no hover actions */
-                <div className="flex justify-end">
-                  <DeletedBubble isMe createdAt={msg.created_at} />
-                </div>
-              ) : isEmojiMsg ? (
-                /* ── Big emoji (WhatsApp-style) — no bubble background ── */
-                <div className="group flex items-center gap-1 justify-end">
-                  <MessageHoverActions
-                    msg={msg}
-                    isMe
-                    isDeleted={isDeleted}
-                    currentUserId={currentUserId}
-                    onReaction={onReaction}
-                    onReply={onReply}
-                    onCopy={onCopy}
-                    onDeleteClick={() => setDeleteConfirmOpen(true)}
-                    menuOpen={menuOpen}
-                    onMenuOpenChange={setMenuOpen}
-                  />
-                  <div className="relative">
-                    <div className="flex flex-col items-end select-none">
-                      <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="font-mono text-[10px] text-foreground-muted/70">
-                          {fmtTime(msg.created_at)}
-                        </span>
-                        {msg.status === "sending" && (
-                          <Clock size={10} className="text-foreground-muted/60 animate-pulse" />
-                        )}
-                        {(msg.status === "sent" || !msg.status) && (
-                          <CheckCheck size={11} className="text-foreground-muted/70" />
-                        )}
-                        {msg.status === "failed" && (
-                          <span className="text-[10px] text-red-400">!</span>
-                        )}
-                      </div>
-                    </div>
-                    <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe msgId={msg.id} onReaction={onReaction} />
-                  </div>
-                </div>
-              ) : (
-                /* group scoped here — hover only triggers on [actions + bubble], not the full row */
-                <div className="group flex items-center gap-1 justify-end">
-                  {/* Actions sit to the LEFT of sent bubbles */}
-                  <MessageHoverActions
-                    msg={msg}
-                    isMe
-                    isDeleted={isDeleted}
-                    currentUserId={currentUserId}
-                    onReaction={onReaction}
-                    onReply={onReply}
-                    onCopy={onCopy}
-                    onDeleteClick={() => setDeleteConfirmOpen(true)}
-                    menuOpen={menuOpen}
-                    onMenuOpenChange={setMenuOpen}
-                    showMenu={false}
-                  />
-                  <div className="relative min-w-0">
-                    <div
-                      className={`relative rounded-2xl rounded-tr-sm px-3 pt-2 pb-1.5 select-none transition-shadow duration-150 ${
-                        menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
-                      } ${
-                        msg.status === "sending"
-                          ? "bg-accent opacity-70"
-                          : msg.status === "failed"
-                          ? "bg-red-500/80"
-                          : "bg-accent"
-                      }`}
-                    >
-                      {replyTo && <ReplyBubble reply={replyTo} isMe onReplyClick={onReplyClick} />}
-                      {imageUrl && (
-                        <BubbleImage
-                          url={imageUrl}
-                          isMe
-                          uploading={uploading}
-                          onCancel={() => onCancelSend(msg.id)}
-                        />
-                      )}
-                      {msg.content && (
-                        <MessageContent
-                          content={msg.content}
-                          isMe={true}
-                          showPreview={msg.status !== "failed"}
-                        />
-                      )}
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="font-mono text-[10px] text-accent-foreground/60">
-                          {fmtTime(msg.created_at)}
-                        </span>
-                        {msg.status === "sending" && (
-                          <Clock size={10} className="text-accent-foreground/60 animate-pulse" />
-                        )}
-                        {(msg.status === "sent" || !msg.status) && (
-                          <CheckCheck size={11} className="text-accent-foreground/70" />
-                        )}
-                        {msg.status === "failed" && (
-                          <span className="text-[10px] text-red-200">!</span>
-                        )}
-                      </div>
-                      <MessageHoverActions
-                        msg={msg}
-                        isMe
-                        isDeleted={isDeleted}
-                        currentUserId={currentUserId}
-                        onReaction={onReaction}
-                        onReply={onReply}
-                        onCopy={onCopy}
-                        onDeleteClick={() => setDeleteConfirmOpen(true)}
-                        menuOpen={menuOpen}
-                        onMenuOpenChange={setMenuOpen}
-                        showReaction={false}
-                        insideBubble
-                      />
-                    </div>
-                    <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe msgId={msg.id} onReaction={onReaction} />
-                  </div>
-                </div>
-              )}
-              {reactions.length > 0 && !isDeleted && <div className="h-5" />}
-            </div>
-          </div>
-        </div>
-      </Fragment>
-    );
-  }
+  // ── Unified Slack-style layout: all messages left-aligned with avatar ──
+  const showHeader = !isSameAuthor || isFirstUnread;
 
   return (
     <Fragment>
@@ -844,39 +698,56 @@ export function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`flex items-start gap-2 w-full px-5 transition-colors duration-300 ${rowHighlight} ${
+        className={`group flex items-start gap-2 w-full px-5 transition-colors duration-300 ${rowHighlight} ${
           isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
         }`}
       >
-        <div className="w-7 shrink-0">
-          {!isSameAuthor && sender && !isDeleted && (
+        {/* Avatar column — always on the left */}
+        <div className="w-7 shrink-0 mt-0.5">
+          {showHeader && sender && !isDeleted && (
             <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
           )}
         </div>
+
+        {/* Content column */}
         <div className="max-w-[65%]">
-          {!isSameAuthor && sender && !isDeleted && (
-            <p className="font-body text-[11px] font-medium text-foreground-muted mb-0.5 ml-0.5">
+          {/* Sender name */}
+          {showHeader && sender && !isDeleted && (
+            <p className={`font-body text-[11px] font-semibold mb-0.5 ml-0.5 ${
+              isMe ? "text-accent" : "text-foreground-muted"
+            }`}>
               {sender.name}
             </p>
           )}
 
           {isDeleted ? (
-            <DeletedBubble isMe={false} createdAt={msg.created_at} />
+            <DeletedBubble isMe={isMe} createdAt={msg.created_at} />
           ) : isEmojiMsg ? (
-            /* ── Big emoji (WhatsApp-style) — no bubble background ── */
-            <div className="group flex items-center gap-1">
+            /* ── Big emoji — no bubble background ── */
+            <div className="flex items-center gap-1">
               <div className="relative">
                 <div className="flex flex-col items-start select-none">
                   <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
-                  <span className="font-mono text-[10px] text-foreground-muted/70 mt-0.5">
-                    {fmtTime(msg.created_at)}
-                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="font-mono text-[10px] text-foreground-muted/70">
+                      {fmtTime(msg.created_at)}
+                    </span>
+                    {isMe && msg.status === "sending" && (
+                      <Clock size={10} className="text-foreground-muted/60 animate-pulse" />
+                    )}
+                    {isMe && (msg.status === "sent" || !msg.status) && (
+                      <CheckCheck size={11} className="text-foreground-muted/70" />
+                    )}
+                    {isMe && msg.status === "failed" && (
+                      <span className="text-[10px] text-red-400">!</span>
+                    )}
+                  </div>
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={false} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
               </div>
               <MessageHoverActions
                 msg={msg}
-                isMe={false}
+                isMe={isMe}
                 isDeleted={isDeleted}
                 currentUserId={currentUserId}
                 onReaction={onReaction}
@@ -888,17 +759,28 @@ export function MessageBubble({
               />
             </div>
           ) : (
-            /* group scoped here — hover only triggers on [bubble + actions], not the full row */
-            <div className="group flex items-center gap-1">
+            /* ── Normal bubble ── */
+            <div className="flex items-center gap-1">
+              {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
               <div className="relative min-w-0">
-                <div className={`relative rounded-2xl rounded-tl-sm bg-surface-raised shadow-sm px-3 pt-2 pb-1.5 select-none transition-shadow duration-150 ${
-                  menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
-                }`}>
-                  {replyTo && <ReplyBubble reply={replyTo} isMe={false} onReplyClick={onReplyClick} />}
+                <div
+                  className={`relative rounded-2xl px-3 pt-2 pb-1.5 select-none transition-shadow duration-150 ${
+                    menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
+                  } ${
+                    isMe
+                      ? msg.status === "sending"
+                        ? "bg-accent opacity-70"
+                        : msg.status === "failed"
+                        ? "bg-red-500/80"
+                        : "bg-accent"
+                      : "bg-surface-raised shadow-sm"
+                  }`}
+                >
+                  {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
                     <BubbleImage
                       url={imageUrl}
-                      isMe={false}
+                      isMe={isMe}
                       uploading={uploading}
                       onCancel={() => onCancelSend(msg.id)}
                     />
@@ -906,16 +788,29 @@ export function MessageBubble({
                   {msg.content && (
                     <MessageContent
                       content={msg.content}
-                      isMe={false}
-                      showPreview={true}
+                      isMe={isMe}
+                      showPreview={msg.status !== "failed"}
                     />
                   )}
-                  <p className="font-mono text-[10px] text-foreground-muted text-right mt-1">
-                    {fmtTime(msg.created_at)}
-                  </p>
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    <span className={`font-mono text-[10px] ${
+                      isMe ? "text-accent-foreground/60" : "text-foreground-muted"
+                    }`}>
+                      {fmtTime(msg.created_at)}
+                    </span>
+                    {isMe && msg.status === "sending" && (
+                      <Clock size={10} className="text-accent-foreground/60 animate-pulse" />
+                    )}
+                    {isMe && (msg.status === "sent" || !msg.status) && (
+                      <CheckCheck size={11} className="text-accent-foreground/70" />
+                    )}
+                    {isMe && msg.status === "failed" && (
+                      <span className="text-[10px] text-red-200">!</span>
+                    )}
+                  </div>
                   <MessageHoverActions
                     msg={msg}
-                    isMe={false}
+                    isMe={isMe}
                     isDeleted={isDeleted}
                     currentUserId={currentUserId}
                     onReaction={onReaction}
@@ -928,12 +823,12 @@ export function MessageBubble({
                     insideBubble
                   />
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={false} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
               </div>
-              {/* Actions sit to the RIGHT of received bubbles */}
+              {/* Emoji reaction button to the right of bubble */}
               <MessageHoverActions
                 msg={msg}
-                isMe={false}
+                isMe={isMe}
                 isDeleted={isDeleted}
                 currentUserId={currentUserId}
                 onReaction={onReaction}

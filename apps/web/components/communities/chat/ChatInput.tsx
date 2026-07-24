@@ -89,7 +89,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     };
 
     return (
-      <div className="px-4 pb-4 pt-2 shrink-0">
+      <div className="px-4 pb-4 shrink-0">
         {error && (
           <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
         )}
@@ -170,7 +170,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
-          <div className="flex items-center gap-2 bg-surface-raised rounded-2xl shadow-md px-3 py-3 min-h-[56px]">
+          <div className="flex items-center gap-2 bg-surface-raised rounded-full shadow-md px-3 py-2 min-h-[52px]">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -189,7 +189,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               type="button"
               onClick={() => setPickerOpen((v) => !v)}
               disabled={sending}
-              className={`shrink-0 h-7 w-7 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+              className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
                 ${pickerOpen
                   ? "bg-accent/20 text-accent"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface"
@@ -205,7 +205,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={sending}
-              className="shrink-0 h-7 w-7 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label="Attach image"
             >
               <ImageIcon size={17} />
