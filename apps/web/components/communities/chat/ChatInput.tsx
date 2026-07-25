@@ -94,28 +94,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
         )}
 
-        {/* Reply preview bar */}
-        {replyTo && (
-          <div className="flex items-start gap-2 mb-1 px-1 py-2 rounded-xl bg-surface-raised border-l-2 border-accent">
-            <CornerUpLeft size={14} className="text-accent mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-[11px] font-semibold text-accent truncate">
-                {replyTo.user_name}
-              </p>
-              <p className="font-body text-[11px] text-foreground-muted truncate">
-                {replyTo.content}
-              </p>
-            </div>
-            <button
-              onClick={onCancelReply}
-              className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-0.5"
-              aria-label="Cancel reply"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-
         {/* Image preview bar */}
         {pendingImagePreview && (
           <div className="flex items-center gap-2 mb-1 px-2 py-2 rounded-xl bg-surface-raised">
@@ -170,7 +148,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
-          <div className="flex items-center gap-2 bg-surface-raised rounded-full shadow-md px-3 py-2 min-h-[52px]">
+          <div className="flex flex-col bg-surface-raised rounded-2xl shadow-md px-[5px] pl-[5px] pr-[8px]">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -184,32 +162,56 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               }}
             />
 
-            {/* Emoji / GIF / Sticker picker button */}
-            <button
-              type="button"
-              onClick={() => setPickerOpen((v) => !v)}
-              disabled={sending}
-              className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
-                ${pickerOpen
-                  ? "bg-accent/20 text-accent"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface"
-                }`}
-              aria-label="Open emoji & GIF picker"
-              aria-expanded={pickerOpen}
-            >
-              <Smile size={17} />
-            </button>
+            {/* Reply preview inside the box */}
+            {replyTo && (
+              <div className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-black/30">
+                <div className="flex-1 min-w-0 py-2 pl-2 rounded-sm">
+                  <p className="font-body text-[11px] font-semibold text-accent truncate">
+                    {replyTo.user_name}
+                  </p>
+                  <p className="font-body text-[11px] text-foreground-muted truncate">
+                    {replyTo.content}
+                  </p>
+                </div>
+                <button
+                  onClick={onCancelReply}
+                  className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-2 rounded-full text-foreground-muted hover:text-foreground hover:bg-surface"
+                  aria-label="Cancel reply"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            )}
 
-            {/* Image picker button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={sending}
-              className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              aria-label="Attach image"
-            >
-              <ImageIcon size={17} />
-            </button>
+            {/* Input row */}
+            <div className="flex items-center gap-2 min-h-[52px]">
+            {/* Emoji + Image picker buttons */}
+            <div className="flex items-center">
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                disabled={sending}
+                className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                  ${pickerOpen
+                    ? "bg-accent/20 text-accent"
+                    : "text-foreground-muted hover:text-foreground hover:bg-surface"
+                  }`}
+                aria-label="Open emoji & GIF picker"
+                aria-expanded={pickerOpen}
+              >
+                <Smile size={19} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={sending}
+                className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Attach image"
+              >
+                <ImageIcon size={19} />
+              </button>
+            </div>
 
             <textarea
               ref={ref}
@@ -244,8 +246,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </svg>
               </button>
             )}
-          </div>
-        </div>
+            </div>{/* end input row */}
+          </div>{/* end outer box */}
+        </div>{/* end picker container */}
       </div>
     );
   }

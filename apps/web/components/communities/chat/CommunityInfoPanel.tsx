@@ -110,7 +110,7 @@ export function CommunityInfoPanel({ members, community }: CommunityInfoPanelPro
 
   return (
     // Outer wrapper — sizing + scroll, holds both cards
-    <div className="w-80 shrink-0 flex flex-col gap-3 overflow-y-auto">
+    <div className="w-72 shrink-0 flex flex-col gap-3 overflow-y-auto">
 
       {/* Main info card */}
       <div className="border border-border mr-4 mt-4 rounded-xl flex flex-col">
