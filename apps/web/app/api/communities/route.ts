@@ -39,7 +39,7 @@ export async function GET() {
     // Fetch the latest messages across all communities.
     db
       .from("community_messages")
-      .select("id, community_id, content, created_at, user_id")
+      .select("id, community_id, content, created_at, user_id, reply_to_id")
       .in("community_id", ids)
       .order("created_at", { ascending: false })
       .limit(ids.length * 10),
@@ -54,7 +54,7 @@ export async function GET() {
   }
 
   // 4. Pick the latest message per community AND count unread messages in JS.
-  const lastMsgByComm: Record<string, { id: string; community_id: string; content: string; created_at: string; user_id: string }> = {};
+  const lastMsgByComm: Record<string, { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null }> = {};
   const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
     if (!lastMsgByComm[m.community_id]) {
@@ -71,10 +71,19 @@ export async function GET() {
   // 5. Batch-fetch sender names for last messages (1 query instead of N)
   const senderIds = [...new Set(Object.values(lastMsgByComm).map((m) => m.user_id))];
 
+  // Collect reply_to_ids from last messages so we can resolve the replied-to user names.
+  const replyToIds = [
+    ...new Set(
+      Object.values(lastMsgByComm)
+        .map((m) => m.reply_to_id)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+
   // 5b. Fetch the most recent reaction in each community so the sidebar can
   //     show "You reacted 🔥 to: …" even when the reacted message is not the
   //     latest message.
-  const [{ data: senderUsers }, { data: recentReactions }] = await Promise.all([
+  const [{ data: senderUsers }, { data: recentReactions }, { data: replyParentRows }] = await Promise.all([
     senderIds.length
       ? db.from("users").select("id, name").in("id", senderIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
@@ -93,7 +102,24 @@ export async function GET() {
             created_at: string;
           }[],
         }),
+    replyToIds.length
+      ? db.from("community_messages").select("id, user_id").in("id", replyToIds)
+      : Promise.resolve({ data: [] as { id: string; user_id: string }[] }),
   ]);
+
+  // Resolve names for reply-parent senders.
+  const replyParentUserIds = [...new Set((replyParentRows ?? []).map((m) => m.user_id))];
+  const { data: replyParentUsers } = replyParentUserIds.length
+    ? await db.from("users").select("id, name").in("id", replyParentUserIds)
+    : { data: [] as { id: string; name: string }[] };
+
+  // Map: parent message id → first name of original sender.
+  const replyParentNameMap: Record<string, string> = {};
+  const replyParentUserMap = Object.fromEntries((replyParentUsers ?? []).map((u) => [u.id, u.name]));
+  for (const m of replyParentRows ?? []) {
+    const name = replyParentUserMap[m.user_id];
+    if (name) replyParentNameMap[m.id] = name.split(" ")[0];
+  }
 
   // Pick the most-recent reaction per community.
   const latestReactionByCommunity: Record<
@@ -210,6 +236,10 @@ export async function GET() {
               content: lastMsg.content,
               created_at: lastMsg.created_at,
               user: { name: senderMap[lastMsg.user_id] ?? "Unknown" },
+              is_reply: !!lastMsg.reply_to_id,
+              reply_to_user: lastMsg.reply_to_id
+                ? (replyParentNameMap[lastMsg.reply_to_id] ?? null)
+                : null,
             }
           : null,
         lastReaction,

@@ -28,7 +28,7 @@ function formatPreview(msg: NonNullable<Community["last_message"]>): {
     const to = msg.reply_to_user ?? null;
     return {
       prefix: sender,
-      text: to ? `replied to ${to}: ${msg.content}` : `↩ ${msg.content}`,
+      text: to ? `replied to ${to}: ${msg.content}` : `replied: ${msg.content}`,
     };
   }
   return { prefix: sender, text: msg.content ?? "" };
