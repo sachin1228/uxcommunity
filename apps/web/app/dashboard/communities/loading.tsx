@@ -14,7 +14,7 @@ export default function CommunitiesLoading() {
         <div className="h-9 w-full rounded-lg bg-surface-raised mb-4" />
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 border-b border-border pb-px">
+        <div className="flex items-center gap-2 border-b border-border-subtle pb-px">
           {[64, 48, 72, 72, 80, 48].map((w, i) => (
             <div key={i} className={`h-4 w-${w === 48 ? 12 : w === 64 ? 16 : w === 72 ? 18 : 20} rounded bg-surface-raised mx-2 mb-2.5`} />
           ))}
@@ -24,7 +24,7 @@ export default function CommunitiesLoading() {
       {/* List rows */}
       <div className="flex-1 overflow-hidden">
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="flex items-center gap-3 px-6 py-3 border-b border-border/50">
+          <div key={i} className="flex items-center gap-3 px-6 py-3 border-b border-border-subtle">
             <div className="h-10 w-10 rounded-full bg-surface-raised shrink-0" />
             <div className="flex-1 space-y-1.5">
               <div className="h-3 w-36 rounded bg-surface-raised" />

@@ -147,7 +147,7 @@ export default function AdminApplicationsPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-white/10 bg-surface overflow-hidden mb-3">
+      <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
             <Spinner className="h-4 w-4 text-foreground-muted" />
@@ -159,7 +159,7 @@ export default function AdminApplicationsPage() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/10">
+              <tr className="border-b border-border">
                 {["Name", "Email", "Status", "Tags", "Applied", ""].map((h) => (
                   <th
                     key={h}
@@ -175,7 +175,7 @@ export default function AdminApplicationsPage() {
                 <tr
                   key={app.id}
                   className={`${
-                    idx < applications.length - 1 ? "border-b border-white/[0.06]" : ""
+                    idx < applications.length - 1 ? "border-b border-border-subtle" : ""
                   } hover:bg-white/[0.03] transition-colors cursor-pointer`}
                   onClick={() => setSelectedApp(app)}
                 >

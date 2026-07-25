@@ -116,7 +116,7 @@ export default function UsersPage() {
                 <tr
                   key={user.id}
                   className={`${
-                    idx < users.length - 1 ? "border-b border-white/5" : ""
+                    idx < users.length - 1 ? "border-b border-border-subtle" : ""
                   } hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-4 py-2.5">

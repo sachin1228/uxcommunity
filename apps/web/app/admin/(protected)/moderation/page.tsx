@@ -127,7 +127,7 @@ export default function ModerationPage() {
             </thead>
             <tbody>
               {events.map((event, index) => (
-                <tr key={event.id} className={`${index < events.length - 1 ? "border-b border-white/5" : ""} align-top`}>
+                <tr key={event.id} className={`${index < events.length - 1 ? "border-b border-border-subtle" : ""} align-top`}>
                   <td className="px-4 py-3">
                     <p className="font-body text-xs font-medium text-foreground">{event.content_type.replaceAll("_", " ")}</p>
                     <p className="mt-1 font-mono text-[10px] text-foreground-muted">{event.content_ref_id ?? event.id}</p>

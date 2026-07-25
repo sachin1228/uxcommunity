@@ -232,7 +232,7 @@ export function MasterDataPage({
                   key={item.id}
                   onClick={() => router.push(`${basePath}/${item.id}`)}
                   className={`cursor-pointer ${
-                    idx < filtered.length - 1 ? "border-b border-white/5" : ""
+                    idx < filtered.length - 1 ? "border-b border-border-subtle" : ""
                   } hover:bg-surface-raised transition-colors`}
                 >
                   <td className="px-4 py-2">

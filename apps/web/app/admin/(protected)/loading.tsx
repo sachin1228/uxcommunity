@@ -12,7 +12,7 @@ export default function AdminLoading() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-3 border-b border-border pb-px">
+      <div className="flex gap-1 mb-3 border-b border-border-subtle pb-px">
         {[48, 64, 72, 56].map((w, i) => (
           <div key={i} className="h-4 rounded bg-surface-raised mx-2 mb-2.5" style={{ width: w }} />
         ))}
@@ -31,7 +31,7 @@ export default function AdminLoading() {
         </div>
         {/* Data rows */}
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-border/50">
+          <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-border-subtle">
             <div className="h-6 w-6 rounded bg-surface-raised shrink-0" />
             <div className="h-3 w-40 rounded bg-surface-raised flex-1" />
             <div className="h-4 w-14 rounded-full bg-surface-raised" />
