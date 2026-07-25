@@ -67,6 +67,19 @@ export function useSidebarRealtime({
     // Cache resolved sender names for the lifetime of this subscription.
     const resolvedNames = new Map<string, string>();
 
+    type ReactionRow = {
+      community_id: string;
+      message_id: string;
+      user_id: string;
+      emoji: string;
+      created_at?: string;
+    };
+
+    type ReactionMessage = {
+      content?: string | null;
+      image_url?: string | null;
+    };
+
     /** Fetch a member's profile and cache their name. */
     async function resolveName(commId: string, uid: string): Promise<string | null> {
       if (resolvedNames.has(uid)) return resolvedNames.get(uid)!;
@@ -77,6 +90,77 @@ export function useSidebarRealtime({
         if (data?.name) { resolvedNames.set(uid, data.name); return data.name; }
       } catch {}
       return null;
+    }
+
+    function reactionPreview(
+      row: ReactionRow,
+      message: ReactionMessage | null,
+    ): string {
+      if (message?.content) {
+        return `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`;
+      }
+      if (message?.image_url) return "📷 Photo";
+      return "a message";
+    }
+
+    function applyReaction(
+      row: ReactionRow,
+      message?: ReactionMessage | null,
+    ) {
+      const isOwn = row.user_id === userId;
+
+      setCommunities((prev) =>
+        applyUpdate(prev, row.community_id, (c) => {
+          // Realtime can deliver events out of order. Keep the newest reaction
+          // preview instead of allowing a delayed lookup to overwrite it.
+          if (
+            c.lastReaction?.createdAt &&
+            row.created_at &&
+            c.lastReaction.createdAt > row.created_at
+          ) {
+            return c;
+          }
+
+          const fallbackMessage =
+            c.last_message?.id === row.message_id ? c.last_message : null;
+
+          return {
+            ...c,
+            lastReaction: {
+              messageId: row.message_id,
+              createdAt: row.created_at,
+              emoji: row.emoji,
+              firstName: isOwn
+                ? "You"
+                : (resolvedNames.get(row.user_id)?.split(" ")[0] ?? "Someone"),
+              isOwn,
+              messagePreview: reactionPreview(
+                row,
+                message ??
+                  (fallbackMessage
+                    ? {
+                        content: fallbackMessage.content,
+                        image_url: fallbackMessage.has_image ? "present" : null,
+                      }
+                    : null),
+              ),
+            },
+          };
+        }),
+      );
+    }
+
+    function fetchAndApplyReaction(row: ReactionRow) {
+      applyReaction(row);
+
+      // The reacted message may not be the community's last message. Fetch it
+      // so reactions on older messages still have the correct sidebar snippet.
+      fetch(`/api/communities/${row.community_id}/messages/${row.message_id}`)
+        .then((res) => (res.ok ? (res.json() as Promise<ReactionMessage>) : null))
+        .then((message) => {
+          if (message) applyReaction(row, message);
+        })
+        .catch(() => {});
     }
 
     const channels = communities.map((comm) =>
@@ -216,47 +300,25 @@ export function useSidebarRealtime({
             filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
-            const r = payload.new as {
-              message_id: string;
-              user_id: string;
-              emoji: string;
-            };
-
-            const isOwn = r.user_id === userId;
-
-            setCommunities((prev) =>
-              applyUpdate(prev, comm.id, (c) => {
-                if (!c.last_message || c.last_message.id !== r.message_id) return c;
-
-                const preview = c.last_message.has_image
-                  ? "📷 Photo"
-                  : c.last_message.content
-                  ? `"${c.last_message.content.slice(0, 40)}${c.last_message.content.length > 40 ? "…" : ""}"`
-                  : "a message";
-
-                return {
-                  ...c,
-                  lastReaction: {
-                    emoji:          r.emoji,
-                    firstName:      isOwn ? "You" : (resolvedNames.get(r.user_id)?.split(" ")[0] ?? "Someone"),
-                    isOwn,
-                    messagePreview: preview,
-                  },
-                };
-              }),
-            );
+            const r = payload.new as ReactionRow;
+            fetchAndApplyReaction(r);
 
             // Async: resolve reactor name for others so it shows correctly.
-            if (!isOwn && !resolvedNames.has(r.user_id)) {
+            if (r.user_id !== userId && !resolvedNames.has(r.user_id)) {
               const msgId  = r.message_id;
               const rEmoji = r.emoji;
               const uid    = r.user_id;
+              const createdAt = r.created_at;
               resolveName(comm.id, uid).then((name) => {
                 if (!name) return;
                 setCommunities((prev) =>
                   applyUpdate(prev, comm.id, (c) => {
-                    if (!c.lastReaction || c.lastReaction.emoji !== rEmoji) return c;
-                    if (!c.last_message || c.last_message.id !== msgId) return c;
+                    if (
+                      !c.lastReaction ||
+                      c.lastReaction.messageId !== msgId ||
+                      c.lastReaction.emoji !== rEmoji ||
+                      c.lastReaction.createdAt !== createdAt
+                    ) return c;
                     return {
                       ...c,
                       lastReaction: { ...c.lastReaction, firstName: name.split(" ")[0] },
@@ -265,6 +327,21 @@ export function useSidebarRealtime({
                 );
               });
             }
+          },
+        )
+
+        // ── Reaction changed ───────────────────────────────────────────────
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "message_reactions",
+            filter: `community_id=eq.${comm.id}`,
+          },
+          (payload) => {
+            const r = payload.new as ReactionRow;
+            fetchAndApplyReaction(r);
           },
         )
 
@@ -278,15 +355,25 @@ export function useSidebarRealtime({
             filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
-            const r = payload.old as { message_id?: string; user_id?: string; emoji?: string };
+            const r = payload.old as {
+              message_id?: string;
+              user_id?: string;
+              emoji?: string;
+              created_at?: string;
+            };
             if (!r.message_id || !r.user_id || !r.emoji) return;
 
             setCommunities((prev) =>
               applyUpdate(prev, comm.id, (c) => {
                 // Clear lastReaction only if it matches the removed reaction.
+                const current = c.lastReaction;
+                if (!current) return c;
                 if (
-                  c.lastReaction?.emoji === r.emoji &&
-                  c.last_message?.id === r.message_id
+                  current.messageId === r.message_id &&
+                  current.emoji === r.emoji &&
+                  (!current.createdAt ||
+                    !r.created_at ||
+                    current.createdAt === r.created_at)
                 ) {
                   return { ...c, lastReaction: null };
                 }

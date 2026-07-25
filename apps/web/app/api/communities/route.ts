@@ -71,41 +71,71 @@ export async function GET() {
   // 5. Batch-fetch sender names for last messages (1 query instead of N)
   const senderIds = [...new Set(Object.values(lastMsgByComm).map((m) => m.user_id))];
 
-  // 5b. Fetch the most recent reaction on each community's last message so
-  //     the sidebar can show "You reacted 🔥 to: …" after a page refresh.
-  const lastMsgIds = Object.values(lastMsgByComm).map((m) => m.id);
+  // 5b. Fetch the most recent reaction in each community so the sidebar can
+  //     show "You reacted 🔥 to: …" even when the reacted message is not the
+  //     latest message.
   const [{ data: senderUsers }, { data: recentReactions }] = await Promise.all([
     senderIds.length
       ? db.from("users").select("id, name").in("id", senderIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    lastMsgIds.length
+    ids.length
       ? db
           .from("message_reactions")
-          .select("message_id, user_id, emoji, created_at")
-          .in("message_id", lastMsgIds)
+          .select("community_id, message_id, user_id, emoji, created_at")
+          .in("community_id", ids)
           .order("created_at", { ascending: false })
-      : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string; created_at: string }[] }),
+      : Promise.resolve({
+          data: [] as {
+            community_id: string;
+            message_id: string;
+            user_id: string;
+            emoji: string;
+            created_at: string;
+          }[],
+        }),
   ]);
 
-  // Pick the most-recent reaction per last message
-  const latestReactionByMsg: Record<string, { user_id: string; emoji: string }> = {};
+  // Pick the most-recent reaction per community.
+  const latestReactionByCommunity: Record<
+    string,
+    { message_id: string; user_id: string; emoji: string; created_at: string }
+  > = {};
   for (const r of recentReactions ?? []) {
-    if (!latestReactionByMsg[r.message_id]) {
-      latestReactionByMsg[r.message_id] = { user_id: r.user_id, emoji: r.emoji };
+    if (!latestReactionByCommunity[r.community_id]) {
+      latestReactionByCommunity[r.community_id] = {
+        message_id: r.message_id,
+        user_id: r.user_id,
+        emoji: r.emoji,
+        created_at: r.created_at,
+      };
     }
   }
 
-  // Fetch names for reactors not already in senderIds
+  const reactionMessageIds = Object.values(latestReactionByCommunity).map(
+    (r) => r.message_id,
+  );
   const reactorIds = [
-    ...new Set(
-      Object.values(latestReactionByMsg)
-        .map((r) => r.user_id)
-        .filter((id) => !senderIds.includes(id)),
-    ),
+    ...new Set(Object.values(latestReactionByCommunity).map((r) => r.user_id)),
   ];
-  const { data: reactorUsers } = reactorIds.length
-    ? await db.from("users").select("id, name").in("id", reactorIds)
-    : { data: [] as { id: string; name: string }[] };
+
+  // Fetch the reacted-to message and names for reactors not already in senderIds.
+  const [{ data: reactionMessages }, { data: reactorUsers }] = await Promise.all([
+    reactionMessageIds.length
+      ? db
+          .from("community_messages")
+          .select("id, content, image_url")
+          .in("id", reactionMessageIds)
+      : Promise.resolve({
+          data: [] as { id: string; content: string | null; image_url: string | null }[],
+        }),
+    reactorIds.length
+      ? db.from("users").select("id, name").in("id", reactorIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  const reactionMessageMap = Object.fromEntries(
+    (reactionMessages ?? []).map((m) => [m.id, m]),
+  );
 
   const senderMap = Object.fromEntries((senderUsers ?? []).map((u) => [u.id, u.name]));
   // Merge reactor names into senderMap for convenient lookup
@@ -146,19 +176,24 @@ export async function GET() {
     .filter((c) => validCommunityIds.has(c.id))
     .map((c) => {
       const lastMsg = lastMsgByComm[c.id] ?? null;
-      const latestReaction = lastMsg ? latestReactionByMsg[lastMsg.id] : undefined;
+      const latestReaction = latestReactionByCommunity[c.id];
+      const reactionMessage = latestReaction
+        ? reactionMessageMap[latestReaction.message_id]
+        : undefined;
 
       // Reconstruct the sidebar lastReaction preview so it survives page refresh.
       const lastReaction = latestReaction
         ? {
+            messageId: latestReaction.message_id,
             emoji: latestReaction.emoji,
+            createdAt: latestReaction.created_at,
             firstName:
               latestReaction.user_id === userId
                 ? "You"
                 : (senderMap[latestReaction.user_id]?.split(" ")[0] ?? "Someone"),
             isOwn: latestReaction.user_id === userId,
-            messagePreview: lastMsg?.content
-              ? `"${lastMsg.content.slice(0, 40)}${lastMsg.content.length > 40 ? "…" : ""}"`
+            messagePreview: reactionMessage?.content
+              ? `"${reactionMessage.content.slice(0, 40)}${reactionMessage.content.length > 40 ? "…" : ""}"`
               : "📷 Photo",
           }
         : null;

@@ -47,7 +47,11 @@ export interface CachedMeta {
 // ─── Sidebar joined-communities cache ─────────────────────────────────────────
 
 export interface SidebarLastReaction {
+  /** Message that received the reaction. */
+  messageId: string;
   emoji: string;
+  /** Used to ignore delayed realtime responses for older reactions. */
+  createdAt?: string;
   /** First name of the person who reacted (or "You" if isOwn). */
   firstName: string;
   isOwn: boolean;

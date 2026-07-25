@@ -57,7 +57,7 @@ export async function DELETE(
  * Lightweight endpoint used by the realtime handler to fetch the reply preview
  * of a parent message that may not be in the local message cache.
  *
- * Returns: { id: string; content: string | null; user_name: string }
+ * Returns: { id: string; content: string | null; image_url: string | null; user_name: string }
  */
 export async function GET(
   _req: NextRequest,
@@ -84,7 +84,7 @@ export async function GET(
 
   const { data: msg } = await db
     .from("community_messages")
-    .select("id, content, user_id")
+    .select("id, content, image_url, user_id")
     .eq("id", msgId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -102,6 +102,7 @@ export async function GET(
   return NextResponse.json({
     id: msg.id,
     content: (msg as any).content ?? null,
+    image_url: (msg as any).image_url ?? null,
     user_name: user?.name ?? "Unknown",
   });
 }
