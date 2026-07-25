@@ -19,12 +19,13 @@ export default async function DashboardPage() {
   })();
 
   return (
-    <div>
+    <div className="px-8 py-8">
       <h1 className="font-display text-2xl font-semibold text-foreground mb-1">
         Welcome back{name ? `, ${name.split(" ")[0]}` : ""}
       </h1>
       <p className="font-body text-sm text-foreground-muted">
-        Your space to share work, connect with creatives, and discover new opportunities.
+        Your space to share work, connect with creatives, and discover new
+        opportunities.
       </p>
     </div>
   );

@@ -61,10 +61,10 @@ export function CommunityRow({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`w-full flex items-center gap-4 px-3 py-2.5 text-left transition-colors ${
+        className={`w-full flex items-center gap-4 px-3 py-2.5 rounded-lg text-left transition-colors ${
           active
-            ? "bg-accent/10 border-l-2 border-l-accent"
-            : "hover:bg-surface-raised border-l-2 border-l-transparent"
+            ? "bg-surface-raised text-foreground"
+            : "hover:bg-surface-raised"
         }`}
       >
         <CommunityAvatar

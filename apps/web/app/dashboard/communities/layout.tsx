@@ -1,20 +1,16 @@
-import { getSession } from "@/lib/auth/session";
-import { CommunitiesPanel } from "@/components/communities/CommunitiesPanel";
+// Communities sub-layout.
+// The global sidebar (in DashboardLayout) already renders the community list
+// and the Explore Communities link, so this layout only needs to make the
+// content area fill the available height for the chat / explore pages.
 
-export default async function CommunitiesLayout({
+export default function CommunitiesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-  const userId = (session as { userId?: string } | null)?.userId ?? "";
-
   return (
-    <div className="-mx-8 -my-8 flex overflow-hidden" style={{ height: "calc(100vh - 48px)" }}>
-      <CommunitiesPanel userId={userId} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {children}
-      </div>
+    <div className="flex flex-col h-full overflow-hidden">
+      {children}
     </div>
   );
 }
