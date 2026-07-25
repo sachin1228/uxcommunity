@@ -208,16 +208,23 @@ export async function GET() {
         : undefined;
 
       // Reconstruct the sidebar lastReaction preview so it survives page refresh.
-      const lastReaction = latestReaction
+      // Only show the reaction if it is strictly more recent than the last message.
+      // If a newer message exists, it takes priority — mirroring what useSidebarRealtime
+      // does when it clears lastReaction on a new-message INSERT event.
+      const reactionIsLatest =
+        latestReaction &&
+        (!lastMsg || latestReaction.created_at > lastMsg.created_at);
+
+      const lastReaction = reactionIsLatest
         ? {
-            messageId: latestReaction.message_id,
-            emoji: latestReaction.emoji,
-            createdAt: latestReaction.created_at,
+            messageId: latestReaction!.message_id,
+            emoji: latestReaction!.emoji,
+            createdAt: latestReaction!.created_at,
             firstName:
-              latestReaction.user_id === userId
+              latestReaction!.user_id === userId
                 ? "You"
-                : (senderMap[latestReaction.user_id]?.split(" ")[0] ?? "Someone"),
-            isOwn: latestReaction.user_id === userId,
+                : (senderMap[latestReaction!.user_id]?.split(" ")[0] ?? "Someone"),
+            isOwn: latestReaction!.user_id === userId,
             messagePreview: reactionMessage?.content
               ? `"${reactionMessage.content.slice(0, 40)}${reactionMessage.content.length > 40 ? "…" : ""}"`
               : "📷 Photo",
