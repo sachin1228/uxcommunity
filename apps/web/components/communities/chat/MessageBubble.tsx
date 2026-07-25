@@ -373,7 +373,7 @@ function MessageHoverActions({
 
         {/* Dropdown — always mounted, animated like profile dropdown */}
         <div
-          className={`absolute top-full mt-1 right-0 z-40 min-w-[11rem] rounded-xl bg-surface-raised border border-white/[0.1] shadow-2xl overflow-hidden origin-top-right transform transition ${
+          className={`absolute top-full mt-1 right-0 z-40 min-w-[8rem] rounded-xl bg-surface-raised border border-white/[0.1] shadow-2xl overflow-hidden origin-top-right transform transition ${
             menuOpen
               ? "opacity-100 scale-100 ease-out duration-100 pointer-events-auto"
               : "opacity-0 scale-95 ease-in duration-75 pointer-events-none"
