@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Pencil, ChevronDown, X, Check } from "lucide-react";
 import { INTEREST_EMOJIS } from "@/lib/interests";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
@@ -32,6 +33,7 @@ export function ProfileInterests({
   onChange,
 }: ProfileInterestsProps) {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const selectedInterests = allInterests.filter((i) => interestIds.includes(i.id));
@@ -68,9 +70,10 @@ export function ProfileInterests({
         )}
       </div>
 
-      {/* Dropdown */}
+      {/* Dropdown trigger */}
       <div ref={containerRef} className="relative inline-block">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-accent/40 bg-surface-raised px-4 py-2 font-body text-sm text-foreground-muted hover:text-foreground transition-all"
@@ -80,35 +83,40 @@ export function ProfileInterests({
           <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
-        {open && (
-          <div className="absolute left-0 top-full mt-2 z-30 w-72 rounded-xl border border-border bg-surface shadow-xl overflow-hidden">
-            <div className="max-h-72 overflow-y-auto">
-              {allInterests.map((interest) => {
-                const selected = interestIds.includes(interest.id);
-                return (
-                  <button
-                    key={interest.id}
-                    type="button"
-                    onClick={() => toggle(interest.id)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-surface-raised transition-colors"
+        {/* Portal dropdown — always above other content */}
+        <DropdownMenu
+          triggerRef={triggerRef}
+          open={open}
+          onClose={() => setOpen(false)}
+          align="left"
+          className="w-72"
+        >
+          <div className="max-h-72 overflow-y-auto">
+            {allInterests.map((interest) => {
+              const selected = interestIds.includes(interest.id);
+              return (
+                <button
+                  key={interest.id}
+                  type="button"
+                  onClick={() => toggle(interest.id)}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.08] transition-colors"
+                >
+                  <span className="text-base leading-none shrink-0">
+                    {INTEREST_EMOJIS[interest.name] ?? "🎨"}
+                  </span>
+                  <span className="flex-1 font-body text-sm text-foreground">{interest.name}</span>
+                  <span
+                    className={`h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors ${
+                      selected ? "bg-accent" : "border border-border"
+                    }`}
                   >
-                    <span className="text-base leading-none shrink-0">
-                      {INTEREST_EMOJIS[interest.name] ?? "🎨"}
-                    </span>
-                    <span className="flex-1 font-body text-sm text-foreground">{interest.name}</span>
-                    <span
-                      className={`h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors ${
-                        selected ? "bg-accent" : "border border-border"
-                      }`}
-                    >
-                      {selected && <Check size={10} className="text-white" />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+                    {selected && <Check size={10} className="text-white" />}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </DropdownMenu>
       </div>
     </div>
   );

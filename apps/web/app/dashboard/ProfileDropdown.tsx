@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
 interface Props {
   name: string;
@@ -16,19 +17,8 @@ interface Props {
 export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
-
-  // Close on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    if (open) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
 
   async function handleLogout() {
     setLoading(true);
@@ -46,9 +36,10 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       {/* Avatar trigger */}
       <button
+        ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
         className="h-7 w-7 rounded-full overflow-hidden shrink-0 focus:outline-none ring-2 ring-transparent hover:ring-accent/40 transition-all"
         aria-label="Profile menu"
@@ -64,51 +55,51 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
         )}
       </button>
 
-      {/* Dropdown — always mounted, animated like Alpine.js x-transition */}
-      <div
-        className={`absolute right-0 top-full mt-2 w-56 rounded-xl bg-surface shadow-lg border border-border overflow-hidden z-50 origin-top-right transform transition ${
-          open
-            ? "opacity-100 scale-100 ease-out duration-100 pointer-events-auto"
-            : "opacity-0 scale-95 ease-in duration-75 pointer-events-none"
-        }`}
+      {/* Portal dropdown — sits above all stacking contexts */}
+      <DropdownMenu
+        triggerRef={triggerRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        align="right"
+        className="w-56"
       >
-          {/* User info */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
-              {avatarUrl ? (
-                <AvatarImg url={avatarUrl} name={name} size={36} className="h-9 w-9 rounded-full object-cover" />
-              ) : (
-                <div className="h-9 w-9 rounded-full bg-accent flex items-center justify-center select-none">
-                  <span className="font-display text-sm font-semibold text-accent-foreground">{initial}</span>
-                </div>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="font-body text-sm font-medium text-foreground truncate">{name}</p>
-              <p className="font-body text-[11px] text-foreground-muted truncate">{email}</p>
-            </div>
+        {/* User info header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.08]">
+          <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
+            {avatarUrl ? (
+              <AvatarImg url={avatarUrl} name={name} size={36} className="h-9 w-9 rounded-full object-cover" />
+            ) : (
+              <div className="h-9 w-9 rounded-full bg-accent flex items-center justify-center select-none">
+                <span className="font-display text-sm font-semibold text-accent-foreground">{initial}</span>
+              </div>
+            )}
           </div>
-
-          {/* Actions */}
-          <div className="py-1">
-            <Link
-              href="/dashboard/profile"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised/50 transition-colors"
-            >
-              <UserCircle size={14} />
-              My Profile
-            </Link>
-            <button
-              onClick={handleLogout}
-              disabled={loading}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-surface-raised/50 transition-colors disabled:opacity-50"
-            >
-              <LogOut size={14} />
-              {loading ? "Signing out…" : "Sign out"}
-            </button>
+          <div className="min-w-0">
+            <p className="font-body text-sm font-medium text-foreground truncate">{name}</p>
+            <p className="font-body text-[11px] text-foreground-muted truncate">{email}</p>
           </div>
         </div>
+
+        {/* Actions */}
+        <div className="py-1">
+          <Link
+            href="/dashboard/profile"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors"
+          >
+            <UserCircle size={14} />
+            My Profile
+          </Link>
+          <button
+            onClick={handleLogout}
+            disabled={loading}
+            className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+          >
+            <LogOut size={14} />
+            {loading ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      </DropdownMenu>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect } from "react";
-import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, ChevronDown } from "lucide-react";
+import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
 
 interface MessageBubbleProps {
@@ -228,6 +229,7 @@ function MessageHoverActions({
   showReaction = true,
   showMenu = true,
   insideBubble = false,
+  dotsVisible = false,
 }: {
   msg: CachedMessage;
   isMe: boolean;
@@ -242,10 +244,12 @@ function MessageHoverActions({
   showReaction?: boolean;
   showMenu?: boolean;
   insideBubble?: boolean;
+  /** Controls three-dot button visibility when insideBubble=true (proximity-based). */
+  dotsVisible?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerBtnRef = useRef<HTMLButtonElement>(null);
   const myEmoji = msg.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji;
   const canCopy = !!msg.content && !isDeleted;
 
@@ -260,25 +264,6 @@ function MessageHoverActions({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
-
-  // Close the action menu when clicking outside or pressing Escape.
-  useEffect(() => {
-    if (!showMenu || !menuOpen) return;
-    const handlePointerDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onMenuOpenChange(false);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onMenuOpenChange(false);
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [menuOpen, onMenuOpenChange, showMenu]);
 
   // No actions on deleted or still-sending messages
   if (isDeleted || msg.status === "sending") return null;
@@ -348,12 +333,18 @@ function MessageHoverActions({
 
       {/* Reply, copy, and delete menu */}
       {showMenu && (
-      <div className={insideBubble ? "absolute top-1 right-1 z-30" : "relative"} ref={menuRef}>
+      <div className={insideBubble ? "absolute top-1 right-1 z-30" : "relative"}>
         <button
+          ref={triggerBtnRef}
           onClick={(e) => { e.stopPropagation(); onMenuOpenChange(!menuOpen); }}
           className={`
             w-7 h-7 rounded-full flex items-center justify-center
-            ${insideBubble ? "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto" : ""}
+            ${insideBubble
+              ? (dotsVisible || menuOpen)
+                ? "opacity-100 pointer-events-auto"
+                : "opacity-0 pointer-events-none"
+              : ""}
+            transition-opacity duration-150
             transition-colors duration-100
             ${isMe
               ? menuOpen
@@ -368,17 +359,15 @@ function MessageHoverActions({
           aria-expanded={menuOpen}
           title="More actions"
         >
-          <ChevronDown size={14} strokeWidth={2.5} />
+          <MoreHorizontal size={14} strokeWidth={2.5} />
         </button>
 
-        {/* Dropdown — always mounted, animated like profile dropdown */}
-        <div
-          className={`absolute top-full mt-1 right-0 z-40 min-w-[8rem] rounded-xl bg-surface-raised border border-white/[0.1] shadow-2xl overflow-hidden origin-top-right transform transition ${
-            menuOpen
-              ? "opacity-100 scale-100 ease-out duration-100 pointer-events-auto"
-              : "opacity-0 scale-95 ease-in duration-75 pointer-events-none"
-          }`}
-          role="menu"
+        {/* Portal dropdown — renders at document.body, above all stacking contexts */}
+        <DropdownMenu
+          triggerRef={triggerBtnRef}
+          open={menuOpen}
+          onClose={() => onMenuOpenChange(false)}
+          align="right"
         >
           <button
             onClick={(e) => {
@@ -425,7 +414,7 @@ function MessageHoverActions({
               </button>
             </>
           )}
-        </div>
+        </DropdownMenu>
       </div>
       )}
     </div>
@@ -584,6 +573,17 @@ export function MessageBubble({
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [nearBubble, setNearBubble] = useState(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+
+  /** Show three-dot button when mouse is within 40 px of the bubble's right edge. */
+  function handleRowMouseMove(e: React.MouseEvent) {
+    if (!bubbleRef.current) return;
+    const r = bubbleRef.current.getBoundingClientRect();
+    const withinX = e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
+    const withinY = e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
+    setNearBubble(withinX && withinY);
+  }
 
   const sender    = msg.users;
   const reactions = msg.reactions ?? [];
@@ -626,6 +626,8 @@ export function MessageBubble({
         className={`group flex items-start gap-2 w-full px-5 transition-colors duration-300 ${rowHighlight} ${
           isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
         }`}
+        onMouseMove={handleRowMouseMove}
+        onMouseLeave={() => setNearBubble(false)}
       >
         {/* Avatar column — always on the left */}
         <div className="w-7 shrink-0 mt-0.5">
@@ -689,6 +691,7 @@ export function MessageBubble({
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
               <div className="relative min-w-0">
                 <div
+                  ref={bubbleRef}
                   className={`relative rounded-2xl px-3 pt-2 pb-1.5 select-none transition-shadow duration-150 ${
                     menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
                   } ${
@@ -746,6 +749,7 @@ export function MessageBubble({
                     onMenuOpenChange={setMenuOpen}
                     showReaction={false}
                     insideBubble
+                    dotsVisible={nearBubble}
                   />
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
