@@ -25,7 +25,7 @@ export function ChatHeader({
   onTabChange,
 }: ChatHeaderProps) {
   return (
-    <div className="px-5 pt-5 border-b border-border shrink-0">
+    <div className="px-5 pt-4 border-b border-border shrink-0">
       {community ? (
         <>
           <div className="flex items-center justify-between">
