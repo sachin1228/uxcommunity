@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ProfileClient } from "./ProfileClient";
+import type { ProfileThread } from "@/components/communities/threads/types";
 
 export const metadata = { title: "Your Profile" };
 
@@ -17,6 +18,7 @@ export default async function ProfilePage() {
     { data: profile },
     { data: userInterests },
     { data: allInterests },
+    { data: threads },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -31,6 +33,14 @@ export default async function ProfilePage() {
       .select("interest_id, design_interests(id, name, image_url)")
       .eq("user_id", userId),
     db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
+    db
+      .from("community_threads")
+      .select(
+        "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at, communities(name)",
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50),
   ]);
 
   const myInterestIds = (userInterests ?? [])
@@ -53,6 +63,15 @@ export default async function ProfilePage() {
       initialBio={(profile as any)?.bio ?? ""}
       initialInterestIds={myInterestIds}
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
+      initialThreads={(threads ?? []).map((thread) => ({
+        ...thread,
+        users: null,
+        community: (thread as { communities?: { name: string }[] | null }).communities?.[0] ?? null,
+        vote_count: 0,
+        user_voted: false,
+        comment_count: 0,
+      })) as ProfileThread[]}
+      currentUserId={userId}
     />
   );
 }
