@@ -1,12 +1,12 @@
 export const THREAD_CATEGORIES = [
-  { value: "question", label: "Question", emoji: "❓" },
-  { value: "discussion", label: "Discussion", emoji: "💬" },
-  { value: "showcase", label: "Showcase", emoji: "🎨" },
-  { value: "resource", label: "Resource", emoji: "📚" },
-  { value: "idea", label: "Idea", emoji: "💡" },
-  { value: "feedback", label: "Feedback", emoji: "📣" },
-  { value: "job", label: "Job", emoji: "💼" },
-  { value: "collaboration", label: "Collaboration", emoji: "🤝" },
+  { value: "question", label: "Question" },
+  { value: "discussion", label: "Discussion" },
+  { value: "showcase", label: "Showcase" },
+  { value: "resource", label: "Resource" },
+  { value: "idea", label: "Idea" },
+  { value: "feedback", label: "Feedback" },
+  { value: "job", label: "Job" },
+  { value: "collaboration", label: "Collaboration" },
 ] as const;
 
 export type ThreadCategory = (typeof THREAD_CATEGORIES)[number]["value"];

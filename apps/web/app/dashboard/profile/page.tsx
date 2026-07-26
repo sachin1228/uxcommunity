@@ -18,7 +18,7 @@ export default async function ProfilePage() {
     { data: profile },
     { data: userInterests },
     { data: allInterests },
-    { data: threads },
+    { data: rawThreads },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -43,6 +43,35 @@ export default async function ProfilePage() {
       .limit(50),
   ]);
 
+  // Compute real vote + comment counts so the profile page doesn't open with all zeros.
+  const threadList = rawThreads ?? [];
+  const threadIds = threadList.map((t) => t.id);
+
+  const [{ data: allVotes }, { data: myVotes }, { data: allComments }] = threadIds.length
+    ? await Promise.all([
+        db.from("thread_votes").select("thread_id").in("thread_id", threadIds),
+        db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
+        db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
+
+  const voteCountMap: Record<string, number> = {};
+  for (const v of allVotes ?? []) voteCountMap[v.thread_id] = (voteCountMap[v.thread_id] ?? 0) + 1;
+
+  const commentCountMap: Record<string, number> = {};
+  for (const c of allComments ?? []) commentCountMap[c.thread_id] = (commentCountMap[c.thread_id] ?? 0) + 1;
+
+  const myVoteSet = new Set((myVotes ?? []).map((v) => v.thread_id));
+
+  // Supabase returns the joined communities row as an object (many-to-one),
+  // not as an array. Normalise to { name } | null regardless of shape.
+  function communityOf(thread: { communities?: unknown }): { name: string } | null {
+    const raw = thread.communities;
+    if (!raw) return null;
+    if (Array.isArray(raw)) return (raw[0] as { name: string }) ?? null;
+    return raw as { name: string };
+  }
+
   const myInterestIds = (userInterests ?? [])
     .map((r: any) => r.design_interests?.id)
     .filter(Boolean) as string[];
@@ -63,13 +92,13 @@ export default async function ProfilePage() {
       initialBio={(profile as any)?.bio ?? ""}
       initialInterestIds={myInterestIds}
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
-      initialThreads={(threads ?? []).map((thread) => ({
+      initialThreads={threadList.map((thread) => ({
         ...thread,
         users: null,
-        community: (thread as { communities?: { name: string }[] | null }).communities?.[0] ?? null,
-        vote_count: 0,
-        user_voted: false,
-        comment_count: 0,
+        community: communityOf(thread),
+        vote_count: voteCountMap[thread.id] ?? 0,
+        user_voted: myVoteSet.has(thread.id),
+        comment_count: commentCountMap[thread.id] ?? 0,
       })) as ProfileThread[]}
       currentUserId={userId}
     />

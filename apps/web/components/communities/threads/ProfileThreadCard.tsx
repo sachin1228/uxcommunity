@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronUp, MessageSquare, MoreHorizontal, Pencil } from "lucide-react";
+import { ChevronUp, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import type { ProfileThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import type { CommunityThread } from "./types";
+import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
 
 function formatRelativeDate(value: string) {
@@ -20,15 +21,26 @@ function formatRelativeDate(value: string) {
 
 interface ProfileThreadCardProps {
   thread: ProfileThread;
+  currentUserName: string;
+  currentUserAvatar: string | null;
   onUpdated: (thread: ProfileThread) => void;
   onVoteChanged: (threadId: string, voted: boolean, newCount: number) => void;
+  onDeleted: (threadId: string) => void;
 }
 
-export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileThreadCardProps) {
+export function ProfileThreadCard({
+  thread,
+  currentUserName,
+  currentUserAvatar,
+  onUpdated,
+  onVoteChanged,
+  onDeleted,
+}: ProfileThreadCardProps) {
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const [votePending, setVotePending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +53,21 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
+
+  async function handleDelete(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!confirm("Delete this thread? This cannot be undone.")) return;
+    setDeleting(true);
+    setMenuOpen(false);
+    try {
+      const res = await fetch(`/api/communities/${thread.community_id}/threads/${thread.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) onDeleted(thread.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleVote() {
     if (votePending) return;
@@ -63,13 +90,15 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
     }
   }
 
+  const authorName = currentUserName || "You";
+  const authorInitial = authorName.charAt(0).toUpperCase();
   const threadHref = `/dashboard/communities/${thread.community_id}/threads/${thread.id}`;
 
   return (
     <>
-      <article className="group rounded-xl border border-border bg-surface-raised">
+      <article className="group rounded-xl border border-border bg-surface">
         <div className="flex items-stretch">
-          {/* Left — upvote column */}
+          {/* Left — upvote column (not a link) */}
           <div className="flex w-11 shrink-0 flex-col items-center justify-start gap-0.5 px-1 py-3">
             <button
               type="button"
@@ -84,19 +113,23 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
             >
               <ChevronUp size={15} strokeWidth={thread.user_voted ? 2.5 : 2} />
             </button>
-            <span className={`font-mono text-[11px] font-semibold tabular-nums ${thread.user_voted ? "text-accent" : "text-foreground-muted"}`}>
+            <span
+              className={`font-mono text-[11px] font-semibold tabular-nums ${
+                thread.user_voted ? "text-accent" : "text-foreground-muted"
+              }`}
+            >
               {thread.vote_count}
             </span>
           </div>
 
-          {/* Main content — clickable */}
+          {/* Main content — clickable link area */}
           <Link href={threadHref} className="min-w-0 flex-1 py-3 pr-3 block">
-            {/* Top row: category + community + menu */}
+            {/* Top row: category + community badge + menu */}
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 {category && (
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-foreground-muted">
-                    <span>{category.emoji}</span>
+                    <CategoryIcon category={category.value} size={10} />
                     {category.label}
                   </span>
                 )}
@@ -107,27 +140,43 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
                 )}
               </div>
               <div
-                className="relative shrink-0"
+                className="relative ml-auto shrink-0"
                 ref={menuRef}
                 onClick={(e) => e.preventDefault()}
               >
                 <button
                   type="button"
-                  onClick={(e) => { e.preventDefault(); setMenuOpen((prev) => !prev); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMenuOpen((prev) => !prev);
+                  }}
                   aria-label="Thread options"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface hover:text-foreground focus:opacity-100"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-raised hover:text-foreground focus:opacity-100"
                 >
                   <MoreHorizontal size={13} />
                 </button>
                 {menuOpen && (
-                  <div className="absolute right-0 top-7 z-20 min-w-[120px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                  <div className="absolute right-0 top-7 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
                     <button
                       type="button"
-                      onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setMenuOpen(false);
+                        setShowEditModal(true);
+                      }}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                     >
                       <Pencil size={11} />
                       Edit thread
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                    >
+                      <Trash2 size={11} />
+                      {deleting ? "Deleting…" : "Delete thread"}
                     </button>
                   </div>
                 )}
@@ -144,12 +193,42 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
               {thread.description}
             </p>
 
+            {/* Image attachments */}
+            {(() => {
+              const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
+              if (images.length === 0) return null;
+              const visible = images.slice(0, 4);
+              const overflow = images.length - visible.length;
+              return (
+                <div className="mt-2 flex gap-1.5">
+                  {visible.map((img, i) => (
+                    <div
+                      key={img.url}
+                      className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-raised"
+                    >
+                      <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+                      {i === visible.length - 1 && overflow > 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                          <span className="font-display text-sm font-semibold text-white">
+                            +{overflow}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Tags */}
             {thread.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="mt-2 flex flex-wrap gap-2">
                 {thread.tags.map((tag) => (
-                  <span key={tag} className="rounded border border-border px-1.5 py-0.5 font-body text-[10px] text-foreground-subtle">
-                    {tag}
+                  <span
+                    key={tag}
+                    className="font-body text-[11px] text-foreground-subtle"
+                  >
+                    #{tag}
                   </span>
                 ))}
               </div>
@@ -157,6 +236,21 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
 
             {/* Footer */}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/15">
+                {currentUserAvatar ? (
+                  <img
+                    src={currentUserAvatar}
+                    alt={authorName}
+                    className="h-4 w-4 object-cover"
+                  />
+                ) : (
+                  <span className="font-display text-[8px] font-bold text-accent">
+                    {authorInitial}
+                  </span>
+                )}
+              </div>
+              <span className="font-body text-[11px] text-foreground-muted">{authorName}</span>
+              <span className="font-body text-[11px] text-foreground-subtle">·</span>
               <span className="font-body text-[11px] text-foreground-subtle">
                 {formatRelativeDate(thread.updated_at || thread.created_at)}
               </span>
@@ -175,7 +269,13 @@ export function ProfileThreadCard({ thread, onUpdated, onVoteChanged }: ProfileT
           thread={thread as CommunityThread}
           communityId={thread.community_id}
           onClose={() => setShowEditModal(false)}
-          onUpdated={(updated) => onUpdated({ ...thread, ...updated })}
+          onUpdated={(updated) =>
+            onUpdated({
+              ...thread,
+              ...updated,
+              community: thread.community,
+            })
+          }
         />
       )}
     </>

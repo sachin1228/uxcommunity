@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Check, FilePlus2, Link as LinkIcon, Loader2, Plus, X } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES } from "./types";
+import { CategoryIcon } from "./categoryIcons";
 
 interface EditThreadModalProps {
   thread: CommunityThread;
@@ -196,7 +197,8 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                       : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
                   }`}
                 >
-                  {item.emoji} {item.label}
+                  <CategoryIcon category={item.value} size={12} />
+                  {item.label}
                 </button>
               ))}
             </div>

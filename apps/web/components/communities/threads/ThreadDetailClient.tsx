@@ -8,6 +8,7 @@ import {
   Loader2, MessageSquare, MoreHorizontal, Paperclip, Pencil, Send, Trash2,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { CategoryIcon } from "./categoryIcons";
 import type { CommunityThread, ThreadComment } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { EditThreadModal } from "./EditThreadModal";
@@ -417,7 +418,8 @@ export function ThreadDetailClient({ thread: initialThread, initialComments, cur
                 <div className="flex items-center justify-between gap-2">
                   {category && (
                     <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-foreground-muted">
-                      {category.emoji} {category.label}
+                      <CategoryIcon category={category.value} size={10} />
+                      {category.label}
                     </span>
                   )}
                   {isOwner && (

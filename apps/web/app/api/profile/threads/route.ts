@@ -27,12 +27,12 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch your threads." }, { status: 500 });
   }
 
-  const threads = (data ?? []).map((thread) => ({
-    ...thread,
-    users: null,
-    community: (thread as { communities?: { name: string }[] | null }).communities?.[0] ?? null,
-    communities: undefined,
-  }));
+  const threads = (data ?? []).map((thread) => {
+    const raw = (thread as { communities?: unknown }).communities;
+    const community: { name: string } | null =
+      !raw ? null : Array.isArray(raw) ? ((raw[0] as { name: string }) ?? null) : (raw as { name: string });
+    return { ...thread, users: null, community, communities: undefined };
+  });
 
   if (!threads.length) return NextResponse.json({ threads: [] });
 

@@ -279,7 +279,12 @@ export function ProfileClient({
         onChange={setInterestIds}
       />
 
-      <ProfileThreads initialThreads={initialThreads} currentUserId={currentUserId} />
+      <ProfileThreads
+        initialThreads={initialThreads}
+        currentUserId={currentUserId}
+        currentUserName={name}
+        currentUserAvatar={avatarUrl}
+      />
 
       {/* Sticky save bar */}
       {hasChanges && (
