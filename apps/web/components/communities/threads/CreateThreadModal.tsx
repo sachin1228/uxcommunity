@@ -189,7 +189,7 @@ export function CreateThreadModal({
                   key={item.value}
                   type="button"
                   onClick={() => setCategory(item.value)}
-                  className={`rounded-full border px-3 py-1.5 font-body text-xs transition-colors ${
+                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-2 font-body text-xs transition-colors ${
                     category === item.value
                       ? "border-accent bg-accent/15 text-accent"
                       : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
