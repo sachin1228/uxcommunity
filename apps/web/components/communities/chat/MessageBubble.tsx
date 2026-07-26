@@ -631,7 +631,7 @@ export function MessageBubble({
       >
         {/* Avatar column — always on the left */}
         <div className="w-7 shrink-0 mt-0.5">
-          {showHeader && sender && !isDeleted && (
+          {showHeader && sender && (
             <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
           )}
         </div>

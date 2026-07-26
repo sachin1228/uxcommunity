@@ -157,9 +157,9 @@ export function MessageList({
 
       {/* Date-grouped timeline (messages + thread notifications merged) */}
       {mergedGroups.map((group) => {
-        // Track the running index of message items so isSameAuthor still works.
-        let msgIndex = -1;
-        const msgItems = group.items.filter((i) => i.kind === "message");
+        // Track the previous timeline item so isSameAuthor works correctly
+        // even when thread notifications appear between messages.
+        let prevItem: TimelineItem | null = null;
 
         return (
           <div key={group.date}>
@@ -173,7 +173,7 @@ export function MessageList({
             {group.items.map((item) => {
               if (item.kind === "thread") {
                 // Thread notifications break the "same author" run for messages.
-                msgIndex = -1;
+                prevItem = null;
                 return (
                   <ThreadNotificationBubble
                     key={`thread-${item.event.id}`}
@@ -186,11 +186,11 @@ export function MessageList({
 
               // message item
               const msg = item.msg;
-              const prevMsg = msgIndex >= 0 ? msgItems[msgIndex] : undefined;
-              msgIndex++;
               const isMe = msg.user_id === currentUserId;
               const isSameAuthor =
-                prevMsg?.kind === "message" && prevMsg.msg.user_id === msg.user_id;
+                prevItem?.kind === "message" &&
+                prevItem.msg.user_id === msg.user_id;
+              prevItem = item;
               const isFirstUnread = firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
               const dividerNode = isFirstUnread ? (
                 <UnreadDivider ref={unreadDividerRef} count={unreadDisplayCount} />
