@@ -3,7 +3,7 @@
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 
 type Message = CachedMessage;
@@ -12,6 +12,7 @@ interface UseRealtimeChatOptions {
   communityId: string;
   fetchMessages: (after?: string) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
   membersRef: MutableRefObject<Member[]>;
   pendingProfileFetchRef: MutableRefObject<Map<string, Promise<void>>>;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
@@ -24,6 +25,7 @@ export function useRealtimeChat({
   communityId,
   fetchMessages,
   setMessages,
+  setThreadEvents,
   membersRef,
   pendingProfileFetchRef,
   scrollContainerRef,
@@ -333,6 +335,126 @@ export function useRealtimeChat({
             msgCache.set(communityId, next);
             return next;
           });
+        }
+      )
+      // ── New thread created ──────────────────────────────────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "community_threads",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            community_id: string;
+            user_id: string;
+            title: string;
+            description: string;
+            category: string;
+            attachments: Array<{ name: string; url: string; type: string; size: number }>;
+            created_at: string;
+          };
+
+          // Resolve author from local member list; lazy-fetch if unknown.
+          const senderMember = membersRef.current.find((m) => m.user_id === row.user_id);
+          const users = senderMember?.users ?? null;
+
+          const event: CachedThreadEvent = {
+            id:           row.id,
+            community_id: row.community_id,
+            user_id:      row.user_id,
+            title:        row.title,
+            description:  row.description,
+            category:     row.category,
+            attachments:  row.attachments ?? [],
+            created_at:   row.created_at,
+            users,
+          };
+
+          setThreadEvents((prev) => {
+            if (prev.some((e) => e.id === event.id)) return prev;
+            return [...prev, event].sort(
+              (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+            );
+          });
+
+          // Lazy-fetch profile if the author isn't in our member list yet.
+          if (!senderMember && !pendingProfileFetchRef.current.has(row.user_id)) {
+            const targetUserId  = row.user_id;
+            const targetEventId = row.id;
+            const p: Promise<void> = fetch(
+              `/api/communities/${communityId}/members/${targetUserId}`
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .then((profile: { name: string; avatar_url: string | null } | null) => {
+                if (!profile) return;
+                const resolvedUsers = { name: profile.name, avatar_url: profile.avatar_url };
+                membersRef.current = [
+                  ...membersRef.current,
+                  { user_id: targetUserId, users: resolvedUsers },
+                ];
+                setThreadEvents((prev) =>
+                  prev.map((e) =>
+                    e.id === targetEventId && e.users === null
+                      ? { ...e, users: resolvedUsers }
+                      : e
+                  )
+                );
+              })
+              .catch(() => {})
+              .finally(() => { pendingProfileFetchRef.current.delete(targetUserId); });
+            pendingProfileFetchRef.current.set(targetUserId, p);
+          }
+        }
+      )
+      // ── Thread updated (title / description / category / attachments) ───
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "community_threads",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            title: string;
+            description: string;
+            category: string;
+            attachments: Array<{ name: string; url: string; type: string; size: number }>;
+          };
+          setThreadEvents((prev) =>
+            prev.map((e) =>
+              e.id === row.id
+                ? {
+                    ...e,
+                    title:       row.title,
+                    description: row.description,
+                    category:    row.category,
+                    attachments: row.attachments ?? [],
+                  }
+                : e
+            )
+          );
+        }
+      )
+      // ── Thread deleted ───────────────────────────────────────────────────
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "community_threads",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          const row = payload.old as { id?: string };
+          if (!row.id) return;
+          setThreadEvents((prev) => prev.filter((e) => e.id !== row.id));
         }
       )
       .subscribe((status) => {

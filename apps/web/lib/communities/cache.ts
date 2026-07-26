@@ -29,6 +29,19 @@ export interface CachedMessage {
   deleted_at?: string | null;
 }
 
+/** A thread-created event shown inline in the chat timeline. */
+export interface CachedThreadEvent {
+  id: string;           // thread id
+  community_id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  category: string;
+  attachments: Array<{ name: string; url: string; type: string; size: number }>;
+  created_at: string;
+  users: { name: string; avatar_url: string | null } | null;
+}
+
 export interface CachedMeta {
   community: {
     id: string;

@@ -3,7 +3,7 @@
 import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 import { sidebarStore, msgCache } from "@/lib/communities/cache";
-import type { CachedMessage, CachedMeta, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
@@ -40,7 +40,46 @@ export function CommunityChat({
 }) {
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>("chat");
+  const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
+
+  // ── Load existing threads on mount so they persist across refreshes ───────
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/communities/${communityId}/threads`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { threads: Array<{
+        id: string; community_id: string; user_id: string;
+        title: string; description: string; category: string;
+        attachments: Array<{ name: string; url: string; type: string; size: number }>;
+        created_at: string;
+        users: { name: string; avatar_url: string | null } | null;
+      }> } | null) => {
+        if (cancelled || !data?.threads?.length) return;
+        const events: CachedThreadEvent[] = data.threads.map((t) => ({
+          id:           t.id,
+          community_id: t.community_id,
+          user_id:      t.user_id,
+          title:        t.title,
+          description:  t.description,
+          category:     t.category,
+          attachments:  t.attachments ?? [],
+          created_at:   t.created_at,
+          users:        t.users,
+        }));
+        setThreadEvents((prev) => {
+          // Merge with any events already added by realtime (deduplicate).
+          const existingIds = new Set(prev.map((e) => e.id));
+          const merged = [
+            ...events.filter((e) => !existingIds.has(e.id)),
+            ...prev,
+          ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+          return merged;
+        });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [communityId]);
 
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
@@ -223,6 +262,7 @@ export function CommunityChat({
     communityId,
     fetchMessages,
     setMessages,
+    setThreadEvents,
     membersRef,
     pendingProfileFetchRef,
     scrollContainerRef,
@@ -399,6 +439,7 @@ export function CommunityChat({
           >
             <MessageList
               grouped={grouped}
+              threadEvents={threadEvents}
               currentUserId={currentUserId}
               firstUnreadMsgId={firstUnreadMsgId}
               unreadDisplayCount={unreadDisplayCount}

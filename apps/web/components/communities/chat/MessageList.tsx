@@ -1,12 +1,13 @@
 "use client";
 
-import { RefObject } from "react";
+import { RefObject, useMemo } from "react";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { TypingIndicator } from "./TypingIndicator";
-import { TYPE_EMOJI } from "./chatUtils";
-import type { CachedMessage, MessageReaction } from "@/lib/communities/cache";
+import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
+import { TYPE_EMOJI, fmtDate } from "./chatUtils";
+import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
 import type { TypingUser } from "./useTypingPresence";
 
 type Message = CachedMessage;
@@ -23,8 +24,18 @@ interface DateGroup {
   messages: Message[];
 }
 
+type TimelineItem =
+  | { kind: "message"; msg: CachedMessage; created_at: string }
+  | { kind: "thread"; event: CachedThreadEvent; created_at: string };
+
+interface MergedGroup {
+  date: string;
+  items: TimelineItem[];
+}
+
 interface MessageListProps {
   grouped: DateGroup[];
+  threadEvents: CachedThreadEvent[];
   currentUserId: string;
   firstUnreadMsgId: string | null;
   unreadDisplayCount: number;
@@ -47,6 +58,7 @@ interface MessageListProps {
 
 export function MessageList({
   grouped,
+  threadEvents,
   currentUserId,
   firstUnreadMsgId,
   unreadDisplayCount,
@@ -66,6 +78,43 @@ export function MessageList({
   onCopy,
   onDelete,
 }: MessageListProps) {
+  // Merge messages + thread events into date-grouped timeline items.
+  const mergedGroups = useMemo<MergedGroup[]>(() => {
+    // Build a map of date → items so we can add thread events even on dates
+    // that have no regular messages yet.
+    const map = new Map<string, TimelineItem[]>();
+
+    for (const group of grouped) {
+      const items: TimelineItem[] = group.messages.map((msg) => ({
+        kind: "message",
+        msg,
+        created_at: msg.created_at,
+      }));
+      map.set(group.date, items);
+    }
+
+    for (const event of threadEvents) {
+      const date = fmtDate(event.created_at);
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push({ kind: "thread", event, created_at: event.created_at });
+    }
+
+    // Sort each group's items by created_at, then sort groups by date.
+    const result: MergedGroup[] = [];
+    for (const [date, items] of map) {
+      items.sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      result.push({ date, items });
+    }
+    result.sort(
+      (a, b) =>
+        new Date(a.items[0]?.created_at ?? 0).getTime() -
+        new Date(b.items[0]?.created_at ?? 0).getTime()
+    );
+    return result;
+  }, [grouped, threadEvents]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -85,7 +134,7 @@ export function MessageList({
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
       {/* Empty state */}
-      {grouped.length === 0 && (
+      {mergedGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
             {displayCommunity?.image_url ? (
@@ -110,48 +159,70 @@ export function MessageList({
         </div>
       )}
 
-      {/* Date-grouped messages */}
-      {grouped.map((group) => (
-        <div key={group.date}>
-          {/* Date divider */}
-          <div className="flex items-center justify-center py-3 px-5">
-            <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
-              {group.date}
-            </span>
+      {/* Date-grouped timeline (messages + thread notifications merged) */}
+      {mergedGroups.map((group) => {
+        // Track the running index of message items so isSameAuthor still works.
+        let msgIndex = -1;
+        const msgItems = group.items.filter((i) => i.kind === "message");
+
+        return (
+          <div key={group.date}>
+            {/* Date divider */}
+            <div className="flex items-center justify-center py-3 px-5">
+              <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                {group.date}
+              </span>
+            </div>
+
+            {group.items.map((item) => {
+              if (item.kind === "thread") {
+                // Thread notifications break the "same author" run for messages.
+                msgIndex = -1;
+                return (
+                  <ThreadNotificationBubble
+                    key={`thread-${item.event.id}`}
+                    event={item.event}
+                    communityId={communityId}
+                    currentUserId={currentUserId}
+                  />
+                );
+              }
+
+              // message item
+              const msg = item.msg;
+              const prevMsg = msgIndex >= 0 ? msgItems[msgIndex] : undefined;
+              msgIndex++;
+              const isMe = msg.user_id === currentUserId;
+              const isSameAuthor =
+                prevMsg?.kind === "message" && prevMsg.msg.user_id === msg.user_id;
+              const isFirstUnread = firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
+              const dividerNode = isFirstUnread ? (
+                <UnreadDivider ref={unreadDividerRef} count={unreadDisplayCount} />
+              ) : null;
+
+              return (
+                <MessageBubble
+                  key={msg.id}
+                  msg={msg}
+                  isMe={isMe}
+                  isSameAuthor={isSameAuthor}
+                  isFirstUnread={isFirstUnread}
+                  unreadDivider={dividerNode}
+                  currentUserId={currentUserId}
+                  highlighted={highlightedMsgId === msg.id}
+                  onReplyClick={onReplyClick}
+                  onCancelSend={onCancelSend}
+                  onRetrySend={onRetrySend}
+                  onReaction={onReaction}
+                  onReply={onReply}
+                  onCopy={onCopy}
+                  onDelete={onDelete}
+                />
+              );
+            })}
           </div>
-
-          {group.messages.map((msg, i) => {
-            const isMe         = msg.user_id === currentUserId;
-            const prev         = group.messages[i - 1];
-            const isSameAuthor = prev?.user_id === msg.user_id;
-            const isFirstUnread =
-              firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
-            const dividerNode = isFirstUnread ? (
-              <UnreadDivider ref={unreadDividerRef} count={unreadDisplayCount} />
-            ) : null;
-
-            return (
-              <MessageBubble
-                key={msg.id}
-                msg={msg}
-                isMe={isMe}
-                isSameAuthor={isSameAuthor}
-                isFirstUnread={isFirstUnread}
-                unreadDivider={dividerNode}
-                currentUserId={currentUserId}
-                highlighted={highlightedMsgId === msg.id}
-                onReplyClick={onReplyClick}
-                onCancelSend={onCancelSend}
-                onRetrySend={onRetrySend}
-                onReaction={onReaction}
-                onReply={onReply}
-                onCopy={onCopy}
-                onDelete={onDelete}
-              />
-            );
-          })}
-        </div>
-      ))}
+        );
+      })}
 
       {/* WhatsApp-style typing bubble — rendered inside the scroll area */}
       <TypingIndicator users={typingUsers} />

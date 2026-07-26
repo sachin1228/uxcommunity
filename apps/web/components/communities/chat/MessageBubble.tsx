@@ -638,8 +638,8 @@ export function MessageBubble({
 
         {/* Content column */}
         <div className="max-w-[65%]">
-          {/* Sender name */}
-          {showHeader && sender && !isDeleted && (
+          {/* Sender name — hidden for the current user's own messages */}
+          {showHeader && sender && !isDeleted && !isMe && (
             <p className={`font-body text-[11px] font-semibold mb-0.5 ml-0.5 ${
               isMe ? "text-accent" : "text-foreground-muted"
             }`}>
