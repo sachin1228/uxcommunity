@@ -4,11 +4,9 @@ import {
   ChevronRight,
   HelpCircle,
   MessageCircle,
-  Sparkles,
-  BookOpen,
   Lightbulb,
   Flag,
-  Briefcase,
+  Share2,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -33,11 +31,9 @@ function categoryLabel(value: string): string {
 const CATEGORY_ICON: Record<string, LucideIcon> = {
   question:      HelpCircle,
   discussion:    MessageCircle,
-  showcase:      Sparkles,
-  resource:      BookOpen,
   idea:          Lightbulb,
   feedback:      Flag,
-  job:           Briefcase,
+  referral:      Share2,
   collaboration: Users,
 };
 

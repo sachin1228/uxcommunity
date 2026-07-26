@@ -12,11 +12,9 @@ const PAGE_SIZE = 50;
 const CATEGORIES = new Set<ThreadCategory>([
   "question",
   "discussion",
-  "showcase",
-  "resource",
   "idea",
   "feedback",
-  "job",
+  "referral",
   "collaboration",
 ]);
 

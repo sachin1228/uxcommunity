@@ -8,8 +8,8 @@ import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 
 const CATEGORIES = new Set<ThreadCategory>([
-  "question", "discussion", "showcase", "resource",
-  "idea", "feedback", "job", "collaboration",
+  "question", "discussion",
+  "idea", "feedback", "referral", "collaboration",
 ]);
 
 interface RawAttachment { name?: unknown; url?: unknown; type?: unknown; size?: unknown; }

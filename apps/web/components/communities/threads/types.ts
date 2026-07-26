@@ -1,11 +1,37 @@
+export const THREAD_TAGS = [
+  "UI Design",
+  "UX Design",
+  "Typography",
+  "Color Theory",
+  "Layout",
+  "Branding",
+  "Illustration",
+  "Iconography",
+  "Motion Design",
+  "Design Systems",
+  "Prototyping",
+  "Figma",
+  "User Research",
+  "Accessibility",
+  "Mobile Design",
+  "Web Design",
+  "Product Design",
+  "Interaction Design",
+  "Components",
+  "Dark Mode",
+  "Responsive Design",
+  "Portfolio",
+  "Freelance",
+] as const;
+
+export type ThreadTag = (typeof THREAD_TAGS)[number];
+
 export const THREAD_CATEGORIES = [
   { value: "question", label: "Question" },
   { value: "discussion", label: "Discussion" },
-  { value: "showcase", label: "Showcase" },
-  { value: "resource", label: "Resource" },
   { value: "idea", label: "Idea" },
   { value: "feedback", label: "Feedback" },
-  { value: "job", label: "Job" },
+  { value: "referral", label: "Referral" },
   { value: "collaboration", label: "Collaboration" },
 ] as const;
 

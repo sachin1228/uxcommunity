@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Check, FilePlus2, Link as LinkIcon, Loader2, Plus, X } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
+import { Check, ChevronDown, FilePlus2, Link as LinkIcon, Loader2, Plus, X } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
-import { THREAD_CATEGORIES } from "./types";
+import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
 
 interface CreateThreadModalProps {
@@ -22,7 +22,8 @@ export function CreateThreadModal({
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<ThreadCategory>("question");
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
   const [attachments, setAttachments] = useState<ThreadAttachment[]>([]);
   const [links, setLinks] = useState<string[]>([]);
   const [linkInput, setLinkInput] = useState("");
@@ -31,12 +32,15 @@ export function CreateThreadModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  function addTag(raw: string) {
-    const tag = raw.trim().replace(/^#/, "");
-    if (!tag || tags.length >= 3 || tags.includes(tag) || tag.length > 30) return;
-    setTags((current) => [...current, tag]);
-    setTagInput("");
-  }
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
+        setTagDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   function addLink() {
     const link = linkInput.trim();
@@ -202,34 +206,66 @@ export function CreateThreadModal({
             </div>
           </fieldset>
 
-          <div>
+          <div ref={tagDropdownRef} className="relative">
             <label className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
               Tags <span className="font-normal text-foreground-subtle">(up to 3)</span>
             </label>
-            <div className="flex min-h-11 flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-2 focus-within:border-accent">
+            <button
+              type="button"
+              onClick={() => setTagDropdownOpen((o) => !o)}
+              className={`flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-surface-raised px-3 py-2 text-left transition-colors ${tagDropdownOpen ? "border-accent" : "border-border"}`}
+            >
+              {tags.length === 0 && (
+                <span className="font-body text-sm text-foreground-subtle">Select up to 3 tags…</span>
+              )}
               {tags.map((tag) => (
                 <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 font-body text-xs text-accent">
-                  #{tag}
-                  <button type="button" onClick={() => setTags((current) => current.filter((item) => item !== tag))} aria-label={`Remove ${tag}`}>
+                  {tag}
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remove ${tag}`}
+                    onClick={(e) => { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); } }}
+                    className="cursor-pointer"
+                  >
                     <X size={11} />
-                  </button>
+                  </span>
                 </span>
               ))}
-              {tags.length < 3 && (
-                <input
-                  value={tagInput}
-                  onChange={(event) => setTagInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === ",") {
-                      event.preventDefault();
-                      addTag(tagInput);
-                    }
-                  }}
-                  placeholder={tags.length ? "Add another tag" : "Type a tag and press Enter"}
-                  className="min-w-[180px] flex-1 bg-transparent font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle"
-                />
-              )}
-            </div>
+              <ChevronDown size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+            {tagDropdownOpen && (
+              <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
+                {THREAD_TAGS.map((tag) => {
+                  const selected = tags.includes(tag);
+                  const maxed = !selected && tags.length >= 3;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      disabled={maxed}
+                      onClick={() => {
+                        if (selected) setTags((c) => c.filter((t) => t !== tag));
+                        else if (tags.length < 3) setTags((c) => [...c, tag]);
+                      }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 font-body text-sm transition-colors ${
+                        selected
+                          ? "bg-accent/10 text-accent"
+                          : maxed
+                          ? "cursor-not-allowed text-foreground-subtle opacity-40"
+                          : "text-foreground hover:bg-surface-raised"
+                      }`}
+                    >
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-accent bg-accent" : "border-border"}`}>
+                        {selected && <Check size={10} className="text-accent-foreground" />}
+                      </span>
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>

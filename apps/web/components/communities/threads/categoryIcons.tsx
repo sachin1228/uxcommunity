@@ -1,11 +1,9 @@
 import {
   HelpCircle,
   MessageCircle,
-  Palette,
-  BookOpen,
   Lightbulb,
   Megaphone,
-  Briefcase,
+  Share2,
   Users,
 } from "lucide-react";
 import type { ThreadCategory } from "./types";
@@ -13,11 +11,9 @@ import type { ThreadCategory } from "./types";
 export const CATEGORY_ICONS: Record<ThreadCategory, React.ElementType> = {
   question: HelpCircle,
   discussion: MessageCircle,
-  showcase: Palette,
-  resource: BookOpen,
   idea: Lightbulb,
   feedback: Megaphone,
-  job: Briefcase,
+  referral: Share2,
   collaboration: Users,
 };
 
