@@ -9,6 +9,8 @@ type Message = CachedMessage;
 interface UseSendMessageOptions {
   communityId: string;
   currentUserId: string;
+  currentUserName: string;
+  currentUserAvatar: string | null;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setHideUnreadDivider: (val: boolean) => void;
   replyTo: ReplyPreview | null;
@@ -24,6 +26,8 @@ type RetryData = {
 export function useSendMessage({
   communityId,
   currentUserId,
+  currentUserName,
+  currentUserAvatar,
   setMessages,
   setHideUnreadDivider,
   replyTo,
@@ -160,7 +164,7 @@ export function useSendMessage({
       content,
       created_at: new Date().toISOString(),
       user_id: currentUserId,
-      users: null,
+      users: { name: currentUserName, avatar_url: currentUserAvatar },
       status: "sending",
       reactions: [],
       reply_to: msgReplyTo ?? null,
@@ -394,7 +398,7 @@ export function useSendMessage({
       content: "",
       created_at: new Date().toISOString(),
       user_id: currentUserId,
-      users: null,
+      users: { name: currentUserName, avatar_url: currentUserAvatar },
       status: "sending",
       reactions: [],
       reply_to: null,

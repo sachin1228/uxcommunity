@@ -215,9 +215,9 @@ export function CommunityChat({
     }
   }, [communityId, fetchMessages, setMessages]);
 
-  const currentUserName =
-    members.find((member) => member.user_id === currentUserId)?.users?.name ??
-    "Someone";
+  const currentUserMember = members.find((member) => member.user_id === currentUserId);
+  const currentUserName = currentUserMember?.users?.name ?? "Someone";
+  const currentUserAvatar = currentUserMember?.users?.avatar_url ?? null;
   const { typingUsers, setTyping } = useTypingPresence({
     communityId,
     currentUserId,
@@ -290,6 +290,8 @@ export function CommunityChat({
   } = useSendMessage({
     communityId,
     currentUserId,
+    currentUserName,
+    currentUserAvatar,
     setMessages,
     setHideUnreadDivider,
     replyTo,
@@ -504,7 +506,7 @@ export function CommunityChat({
         )}
       </div>
 
-      <CommunityInfoPanel members={members} community={displayCommunity} />
+      <CommunityInfoPanel members={members} community={displayCommunity} communityId={communityId} />
     </div>
   );
 }

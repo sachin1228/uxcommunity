@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   MapPin,
   Calendar,
   Download,
   Users,
   FileText,
+  ExternalLink,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 
@@ -14,12 +17,22 @@ interface Member {
   users: { name: string; avatar_url: string | null } | null;
 }
 
+interface UpcomingEvent {
+  id: string;
+  title: string;
+  event_date: string;
+  location: string | null;
+  is_online: boolean;
+  rsvp_count: number;
+}
+
 interface CommunityInfoPanelProps {
   members: Member[];
   community: { member_count: number } | null;
+  communityId: string;
 }
 
-// ─── Static data (replace with real API later) ────────────────────────────────
+// ─── Static about data (community-agnostic fallback display) ─────────────────
 const STATIC_ABOUT = {
   description:
     "A community for designers working at Amazon across India to connect, share, and grow together.",
@@ -28,18 +41,18 @@ const STATIC_ABOUT = {
   tags: ["Design", "Amazon", "Product Design"],
 };
 
-const STATIC_EVENT = {
-  title: "Pune Designers Meetup",
-  date: "26 Jul, 2025 · 4:00 PM",
-  location: "Mariplex, Pune",
-  going: 32,
-};
-
 const STATIC_RESOURCES = [
   { name: "Design System Guidelines", meta: "PDF · 2.4 MB" },
   { name: "Amazon Design Principles",  meta: "PDF · 1.1 MB" },
   { name: "Figma Component Library",   meta: "Figma File · 12.4 MB" },
 ];
+
+function fmtEventDate(iso: string) {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+  return `${date} · ${time}`;
+}
 
 // ─── Avatar stack ─────────────────────────────────────────────────────────────
 function AvatarStack({ members, total }: { members: Member[]; total: number }) {
@@ -105,8 +118,25 @@ function SeeAll() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function CommunityInfoPanel({ members, community }: CommunityInfoPanelProps) {
+export function CommunityInfoPanel({ members, community, communityId }: CommunityInfoPanelProps) {
   const memberCount = community?.member_count ?? members.length;
+
+  const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
+
+  useEffect(() => {
+    if (!communityId) return;
+    fetch(`/api/communities/${communityId}/events`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { events: UpcomingEvent[] } | null) => {
+        if (!data?.events?.length) return;
+        const now = new Date();
+        const upcoming = data.events
+          .filter((e) => new Date(e.event_date) > now)
+          .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
+        setUpcomingEvent(upcoming[0] ?? null);
+      })
+      .catch(() => {/* silent */});
+  }, [communityId]);
 
   return (
     // Outer wrapper — sizing + scroll, holds both cards
@@ -150,36 +180,49 @@ export function CommunityInfoPanel({ members, community }: CommunityInfoPanelPro
           </div>
         </Section>
 
-        {/* Upcoming Events */}
-        <Section title="Upcoming Events" action={<SeeAll />}>
-          <div className="flex gap-3">
-            <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
-              <Calendar size={20} className="text-foreground-subtle" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-[13px] font-semibold text-foreground leading-snug mb-1">
-                {STATIC_EVENT.title}
-              </p>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                  <Calendar size={11} className="shrink-0" />
-                  {STATIC_EVENT.date}
-                </div>
-                <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                  <MapPin size={11} className="shrink-0" />
-                  {STATIC_EVENT.location}
-                </div>
-                <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                  <Users size={11} className="shrink-0" />
-                  {STATIC_EVENT.going} going
+        {/* Upcoming Events — only shown when a real upcoming event exists */}
+        {upcomingEvent && (
+          <Section title="Upcoming Events" action={<SeeAll />}>
+            <div className="flex gap-3">
+              <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
+                <Calendar size={20} className="text-foreground-subtle" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-body text-[13px] font-semibold text-foreground leading-snug mb-1">
+                  {upcomingEvent.title}
+                </p>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                    <Calendar size={11} className="shrink-0" />
+                    {fmtEventDate(upcomingEvent.event_date)}
+                  </div>
+                  {upcomingEvent.location && (
+                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                      <MapPin size={11} className="shrink-0" />
+                      {upcomingEvent.location}
+                    </div>
+                  )}
+                  {upcomingEvent.is_online && !upcomingEvent.location && (
+                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                      <ExternalLink size={11} className="shrink-0" />
+                      Online
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                    <Users size={11} className="shrink-0" />
+                    {upcomingEvent.rsvp_count} going
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-          <button className="mt-3 w-full py-1.5 rounded-lg bg-accent font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover transition-colors">
-            Join
-          </button>
-        </Section>
+            <Link
+              href={`/dashboard/communities/${communityId}/events/${upcomingEvent.id}`}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 font-body text-sm font-medium text-foreground-muted hover:bg-surface-raised hover:text-foreground transition-colors"
+            >
+              View Event
+            </Link>
+          </Section>
+        )}
 
         {/* Popular Resources — last section, no border-b */}
         <div className="px-4 py-4">
