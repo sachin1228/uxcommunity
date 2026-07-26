@@ -59,7 +59,7 @@ export function ApplicationHistory({ history }: Props) {
                 </a>
               </div>
               {h.review_notes && (
-                <p className="font-body text-xs text-foreground-muted italic">
+                <p className="font-body text-xs text-foreground-muted">
                   {h.review_notes}
                 </p>
               )}

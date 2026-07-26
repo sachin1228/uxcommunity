@@ -50,27 +50,29 @@ export async function GET(
   const before = searchParams.get("before");
   const after  = searchParams.get("after");
 
+  // Fetch membership first so we can use joined_at as a lower bound on messages.
+  // Members only see chat messages sent after they joined — not historical ones.
+  const { data: membership } = await db
+    .from("community_members")
+    .select("joined_at")
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+
   let msgQuery = db
     .from("community_messages")
     .select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at")
     .eq("community_id", communityId)
+    .gte("created_at", membership.joined_at)   // never show messages before the user joined
     .order("created_at", { ascending: false });
 
   if (after)        msgQuery = msgQuery.gt("created_at", after);
   else if (before)  msgQuery = msgQuery.lt("created_at", before).limit(PAGE_SIZE);
   else              msgQuery = msgQuery.limit(PAGE_SIZE);
 
-  const [{ data: membership }, { data, error }] = await Promise.all([
-    db
-      .from("community_members")
-      .select("joined_at")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    msgQuery,
-  ]);
-
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  const { data, error } = await msgQuery;
   if (error) {
     console.error("[GET messages]", error);
     return NextResponse.json({ error: "Failed to fetch messages." }, { status: 500 });

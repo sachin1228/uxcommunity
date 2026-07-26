@@ -32,10 +32,13 @@ function SignupInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
+  // When there is no token we go straight into direct-signup mode
+  const directMode = !token;
+
   const [tokenState, setTokenState] = useState<TokenState>(() =>
-    token
-      ? { status: "loading" }
-      : { status: "invalid", error: "No invitation token found in the URL." }
+    directMode
+      ? { status: "valid" }          // no token → open direct signup immediately
+      : { status: "loading" }
   );
 
   // Step 1
@@ -85,9 +88,9 @@ function SignupInner() {
   );
   const visibleAvatarOptions = avatarSourceOptions[activeAvatarTab as keyof typeof avatarSourceOptions] as AvatarOption[];
 
-  // ── Validate token ────────────────────────────────────────────────────────
+  // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
-    if (!token) return;
+    if (directMode) return;
     fetch(`/api/signup/validate?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -102,7 +105,7 @@ function SignupInner() {
         }
       })
       .catch(() => setTokenState({ status: "invalid", error: "Failed to validate invitation. Please try again." }));
-  }, [token]);
+  }, [token, directMode]);
 
   // ── Load dropdowns for step 2 ─────────────────────────────────────────────
   useEffect(() => {
@@ -132,10 +135,13 @@ function SignupInner() {
     setStep1Error(null);
     setStep1FieldErrors({});
     try {
-      const res = await fetch("/api/signup/complete", {
+      // Direct-signup mode uses a separate endpoint that doesn't require a token
+      const endpoint = directMode ? "/api/signup/direct" : "/api/signup/complete";
+      const body = directMode ? step1 : { ...step1, token };
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...step1, token }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {

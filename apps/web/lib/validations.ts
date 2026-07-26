@@ -32,6 +32,22 @@ export const signupStep1Schema = z
     path: ["confirm_password"],
   });
 
+// Schema for the direct signup flow (no invitation token required)
+export const directSignupStep1Schema = z
+  .object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    email: z.string().email("Please enter a valid email address"),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[0-9]/, "Must contain at least one number"),
+    confirm_password: z.string(),
+  })
+  .refine((d) => d.password === d.confirm_password, {
+    message: "Passwords do not match",
+    path: ["confirm_password"],
+  });
+
 export const signupStep2Schema = z.object({
   company_id: z.string().uuid("Please select a company"),
   city_id: z.string().uuid("Please select a city"),

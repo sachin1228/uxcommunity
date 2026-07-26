@@ -214,10 +214,10 @@ export default function LoginPage() {
                   <p className="font-body text-sm text-red-500">{error}</p>
                   {showApplyLink && (
                     <Link
-                      href="/apply"
+                      href="/signup"
                       className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
                     >
-                      Apply for access →
+                      Create an account →
                     </Link>
                   )}
                 </div>
@@ -307,7 +307,7 @@ export default function LoginPage() {
           <p className="mt-6 text-center font-body text-sm text-foreground-muted">
             New to {APP_NAME}?{" "}
             <Link
-              href="/apply"
+              href="/signup"
               className="font-medium text-accent transition-colors hover:text-accent-hover"
             >
               Create an account

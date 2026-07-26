@@ -19,10 +19,9 @@ function timeAgo(iso: string): string {
 function formatPreview(msg: NonNullable<Community["last_message"]>): {
   prefix?: string;
   text: string;
-  italic?: boolean;
 } {
   const sender = msg.user?.name.split(" ")[0];
-  if (msg.is_deleted) return { prefix: sender, text: "Message deleted", italic: true };
+  if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
   if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
   if (msg.is_reply) {
     const to = msg.reply_to_user ?? null;
@@ -91,7 +90,7 @@ export function CommunityRow({
           <div className="flex items-center gap-1.5">
             {typingText ? (
               /* Typing — highest priority */
-              <p className="font-body text-[13px] text-accent truncate flex-1 italic">
+              <p className="font-body text-[13px] text-accent truncate flex-1">
                 {typingText}
               </p>
 
@@ -102,20 +101,14 @@ export function CommunityRow({
                 {lastReaction.isOwn ? " reacted " : " reacted "}
                 <span>{lastReaction.emoji}</span>
                 {" to: "}
-                <span className="italic">{lastReaction.messagePreview}</span>
+                <span>{lastReaction.messagePreview}</span>
               </p>
 
             ) : preview ? (
               /* Standard message preview */
-              <p
-                className={`font-body text-[13px] truncate flex-1 ${
-                  preview.italic
-                    ? "text-foreground-muted/60 italic"
-                    : "text-foreground-muted"
-                }`}
-              >
+              <p className="font-body text-[13px] truncate flex-1 text-foreground-muted">
                 {preview.prefix && (
-                  <span className="font-medium not-italic">{preview.prefix}: </span>
+                  <span className="font-medium">{preview.prefix}: </span>
                 )}
                 {preview.text}
               </p>

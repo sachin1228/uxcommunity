@@ -7,10 +7,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { compressImage } from "@/lib/compressImage";
 import { getAvatarTabLabel, getAllAvatarOptions } from "@/lib/avatar";
 import type { AvatarOption, AvatarSource } from "@/lib/avatar";
-import { ProfileHero } from "./components/ProfileHero";
-import { ProfileIdentity } from "./components/ProfileIdentity";
-import { ProfileLinks } from "./components/ProfileLinks";
-import { ProfileInterests } from "./components/ProfileInterests";
+import { ProfileCard } from "./components/ProfileCard";
 import { ProfileThreads } from "./components/ProfileThreads";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
 import type { ProfileThread } from "@/components/communities/threads/types";
@@ -211,7 +208,7 @@ export function ProfileClient({
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto  mt-8">
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -248,35 +245,20 @@ export function ProfileClient({
         </div>
       )}
 
-      <ProfileHero
+      <ProfileCard
         name={name}
         email={email}
         avatarUrl={avatarUrl}
         memberSince={memberSince}
-        bio={bio}
-        onNameChange={setName}
-        onBioChange={setBio}
         onOpenAvatarPicker={() => setShowAvatarPicker(true)}
-      />
-
-      <ProfileIdentity
         city={city}
         company={company}
         sector={sector}
         experienceLevel={experienceLevel}
-      />
-
-      <ProfileLinks
         linkedin={linkedin}
         portfolio={portfolio}
         onLinkedinChange={setLinkedin}
         onPortfolioChange={setPortfolio}
-      />
-
-      <ProfileInterests
-        allInterests={allInterests}
-        interestIds={interestIds}
-        onChange={setInterestIds}
       />
 
       <ProfileThreads
