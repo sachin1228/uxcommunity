@@ -75,7 +75,7 @@ export function ChatHeader({
                 role="tab"
                 aria-selected={activeTab === tab}
                 onClick={() => onTabChange(tab)}
-                className={`border-b-2 pb-2 font-body text-sm transition-colors ${
+                className={`border-b-2 pb-2 font-body text-xs transition-colors ${
                   activeTab === tab
                     ? "border-accent text-foreground"
                     : "border-transparent text-foreground-muted hover:text-foreground"
