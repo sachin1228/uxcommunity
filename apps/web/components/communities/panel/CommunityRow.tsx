@@ -94,7 +94,7 @@ export function CommunityRow({
 
           {/* Meta: member count + city */}
           <div className="flex items-center gap-1 font-body text-[11px] text-foreground-muted leading-none mb-0.5">
-            <span>· {fmtCount(c.member_count)} members</span>
+            <span> {fmtCount(c.member_count)} members</span>
             {c.type === "city" && c.reference_name && (
               <span>· {c.reference_name}</span>
             )}
