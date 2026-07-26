@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, MessagesSquare, Users } from "lucide-react";
+import { Calendar, MessageCircle, MessagesSquare, Users } from "lucide-react";
 import { TYPE_EMOJI } from "./chatUtils";
 
 interface Community {
@@ -17,7 +17,7 @@ interface ChatHeaderProps {
   onTabChange: (tab: ChatTab) => void;
 }
 
-export type ChatTab = "chat" | "threads";
+export type ChatTab = "chat" | "threads" | "events";
 
 export function ChatHeader({
   community,
@@ -68,6 +68,7 @@ export function ChatHeader({
             {([
               ["chat", "Chat", MessageCircle],
               ["threads", "Threads", MessagesSquare],
+              ["events", "Events", Calendar],
             ] as const).map(([tab, label, Icon]) => (
               <button
                 key={tab}

@@ -10,6 +10,7 @@ import { ChatInput } from "./chat/ChatInput";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
 import { ThreadsView } from "./threads/ThreadsView";
+import { EventsView } from "./events/EventsView";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
@@ -423,6 +424,8 @@ export function CommunityChat({
 
         {activeTab === "threads" ? (
           <ThreadsView communityId={communityId} currentUserId={currentUserId} />
+        ) : activeTab === "events" ? (
+          <EventsView communityId={communityId} currentUserId={currentUserId} />
         ) : (
           <div className="flex-1 flex overflow-hidden">
           <div className="flex-1 overflow-hidden relative">
