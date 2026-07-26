@@ -28,7 +28,7 @@ export function ChatHeader({
     <div className="px-5 pt-4 border-b border-border shrink-0">
       {community ? (
         <>
-          <div className="flex items-center justify-between">
+           <div className="flex items-center justify-between pb-3">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-surface-raised flex items-center justify-center text-sm shrink-0 overflow-hidden">
                 {community.image_url ? (
