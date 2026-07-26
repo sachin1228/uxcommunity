@@ -55,6 +55,7 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
     case "sector":           return `A community for designers in the ${name} industry.`;
     case "interest":         return `Designers who share a passion for ${name}.`;
     case "experience_level": return `A space for ${name} designers to connect and share.`;
+    case "general":          return "The default community for every Drafthub designer.";
     default:                 return "A designer community on Drafthub.";
   }
 }
@@ -175,7 +176,6 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
         {/* Members */}
         <Section
           title={`Members (${memberCount.toLocaleString()})`}
-          action={<SeeAll />}
         >
           <AvatarStack members={members} total={memberCount} />
         </Section>
@@ -225,7 +225,17 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
 
         {/* Upcoming Events — only shown when a real upcoming event exists */}
         {upcomingEvent && (
-          <Section title="Upcoming Events" action={<SeeAll />}>
+          <Section
+            title="Upcoming Events"
+            action={
+              <Link
+                href={`/dashboard/communities/${communityId}/events`}
+                className="font-body text-xs text-accent hover:underline"
+              >
+                See all
+              </Link>
+            }
+          >
             <div className="flex gap-3">
               <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
                 <Calendar size={20} className="text-foreground-subtle" />

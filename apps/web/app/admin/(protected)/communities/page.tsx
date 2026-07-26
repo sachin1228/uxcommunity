@@ -8,6 +8,7 @@ import { CommunityRow, type CommunityListItem } from "@/components/admin/communi
 
 const TABS = [
   { label: "All",        value: "all"              },
+  { label: "General",    value: "general"          },
   { label: "Company",    value: "company"          },
   { label: "Industry",   value: "sector"           },
   { label: "Interest",   value: "interest"         },

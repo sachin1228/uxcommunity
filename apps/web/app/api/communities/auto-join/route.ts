@@ -95,11 +95,28 @@ export async function POST() {
     }
   }
 
-  if (!specs.length) return NextResponse.json({ joined: [] });
-
-  // ── 3. Upsert each community ─────────────────────────────────
+  // ── 3. Always join the default general community ─────────────
   const joinedCommunities: string[] = [];
 
+  const { data: generalCommunity } = await db
+    .from("communities")
+    .select("id")
+    .eq("type", "general")
+    .maybeSingle();
+
+  if (generalCommunity) {
+    await db
+      .from("community_members")
+      .upsert(
+        { community_id: generalCommunity.id, user_id: userId },
+        { onConflict: "community_id,user_id", ignoreDuplicates: true }
+      );
+    joinedCommunities.push(generalCommunity.id);
+  }
+
+  if (!specs.length) return NextResponse.json({ joined: joinedCommunities });
+
+  // ── 4. Upsert each profile-based community ───────────────────
   for (const spec of specs) {
     const { data: community, error } = await db
       .from("communities")

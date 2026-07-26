@@ -37,6 +37,7 @@ export const TYPE_LABELS: Record<string, string> = {
   interest:         "Interest",
   company:          "Company",
   experience_level: "Experience",
+  general:          "General",
 };
 
 export const TYPE_EMOJI: Record<string, string> = {
@@ -45,6 +46,7 @@ export const TYPE_EMOJI: Record<string, string> = {
   interest:         "✦",
   company:          "🏬",
   experience_level: "🎯",
+  general:          "🌐",
 };
 
 /** Includes border colour — used in the detail page type badge. */
@@ -54,6 +56,7 @@ export const TYPE_COLORS_WITH_BORDER: Record<string, string> = {
   interest:         "bg-pink-500/10 text-pink-400 border-pink-500/20",
   company:          "bg-amber-500/10 text-amber-400 border-amber-500/20",
   experience_level: "bg-green-500/10 text-green-400 border-green-500/20",
+  general:          "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
 };
 
 /** No border — used in the list page type badge. */
@@ -63,6 +66,7 @@ export const TYPE_COLORS: Record<string, string> = {
   interest:         "bg-pink-500/10 text-pink-400",
   company:          "bg-amber-500/10 text-amber-400",
   experience_level: "bg-green-500/10 text-green-400",
+  general:          "bg-cyan-500/10 text-cyan-400",
 };
 
 export function fmtDateTime(iso: string) {
