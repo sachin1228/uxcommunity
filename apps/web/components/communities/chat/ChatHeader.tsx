@@ -64,7 +64,7 @@ export function ChatHeader({
               </span>
             </div>
           </div>
-          <nav className="flex items-center gap-5 mt-1" aria-label="Community views">
+          <nav className="flex items-center gap-5" aria-label="Community views">
             {([
               ["chat", "Chat", MessageCircle],
               ["threads", "Threads", MessagesSquare],
