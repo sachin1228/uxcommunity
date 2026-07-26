@@ -545,7 +545,7 @@ function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }
         }`}
     >
       <Ban size={13} className={isMe ? "text-accent-foreground/40 shrink-0" : "text-foreground-muted/50 shrink-0"} />
-      <span className={`font-body text-xs italic ${isMe ? "text-accent-foreground/50" : "text-foreground-muted/60"}`}>
+      <span className={`font-body text-xs  ${isMe ? "text-accent-foreground/50" : "text-foreground-muted/60"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
       <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-accent-foreground/40" : "text-foreground-muted/50"}`}>

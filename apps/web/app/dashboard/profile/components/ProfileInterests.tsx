@@ -53,7 +53,7 @@ export function ProfileInterests({
       {/* Selected chips */}
       <div className="flex flex-wrap gap-2 mb-4 min-h-[32px]">
         {selectedInterests.length === 0 ? (
-          <span className="font-body text-sm text-foreground-subtle italic">No interests selected yet</span>
+          <span className="font-body text-sm text-foreground-subtle ">No interests selected yet</span>
         ) : (
           selectedInterests.map((interest) => (
             <button

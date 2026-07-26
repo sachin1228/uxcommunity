@@ -47,7 +47,7 @@ export function ChatHeader({
                 )}
               </div>
               <div>
-                <h3 className="font-display text-sm font-semibold text-foreground leading-none">
+                <h3 className="font-display text-base font-semibold text-foreground leading-none">
                   {community.name}
                 </h3>
                 <p className="font-body text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1">

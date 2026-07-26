@@ -230,7 +230,7 @@ export function SearchableSelect({
                 aria-selected={value === otherValue}
                 onClick={() => handleSelect(otherValue)}
                 className={
-                  "flex cursor-pointer items-center gap-2 px-3.5 py-2 font-body text-sm italic transition-colors " +
+                  "flex cursor-pointer items-center gap-2 px-3.5 py-2 font-body text-sm  transition-colors " +
                   (value === otherValue
                     ? "bg-accent/10 text-accent"
                     : "text-overlay-muted hover:bg-overlay-elevated")
