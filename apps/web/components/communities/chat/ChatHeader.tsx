@@ -15,6 +15,7 @@ interface ChatHeaderProps {
   community: Community | null;
   activeTab: ChatTab;
   onTabChange: (tab: ChatTab) => void;
+  onlineCount?: number;
 }
 
 export type ChatTab = "chat" | "threads" | "events";
@@ -23,6 +24,7 @@ export function ChatHeader({
   community,
   activeTab,
   onTabChange,
+  onlineCount = 0,
 }: ChatHeaderProps) {
   return (
     <div className="px-5 pt-4 border-b border-border shrink-0">
@@ -56,11 +58,10 @@ export function ChatHeader({
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Users size={14} className="text-foreground-muted" />
+            <div className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
               <span className="font-body text-xs text-foreground-muted">
-                {community.member_count} member
-                {community.member_count !== 1 ? "s" : ""}
+                {onlineCount} online
               </span>
             </div>
           </div>

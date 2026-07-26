@@ -39,6 +39,12 @@ export default function CommunityDetailPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Inline description edit state
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [editDesc, setEditDesc] = useState("");
+  const [editDescLoading, setEditDescLoading] = useState(false);
+  const [editDescError, setEditDescError] = useState<string | null>(null);
+
   useEffect(() => {
     fetch(`/api/admin/communities/${id}`)
       .then(async (r) => {
@@ -49,6 +55,26 @@ export default function CommunityDetailPage() {
       .catch(() => setError("Failed to load community."))
       .finally(() => setLoading(false));
   }, [id]);
+
+  async function handleDescSave() {
+    setEditDescLoading(true);
+    setEditDescError(null);
+    try {
+      const res = await fetch(`/api/admin/communities/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: editDesc }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setEditDescError(data.error ?? "Failed to save."); return; }
+      setCommunity((c) => c ? { ...c, description: data.community.description } : c);
+      setEditingDesc(false);
+    } catch {
+      setEditDescError("Network error.");
+    } finally {
+      setEditDescLoading(false);
+    }
+  }
 
   async function handleRenameSave() {
     const trimmed = editName.trim();
@@ -200,6 +226,53 @@ export default function CommunityDetailPage() {
         />
         <InfoRow label="Type"           value={TYPE_LABELS[community.type] ?? community.type} />
         <InfoRow label="Linked to"      value={community.reference_name ?? "—"} />
+        <InfoRow
+          label="Description"
+          value={
+            editingDesc ? (
+              <div className="flex flex-col gap-1 w-full">
+                <textarea
+                  autoFocus
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-border bg-surface-raised px-2 py-1 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 resize-none"
+                />
+                {editDescError && (
+                  <p className="font-body text-[11px] text-red-400">{editDescError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDescSave}
+                    disabled={editDescLoading}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                  >
+                    {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check size={11} />} Save
+                  </button>
+                  <button
+                    onClick={() => { setEditingDesc(false); setEditDescError(null); }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
+                  >
+                    <X size={11} /> Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2 group">
+                <span className="text-foreground-muted">
+                  {community.description || <em className="opacity-50">No description</em>}
+                </span>
+                <button
+                  onClick={() => { setEditDesc(community.description ?? ""); setEditingDesc(true); }}
+                  className="shrink-0 p-0.5 text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+                  title="Edit description"
+                >
+                  <Pencil size={11} />
+                </button>
+              </div>
+            )
+          }
+        />
         <InfoRow label="Members"        value={community.member_count.toLocaleString()} />
         <InfoRow label="Total messages" value={community.message_count.toLocaleString()} />
         <InfoRow

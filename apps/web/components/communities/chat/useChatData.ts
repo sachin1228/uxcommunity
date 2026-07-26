@@ -21,6 +21,9 @@ export interface Community {
   type: string;
   member_count: number;
   image_url: string | null;
+  description?: string | null;
+  reference_name?: string | null;
+  created_at?: string;
 }
 
 export interface Member {

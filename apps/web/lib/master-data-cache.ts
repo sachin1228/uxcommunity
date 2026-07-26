@@ -44,3 +44,23 @@ export const getMasterImageMap = unstable_cache(
   ["master-image-map"],
   { revalidate: 3600, tags: ["master-images"] }
 );
+
+/**
+ * Returns a map of { referenceId → name } for a master data table.
+ * Cached alongside image maps — 1 hour, same tag.
+ */
+export const getMasterNameMap = unstable_cache(
+  async (type: string): Promise<Record<string, string>> => {
+    const lookup = TABLE_LOOKUP[type];
+    if (!lookup) return {};
+    const db = createServiceClient();
+    const { data: rows } = await db
+      .from(lookup.table as any)
+      .select(`${lookup.idCol}, name`);
+    return Object.fromEntries(
+      (rows ?? []).map((r: any) => [r[lookup.idCol], r.name ?? ""])
+    ) as Record<string, string>;
+  },
+  ["master-name-map"],
+  { revalidate: 3600, tags: ["master-images"] }
+);

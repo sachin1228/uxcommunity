@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 
 export async function GET() {
   let session;
@@ -175,6 +175,7 @@ export async function GET() {
   }
 
   const masterImageMap: Record<string, string | null> = {};
+  const masterNameMap: Record<string, string | null> = {};
   const validCommunityIds = new Set<string>();
 
   await Promise.all(
@@ -185,12 +186,16 @@ export async function GET() {
       }
 
       // Cached fetch — warm after the first request per deploy
-      const imgMap = await getMasterImageMap(type);
+      const [imgMap, nameMap] = await Promise.all([
+        getMasterImageMap(type),
+        getMasterNameMap(type),
+      ]);
 
       for (const item of items) {
         if (item.reference_id in imgMap) {
           validCommunityIds.add(item.id);
           masterImageMap[item.id] = imgMap[item.reference_id] ?? null;
+          masterNameMap[item.id] = nameMap[item.reference_id] ?? null;
         }
         // reference_id not found → master row deleted → skip
       }
@@ -234,6 +239,7 @@ export async function GET() {
       return {
         ...c,
         image_url: masterImageMap[c.id] ?? c.image_url ?? null,
+        reference_name: masterNameMap[c.id] ?? null,
         member_count: countMap[c.id] ?? 0,
         message_count: msgCountMap[c.id] ?? 0,
         last_read_at: lastReadMap[c.id] ?? null,

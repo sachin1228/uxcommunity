@@ -5,9 +5,7 @@ import Link from "next/link";
 import {
   MapPin,
   Calendar,
-  Download,
   Users,
-  FileText,
   ExternalLink,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
@@ -26,26 +24,47 @@ interface UpcomingEvent {
   rsvp_count: number;
 }
 
-interface CommunityInfoPanelProps {
-  members: Member[];
-  community: { member_count: number } | null;
-  communityId: string;
+interface CommunityData {
+  member_count: number;
+  type?: string;
+  description?: string | null;
+  reference_name?: string | null;
+  created_at?: string;
 }
 
-// ─── Static about data (community-agnostic fallback display) ─────────────────
-const STATIC_ABOUT = {
-  description:
-    "A community for designers working at Amazon across India to connect, share, and grow together.",
-  location: "Pune, India",
-  createdAt: "23 May 2024",
-  tags: ["Design", "Amazon", "Product Design"],
+interface CommunityInfoPanelProps {
+  members: Member[];
+  community: CommunityData | null;
+  communityId: string;
+  onlineCount?: number;
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  city:             "City",
+  sector:           "Industry",
+  interest:         "Interest",
+  company:          "Company",
+  experience_level: "Experience",
 };
 
-const STATIC_RESOURCES = [
-  { name: "Design System Guidelines", meta: "PDF · 2.4 MB" },
-  { name: "Amazon Design Principles",  meta: "PDF · 1.1 MB" },
-  { name: "Figma Component Library",   meta: "Figma File · 12.4 MB" },
-];
+function fallbackDescription(type?: string, referenceName?: string | null): string {
+  const name = referenceName ?? "this topic";
+  switch (type) {
+    case "city":             return `Connect with designers based in ${name}.`;
+    case "company":          return `A space for designers working at ${name} to connect and grow together.`;
+    case "sector":           return `A community for designers in the ${name} industry.`;
+    case "interest":         return `Designers who share a passion for ${name}.`;
+    case "experience_level": return `A space for ${name} designers to connect and share.`;
+    default:                 return "A designer community on Drafthub.";
+  }
+}
+
+function fmtCreatedAt(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+  });
+}
 
 function fmtEventDate(iso: string) {
   const d = new Date(iso);
@@ -97,7 +116,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="px-4 py-4 border-b border-border">
+    <div className="px-4 py-4 border-b border-border last:border-b-0">
       <div className="flex items-center justify-between mb-3">
         <span className="font-body text-sm font-semibold text-foreground">
           {title}
@@ -118,10 +137,11 @@ function SeeAll() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function CommunityInfoPanel({ members, community, communityId }: CommunityInfoPanelProps) {
+export function CommunityInfoPanel({ members, community, communityId, onlineCount = 0 }: CommunityInfoPanelProps) {
   const memberCount = community?.member_count ?? members.length;
 
   const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
+  const [postsToday, setPostsToday] = useState<number | null>(null);
 
   useEffect(() => {
     if (!communityId) return;
@@ -134,6 +154,13 @@ export function CommunityInfoPanel({ members, community, communityId }: Communit
           .filter((e) => new Date(e.event_date) > now)
           .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
         setUpcomingEvent(upcoming[0] ?? null);
+      })
+      .catch(() => {/* silent */});
+
+    fetch(`/api/communities/${communityId}/stats`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { posts_today: number } | null) => {
+        if (data != null) setPostsToday(data.posts_today);
       })
       .catch(() => {/* silent */});
   }, [communityId]);
@@ -154,31 +181,47 @@ export function CommunityInfoPanel({ members, community, communityId }: Communit
         </Section>
 
         {/* About */}
-        <Section title="About">
-          <p className="font-body text-[13px] text-foreground-muted leading-relaxed mb-3">
-            {STATIC_ABOUT.description}
-          </p>
-          <div className="space-y-2 mb-3">
-            <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
-              <MapPin size={13} className="shrink-0 text-foreground-subtle" />
-              {STATIC_ABOUT.location}
-            </div>
-            <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
-              <Calendar size={13} className="shrink-0 text-foreground-subtle" />
-              Created {STATIC_ABOUT.createdAt}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {STATIC_ABOUT.tags.map((tag) => (
-              <span
-                key={tag}
-                className="px-2.5 py-0.5 rounded-full border border-border font-body text-[12px] text-foreground-muted"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        </Section>
+        {(() => {
+          const type = community?.type;
+          const refName = community?.reference_name ?? null;
+          const description = community?.description
+            ?? fallbackDescription(type, refName);
+          const tags: string[] = [
+            ...(type ? [TYPE_LABELS[type] ?? type] : []),
+            ...(refName ? [refName] : []),
+          ];
+          return (
+            <Section title="About">
+              <p className="font-body text-[13px] text-foreground-muted leading-relaxed mb-3">
+                {description}
+              </p>
+              <div className="space-y-2 mb-3">
+                {type === "city" && refName && (
+                  <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
+                    <MapPin size={13} className="shrink-0 text-foreground-subtle" />
+                    {refName}
+                  </div>
+                )}
+                <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
+                  <Calendar size={13} className="shrink-0 text-foreground-subtle" />
+                  Created {fmtCreatedAt(community?.created_at)}
+                </div>
+              </div>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2.5 py-0.5 rounded-full border border-border font-body text-[12px] text-foreground-muted"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Section>
+          );
+        })()}
 
         {/* Upcoming Events — only shown when a real upcoming event exists */}
         {upcomingEvent && (
@@ -224,36 +267,6 @@ export function CommunityInfoPanel({ members, community, communityId }: Communit
           </Section>
         )}
 
-        {/* Popular Resources — last section, no border-b */}
-        <div className="px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-body text-sm font-semibold text-foreground">
-              Popular Resources
-            </span>
-            <SeeAll />
-          </div>
-          <div className="space-y-3">
-            {STATIC_RESOURCES.map((r) => (
-              <div key={r.name} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-surface-raised flex items-center justify-center shrink-0 border border-border">
-                  <FileText size={14} className="text-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-body text-[13px] font-medium text-foreground truncate">
-                    {r.name}
-                  </p>
-                  <p className="font-body text-[11px] text-foreground-muted">
-                    {r.meta}
-                  </p>
-                </div>
-                <button className="shrink-0 text-foreground-muted hover:text-foreground transition-colors">
-                  <Download size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </div>{/* end main info card */}
 
       {/* Community Stats — separate card below */}
@@ -264,8 +277,8 @@ export function CommunityInfoPanel({ members, community, communityId }: Communit
         <div className="grid grid-cols-3 gap-2">
           {[
             { label: "Members",     value: memberCount.toLocaleString() },
-            { label: "Online",      value: "156" },
-            { label: "Posts today", value: "32" },
+            { label: "Online",      value: onlineCount.toLocaleString() },
+            { label: "Messages", value: postsToday != null ? postsToday.toLocaleString() : "—" },
           ].map(({ label, value }) => (
             <div
               key={label}

@@ -125,6 +125,9 @@ export async function PATCH(
   if (typeof body.is_active === "boolean") {
     update.is_active = body.is_active;
   }
+  if (typeof body.description === "string") {
+    update.description = body.description.trim() || null;
+  }
 
   if (!Object.keys(update).length) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 422 });

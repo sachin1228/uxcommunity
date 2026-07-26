@@ -16,6 +16,8 @@ import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
 import { useTypingPresence } from "./chat/useTypingPresence";
+import { useOnlinePresence } from "./chat/useOnlinePresence";
+import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 
 const useIsomorphicLayoutEffect =
@@ -224,6 +226,8 @@ export function CommunityChat({
     currentUserName,
   });
 
+  const { onlineCount } = useOnlinePresence({ communityId, currentUserId });
+
   // ── Scroll positioning + unread boundary ──────────────────────────────────
   const {
     bottomRef,
@@ -422,6 +426,7 @@ export function CommunityChat({
           community={displayCommunity}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          onlineCount={onlineCount}
         />
 
         {activeTab === "threads" ? (
@@ -455,7 +460,6 @@ export function CommunityChat({
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
-              typingUsers={typingUsers}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}
@@ -478,6 +482,7 @@ export function CommunityChat({
                 <ChevronDown size={16} />
               </button>
             )}
+            <TypingIndicator users={typingUsers} />
             <div className="bg-black/40 backdrop-blur-sm">
               <ChatInput
                 ref={inputRef}
@@ -506,7 +511,7 @@ export function CommunityChat({
         )}
       </div>
 
-      <CommunityInfoPanel members={members} community={displayCommunity} communityId={communityId} />
+      <CommunityInfoPanel members={members} community={displayCommunity} communityId={communityId} onlineCount={onlineCount} />
     </div>
   );
 }

@@ -31,7 +31,7 @@ export async function GET(
       .maybeSingle(),
     db
       .from("communities")
-      .select("id, name, type, image_url, reference_id, created_at")
+      .select("id, name, type, image_url, description, reference_id, created_at")
       .eq("id", id)
       .eq("is_active", true)
       .maybeSingle(),
@@ -50,7 +50,7 @@ export async function GET(
     lookup && community.reference_id
       ? db
           .from(lookup.table as any)
-          .select(`${lookup.idCol}, image_url`)
+          .select(`${lookup.idCol}, name, image_url`)
           .eq(lookup.idCol, community.reference_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
@@ -68,6 +68,8 @@ export async function GET(
 
   const resolvedImageUrl: string | null =
     (resolvedImageResult as any)?.data?.image_url ?? community.image_url ?? null;
+  const resolvedReferenceName: string | null =
+    (resolvedImageResult as any)?.data?.name ?? null;
 
   // Batch-fetch member user info (1 query instead of N)
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
@@ -96,6 +98,7 @@ export async function GET(
     community: {
       ...community,
       image_url: resolvedImageUrl,
+      reference_name: resolvedReferenceName,
       member_count: member_count ?? 0,
     },
     members,

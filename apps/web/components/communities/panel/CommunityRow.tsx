@@ -5,6 +5,12 @@ import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = CachedSidebarCommunity;
 
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -83,6 +89,14 @@ export function CommunityRow({
               <span className="font-mono text-xs text-foreground-muted shrink-0">
                 {timeAgo(c.last_message.created_at)}
               </span>
+            )}
+          </div>
+
+          {/* Meta: member count + city */}
+          <div className="flex items-center gap-1 font-body text-[11px] text-foreground-muted leading-none mb-0.5">
+            <span>· {fmtCount(c.member_count)} members</span>
+            {c.type === "city" && c.reference_name && (
+              <span>· {c.reference_name}</span>
             )}
           </div>
 
