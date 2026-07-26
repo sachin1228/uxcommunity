@@ -6,6 +6,7 @@ import { sidebarStore, msgCache } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
+
 import { ChatInput } from "./chat/ChatInput";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
@@ -34,15 +35,17 @@ export function CommunityChat({
   initialMeta,
   initialMessages,
   initialLastReadAt,
+  initialTab = "chat",
 }: {
   communityId: string;
   currentUserId: string;
   initialMeta?: CachedMeta;
   initialMessages?: CachedMessage[];
   initialLastReadAt?: string | null;
+  initialTab?: ChatTab;
 }) {
   const [hasMounted, setHasMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<ChatTab>("chat");
+  const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 

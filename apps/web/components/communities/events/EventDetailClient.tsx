@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Calendar, CornerDownRight, ExternalLink,
+  Calendar, CornerDownRight, ExternalLink,
   Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
   Send, Trash2, Users, Video,
 } from "lucide-react";
@@ -427,14 +426,6 @@ export function EventDetailClient({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
-        {/* Back link */}
-        <Link
-          href={`/dashboard/communities/${communityId}`}
-          className="mb-5 inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground"
-        >
-          <ArrowLeft size={13} /> Back to {communityName}
-        </Link>
-
         {/* Main event card — horizontal */}
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
           <div className="flex min-h-[200px]">

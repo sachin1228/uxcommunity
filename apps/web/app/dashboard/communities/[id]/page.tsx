@@ -3,16 +3,21 @@ import { headers } from "next/headers";
 import { getSession } from "@/lib/auth/session";
 import { fetchCommunitySSRData } from "@/lib/communities/server";
 import { CommunityChat } from "@/components/communities/CommunityChat";
+import type { ChatTab } from "@/components/communities/chat/ChatHeader";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }
 
-export default async function CommunityPage({ params }: Props) {
+export default async function CommunityPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session || session.role !== "user") redirect("/login");
 
   const { id } = await params;
+  const { tab } = await searchParams;
+  const initialTab: ChatTab =
+    tab === "threads" || tab === "events" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
 
   /**
@@ -53,6 +58,7 @@ export default async function CommunityPage({ params }: Props) {
       initialMeta={ssrData?.meta}
       initialMessages={ssrData?.messages}
       initialLastReadAt={ssrData?.lastReadAt}
+      initialTab={initialTab}
     />
   );
 }

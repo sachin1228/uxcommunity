@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ShieldOff, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, ShieldOff, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { UserInfoCard } from "@/components/admin/users/UserInfoCard";
@@ -19,6 +19,8 @@ export default function UserDetailPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [memberOfAll, setMemberOfAll] = useState(false);
+  const [allCommunitiesLoading, setAllCommunitiesLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -30,6 +32,7 @@ export default function UserDetailPage() {
         setUser(data.user);
         setApplication(data.application ?? null);
         setInterests(data.interests ?? []);
+        setMemberOfAll(data.memberOfAllCommunities ?? false);
       } catch {
         setError("Failed to load user.");
       } finally {
@@ -38,6 +41,21 @@ export default function UserDetailPage() {
     }
     load();
   }, [id]);
+
+  async function handleToggleAllCommunities() {
+    setAllCommunitiesLoading(true);
+    const next = !memberOfAll;
+    try {
+      const res = await fetch(`/api/admin/users/${id}/join-all-communities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ join: next }),
+      });
+      if (res.ok) setMemberOfAll(next);
+    } finally {
+      setAllCommunitiesLoading(false);
+    }
+  }
 
   async function handleBlock() {
     if (!user) return;
@@ -161,6 +179,46 @@ export default function UserDetailPage() {
             Delete
           </button>
         </div>
+      </div>
+
+      {/* Member of all communities toggle */}
+      <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised">
+            <Users size={16} className="text-foreground-muted" />
+          </span>
+          <div>
+            <p className="font-body text-sm font-medium text-foreground">
+              Member of all communities
+            </p>
+            <p className="font-body text-xs text-foreground-muted">
+              {memberOfAll
+                ? "This user is joined to every community."
+                : "Turn on to instantly add this user to every community."}
+            </p>
+          </div>
+        </div>
+
+        <button
+          onClick={handleToggleAllCommunities}
+          disabled={allCommunitiesLoading}
+          aria-pressed={memberOfAll}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+            memberOfAll ? "bg-accent" : "bg-surface-raised border border-border"
+          }`}
+        >
+          {allCommunitiesLoading ? (
+            <span className="absolute inset-0 flex items-center justify-center">
+              <Spinner className="h-3.5 w-3.5 text-foreground-muted" />
+            </span>
+          ) : (
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                memberOfAll ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          )}
+        </button>
       </div>
 
       {/* Details card */}

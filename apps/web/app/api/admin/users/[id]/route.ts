@@ -61,7 +61,19 @@ export async function GET(
     })
     .filter(Boolean);
 
-  return NextResponse.json({ user, application, interests });
+  // Community membership stats for the "member of all communities" toggle
+  const [{ count: totalCommunities }, { count: userCommunities }] = await Promise.all([
+    db.from("communities").select("id", { count: "exact", head: true }),
+    db.from("community_members").select("community_id", { count: "exact", head: true }).eq("user_id", id),
+  ]);
+
+  const memberOfAllCommunities =
+    typeof totalCommunities === "number" &&
+    typeof userCommunities === "number" &&
+    totalCommunities > 0 &&
+    userCommunities >= totalCommunities;
+
+  return NextResponse.json({ user, application, interests, memberOfAllCommunities });
 }
 
 export async function PATCH(

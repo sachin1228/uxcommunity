@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, ChevronUp, CornerDownRight, Link as LinkIcon,
+  ChevronUp, CornerDownRight, Link as LinkIcon,
   Loader2, MessageSquare, MoreHorizontal, Paperclip, Pencil, Send, Trash2,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
@@ -381,15 +380,6 @@ export function ThreadDetailClient({ thread: initialThread, initialComments, cur
     <>
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-6">
-
-          {/* Back nav */}
-          <Link
-            href={`/dashboard/communities/${communityId}`}
-            className="mb-5 inline-flex items-center gap-1.5 font-body text-xs text-foreground-subtle hover:text-foreground"
-          >
-            <ArrowLeft size={13} />
-            {communityName} · Threads
-          </Link>
 
           {/* Thread card */}
           <div className="rounded-xl border border-border bg-surface">
