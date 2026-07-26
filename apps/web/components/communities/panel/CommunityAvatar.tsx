@@ -31,7 +31,7 @@ export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvata
         height={40}
         loading="lazy"
         decoding="async"
-        className="h-10 w-10 rounded-full object-cover shrink-0"
+        className="h-11 w-11 rounded-full object-cover shrink-0"
         onError={() => setFailed(true)}
       />
     );

@@ -61,7 +61,7 @@ export function CommunityRow({
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        className={`w-full flex items-center gap-4 px-3 py-2.5 rounded-lg text-left transition-colors ${
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
           active
             ? "bg-surface-raised text-foreground"
             : "hover:bg-surface-raised"

@@ -46,18 +46,17 @@ export default async function DashboardLayout({
 
         <div className="ml-auto flex items-center gap-0.5">
           <button
-            className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
             aria-label="Direct messages"
           >
             <MessageCircle size={16} />
           </button>
           <button
-            className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
             aria-label="Notifications"
           >
             <Bell size={16} />
           </button>
-          <div className="mx-1 h-4 w-px bg-border shrink-0" />
           <ProfileDropdown
             name={name}
             email={email}

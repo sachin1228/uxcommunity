@@ -51,7 +51,7 @@ function CommunityCard({
         <img
           src={c.image_url}
           alt={c.name}
-          className="h-10 w-10 rounded-full object-cover shrink-0"
+          className="h-11 w-11 rounded-full object-cover shrink-0"
           onError={() => setImgFailed(true)}
         />
       ) : (

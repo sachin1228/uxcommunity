@@ -30,12 +30,12 @@ export function ChatHeader({
         <>
            <div className="flex items-center justify-between pb-3">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-full bg-surface-raised flex items-center justify-center text-sm shrink-0 overflow-hidden">
+              <div className="h-11 w-11 rounded-full bg-surface-raised flex items-center justify-center text-sm shrink-0 overflow-hidden">
                 {community.image_url ? (
                   <img
                     src={community.image_url}
                     alt={community.name}
-                    className="h-9 w-9 rounded-full object-cover"
+                    className="h-11 w-11 rounded-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = "none";
                       e.currentTarget.parentElement!.textContent =
