@@ -17,7 +17,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { tab } = await searchParams;
   const initialTab: ChatTab =
-    tab === "threads" || tab === "events" ? tab : "chat";
+    tab === "threads" || tab === "events" || tab === "resources" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
 
   /**

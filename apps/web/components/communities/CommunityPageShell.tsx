@@ -136,6 +136,11 @@ export function CommunityPageShell({ communityId, activeTab, currentUserId, chil
     }
   }
 
+  // For resource detail pages we are already under /resources/[id] so clicking
+  // the Resources tab should navigate back to the resources list.
+  // The activeTab="resources" shell only wraps resource detail pages, so
+  // handleTabChange handles the routing correctly via ?tab=resources above.
+
   return (
     <div className="flex-1 flex overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">

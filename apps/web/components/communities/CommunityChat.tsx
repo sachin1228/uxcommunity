@@ -12,6 +12,7 @@ import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
 import { ThreadsView } from "./threads/ThreadsView";
 import { EventsView } from "./events/EventsView";
+import { ResourcesView } from "./resources/ResourcesView";
 import { MembersView } from "./members/MembersView";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
@@ -520,6 +521,8 @@ export function CommunityChat({
           <ThreadsView communityId={communityId} currentUserId={currentUserId} />
         ) : activeTab === "events" ? (
           <EventsView communityId={communityId} currentUserId={currentUserId} />
+        ) : activeTab === "resources" ? (
+          <ResourcesView communityId={communityId} currentUserId={currentUserId} />
         ) : activeTab === "members" ? (
           <MembersView communityId={communityId} />
         ) : (

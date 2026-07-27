@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Calendar, ChevronDown, Loader2, MessageCircle, MessagesSquare, MoreHorizontal, Users } from "lucide-react";
+import { Bell, BookMarked, Calendar, ChevronDown, Loader2, MessageCircle, MessagesSquare, MoreHorizontal, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { TYPE_EMOJI } from "./chatUtils";
 
@@ -21,7 +21,7 @@ interface ChatHeaderProps {
   onlineCount?: number;
 }
 
-export type ChatTab = "chat" | "threads" | "events" | "members";
+export type ChatTab = "chat" | "threads" | "events" | "resources" | "members";
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -248,10 +248,11 @@ export function ChatHeader({
             </div>
             <nav className="flex items-center gap-5" aria-label="Community views">
               {([
-                ["chat",    "Chat",    MessageCircle],
-                ["threads", "Threads", MessagesSquare],
-                ["events",  "Events",  Calendar],
-                ["members", "Members", Users],
+                ["chat",      "Chat",      MessageCircle],
+                ["threads",   "Threads",   MessagesSquare],
+                ["events",    "Events",    Calendar],
+                ["resources", "Resources", BookMarked],
+                ["members",   "Members",   Users],
               ] as const).map(([tab, label, Icon]) => (
                 <button
                   key={tab}
