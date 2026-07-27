@@ -13,7 +13,11 @@ interface EditEventModalProps {
 
 function toDateInput(iso: string | null) {
   if (!iso) return "";
-  return iso.slice(0, 10);
+  const d = new Date(iso);
+  const yyyy = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mo}-${dd}`;
 }
 function toTimeInput(iso: string | null) {
   if (!iso) return "";

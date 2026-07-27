@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { createNotification, eventHref, getActorName } from "@/lib/notifications";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -56,7 +57,7 @@ export async function POST(
   // Verify event exists in this community
   const { data: event } = await db
     .from("community_events")
-    .select("id")
+    .select("id, user_id, title")
     .eq("id", eventId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -78,14 +79,16 @@ export async function POST(
   }
 
   // Validate parent belongs to same event
+  let parentAuthorId: string | null = null;
   if (parentId) {
     const { data: parent } = await db
       .from("event_comments")
-      .select("id")
+      .select("id, user_id")
       .eq("id", parentId)
       .eq("event_id", eventId)
       .maybeSingle();
     if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 });
+    parentAuthorId = parent.user_id;
   }
 
   const { data: comment, error } = await db
@@ -95,6 +98,34 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const actorName = await getActorName(db, userId);
+  const href = eventHref(communityId, eventId);
+  await createNotification(db, {
+    userId: event.user_id,
+    actorId: userId,
+    communityId,
+    type: "event_comment",
+    entityType: "event",
+    entityId: eventId,
+    title: `${actorName} commented on your event`,
+    body: event.title,
+    href,
+  });
+
+  if (parentAuthorId && parentAuthorId !== event.user_id) {
+    await createNotification(db, {
+      userId: parentAuthorId,
+      actorId: userId,
+      communityId,
+      type: "event_reply",
+      entityType: "event",
+      entityId: eventId,
+      title: `${actorName} replied to your event comment`,
+      body: event.title,
+      href,
+    });
+  }
 
   const [{ data: userRow }, { data: profileRow }] = await Promise.all([
     db.from("users").select("id, name").eq("id", userId).maybeSingle(),

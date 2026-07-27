@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { eventHref, getActorName, notifyCommunityMembers } from "@/lib/notifications";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -31,11 +32,15 @@ async function enrichEvents(
     { data: profiles },
     { data: allRsvps },
     { data: myRsvps },
+    { data: allSaves },
+    { data: mySaves },
   ] = await Promise.all([
     db.from("users").select("id, name").in("id", authorIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
     db.from("event_rsvps").select("event_id").in("event_id", eventIds),
     db.from("event_rsvps").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
+    db.from("event_saves").select("event_id").in("event_id", eventIds),
+    db.from("event_saves").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
   ]);
 
   const nameMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
@@ -45,6 +50,11 @@ async function enrichEvents(
     return acc;
   }, {});
   const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
+  const saveCounts = (allSaves ?? []).reduce<Record<string, number>>((acc, r) => {
+    acc[r.event_id] = (acc[r.event_id] ?? 0) + 1;
+    return acc;
+  }, {});
+  const mySaveSet = new Set((mySaves ?? []).map((r) => r.event_id));
 
   return rows.map((row) => {
     const authorId = row.user_id as string;
@@ -55,6 +65,8 @@ async function enrichEvents(
         : null,
       rsvp_count: rsvpCounts[row.id as string] ?? 0,
       user_rsvped: myRsvpSet.has(row.id as string),
+      save_count: saveCounts[row.id as string] ?? 0,
+      user_saved: mySaveSet.has(row.id as string),
     };
   });
 }
@@ -164,6 +176,19 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const actorName = await getActorName(db, userId);
+  await notifyCommunityMembers(db, {
+    communityId,
+    actorId: userId,
+    type: "community_event",
+    entityType: "event",
+    entityId: data.id,
+    title: `${actorName} created a new event`,
+    body: title,
+    href: eventHref(communityId, data.id),
+    metadata: { event_date: eventDate },
+  });
 
   const [enriched] = await enrichEvents(db, [data as unknown as Record<string, unknown>], userId);
   return NextResponse.json({ event: enriched }, { status: 201 });

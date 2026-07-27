@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Calendar, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
+import { Bookmark, BookmarkCheck, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 
@@ -60,9 +60,10 @@ interface EventCardProps {
   onUpdated: (event: CommunityEvent) => void;
   onDeleted: (eventId: string) => void;
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
+  onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged }: EventCardProps) {
+export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
@@ -71,6 +72,8 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
   const [deleting, setDeleting] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [shared, setShared] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [savePending, setSavePending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,6 +118,34 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
     } finally {
       setRsvpPending(false);
     }
+  }
+
+  async function handleSave(e: React.MouseEvent) {
+    e.preventDefault();
+    if (savePending) return;
+    const newSaved = !event.user_saved;
+    const newCount = event.save_count + (newSaved ? 1 : -1);
+    onSaveChanged(event.id, newSaved, newCount);
+    setSavePending(true);
+    try {
+      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        onSaveChanged(event.id, data.saved, data.save_count);
+      } else {
+        onSaveChanged(event.id, event.user_saved, event.save_count);
+      }
+    } catch {
+      onSaveChanged(event.id, event.user_saved, event.save_count);
+    } finally {
+      setSavePending(false);
+    }
+  }
+
+  function handleReport(e: React.MouseEvent) {
+    e.preventDefault();
+    setMenuOpen(false);
+    setReported(true);
   }
 
   async function handleShare(e: React.MouseEvent) {
@@ -198,32 +229,56 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
                     {shared ? "Copied!" : "Share"}
                   </button>
 
-                  {/* Owner menu */}
-                  {isOwner && (
-                    <div ref={menuRef} className="relative">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p); }}
-                        aria-label="Event options"
-                        className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-raised hover:text-foreground focus:opacity-100"
-                      >
-                        <MoreHorizontal size={13} />
-                      </button>
-                      {menuOpen && (
-                        <div className="absolute right-0 top-8 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                          <button type="button"
-                            onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                            <Pencil size={11} /> Edit event
-                          </button>
-                          <button type="button" onClick={handleDelete} disabled={deleting}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                            <Trash2 size={11} /> {deleting ? "Deleting…" : "Delete event"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Save / bookmark */}
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={savePending}
+                    aria-label={event.user_saved ? "Unsave event" : "Save event"}
+                    className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                      event.user_saved
+                        ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
+                        : "border-border text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
+                    }`}
+                  >
+                    {event.user_saved
+                      ? <BookmarkCheck size={13} />
+                      : <Bookmark size={13} />}
+                  </button>
+
+                  {/* Options menu — visible to all users */}
+                  <div ref={menuRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p); }}
+                      aria-label="Event options"
+                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+                    >
+                      <MoreHorizontal size={13} />
+                    </button>
+                    {menuOpen && (
+                      <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                        {isOwner && (
+                          <>
+                            <button type="button"
+                              onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                              <Pencil size={11} /> Edit event
+                            </button>
+                            <button type="button" onClick={handleDelete} disabled={deleting}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+                              <Trash2 size={11} /> {deleting ? "Deleting…" : "Delete event"}
+                            </button>
+                            <div className="my-1 border-t border-border" />
+                          </>
+                        )}
+                        <button type="button" onClick={handleReport} disabled={reported}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+                          <Flag size={11} /> {reported ? "Reported" : "Report post"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

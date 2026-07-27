@@ -6,6 +6,7 @@ import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import { getActorName, notifyCommunityMembers, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 
 const PAGE_SIZE = 50;
@@ -273,6 +274,19 @@ export async function POST(
     contentRefId: inserted.id,
     contentHash: contentHash(text),
     decision,
+  });
+
+  const actorName = await getActorName(db, userId);
+  await notifyCommunityMembers(db, {
+    communityId,
+    actorId: userId,
+    type: "community_thread",
+    entityType: "thread",
+    entityId: inserted.id,
+    title: `${actorName} started a new thread`,
+    body: title,
+    href: threadHref(communityId, inserted.id),
+    metadata: { category },
   });
 
   const enriched = (await withAuthorAndVotes(db, [inserted as Record<string, unknown>], userId))[0];

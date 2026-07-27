@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { createNotification, getActorName, threadHref } from "@/lib/notifications";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -99,8 +100,9 @@ export async function POST(
   // Check thread exists and allows replies
   const { data: thread } = await db
     .from("community_threads")
-    .select("id, allow_replies")
+    .select("id, user_id, title, allow_replies")
     .eq("id", threadId)
+    .eq("community_id", communityId)
     .maybeSingle();
 
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
@@ -120,16 +122,18 @@ export async function POST(
   }
 
   const parentId = typeof body.parent_id === "string" ? body.parent_id : null;
+  let parentAuthorId: string | null = null;
   if (parentId) {
     const { data: parent } = await db
       .from("thread_comments")
-      .select("id, parent_id")
+      .select("id, parent_id, user_id")
       .eq("id", parentId)
       .eq("thread_id", threadId)
       .maybeSingle();
     if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 });
     // Only allow one level of nesting
     if (parent.parent_id) return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 422 });
+    parentAuthorId = parent.user_id;
   }
 
   const { data: inserted, error } = await db
@@ -141,6 +145,34 @@ export async function POST(
   if (error || !inserted) {
     console.error("[POST comment]", error);
     return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
+  }
+
+  const actorName = await getActorName(db, userId);
+  const href = threadHref(communityId, threadId);
+  await createNotification(db, {
+    userId: thread.user_id,
+    actorId: userId,
+    communityId,
+    type: "thread_comment",
+    entityType: "thread",
+    entityId: threadId,
+    title: `${actorName} commented on your thread`,
+    body: thread.title,
+    href,
+  });
+
+  if (parentAuthorId && parentAuthorId !== thread.user_id) {
+    await createNotification(db, {
+      userId: parentAuthorId,
+      actorId: userId,
+      communityId,
+      type: "thread_reply",
+      entityType: "thread",
+      entityId: threadId,
+      title: `${actorName} replied to your comment`,
+      body: thread.title,
+      href,
+    });
   }
 
   const [enriched] = await attachUsers(db, [inserted as Record<string, unknown>]);

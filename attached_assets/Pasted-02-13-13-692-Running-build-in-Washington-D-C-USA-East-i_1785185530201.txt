@@ -1,0 +1,67 @@
+02:13:13.692 Running build in Washington, D.C., USA (East) – iad1
+02:13:13.693 Build machine configuration: 2 cores, 8 GB
+02:13:13.807 Cloning github.com/sachin1228/drafthub (Branch: codex/realtime-notifications, Commit: 9644dcc)
+02:13:16.796 Cloning completed: 2.989s
+02:13:16.921 Restored build cache from previous deployment (6nnesbNvhbv1tX47vSFXwXQHhvUB)
+02:13:17.119 Running "vercel build"
+02:13:17.136 Vercel CLI 56.5.0
+02:13:17.353 Installing dependencies...
+02:13:18.990 
+02:13:18.991 changed 2 packages in 1s
+02:13:18.991 
+02:13:18.992 173 packages are looking for funding
+02:13:18.992   run `npm fund` for details
+02:13:19.019 Detected Next.js version: 16.2.11
+02:13:19.025 Running "npm run build"
+02:13:19.157 
+02:13:19.157 > web@0.1.0 build
+02:13:19.158 > next build
+02:13:19.158 
+02:13:19.763   Applying modifyConfig from Vercel
+02:13:19.838 ▲ Next.js 16.2.11 (Turbopack)
+02:13:19.839 
+02:13:19.841 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+02:13:19.902   Creating an optimized production build ...
+02:13:40.601 Turbopack build encountered 1 warnings:
+02:13:40.602 ./apps/web/next.config.js
+02:13:40.602 Encountered unexpected file in NFT list
+02:13:40.602 A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+02:13:40.602 - filesystem operations (like path.join, path.resolve or fs.readFile), or
+02:13:40.602 - very dynamic requires (like require('./' + foo)).
+02:13:40.602 To resolve this, you can
+02:13:40.603 - remove them if possible, or
+02:13:40.603 - only use them in development, or
+02:13:40.603 - make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+02:13:40.603 - add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+02:13:40.603 
+02:13:40.603 Import trace:
+02:13:40.603   App Route:
+02:13:40.603     ./apps/web/next.config.js
+02:13:40.603     ./apps/web/app/api/admin/load-test/impl.ts
+02:13:40.603     ./apps/web/app/api/admin/load-test/route.ts
+02:13:40.603 
+02:13:40.603 
+02:13:40.638 ✓ Compiled successfully in 20.4s
+02:13:40.647   Running TypeScript ...
+02:13:56.026 Failed to type check.
+02:13:56.026 
+02:13:56.027 ./app/dashboard/profile/page.tsx:95:23
+02:13:56.027 Type error: Conversion of type '{ users: null; community: { name: string; } | null; vote_count: number; user_voted: boolean; comment_count: number; id: any; community_id: any; user_id: any; title: any; description: any; category: any; ... 6 more ...; communities: { ...; }[]; }[]' to type 'ProfileThread[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+02:13:56.033   Property 'user_saved' is missing in type '{ users: null; community: { name: string; } | null; vote_count: number; user_voted: boolean; comment_count: number; id: any; community_id: any; user_id: any; title: any; description: any; category: any; ... 6 more ...; communities: { ...; }[]; }' but required in type 'ProfileThread'.
+02:13:56.033 
+02:13:56.034   93 |       initialInterestIds={myInterestIds}
+02:13:56.034   94 |       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string...
+02:13:56.034 > 95 |       initialThreads={threadList.map((thread) => ({
+02:13:56.034      |                       ^
+02:13:56.034   96 |         ...thread,
+02:13:56.035   97 |         users: null,
+02:13:56.035   98 |         community: communityOf(thread),
+02:13:56.096 Next.js build worker exited with code: 1 and signal: null
+02:13:56.149 npm error Lifecycle script `build` failed with error:
+02:13:56.149 npm error code 1
+02:13:56.149 npm error path /vercel/path0/apps/web
+02:13:56.149 npm error workspace web@0.1.0
+02:13:56.150 npm error location /vercel/path0/apps/web
+02:13:56.150 npm error command failed
+02:13:56.150 npm error command sh -c next build
+02:13:56.181 Error: Command "npm run build" exited with 1

@@ -156,6 +156,7 @@ export function CommunityPageShell({ communityId, activeTab, currentUserId, chil
         members={members}
         community={community}
         communityId={communityId}
+        currentUserId={currentUserId}
         onlineCount={onlineCount}
       />
     </div>

@@ -23,6 +23,8 @@ interface UpcomingEvent {
   location: string | null;
   is_online: boolean;
   rsvp_count: number;
+  cover_image_url: string | null;
+  user_rsvped: boolean;
 }
 
 interface CommunityData {
@@ -37,6 +39,7 @@ interface CommunityInfoPanelProps {
   members: Member[];
   community: CommunityData | null;
   communityId: string;
+  currentUserId?: string;
   onlineCount?: number;
 }
 
@@ -145,12 +148,44 @@ interface CommunityRule {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function CommunityInfoPanel({ members, community, communityId, onlineCount = 0 }: CommunityInfoPanelProps) {
+export function CommunityInfoPanel({ members, community, communityId, currentUserId, onlineCount = 0 }: CommunityInfoPanelProps) {
   const memberCount = community?.member_count ?? members.length;
 
   const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
   const [postsToday, setPostsToday] = useState<number | null>(null);
   const [rules, setRules] = useState<CommunityRule[]>([]);
+  const [rsvpPending, setRsvpPending] = useState(false);
+  const [localRsvped, setLocalRsvped] = useState<boolean | null>(null);
+  const [localRsvpCount, setLocalRsvpCount] = useState<number | null>(null);
+
+  const userRsvped = localRsvped ?? upcomingEvent?.user_rsvped ?? false;
+  const rsvpCount = localRsvpCount ?? upcomingEvent?.rsvp_count ?? 0;
+
+  async function handleRsvp(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!upcomingEvent || rsvpPending) return;
+    const newRsvped = !userRsvped;
+    const newCount = rsvpCount + (newRsvped ? 1 : -1);
+    setLocalRsvped(newRsvped);
+    setLocalRsvpCount(newCount);
+    setRsvpPending(true);
+    try {
+      const res = await fetch(`/api/communities/${communityId}/events/${upcomingEvent.id}/rsvp`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setLocalRsvped(data.rsvped);
+        setLocalRsvpCount(data.rsvp_count);
+      } else {
+        setLocalRsvped(userRsvped);
+        setLocalRsvpCount(rsvpCount);
+      }
+    } catch {
+      setLocalRsvped(userRsvped);
+      setLocalRsvpCount(rsvpCount);
+    } finally {
+      setRsvpPending(false);
+    }
+  }
 
   useEffect(() => {
     if (!communityId) return;
@@ -164,7 +199,10 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
         const upcoming = data.events
           .filter((e) => new Date(e.event_date) > now)
           .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
-        setUpcomingEvent(upcoming[0] ?? null);
+        const evt = upcoming[0] ?? null;
+        setUpcomingEvent(evt);
+        setLocalRsvped(null);
+        setLocalRsvpCount(null);
       })
       .catch(() => {/* silent */});
 
@@ -182,9 +220,10 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
       })
       .catch(() => {/* silent */});
 
-    // ── Realtime subscription — rules update without page refresh ──────────
+    // ── Realtime subscriptions ─────────────────────────────────────────────
     const supabase = createClient();
-    const channel = supabase
+
+    const rulesChannel = supabase
       .channel(`community-rules:${communityId}`)
       .on(
         "postgres_changes",
@@ -215,10 +254,43 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
       )
       .subscribe();
 
+    // ── Realtime RSVP sync — keep sidebar count in sync with event_rsvps ──
+    const rsvpChannel = supabase
+      .channel(`sidebar-event-rsvps:${communityId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "event_rsvps" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { event_id?: string; user_id?: string } | null;
+          if (!row?.event_id) return;
+          setUpcomingEvent((prev) => {
+            if (!prev || prev.id !== row.event_id) return prev;
+            const delta = payload.eventType === "INSERT" ? 1 : payload.eventType === "DELETE" ? -1 : 0;
+            const newCount = Math.max(0, prev.rsvp_count + delta);
+            // If the change is from the current user, sync user_rsvped too
+            const isMe = currentUserId && row.user_id === currentUserId;
+            return {
+              ...prev,
+              rsvp_count: newCount,
+              user_rsvped: isMe
+                ? payload.eventType === "INSERT"
+                : prev.user_rsvped,
+            };
+          });
+          // Keep local overrides in sync so the button reflects realtime state
+          if (currentUserId && row.user_id === currentUserId) {
+            setLocalRsvped(payload.eventType === "INSERT");
+          }
+          setLocalRsvpCount(null); // let upcomingEvent.rsvp_count drive the count
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(rulesChannel);
+      supabase.removeChannel(rsvpChannel);
     };
-  }, [communityId]);
+  }, [communityId, currentUserId]);
 
   return (
     // Outer wrapper — sizing + scroll, holds both cards
@@ -241,6 +313,85 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
         >
           <AvatarStack members={members} total={memberCount} />
         </Section>
+
+        {/* Upcoming Events — only shown when a real upcoming event exists */}
+        {upcomingEvent && (
+          <Section
+            title="Upcoming Events"
+            action={
+              <Link
+                href={`/dashboard/communities/${communityId}/events`}
+                className="font-body text-xs text-accent hover:underline"
+              >
+                See all
+              </Link>
+            }
+          >
+            <div className="flex gap-3">
+              {/* Cover image — matches EventCard thumbnail style */}
+              <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
+                {upcomingEvent.cover_image_url ? (
+                  <img
+                    src={upcomingEvent.cover_image_url}
+                    alt={upcomingEvent.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Calendar size={20} className="text-foreground-subtle" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-body text-[13px] font-semibold text-foreground leading-snug mb-1">
+                  {upcomingEvent.title}
+                </p>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                    <Calendar size={11} className="shrink-0" />
+                    {fmtEventDate(upcomingEvent.event_date)}
+                  </div>
+                  {upcomingEvent.location && (
+                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                      <MapPin size={11} className="shrink-0" />
+                      {upcomingEvent.location}
+                    </div>
+                  )}
+                  {upcomingEvent.is_online && !upcomingEvent.location && (
+                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                      <ExternalLink size={11} className="shrink-0" />
+                      Online
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
+                    <Users size={11} className="shrink-0" />
+                    {rsvpCount} going
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Action row: Going toggle + View Event */}
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={handleRsvp}
+                disabled={rsvpPending}
+                className={`flex-1 rounded-lg py-1.5 font-body text-sm font-medium transition-colors disabled:opacity-50 ${
+                  userRsvped
+                    ? "bg-accent/15 text-accent hover:bg-accent/25"
+                    : "bg-accent text-accent-foreground hover:bg-accent-hover"
+                }`}
+              >
+                {rsvpPending ? "…" : userRsvped ? "Going ✓" : "Join Event"}
+              </button>
+              <Link
+                href={`/dashboard/communities/${communityId}/events/${upcomingEvent.id}`}
+                className="flex-1 flex items-center justify-center rounded-lg border border-border py-1.5 font-body text-sm font-medium text-foreground-muted hover:bg-surface-raised hover:text-foreground transition-colors"
+              >
+                View Event
+              </Link>
+            </div>
+          </Section>
+        )}
 
         {/* About */}
         {(() => {
@@ -300,60 +451,6 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
                 </li>
               ))}
             </ol>
-          </Section>
-        )}
-
-        {/* Upcoming Events — only shown when a real upcoming event exists */}
-        {upcomingEvent && (
-          <Section
-            title="Upcoming Events"
-            action={
-              <Link
-                href={`/dashboard/communities/${communityId}/events`}
-                className="font-body text-xs text-accent hover:underline"
-              >
-                See all
-              </Link>
-            }
-          >
-            <div className="flex gap-3">
-              <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
-                <Calendar size={20} className="text-foreground-subtle" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-body text-[13px] font-semibold text-foreground leading-snug mb-1">
-                  {upcomingEvent.title}
-                </p>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                    <Calendar size={11} className="shrink-0" />
-                    {fmtEventDate(upcomingEvent.event_date)}
-                  </div>
-                  {upcomingEvent.location && (
-                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                      <MapPin size={11} className="shrink-0" />
-                      {upcomingEvent.location}
-                    </div>
-                  )}
-                  {upcomingEvent.is_online && !upcomingEvent.location && (
-                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                      <ExternalLink size={11} className="shrink-0" />
-                      Online
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                    <Users size={11} className="shrink-0" />
-                    {upcomingEvent.rsvp_count} going
-                  </div>
-                </div>
-              </div>
-            </div>
-            <Link
-              href={`/dashboard/communities/${communityId}/events/${upcomingEvent.id}`}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border py-1.5 font-body text-sm font-medium text-foreground-muted hover:bg-surface-raised hover:text-foreground transition-colors"
-            >
-              View Event
-            </Link>
           </Section>
         )}
 

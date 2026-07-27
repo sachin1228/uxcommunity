@@ -58,6 +58,27 @@ export function EventsView({
       }, () => void fetchEvents(true))
       .subscribe();
 
+    const saveChannel = supabase
+      .channel(`event-saves:${communityId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "event_saves",
+      }, (payload) => {
+        // Optimistically update save_count without a full refetch
+        const row = (payload.new ?? payload.old) as { event_id?: string; user_id?: string } | null;
+        if (!row?.event_id) return;
+        setEvents((prev) => prev.map((e) => {
+          if (e.id !== row.event_id) return e;
+          const delta = payload.eventType === "INSERT" ? 1 : payload.eventType === "DELETE" ? -1 : 0;
+          const user_saved = row.user_id === currentUserId
+            ? payload.eventType === "INSERT"
+            : e.user_saved;
+          return { ...e, save_count: Math.max(0, e.save_count + delta), user_saved };
+        }));
+      })
+      .subscribe();
+
     const handleFocus = () => { if (document.visibilityState === "visible") void fetchEvents(true); };
     document.addEventListener("visibilitychange", handleFocus);
     window.addEventListener("focus", handleFocus);
@@ -65,6 +86,7 @@ export function EventsView({
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(rsvpChannel);
+      supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
     };
@@ -91,6 +113,12 @@ export function EventsView({
   function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {
     setEvents((prev) =>
       prev.map((e) => e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e)
+    );
+  }
+
+  function handleSaveChanged(eventId: string, saved: boolean, count: number) {
+    setEvents((prev) =>
+      prev.map((e) => e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e)
     );
   }
 
@@ -165,6 +193,7 @@ export function EventsView({
                       onUpdated={handleUpdated}
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
+                      onSaveChanged={handleSaveChanged}
                     />
                   ))}
                 </div>
@@ -185,6 +214,7 @@ export function EventsView({
                       onUpdated={handleUpdated}
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
+                      onSaveChanged={handleSaveChanged}
                     />
                   ))}
                 </div>

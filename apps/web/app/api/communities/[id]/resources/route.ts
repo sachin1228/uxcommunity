@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { getActorName, notifyCommunityMembers, resourceHref } from "@/lib/notifications";
 import type { ResourceType } from "@/components/communities/resources/types";
 
 const PAGE_SIZE = 100;
@@ -190,6 +191,19 @@ export async function POST(
     console.error("[POST resource]", error);
     return NextResponse.json({ error: "Failed to create resource." }, { status: 500 });
   }
+
+  const actorName = await getActorName(db, userId);
+  await notifyCommunityMembers(db, {
+    communityId,
+    actorId: userId,
+    type: "community_resource",
+    entityType: "resource",
+    entityId: inserted.id,
+    title: `${actorName} shared a new resource`,
+    body: title,
+    href: resourceHref(communityId, inserted.id),
+    metadata: { resource_type: resourceType },
+  });
 
   const enriched = (await withAuthorAndMeta(db, [inserted as Record<string, unknown>], userId))[0];
   return NextResponse.json({ resource: enriched }, { status: 201 });

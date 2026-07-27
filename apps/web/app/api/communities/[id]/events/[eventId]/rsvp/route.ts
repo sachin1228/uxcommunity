@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { createNotification, eventHref, getActorName } from "@/lib/notifications";
 
 export async function POST(
   _req: NextRequest,
@@ -16,7 +17,7 @@ export async function POST(
   // Verify event belongs to community
   const { data: event } = await db
     .from("community_events")
-    .select("id, max_attendees")
+    .select("id, user_id, title, max_attendees")
     .eq("id", eventId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -47,6 +48,19 @@ export async function POST(
   }
 
   await db.from("event_rsvps").insert({ event_id: eventId, user_id: userId });
+  const actorName = await getActorName(db, userId);
+  await createNotification(db, {
+    userId: event.user_id,
+    actorId: userId,
+    communityId,
+    type: "event_rsvp",
+    entityType: "event",
+    entityId: eventId,
+    title: `${actorName} RSVPed to your event`,
+    body: event.title,
+    href: eventHref(communityId, eventId),
+  });
+
   const { data: all } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
   return NextResponse.json({ rsvped: true, rsvp_count: (all ?? []).length });
 }

@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
-import { Bell } from "lucide-react";
+import { NotificationBell } from "@/app/dashboard/NotificationBell";
 
 
 export default async function DashboardLayout({
@@ -46,13 +46,7 @@ export default async function DashboardLayout({
         </span>
 
         <div className="ml-auto flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="h-8 w-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
-          >
-            <Bell size={16} strokeWidth={1.8} />
-          </button>
+          <NotificationBell userId={userId} />
           <ProfileDropdown
             name={name}
             email={email}

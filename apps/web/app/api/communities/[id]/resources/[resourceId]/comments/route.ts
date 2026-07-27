@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { createNotification, getActorName, resourceHref } from "@/lib/notifications";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -99,8 +100,9 @@ export async function POST(
   // Verify resource exists
   const { data: resource } = await db
     .from("community_resources")
-    .select("id")
+    .select("id, user_id, title")
     .eq("id", resourceId)
+    .eq("community_id", communityId)
     .maybeSingle();
   if (!resource) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
 
@@ -118,15 +120,17 @@ export async function POST(
   }
 
   const parentId = typeof body.parent_id === "string" ? body.parent_id : null;
+  let parentAuthorId: string | null = null;
   if (parentId) {
     const { data: parent } = await db
       .from("resource_comments")
-      .select("id, parent_id")
+      .select("id, parent_id, user_id")
       .eq("id", parentId)
       .eq("resource_id", resourceId)
       .maybeSingle();
     if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 });
     if (parent.parent_id) return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 422 });
+    parentAuthorId = parent.user_id;
   }
 
   const { data: inserted, error } = await db
@@ -138,6 +142,34 @@ export async function POST(
   if (error || !inserted) {
     console.error("[POST resource comment]", error);
     return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
+  }
+
+  const actorName = await getActorName(db, userId);
+  const href = resourceHref(communityId, resourceId);
+  await createNotification(db, {
+    userId: resource.user_id,
+    actorId: userId,
+    communityId,
+    type: "resource_comment",
+    entityType: "resource",
+    entityId: resourceId,
+    title: `${actorName} commented on your resource`,
+    body: resource.title,
+    href,
+  });
+
+  if (parentAuthorId && parentAuthorId !== resource.user_id) {
+    await createNotification(db, {
+      userId: parentAuthorId,
+      actorId: userId,
+      communityId,
+      type: "resource_reply",
+      entityType: "resource",
+      entityId: resourceId,
+      title: `${actorName} replied to your comment`,
+      body: resource.title,
+      href,
+    });
   }
 
   const [enriched] = await attachUsers(db, [inserted as Record<string, unknown>]);

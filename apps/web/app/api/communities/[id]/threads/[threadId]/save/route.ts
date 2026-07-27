@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { createNotification, getActorName, threadHref } from "@/lib/notifications";
 
 export async function POST(
   _request: NextRequest,
@@ -13,9 +14,17 @@ export async function POST(
     return error as Response;
   }
 
-  const { threadId } = await params;
+  const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+
+  const { data: thread } = await db
+    .from("community_threads")
+    .select("id, user_id, title")
+    .eq("id", threadId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+  if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   // Toggle: check existing save
   const { data: existing } = await db
@@ -47,5 +56,19 @@ export async function POST(
     console.error("[INSERT save]", error);
     return NextResponse.json({ error: "Failed to save thread." }, { status: 500 });
   }
+
+  const actorName = await getActorName(db, userId);
+  await createNotification(db, {
+    userId: thread.user_id,
+    actorId: userId,
+    communityId,
+    type: "thread_save",
+    entityType: "thread",
+    entityId: threadId,
+    title: `${actorName} saved your thread`,
+    body: thread.title,
+    href: threadHref(communityId, threadId),
+  });
+
   return NextResponse.json({ saved: true });
 }

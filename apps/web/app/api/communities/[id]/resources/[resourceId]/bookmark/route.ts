@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { createNotification, getActorName, resourceHref } from "@/lib/notifications";
 
 export async function POST(
   _req: NextRequest,
@@ -25,7 +26,7 @@ export async function POST(
   // Verify resource exists in this community
   const { data: resource } = await db
     .from("community_resources")
-    .select("id")
+    .select("id, user_id, title")
     .eq("id", resourceId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -43,6 +44,19 @@ export async function POST(
     await db.from("resource_bookmarks").delete().eq("resource_id", resourceId).eq("user_id", userId);
   } else {
     await db.from("resource_bookmarks").insert({ resource_id: resourceId, user_id: userId });
+
+    const actorName = await getActorName(db, userId);
+    await createNotification(db, {
+      userId: resource.user_id,
+      actorId: userId,
+      communityId,
+      type: "resource_bookmark",
+      entityType: "resource",
+      entityId: resourceId,
+      title: `${actorName} bookmarked your resource`,
+      body: resource.title,
+      href: resourceHref(communityId, resourceId),
+    });
   }
 
   const { data: allBookmarks } = await db
