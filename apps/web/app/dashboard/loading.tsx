@@ -4,8 +4,10 @@
  */
 export default function DashboardLoading() {
   return (
-    <div className="animate-pulse">
-      <div className="h-7 w-56 rounded bg-surface-raised mb-2" />
+    <div className="px-8 py-8 animate-pulse">
+      {/* "Welcome back, Name" */}
+      <div className="h-8 w-64 rounded bg-surface-raised mb-2" />
+      {/* subtitle */}
       <div className="h-4 w-96 rounded bg-surface-raised" />
     </div>
   );

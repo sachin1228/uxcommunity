@@ -1,2 +1,3 @@
 - [Profile page migration](profile-page-migration.md) — linkedin_url, portfolio_url, bio must be added to designer_profiles via migration before profile page works.
 - [Realtime sidebar previews](realtime-sidebar-previews.md) — reaction previews need message identity and event ordering to stay correct across messages.
+- [Private community archive](private-community-archive.md) — “delete” from the sidebar is a per-user archive; shared community data stays intact and new messages restore it.

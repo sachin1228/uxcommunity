@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
-/**
- * Strip year-range suffixes and singularize experience level names for display.
- * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- */
 function cleanDesignation(name: string): string {
   const clean = name.split("(")[0].trim();
   if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
@@ -13,20 +9,26 @@ function cleanDesignation(name: string): string {
   return clean;
 }
 
+const PAGE_SIZE = 30;
+
 /**
- * GET /api/communities/[id]/members
+ * GET /api/communities/[id]/members?page=0&search=...
  *
- * Returns the full member list for a community with profile data
- * (avatar, designation, company). Requires the caller to be a member.
+ * Paginated member list. page is 0-indexed, PAGE_SIZE rows per page.
+ * Optional `search` filters by name (case-insensitive, server-side).
  */
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
   const callerId = session.userId!;
   const { id: communityId } = await params;
+
+  const url    = new URL(req.url);
+  const page   = Math.max(0, parseInt(url.searchParams.get("page") ?? "0", 10));
+  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
 
   const db = createServiceClient();
 
@@ -42,24 +44,46 @@ export async function GET(
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
-  // Fetch all members ordered by join date.
-  const { data: memberRows } = await db
+  // Fetch all member user_ids ordered by join date (needed for stable pagination).
+  const { data: allRows } = await db
     .from("community_members")
     .select("user_id, joined_at")
     .eq("community_id", communityId)
     .order("joined_at", { ascending: true });
 
-  const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
-  if (!memberUserIds.length) {
-    return NextResponse.json({ members: [] });
+  let memberRows = allRows ?? [];
+  if (!memberRows.length) return NextResponse.json({ members: [], has_more: false });
+
+  const allUserIds = memberRows.map((m) => m.user_id);
+
+  // If searching, fetch names first so we can filter by name server-side.
+  let filteredUserIds = allUserIds;
+  if (search) {
+    const { data: nameRows } = await db
+      .from("users")
+      .select("id, name")
+      .in("id", allUserIds)
+      .ilike("name", `%${search}%`);
+    filteredUserIds = (nameRows ?? []).map((u) => u.id);
+    memberRows = memberRows.filter((m) => filteredUserIds.includes(m.user_id));
   }
 
+  const total      = memberRows.length;
+  const from       = page * PAGE_SIZE;
+  const pageRows   = memberRows.slice(from, from + PAGE_SIZE);
+  const has_more   = from + PAGE_SIZE < total;
+
+  if (!pageRows.length) return NextResponse.json({ members: [], has_more: false });
+
+  const pageUserIds = pageRows.map((m) => m.user_id);
+
   const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", memberUserIds),
-    db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
+    db.from("users").select("id, name").in("id", pageUserIds),
+    db.from("designer_profiles")
+      .select("user_id, avatar_url, experience_level, companies(name)")
+      .in("user_id", pageUserIds),
   ]);
 
-  // Batch-resolve experience level slugs.
   const slugs = [...new Set((profiles ?? []).map((p: any) => p.experience_level).filter(Boolean) as string[])];
   const expLevelMap: Record<string, string> = {};
   if (slugs.length) {
@@ -70,21 +94,46 @@ export async function GET(
   const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, p]));
   const userMap    = Object.fromEntries((users    ?? []).map((u) => [u.id, u]));
 
-  const members = (memberRows ?? [])
+  const members = pageRows
     .map((m) => {
       const u = userMap[m.user_id];
       const p = profileMap[m.user_id];
       if (!u) return null;
       return {
-        user_id:    m.user_id,
-        joined_at:  m.joined_at,
-        name:       u.name,
-        avatar_url: p?.avatar_url ?? null,
+        user_id:     m.user_id,
+        joined_at:   m.joined_at,
+        name:        u.name,
+        avatar_url:  p?.avatar_url ?? null,
         designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-        company:    (p?.companies as any)?.name ?? null,
+        company:     (p?.companies as any)?.name ?? null,
       };
     })
     .filter(Boolean);
 
-  return NextResponse.json({ members });
+  return NextResponse.json({ members, has_more, total });
+}
+
+/**
+ * DELETE /api/communities/[id]/members — leave the community.
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const userId = session.userId!;
+  const { id: communityId } = await params;
+  const db = createServiceClient();
+
+  const { error } = await db
+    .from("community_members")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", userId);
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to leave community." }, { status: 500 });
+  }
+  return NextResponse.json({ success: true });
 }

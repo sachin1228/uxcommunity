@@ -80,6 +80,8 @@ export interface CachedSidebarCommunity {
   reference_name?: string | null;
   member_count: number;
   message_count: number;
+  /** Hidden by this user until a new message arrives. */
+  is_archived?: boolean;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;
@@ -182,6 +184,32 @@ export function invalidateOnLeave(communityId: string): void {
   msgCache.delete(communityId);
   metaCache.delete(communityId);
   msgFetchedAt.delete(communityId);
+  lastReadAtOnOpen.delete(communityId);
+  notifySidebarChanged();
+}
+
+/** Hide a community for this user while retaining the membership. */
+export function invalidateOnArchive(communityId: string): void {
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.map((c) =>
+        c.id === communityId ? { ...c, is_archived: true } : c
+      ),
+    };
+  }
+  msgCache.delete(communityId);
+  msgFetchedAt.delete(communityId);
+  lastReadAtOnOpen.delete(communityId);
+  notifySidebarChanged();
+}
+
+export const SIDEBAR_CHANGED_EVENT = "drafthub:sidebar-changed";
+
+function notifySidebarChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SIDEBAR_CHANGED_EVENT));
+  }
 }
 
 // ─── Reaction helpers ─────────────────────────────────────────────────────────

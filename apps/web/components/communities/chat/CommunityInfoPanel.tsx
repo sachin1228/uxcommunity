@@ -85,7 +85,7 @@ function AvatarStack({ members, total }: { members: Member[]; total: number }) {
       {shown.map((m, i) => (
         <div
           key={m.user_id}
-          className="ring-2 ring-surface rounded-full shrink-0"
+          className="ring-2 ring-surface rounded-full shrink-0 bg-surface-raised"
           style={{ marginLeft: i === 0 ? 0 : -10, zIndex: shown.length - i }}
         >
           <ChatAvatar
@@ -97,8 +97,8 @@ function AvatarStack({ members, total }: { members: Member[]; total: number }) {
       ))}
       {extra > 0 && (
         <div
-          className="h-7 w-7 shrink-0 rounded-full bg-surface-raised ring-2 ring-surface flex items-center justify-center font-body text-[10px] font-semibold text-foreground-muted"
-          style={{ marginLeft: -10 }}
+          className="h-7 min-w-[28px] px-1.5 shrink-0 rounded-full bg-surface-raised ring-2 ring-surface flex items-center justify-center font-body text-[10px] font-semibold text-foreground-muted"
+          style={{ marginLeft: -6 }}
         >
           {extra >= 1000 ? `+${Math.round(extra / 1000)}K` : `+${extra}`}
         </div>
@@ -230,6 +230,14 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
         {/* Members */}
         <Section
           title={`Members (${memberCount.toLocaleString()})`}
+          action={
+            onlineCount > 0 ? (
+              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
+                {onlineCount} online
+              </span>
+            ) : undefined
+          }
         >
           <AvatarStack members={members} total={memberCount} />
         </Section>

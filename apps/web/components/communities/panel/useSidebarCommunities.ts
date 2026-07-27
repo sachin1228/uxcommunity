@@ -7,6 +7,7 @@ import {
   SIDEBAR_STALE_MS,
   initUserCache,
   lastReadAtOnOpen,
+  SIDEBAR_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 import { usePrefetch } from "./usePrefetch";
@@ -129,6 +130,16 @@ export function useSidebarCommunities(userId: string) {
     if (cacheWasFresh) revalidateUnreadCounts();
   }, [load, revalidateUnreadCounts]);
 
+  // Header actions update the module-level cache because the global sidebar
+  // stays mounted while the community route changes.
+  useEffect(() => {
+    const syncFromCache = () => {
+      if (sidebarStore.data) setCommunities(sidebarStore.data.communities);
+    };
+    window.addEventListener(SIDEBAR_CHANGED_EVENT, syncFromCache);
+    return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, syncFromCache);
+  }, []);
+
   // ── Active community change: clear badge + mark read ─────────────────────
   useEffect(() => {
     activeCommunityIdRef.current = activeCommunityId;
@@ -221,7 +232,7 @@ export function useSidebarCommunities(userId: string) {
   }
 
   return {
-    communities,
+    communities: communities.filter((c) => !c.is_archived),
     loading,
     activeCommunityId,
     typingMap,

@@ -67,18 +67,23 @@ export async function GET(
   // Members only see chat messages sent after they joined — not historical ones.
   const { data: membership } = await db
     .from("community_members")
-    .select("joined_at")
+    .select("joined_at, history_cleared_at")
     .eq("community_id", communityId)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
 
+  const historyStart = membership.history_cleared_at &&
+    membership.history_cleared_at > membership.joined_at
+    ? membership.history_cleared_at
+    : membership.joined_at;
+
   let msgQuery = db
     .from("community_messages")
     .select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at")
     .eq("community_id", communityId)
-    .gte("created_at", membership.joined_at)   // never show messages before the user joined
+    .gte("created_at", historyStart)   // never show messages before join/archive
     .order("created_at", { ascending: false });
 
   if (after)        msgQuery = msgQuery.gt("created_at", after);

@@ -194,6 +194,7 @@ export function useSidebarRealtime({
             setCommunities((prev) =>
               applyUpdate(prev, row.community_id, (c) => ({
                 ...c,
+                 is_archived: false,
                 lastReaction: null, // new message clears any pending reaction preview
                 last_message: {
                   id:         row.id,
