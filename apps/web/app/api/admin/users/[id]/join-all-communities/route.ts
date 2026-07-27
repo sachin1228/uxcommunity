@@ -46,7 +46,7 @@ export async function POST(
     if (rows.length > 0) {
       const { error } = await db
         .from("community_members")
-        .upsert(rows, { onConflict: "community_id,user_id" });
+        .upsert(rows, { onConflict: "community_id,user_id", ignoreDuplicates: true });
 
       if (error) {
         console.error("[admin/join-all] upsert members:", error);

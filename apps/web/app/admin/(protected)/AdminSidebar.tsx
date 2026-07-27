@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard, Wrench, MessagesSquare, ShieldCheck } from "lucide-react";
+import { LayoutList, Building2, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, Clapperboard, Wrench, MessagesSquare, ShieldCheck, Gauge } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -115,6 +115,20 @@ export function AdminSidebar() {
       >
         <Wrench size={16} className={active("/admin/tools") ? "text-accent" : ""} />
         Tools
+      </Link>
+
+      {/* Load Test */}
+      <Link
+        href="/admin/load-test"
+        onClick={() => setPendingHref("/admin/load-test")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/load-test")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <Gauge size={16} className={active("/admin/load-test") ? "text-accent" : ""} />
+        Load Test
       </Link>
 
       {/* Master Data accordion */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, MutableRefObject } from "react";
+import { useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
@@ -33,6 +33,21 @@ export function useRealtimeChat({
   realtimeInsertPendingRef,
   realtimeWasNearBottomRef,
 }: UseRealtimeChatOptions) {
+  // ── Debounced catch-up fetch ───────────────────────────────────────────────
+  // Collapses rapid reconnect / visibility events into a single fetchMessages
+  // call. Prevents a storm of incremental API requests during a chat flood.
+  const catchUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debouncedCatchUp = useCallback(
+    (after?: string) => {
+      if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
+      catchUpTimerRef.current = setTimeout(() => {
+        catchUpTimerRef.current = null;
+        fetchMessages(after);
+      }, 300);
+    },
+    [fetchMessages],
+  );
+
   // ── Supabase Realtime ─────────────────────────────────────────────────────
   useEffect(() => {
     let supabase: ReturnType<typeof createBrowserClient>;
@@ -462,12 +477,14 @@ export function useRealtimeChat({
           if (!hasSubscribedRef.current) {
             hasSubscribedRef.current = true;
           } else {
-            // Reconnected — catch up on missed messages
+            // Reconnected — catch up on missed messages.
+            // Debounced so rapid reconnections (e.g. during a chat flood) collapse
+            // into a single incremental fetch instead of one per reconnect event.
             const cached   = msgCache.get(communityId) ?? [];
             const lastReal = cached
               .filter((m) => !m.id.startsWith("temp-"))
               .at(-1);
-            fetchMessages(lastReal?.created_at ?? undefined);
+            debouncedCatchUp(lastReal?.created_at ?? undefined);
           }
         }
       });
@@ -486,7 +503,9 @@ export function useRealtimeChat({
       const lastReal = cached
         .filter((m) => !m.id.startsWith("temp-"))
         .at(-1);
-      fetchMessages(lastReal?.created_at ?? undefined);
+      // Debounced: rapid focus/visibility events (e.g. alt-tab during a flood)
+      // collapse into one incremental fetch instead of one per event.
+      debouncedCatchUp(lastReal?.created_at ?? undefined);
     };
     document.addEventListener("visibilitychange", handleCatchUp);
     window.addEventListener("focus", handleCatchUp);
@@ -494,5 +513,5 @@ export function useRealtimeChat({
       document.removeEventListener("visibilitychange", handleCatchUp);
       window.removeEventListener("focus", handleCatchUp);
     };
-  }, [communityId, fetchMessages]);
+  }, [communityId, debouncedCatchUp]);
 }

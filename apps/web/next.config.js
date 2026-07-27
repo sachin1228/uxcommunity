@@ -7,6 +7,12 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : "*.supabase.co";
 
 const nextConfig = {
+  // Prevent k6 scripts from being pulled into Next.js file tracing.
+  // The load-test route spawns k6/node as external processes; those files
+  // must never be bundled or traced as app modules.
+  outputFileTracingExcludes: {
+    "*": ["../../k6/**"],
+  },
   reactStrictMode: true,
   transpilePackages: ["@draft/shared", "@draft/design-system"],
   allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],

@@ -188,12 +188,83 @@ export function CommunityChat({
     messages,
     loading,
     initialMessagesReady,
+    hasMoreAbove,
+    loadingOlder,
     setMessages,
     fetchMessages,
+    fetchOlderMessages,
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,
   } = useChatData({ communityId, initialMeta, initialMessages });
+
+  // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
+  const topSentinelRef   = useRef<HTMLDivElement>(null);
+  /** Captured scroll position just before we prepend older messages. */
+  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  /** Always points to the latest load-older logic; never stale inside event handlers. */
+  const loadOlderCallbackRef = useRef<(() => void) | null>(null);
+
+  // Keep the callback ref current on every render (no deps needed).
+  useEffect(() => {
+    loadOlderCallbackRef.current = () => {
+      const oldest = messages.find((m) => !m.id.startsWith("temp-"));
+      if (!oldest || !hasMoreAbove || loadingOlder) return;
+      const container = scrollContainerRef.current;
+      if (container) {
+        prependAnchorRef.current = {
+          scrollHeight: container.scrollHeight,
+          scrollTop:    container.scrollTop,
+        };
+      }
+      fetchOlderMessages(oldest.created_at);
+    };
+  });
+
+  // Restore scroll position after older messages are prepended, so the view
+  // doesn't jump to the top. Runs synchronously before the browser paints.
+  useIsomorphicLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    if (!anchor) return;
+    prependAnchorRef.current = null;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const delta = container.scrollHeight - anchor.scrollHeight;
+    if (delta > 0) container.scrollTop = anchor.scrollTop + delta;
+  }, [messages]);
+
+  // IntersectionObserver-based trigger: starts loading older messages before
+  // the user reaches the top by using a 300 px rootMargin.  Including
+  // `loading` and `loadingOlder` in the deps ensures the observer is
+  // (re-)created once the initial load finishes and the sentinel first
+  // appears in the DOM, and again after each older-page fetch completes.
+  // Stops observing automatically once hasMoreAbove becomes false.
+  useEffect(() => {
+    if (!hasMoreAbove) return;
+
+    const sentinel = topSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadOlderCallbackRef.current?.();
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        // Fire 300 px before the sentinel reaches the viewport top so
+        // older messages start loading well before the user gets there.
+        rootMargin: "300px 0px 0px 0px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // scrollContainerRef is a stable ref — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMoreAbove, loadingOlder, loading]);
 
   const handleDelete = useCallback(async (msgId: string) => {
     // Optimistic update: mark as deleted locally immediately
@@ -457,9 +528,12 @@ export function CommunityChat({
               firstUnreadMsgId={firstUnreadMsgId}
               unreadDisplayCount={unreadDisplayCount}
               unreadDividerRef={unreadDividerRef}
+              topSentinelRef={topSentinelRef}
               bottomRef={bottomRef}
               initialPositionResolved={initialPositionResolved}
               loading={loading}
+              loadingOlder={loadingOlder}
+              hasMoreAbove={hasMoreAbove}
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}

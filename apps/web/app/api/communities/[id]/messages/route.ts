@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
+import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
@@ -181,17 +182,21 @@ export async function POST(
   if (!content && !image_url) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
   if (content.length > 2000)  return NextResponse.json({ error: "Message too long." },        { status: 422 });
 
-  const textDecision = content
-    ? await moderateText({ content, contentType: "chat_message", userId })
+  // ── Phase 1: synchronous local-rules check (<1 ms) ───────────────────────
+  // This is the only blocking moderation gate. It catches clear-cut violations
+  // (phishing, spam links, banned keywords) before the DB insert so malicious
+  // content never lands in the database at all.
+  const localDecision = content
+    ? moderateWithLocalTextRules({ content, contentType: "chat_message", userId })
     : null;
-  if (textDecision && !textDecision.allowed) {
+  if (localDecision && !localDecision.allowed) {
     await logModerationDecision(db, {
       userId,
       contentType: "chat_message",
       contentHash: contentHash(content),
-      decision: textDecision,
+      decision: localDecision,
     });
-    return moderationFailureResponse(textDecision);
+    return moderationFailureResponse(localDecision);
   }
 
   // Validate reply_to_id belongs to this community (if provided)
@@ -216,21 +221,50 @@ export async function POST(
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
 
-  if (textDecision) {
-    await logModerationDecision(db, {
-      userId,
-      contentType: "chat_message",
-      contentRefId: inserted.id,
-      contentHash: contentHash(content),
-      decision: textDecision,
-    });
-  }
-
   const [{ data: user }, { data: profile }, replyMap] = await Promise.all([
     db.from("users").select("name").eq("id", userId).single(),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
     fetchReplyPreviews(db, reply_to_id ? [reply_to_id] : []),
   ]);
+
+  // ── Phase 2: AI moderation after the response is sent ────────────────────
+  // `after()` runs the callback once the HTTP response has been flushed,
+  // keeping POST latency to <100 ms even when the AI provider is slow.
+  // If the AI rejects the message it is soft-deleted via a Realtime UPDATE,
+  // which the existing UPDATE handler in useRealtimeChat already processes.
+  if (content) {
+    const capturedId      = inserted.id;
+    const capturedContent = content;
+    const capturedUserId  = userId;
+    after(async () => {
+      try {
+        const aiDecision = await moderateText({
+          content: capturedContent,
+          contentType: "chat_message",
+          userId: capturedUserId,
+        });
+        if (!aiDecision.allowed) {
+          // Soft-delete triggers a Realtime UPDATE → client removes the bubble.
+          const moderationDb = createServiceClient();
+          await Promise.all([
+            moderationDb
+              .from("community_messages")
+              .update({ deleted_at: new Date().toISOString() })
+              .eq("id", capturedId),
+            logModerationDecision(moderationDb, {
+              userId: capturedUserId,
+              contentType: "chat_message",
+              contentRefId: capturedId,
+              contentHash: contentHash(capturedContent),
+              decision: aiDecision,
+            }),
+          ]);
+        }
+      } catch (err) {
+        console.error("[POST message] after() AI moderation error:", err);
+      }
+    });
+  }
 
   return NextResponse.json(
     {

@@ -12,6 +12,9 @@ import {
   type CachedMeta,
 } from "@/lib/communities/cache";
 
+/** Must match PAGE_SIZE in the messages API route. */
+const PAGE_SIZE = 50;
+
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -55,10 +58,13 @@ export function useChatData({
   const [messages,            setMessages]           = useState<Message[]>([]);
   const [loading,             setLoading]            = useState(true);
   const [initialMessagesReady, setInitialMessagesReady] = useState(false);
+  const [hasMoreAbove,        setHasMoreAbove]       = useState(true);
+  const [loadingOlder,        setLoadingOlder]       = useState(false);
 
   const communityIdRef         = useRef(communityId);
   const membersRef             = useRef(members);
   const pendingProfileFetchRef = useRef<Map<string, Promise<void>>>(new Map());
+  const isFetchingOlderRef     = useRef(false);
 
   useEffect(() => {
     membersRef.current = members;
@@ -168,7 +174,11 @@ export function useChatData({
             msgCache.set(targetId, incoming);
             msgFetchedAt.set(targetId, Date.now());
             evictIfNeeded();
-            if (communityIdRef.current === targetId) setMessages(incoming);
+            if (communityIdRef.current === targetId) {
+              setMessages(incoming);
+              // If we got fewer than a full page, there's nothing older to load.
+              setHasMoreAbove(incoming.length >= PAGE_SIZE);
+            }
           }
         })
         .catch(() => {})
@@ -182,10 +192,51 @@ export function useChatData({
     [communityId]
   );
 
+  // ── Fetch older messages (upward pagination via ?before=ISO) ─────────────
+  const fetchOlderMessages = useCallback(
+    async (before: string): Promise<void> => {
+      if (isFetchingOlderRef.current) return;
+      isFetchingOlderRef.current = true;
+      setLoadingOlder(true);
+      const targetId = communityId;
+      try {
+        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(before)}`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const d = await res.json();
+        if (communityIdRef.current !== targetId) return;
+        const incoming: Message[] = d.messages ?? [];
+        if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
+        if (incoming.length === 0) return;
+        setMessages((prev) => {
+          const prevIds = new Set(prev.map((m) => m.id));
+          const toAdd   = incoming.filter((m) => !prevIds.has(m.id));
+          if (toAdd.length === 0) return prev;
+          const merged  = [
+            ...toAdd,
+            ...prev.filter((m) => !m.id.startsWith("temp-")),
+          ].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          );
+          msgCache.set(targetId, merged);
+          return merged;
+        });
+      } catch {
+        // Network error — leave state as-is
+      } finally {
+        isFetchingOlderRef.current = false;
+        setLoadingOlder(false);
+      }
+    },
+    [communityId]
+  );
+
   // ── On communityId change: show cache instantly, then catch up ────────────
   useEffect(() => {
     communityIdRef.current = communityId;
     setInitialMessagesReady(false);
+    setHasMoreAbove(true);
+    isFetchingOlderRef.current = false;
     let cancelled = false;
     const cachedMsgs = msgCache.get(communityId);
     const cachedMeta = metaCache.get(communityId);
@@ -228,8 +279,11 @@ export function useChatData({
     messages,
     loading,
     initialMessagesReady,
+    hasMoreAbove,
+    loadingOlder,
     setMessages,
     fetchMessages,
+    fetchOlderMessages,
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,

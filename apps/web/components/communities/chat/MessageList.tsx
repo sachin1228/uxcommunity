@@ -7,6 +7,7 @@ import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { TYPE_EMOJI, fmtDate } from "./chatUtils";
 import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
+import { Loader2 } from "lucide-react";
 
 type Message = CachedMessage;
 
@@ -38,9 +39,15 @@ interface MessageListProps {
   firstUnreadMsgId: string | null;
   unreadDisplayCount: number;
   unreadDividerRef: RefObject<HTMLDivElement>;
+  /** Observed by an IntersectionObserver in CommunityChat to trigger loading older messages. */
+  topSentinelRef: RefObject<HTMLDivElement>;
   bottomRef: RefObject<HTMLDivElement>;
   initialPositionResolved: boolean;
   loading: boolean;
+  /** True while an older-messages fetch is in flight. */
+  loadingOlder: boolean;
+  /** False once we know there are no more messages above the current window. */
+  hasMoreAbove: boolean;
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
@@ -60,9 +67,12 @@ export function MessageList({
   firstUnreadMsgId,
   unreadDisplayCount,
   unreadDividerRef,
+  topSentinelRef,
   bottomRef,
   initialPositionResolved,
   loading,
+  loadingOlder,
+  hasMoreAbove,
   displayCommunity,
   communityId,
   highlightedMsgId,
@@ -129,6 +139,29 @@ export function MessageList({
       className="min-h-full flex flex-col justify-end py-4 space-y-1"
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
+      {/* Top sentinel — observed by IntersectionObserver in CommunityChat to
+          load older messages when the user scrolls near the top.
+          Only rendered while there may be more messages above.              */}
+      {hasMoreAbove && (
+        <div ref={topSentinelRef} className="h-1 shrink-0" aria-hidden />
+      )}
+
+      {/* Spinner shown while an older-page fetch is in flight */}
+      {loadingOlder && (
+        <div className="flex items-center justify-center py-3">
+          <Loader2 size={18} className="animate-spin text-foreground-muted" />
+        </div>
+      )}
+
+      {/* "Beginning of conversation" marker once we know there's nothing older */}
+      {!hasMoreAbove && mergedGroups.length > 0 && (
+        <div className="flex items-center justify-center py-4 px-5">
+          <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5">
+            Beginning of conversation
+          </span>
+        </div>
+      )}
+
       {/* Empty state */}
       {mergedGroups.length === 0 && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
