@@ -101,6 +101,12 @@ export function ResourcesView({
     );
   }
 
+  function handleBookmarkChanged(resourceId: string, bookmarked: boolean, newCount: number) {
+    setResources((prev) =>
+      prev.map((r) => r.id === resourceId ? { ...r, user_bookmarked: bookmarked, bookmark_count: newCount } : r),
+    );
+  }
+
   function handleDeleted(resourceId: string) {
     setResources((prev) => prev.filter((r) => r.id !== resourceId));
   }
@@ -209,7 +215,7 @@ export function ResourcesView({
             <p className="mt-1 font-body text-sm text-foreground-muted">Try a different filter or share one yourself.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {filtered.map((resource) => (
               <ResourceCard
                 key={resource.id}
@@ -218,6 +224,7 @@ export function ResourcesView({
                 communityId={communityId}
                 onUpdated={handleUpdated}
                 onSaveChanged={handleSaveChanged}
+                onBookmarkChanged={handleBookmarkChanged}
                 onDeleted={handleDeleted}
               />
             ))}

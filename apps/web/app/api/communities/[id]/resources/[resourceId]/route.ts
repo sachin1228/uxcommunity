@@ -29,20 +29,26 @@ async function enrichResource(
     { data: allSaves },
     { data: mySave },
     { count: commentCount },
+    { data: allBookmarks },
+    { data: myBookmark },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
     db.from("resource_saves").select("resource_id").eq("resource_id", resourceId),
     db.from("resource_saves").select("resource_id").eq("resource_id", resourceId).eq("user_id", currentUserId).maybeSingle(),
     db.from("resource_comments").select("id", { count: "exact", head: true }).eq("resource_id", resourceId),
+    db.from("resource_bookmarks").select("resource_id").eq("resource_id", resourceId),
+    db.from("resource_bookmarks").select("resource_id").eq("resource_id", resourceId).eq("user_id", currentUserId).maybeSingle(),
   ]);
 
   return {
     ...row,
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
-    save_count: (allSaves ?? []).length,
-    user_saved: Boolean(mySave),
-    comment_count: commentCount ?? 0,
+    save_count:      (allSaves ?? []).length,
+    user_saved:      Boolean(mySave),
+    comment_count:   commentCount ?? 0,
+    bookmark_count:  (allBookmarks ?? []).length,
+    user_bookmarked: Boolean(myBookmark),
   };
 }
 

@@ -1,0 +1,68 @@
+22:46:17.954 Running build in Washington, D.C., USA (East) – iad1
+22:46:17.955 Build machine configuration: 2 cores, 8 GB
+22:46:18.241 Cloning github.com/sachin1228/drafthub (Branch: feat/thread-card-redesign, Commit: e28a363)
+22:46:21.360 Cloning completed: 3.118s
+22:46:21.613 Restored build cache from previous deployment (GzvkVbMc2Gj5JN6QuksJZoYmjLzs)
+22:46:22.702 Running "vercel build"
+22:46:22.721 Vercel CLI 56.5.0
+22:46:23.150 Installing dependencies...
+22:46:24.933 
+22:46:24.934 changed 2 packages in 2s
+22:46:24.934 
+22:46:24.935 173 packages are looking for funding
+22:46:24.935   run `npm fund` for details
+22:46:25.064 Detected Next.js version: 16.2.11
+22:46:25.070 Running "npm run build"
+22:46:25.197 
+22:46:25.197 > web@0.1.0 build
+22:46:25.197 > next build
+22:46:25.197 
+22:46:25.797   Applying modifyConfig from Vercel
+22:46:25.872 ▲ Next.js 16.2.11 (Turbopack)
+22:46:25.874 
+22:46:25.882 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+22:46:25.934   Creating an optimized production build ...
+22:46:45.053 Turbopack build encountered 1 warnings:
+22:46:45.054 ./apps/web/next.config.js
+22:46:45.055 Encountered unexpected file in NFT list
+22:46:45.055 A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+22:46:45.056 - filesystem operations (like path.join, path.resolve or fs.readFile), or
+22:46:45.056 - very dynamic requires (like require('./' + foo)).
+22:46:45.056 To resolve this, you can
+22:46:45.056 - remove them if possible, or
+22:46:45.056 - only use them in development, or
+22:46:45.057 - make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+22:46:45.057 - add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+22:46:45.057 
+22:46:45.057 Import trace:
+22:46:45.057   App Route:
+22:46:45.057     ./apps/web/next.config.js
+22:46:45.057     ./apps/web/app/api/admin/load-test/impl.ts
+22:46:45.058     ./apps/web/app/api/admin/load-test/route.ts
+22:46:45.058 
+22:46:45.058 
+22:46:45.094 ✓ Compiled successfully in 18.8s
+22:46:45.105   Running TypeScript ...
+22:47:00.017 Failed to type check.
+22:47:00.019 
+22:47:00.019 ./app/dashboard/profile/components/ProfileThreads.tsx:156:21
+22:47:00.022 Type error: Type '(updated: ProfileThread) => void' is not assignable to type '(thread: CommunityThread) => void'.
+22:47:00.022   Types of parameters 'updated' and 'thread' are incompatible.
+22:47:00.022     Property 'community' is missing in type 'CommunityThread' but required in type 'ProfileThread'.
+22:47:00.022 
+22:47:00.022   154 |                     communityId={thread.community_id}
+22:47:00.022   155 |                     communityName={thread.community?.name}
+22:47:00.023 > 156 |                     onUpdated={handleUpdated(thread.id, thread.community)}
+22:47:00.023       |                     ^
+22:47:00.023   157 |                     onVoteChanged={handleVoteChanged}
+22:47:00.023   158 |                     onDeleted={handleDeleted}
+22:47:00.023   159 |                   />
+22:47:00.092 Next.js build worker exited with code: 1 and signal: null
+22:47:00.126 npm error Lifecycle script `build` failed with error:
+22:47:00.127 npm error code 1
+22:47:00.127 npm error path /vercel/path0/apps/web
+22:47:00.128 npm error workspace web@0.1.0
+22:47:00.128 npm error location /vercel/path0/apps/web
+22:47:00.128 npm error command failed
+22:47:00.128 npm error command sh -c next build
+22:47:00.149 Error: Command "npm run build" exited with 1

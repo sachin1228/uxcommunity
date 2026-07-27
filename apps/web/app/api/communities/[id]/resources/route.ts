@@ -51,12 +51,16 @@ async function withAuthorAndMeta(
     { data: allSaves },
     { data: mySaves },
     { data: allComments },
+    { data: allBookmarks },
+    { data: myBookmarks },
   ] = await Promise.all([
     userIds.length ? db.from("users").select("id, name").in("id", userIds) : { data: [] },
     userIds.length ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds) : { data: [] },
     db.from("resource_saves").select("resource_id").in("resource_id", resourceIds),
     db.from("resource_saves").select("resource_id").in("resource_id", resourceIds).eq("user_id", currentUserId),
     db.from("resource_comments").select("resource_id").in("resource_id", resourceIds),
+    db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds),
+    db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds).eq("user_id", currentUserId),
   ]);
 
   const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
@@ -72,16 +76,24 @@ async function withAuthorAndMeta(
     commentCountMap[c.resource_id] = (commentCountMap[c.resource_id] ?? 0) + 1;
   }
 
-  const mySaveSet = new Set((mySaves ?? []).map((s) => s.resource_id));
+  const bookmarkCountMap: Record<string, number> = {};
+  for (const b of allBookmarks ?? []) {
+    bookmarkCountMap[b.resource_id] = (bookmarkCountMap[b.resource_id] ?? 0) + 1;
+  }
+
+  const mySaveSet     = new Set((mySaves     ?? []).map((s) => s.resource_id));
+  const myBookmarkSet = new Set((myBookmarks ?? []).map((b) => b.resource_id));
 
   return rows.map((row) => ({
     ...row,
     users: userMap[row.user_id as string]
       ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
       : null,
-    save_count: saveCountMap[row.id as string] ?? 0,
-    user_saved: mySaveSet.has(row.id as string),
-    comment_count: commentCountMap[row.id as string] ?? 0,
+    save_count:      saveCountMap[row.id as string] ?? 0,
+    user_saved:      mySaveSet.has(row.id as string),
+    comment_count:   commentCountMap[row.id as string] ?? 0,
+    bookmark_count:  bookmarkCountMap[row.id as string] ?? 0,
+    user_bookmarked: myBookmarkSet.has(row.id as string),
   }));
 }
 

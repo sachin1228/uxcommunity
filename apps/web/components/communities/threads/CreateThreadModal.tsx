@@ -6,6 +6,16 @@ import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types"
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
 
+/** Per-category color tokens used for the pill selectors */
+const CATEGORY_PILL_COLORS: Record<string, { border: string; text: string; bg: string; activeBorder: string; activeText: string; activeBg: string }> = {
+  question:    { border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#7C3AED", activeText: "#A78BFA", activeBg: "rgba(124,58,237,0.12)" },
+  discussion:  { border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#0070F3", activeText: "#60A5FA", activeBg: "rgba(0,112,243,0.12)"  },
+  idea:        { border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#D97706", activeText: "#FCD34D", activeBg: "rgba(217,119,6,0.12)"  },
+  feedback:    { border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#EA580C", activeText: "#FB923C", activeBg: "rgba(234,88,12,0.12)"  },
+  referral:    { border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#16A34A", activeText: "#4ADE80", activeBg: "rgba(22,163,74,0.12)"  },
+  collaboration:{ border: "#303036", text: "#737373", bg: "transparent", activeBorder: "#0891B2", activeText: "#67E8F9", activeBg: "rgba(8,145,178,0.12)" },
+};
+
 interface CreateThreadModalProps {
   communityId: string;
   onClose: () => void;
@@ -188,21 +198,26 @@ export function CreateThreadModal({
               What&apos;s this thread about?
             </legend>
             <div className="flex flex-wrap gap-2">
-              {THREAD_CATEGORIES.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  onClick={() => setCategory(item.value)}
-                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-2 font-body text-xs transition-colors ${
-                    category === item.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-                  }`}
-                >
-                  <CategoryIcon category={item.value} size={12} />
-                  {item.label}
-                </button>
-              ))}
+              {THREAD_CATEGORIES.map((item) => {
+                const colors = CATEGORY_PILL_COLORS[item.value] ?? CATEGORY_PILL_COLORS["discussion"];
+                const active = category === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setCategory(item.value)}
+                    className="rounded-full px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs font-medium transition-all"
+                    style={{
+                      border: `1px solid ${active ? colors.activeBorder : colors.border}`,
+                      color: active ? colors.activeText : colors.text,
+                      background: active ? colors.activeBg : colors.bg,
+                    }}
+                  >
+                    <CategoryIcon category={item.value} size={12} />
+                    {item.label}
+                  </button>
+                );
+              })}
             </div>
           </fieldset>
 

@@ -39,6 +39,9 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialFetchDoneRef = useRef(false);
+  // Prevents the url-change effect from firing on the very first render
+  // (the mount effect below handles the initial fetch instead).
+  const urlEffectFirstRunRef = useRef(true);
 
   const fetchPreview = useCallback(async (rawUrl: string) => {
     if (previewAbortRef.current) previewAbortRef.current.abort();
@@ -72,8 +75,14 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
 
   // Debounce URL changes → re-fetch preview
   useEffect(() => {
-    // Skip the very first render (handled by the mount effect)
-    if (!initialFetchDoneRef.current) return;
+    // Skip the very first render — the mount effect above handles the initial fetch.
+    // Using its own ref because initialFetchDoneRef is already set to true by the
+    // time this effect runs (effects fire in order after the same render), which
+    // would cause this effect to abort the initial fetch after 700 ms.
+    if (urlEffectFirstRunRef.current) {
+      urlEffectFirstRunRef.current = false;
+      return;
+    }
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!isValidHttpUrl(url)) {

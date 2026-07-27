@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ChevronUp, MessageSquare, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowUp, MessageSquare, MoreHorizontal, Pencil, Trash2, Bookmark, Share2 } from "lucide-react";
+
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -18,6 +19,16 @@ function formatRelativeDate(value: string) {
   return `${days}d ago`;
 }
 
+/** Per-category color tokens — border, icon, text */
+const CATEGORY_COLORS: Record<string, { border: string; text: string; bg: string }> = {
+  question:    { border: "#7C3AED", text: "#A78BFA", bg: "rgba(124,58,237,0.10)" },
+  discussion:  { border: "#0070F3", text: "#60A5FA", bg: "rgba(0,112,243,0.10)"  },
+  idea:        { border: "#D97706", text: "#FCD34D", bg: "rgba(217,119,6,0.10)"  },
+  feedback:    { border: "#EA580C", text: "#FB923C", bg: "rgba(234,88,12,0.10)"  },
+  referral:    { border: "#16A34A", text: "#4ADE80", bg: "rgba(22,163,74,0.10)"  },
+  collaboration:{ border: "#0891B2", text: "#67E8F9", bg: "rgba(8,145,178,0.10)" },
+};
+
 interface ThreadCardProps {
   thread: CommunityThread;
   currentUserId: string;
@@ -25,6 +36,8 @@ interface ThreadCardProps {
   onUpdated: (thread: CommunityThread) => void;
   onVoteChanged: (threadId: string, voted: boolean, newCount: number) => void;
   onDeleted: (threadId: string) => void;
+  /** When set, shows a small "in CommunityName" badge — used on the profile page */
+  communityName?: string;
 }
 
 export function ThreadCard({
@@ -34,14 +47,16 @@ export function ThreadCard({
   onUpdated,
   onVoteChanged,
   onDeleted,
+  communityName,
 }: ThreadCardProps) {
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
+  const categoryColor = CATEGORY_COLORS[thread.category] ?? CATEGORY_COLORS["discussion"];
   const isOwner = thread.user_id === currentUserId;
 
   const [votePending, setVotePending] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [deleting, setDeleting]       = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,7 +83,8 @@ export function ThreadCard({
     }
   }
 
-  async function handleVote() {
+  async function handleVote(e: React.MouseEvent) {
+    e.preventDefault();
     if (votePending) return;
     const newVoted = !thread.user_voted;
     const newCount = thread.vote_count + (newVoted ? 1 : -1);
@@ -89,146 +105,190 @@ export function ThreadCard({
     }
   }
 
-  const authorName = thread.users?.name ?? "Member";
+  const authorName    = thread.users?.name ?? "Member";
   const authorInitial = authorName.charAt(0).toUpperCase();
-  const threadHref = `/dashboard/communities/${communityId}/threads/${thread.id}`;
+  const threadHref    = `/dashboard/communities/${communityId}/threads/${thread.id}`;
 
   return (
     <>
-      <article className="group rounded-xl border border-border bg-surface">
-        <div className="flex items-stretch">
-          {/* Left — upvote column (not a link) */}
-          <div className="flex w-11 shrink-0 flex-col items-center justify-start gap-0.5 px-1 py-3">
+      <article className="group rounded-2xl border border-border bg-surface transition-colors hover:border-border-strong">
+        <Link href={threadHref} className="block p-5">
+
+          {/* ── Top row: avatar · name · time · category pill · menu ── */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Avatar */}
+              <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
+                {thread.users?.avatar_url ? (
+                  <img src={thread.users.avatar_url} alt={authorName} className="h-9 w-9 object-cover" />
+                ) : (
+                  <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
+                )}
+              </div>
+
+              {/* Name + time + category */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
+                <span className="font-body text-[11px] text-foreground-subtle">
+                  {formatRelativeDate(thread.updated_at || thread.created_at)}
+                </span>
+                {category && (
+                  <>
+                    <span className="font-body text-[11px] text-foreground-subtle">·</span>
+                    <span
+                      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
+                      style={{
+                        border: `1px solid ${categoryColor.border}`,
+                        color: categoryColor.text,
+                        background: categoryColor.bg,
+                      }}
+                    >
+                      <CategoryIcon category={category.value} size={10} />
+                      {category.label}
+                    </span>
+                  </>
+                )}
+                {communityName && (
+                  <>
+                    <span className="font-body text-[11px] text-foreground-subtle">·</span>
+                    <span className="font-body text-[11px] text-foreground-subtle">
+                      in <span className="text-foreground-muted">{communityName}</span>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* ··· menu */}
+            <div
+              className="relative shrink-0"
+              ref={menuRef}
+              onClick={(e) => e.preventDefault()}
+            >
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); setMenuOpen((prev) => !prev); }}
+                aria-label="Thread options"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-raised hover:text-foreground focus:opacity-100"
+              >
+                <MoreHorizontal size={15} />
+              </button>
+              {menuOpen && isOwner && (
+                <div className="absolute right-0 top-8 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                  >
+                    <Pencil size={11} /> Edit thread
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                  >
+                    <Trash2 size={11} />
+                    {deleting ? "Deleting…" : "Delete thread"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Title ── */}
+          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
+            {thread.title}
+          </h3>
+
+          {/* ── Description ── */}
+          <p className="mt-1.5 line-clamp-3 font-body text-xs leading-relaxed text-foreground-muted">
+            {thread.description}
+          </p>
+
+          {/* ── Image attachments ── */}
+          {(() => {
+            const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
+            if (images.length === 0) return null;
+            const visible  = images.slice(0, 4);
+            const overflow = images.length - visible.length;
+            return (
+              <div className="mt-3 flex gap-2">
+                {visible.map((img, i) => (
+                  <div key={img.url} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised">
+                    <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
+                    {i === visible.length - 1 && overflow > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                        <span className="font-display text-sm font-semibold text-white">+{overflow}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── Divider ── */}
+          <div className="mt-4 border-t border-border" />
+
+          {/* ── Footer: upvote · comments · bookmark · share ── */}
+          <div className="mt-3 flex items-center gap-4">
+            {/* Upvote */}
             <button
               type="button"
               onClick={handleVote}
               disabled={votePending}
               aria-label={thread.user_voted ? "Remove upvote" : "Upvote"}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:opacity-60 ${
-                thread.user_voted
-                  ? "bg-accent/20 text-accent"
-                  : "text-foreground-subtle hover:bg-accent/10 hover:text-accent"
-              }`}
+              className="flex items-center gap-2 disabled:opacity-60"
             >
-              <ChevronUp size={15} strokeWidth={thread.user_voted ? 2.5 : 2} />
-            </button>
-            <span className={`font-mono text-[11px] font-semibold tabular-nums ${thread.user_voted ? "text-accent" : "text-foreground-muted"}`}>
-              {thread.vote_count}
-            </span>
-          </div>
-
-          {/* Main content — clickable link area */}
-          <Link href={threadHref} className="min-w-0 flex-1 py-3 pr-3 block">
-            {/* Top row: category + menu */}
-            <div className="flex items-center justify-between gap-2">
-              {category && (
-                <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-0.5 font-body text-[10px] text-foreground-muted">
-                  <CategoryIcon category={category.value} size={10} />
-                  {category.label}
-                </span>
-              )}
-              <div
-                className="relative ml-auto"
-                ref={menuRef}
-                onClick={(e) => e.preventDefault()}
+              <span
+                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${
+                  thread.user_voted
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+                    : "border-border text-foreground-subtle hover:border-emerald-500/60 hover:text-emerald-400"
+                }`}
               >
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); setMenuOpen((prev) => !prev); }}
-                  aria-label="Thread options"
-                  className="flex h-6 w-6 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-raised hover:text-foreground focus:opacity-100"
-                >
-                  <MoreHorizontal size={13} />
-                </button>
-                {menuOpen && isOwner && (
-                  <div className="absolute right-0 top-7 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                    >
-                      <Pencil size={11} />
-                      Edit thread
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                    >
-                      <Trash2 size={11} />
-                      {deleting ? "Deleting…" : "Delete thread"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Title */}
-            <h3 className="mt-1.5 font-display text-sm font-semibold leading-snug text-foreground">
-              {thread.title}
-            </h3>
-
-            {/* Description */}
-            <p className="mt-1 line-clamp-2 font-body text-xs text-foreground-muted">
-              {thread.description}
-            </p>
-
-            {/* Image attachments */}
-            {(() => {
-              const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
-              if (images.length === 0) return null;
-              const visible = images.slice(0, 4);
-              const overflow = images.length - visible.length;
-              return (
-                <div className="mt-2 flex gap-1.5">
-                  {visible.map((img, i) => (
-                    <div key={img.url} className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-raised">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-                      {i === visible.length - 1 && overflow > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                          <span className="font-display text-sm font-semibold text-white">+{overflow}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-
-            {/* Tags */}
-            {thread.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {thread.tags.map((tag) => (
-                  <span key={tag} className="font-body text-[11px] text-foreground-subtle">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Footer */}
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <div className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/15">
-                {thread.users?.avatar_url ? (
-                  <img src={thread.users.avatar_url} alt={authorName} className="h-4 w-4 object-cover" />
-                ) : (
-                  <span className="font-display text-[8px] font-bold text-accent">{authorInitial}</span>
-                )}
-              </div>
-              <span className="font-body text-[11px] text-foreground-muted">{authorName}</span>
-              <span className="font-body text-[11px] text-foreground-subtle">·</span>
-              <span className="font-body text-[11px] text-foreground-subtle">
-                {formatRelativeDate(thread.updated_at || thread.created_at)}
+                <ArrowUp size={14} strokeWidth={thread.user_voted ? 2.5 : 2} />
               </span>
-              <span className="font-body text-[11px] text-foreground-subtle">·</span>
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle">
-                <MessageSquare size={10} />
-                {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
+              <span
+                className={`font-body text-xs font-semibold tabular-nums ${
+                  thread.user_voted ? "text-emerald-400" : "text-foreground-muted"
+                }`}
+              >
+                {thread.vote_count}
               </span>
-            </div>
-          </Link>
-        </div>
+            </button>
+
+            {/* Comments */}
+            <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-subtle">
+              <MessageSquare size={14} />
+              {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
+            </span>
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Bookmark */}
+            <button
+              type="button"
+              aria-label="Bookmark"
+              onClick={(e) => e.preventDefault()}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+            >
+              <Bookmark size={14} />
+            </button>
+
+            {/* Share */}
+            <button
+              type="button"
+              aria-label="Share"
+              onClick={(e) => e.preventDefault()}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+            >
+              <Share2 size={14} />
+            </button>
+          </div>
+        </Link>
       </article>
 
       {showEditModal && (

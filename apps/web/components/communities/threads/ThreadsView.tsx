@@ -164,32 +164,38 @@ export function ThreadsView({
         {loading ? (
           <div className="space-y-3 animate-pulse">
             {[1, 2, 3].map((item) => (
-              <div key={item} className="rounded-xl border border-border bg-surface">
-                <div className="flex items-stretch">
-                  {/* Upvote column */}
-                  <div className="flex w-11 shrink-0 flex-col items-center gap-1 px-1 py-3">
-                    <div className="h-7 w-7 rounded-md bg-surface-raised" />
-                    <div className="h-3 w-4 rounded bg-surface-raised" />
+              <div key={item} className="rounded-2xl border border-border bg-surface p-5">
+                {/* Top row: avatar + name + category */}
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-20 rounded bg-surface-raised" />
+                    <div className="h-3 w-10 rounded bg-surface-raised" />
+                    <div className="h-5 w-16 rounded-full bg-surface-raised" />
                   </div>
-                  {/* Content */}
-                  <div className="min-w-0 flex-1 py-3 pr-3">
-                    {/* Category pill */}
-                    <div className="h-4 w-20 rounded-full bg-surface-raised" />
-                    {/* Title */}
-                    <div className="mt-2 h-3.5 w-3/4 rounded bg-surface-raised" />
-                    {/* Description */}
-                    <div className="mt-2 space-y-1.5">
-                      <div className="h-2.5 w-full rounded bg-surface-raised" />
-                      <div className="h-2.5 w-4/5 rounded bg-surface-raised" />
-                    </div>
-                    {/* Footer */}
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="h-4 w-4 rounded-full bg-surface-raised" />
-                      <div className="h-2.5 w-16 rounded bg-surface-raised" />
-                      <div className="h-2.5 w-12 rounded bg-surface-raised" />
-                      <div className="h-2.5 w-16 rounded bg-surface-raised" />
-                    </div>
+                </div>
+                {/* Title */}
+                <div className="mt-4 h-5 w-3/4 rounded bg-surface-raised" />
+                {/* Description */}
+                <div className="mt-2 space-y-1.5">
+                  <div className="h-3 w-full rounded bg-surface-raised" />
+                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
+                  <div className="h-3 w-2/3 rounded bg-surface-raised" />
+                </div>
+                {/* Tags */}
+                <div className="mt-3 flex gap-2">
+                  <div className="h-6 w-16 rounded-lg bg-surface-raised" />
+                  <div className="h-6 w-20 rounded-lg bg-surface-raised" />
+                </div>
+                {/* Divider */}
+                <div className="mt-4 border-t border-border" />
+                {/* Footer */}
+                <div className="mt-3 flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-full bg-surface-raised" />
+                    <div className="h-3 w-6 rounded bg-surface-raised" />
                   </div>
+                  <div className="h-3 w-20 rounded bg-surface-raised" />
                 </div>
               </div>
             ))}

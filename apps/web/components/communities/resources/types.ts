@@ -58,6 +58,8 @@ export interface CommunityResource {
   save_count: number;
   user_saved: boolean;
   comment_count: number;
+  bookmark_count: number;
+  user_bookmarked: boolean;
   users: {
     name: string;
     avatar_url: string | null;
