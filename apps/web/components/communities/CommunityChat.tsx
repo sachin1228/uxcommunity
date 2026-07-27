@@ -47,10 +47,16 @@ export function CommunityChat({
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
+  /** True once the initial threads fetch for the current community has settled. */
+  const [threadsReady, setThreadsReady] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 
   // ── Load existing threads on mount so they persist across refreshes ───────
   useEffect(() => {
+    // Reset thread state immediately when the community changes so the empty-state
+    // isn't shown prematurely while the fetch is still in flight.
+    setThreadEvents([]);
+    setThreadsReady(false);
     let cancelled = false;
     fetch(`/api/communities/${communityId}/threads`)
       .then((r) => (r.ok ? r.json() : null))
@@ -61,29 +67,34 @@ export function CommunityChat({
         created_at: string;
         users: { name: string; avatar_url: string | null } | null;
       }> } | null) => {
-        if (cancelled || !data?.threads?.length) return;
-        const events: CachedThreadEvent[] = data.threads.map((t) => ({
-          id:           t.id,
-          community_id: t.community_id,
-          user_id:      t.user_id,
-          title:        t.title,
-          description:  t.description,
-          category:     t.category,
-          attachments:  t.attachments ?? [],
-          created_at:   t.created_at,
-          users:        t.users,
-        }));
-        setThreadEvents((prev) => {
-          // Merge with any events already added by realtime (deduplicate).
-          const existingIds = new Set(prev.map((e) => e.id));
-          const merged = [
-            ...events.filter((e) => !existingIds.has(e.id)),
-            ...prev,
-          ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-          return merged;
-        });
+        if (cancelled) return;
+        if (data?.threads?.length) {
+          const events: CachedThreadEvent[] = data.threads.map((t) => ({
+            id:           t.id,
+            community_id: t.community_id,
+            user_id:      t.user_id,
+            title:        t.title,
+            description:  t.description,
+            category:     t.category,
+            attachments:  t.attachments ?? [],
+            created_at:   t.created_at,
+            users:        t.users,
+          }));
+          setThreadEvents((prev) => {
+            // Merge with any events already added by realtime (deduplicate).
+            const existingIds = new Set(prev.map((e) => e.id));
+            const merged = [
+              ...events.filter((e) => !existingIds.has(e.id)),
+              ...prev,
+            ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            return merged;
+          });
+        }
+        setThreadsReady(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setThreadsReady(true);
+      });
     return () => { cancelled = true; };
   }, [communityId]);
 
@@ -534,6 +545,7 @@ export function CommunityChat({
               loading={loading}
               loadingOlder={loadingOlder}
               hasMoreAbove={hasMoreAbove}
+              threadsReady={threadsReady}
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}

@@ -48,6 +48,8 @@ interface MessageListProps {
   loadingOlder: boolean;
   /** False once we know there are no more messages above the current window. */
   hasMoreAbove: boolean;
+  /** True once the initial threads fetch for the current community has settled. */
+  threadsReady: boolean;
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
@@ -73,6 +75,7 @@ export function MessageList({
   loading,
   loadingOlder,
   hasMoreAbove,
+  threadsReady,
   displayCommunity,
   communityId,
   highlightedMsgId,
@@ -162,8 +165,10 @@ export function MessageList({
         </div>
       )}
 
-      {/* Empty state */}
-      {mergedGroups.length === 0 && (
+      {/* Empty state — only shown once threads have loaded too, so we don't
+          flash "Be the first to say something" in communities that have threads
+          but no chat messages while the thread fetch is still in flight.     */}
+      {mergedGroups.length === 0 && threadsReady && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
             {displayCommunity?.image_url ? (
