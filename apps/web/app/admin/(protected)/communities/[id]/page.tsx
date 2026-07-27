@@ -14,6 +14,7 @@ import {
   fmtDateTime,
   type Community,
 } from "@/components/admin/communities/communityTypes";
+import { CommunityRulesPanel } from "@/components/admin/communities/CommunityRulesPanel";
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -305,6 +306,9 @@ export default function CommunityDetailPage() {
         members={community.members}
         memberCount={community.member_count}
       />
+
+      {/* Rules */}
+      <CommunityRulesPanel communityId={id} />
 
       {/* Messages */}
       <CommunityMessagesList

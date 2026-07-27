@@ -9,6 +9,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
+import { createClient } from "@/lib/supabase/client";
 
 interface Member {
   user_id: string;
@@ -137,15 +138,24 @@ function SeeAll() {
   );
 }
 
+interface CommunityRule {
+  id: string;
+  rule_text: string;
+  order_index: number;
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export function CommunityInfoPanel({ members, community, communityId, onlineCount = 0 }: CommunityInfoPanelProps) {
   const memberCount = community?.member_count ?? members.length;
 
   const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
   const [postsToday, setPostsToday] = useState<number | null>(null);
+  const [rules, setRules] = useState<CommunityRule[]>([]);
 
   useEffect(() => {
     if (!communityId) return;
+
+    // ── Fetch events, stats, rules in parallel ─────────────────────────────
     fetch(`/api/communities/${communityId}/events`)
       .then((r) => r.ok ? r.json() : null)
       .then((data: { events: UpcomingEvent[] } | null) => {
@@ -164,6 +174,50 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
         if (data != null) setPostsToday(data.posts_today);
       })
       .catch(() => {/* silent */});
+
+    fetch(`/api/communities/${communityId}/rules`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: { rules: CommunityRule[] } | null) => {
+        if (data?.rules) setRules(data.rules);
+      })
+      .catch(() => {/* silent */});
+
+    // ── Realtime subscription — rules update without page refresh ──────────
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`community-rules:${communityId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "community_rules",
+          filter: `community_id=eq.${communityId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT") {
+            const newRule = payload.new as CommunityRule;
+            setRules((prev) =>
+              [...prev, newRule].sort((a, b) => a.order_index - b.order_index)
+            );
+          } else if (payload.eventType === "UPDATE") {
+            const updated = payload.new as CommunityRule;
+            setRules((prev) =>
+              prev
+                .map((r) => (r.id === updated.id ? updated : r))
+                .sort((a, b) => a.order_index - b.order_index)
+            );
+          } else if (payload.eventType === "DELETE") {
+            const deletedId = (payload.old as { id: string }).id;
+            setRules((prev) => prev.filter((r) => r.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [communityId]);
 
   return (
@@ -222,6 +276,24 @@ export function CommunityInfoPanel({ members, community, communityId, onlineCoun
             </Section>
           );
         })()}
+
+        {/* Community Rules — only shown when the community has rules */}
+        {rules.length > 0 && (
+          <Section title="Rules">
+            <ol className="flex flex-col gap-2.5">
+              {rules.map((rule, i) => (
+                <li key={rule.id} className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-raised font-mono text-[10px] font-semibold text-foreground-muted select-none">
+                    {i + 1}
+                  </span>
+                  <span className="font-body text-[13px] text-foreground-muted leading-relaxed">
+                    {rule.rule_text}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        )}
 
         {/* Upcoming Events — only shown when a real upcoming event exists */}
         {upcomingEvent && (
