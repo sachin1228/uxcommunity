@@ -385,6 +385,7 @@ export function CommunityChat({
     setHideUnreadDivider,
     replyTo,
     onClearReply: handleClearReply,
+    scrollToBottomRef: bottomRef,
   });
 
   // Insert emoji at the cursor position in the textarea

@@ -15,6 +15,8 @@ interface UseSendMessageOptions {
   setHideUnreadDivider: (val: boolean) => void;
   replyTo: ReplyPreview | null;
   onClearReply: () => void;
+  /** Ref to the bottom sentinel — scrolled into view instantly on every send. */
+  scrollToBottomRef: React.RefObject<HTMLDivElement>;
 }
 
 type RetryData = {
@@ -32,6 +34,7 @@ export function useSendMessage({
   setHideUnreadDivider,
   replyTo,
   onClearReply,
+  scrollToBottomRef,
 }: UseSendMessageOptions) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
@@ -175,6 +178,11 @@ export function useSendMessage({
       const next = [...prev, optimistic];
       msgCache.set(communityId, next);
       return next;
+    });
+    // Immediately jump to the bottom so the user sees their own message,
+    // regardless of how far up they were scrolled when they sent it.
+    requestAnimationFrame(() => {
+      scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
     });
 
     const abortController = new AbortController();
@@ -409,6 +417,10 @@ export function useSendMessage({
       const next = [...prev, optimistic];
       msgCache.set(communityId, next);
       return next;
+    });
+    // Jump to bottom so the GIF/sticker is immediately visible.
+    requestAnimationFrame(() => {
+      scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
     });
 
     try {
