@@ -126,6 +126,14 @@ export function ThreadsView({
     );
   }
 
+  function handleSaveChanged(threadId: string, saved: boolean) {
+    setThreads((current) =>
+      current.map((thread) =>
+        thread.id === threadId ? { ...thread, user_saved: saved } : thread,
+      ),
+    );
+  }
+
   function handleDeleted(threadId: string) {
     setThreads((current) => current.filter((thread) => thread.id !== threadId));
   }
@@ -216,6 +224,7 @@ export function ThreadsView({
                 communityId={communityId}
                 onUpdated={handleUpdated}
                 onVoteChanged={handleVoteChanged}
+                onSaveChanged={handleSaveChanged}
                 onDeleted={handleDeleted}
               />
             ))}

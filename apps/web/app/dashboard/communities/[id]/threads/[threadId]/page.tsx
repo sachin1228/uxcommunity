@@ -26,12 +26,13 @@ async function getThreadWithMeta(
   const threadId2 = data.id;
   const authorId = data.user_id;
 
-  const [{ data: userRow }, { data: profileRow }, { data: allVotes }, { data: myVote }, { count: commentCount }] =
+  const [{ data: userRow }, { data: profileRow }, { data: allVotes }, { data: myVote }, { data: mySave }, { count: commentCount }] =
     await Promise.all([
       db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
       db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
       db.from("thread_votes").select("thread_id").eq("thread_id", threadId2),
       db.from("thread_votes").select("thread_id").eq("thread_id", threadId2).eq("user_id", userId).maybeSingle(),
+      db.from("thread_saves").select("thread_id").eq("thread_id", threadId2).eq("user_id", userId).maybeSingle(),
       db.from("thread_comments").select("*", { count: "exact", head: true }).eq("thread_id", threadId2),
     ]);
 
@@ -40,6 +41,7 @@ async function getThreadWithMeta(
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     vote_count: (allVotes ?? []).length,
     user_voted: Boolean(myVote),
+    user_saved: Boolean(mySave),
     comment_count: commentCount ?? 0,
   };
 }

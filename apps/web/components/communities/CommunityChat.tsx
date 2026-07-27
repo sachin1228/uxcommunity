@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { sidebarStore, msgCache } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
@@ -46,12 +47,22 @@ export function CommunityChat({
   initialLastReadAt?: string | null;
   initialTab?: ChatTab;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
   /** True once the initial threads fetch for the current community has settled. */
   const [threadsReady, setThreadsReady] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
+
+  const handleTabChange = useCallback((tab: ChatTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams();
+    if (tab !== "chat") params.set("tab", tab);
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [router, pathname]);
 
   // ── Load existing threads on mount so they persist across refreshes ───────
   useEffect(() => {
@@ -513,7 +524,7 @@ export function CommunityChat({
         <ChatHeader
           community={displayCommunity}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           onlineCount={onlineCount}
         />
 

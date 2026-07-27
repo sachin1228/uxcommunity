@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, BookMarked, Calendar, ChevronDown, Loader2, MessageCircle, MessagesSquare, MoreHorizontal, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, Loader2, MessageCircle, MessagesSquare, MoreHorizontal, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { TYPE_EMOJI } from "./chatUtils";
 
@@ -190,13 +190,6 @@ export function ChatHeader({
                 </div>
               </div>
               <div ref={menuRef} className="relative flex items-center gap-2">
-                <button
-                  type="button"
-                  aria-label="Notifications"
-                  className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
-                >
-                  <Bell size={15} strokeWidth={1.8} />
-                </button>
                 <div className="relative">
                   <button
                     type="button"

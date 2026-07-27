@@ -59,6 +59,7 @@ export interface CommunityThread {
   updated_at: string;
   vote_count: number;
   user_voted: boolean;
+  user_saved: boolean;
   comment_count: number;
   users: {
     name: string;

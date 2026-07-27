@@ -105,12 +105,14 @@ async function withAuthorAndVotes(
     { data: profiles },
     { data: allVotes },
     { data: myVotes },
+    { data: mySaves },
     { data: allComments },
   ] = await Promise.all([
     userIds.length ? db.from("users").select("id, name").in("id", userIds) : { data: [] },
     userIds.length ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds) : { data: [] },
     db.from("thread_votes").select("thread_id").in("thread_id", threadIds),
     db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", currentUserId),
+    db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", currentUserId),
     db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
   ]);
 
@@ -128,6 +130,7 @@ async function withAuthorAndVotes(
   }
 
   const myVoteSet = new Set((myVotes ?? []).map((v) => v.thread_id));
+  const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
   return rows.map((row) => ({
     ...row,
@@ -136,6 +139,7 @@ async function withAuthorAndVotes(
       : null,
     vote_count: voteCountMap[row.id as string] ?? 0,
     user_voted: myVoteSet.has(row.id as string),
+    user_saved: mySaveSet.has(row.id as string),
     comment_count: commentCountMap[row.id as string] ?? 0,
   }));
 }

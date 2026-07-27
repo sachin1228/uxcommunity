@@ -54,12 +54,14 @@ async function enrichThread(
     { data: profileRow },
     { data: allVotes },
     { data: myVote },
+    { data: mySave },
     { data: commentCount },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
     db.from("thread_votes").select("thread_id").eq("thread_id", threadId),
     db.from("thread_votes").select("thread_id").eq("thread_id", threadId).eq("user_id", currentUserId).maybeSingle(),
+    db.from("thread_saves").select("thread_id").eq("thread_id", threadId).eq("user_id", currentUserId).maybeSingle(),
     db.from("thread_comments").select("id", { count: "exact", head: true }).eq("thread_id", threadId),
   ]);
 
@@ -68,6 +70,7 @@ async function enrichThread(
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     vote_count: (allVotes ?? []).length,
     user_voted: Boolean(myVote),
+    user_saved: Boolean(mySave),
     comment_count: commentCount ?? 0,
   };
 }

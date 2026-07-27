@@ -111,6 +111,12 @@ export function ProfileThreads({
     );
   }
 
+  function handleSaveChanged(threadId: string, saved: boolean) {
+    setThreads((current) =>
+      current.map((t) => (t.id === threadId ? { ...t, user_saved: saved } : t)),
+    );
+  }
+
   function handleDeleted(threadId: string) {
     setThreads((current) => current.filter((t) => t.id !== threadId));
   }
@@ -160,6 +166,7 @@ export function ProfileThreads({
                     communityName={thread.community?.name}
                     onUpdated={handleUpdated(thread.id, thread.community)}
                     onVoteChanged={handleVoteChanged}
+                    onSaveChanged={handleSaveChanged}
                     onDeleted={handleDeleted}
                   />
                 );
