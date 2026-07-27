@@ -47,13 +47,14 @@ export default async function ProfilePage() {
   const threadList = rawThreads ?? [];
   const threadIds = threadList.map((t) => t.id);
 
-  const [{ data: allVotes }, { data: myVotes }, { data: allComments }] = threadIds.length
+  const [{ data: allVotes }, { data: myVotes }, { data: mySaves }, { data: allComments }] = threadIds.length
     ? await Promise.all([
         db.from("thread_votes").select("thread_id").in("thread_id", threadIds),
         db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
+        db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
         db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const voteCountMap: Record<string, number> = {};
   for (const v of allVotes ?? []) voteCountMap[v.thread_id] = (voteCountMap[v.thread_id] ?? 0) + 1;
@@ -62,6 +63,7 @@ export default async function ProfilePage() {
   for (const c of allComments ?? []) commentCountMap[c.thread_id] = (commentCountMap[c.thread_id] ?? 0) + 1;
 
   const myVoteSet = new Set((myVotes ?? []).map((v) => v.thread_id));
+  const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
   // Supabase returns the joined communities row as an object (many-to-one),
   // not as an array. Normalise to { name } | null regardless of shape.
@@ -98,6 +100,7 @@ export default async function ProfilePage() {
         community: communityOf(thread),
         vote_count: voteCountMap[thread.id] ?? 0,
         user_voted: myVoteSet.has(thread.id),
+        user_saved: mySaveSet.has(thread.id),
         comment_count: commentCountMap[thread.id] ?? 0,
       })) as ProfileThread[]}
       currentUserId={userId}

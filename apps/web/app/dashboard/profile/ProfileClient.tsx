@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { compressImage } from "@/lib/compressImage";
 import { getAvatarTabLabel, getAllAvatarOptions } from "@/lib/avatar";
@@ -58,11 +57,6 @@ export function ProfileClient({
   const [avatarSaving,      setAvatarSaving]      = useState(false);
   const [avatarError,       setAvatarError]       = useState<string | null>(null);
 
-  // Save state
-  const [saving,    setSaving]    = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saved,     setSaved]     = useState(false);
-
   const memberSince = createdAt
     ? new Date(createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : null;
@@ -88,52 +82,6 @@ export function ProfileClient({
 
   const visibleAvatarOptions =
     (avatarLibOptions[activeAvatarLib as keyof typeof avatarLibOptions] as AvatarOption[]) ?? [];
-
-  const hasChanges =
-    name !== initialName ||
-    bio !== initialBio ||
-    linkedin !== initialLinkedIn ||
-    portfolio !== initialPortfolio ||
-    JSON.stringify([...interestIds].sort()) !== JSON.stringify([...initialInterestIds].sort());
-
-  // ── Save profile ────────────────────────────────────────────────────────
-  async function handleSave() {
-    setSaving(true);
-    setSaveError(null);
-    setSaved(false);
-    try {
-      const [profileRes, interestsRes] = await Promise.all([
-        fetch("/api/profile", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), bio, linkedin_url: linkedin, portfolio_url: portfolio }),
-        }),
-        fetch("/api/profile/interests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ interest_ids: interestIds }),
-        }),
-      ]);
-
-      if (!profileRes.ok) {
-        const d = await profileRes.json();
-        setSaveError(d.error ?? "Failed to save profile.");
-        return;
-      }
-      if (!interestsRes.ok) {
-        const d = await interestsRes.json();
-        setSaveError(d.error ?? "Failed to save interests.");
-        return;
-      }
-      setSaved(true);
-      router.refresh();
-      setTimeout(() => setSaved(false), 3000);
-    } catch {
-      setSaveError("Network error. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   // ── Avatar file select ──────────────────────────────────────────────────
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -210,40 +158,12 @@ export function ProfileClient({
   return (
     <div className="max-w-4xl mx-auto  mt-8">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
-          <p className="font-body text-sm text-foreground-muted mt-0.5">
-            How you appear to others in the community
-          </p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={saving || !hasChanges}
-          className={`flex items-center gap-2 rounded-lg px-5 py-2.5 font-body text-sm font-medium transition-all ${
-            saved
-              ? "bg-green-500/20 text-green-400 border border-green-500/30"
-              : hasChanges
-              ? "bg-accent text-accent-foreground hover:bg-accent-hover shadow-sm"
-              : "bg-surface text-foreground-subtle border border-border cursor-not-allowed"
-          }`}
-        >
-          {saving && <Spinner className="h-3.5 w-3.5" />}
-          {saved ? (
-            <><Check size={14} /> Saved!</>
-          ) : saving ? (
-            "Saving…"
-          ) : (
-            "Save Changes"
-          )}
-        </button>
+      <div className="mb-8">
+        <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
+        <p className="font-body text-sm text-foreground-muted mt-0.5">
+          How you appear to others in the community
+        </p>
       </div>
-
-      {saveError && (
-        <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
-          <p className="font-body text-sm text-red-400">{saveError}</p>
-        </div>
-      )}
 
       <ProfileCard
         name={name}
@@ -268,20 +188,6 @@ export function ProfileClient({
         currentUserAvatar={avatarUrl}
       />
 
-      {/* Sticky save bar */}
-      {hasChanges && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-2xl border border-border bg-surface/90 backdrop-blur-md px-5 py-3 shadow-xl">
-          <span className="font-body text-sm text-foreground-muted">You have unsaved changes</span>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover transition-colors disabled:opacity-60"
-          >
-            {saving && <Spinner className="h-3.5 w-3.5" />}
-            {saving ? "Saving…" : "Save"}
-          </button>
-        </div>
-      )}
 
       {/* Avatar picker modal */}
       {showAvatarPicker && (
