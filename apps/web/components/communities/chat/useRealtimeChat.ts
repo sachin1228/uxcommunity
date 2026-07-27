@@ -111,7 +111,7 @@ export function useRealtimeChat({
             const senderMember = membersRef.current.find(
               (m) => m.user_id === newRow.user_id
             );
-            const users = senderMember?.users ?? null;
+            const users: CachedMessage["users"] = senderMember?.users ?? null;
 
             // Resolve reply_to in this same state update to avoid a flicker:
             //   1. Inherit from the replaced temp message (sender's own send).
@@ -197,11 +197,15 @@ export function useRealtimeChat({
                   (profile: {
                     name: string;
                     avatar_url: string | null;
+                    designation?: string | null;
+                    company?: string | null;
                   } | null) => {
                     if (!profile) return;
                     const resolvedUsers = {
-                      name: profile.name,
-                      avatar_url: profile.avatar_url,
+                      name:        profile.name,
+                      avatar_url:  profile.avatar_url,
+                      designation: profile.designation ?? null,
+                      company:     profile.company ?? null,
                     };
                     membersRef.current = [
                       ...membersRef.current,
@@ -404,9 +408,9 @@ export function useRealtimeChat({
               `/api/communities/${communityId}/members/${targetUserId}`
             )
               .then((r) => (r.ok ? r.json() : null))
-              .then((profile: { name: string; avatar_url: string | null } | null) => {
+              .then((profile: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null) => {
                 if (!profile) return;
-                const resolvedUsers = { name: profile.name, avatar_url: profile.avatar_url };
+                const resolvedUsers = { name: profile.name, avatar_url: profile.avatar_url, designation: profile.designation ?? null, company: profile.company ?? null };
                 membersRef.current = [
                   ...membersRef.current,
                   { user_id: targetUserId, users: resolvedUsers },

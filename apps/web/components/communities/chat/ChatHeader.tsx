@@ -18,7 +18,7 @@ interface ChatHeaderProps {
   onlineCount?: number;
 }
 
-export type ChatTab = "chat" | "threads" | "events";
+export type ChatTab = "chat" | "threads" | "events" | "members";
 
 export function ChatHeader({
   community,
@@ -67,9 +67,10 @@ export function ChatHeader({
           </div>
           <nav className="flex items-center gap-5" aria-label="Community views">
             {([
-              ["chat", "Chat", MessageCircle],
+              ["chat",    "Chat",    MessageCircle],
               ["threads", "Threads", MessagesSquare],
-              ["events", "Events", Calendar],
+              ["events",  "Events",  Calendar],
+              ["members", "Members", Users],
             ] as const).map(([tab, label, Icon]) => (
               <button
                 key={tab}

@@ -3,6 +3,18 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getMasterImageMap } from "@/lib/master-data-cache";
 import type { CachedMeta, CachedMessage, MessageReaction, ReplyPreview } from "./cache";
 
+/**
+ * Strip year-range suffixes and singularize experience level names for display.
+ * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
+ *      "Heads of Design"                 → "Head of Design"
+ */
+function cleanDesignation(name: string): string {
+  const clean = name.split("(")[0].trim();
+  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
+  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
+  return clean;
+}
+
 export interface SSRCommunityData {
   meta: CachedMeta;
   messages: CachedMessage[];
@@ -50,8 +62,8 @@ export async function fetchCommunitySSRData(
       ? db.from("users").select("id, name").in("id", uniqueMsgUserIds)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     uniqueMsgUserIds.length
-      ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", uniqueMsgUserIds)
-      : Promise.resolve({ data: [] as { user_id: string; avatar_url: string | null }[] }),
+      ? db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", uniqueMsgUserIds)
+      : Promise.resolve({ data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] }),
     messageIds.length
       ? db.from("message_reactions").select("message_id, user_id, emoji").in("message_id", messageIds)
       : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string }[] }),
@@ -80,21 +92,40 @@ export async function fetchCommunitySSRData(
   const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
     ? await Promise.all([
         db.from("users").select("id, name").in("id", memberUserIds),
-        db.from("designer_profiles").select("user_id, avatar_url").in("user_id", memberUserIds),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
       ])
     : [
         { data: [] as { id: string; name: string }[] },
-        { data: [] as { user_id: string; avatar_url: string | null }[] },
+        { data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] },
       ];
 
-  const memberUserMap   = Object.fromEntries((memberUsers ?? []).map((u) => [u.id, u.name]));
-  const memberAvatarMap = Object.fromEntries((memberProfiles ?? []).map((p) => [p.user_id, p.avatar_url ?? null]));
-  const members: CachedMeta["members"] = (memberRows ?? []).map((m) => ({
-    user_id: m.user_id,
-    users: memberUserMap[m.user_id]
-      ? { name: memberUserMap[m.user_id], avatar_url: memberAvatarMap[m.user_id] ?? null }
-      : null,
-  }));
+  // Resolve all experience level slugs (members + message senders) in one batch query.
+  const allSlugs = [...new Set([
+    ...(memberProfiles  ?? []).map((p: any) => p.experience_level),
+    ...(msgProfiles     ?? []).map((p: any) => p.experience_level),
+  ].filter(Boolean) as string[])];
+  const expLevelMap: Record<string, string> = {};
+  if (allSlugs.length) {
+    const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", allSlugs);
+    for (const l of levels ?? []) expLevelMap[l.slug] = cleanDesignation(l.name);
+  }
+
+  const memberUserMap    = Object.fromEntries((memberUsers ?? []).map((u) => [u.id, u.name]));
+  const memberProfileMap = Object.fromEntries((memberProfiles ?? []).map((p: any) => [p.user_id, p]));
+  const members: CachedMeta["members"] = (memberRows ?? []).map((m) => {
+    const p = memberProfileMap[m.user_id];
+    return {
+      user_id: m.user_id,
+      users: memberUserMap[m.user_id]
+        ? {
+            name:        memberUserMap[m.user_id],
+            avatar_url:  p?.avatar_url ?? null,
+            designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+            company:     (p?.companies as any)?.name ?? null,
+          }
+        : null,
+    };
+  });
 
   // Reactions map
   const reactionsMap: Record<string, MessageReaction[]> = {};
@@ -105,10 +136,18 @@ export async function fetchCommunitySSRData(
     else reactionsMap[r.message_id].push({ emoji: r.emoji, user_ids: [r.user_id] });
   }
 
-  // Sender map
-  const msgUserMap: Record<string, { name: string; avatar_url: string | null }> = {};
-  const msgAvatarMap = Object.fromEntries((msgProfiles ?? []).map((p) => [p.user_id, p.avatar_url ?? null]));
-  for (const u of msgUsers ?? []) msgUserMap[u.id] = { name: u.name, avatar_url: msgAvatarMap[u.id] ?? null };
+  // Sender map (messages)
+  const msgUserMap: Record<string, { name: string; avatar_url: string | null; designation: string | null; company: string | null }> = {};
+  const msgProfileMap = Object.fromEntries((msgProfiles ?? []).map((p: any) => [p.user_id, p]));
+  for (const u of msgUsers ?? []) {
+    const p = msgProfileMap[u.id];
+    msgUserMap[u.id] = {
+      name:        u.name,
+      avatar_url:  p?.avatar_url ?? null,
+      designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+      company:     (p?.companies as any)?.name ?? null,
+    };
+  }
 
   const messages: CachedMessage[] = msgs.slice().reverse().map((m) => ({
     ...m,

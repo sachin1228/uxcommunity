@@ -31,7 +31,7 @@ export interface Community {
 
 export interface Member {
   user_id: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null;
 }
 
 type Message = CachedMessage;

@@ -21,7 +21,7 @@ export interface CachedMessage {
   content: string;
   created_at: string;
   user_id: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null;
   status?: "sending" | "sent" | "failed";
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
@@ -52,7 +52,7 @@ export interface CachedMeta {
   };
   members: {
     user_id: string;
-    users: { name: string; avatar_url: string | null } | null;
+    users: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null;
   }[];
   fetchedAt: number;
 }

@@ -4,6 +4,20 @@ import { Fragment, useState, useRef, useEffect } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
+
+/** Convert a plural community-style level name to a singular job title.
+ *  Strips trailing year-range parentheticals, then singularizes.
+ *  e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
+ *       "Heads of Design"                 → "Head of Design"
+ *       "VP of Design"                    → "VP of Design"  (unchanged)
+ */
+function toJobTitle(name: string): string {
+  // Strip trailing parenthetical like "(3-5 years)" or "(5+ years)"
+  const clean = name.replace(/\s*\(.*?\)\s*$/, "").trim();
+  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
+  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
+  return clean;
+}
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
@@ -640,10 +654,17 @@ export function MessageBubble({
         <div className="max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
-            <p className={`font-body text-[11px] font-semibold mb-0.5 ml-0.5 ${
-              isMe ? "text-accent" : "text-foreground-muted"
-            }`}>
-              {sender.name}
+            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted flex items-center gap-1.5 flex-wrap">
+              <span>{sender.name}</span>
+              {(sender.designation || sender.company) && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
+                  {sender.designation && sender.company
+                    ? `${toJobTitle(sender.designation)} @ ${sender.company}`
+                    : sender.designation
+                    ? toJobTitle(sender.designation)
+                    : `@ ${sender.company}`}
+                </span>
+              )}
             </p>
           )}
 

@@ -3,6 +3,18 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
 /**
+ * Strip year-range suffixes and singularize experience level names for display.
+ * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
+ *      "Heads of Design"                 → "Head of Design"
+ */
+function cleanDesignation(name: string): string {
+  const clean = name.split("(")[0].trim();
+  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
+  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
+  return clean;
+}
+
+/**
  * GET /api/communities/[id]/members/[userId]
  *
  * Lightweight endpoint used by CommunityChat to lazily resolve the display
@@ -34,18 +46,32 @@ export async function GET(
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
-  // Fetch name + avatar in parallel.
+  // Fetch name + avatar + designation + company in parallel.
   const [{ data: user }, { data: profile }] = await Promise.all([
     db.from("users").select("name").eq("id", userId).maybeSingle(),
-    db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
+    db.from("designer_profiles").select("avatar_url, experience_level, companies(name)").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (!user) {
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
 
+  // Resolve experience level display name from slug.
+  let designation: string | null = null;
+  const expSlug = (profile as any)?.experience_level ?? null;
+  if (expSlug) {
+    const { data: expLevel } = await db
+      .from("experience_levels")
+      .select("name")
+      .eq("slug", expSlug)
+      .maybeSingle();
+    designation = expLevel?.name ? cleanDesignation(expLevel.name) : null;
+  }
+
   return NextResponse.json({
     name: user.name,
     avatar_url: profile?.avatar_url ?? null,
+    designation,
+    company: (profile as any)?.companies?.name ?? null,
   });
 }
