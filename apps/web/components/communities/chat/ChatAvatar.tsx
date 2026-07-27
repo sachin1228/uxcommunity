@@ -9,30 +9,16 @@ interface ChatAvatarProps {
 }
 
 export function ChatAvatar({ name, url, size = 8 }: ChatAvatarProps) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
   const px = size * 4;
 
-  if (url) {
-    return (
-      <AvatarImg
-        url={url}
-        name={name}
-        size={px}
-        className={`rounded-full object-cover h-${size} w-${size} shrink-0`}
-      />
-    );
-  }
-
+  // AvatarImg always renders something — either the stored avatar or a
+  // deterministic boring-avatar generated from the user's name.
   return (
-    <div
-      className={`h-${size} w-${size} shrink-0 rounded-full bg-accent/20 flex items-center justify-center font-body text-xs font-semibold text-accent select-none`}
-    >
-      {initials}
-    </div>
+    <AvatarImg
+      url={url}
+      name={name}
+      size={px}
+      className={`rounded-full object-cover h-${size} w-${size} shrink-0`}
+    />
   );
 }
