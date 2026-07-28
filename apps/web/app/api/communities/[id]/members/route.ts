@@ -47,7 +47,7 @@ export async function GET(
   // Fetch all member user_ids ordered by join date (needed for stable pagination).
   const { data: allRows } = await db
     .from("community_members")
-    .select("user_id, joined_at")
+    .select("user_id, joined_at, role")
     .eq("community_id", communityId)
     .order("joined_at", { ascending: true });
 
@@ -94,6 +94,8 @@ export async function GET(
   const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [p.user_id, p]));
   const userMap    = Object.fromEntries((users    ?? []).map((u) => [u.id, u]));
 
+  const roleMap = Object.fromEntries((allRows ?? []).map((m) => [m.user_id, (m as any).role ?? "member"]));
+
   const members = pageRows
     .map((m) => {
       const u = userMap[m.user_id];
@@ -102,6 +104,7 @@ export async function GET(
       return {
         user_id:     m.user_id,
         joined_at:   m.joined_at,
+        role:        roleMap[m.user_id] ?? "member",
         name:        u.name,
         avatar_url:  p?.avatar_url ?? null,
         designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,

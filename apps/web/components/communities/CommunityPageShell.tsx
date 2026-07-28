@@ -37,6 +37,8 @@ interface Community {
   description?: string | null;
   reference_name?: string | null;
   created_at?: string;
+  is_private?: boolean;
+  enabled_tabs?: string[];
 }
 
 interface Member {
@@ -66,6 +68,8 @@ function readCache(communityId: string): { community: Community | null; members:
         type: entry.type,
         member_count: entry.member_count,
         image_url: entry.image_url,
+        is_private: entry.is_private,
+        enabled_tabs: entry.enabled_tabs,
       },
       members: [],
     };

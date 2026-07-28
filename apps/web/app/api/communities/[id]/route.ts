@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
+const VALID_TABS = new Set(["chat", "threads", "events", "resources"]);
+
 /**
  * Strip year-range suffixes and singularize experience level names for display.
  * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
@@ -37,13 +39,13 @@ export async function GET(
   const [{ data: membership }, { data: community, error: commErr }] = await Promise.all([
     db
       .from("community_members")
-      .select("joined_at")
+      .select("joined_at, role")
       .eq("community_id", id)
       .eq("user_id", userId)
       .maybeSingle(),
     db
       .from("communities")
-      .select("id, name, type, image_url, description, reference_id, created_at")
+      .select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token")
       .eq("id", id)
       .eq("is_active", true)
       .maybeSingle(),
@@ -68,7 +70,7 @@ export async function GET(
       : Promise.resolve({ data: null }),
     db
       .from("community_members")
-      .select("user_id, joined_at")
+      .select("user_id, joined_at, role")
       .eq("community_id", id)
       .order("joined_at", { ascending: false })
       .limit(10),
@@ -106,8 +108,9 @@ export async function GET(
   const members = (memberRows ?? []).map((m) => {
     const p = profileMap[m.user_id];
     return {
-      user_id: m.user_id,
+      user_id:  m.user_id,
       joined_at: m.joined_at,
+      role:     (m as any).role ?? "member",
       users: userMap[m.user_id]
         ? {
             name:        userMap[m.user_id].name,
@@ -119,13 +122,119 @@ export async function GET(
     };
   });
 
+  // Only expose invite_token to the owner
+  const isOwner = community.owner_id === userId;
+
   return NextResponse.json({
     community: {
       ...community,
-      image_url: resolvedImageUrl,
+      image_url:      resolvedImageUrl,
       reference_name: resolvedReferenceName,
-      member_count: member_count ?? 0,
+      member_count:   member_count ?? 0,
+      invite_token:   isOwner ? (community as any).invite_token : undefined,
     },
     members,
+    current_user_role: (membership as any).role ?? "member",
   });
+}
+
+// ── PATCH /api/communities/[id] ─────────────────────────────────────────────
+// Update name, description, privacy, tabs, rules. Owner only.
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const userId = session.userId!;
+  const { id } = await params;
+  const db = createServiceClient();
+
+  const { data: community } = await db
+    .from("communities")
+    .select("id, owner_id")
+    .eq("id", id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+
+  let body: Record<string, unknown>;
+  try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON." }, { status: 400 }); }
+
+  const updates: Record<string, unknown> = {};
+
+  if (typeof body.name === "string") {
+    const name = body.name.trim();
+    if (name.length < 1 || name.length > 80) return NextResponse.json({ error: "Name must be 1–80 characters." }, { status: 422 });
+    updates.name = name;
+  }
+  if ("description" in body) {
+    const desc = typeof body.description === "string" ? body.description.trim() : "";
+    if (desc.length > 500) return NextResponse.json({ error: "Description must be 500 characters or less." }, { status: 422 });
+    updates.description = desc || null;
+  }
+  if (typeof body.is_private === "boolean") {
+    updates.is_private = body.is_private;
+  }
+  if (Array.isArray(body.tabs)) {
+    const tabs = Array.from(new Set(["chat", ...(body.tabs as string[]).filter((t) => VALID_TABS.has(t))]));
+    updates.enabled_tabs = tabs;
+  }
+
+  if (Object.keys(updates).length > 0) {
+    const { error } = await db.from("communities").update(updates).eq("id", id);
+    if (error) return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+  }
+
+  // Update rules if provided
+  if (Array.isArray(body.rules)) {
+    const rules = (body.rules as unknown[])
+      .filter((r): r is string => typeof r === "string")
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .slice(0, 12);
+
+    await db.from("community_rules").delete().eq("community_id", id);
+    if (rules.length) {
+      await db.from("community_rules").insert(
+        rules.map((rule_text, order_index) => ({ community_id: id, rule_text, order_index }))
+      );
+    }
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+// ── DELETE /api/communities/[id] ────────────────────────────────────────────
+// Permanently delete the community. Owner only.
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const userId = session.userId!;
+  const { id } = await params;
+  const db = createServiceClient();
+
+  const { data: community } = await db
+    .from("communities")
+    .select("id, owner_id")
+    .eq("id", id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+
+  // Soft-delete (mark inactive) to preserve chat history references.
+  const { error } = await db
+    .from("communities")
+    .update({ is_active: false })
+    .eq("id", id);
+
+  if (error) return NextResponse.json({ error: "Failed to delete community." }, { status: 500 });
+  return NextResponse.json({ success: true });
 }

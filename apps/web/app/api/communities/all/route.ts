@@ -13,8 +13,9 @@ export async function GET() {
   // All communities
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id")
+    .select("id, name, type, image_url, reference_id, is_private")
     .eq("is_active", true)
+    .eq("is_private", false)
     .order("name");
 
   if (error) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
@@ -79,6 +80,7 @@ export async function GET() {
       name: c.name,
       type: c.type,
       image_url: masterImageMap[c.id] ?? c.image_url ?? null,
+      is_private: c.is_private ?? false,
       member_count: countMap[c.id] ?? 0,
       joined: joinedIds.has(c.id),
     }));

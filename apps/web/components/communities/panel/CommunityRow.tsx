@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
@@ -81,12 +82,15 @@ export function CommunityRow({
 
         <div className="flex-1 min-w-0">
           {/* Community name + timestamp */}
-          <div className="flex items-center justify-between gap-1 mb-0.5">
-            <span className="font-body text-[14px] font-medium truncate text-foreground">
+          <div className="flex items-center gap-1 mb-0.5 min-w-0">
+            <span className="font-body text-[14px] font-medium truncate text-foreground min-w-0">
               {c.name}
             </span>
+            {c.is_private && (
+              <Lock size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
+            )}
             {c.last_message && !typingText && (
-              <span className="font-mono text-xs text-foreground-muted shrink-0">
+              <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
                 {timeAgo(c.last_message.created_at)}
               </span>
             )}

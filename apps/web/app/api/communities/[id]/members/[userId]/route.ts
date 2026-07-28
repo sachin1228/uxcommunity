@@ -75,3 +75,41 @@ export async function GET(
     company: (profile as any)?.companies?.name ?? null,
   });
 }
+
+/**
+ * DELETE /api/communities/[id]/members/[userId]
+ *
+ * Owner removes a specific member from the community.
+ * The owner cannot remove themselves (use leave instead).
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; userId: string }> }
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const callerId = session.userId!;
+  const { id: communityId, userId: targetUserId } = await params;
+  const db = createServiceClient();
+
+  // Verify caller is the owner
+  const { data: community } = await db
+    .from("communities")
+    .select("owner_id")
+    .eq("id", communityId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  if (community.owner_id !== callerId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  if (targetUserId === callerId) return NextResponse.json({ error: "Owner cannot remove themselves." }, { status: 400 });
+
+  const { error } = await db
+    .from("community_members")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", targetUserId);
+
+  if (error) return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+  return NextResponse.json({ success: true });
+}

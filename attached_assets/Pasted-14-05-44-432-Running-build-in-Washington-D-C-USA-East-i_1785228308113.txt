@@ -1,0 +1,66 @@
+14:05:44.432 Running build in Washington, D.C., USA (East) – iad1
+14:05:44.433 Build machine configuration: 2 cores, 8 GB
+14:05:44.653 Cloning github.com/sachin1228/drafthub (Branch: codex/user-created-communities, Commit: 7735f1e)
+14:05:45.797 Cloning completed: 1.143s
+14:05:46.601 Restored build cache from previous deployment (8zR9twHQQReuPKVb2MWChCBxyyhQ)
+14:05:47.802 Running "vercel build"
+14:05:47.833 Vercel CLI 56.5.0
+14:05:48.144 Installing dependencies...
+14:05:50.040 
+14:05:50.041 changed 2 packages in 2s
+14:05:50.041 
+14:05:50.041 173 packages are looking for funding
+14:05:50.042   run `npm fund` for details
+14:05:50.069 Detected Next.js version: 16.2.11
+14:05:50.076 Running "npm run build"
+14:05:50.208 
+14:05:50.208 > web@0.1.0 build
+14:05:50.209 > next build
+14:05:50.209 
+14:05:50.840   Applying modifyConfig from Vercel
+14:05:50.920 ▲ Next.js 16.2.11 (Turbopack)
+14:05:50.921 
+14:05:50.929 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+14:05:50.987   Creating an optimized production build ...
+14:06:10.638 Turbopack build encountered 1 warnings:
+14:06:10.639 ./apps/web/next.config.js
+14:06:10.640 Encountered unexpected file in NFT list
+14:06:10.640 A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+14:06:10.641 - filesystem operations (like path.join, path.resolve or fs.readFile), or
+14:06:10.641 - very dynamic requires (like require('./' + foo)).
+14:06:10.642 To resolve this, you can
+14:06:10.643 - remove them if possible, or
+14:06:10.643 - only use them in development, or
+14:06:10.644 - make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+14:06:10.645 - add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+14:06:10.646 
+14:06:10.646 Import trace:
+14:06:10.646   App Route:
+14:06:10.646     ./apps/web/next.config.js
+14:06:10.646     ./apps/web/app/api/admin/load-test/impl.ts
+14:06:10.646     ./apps/web/app/api/admin/load-test/route.ts
+14:06:10.646 
+14:06:10.646 
+14:06:10.669 ✓ Compiled successfully in 19.3s
+14:06:10.672   Running TypeScript ...
+14:06:26.152 Failed to type check.
+14:06:26.153 
+14:06:26.154 ./lib/communities/server.ts:171:7
+14:06:26.155 Type error: Object literal may only specify known properties, and 'description' does not exist in type '{ id: string; name: string; type: string; member_count: number; image_url: string | null; is_private?: boolean | undefined; enabled_tabs?: string[] | undefined; owner_id?: string | null | undefined; invite_token?: string | ... 1 more ... | undefined; }'.
+14:06:26.155 
+14:06:26.155   169 |       id: community.id, name: community.name, type: community.type,
+14:06:26.155   170 |       member_count: memberCount ?? 0, image_url: resolvedImageUrl,
+14:06:26.155 > 171 |       description: (community as any).description ?? null,
+14:06:26.155       |       ^
+14:06:26.156   172 |       created_at: (community as any).created_at ?? undefined,
+14:06:26.156   173 |       owner_id: (community as any).owner_id ?? null,
+14:06:26.156   174 |       is_private: (community as any).is_private ?? false,
+14:06:26.222 Next.js build worker exited with code: 1 and signal: null
+14:06:26.254 npm error Lifecycle script `build` failed with error:
+14:06:26.256 npm error code 1
+14:06:26.256 npm error path /vercel/path0/apps/web
+14:06:26.256 npm error workspace web@0.1.0
+14:06:26.256 npm error location /vercel/path0/apps/web
+14:06:26.256 npm error command failed
+14:06:26.256 npm error command sh -c next build
+14:06:26.285 Error: Command "npm run build" exited with 1

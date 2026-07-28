@@ -4,6 +4,10 @@ export const TYPE_EMOJI: Record<string, string> = {
   city:     "📍",
   sector:   "🏢",
   interest: "✦",
+  company:  "🏬",
+  experience_level: "🎯",
+  general:  "💬",
+  user:     "◎",
 };
 
 export function fmtTime(iso: string): string {

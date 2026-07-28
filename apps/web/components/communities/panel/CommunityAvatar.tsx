@@ -8,6 +8,8 @@ const TYPE_EMOJI: Record<string, string> = {
   interest:         "✦",
   company:          "🏬",
   experience_level: "🎯",
+  general:          "💬",
+  user:             "◎",
 };
 
 interface CommunityAvatarProps {

@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Users, MessageSquare } from "lucide-react";
+import { Home, MessageSquare, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
+import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
+import { invalidateCommunitiesList } from "@/lib/communities/cache";
 
 interface Props {
   userId: string;
@@ -19,6 +22,7 @@ function isMatch(href: string, pathname: string) {
 
 export function GlobalSidebar({ userId }: Props) {
   const pathname = usePathname();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const {
     communities,
@@ -28,6 +32,7 @@ export function GlobalSidebar({ userId }: Props) {
     handleNavigate,
     onEnter,
     onLeave,
+    router,
   } = useSidebarCommunities(userId);
 
   const sorted = [...communities].sort((a, b) => {
@@ -44,6 +49,16 @@ export function GlobalSidebar({ userId }: Props) {
 
   return (
     <aside className="h-full w-72 shrink-0 border-r border-border bg-background overflow-y-auto">
+      {createOpen && (
+        <CreateCommunityModal
+          open
+          onClose={() => setCreateOpen(false)}
+          onCreated={(community) => {
+            invalidateCommunitiesList();
+            router.push(`/dashboard/communities/${community.id}`);
+          }}
+        />
+      )}
       {/* WORKSPACE nav */}
       <div className="px-4 pt-5 pb-3">
         <p className="px-1 mb-3 font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
@@ -95,19 +110,44 @@ export function GlobalSidebar({ userId }: Props) {
             <Spinner className="h-4 w-4 text-foreground-muted" />
           </div>
         ) : communities.length === 0 ? (
-          <div className="px-4 py-10 text-center">
-            <MessageSquare
-              size={24}
-              className="mx-auto text-foreground-muted mb-2 opacity-40"
-            />
-            <p className="font-body text-xs text-foreground-muted">No communities yet</p>
+          <div>
+            <div className="flex items-center justify-between px-5 pt-3 pb-1">
+              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+                Your Community
+              </span>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                aria-label="Create community"
+                title="Create community"
+              >
+                <Plus size={11} strokeWidth={2.5} />
+              </button>
+            </div>
+            <div className="px-4 py-6 text-center">
+              <MessageSquare
+                size={24}
+                className="mx-auto text-foreground-muted mb-2 opacity-40"
+              />
+              <p className="font-body text-xs text-foreground-muted">No communities yet</p>
+            </div>
           </div>
         ) : (
           <div>
-            <div className="px-5 pt-3 pb-2">
+            <div className="flex items-center justify-between px-5 pt-3 pb-2">
               <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
-                Your community
+                Your Community
               </span>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                aria-label="Create community"
+                title="Create community"
+              >
+                <Plus size={11} strokeWidth={2.5} />
+              </button>
             </div>
             <ul className="space-y-0.5 px-3">
               {sorted.map((c) => (

@@ -12,6 +12,8 @@ interface ModalProps {
   maxWidth?: string;
   /** Set true when the caller renders its own close button inside children */
   hideCloseButton?: boolean;
+  /** Extra classes applied to the panel div (e.g. "p-0" to remove default padding) */
+  panelClassName?: string;
 }
 
 export function Modal({
@@ -21,6 +23,7 @@ export function Modal({
   children,
   maxWidth = "max-w-lg",
   hideCloseButton = false,
+  panelClassName,
 }: ModalProps) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -56,7 +59,7 @@ export function Modal({
 
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-border bg-surface p-8 shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto`}
+        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-border bg-surface shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto ${panelClassName ?? "p-8"}`}
       >
         {title && (
           <div className="mb-6 flex items-start justify-between gap-4">

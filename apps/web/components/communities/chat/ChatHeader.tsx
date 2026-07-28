@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookMarked, Calendar, ChevronDown, Loader2, MessageCircle, MessagesSquare, MoreHorizontal, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { TYPE_EMOJI } from "./chatUtils";
 
@@ -12,6 +12,9 @@ interface Community {
   type: string;
   member_count: number;
   image_url: string | null;
+  is_private?: boolean;
+  enabled_tabs?: string[];
+  owner_id?: string | null;
 }
 
 interface ChatHeaderProps {
@@ -19,9 +22,12 @@ interface ChatHeaderProps {
   activeTab: ChatTab;
   onTabChange: (tab: ChatTab) => void;
   onlineCount?: number;
+  currentUserId?: string;
+  onSettingsClick?: () => void;
 }
 
 export type ChatTab = "chat" | "threads" | "events" | "resources" | "members";
+const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "events", "resources", "members"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -98,6 +104,8 @@ export function ChatHeader({
   activeTab,
   onTabChange,
   onlineCount = 0,
+  currentUserId,
+  onSettingsClick,
 }: ChatHeaderProps) {
   const router = useRouter();
   const [openMenu, setOpenMenu] = useState<"joined" | "more" | null>(null);
@@ -147,6 +155,10 @@ export function ChatHeader({
     setConfirmAction(action);
   }
 
+  const visibleTabs = community
+    ? DEFAULT_TABS.filter((tab) => tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    : DEFAULT_TABS;
+
   return (
     <>
       {confirmAction && (
@@ -181,7 +193,12 @@ export function ChatHeader({
                 </div>
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
-                    {community.name}
+                    <span className="inline-flex items-center gap-1.5">
+                      {community.name}
+                      {community.is_private && (
+                        <Lock size={13} className="text-foreground-muted" aria-label="Private community" />
+                      )}
+                    </span>
                   </h3>
                   <p className="font-body text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1">
                     <Users size={10} /> {community.member_count} member
@@ -190,6 +207,18 @@ export function ChatHeader({
                 </div>
               </div>
               <div ref={menuRef} className="relative flex items-center gap-2">
+                {/* Settings button — community owner only */}
+                {currentUserId && community?.owner_id === currentUserId && onSettingsClick && (
+                  <button
+                    type="button"
+                    onClick={onSettingsClick}
+                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                    aria-label="Community settings"
+                    title="Community settings"
+                  >
+                    <Settings size={15} />
+                  </button>
+                )}
                 <div className="relative">
                   <button
                     type="button"
@@ -246,7 +275,7 @@ export function ChatHeader({
                 ["events",    "Events",    Calendar],
                 ["resources", "Resources", BookMarked],
                 ["members",   "Members",   Users],
-              ] as const).map(([tab, label, Icon]) => (
+              ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
                 <button
                   key={tab}
                   type="button"

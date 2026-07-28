@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getMasterImageMap } from "@/lib/master-data-cache";
+import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import type { CachedMeta, CachedMessage, MessageReaction, ReplyPreview } from "./cache";
 
 /**
@@ -33,7 +33,7 @@ export async function fetchCommunitySSRData(
     { data: msgRows },
   ] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at, history_cleared_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, reference_id, created_at").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
     db.from("community_messages").select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
   ]);
 
@@ -60,7 +60,9 @@ export async function fetchCommunitySSRData(
     { data: reactionRows },
     replyMsgsResult,
   ] = await Promise.all([
-    getMasterImageMap(community.type as string),
+    TABLE_LOOKUP[community.type as string]
+      ? getMasterImageMap(community.type as string)
+      : Promise.resolve({} as Record<string, string | null>),
     db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
     db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
     uniqueMsgUserIds.length
@@ -166,6 +168,11 @@ export async function fetchCommunitySSRData(
     community: {
       id: community.id, name: community.name, type: community.type,
       member_count: memberCount ?? 0, image_url: resolvedImageUrl,
+      description: (community as any).description ?? null,
+      created_at: (community as any).created_at ?? undefined,
+      owner_id: (community as any).owner_id ?? null,
+      is_private: (community as any).is_private ?? false,
+      enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "events", "resources"],
     },
     members,
     fetchedAt: Date.now(),

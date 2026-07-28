@@ -134,11 +134,16 @@ export function useSidebarCommunities(userId: string) {
   // stays mounted while the community route changes.
   useEffect(() => {
     const syncFromCache = () => {
-      if (sidebarStore.data) setCommunities(sidebarStore.data.communities);
+      if (sidebarStore.data) {
+        setCommunities(sidebarStore.data.communities);
+      } else {
+        // Cache was invalidated (e.g. community created/joined/left) — re-fetch.
+        load();
+      }
     };
     window.addEventListener(SIDEBAR_CHANGED_EVENT, syncFromCache);
     return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, syncFromCache);
-  }, []);
+  }, [load]);
 
   // ── Active community change: clear badge + mark read ─────────────────────
   useEffect(() => {
