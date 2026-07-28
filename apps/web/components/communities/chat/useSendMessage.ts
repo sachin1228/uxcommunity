@@ -232,22 +232,31 @@ export function useSendMessage({
         }
 
         setMessages((prev) => {
+          // The server returns a bare insert (users: null, reply_to: null) to
+          // avoid expensive post-insert DB fetches. Merge it over the optimistic
+          // message so we preserve the sender's name/avatar and reply preview
+          // that the client already had.
+          const optimistic = prev.find((m) => m.id === tempId);
+
+          const merged: Message = {
+            ...(optimistic ?? {}),
+            ...message,
+            users:     message.users    ?? optimistic?.users    ?? null,
+            reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
+            image_url: message.image_url ?? optimistic?.image_url ?? null,
+            status: "sent" as const,
+          };
+
           if (prev.some((m) => m.id === message.id)) {
-            // Realtime beat the API response — the existing entry lacks reply_to
-            // and image_url. Replace it with the full server payload.
+            // Realtime beat the API response — update the existing real entry.
             const next = prev
               .filter((m) => m.id !== tempId)
-              .map((m) =>
-                m.id === message.id ? { ...message, status: "sent" as const } : m
-              );
+              .map((m) => m.id === message.id ? merged : m);
             msgCache.set(communityId, next);
             return next;
           }
 
-          const next = prev.map((m) =>
-            m.id === tempId ? { ...message, status: "sent" as const } : m
-          );
-
+          const next = prev.map((m) => m.id === tempId ? merged : m);
           msgCache.set(communityId, next);
           return next;
         });
@@ -438,16 +447,24 @@ export function useSendMessage({
         if (!message) throw new Error("No message in response");
 
         setMessages((prev) => {
+          const optimistic = prev.find((m) => m.id === tempId);
+          const merged: Message = {
+            ...(optimistic ?? {}),
+            ...message,
+            users:     message.users    ?? optimistic?.users    ?? null,
+            reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
+            image_url: message.image_url ?? optimistic?.image_url ?? null,
+            status: "sent" as const,
+          };
+
           if (prev.some((m) => m.id === message.id)) {
             const next = prev
               .filter((m) => m.id !== tempId)
-              .map((m) => (m.id === message.id ? { ...message, status: "sent" as const } : m));
+              .map((m) => (m.id === message.id ? merged : m));
             msgCache.set(communityId, next);
             return next;
           }
-          const next = prev.map((m) =>
-            m.id === tempId ? { ...message, status: "sent" as const } : m,
-          );
+          const next = prev.map((m) => m.id === tempId ? merged : m);
           msgCache.set(communityId, next);
           return next;
         });

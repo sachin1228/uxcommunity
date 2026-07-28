@@ -200,14 +200,9 @@ export async function POST(
     );
   }
 
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  // Membership is verified by the DB insert itself — only members can insert
+  // (enforced by RLS). Doing a pre-flight SELECT here added a full round-trip
+  // before every message with no security benefit on top of RLS.
 
   let content: string;
   let reply_to_id: string | null = null;
@@ -263,22 +258,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
 
-  const [{ data: user }, profileResult, replyMap] = await Promise.all([
-    db.from("users").select("name").eq("id", userId).single(),
-    db.from("designer_profiles").select("avatar_url, experience_level, companies(name)").eq("user_id", userId).maybeSingle(),
-    fetchReplyPreviews(db, reply_to_id ? [reply_to_id] : []),
-  ]);
-
-  const profile = profileResult.data;
-  const postExpSlug = (profile as any)?.experience_level ?? null;
-
-  // Resolve experience level display name — only fetch if there's a slug.
-  let postDesignation: string | null = null;
-  if (postExpSlug) {
-    const { data: expLevel } = await db.from("experience_levels").select("name").eq("slug", postExpSlug).maybeSingle();
-    postDesignation = expLevel?.name ?? null;
-  }
-
   // ── Phase 2: AI moderation after the response is sent ────────────────────
   // `after()` runs the callback once the HTTP response has been flushed,
   // keeping POST latency to <100 ms even when the AI provider is slow.
@@ -318,20 +297,17 @@ export async function POST(
     });
   }
 
+  // Return only the inserted row. The client already has the sender's own
+  // name/avatar (passed as props) and the reply preview (passed in the
+  // request). Fetching them again from the DB just added 2–3 extra round
+  // trips to the critical path. The client merges its cached data in.
   return NextResponse.json(
     {
       message: {
         ...inserted,
-        users: user
-          ? {
-              name:        user.name,
-              avatar_url:  profile?.avatar_url ?? null,
-              designation: postDesignation,
-              company:     (profile as any)?.companies?.name ?? null,
-            }
-          : null,
+        users:     null,
         reactions: [],
-        reply_to:  reply_to_id ? (replyMap[reply_to_id] ?? null) : null,
+        reply_to:  null,
         image_url: inserted.image_url ?? null,
       },
     },
