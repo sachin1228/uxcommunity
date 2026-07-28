@@ -55,9 +55,9 @@ function CommunityCard({
   onJoin: (id: string) => void;
   joining: boolean;
 }) {
-  const router      = useRouter();
+  const router          = useRouter();
   const [imgErr, setImgErr] = useState(false);
-  const locked      = !c.can_join && !c.joined;
+  const locked          = !c.can_join && !c.joined;
 
   function handleCardClick() {
     if (c.joined) router.push(`/dashboard/communities/${c.id}`);
@@ -68,39 +68,42 @@ function CommunityCard({
       onClick={handleCardClick}
       className={`group flex flex-col gap-2 rounded-xl border bg-surface-raised p-3 transition-colors ${
         c.joined
-          ? "border-border hover:border-border-strong cursor-pointer"
+          ? "border-white/[0.1] hover:border-white/[0.18] cursor-pointer"
           : locked
-          ? "border-border opacity-55"
-          : "border-border hover:border-border-strong cursor-default"
+          ? "border-white/[0.06]"
+          : "border-white/[0.08] hover:border-white/[0.15] cursor-default"
       }`}
     >
       {/* ── Header row: avatar · name/count · action ── */}
       <div className="flex items-center gap-2.5">
-        {/* Avatar */}
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-surface flex items-center justify-center text-base select-none">
-          {c.image_url && !imgErr ? (
-            <img
-              src={c.image_url}
-              alt={c.name}
-              className="h-9 w-9 object-cover"
-              onError={() => setImgErr(true)}
-            />
-          ) : (
-            TYPE_EMOJI[c.type] ?? "💬"
-          )}
+        {/* Avatar + name/count — faded when locked, but keeps action at full opacity */}
+        <div className={`flex items-center gap-2.5 flex-1 min-w-0 ${locked ? "opacity-50" : ""}`}>
+          {/* Avatar */}
+          <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-surface flex items-center justify-center text-base select-none">
+            {c.image_url && !imgErr ? (
+              <img
+                src={c.image_url}
+                alt={c.name}
+                className="h-9 w-9 object-cover"
+                onError={() => setImgErr(true)}
+              />
+            ) : (
+              TYPE_EMOJI[c.type] ?? "💬"
+            )}
+          </div>
+
+          {/* Name + member count */}
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-sm font-semibold text-foreground truncate leading-tight">
+              {c.name}
+            </p>
+            <p className="font-body text-[11px] text-foreground-muted leading-tight mt-0.5">
+              {c.member_count.toLocaleString()} member{c.member_count !== 1 ? "s" : ""}
+            </p>
+          </div>
         </div>
 
-        {/* Name + member count */}
-        <div className="min-w-0 flex-1">
-          <p className="font-display text-sm font-semibold text-foreground truncate leading-tight">
-            {c.name}
-          </p>
-          <p className="font-body text-[11px] text-foreground-muted leading-tight mt-0.5">
-            {c.member_count.toLocaleString()} member{c.member_count !== 1 ? "s" : ""}
-          </p>
-        </div>
-
-        {/* Action — prevents card-click propagation */}
+        {/* Action — never faded so tooltip stays fully visible */}
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
           {c.joined ? (
             <button
@@ -114,14 +117,14 @@ function CommunityCard({
             <div className="relative group/lock">
               <button
                 disabled
-                className="flex items-center gap-1 rounded-full border border-border px-3 py-1 font-body text-xs font-medium text-foreground-subtle cursor-not-allowed"
+                className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
                 <Lock size={10} />
                 Join
               </button>
-              {/* Tooltip */}
-              <div className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover/lock:block z-20 w-52 rounded-lg border border-border bg-surface px-3 py-2 shadow-xl">
-                <p className="font-body text-[11px] text-foreground-muted text-center leading-relaxed">
+              {/* Tooltip — positioned BELOW the button to avoid overflow clipping */}
+              <div className="pointer-events-none absolute top-full right-0 mt-1.5 hidden group-hover/lock:block z-[100] w-56 rounded-xl border border-white/10 bg-[#1c1c1e] px-3 py-2.5 shadow-2xl">
+                <p className="font-body text-[11px] text-foreground-muted/90 text-center leading-relaxed">
                   {LOCK_REASON[c.type] ?? "Update your profile to join"}
                 </p>
               </div>
@@ -138,9 +141,9 @@ function CommunityCard({
         </div>
       </div>
 
-      {/* ── Description ── */}
+      {/* ── Description — faded when locked ── */}
       {c.description && (
-        <p className="font-body text-[11px] leading-relaxed text-foreground-muted line-clamp-2 pl-[46px]">
+        <p className={`font-body text-[11px] leading-relaxed text-foreground-muted line-clamp-2 pl-[46px] ${locked ? "opacity-50" : ""}`}>
           {c.description}
         </p>
       )}
@@ -197,15 +200,18 @@ export default function CommunitiesIndexPage() {
     setJoiningId(communityId);
     setErrorMsg(null);
 
+    // Optimistic update
     setCommunities((prev) =>
       prev.map((c) => c.id === communityId ? { ...c, joined: true } : c),
     );
+    // Notify sidebar immediately so it starts re-fetching
     invalidateOnJoin(communityId);
 
     try {
       const res = await fetch(`/api/communities/${communityId}/join`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
+        // Roll back optimistic update on failure
         setCommunities((prev) =>
           prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
         );
@@ -271,7 +277,7 @@ export default function CommunitiesIndexPage() {
           />
         </div>
 
-        {/* Reddit-style pill filters */}
+        {/* Pill filters */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.value;
@@ -289,7 +295,6 @@ export default function CommunitiesIndexPage() {
               </button>
             );
           })}
-          {/* Overflow arrow hint */}
           <div className="shrink-0 text-foreground-muted">
             <ChevronRight size={16} />
           </div>
@@ -334,7 +339,7 @@ export default function CommunitiesIndexPage() {
               </section>
             )}
 
-            {/* Joined / locked / filtered */}
+            {/* Joined / locked / all communities */}
             {rest.length > 0 && (
               <section>
                 {isAllTab && recommended.length > 0 && (

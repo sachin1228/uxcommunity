@@ -130,6 +130,17 @@ export function useSidebarCommunities(userId: string) {
     if (cacheWasFresh) revalidateUnreadCounts();
   }, [load, revalidateUnreadCounts]);
 
+  // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
+  useEffect(() => {
+    const handler = () => {
+      setCommunities(sidebarStore.data?.communities ?? []);
+      setLoading(sidebarStore.data === null);
+      load();
+    };
+    window.addEventListener(SIDEBAR_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, handler);
+  }, [load]);
+
   // Header actions update the module-level cache because the global sidebar
   // stays mounted while the community route changes.
   useEffect(() => {

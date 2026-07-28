@@ -178,6 +178,7 @@ export function invalidateOnJoin(communityId: string): void {
   }
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
+  notifySidebarChanged();
 }
 
 export function invalidateCommunitiesList(): void {
