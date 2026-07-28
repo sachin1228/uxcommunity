@@ -7,6 +7,10 @@ import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 
+// ── Module-level cache ────────────────────────────────────────────────────────
+const eventsCache = new Map<string, { data: CommunityEvent[]; fetchedAt: number }>();
+const EVENTS_STALE_MS = 60_000;
+
 export function EventsView({
   communityId,
   currentUserId,
@@ -14,8 +18,9 @@ export function EventsView({
   communityId: string;
   currentUserId: string;
 }) {
-  const [events, setEvents] = useState<CommunityEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = eventsCache.get(communityId);
+  const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.data ?? []);
+  const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,7 +30,9 @@ export function EventsView({
       const res = await fetch(`/api/communities/${communityId}/events`, { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load events.");
-      setEvents(data.events as CommunityEvent[]);
+      const fresh = data.events as CommunityEvent[];
+      setEvents(fresh);
+      eventsCache.set(communityId, { data: fresh, fetchedAt: Date.now() });
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
@@ -35,7 +42,9 @@ export function EventsView({
   }, [communityId]);
 
   useEffect(() => {
-    void fetchEvents();
+    const hit = eventsCache.get(communityId);
+    const isStale = !hit || Date.now() - hit.fetchedAt > EVENTS_STALE_MS;
+    void fetchEvents(!isStale);
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
@@ -92,34 +101,37 @@ export function EventsView({
     };
   }, [communityId, fetchEvents]);
 
+  function writeCache(updater: (prev: CommunityEvent[]) => CommunityEvent[]) {
+    setEvents((prev) => {
+      const next = updater(prev);
+      eventsCache.set(communityId, { data: next, fetchedAt: eventsCache.get(communityId)?.fetchedAt ?? Date.now() });
+      return next;
+    });
+  }
+
   function handleCreated(event: CommunityEvent) {
-    setEvents((prev) => [event, ...prev].sort(
+    writeCache((prev) => [event, ...prev].sort(
       (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     ));
   }
 
   function handleUpdated(updated: CommunityEvent) {
-    setEvents((prev) =>
-      prev
-        .map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
-        .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
+    writeCache((prev) =>
+      prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
+          .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
     );
   }
 
   function handleDeleted(eventId: string) {
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    writeCache((prev) => prev.filter((e) => e.id !== eventId));
   }
 
   function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {
-    setEvents((prev) =>
-      prev.map((e) => e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e)
-    );
+    writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e));
   }
 
   function handleSaveChanged(eventId: string, saved: boolean, count: number) {
-    setEvents((prev) =>
-      prev.map((e) => e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e)
-    );
+    writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e));
   }
 
   // Split into upcoming and past
@@ -140,9 +152,9 @@ export function EventsView({
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            <Plus size={16} /> Create Event
+            <Plus size={14} /> Create Event
           </button>
         </div>
 

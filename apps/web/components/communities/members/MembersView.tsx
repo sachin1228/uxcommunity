@@ -30,6 +30,10 @@ interface MembersViewProps {
 
 const PAGE_SIZE = 30;
 
+// ── Module-level cache for page-0, no-search members list ────────────────────
+const membersCache = new Map<string, { data: CommunityMember[]; hasMore: boolean; fetchedAt: number }>();
+const MEMBERS_STALE_MS = 60_000;
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const h = Math.floor(diff / 3_600_000);
@@ -40,10 +44,11 @@ function timeAgo(iso: string): string {
 }
 
 export function MembersView({ communityId, isOwner = false, isPrivate = false }: MembersViewProps) {
-  const [members,      setMembers]      = useState<CommunityMember[]>([]);
+  const cachedMembers = membersCache.get(communityId);
+  const [members,      setMembers]      = useState<CommunityMember[]>(() => cachedMembers?.data ?? []);
   const [page,         setPage]         = useState(0);
-  const [hasMore,      setHasMore]      = useState(false);
-  const [loading,      setLoading]      = useState(true);
+  const [hasMore,      setHasMore]      = useState(() => cachedMembers?.hasMore ?? false);
+  const [loading,      setLoading]      = useState(() => !cachedMembers);
   const [loadingMore,  setLoadingMore]  = useState(false);
   const [query,        setQuery]        = useState("");
   const [debouncedQ,   setDebouncedQ]   = useState("");
@@ -71,17 +76,37 @@ export function MembersView({ communityId, isOwner = false, isPrivate = false }:
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    setMembers([]);
-    setPage(0);
-    setHasMore(false);
-    setLoading(true);
+
+    // Use cache for the no-search initial load
+    const hit = !debouncedQ ? membersCache.get(communityId) : undefined;
+    const isStale = !hit || Date.now() - hit.fetchedAt > MEMBERS_STALE_MS;
+
+    if (hit && isStale) {
+      // Show cached data immediately, fetch fresh in background
+      setMembers(hit.data);
+      setHasMore(hit.hasMore);
+      setPage(0);
+      setLoading(false);
+    } else if (!hit) {
+      setMembers([]);
+      setPage(0);
+      setHasMore(false);
+      setLoading(true);
+    }
 
     const url = `/api/communities/${communityId}/members?page=0${debouncedQ ? `&search=${encodeURIComponent(debouncedQ)}` : ""}`;
     fetch(url, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: { members: CommunityMember[]; has_more: boolean } | null) => {
-        setMembers(data?.members ?? []);
-        setHasMore(data?.has_more ?? false);
+        const freshMembers = data?.members ?? [];
+        const freshHasMore = data?.has_more ?? false;
+        setMembers(freshMembers);
+        setHasMore(freshHasMore);
+        setPage(0);
+        // Only cache the un-filtered page-0 result
+        if (!debouncedQ) {
+          membersCache.set(communityId, { data: freshMembers, hasMore: freshHasMore, fetchedAt: Date.now() });
+        }
         setLoading(false);
       })
       .catch((err) => { if (err.name !== "AbortError") setLoading(false); });

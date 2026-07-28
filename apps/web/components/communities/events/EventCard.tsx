@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, BookmarkCheck, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 
@@ -179,7 +179,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
         <Link href={eventHref} className="block">
           <div className="flex">
             {/* Cover image / gradient — left panel */}
-            <div className="relative w-44 shrink-0 overflow-hidden">
+            <div className="relative w-36 shrink-0 overflow-hidden">
               {event.cover_image_url ? (
                 <img
                   src={event.cover_image_url}
@@ -187,15 +187,15 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]} min-h-[160px]`} />
+                <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]} min-h-[130px]`} />
               )}
             </div>
 
             {/* Content — right panel */}
-            <div className="flex flex-1 flex-col gap-2 px-5 py-4 min-w-0">
+            <div className="flex flex-1 flex-col gap-1.5 px-4 py-3 min-w-0">
               {/* Top row: badge + action buttons */}
-              <div className="flex items-start justify-between gap-3">
-                <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-medium ${
+              <div className="flex items-start justify-between gap-2">
+                <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
                   past
                     ? "border-border text-foreground-subtle"
                     : "border-accent/50 text-accent"
@@ -204,13 +204,13 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
                 </span>
 
                 {/* Action buttons */}
-                <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.preventDefault()}>
+                <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
                   {!past && (
                     <button
                       type="button"
                       onClick={handleJoin}
                       disabled={rsvpPending || (full && !event.user_rsvped)}
-                      className={`rounded-lg px-3.5 py-1.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      className={`rounded-md px-2.5 py-1 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                         event.user_rsvped
                           ? "bg-accent/15 text-accent hover:bg-accent/25"
                           : full
@@ -224,7 +224,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
                   <button
                     type="button"
                     onClick={handleShare}
-                    className="rounded-lg border border-border px-3.5 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                    className="rounded-md border border-border px-2.5 py-1 font-body text-[11px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                   >
                     {shared ? "Copied!" : "Share"}
                   </button>
@@ -233,17 +233,14 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
                   <button
                     type="button"
                     onClick={handleSave}
-                    disabled={savePending}
                     aria-label={event.user_saved ? "Unsave event" : "Save event"}
-                    className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors disabled:opacity-50 ${
+                    className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
                       event.user_saved
-                        ? "border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
-                        : "border-border text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
+                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-500"
+                        : "border-border text-foreground-subtle"
                     }`}
                   >
-                    {event.user_saved
-                      ? <BookmarkCheck size={13} />
-                      : <Bookmark size={13} />}
+                    <Bookmark size={13} fill={event.user_saved ? "currentColor" : "none"} />
                   </button>
 
                   {/* Options menu — visible to all users */}
@@ -283,40 +280,40 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
               </div>
 
               {/* Title */}
-              <h3 className="font-display text-lg font-bold leading-snug text-foreground line-clamp-2">
+              <h3 className="font-display text-sm font-semibold leading-snug text-foreground line-clamp-2">
                 {event.title}
               </h3>
 
               {/* Description */}
               {event.description && (
-                <p className="font-body text-sm text-foreground-muted line-clamp-2 leading-relaxed">
+                <p className="font-body text-xs text-foreground-muted line-clamp-2 leading-relaxed">
                   {event.description}
                 </p>
               )}
 
               {/* Date + Location */}
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
-                  <Calendar size={12} className="shrink-0 text-accent" />
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+                  <Calendar size={11} className="shrink-0 text-accent" />
                   {fmtEventDateTime(event.event_date)}
                 </span>
                 {event.is_online ? (
-                  <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
-                    <Video size={12} className="shrink-0" />
+                  <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+                    <Video size={11} className="shrink-0" />
                     {event.meet_link ? "Online (Google Meet)" : "Online"}
                   </span>
                 ) : event.location ? (
-                  <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
-                    <MapPin size={12} className="shrink-0" />
+                  <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+                    <MapPin size={11} className="shrink-0" />
                     {event.location}
                   </span>
                 ) : null}
               </div>
 
               {/* Host + Attendees */}
-              <div className="mt-auto flex items-center justify-between pt-1">
-                <div className="space-y-1.5">
-                  <p className="font-body text-xs text-foreground-muted">
+              <div className="mt-auto flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="font-body text-[11px] text-foreground-muted">
                     Hosted by <span className="font-medium text-foreground">{authorName}</span>
                   </p>
                   <AvatarStack host={event.users} count={event.rsvp_count} />

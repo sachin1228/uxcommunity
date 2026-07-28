@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Bookmark, BookmarkCheck, Flag, Heart,
+  Bookmark, Flag, Heart,
   MoreHorizontal, Pencil, Trash2,
 } from "lucide-react";
 import type { CommunityResource } from "./types";
@@ -314,15 +314,16 @@ export function ResourceCard({
             <button
               type="button"
               onClick={handleBookmark}
-              disabled={bookmarkPending}
               aria-label={resource.user_bookmarked ? "Remove bookmark" : "Bookmark"}
-              className="flex items-center gap-1.5 disabled:opacity-60"
+              className="flex items-center gap-1.5"
             >
-              {resource.user_bookmarked
-                ? <BookmarkCheck size={16} className="text-accent transition-colors" strokeWidth={2} />
-                : <Bookmark size={16} className="text-foreground-subtle hover:text-accent transition-colors" strokeWidth={1.75} />
-              }
-              <span className={`font-body text-xs font-semibold tabular-nums ${resource.user_bookmarked ? "text-accent" : "text-foreground-muted"}`}>
+              <Bookmark
+                size={16}
+                fill={resource.user_bookmarked ? "currentColor" : "none"}
+                strokeWidth={1.75}
+                className={`transition-colors ${resource.user_bookmarked ? "text-emerald-500" : "text-foreground-subtle"}`}
+              />
+              <span className={`font-body text-xs font-semibold tabular-nums ${resource.user_bookmarked ? "text-emerald-500" : "text-foreground-muted"}`}>
                 {resource.bookmark_count}
               </span>
             </button>

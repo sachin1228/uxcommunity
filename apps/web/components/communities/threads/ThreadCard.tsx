@@ -391,11 +391,10 @@ export function ThreadCard({
               type="button"
               aria-label={thread.user_saved ? "Unsave thread" : "Save thread"}
               onClick={handleSave}
-              disabled={savePending}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:opacity-50 ${
+              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
                 thread.user_saved
-                  ? "text-accent"
-                  : "text-foreground-subtle hover:text-foreground"
+                  ? "text-emerald-500"
+                  : "text-foreground-subtle"
               }`}
             >
               <Bookmark size={14} fill={thread.user_saved ? "currentColor" : "none"} />

@@ -7,6 +7,10 @@ import type { CommunityThread } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 
+// ── Module-level cache (survives tab switches within the same session) ─────────
+const threadsCache = new Map<string, { data: CommunityThread[]; fetchedAt: number }>();
+const THREADS_STALE_MS = 60_000;
+
 export function ThreadsView({
   communityId,
   currentUserId,
@@ -14,8 +18,9 @@ export function ThreadsView({
   communityId: string;
   currentUserId: string;
 }) {
-  const [threads, setThreads] = useState<CommunityThread[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cached = threadsCache.get(communityId);
+  const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.data ?? []);
+  const [loading, setLoading] = useState(() => !cached);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +31,9 @@ export function ThreadsView({
       const response = await fetch(`/api/communities/${communityId}/threads`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to load threads.");
-      setThreads(data.threads as CommunityThread[]);
+      const fresh = data.threads as CommunityThread[];
+      setThreads(fresh);
+      threadsCache.set(communityId, { data: fresh, fetchedAt: Date.now() });
       setError(null);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load threads.");
@@ -36,7 +43,9 @@ export function ThreadsView({
   }, [communityId]);
 
   useEffect(() => {
-    void fetchThreads();
+    const hit = threadsCache.get(communityId);
+    const isStale = !hit || Date.now() - hit.fetchedAt > THREADS_STALE_MS;
+    void fetchThreads(!isStale); // background-only when cache is fresh
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
       supabase = createBrowserClient();
@@ -106,36 +115,34 @@ export function ThreadsView({
     };
   }, [communityId, currentUserId, fetchThreads]);
 
+  function writeCache(updater: (prev: CommunityThread[]) => CommunityThread[]) {
+    setThreads((prev) => {
+      const next = updater(prev);
+      threadsCache.set(communityId, { data: next, fetchedAt: threadsCache.get(communityId)?.fetchedAt ?? Date.now() });
+      return next;
+    });
+  }
+
   function handleCreated(thread: CommunityThread) {
-    setThreads((current) => [thread, ...current.filter((item) => item.id !== thread.id)]);
+    writeCache((cur) => [thread, ...cur.filter((item) => item.id !== thread.id)]);
   }
 
   function handleUpdated(updated: CommunityThread) {
-    setThreads((current) =>
-      current.map((thread) => (thread.id === updated.id ? { ...thread, ...updated } : thread)),
-    );
+    writeCache((cur) => cur.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
   function handleVoteChanged(threadId: string, voted: boolean, newCount: number) {
-    setThreads((current) =>
-      current.map((thread) =>
-        thread.id === threadId
-          ? { ...thread, user_voted: voted, vote_count: newCount }
-          : thread,
-      ),
+    writeCache((cur) =>
+      cur.map((t) => t.id === threadId ? { ...t, user_voted: voted, vote_count: newCount } : t),
     );
   }
 
   function handleSaveChanged(threadId: string, saved: boolean) {
-    setThreads((current) =>
-      current.map((thread) =>
-        thread.id === threadId ? { ...thread, user_saved: saved } : thread,
-      ),
-    );
+    writeCache((cur) => cur.map((t) => t.id === threadId ? { ...t, user_saved: saved } : t));
   }
 
   function handleDeleted(threadId: string) {
-    setThreads((current) => current.filter((thread) => thread.id !== threadId));
+    writeCache((cur) => cur.filter((t) => t.id !== threadId));
   }
 
   return (
@@ -152,9 +159,9 @@ export function ThreadsView({
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover"
             >
-              <Plus size={16} />
+              <Plus size={14} />
               Create Thread
             </button>
           </div>

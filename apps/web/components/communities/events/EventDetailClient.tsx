@@ -428,28 +428,28 @@ export function EventDetailClient({
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
         {/* Main event card — horizontal */}
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="flex min-h-[200px]">
-            <div className="relative w-56 shrink-0 overflow-hidden">
+          <div className="flex min-h-[160px]">
+            <div className="relative w-44 shrink-0 overflow-hidden">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
                 : <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]}`} />}
             </div>
 
-            <div className="flex flex-1 flex-col gap-3 px-6 py-5 min-w-0">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <span className={`inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 font-body text-[11px] font-medium ${
+            <div className="flex flex-1 flex-col gap-2 px-5 py-4 min-w-0">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
                   past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"
                 }`}>
                   {past ? "Past Event" : "Upcoming Event"}
                 </span>
 
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5">
                   {!past && (
                     <button
                       type="button"
                       onClick={handleJoin}
                       disabled={rsvpPending || (full && !event.user_rsvped)}
-                      className={`rounded-lg px-4 py-1.5 font-body text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         event.user_rsvped
                           ? "bg-accent/15 text-accent hover:bg-accent/25"
                           : full
@@ -461,24 +461,24 @@ export function EventDetailClient({
                     </button>
                   )}
                   <button type="button" onClick={handleShare}
-                    className="rounded-lg border border-border px-4 py-1.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+                    className="rounded-md border border-border px-3 py-1 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
                     {shared ? "Copied!" : "Share"}
                   </button>
                   {isOwner && (
                     <div className="relative">
                       <button type="button" onClick={() => setMenuOpen((p) => !p)} aria-label="Event options"
-                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                        <MoreHorizontal size={15} />
+                        className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                        <MoreHorizontal size={13} />
                       </button>
                       {menuOpen && (
-                        <div className="absolute right-0 top-9 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                        <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
                           <button type="button" onClick={() => { setMenuOpen(false); setShowEditModal(true); }}
-                            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                            <Pencil size={12} /> Edit event
+                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                            <Pencil size={11} /> Edit event
                           </button>
                           <button type="button" onClick={handleDeleteEvent} disabled={deleting}
-                            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                            {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+                            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                             {deleting ? "Deleting…" : "Delete event"}
                           </button>
                         </div>
@@ -488,21 +488,21 @@ export function EventDetailClient({
                 </div>
               </div>
 
-              <h1 className="font-display text-2xl font-bold leading-tight text-foreground">{event.title}</h1>
+              <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
 
               {event.description && (
-                <p className="font-body text-sm leading-relaxed text-foreground-muted">{event.description}</p>
+                <p className="font-body text-xs leading-relaxed text-foreground-muted">{event.description}</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                <span className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted">
-                  <Calendar size={13} className="shrink-0 text-accent" />
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                  <Calendar size={12} className="shrink-0 text-accent" />
                   {fmtEventDateTime(event.event_date)}
                   {event.end_date && ` – ${fmtTime(event.end_date)}`}
                 </span>
                 {event.is_online ? (
-                  <span className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted">
-                    <Video size={13} className="shrink-0" />
+                  <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                    <Video size={12} className="shrink-0" />
                     {event.meet_link
                       ? <a href={event.meet_link} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-accent hover:underline">
@@ -511,14 +511,14 @@ export function EventDetailClient({
                       : "Online"}
                   </span>
                 ) : event.location ? (
-                  <span className="inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted">
-                    <MapPin size={13} className="shrink-0" />
+                  <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                    <MapPin size={12} className="shrink-0" />
                     {event.location}
                   </span>
                 ) : null}
               </div>
 
-              <p className="font-body text-sm text-foreground-muted">
+              <p className="font-body text-xs text-foreground-muted">
                 Hosted by <span className="font-semibold text-foreground">{event.users?.name ?? "Community member"}</span>
               </p>
 

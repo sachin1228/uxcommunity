@@ -166,12 +166,17 @@ export function CreateResourceModal({ communityId, onClose, onCreated }: CreateR
                 type="url"
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
               />
-              {previewLoading && (
-                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-foreground-subtle" />
-              )}
-              {!previewLoading && isValidHttpUrl(url) && !preview && (
-                <Globe size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle" />
-              )}
+              {/* Always-mounted icon slot — avoids animation restart jitter on mount/unmount */}
+              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2
+                  size={14}
+                  className={`animate-spin text-foreground-subtle transition-opacity duration-150 ${previewLoading ? "opacity-100" : "opacity-0"}`}
+                />
+                <Globe
+                  size={14}
+                  className={`absolute inset-0 text-foreground-subtle transition-opacity duration-150 ${!previewLoading && isValidHttpUrl(url) && !preview ? "opacity-100" : "opacity-0"}`}
+                />
+              </div>
             </div>
           </label>
 
