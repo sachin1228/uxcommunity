@@ -4,5 +4,11 @@
     "app/api/communities/[id]/messages/route.ts": {
       "maxDuration": 10
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/healthz",
+      "schedule": "* * * * *"
+    }
+  ]
 }
