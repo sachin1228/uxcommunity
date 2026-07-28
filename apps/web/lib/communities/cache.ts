@@ -212,6 +212,26 @@ export function invalidateOnLeave(communityId: string): void {
 }
 
 /** Hide a community for this user while retaining the membership. */
+/**
+ * Surgically update fields on a single community in the sidebar store
+ * (e.g. name, image_url after saving settings) without busting the whole cache.
+ * Fires SIDEBAR_CHANGED_EVENT so the panel re-renders immediately.
+ */
+export function patchSidebarCommunity(
+  communityId: string,
+  patch: Partial<Pick<CachedSidebarCommunity, "name" | "image_url" | "is_private" | "enabled_tabs">>,
+): void {
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.map((c) =>
+        c.id === communityId ? { ...c, ...patch } : c
+      ),
+    };
+  }
+  notifySidebarChanged();
+}
+
 export function invalidateOnArchive(communityId: string): void {
   if (sidebarStore.data) {
     sidebarStore.data = {

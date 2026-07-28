@@ -564,6 +564,16 @@ export function CommunityChat({
               onClose={() => setShowSettings(false)}
               onSaved={(updated) => {
                 setCommunity((prev) => prev ? { ...prev, ...updated } : prev);
+                // Patch the sidebar store in-place so the logo/name update
+                // immediately without requiring a page refresh.
+                import("@/lib/communities/cache").then(({ patchSidebarCommunity }) => {
+                  patchSidebarCommunity(communityId, {
+                    ...(updated.name         !== undefined && { name:         updated.name }),
+                    ...(updated.image_url    !== undefined && { image_url:    updated.image_url }),
+                    ...(updated.is_private   !== undefined && { is_private:   updated.is_private }),
+                    ...(updated.enabled_tabs !== undefined && { enabled_tabs: updated.enabled_tabs }),
+                  });
+                });
                 setShowSettings(false);
               }}
               onDeleted={() => {

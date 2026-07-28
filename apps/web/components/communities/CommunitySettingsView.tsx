@@ -8,6 +8,7 @@ import {
   Copy,
   Globe2,
   Hash,
+  ImagePlus,
   Loader2,
   Lock,
   MessageSquare,
@@ -26,6 +27,7 @@ interface Community {
   enabled_tabs?: string[];
   invite_token?: string | null;
   owner_id?: string | null;
+  image_url?: string | null;
 }
 
 interface CommunitySettingsViewProps {
@@ -70,6 +72,13 @@ export function CommunitySettingsView({
     (community.enabled_tabs ?? ["chat", "threads", "events", "resources"]) as Tab[]
   );
 
+  // Image state
+  const [image,         setImage]         = useState<File | null>(null);
+  const [imagePreview,  setImagePreview]  = useState<string | null>(community.image_url ?? null);
+  const [removeImage,   setRemoveImage]   = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const previewUrlRef = useRef<string | null>(null);
+
   // Rules — fetched separately
   const [rules,       setRules]       = useState<string[]>([]);
   const [rulesLoaded, setRulesLoaded] = useState(false);
@@ -110,6 +119,21 @@ export function CommunitySettingsView({
 
   const inviteUrl = buildInviteUrl(inviteToken);
 
+  function handleImageChange(file: File | null) {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    if (file) {
+      previewUrlRef.current = URL.createObjectURL(file);
+      setImage(file);
+      setImagePreview(previewUrlRef.current);
+      setRemoveImage(false);
+    } else {
+      previewUrlRef.current = null;
+      setImage(null);
+      setImagePreview(null);
+      setRemoveImage(true);
+    }
+  }
+
   function toggleTab(tab: Tab) {
     if (tab === "chat") return;
     setTabs((prev) =>
@@ -145,19 +169,23 @@ export function CommunitySettingsView({
     setSaving(true);
     setSaveMsg(null);
     try {
+      const formData = new FormData();
+      formData.set("name",        name.trim());
+      formData.set("description", description.trim());
+      formData.set("is_private",  String(isPrivate));
+      formData.set("tabs",        JSON.stringify(tabs));
+      formData.set("rules",       JSON.stringify(rules));
+      if (image) formData.set("image", image);
+      if (removeImage && !image) formData.set("remove_image", "true");
+
       const res = await fetch(`/api/communities/${communityId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name:       name.trim(),
-          description: description.trim(),
-          is_private: isPrivate,
-          tabs,
-          rules,
-        }),
+        body: formData,
       });
       if (res.ok) {
-        onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs });
+        const data = await res.json().catch(() => null);
+        const newImageUrl = data?.image_url !== undefined ? data.image_url : (removeImage ? null : (community.image_url ?? null));
+        onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs, image_url: newImageUrl });
         setSaveMsg("Settings saved.");
         setTimeout(() => { setSaveMsg(null); onClose(); }, 1200);
       } else {
@@ -243,6 +271,53 @@ export function CommunitySettingsView({
               General
             </h3>
             <div className="space-y-4">
+              {/* Community photo */}
+              <div>
+                <label className="block font-body text-xs font-medium text-foreground mb-1.5">
+                  Community Photo
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                    aria-label="Change community photo"
+                  >
+                    {imagePreview ? (
+                      <img src={imagePreview} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <ImagePlus size={20} />
+                    )}
+                  </button>
+                  <div className="min-w-0 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => fileRef.current?.click()}
+                      className="block font-body text-xs text-accent hover:text-accent-hover transition-colors"
+                    >
+                      {imagePreview ? "Replace photo" : "Upload photo"}
+                    </button>
+                    {imagePreview && (
+                      <button
+                        type="button"
+                        onClick={() => handleImageChange(null)}
+                        className="block font-body text-xs text-foreground-muted hover:text-red-400 transition-colors"
+                      >
+                        Remove photo
+                      </button>
+                    )}
+                    <p className="font-body text-[11px] text-foreground-muted">JPEG, PNG, or WebP under 10 MB.</p>
+                  </div>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => handleImageChange(e.target.files?.[0] ?? null)}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block font-body text-xs font-medium text-foreground mb-1.5">
                   Community Name
