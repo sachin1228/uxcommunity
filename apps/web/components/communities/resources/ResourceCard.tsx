@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Bookmark, BookmarkCheck, Heart,
+  Bookmark, BookmarkCheck, Flag, Heart,
   MoreHorizontal, Pencil, Trash2,
 } from "lucide-react";
 import type { CommunityResource } from "./types";
@@ -95,6 +95,7 @@ export function ResourceCard({
   const [menuOpen, setMenuOpen]               = useState(false);
   const [showEditModal, setShowEditModal]     = useState(false);
   const [deleting, setDeleting]               = useState(false);
+  const [reported, setReported]               = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -219,28 +220,47 @@ export function ResourceCard({
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((p) => !p); }}
                 aria-label="Resource options"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-raised hover:text-foreground focus:opacity-100"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
               >
                 <MoreHorizontal size={15} />
               </button>
-              {menuOpen && isOwner && (
+              {menuOpen && (
                 <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                  >
-                    <Pencil size={11} /> Edit resource
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                  >
-                    <Trash2 size={11} />
-                    {deleting ? "Deleting…" : "Delete resource"}
-                  </button>
+                  {isOwner ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                      >
+                        <Pencil size={11} /> Edit resource
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                        className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                      >
+                        <Trash2 size={11} />
+                        {deleting ? "Deleting…" : "Delete resource"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        setMenuOpen(false);
+                        setReported(true);
+                        setTimeout(() => setReported(false), 3000);
+                      }}
+                      disabled={reported}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+                    >
+                      <Flag size={11} />
+                      {reported ? "Reported" : "Report resource"}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

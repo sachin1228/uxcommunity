@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowUp, Bookmark, Link as LinkIcon, MessageSquare,
+  ArrowUp, Bookmark, Flag, Link as LinkIcon, MessageSquare,
   MoreHorizontal, Paperclip, Pencil, Share2, Trash2,
 } from "lucide-react";
 
@@ -51,6 +51,7 @@ export function ThreadCard({
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting]       = useState(false);
+  const [reported, setReported]       = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -187,24 +188,43 @@ export function ThreadCard({
           >
             <MoreHorizontal size={15} />
           </button>
-          {menuOpen && isOwner && (
+          {menuOpen && (
             <div className="absolute right-0 top-8 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-              >
-                <Pencil size={11} /> Edit thread
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-              >
-                <Trash2 size={11} />
-                {deleting ? "Deleting…" : "Delete thread"}
-              </button>
+              {isOwner ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                  >
+                    <Pencil size={11} /> Edit thread
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                  >
+                    <Trash2 size={11} />
+                    {deleting ? "Deleting…" : "Delete thread"}
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMenuOpen(false);
+                    setReported(true);
+                    setTimeout(() => setReported(false), 3000);
+                  }}
+                  disabled={reported}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+                >
+                  <Flag size={11} />
+                  {reported ? "Reported" : "Report thread"}
+                </button>
+              )}
             </div>
           )}
         </div>
