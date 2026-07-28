@@ -1,0 +1,66 @@
+02:43:48.832 Running build in Washington, D.C., USA (East) – iad1
+02:43:48.832 Build machine configuration: 2 cores, 8 GB
+02:43:48.950 Cloning github.com/sachin1228/drafthub (Branch: main, Commit: 75e69f9)
+02:43:51.632 Cloning completed: 2.682s
+02:43:51.805 Restored build cache from previous deployment (6nnesbNvhbv1tX47vSFXwXQHhvUB)
+02:43:52.000 Running "vercel build"
+02:43:52.017 Vercel CLI 56.5.0
+02:43:52.243 Installing dependencies...
+02:43:53.688 
+02:43:53.689 changed 2 packages in 1s
+02:43:53.689 
+02:43:53.689 173 packages are looking for funding
+02:43:53.689   run `npm fund` for details
+02:43:53.715 Detected Next.js version: 16.2.11
+02:43:53.721 Running "npm run build"
+02:43:53.848 
+02:43:53.849 > web@0.1.0 build
+02:43:53.850 > next build
+02:43:53.851 
+02:43:54.440   Applying modifyConfig from Vercel
+02:43:54.514 ▲ Next.js 16.2.11 (Turbopack)
+02:43:54.514 
+02:43:54.516 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+02:43:54.570   Creating an optimized production build ...
+02:44:13.166 Turbopack build encountered 1 warnings:
+02:44:13.166 ./apps/web/next.config.js
+02:44:13.166 Encountered unexpected file in NFT list
+02:44:13.166 A file was traced that indicates that the whole project was traced unintentionally. Somewhere in the import trace below, there are:
+02:44:13.166 - filesystem operations (like path.join, path.resolve or fs.readFile), or
+02:44:13.166 - very dynamic requires (like require('./' + foo)).
+02:44:13.166 To resolve this, you can
+02:44:13.167 - remove them if possible, or
+02:44:13.167 - only use them in development, or
+02:44:13.167 - make sure they are statically scoped to some subfolder: path.join(process.cwd(), 'data', bar), or
+02:44:13.167 - add ignore comments: path.join(/*turbopackIgnore: true*/ process.cwd(), bar)
+02:44:13.167 
+02:44:13.167 Import trace:
+02:44:13.167   App Route:
+02:44:13.167     ./apps/web/next.config.js
+02:44:13.167     ./apps/web/app/api/admin/load-test/impl.ts
+02:44:13.167     ./apps/web/app/api/admin/load-test/route.ts
+02:44:13.167 
+02:44:13.167 
+02:44:13.196 ✓ Compiled successfully in 18.3s
+02:44:13.214   Running TypeScript ...
+02:44:27.172 Failed to type check.
+02:44:27.173 
+02:44:27.174 ./app/dashboard/profile/components/ProfileThreads.tsx:314:18
+02:44:27.174 Type error: Property 'onSaveChanged' is missing in type '{ key: string; event: ProfileEvent; currentUserId: string; communityId: string; onUpdated: (updated: CommunityEvent) => void; onDeleted: (eventId: string) => void; onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void; }' but required in type 'EventCardProps'.
+02:44:27.174 
+02:44:27.175   312 |             <div className="space-y-3">
+02:44:27.175   313 |               {events.map((event) => (
+02:44:27.175 > 314 |                 <EventCard
+02:44:27.175       |                  ^
+02:44:27.175   315 |                   key={event.id}
+02:44:27.175   316 |                   event={patchUser(event)}
+02:44:27.175   317 |                   currentUserId={currentUserId}
+02:44:27.240 Next.js build worker exited with code: 1 and signal: null
+02:44:27.284 npm error Lifecycle script `build` failed with error:
+02:44:27.287 npm error code 1
+02:44:27.288 npm error path /vercel/path0/apps/web
+02:44:27.288 npm error workspace web@0.1.0
+02:44:27.288 npm error location /vercel/path0/apps/web
+02:44:27.288 npm error command failed
+02:44:27.288 npm error command sh -c next build
+02:44:27.314 Error: Command "npm run build" exited with 1

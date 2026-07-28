@@ -215,6 +215,14 @@ export function ProfileThreads({
     );
   }
 
+  function handleEventSaveChanged(eventId: string, saved: boolean, count: number) {
+    setEvents((current) =>
+      current.map((e) =>
+        e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e,
+      ),
+    );
+  }
+
   // ── Resource handlers ─────────────────────────────────────────────────────
   function handleResourceUpdated(resourceId: string) {
     return (updated: CommunityResource) =>
@@ -319,6 +327,7 @@ export function ProfileThreads({
                   onUpdated={handleEventUpdated(event.id)}
                   onDeleted={handleEventDeleted}
                   onRsvpChanged={handleRsvpChanged}
+                  onSaveChanged={handleEventSaveChanged}
                 />
               ))}
             </div>
@@ -420,6 +429,15 @@ export function ProfileThreads({
                           current.map((i) =>
                             i.type === "event" && i.data.id === eventId
                               ? { ...i, data: { ...i.data, user_rsvped: rsvped, rsvp_count: count } }
+                              : i,
+                          ),
+                        )
+                      }
+                      onSaveChanged={(eventId, saved, count) =>
+                        setSavedItems((current) =>
+                          current.map((i) =>
+                            i.type === "event" && i.data.id === eventId
+                              ? { ...i, data: { ...i.data, user_saved: saved, save_count: count } }
                               : i,
                           ),
                         )

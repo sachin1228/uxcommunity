@@ -18,7 +18,7 @@ A platform for UI/UX, product, and social media designers. Designers apply to jo
 - **Web app:** Next.js 14 (App Router) + TypeScript + Tailwind CSS
 - **Database:** Supabase (PostgreSQL + Row Level Security + Realtime)
 - **Auth:** Custom JWT sessions (`jose`, `bcryptjs`) — not Supabase Auth
-- **Rate limiting:** Upstash Redis (`@upstash/ratelimit`)
+- **Rate limiting:** Upstash Redis (`@upstash/ratelimit`).
 - **Email:** Resend
 - **Image processing:** `sharp`
 - **Validation:** Zod
