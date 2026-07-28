@@ -181,15 +181,18 @@ export async function POST(
   const { id: communityId } = await params;
 
   const db = createServiceClient();
-  const burst = await rateLimit(`moderation:chat:${userId}:10s`, 5, 10);
+
+  // Run both rate-limit checks in parallel — each is an independent Redis call.
+  const [burst, minute] = await Promise.all([
+    rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
+    rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
+  ]);
   if (!burst.success) {
     return NextResponse.json(
       { error: "Too many messages. Please slow down." },
       { status: 429, headers: { "Retry-After": String(Math.ceil((burst.resetAt - Date.now()) / 1000)) } },
     );
   }
-
-  const minute = await rateLimit(`moderation:chat:${userId}:60s`, 20, 60);
   if (!minute.success) {
     return NextResponse.json(
       { error: "Too many messages. Please try again shortly." },
@@ -260,15 +263,17 @@ export async function POST(
     return NextResponse.json({ error: "Failed to send message." }, { status: 500 });
   }
 
-  const [{ data: user }, { data: profile }, replyMap] = await Promise.all([
+  const [{ data: user }, profileResult, replyMap] = await Promise.all([
     db.from("users").select("name").eq("id", userId).single(),
     db.from("designer_profiles").select("avatar_url, experience_level, companies(name)").eq("user_id", userId).maybeSingle(),
     fetchReplyPreviews(db, reply_to_id ? [reply_to_id] : []),
   ]);
 
-  // Resolve experience level display name for the POST response.
-  let postDesignation: string | null = null;
+  const profile = profileResult.data;
   const postExpSlug = (profile as any)?.experience_level ?? null;
+
+  // Resolve experience level display name — only fetch if there's a slug.
+  let postDesignation: string | null = null;
   if (postExpSlug) {
     const { data: expLevel } = await db.from("experience_levels").select("name").eq("slug", postExpSlug).maybeSingle();
     postDesignation = expLevel?.name ?? null;
