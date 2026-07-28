@@ -36,8 +36,11 @@ export function GlobalSidebar({ userId }: Props) {
   } = useSidebarCommunities(userId);
 
   const sorted = [...communities].sort((a, b) => {
-    const ta = a.last_message?.created_at ?? "";
-    const tb = b.last_message?.created_at ?? "";
+    // Use the most-recent of: last message or when the user joined.
+    // This ensures a freshly joined (or created) community always floats
+    // to the top regardless of how old its last message is.
+    const ta = [a.last_message?.created_at, a.joined_at].filter(Boolean).sort().at(-1) ?? "";
+    const tb = [b.last_message?.created_at, b.joined_at].filter(Boolean).sort().at(-1) ?? "";
     if (tb > ta) return 1;
     if (ta > tb) return -1;
     return a.name.localeCompare(b.name);

@@ -1,7 +1,8 @@
 "use client";
 
-import { forwardRef, useRef, useState, useEffect } from "react";
-import { X, CornerUpLeft, ImageIcon, Smile, Link } from "lucide-react";
+import { forwardRef, useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
@@ -26,6 +27,12 @@ interface ChatInputProps {
   onGifSelect: (url: string) => void;
 }
 
+interface PickerPos {
+  bottom: number;
+  left: number;
+  width: number;
+}
+
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -37,46 +44,76 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     },
     ref
   ) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const pickerContainerRef = useRef<HTMLDivElement>(null);
-    const [pickerOpen, setPickerOpen] = useState(false);
+    const fileInputRef       = useRef<HTMLInputElement>(null);
+    const anchorRef          = useRef<HTMLDivElement>(null);   // the input box wrapper
+    const portalPickerRef    = useRef<HTMLDivElement>(null);   // the portal div
+    const [pickerOpen, setPickerOpen]   = useState(false);
+    const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
     const canSend = !!input.trim() || !!pendingImagePreview;
 
-    // Reset dismissed state whenever the URL changes to something new
+    // ── helpers ────────────────────────────────────────────────────────────
+
+    /** Measure the anchor (input box) and compute where the portal should sit. */
+    const measureAndSetPos = useCallback(() => {
+      if (!anchorRef.current) return;
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPickerPos({
+        bottom: window.innerHeight - rect.top + 8,
+        left:   rect.left,
+        width:  rect.width,
+      });
+    }, []);
+
+    const openPicker = useCallback(() => {
+      measureAndSetPos();
+      setPickerOpen(true);
+    }, [measureAndSetPos]);
+
+    const closePicker = useCallback(() => {
+      setPickerOpen(false);
+      setPickerPos(null);
+    }, []);
+
+    const togglePicker = useCallback(() => {
+      if (pickerOpen) closePicker();
+      else openPicker();
+    }, [pickerOpen, openPicker, closePicker]);
+
+    // ── effects ────────────────────────────────────────────────────────────
+
+    // Reset dismissed URL state when the preview URL changes
     useEffect(() => {
       if (dismissedUrl && linkPreviewUrl !== dismissedUrl) {
         setDismissedUrl(null);
       }
     }, [linkPreviewUrl, dismissedUrl]);
 
-    const showLinkPreview =
-      !!linkPreviewUrl && linkPreviewUrl !== dismissedUrl;
-
-    // Close picker when clicking outside
-    useEffect(() => {
-      if (!pickerOpen) return;
-      const handler = (e: MouseEvent) => {
-        if (
-          pickerContainerRef.current &&
-          !pickerContainerRef.current.contains(e.target as Node)
-        ) {
-          setPickerOpen(false);
-        }
-      };
-      document.addEventListener("mousedown", handler);
-      return () => document.removeEventListener("mousedown", handler);
-    }, [pickerOpen]);
+    // (click-outside is handled by the backdrop rendered in the portal)
 
     // Close picker on Escape
     useEffect(() => {
       if (!pickerOpen) return;
       const handler = (e: KeyboardEvent) => {
-        if (e.key === "Escape") setPickerOpen(false);
+        if (e.key === "Escape") closePicker();
       };
       document.addEventListener("keydown", handler);
       return () => document.removeEventListener("keydown", handler);
-    }, [pickerOpen]);
+    }, [pickerOpen, closePicker]);
+
+    // Re-measure on scroll or resize so the picker tracks the input
+    useEffect(() => {
+      if (!pickerOpen) return;
+      const update = () => measureAndSetPos();
+      window.addEventListener("resize", update);
+      window.addEventListener("scroll", update, true);
+      return () => {
+        window.removeEventListener("resize", update);
+        window.removeEventListener("scroll", update, true);
+      };
+    }, [pickerOpen, measureAndSetPos]);
+
+    // ── event handlers ─────────────────────────────────────────────────────
 
     const handleEmojiSelect = (emoji: string) => {
       onEmojiSelect(emoji);
@@ -84,9 +121,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     };
 
     const handleGifSelect = (url: string) => {
-      setPickerOpen(false);
+      closePicker();
       onGifSelect(url);
     };
+
+    const showLinkPreview = !!linkPreviewUrl && linkPreviewUrl !== dismissedUrl;
+
+    // ── render ─────────────────────────────────────────────────────────────
 
     return (
       <div className="px-4 pb-4 shrink-0">
@@ -119,7 +160,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {/* Link preview bar — shown while composing if a URL is detected */}
         {showLinkPreview && (
           <div className="relative mb-1">
-            {/* Header row: link icon + domain label + dismiss */}
             <div className="flex items-center gap-1.5 px-2 pt-1.5 pb-1">
               <Link size={11} className="text-foreground-muted/60 shrink-0" />
               <p className="font-body text-[10px] text-foreground-muted/70 truncate flex-1">
@@ -137,17 +177,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           </div>
         )}
 
-        {/* Picker popup — full width, anchored above the input row */}
-        <div className="relative" ref={pickerContainerRef}>
-          {pickerOpen && (
-            <div className="absolute bottom-full left-0 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-              <EmojiGifPicker
-                onEmojiSelect={handleEmojiSelect}
-                onGifSelect={handleGifSelect}
-              />
-            </div>
-          )}
-
+        {/* Input box — used as the measurement anchor for the portal picker */}
+        <div ref={anchorRef}>
           <div className="flex flex-col bg-surface-raised rounded-2xl shadow-md px-[5px] pl-[5px] pr-[8px]">
             {/* Hidden file input */}
             <input
@@ -185,70 +216,101 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
             {/* Input row */}
             <div className="flex items-center gap-2 min-h-[52px]">
-            {/* Emoji + Image picker buttons */}
-            <div className="flex items-center">
-              <button
-                type="button"
-                onClick={() => setPickerOpen((v) => !v)}
-                disabled={sending}
-                className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
-                  ${pickerOpen
-                    ? "bg-accent/20 text-accent"
-                    : "text-foreground-muted hover:text-foreground hover:bg-surface"
-                  }`}
-                aria-label="Open emoji & GIF picker"
-                aria-expanded={pickerOpen}
-              >
-                <Smile size={19} />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={sending}
-                className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Attach image"
-              >
-                <ImageIcon size={19} />
-              </button>
-            </div>
-
-            <textarea
-              ref={ref}
-              value={input}
-              onChange={(e) => {
-                onChange(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-              }}
-              onKeyDown={onKeyDown}
-              onBlur={onBlur}
-              placeholder={placeholder}
-              rows={1}
-              className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
-              style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
-            />
-
-            {canSend && (
-              <button
-                onClick={() => { setPickerOpen(false); onSend(); }}
-                disabled={sending}
-                className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-                aria-label="Send"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-[15px] h-[15px]"
-                  style={{ marginLeft: "1px" }}
+              {/* Emoji + Image picker buttons */}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={togglePicker}
+                  disabled={sending}
+                  className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+                    ${pickerOpen
+                      ? "bg-accent/20 text-accent"
+                      : "text-foreground-muted hover:text-foreground hover:bg-surface"
+                    }`}
+                  aria-label="Open emoji & GIF picker"
+                  aria-expanded={pickerOpen}
                 >
-                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                </svg>
-              </button>
-            )}
+                  <Smile size={19} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={sending}
+                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-foreground-muted hover:text-foreground hover:bg-surface transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Attach image"
+                >
+                  <ImageIcon size={19} />
+                </button>
+              </div>
+
+              <textarea
+                ref={ref}
+                value={input}
+                onChange={(e) => {
+                  onChange(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
+                onKeyDown={onKeyDown}
+                onBlur={onBlur}
+                placeholder={placeholder}
+                rows={1}
+                className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
+                style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
+              />
+
+              {canSend && (
+                <button
+                  onClick={() => { closePicker(); onSend(); }}
+                  disabled={sending}
+                  className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  aria-label="Send"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-[15px] h-[15px]"
+                    style={{ marginLeft: "1px" }}
+                  >
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              )}
             </div>{/* end input row */}
           </div>{/* end outer box */}
-        </div>{/* end picker container */}
+        </div>{/* end anchor */}
+
+        {/* Portal picker — rendered at document.body to escape all stacking contexts */}
+        {pickerOpen && pickerPos && typeof document !== "undefined" &&
+          createPortal(
+            <>
+              {/* Invisible backdrop — closes the picker on any outside click.
+                  Sits at z-9998, below the picker (z-9999), above everything else. */}
+              <div
+                style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+                onMouseDown={closePicker}
+              />
+              <div
+                ref={portalPickerRef}
+                className="animate-in fade-in slide-in-from-bottom-2 duration-150"
+                style={{
+                  position:  "fixed",
+                  bottom:    pickerPos.bottom,
+                  left:      pickerPos.left,
+                  width:     pickerPos.width,
+                  zIndex:    9999,
+                }}
+              >
+                <EmojiGifPicker
+                  onEmojiSelect={handleEmojiSelect}
+                  onGifSelect={handleGifSelect}
+                />
+              </div>
+            </>,
+            document.body
+          )
+        }
       </div>
     );
   }

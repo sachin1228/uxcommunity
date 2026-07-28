@@ -45,7 +45,7 @@ export async function GET() {
   // 1. Community IDs this user belongs to, plus their last_read_at per community
   const { data: memberships, error: mErr } = await db
     .from("community_members")
-    .select("community_id, last_read_at, archived_at")
+    .select("community_id, last_read_at, archived_at, joined_at")
     .eq("user_id", userId);
 
   if (mErr) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
@@ -56,9 +56,11 @@ export async function GET() {
   // Build a per-community last_read_at map for unread counting below.
   const lastReadMap: Record<string, string | null> = {};
   const archivedAtMap: Record<string, string | null> = {};
+  const joinedAtMap: Record<string, string | null> = {};
   for (const m of memberships) {
     lastReadMap[m.community_id] = (m as any).last_read_at ?? null;
     archivedAtMap[m.community_id] = (m as any).archived_at ?? null;
+    joinedAtMap[m.community_id] = (m as any).joined_at ?? null;
   }
 
   // 2. Community rows + all member counts + recent messages — all in parallel
@@ -67,7 +69,7 @@ export async function GET() {
     { data: allMembers },
     { data: recentMessages },
   ] = await Promise.all([
-    db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id").in("id", ids).eq("is_active", true),
+    db.from("communities").select("id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at").in("id", ids).eq("is_active", true),
     // Single query for all member counts (replaces N individual count queries)
     db.from("community_members").select("community_id").in("community_id", ids),
     // Fetch the latest messages across all communities.
@@ -277,6 +279,7 @@ export async function GET() {
         member_count: countMap[c.id] ?? 0,
         message_count: msgCountMap[c.id] ?? 0,
         last_read_at: lastReadMap[c.id] ?? null,
+        joined_at: joinedAtMap[c.id] ?? null,
         is_archived: !!archivedAtMap[c.id] &&
           (!lastMsg || lastMsg.created_at <= archivedAtMap[c.id]!),
         last_message: lastMsg

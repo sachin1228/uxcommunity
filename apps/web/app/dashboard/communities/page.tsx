@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Check, Lock, ChevronRight } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -55,9 +56,18 @@ function CommunityCard({
   onJoin: (id: string) => void;
   joining: boolean;
 }) {
-  const router          = useRouter();
+  const router              = useRouter();
   const [imgErr, setImgErr] = useState(false);
-  const locked          = !c.can_join && !c.joined;
+  const locked              = !c.can_join && !c.joined;
+  const lockBtnRef          = useRef<HTMLButtonElement>(null);
+  const [tipPos, setTipPos] = useState<{ top: number; right: number } | null>(null);
+
+  function showTip() {
+    if (!lockBtnRef.current) return;
+    const r = lockBtnRef.current.getBoundingClientRect();
+    setTipPos({ top: r.bottom + 6, right: window.innerWidth - r.right });
+  }
+  function hideTip() { setTipPos(null); }
 
   function handleCardClick() {
     if (c.joined) router.push(`/dashboard/communities/${c.id}`);
@@ -114,21 +124,29 @@ function CommunityCard({
               Joined
             </button>
           ) : locked ? (
-            <div className="relative group/lock">
+            <>
               <button
+                ref={lockBtnRef}
                 disabled
+                onMouseEnter={showTip}
+                onMouseLeave={hideTip}
                 className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
                 <Lock size={10} />
                 Join
               </button>
-              {/* Tooltip — positioned BELOW the button to avoid overflow clipping */}
-              <div className="pointer-events-none absolute top-full right-0 mt-1.5 hidden group-hover/lock:block z-[100] w-56 rounded-xl border border-white/10 bg-[#1c1c1e] px-3 py-2.5 shadow-2xl">
-                <p className="font-body text-[11px] text-foreground-muted/90 text-center leading-relaxed">
-                  {LOCK_REASON[c.type] ?? "Update your profile to join"}
-                </p>
-              </div>
-            </div>
+              {tipPos && typeof document !== "undefined" && createPortal(
+                <div
+                  className="pointer-events-none w-56 rounded-xl border border-white/10 bg-[#1c1c1e] px-3 py-2.5 shadow-2xl"
+                  style={{ position: "fixed", top: tipPos.top, right: tipPos.right, zIndex: 9999 }}
+                >
+                  <p className="font-body text-[11px] text-foreground-muted/90 text-center leading-relaxed">
+                    {LOCK_REASON[c.type] ?? "Update your profile to join"}
+                  </p>
+                </div>,
+                document.body
+              )}
+            </>
           ) : (
             <button
               onClick={() => onJoin(c.id)}
@@ -240,14 +258,15 @@ export default function CommunitiesIndexPage() {
   // ── Filtering ──────────────────────────────────────────────────────────────
 
   const filtered = communities.filter((c) => {
+    if (c.joined) return false;
     const matchesTab    = activeTab === "all" || c.type === activeTab;
     const matchesSearch = c.name.toLowerCase().includes(search.trim().toLowerCase());
     return matchesTab && matchesSearch;
   });
 
   const isAllTab    = activeTab === "all";
-  const recommended = isAllTab ? filtered.filter((c) => c.can_join && !c.joined) : [];
-  const rest        = isAllTab ? filtered.filter((c) => c.joined || !c.can_join) : filtered;
+  const recommended = isAllTab ? filtered.filter((c) => c.can_join) : [];
+  const rest        = isAllTab ? filtered.filter((c) => !c.can_join) : filtered;
 
   return (
     <div className="flex flex-col h-full">

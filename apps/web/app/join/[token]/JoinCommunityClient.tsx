@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { invalidateOnJoin } from "@/lib/communities/cache";
 import { Lock, Globe2, Users, Loader2, Check, MessageSquare } from "lucide-react";
 
 interface Community {
@@ -43,6 +44,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
       }
 
       if (data.status === "already_member" || data.status === "joined") {
+        invalidateOnJoin(data.communityId);
         setStatus("joined");
         setTimeout(() => {
           router.push(`/dashboard/communities/${data.communityId}`);
@@ -50,6 +52,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
       } else if (data.status === "requested") {
         setStatus("requested");
       } else {
+        invalidateOnJoin(data.communityId);
         setStatus("joined");
         setTimeout(() => {
           router.push(`/dashboard/communities/${data.communityId}`);

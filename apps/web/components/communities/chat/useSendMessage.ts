@@ -185,6 +185,11 @@ export function useSendMessage({
       scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
     });
 
+    // Re-enable the send button immediately — the optimistic bubble is already
+    // visible, so there's no reason to block the input while waiting for the
+    // network. Errors are shown inline on the failed bubble.
+    setSending(false);
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
@@ -316,7 +321,6 @@ export function useSendMessage({
       });
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
-      setSending(false);
       abortControllerRef.current = null;
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
@@ -432,6 +436,9 @@ export function useSendMessage({
       scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
     });
 
+    // Re-enable the input immediately — same pattern as text/image sends.
+    setSending(false);
+
     try {
       const res = await fetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
@@ -487,8 +494,6 @@ export function useSendMessage({
         return next;
       });
       setError("Network error.");
-    } finally {
-      setSending(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, currentUserId, sending, setMessages]);
