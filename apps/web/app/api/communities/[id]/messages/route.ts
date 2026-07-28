@@ -54,7 +54,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  console.time("requireSession");
+  try {
+    session = await requireSession("user");
+  } catch (e) {
+    return e as Response;
+  }
+  console.timeEnd("requireSession");
   const userId = session.userId!;
   const { id: communityId } = await params;
 
@@ -175,18 +181,29 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const totalStart = performance.now();
+
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  console.time("requireSession");
+  try {
+    session = await requireSession("user");
+  } catch (e) {
+    return e as Response;
+  }
+  console.timeEnd("requireSession");
   const userId = session.userId!;
   const { id: communityId } = await params;
 
   const db = createServiceClient();
 
   // Run both rate-limit checks in parallel — each is an independent Redis call.
+  console.time("rateLimit");
   const [burst, minute] = await Promise.all([
     rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
     rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
   ]);
+  console.timeEnd("rateLimit");
+
   if (!burst.success) {
     return NextResponse.json(
       { error: "Too many messages. Please slow down." },
@@ -247,11 +264,15 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
+  console.time("insertMessage");
+
   const { data: inserted, error: insertErr } = await db
     .from("community_messages")
     .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
     .select("id, content, created_at, user_id, reply_to_id, image_url")
     .single();
+
+  console.timeEnd("insertMessage");
 
   if (insertErr || !inserted) {
     console.error("[POST message] insert error:", insertErr);
@@ -296,6 +317,8 @@ export async function POST(
       }
     });
   }
+
+  console.log("TOTAL:", Math.round(performance.now() - totalStart), "ms");
 
   // Return only the inserted row. The client already has the sender's own
   // name/avatar (passed as props) and the reply preview (passed in the
