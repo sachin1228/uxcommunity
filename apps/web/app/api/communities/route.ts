@@ -90,9 +90,15 @@ export async function GET() {
   }
 
   // 4. Pick the latest message per community AND count unread messages in JS.
+  //    Only consider messages sent after the user joined — pre-join messages
+  //    must never appear as previews or contribute to unread counts.
   const lastMsgByComm: Record<string, { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null }> = {};
   const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
+    const joinedAt = joinedAtMap[m.community_id] ?? null;
+    // Skip messages that predate this user's membership entirely.
+    if (joinedAt && m.created_at <= joinedAt) continue;
+
     if (!lastMsgByComm[m.community_id]) {
       lastMsgByComm[m.community_id] = m;
     }
@@ -249,12 +255,13 @@ export async function GET() {
         : undefined;
 
       // Reconstruct the sidebar lastReaction preview so it survives page refresh.
-      // Only show the reaction if it is strictly more recent than the last message.
-      // If a newer message exists, it takes priority — mirroring what useSidebarRealtime
-      // does when it clears lastReaction on a new-message INSERT event.
+      // Only show the reaction if it is strictly more recent than the last message,
+      // AND it happened after the user joined (pre-join reactions are invisible to them).
+      const joinedAt = joinedAtMap[c.id] ?? null;
       const reactionIsLatest =
         latestReaction &&
-        (!lastMsg || latestReaction.created_at > lastMsg.created_at);
+        (!lastMsg || latestReaction.created_at > lastMsg.created_at) &&
+        (!joinedAt || latestReaction.created_at > joinedAt);
 
       const lastReaction = reactionIsLatest
         ? {
