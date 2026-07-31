@@ -57,7 +57,7 @@ function TypingDots({ color }: { color: string }) {
 
 function Initials({
   name,
-  size = 46,
+  size = 48,
   colors,
 }: {
   name: string;
@@ -176,7 +176,7 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
             source={{ uri: community.image_url }}
             style={[
               styles.avatarBase,
-              { width: 46, height: 46, borderRadius: 23, borderColor: colors.border },
+              { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
             ]}
           />
         ) : (

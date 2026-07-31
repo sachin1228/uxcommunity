@@ -1,7 +1,8 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -25,13 +26,15 @@ export default function CommunitiesScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const [avatarError, setAvatarError] = useState(false);
   const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
 
   const handleCommunityPress = useCallback(
     (community: Community) => {
       markCommunityRead(community.id);
-      router.push(`/community/${community.id}?name=${encodeURIComponent(community.name)}`);
+      const imageParam = community.image_url ? `&image=${encodeURIComponent(community.image_url)}` : '';
+      router.push(`/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}`);
     },
     [router, markCommunityRead]
   );
@@ -79,18 +82,29 @@ export default function CommunitiesScreen() {
             <Feather name="bell" size={22} color={colors.mutedForeground} />
           </Pressable>
 
-          {/* Profile avatar */}
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
-              {user?.name
-                ? user.name
-                    .split(' ')
-                    .slice(0, 2)
-                    .map((w: string) => w[0]?.toUpperCase() ?? '')
-                    .join('')
-                : '?'}
-            </Text>
-          </View>
+          {/* Profile avatar — show real photo when available.
+               boring:// URLs are SVG-only (no network fetch) and can't be
+               loaded by RN's Image; fall back to initials for those and any
+               failed loads. */}
+          {user?.avatar_url && !user.avatar_url.startsWith('boring://') && !avatarError ? (
+            <Image
+              source={{ uri: user.avatar_url }}
+              style={[styles.avatar, styles.avatarImg]}
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
+                {user?.name
+                  ? user.name
+                      .split(' ')
+                      .slice(0, 2)
+                      .map((w: string) => w[0]?.toUpperCase() ?? '')
+                      .join('')
+                  : '?'}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -186,6 +200,9 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImg: {
+    resizeMode: 'cover',
   },
   avatarText: {
     fontSize: 13,

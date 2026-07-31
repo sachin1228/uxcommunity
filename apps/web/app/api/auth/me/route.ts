@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   const { data: profile } = await db
     .from("designer_profiles")
-    .select("id")
+    .select("id, avatar_url")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       ...user,
       role: "user",
       profileComplete: !!profile,
+      avatar_url: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null,
     },
   });
 }

@@ -77,7 +77,14 @@ export interface Message {
 
 export async function getCommunities(): Promise<Community[]> {
   const { data } = await apiFetch<{ communities: Community[] }>('/api/communities');
-  return data.communities;
+  // The API returns `message_count` as the server-computed unread count.
+  // Seed `unread_count` from it so the badge is correct on initial load and
+  // after background reconciliation. Realtime events then increment/zero it
+  // locally from this baseline.
+  return data.communities.map((c) => ({
+    ...c,
+    unread_count: c.message_count ?? 0,
+  }));
 }
 
 export async function getMessages(

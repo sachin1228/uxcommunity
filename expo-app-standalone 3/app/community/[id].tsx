@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,7 +27,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CommunityChat() {
-  const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
+  const { id, name, image } = useLocalSearchParams<{ id: string; name: string; image?: string }>();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -131,6 +132,7 @@ export default function CommunityChat() {
   }, [hasMore, isLoadingMore, loadMore]);
 
   const communityName = name ? decodeURIComponent(name) : 'Chat';
+  const communityImage = image ? decodeURIComponent(image) : null;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
@@ -150,9 +152,26 @@ export default function CommunityChat() {
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
           <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
-          {communityName}
-        </Text>
+
+        {/* Community image + name */}
+        <View style={styles.headerCenter}>
+          {communityImage ? (
+            <Image
+              source={{ uri: communityImage }}
+              style={[styles.headerAvatar, { borderColor: colors.border }]}
+            />
+          ) : (
+            <View style={[styles.headerAvatar, styles.headerAvatarFallback, { backgroundColor: colors.primarySoft }]}>
+              <Text style={[styles.headerAvatarText, { color: colors.primary }]}>
+                {communityName.slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+            {communityName}
+          </Text>
+        </View>
+
         <View style={{ width: 36 }} />
       </View>
 
@@ -253,11 +272,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
-  headerTitle: {
+  headerCenter: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minWidth: 0,
+  },
+  headerAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+  },
+  headerAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: {
+    fontSize: 13,
+    fontFamily: 'Geist_600SemiBold',
+  },
+  headerTitle: {
     fontSize: 17,
     fontFamily: 'Geist_600SemiBold',
-    textAlign: 'center',
+    flexShrink: 1,
   },
   center: {
     flex: 1,

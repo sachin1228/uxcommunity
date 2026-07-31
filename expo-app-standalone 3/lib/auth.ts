@@ -10,6 +10,7 @@ export interface User {
   email: string;
   role: 'user' | 'admin';
   profileComplete: boolean;
+  avatar_url: string | null;
 }
 
 export interface LoginResult {
