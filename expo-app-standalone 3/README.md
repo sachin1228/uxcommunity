@@ -166,3 +166,8 @@ expo-app-standalone 3/
 - **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`draft_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. No Supabase Auth is used.
 - **Rate limiting:** Login is rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
 - **`EXPO_PUBLIC_*` vars** are baked into the JS bundle at build time. Changing them requires a rebuild.
+
+
+
+## build locally
+- cd "/Users/sachin/Documents/GitHub/drafthub/expo-app-standalone 3/android" ./gradlew assembleRelease
