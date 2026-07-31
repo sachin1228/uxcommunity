@@ -6,13 +6,28 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://drafthub-web.vercel.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://drafthub-web.vercel.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+      }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://drafthub-web.vercel.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://eauupthwlnarkauwifmw.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+      }
     }
   },
   "submit": {
