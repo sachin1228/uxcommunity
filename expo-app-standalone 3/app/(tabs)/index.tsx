@@ -24,7 +24,7 @@ export default function CommunitiesScreen() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
 
@@ -60,27 +60,38 @@ export default function CommunitiesScreen() {
           { backgroundColor: colors.background, borderBottomColor: colors.border, paddingTop: insets.top + 8 },
         ]}
       >
-        <View>
-          <Text style={[styles.headerBrand, { color: colors.primary }]}>
-            drafthub <Text style={[styles.headerSlash, { color: colors.mutedForeground }]}>/</Text>
-          </Text>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Communities</Text>
-          {user && (
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
-              {user.name}
+        {/* Logo */}
+        <Text style={[styles.headerLogo, { color: colors.foreground }]}>
+          drafthub{' '}
+          <Text style={[styles.headerLogoSlash, { color: colors.primary }]}>/</Text>
+        </Text>
+
+        {/* Right actions */}
+        <View style={styles.headerRight}>
+          {/* Notification bell */}
+          <Pressable
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: pressed ? colors.subtle : 'transparent' },
+            ]}
+          >
+            <Feather name="bell" size={22} color={colors.mutedForeground} />
+          </Pressable>
+
+          {/* Profile avatar */}
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
+              {user?.name
+                ? user.name
+                    .split(' ')
+                    .slice(0, 2)
+                    .map((w: string) => w[0]?.toUpperCase() ?? '')
+                    .join('')
+                : '?'}
             </Text>
-          )}
+          </View>
         </View>
-        <Pressable
-          onPress={logout}
-          hitSlop={8}
-          style={({ pressed }) => [
-            styles.logoutBtn,
-            { backgroundColor: pressed ? colors.subtle : 'transparent' },
-          ]}
-        >
-          <Feather name="log-out" size={20} color={colors.mutedForeground} />
-        </Pressable>
       </View>
 
       {/* Loading */}
@@ -148,32 +159,37 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerBrand: {
-    fontSize: 13,
-    fontFamily: 'Geist_500Medium',
-    letterSpacing: -0.1,
-    marginBottom: 2,
-  },
-  headerSlash: {
-    fontSize: 13,
-    fontFamily: 'Geist_400Regular',
-  },
-  headerTitle: {
+  headerLogo: {
     fontSize: 20,
     fontFamily: 'Geist_700Bold',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
-  headerSub: {
-    fontSize: 13,
+  headerLogoSlash: {
+    fontSize: 20,
     fontFamily: 'Geist_400Regular',
-    marginTop: 1,
   },
-  logoutBtn: {
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 13,
+    fontFamily: 'Geist_600SemiBold',
   },
   center: {
     flex: 1,

@@ -30,6 +30,7 @@ const colors = {
     // Muted / subdued elements
     muted: '#F5F5F5',
     mutedForeground: '#737373',
+    foregroundSoft: '#8a8a8a',
 
     // Accent (same as primary in light mode)
     accent: '#0070F3',
@@ -59,9 +60,9 @@ const colors = {
     card: '#121214',
     cardForeground: '#EDEDED',
 
-    primary: '#52a8ff',
+    primary: '#0070F3',
     primaryForeground: '#FFFFFF',
-    primaryHover: '#0070f3',
+    primaryHover: '#0060D1',
     primarySoft: '#18243D',
 
     secondary: '#1A1A1E',
@@ -69,8 +70,9 @@ const colors = {
 
     muted: '#1A1A1E',
     mutedForeground: '#525252',
+    foregroundSoft: '#888888',
 
-    accent: '#52a8ff',
+    accent: '#0070F3',
     accentForeground: '#FFFFFF',
     accentSoft: '#18243D',
 

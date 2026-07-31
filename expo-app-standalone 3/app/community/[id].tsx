@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -18,6 +18,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
 import { sendMessage, toggleReaction, Message } from '@/lib/communities';
+import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
@@ -31,6 +32,16 @@ export default function CommunityChat() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+
+  // Track this as the active community so useCommunities won't increment
+  // unread_count for incoming messages while we're looking at this chat.
+  // Mirrors web's activeCommunityIdRef guard in useSidebarRealtime.
+  useEffect(() => {
+    communityStore.activeCommunityId = id;
+    return () => {
+      communityStore.activeCommunityId = null;
+    };
+  }, [id]);
 
   const {
     messages,
