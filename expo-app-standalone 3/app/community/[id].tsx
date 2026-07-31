@@ -150,7 +150,7 @@ export default function CommunityChat() {
         ]}
       >
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Feather name="arrow-left" size={26} color={colors.foreground} />
         </Pressable>
 
         {/* Community image + name */}
@@ -281,9 +281,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -292,11 +292,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: 'Geist_600SemiBold',
   },
   headerTitle: {
-    fontSize: 17,
+    fontSize: 20,
     fontFamily: 'Geist_600SemiBold',
     flexShrink: 1,
   },

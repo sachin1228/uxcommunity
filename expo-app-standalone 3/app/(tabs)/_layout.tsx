@@ -52,7 +52,10 @@ function ClassicTabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          ...(isWeb ? { height: 84 } : { height: 72 }),
+        },
+        tabBarLabelStyle: {
+          fontSize: 13,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -77,9 +80,9 @@ function ClassicTabLayout() {
           title: 'Home',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+              <SymbolView name="house" tintColor={color} size={28} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Feather name="home" size={26} color={color} />
             ),
         }}
       />
@@ -89,9 +92,9 @@ function ClassicTabLayout() {
           title: 'Communities',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={24} />
+              <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={28} />
             ) : (
-              <Feather name="message-circle" size={22} color={color} />
+              <Feather name="message-circle" size={26} color={color} />
             ),
         }}
       />
@@ -101,9 +104,9 @@ function ClassicTabLayout() {
           title: 'Explore',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="safari" tintColor={color} size={24} />
+              <SymbolView name="safari" tintColor={color} size={28} />
             ) : (
-              <Feather name="compass" size={22} color={color} />
+              <Feather name="compass" size={26} color={color} />
             ),
         }}
       />
@@ -113,9 +116,9 @@ function ClassicTabLayout() {
           title: 'Jobs',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="briefcase" tintColor={color} size={24} />
+              <SymbolView name="briefcase" tintColor={color} size={28} />
             ) : (
-              <Feather name="briefcase" size={22} color={color} />
+              <Feather name="briefcase" size={26} color={color} />
             ),
         }}
       />
