@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -9,19 +10,46 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { Message } from '@/lib/communities';
 
-const COMMON_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '🎉', '👏', '💯', '✅'];
+const COMMON_EMOJIS = ['❤️', '👍', '👎', '😮', '🔥', '😂', '🎉', '👏', '💯', '✅'];
 
 interface Props {
   message: Message | null;
+  isOwn: boolean;
   onClose: () => void;
   onReact: (messageId: string, emoji: string) => void;
   onReply: (message: Message) => void;
+  onDelete: (messageId: string) => void;
 }
 
-export function EmojiPicker({ message, onClose, onReact, onReply }: Props) {
+export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelete }: Props) {
   const colors = useColors();
 
   if (!message) return null;
+
+  const isDeleted = !!message.deleted_at;
+  const canReact = !isDeleted;
+  const canReply = !isDeleted;
+  const canDelete = isOwn && !isDeleted;
+
+  function handleDelete() {
+    if (!message) return;
+    onClose();
+    // Small delay so the modal closes first, then show the native alert
+    setTimeout(() => {
+      Alert.alert(
+        'Delete message?',
+        'This will delete the message for everyone in this chat.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete for everyone',
+            style: 'destructive',
+            onPress: () => onDelete(message.id),
+          },
+        ]
+      );
+    }, 200);
+  }
 
   return (
     <Modal
@@ -37,41 +65,65 @@ export function EmojiPicker({ message, onClose, onReact, onReply }: Props) {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {/* Emoji row */}
-          <View style={styles.emojiRow}>
-            {COMMON_EMOJIS.map((emoji) => (
+          {/* Emoji row — only for non-deleted messages */}
+          {canReact && (
+            <>
+              <View style={styles.emojiRow}>
+                {COMMON_EMOJIS.map((emoji) => (
+                  <Pressable
+                    key={emoji}
+                    style={({ pressed }) => [
+                      styles.emojiBtn,
+                      { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                    ]}
+                    onPress={() => {
+                      onReact(message.id, emoji);
+                      onClose();
+                    }}
+                  >
+                    <Text style={styles.emoji}>{emoji}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            </>
+          )}
+
+          {/* Reply */}
+          {canReply && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.action,
+                { backgroundColor: pressed ? colors.subtle : 'transparent' },
+              ]}
+              onPress={() => {
+                onReply(message);
+                onClose();
+              }}
+            >
+              <Text style={[styles.actionText, { color: colors.foreground }]}>↩ Reply</Text>
+            </Pressable>
+          )}
+
+          {/* Delete — own messages only */}
+          {canDelete && (
+            <>
+              {canReply && (
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+              )}
               <Pressable
-                key={emoji}
                 style={({ pressed }) => [
-                  styles.emojiBtn,
-                  { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                  styles.action,
+                  { backgroundColor: pressed ? 'rgba(239,68,68,0.08)' : 'transparent' },
                 ]}
-                onPress={() => {
-                  onReact(message.id, emoji);
-                  onClose();
-                }}
+                onPress={handleDelete}
               >
-                <Text style={styles.emoji}>{emoji}</Text>
+                <Text style={[styles.actionText, { color: colors.destructive }]}>
+                  🗑 Delete
+                </Text>
               </Pressable>
-            ))}
-          </View>
-
-          {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          {/* Actions */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.action,
-              { backgroundColor: pressed ? colors.subtle : 'transparent' },
-            ]}
-            onPress={() => {
-              onReply(message);
-              onClose();
-            }}
-          >
-            <Text style={[styles.actionText, { color: colors.foreground }]}>↩ Reply</Text>
-          </Pressable>
+            </>
+          )}
         </View>
       </Pressable>
     </Modal>
@@ -81,7 +133,7 @@ export function EmojiPicker({ message, onClose, onReact, onReply }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -89,14 +141,14 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 12,
   },
   emojiRow: {
     flexDirection: 'row',
@@ -116,11 +168,11 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginHorizontal: 12,
+    marginHorizontal: 0,
   },
   action: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
   },
   actionText: {
     fontSize: 15,

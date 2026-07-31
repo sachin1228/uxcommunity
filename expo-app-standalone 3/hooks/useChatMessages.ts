@@ -70,6 +70,15 @@ export function useChatMessages(communityId: string) {
     );
   }, []);
 
+  /** Soft-delete a message locally (mirrors the server setting deleted_at). */
+  const softDeleteMessage = useCallback((messageId: string) => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId ? { ...m, deleted_at: new Date().toISOString() } : m
+      )
+    );
+  }, []);
+
   // Realtime subscription
   useEffect(() => {
     const channel = supabase
@@ -191,5 +200,6 @@ export function useChatMessages(communityId: string) {
     loadMore,
     appendMessage,
     updateReactions,
+    softDeleteMessage,
   };
 }

@@ -23,6 +23,7 @@
     "android": {
       "backgroundColor": "#09090B",
       "package": "com.sachinpatil1228.myapp",
+      "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#09090B"

@@ -33,6 +33,54 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
   }
 }
 
+/**
+ * Upload a file as multipart/form-data.
+ * Uses the same session-cookie mechanism as apiFetch, but does NOT set
+ * Content-Type so that fetch can inject the multipart boundary automatically.
+ */
+export async function apiFormUpload<T = unknown>(
+  path: string,
+  formData: FormData
+): Promise<{ data: T; status: number }> {
+  const sessionToken = await getStoredSession();
+  const cookieHeader = sessionToken
+    ? `${SESSION_COOKIE_NAME}=${sessionToken}`
+    : undefined;
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+  };
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const setCookie = response.headers.get('set-cookie');
+  if (setCookie) await saveSessionCookie(setCookie);
+
+  let data: T;
+  const contentType = response.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    data = (await response.json()) as T;
+  } else {
+    data = (await response.text()) as unknown as T;
+  }
+
+  if (!response.ok) {
+    const message =
+      (data as { error?: string })?.error ?? `HTTP ${response.status}`;
+    const error = new Error(message) as Error & { status: number; data: unknown };
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+
+  return { data, status: response.status };
+}
+
 /** Clear a persisted session (on logout or 401). */
 export async function clearSession(): Promise<void> {
   await AsyncStorage.removeItem(SESSION_STORAGE_KEY);

@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, apiFormUpload } from './api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,4 +123,39 @@ export async function toggleReaction(
 
 export async function markRead(communityId: string): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/read`, { method: 'PATCH' });
+}
+
+export async function deleteMessage(
+  communityId: string,
+  messageId: string
+): Promise<void> {
+  await apiFetch(
+    `/api/communities/${communityId}/messages/${messageId}`,
+    { method: 'DELETE' }
+  );
+}
+
+/**
+ * Upload a local image URI to the chat image endpoint.
+ * Uses React Native's multipart FormData object format { uri, type, name }.
+ * Returns the permanent CDN URL to embed in the message payload.
+ */
+export async function uploadChatImage(
+  communityId: string,
+  imageUri: string,
+  mimeType: string = 'image/jpeg'
+): Promise<string> {
+  const formData = new FormData();
+  // React Native multipart upload — append as a file descriptor object
+  formData.append('file', {
+    uri: imageUri,
+    type: mimeType,
+    name: `chat-image.${mimeType.split('/')[1] ?? 'jpg'}`,
+  } as unknown as Blob);
+
+  const { data } = await apiFormUpload<{ url: string }>(
+    `/api/communities/${communityId}/messages/upload`,
+    formData
+  );
+  return data.url;
 }
