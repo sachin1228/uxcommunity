@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession, clearSessionCookie } from "@/lib/auth/session";
-import { getCorsHeaders } from "@/lib/cors";
 
 /** Lightweight Supabase REST check — Edge-compatible, no SDK needed. */
 async function fetchUserStatus(
@@ -34,33 +33,6 @@ async function fetchUserStatus(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const origin = request.headers.get("origin");
-
-  // ── CORS: handle all /api/* routes ──────────────────────────────────
-  if (pathname.startsWith("/api/")) {
-    const corsHeaders = getCorsHeaders(origin);
-
-    // OPTIONS preflight — respond immediately with 204, no auth needed
-    if (request.method === "OPTIONS") {
-      return new NextResponse(null, {
-        status: 204,
-        headers: corsHeaders ?? {},
-      });
-    }
-
-    // For all other API methods, let the request continue but attach CORS
-    // headers to the response so the browser accepts the reply.
-    if (corsHeaders) {
-      const response = NextResponse.next();
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-      return response;
-    }
-
-    return NextResponse.next();
-  }
-
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const session = token ? await verifySession(token) : null;
 
@@ -111,5 +83,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/admin/:path*", "/dashboard/:path*", "/api/:path*"],
+  matcher: ["/", "/login", "/admin/:path*", "/dashboard/:path*"],
 };
