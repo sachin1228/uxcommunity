@@ -123,6 +123,10 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
             maxLength={2000}
             returnKeyType="default"
             editable={!disabled}
+            // Android: remove the asymmetric font padding that pushes text downward
+            includeFontPadding={false}
+            // Android: keep text anchored to the top so multiline grows naturally
+            textAlignVertical="top"
           />
 
           {/* Image picker button — right inside pill */}

@@ -248,7 +248,7 @@ export function MessageBubble({
                 {formatTime(message.created_at)}
               </Text>
               {isOwn && (
-                <Ionicons name="checkmark-done" size={13} color={colors.mutedForeground} />
+                <Ionicons name="checkmark-done-sharp" size={15} color={colors.mutedForeground} />
               )}
             </View>
             <ReactionChips
@@ -305,7 +305,7 @@ export function MessageBubble({
                   {formatTime(message.created_at)}
                 </Text>
                 {isOwn && (
-                  <Ionicons name="checkmark-done" size={13} color={timeColor} />
+                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
                 )}
               </View>
             </Pressable>

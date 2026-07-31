@@ -95,11 +95,14 @@ export function useChatMessages(communityId: string) {
           const row = payload.new as Message;
           setMessages((prev) => {
             if (prev.some((m) => m.id === row.id)) return prev;
+            // Reuse avatar/user info already known from earlier messages
+            const knownUser =
+              prev.find((m) => m.user_id === row.user_id && m.users)?.users ?? null;
             return [
               ...prev,
               {
                 ...row,
-                users: null,
+                users: knownUser,
                 reactions: [],
                 reply_to: null,
                 deleted_at: null,
