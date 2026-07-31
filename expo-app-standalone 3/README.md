@@ -1,96 +1,168 @@
-# My App
+# DraftHub Mobile App
 
-A React Native mobile app built with Expo.
+React Native (Expo) mobile app for the DraftHub platform.
 
-## Requirements
+---
 
-- [Node.js](https://nodejs.org/) 18+
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- [Expo Go](https://expo.dev/go) app on your phone (for quick device testing)
+## Prerequisites
 
-## Getting started
+Make sure you have these installed on your machine:
+
+- **Node.js** 20+ — https://nodejs.org
+- **npm** 10+
+- **Expo CLI** — `npm install -g expo-cli`
+- **Android Studio** (for local Android builds) — https://developer.android.com/studio
+- **Java 17** (Zulu recommended) — `brew install --cask zulu@17`
+- **Xcode** (for iOS builds, Mac only) — App Store
+
+### Set Android SDK path (one-time, Mac)
 
 ```bash
-# Install dependencies
+echo 'export ANDROID_HOME=$HOME/Library/Android/sdk' >> ~/.zshrc
+echo 'export PATH=$PATH:$ANDROID_HOME/platform-tools' >> ~/.zshrc
+source ~/.zshrc
+```
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the root of this folder:
+
+```
+EXPO_PUBLIC_API_URL=https://drafthub-web.vercel.app
+EXPO_PUBLIC_SUPABASE_URL=https://eauupthwlnarkauwifmw.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl
+```
+
+> `.env` is read automatically by Expo during local development and `prebuild`.
+
+---
+
+## Install Dependencies
+
+```bash
 npm install
-
-# Start the dev server
-npm start
 ```
 
-This opens Metro bundler in your terminal. From there you can:
+---
 
-- Press **`i`** to open in iOS Simulator (requires Xcode on macOS)
-- Press **`a`** to open in Android Emulator (requires Android Studio)
-- Press **`w`** to open in a web browser
-- **Scan the QR code** with your phone's camera (iOS) or the Expo Go app (Android) to run on a real device
+## Run Locally (Development)
 
-## Project structure
+### Option 1 — Expo Go (fastest, no build needed)
 
-```
-my-app/
-├── app/                    # Screens (Expo Router — file-based routing)
-│   ├── _layout.tsx         # Root layout & providers
-│   ├── +not-found.tsx      # 404 screen
-│   └── (tabs)/
-│       ├── _layout.tsx     # Tab bar setup
-│       └── index.tsx       # Home tab
-├── assets/
-│   └── images/
-│       └── icon.png        # App icon
-├── components/
-│   ├── ErrorBoundary.tsx
-│   ├── ErrorFallback.tsx
-│   └── KeyboardAwareScrollViewCompat.tsx
-├── constants/
-│   └── colors.ts           # Design tokens / colour palette
-├── hooks/
-│   └── useColors.ts        # Light/dark theme hook
-├── app.json                # Expo config
-├── babel.config.js
-├── metro.config.js
-├── tsconfig.json
-└── package.json
+```bash
+npx expo start
 ```
 
-## Adding screens
+- Scan the QR code with the **Expo Go** app on your phone.
+- Any JS change reflects instantly — no rebuild required.
+- Use this for day-to-day development.
 
-Create a new file inside `app/` and it becomes a route automatically:
+### Option 2 — Development build on Android emulator
 
-```tsx
-// app/profile.tsx
-import { View, Text } from 'react-native';
-
-export default function ProfileScreen() {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <Text>Profile</Text>
-    </View>
-  );
-}
+```bash
+npx expo start --android
 ```
 
-Navigate to it with `<Link href="/profile" />` or `router.push('/profile')` from `expo-router`.
+Requires Android Studio with a virtual device configured.
 
-## Customising the theme
+### Option 3 — Development build on iOS simulator (Mac only)
 
-Edit `constants/colors.ts` to change the colour palette. To add dark mode support, add a `dark` key alongside `light` — the `useColors()` hook picks it up automatically.
+```bash
+npx expo start --ios
+```
 
-## Useful commands
+---
 
-| Command | Description |
-|---|---|
-| `npm start` | Start Metro (interactive menu) |
-| `npm run ios` | Open iOS Simulator directly |
-| `npm run android` | Open Android Emulator directly |
-| `npm run web` | Open in browser |
-| `npm run typecheck` | Run TypeScript checks |
+## Build APK Locally (Android)
 
-## Stack
+Use this to produce a real `.apk` you can install directly on a device.
 
-- **Expo** ~54 / **React Native** 0.81
-- **Expo Router** v6 (file-based routing)
-- **TanStack React Query** v5 (async data)
-- **React Native Reanimated** v4
-- **React Native Gesture Handler** v2
-- **Inter** font (via `@expo-google-fonts/inter`)
+### Step 1 — Generate native Android folder (one-time, or after adding native packages)
+
+```bash
+npx expo prebuild --platform android
+```
+
+> Re-run `prebuild` only when you add/remove native packages or change `app.json`. Not needed for JS-only changes.
+
+### Step 2 — Build the APK
+
+```bash
+cd android
+./gradlew assembleRelease
+```
+
+**First build:** ~20–30 min (downloads all dependencies).  
+**Subsequent builds:** ~3–5 min (incremental).
+
+### Output
+
+```
+android/app/build/outputs/apk/release/app-release.apk
+```
+
+Transfer the APK to your phone (AirDrop, Google Drive, USB cable) and install it.
+
+---
+
+## Build via EAS (Expo Cloud)
+
+EAS builds run in the cloud — no local Android/Java setup needed. Environment variables are already configured in `eas.json` for all profiles.
+
+### Install EAS CLI
+
+```bash
+npm install -g eas-cli
+eas login
+```
+
+### Build profiles
+
+| Profile | Use for | Command |
+|---|---|---|
+| `development` | Dev client build | `eas build --profile development --platform android` |
+| `preview` | Internal testing APK | `eas build --profile preview --platform android` |
+| `production` | Play Store release | `eas build --profile production --platform android` |
+
+### Example — build a preview APK
+
+```bash
+eas build --profile preview --platform android
+```
+
+Download the APK from the link EAS provides when the build finishes.
+
+---
+
+## Project Structure
+
+```
+expo-app-standalone 3/
+├── app/                  Expo Router screens
+│   ├── (auth)/           Login screen
+│   ├── (tabs)/           Main tab screens
+│   └── community/        Community chat screen
+├── components/           Reusable UI components
+├── context/              Auth context (session management)
+├── hooks/                Custom hooks (chat, communities, etc.)
+├── lib/
+│   ├── api.ts            Base fetch client (reads EXPO_PUBLIC_API_URL)
+│   ├── auth.ts           Login / logout / getMe
+│   ├── communities.ts    Community data fetching
+│   └── supabase.ts       Supabase client (Realtime)
+├── constants/            Colors and theme constants
+├── assets/               Images and fonts
+├── app.json              Expo app config
+├── eas.json              EAS build profiles (env vars included)
+└── .env                  Local env vars (not committed)
+```
+
+---
+
+## Notes
+
+- **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`draft_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. No Supabase Auth is used.
+- **Rate limiting:** Login is rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
+- **`EXPO_PUBLIC_*` vars** are baked into the JS bundle at build time. Changing them requires a rebuild.
