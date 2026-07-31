@@ -242,18 +242,18 @@ function makeStyles(colors: Colors) {
     },
     logoLetter: {
       fontSize: 26,
-      fontFamily: 'Inter_700Bold',
+      fontFamily: 'Geist_700Bold',
       color: '#FFFFFF',
     },
     title: {
       fontSize: 26,
-      fontFamily: 'Inter_700Bold',
+      fontFamily: 'Geist_700Bold',
       letterSpacing: -0.5,
       marginBottom: 6,
     },
     subtitle: {
       fontSize: 15,
-      fontFamily: 'Inter_400Regular',
+      fontFamily: 'Geist_400Regular',
     },
     card: {
       borderRadius: 16,
@@ -275,7 +275,7 @@ function makeStyles(colors: Colors) {
     },
     errorText: {
       fontSize: 13,
-      fontFamily: 'Inter_400Regular',
+      fontFamily: 'Geist_400Regular',
       lineHeight: 18,
     },
     field: {
@@ -283,7 +283,7 @@ function makeStyles(colors: Colors) {
     },
     label: {
       fontSize: 13,
-      fontFamily: 'Inter_500Medium',
+      fontFamily: 'Geist_500Medium',
     },
     input: {
       height: 44,
@@ -291,7 +291,7 @@ function makeStyles(colors: Colors) {
       borderWidth: 1,
       paddingHorizontal: 14,
       fontSize: 15,
-      fontFamily: 'Inter_400Regular',
+      fontFamily: 'Geist_400Regular',
     },
     inputRow: {
       height: 44,
@@ -305,14 +305,14 @@ function makeStyles(colors: Colors) {
     inputInner: {
       flex: 1,
       fontSize: 15,
-      fontFamily: 'Inter_400Regular',
+      fontFamily: 'Geist_400Regular',
     },
     eyeBtn: {
       paddingHorizontal: 4,
     },
     eyeText: {
       fontSize: 13,
-      fontFamily: 'Inter_500Medium',
+      fontFamily: 'Geist_500Medium',
     },
     button: {
       height: 46,
@@ -323,7 +323,7 @@ function makeStyles(colors: Colors) {
     },
     buttonText: {
       fontSize: 15,
-      fontFamily: 'Inter_600SemiBold',
+      fontFamily: 'Geist_600SemiBold',
     },
   });
 }

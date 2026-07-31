@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
   avatarSpacer: {
     width: 32,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   senderName: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     marginLeft: 4,
     marginBottom: 2,
   },
@@ -218,11 +218,11 @@ const styles = StyleSheet.create({
   },
   replyName: {
     fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
   replyContent: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
   },
   bubble: {
     borderRadius: 16,
@@ -239,12 +239,12 @@ const styles = StyleSheet.create({
   },
   content: {
     fontSize: 15,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     lineHeight: 21,
   },
   time: {
     fontSize: 11,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     marginLeft: 4,
     marginTop: 2,
   },
@@ -278,11 +278,11 @@ const styles = StyleSheet.create({
   },
   reactionCount: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
   },
   deletedText: {
     fontSize: 13,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     fontStyle: 'italic',
     paddingHorizontal: 12,
     paddingVertical: 6,

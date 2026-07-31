@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 12,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     fontStyle: 'italic',
   },
 });

@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     flex: 1,
     fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     textAlign: 'center',
   },
   center: {
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     textAlign: 'center',
   },
   loadMoreSpinner: {
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     textAlign: 'center',
     marginTop: 8,
   },

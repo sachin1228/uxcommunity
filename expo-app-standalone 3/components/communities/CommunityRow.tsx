@@ -109,13 +109,20 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
           </Text>
         </View>
 
+        {/* Member count */}
+        <Text style={[styles.memberCount, { color: colors.mutedForeground }]}>
+          {community.member_count === 1
+            ? '1 member'
+            : `${community.member_count} members`}
+        </Text>
+
         <View style={styles.bottomRow}>
           <Text
             style={[
               styles.preview,
               {
                 color: isTyping ? colors.primary : community.unread_count > 0 ? colors.foreground : colors.mutedForeground,
-                fontFamily: isTyping || community.unread_count > 0 ? 'Inter_500Medium' : 'Inter_400Regular',
+                fontFamily: isTyping || community.unread_count > 0 ? 'Geist_500Medium' : 'Geist_400Regular',
               },
             ]}
             numberOfLines={1}
@@ -153,7 +160,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   avatarText: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
   body: {
     flex: 1,
@@ -167,15 +174,20 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
     flex: 1,
   },
   nameBold: {
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
   time: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
+  },
+  memberCount: {
+    fontSize: 11,
+    fontFamily: 'Geist_400Regular',
+    marginTop: -1,
   },
   bottomRow: {
     flexDirection: 'row',
@@ -196,6 +208,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
 });

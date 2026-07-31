@@ -61,6 +61,9 @@ export default function CommunitiesScreen() {
         ]}
       >
         <View>
+          <Text style={[styles.headerBrand, { color: colors.primary }]}>
+            drafthub <Text style={[styles.headerSlash, { color: colors.mutedForeground }]}>/</Text>
+          </Text>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Communities</Text>
           {user && (
             <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
@@ -145,14 +148,24 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  headerBrand: {
+    fontSize: 13,
+    fontFamily: 'Geist_500Medium',
+    letterSpacing: -0.1,
+    marginBottom: 2,
+  },
+  headerSlash: {
+    fontSize: 13,
+    fontFamily: 'Geist_400Regular',
+  },
   headerTitle: {
     fontSize: 20,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'Geist_700Bold',
     letterSpacing: -0.3,
   },
   headerSub: {
     fontSize: 13,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     marginTop: 1,
   },
   logoutBtn: {
@@ -171,7 +184,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     textAlign: 'center',
   },
   retryBtn: {
@@ -182,16 +195,16 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 14,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
   },
   emptyTitle: {
     fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
     marginTop: 8,
   },
   emptyText: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     textAlign: 'center',
   },
   list: { flexGrow: 1 },

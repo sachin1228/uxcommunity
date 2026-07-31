@@ -127,11 +127,11 @@ const styles = StyleSheet.create({
   },
   replyLabel: {
     fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Geist_600SemiBold',
   },
   replyPreview: {
     fontSize: 12,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
   },
   inputRow: {
     flexDirection: 'row',
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
     fontSize: 15,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Geist_400Regular',
     maxHeight: 120,
     lineHeight: 20,
   },

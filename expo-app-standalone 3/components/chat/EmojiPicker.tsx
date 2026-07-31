@@ -124,6 +124,6 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 15,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Geist_500Medium',
   },
 });
