@@ -22,7 +22,11 @@
     },
     "android": {
       "backgroundColor": "#09090B",
-      "package": "com.sachinpatil1228.myapp"
+      "package": "com.sachinpatil1228.myapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#09090B"
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
