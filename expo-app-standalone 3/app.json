@@ -17,7 +17,8 @@
       "supportsTablet": false
     },
     "android": {
-      "backgroundColor": "#09090B"
+      "backgroundColor": "#09090B",
+      "package": "com.sachinpatil1228.myapp"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -29,6 +30,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "82dc5762-bc64-4e40-94e1-737e5af0a9da"
+      }
     }
   }
 }
