@@ -75,15 +75,18 @@ export function MessageBubble({ message, isOwn, onLongPress, onReactionPress, cu
 
   const senderName = message.users?.name ?? (isOwn ? 'You' : 'Unknown');
 
+  // Time color: slightly transparent white for own, muted for others
+  const timeColor = isOwn ? 'rgba(255,255,255,0.65)' : colors.mutedForeground;
+
   return (
     <View style={[styles.row, isOwn && styles.rowOwn]}>
-      {/* Avatar — only for others */}
+      {/* Avatar — only for others, aligned to bottom of bubble */}
       {!isOwn && (
         <Avatar name={senderName} colors={colors} />
       )}
 
       <View style={[styles.bubbleWrapper, isOwn && styles.bubbleWrapperOwn]}>
-        {/* Sender name */}
+        {/* Sender name — above the bubble, others only */}
         {!isOwn && (
           <Text style={[styles.senderName, { color: colors.mutedForeground }]}>{senderName}</Text>
         )}
@@ -105,7 +108,7 @@ export function MessageBubble({ message, isOwn, onLongPress, onReactionPress, cu
           </View>
         )}
 
-        {/* Bubble */}
+        {/* Bubble — message + time inside */}
         <Pressable
           onLongPress={() => onLongPress(message)}
           delayLongPress={350}
@@ -126,23 +129,32 @@ export function MessageBubble({ message, isOwn, onLongPress, onReactionPress, cu
             />
           )}
 
-          {/* Text */}
+          {/* Text + time row */}
           {message.content && (
-            <Text
-              style={[
-                styles.content,
-                { color: isOwn ? colors.primaryForeground : colors.foreground },
-              ]}
-            >
-              {message.content}
+            <View style={styles.contentRow}>
+              <Text
+                style={[
+                  styles.content,
+                  { color: isOwn ? colors.primaryForeground : colors.foreground },
+                ]}
+              >
+                {message.content}
+                {/* invisible spacer so time never overlaps text */}
+                {'  '}
+              </Text>
+              <Text style={[styles.timeInline, { color: timeColor }]}>
+                {formatTime(message.created_at)}
+              </Text>
+            </View>
+          )}
+
+          {/* Time below image (when image-only message) */}
+          {message.image_url && !message.content && (
+            <Text style={[styles.timeImage, { color: timeColor }]}>
+              {formatTime(message.created_at)}
             </Text>
           )}
         </Pressable>
-
-        {/* Time */}
-        <Text style={[styles.time, { color: colors.mutedForeground }, isOwn && styles.timeOwn]}>
-          {formatTime(message.created_at)}
-        </Text>
 
         {/* Reactions */}
         {message.reactions.length > 0 && (
@@ -185,7 +197,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
     alignSelf: 'flex-end',
-    marginBottom: 18,
   },
   avatarText: {
     fontSize: 12,
@@ -230,27 +241,38 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    gap: 6,
   },
   messageImage: {
     width: 220,
     height: 160,
     borderRadius: 10,
+    marginBottom: 4,
+  },
+  // Text and time sit in a flex-wrap row so time tucks to the bottom-right
+  contentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-end',
   },
   content: {
     fontSize: 15,
     fontFamily: 'Geist_400Regular',
     lineHeight: 21,
+    flexShrink: 1,
   },
-  time: {
+  timeInline: {
     fontSize: 11,
     fontFamily: 'Geist_400Regular',
+    alignSelf: 'flex-end',
     marginLeft: 4,
-    marginTop: 2,
+    marginBottom: 1,
   },
-  timeOwn: {
-    marginLeft: 0,
-    marginRight: 4,
+  // Time shown below an image-only bubble
+  timeImage: {
+    fontSize: 11,
+    fontFamily: 'Geist_400Regular',
+    alignSelf: 'flex-end',
+    marginTop: 4,
   },
   reactions: {
     flexDirection: 'row',
