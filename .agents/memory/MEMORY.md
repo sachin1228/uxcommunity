@@ -1,3 +1,4 @@
 - [Profile page migration](profile-page-migration.md) — linkedin_url, portfolio_url, bio must be added to designer_profiles via migration before profile page works.
+- [Mobile avatar URL resolution](mobile-avatar-url-formats.md) — RN <Image> can't render SVGs; all avatar_url formats (boring://, DiceBear SVG, multiavatar, null) must be resolved to PNG before use on mobile.
 - [Realtime sidebar previews](realtime-sidebar-previews.md) — reaction previews need message identity and event ordering to stay correct across messages.
 - [Private community archive](private-community-archive.md) — “delete” from the sidebar is a per-user archive; shared community data stays intact and new messages restore it.

@@ -74,6 +74,30 @@ export default function CommunityChat() {
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList>(null);
 
+  /**
+   * isAtBottom — true when the last message in the list is currently visible
+   * on screen. Updated by onViewableItemsChanged which is far more reliable
+   * than scroll-offset arithmetic (no timing race, no threshold guessing).
+   * Starts true because the chat always opens scrolled to the latest message.
+   */
+  const isAtBottom = useRef(true);
+  const lastMessageIdRef = useRef<string | null>(null);
+
+  // Keep lastMessageIdRef in sync so the viewability callback can reference it
+  // without being recreated (FlatList requires a stable onViewableItemsChanged).
+  useEffect(() => {
+    lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+  }, [messages]);
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
+  const handleViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: Array<{ item: Message }> }) => {
+      const lastId = lastMessageIdRef.current;
+      if (!lastId) return;
+      isAtBottom.current = viewableItems.some((vi) => vi.item.id === lastId);
+    }
+  );
+
   const scrollToLatest = useCallback((animated = true) => {
     listRef.current?.scrollToEnd({ animated });
   }, []);
@@ -82,7 +106,9 @@ export default function CommunityChat() {
     if (Platform.OS !== 'android') return;
 
     const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
-      scrollToLatest(true);
+      // Only jump to the bottom when the last message is already visible.
+      // If the user has scrolled up to read old messages, leave them there.
+      if (isAtBottom.current) scrollToLatest(true);
     });
 
     return () => subscription.remove();
@@ -216,6 +242,8 @@ export default function CommunityChat() {
           keyExtractor={keyExtractor}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onViewableItemsChanged={handleViewableItemsChanged.current}
+          viewabilityConfig={viewabilityConfig.current}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
           ListHeaderComponent={
@@ -236,7 +264,7 @@ export default function CommunityChat() {
         />
       )}
 
-      <View onLayout={() => scrollToLatest(false)}>
+      <View onLayout={() => { if (isAtBottom.current) scrollToLatest(false); }}>
         <TypingIndicator label={typingLabel} />
 
         <ChatInput
