@@ -449,9 +449,9 @@ const styles = StyleSheet.create({
   },
 
   content: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Geist_400Regular',
-    lineHeight: 21,
+    lineHeight: 24,
   },
 
   // Fix #1/#2: time always on its own line, right-aligned — matches web layout
