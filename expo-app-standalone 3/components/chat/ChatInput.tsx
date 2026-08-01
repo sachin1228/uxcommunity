@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -66,8 +67,10 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
 
   const canSend = (!!text.trim() || !!pendingImage) && !disabled;
 
+  const bottomPadding = Platform.OS === 'ios' ? Math.max(insets.bottom, 8) : 8;
+
   return (
-    <View style={[styles.root, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.root, { paddingBottom: bottomPadding }]}>
       {/* Reply banner */}
       {replyTo && (
         <View style={[styles.replyBanner, { backgroundColor: colors.subtle, borderLeftColor: colors.primary }]}>
@@ -123,8 +126,6 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
             maxLength={2000}
             returnKeyType="default"
             editable={!disabled}
-            // Android: remove the asymmetric font padding that pushes text downward
-            includeFontPadding={false}
             // Android: keep text anchored to the top so multiline grows naturally
             textAlignVertical="top"
           />
@@ -246,6 +247,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingBottom: 4,
     backgroundColor: 'transparent',
+    includeFontPadding: false,
   },
 
   // Send button — outside the pill

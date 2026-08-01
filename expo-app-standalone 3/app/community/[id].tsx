@@ -3,14 +3,17 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView as RNKeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { KeyboardStickyView } from 'react-native-keyboard-controller';
+import {
+  KeyboardAvoidingView as KeyboardControllerAvoidingView,
+  KeyboardEvents,
+} from 'react-native-keyboard-controller';
 import { useColors } from '@/hooks/useColors';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
@@ -71,6 +74,20 @@ export default function CommunityChat() {
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList>(null);
 
+  const scrollToLatest = useCallback((animated = true) => {
+    listRef.current?.scrollToEnd({ animated });
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
+      scrollToLatest(true);
+    });
+
+    return () => subscription.remove();
+  }, [scrollToLatest]);
+
   const handleSend = useCallback(
     async (text: string, pendingImage?: PendingImage) => {
       if (!text.trim() && !pendingImage) return;
@@ -105,14 +122,14 @@ export default function CommunityChat() {
         });
 
         setReplyTo(null);
-        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+        scrollToLatest(true);
       } catch {
         // Error visible in UI if needed
       } finally {
         setIsSending(false);
       }
     },
-    [id, replyTo, appendMessage, stopTyping, user]
+    [id, replyTo, appendMessage, scrollToLatest, stopTyping, user]
   );
 
   const handleReaction = useCallback(
@@ -177,11 +194,67 @@ export default function CommunityChat() {
   const communityName = name ? decodeURIComponent(name) : 'Chat';
   const communityImage = image ? decodeURIComponent(image) : null;
 
+  const chatContent = (
+    <View style={styles.flex}>
+      {isLoading && (
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      )}
+
+      {!isLoading && error && (
+        <View style={styles.center}>
+          <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
+        </View>
+      )}
+
+      {!isLoading && (
+        <FlatList
+          ref={listRef}
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.2}
+          ListHeaderComponent={
+            isLoadingMore ? (
+              <View style={styles.loadMoreSpinner}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.center}>
+              <Feather name="message-circle" size={36} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                No messages yet. Say hello!
+              </Text>
+            </View>
+          }
+        />
+      )}
+
+      <View onLayout={() => scrollToLatest(false)}>
+        <TypingIndicator label={typingLabel} />
+
+        <ChatInput
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          onSend={handleSend}
+          onTypingChange={onInputChange}
+          disabled={isSending}
+        />
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
-      {/* Header — measured so KAV can offset correctly */}
+      {/* Header measured for iOS keyboard offset. Android uses keyboard-controller height resize. */}
       <View
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height)}
         style={[
@@ -227,125 +300,24 @@ export default function CommunityChat() {
         <View style={{ width: 36 }} />
       </View>
 
-      {Platform.OS === 'ios' ? (
-        /* ── iOS: KeyboardAvoidingView keeps existing behaviour ── */
-        <KeyboardAvoidingView
+      {Platform.OS === 'android' ? (
+        <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
+          {chatContent}
+        </KeyboardControllerAvoidingView>
+      ) : (
+        <RNKeyboardAvoidingView
           style={styles.flex}
           behavior="padding"
           keyboardVerticalOffset={headerHeight}
         >
-          <View style={styles.flex}>
-            {isLoading && (
-              <View style={styles.center}>
-                <ActivityIndicator color={colors.primary} />
-              </View>
-            )}
-
-            {!isLoading && error && (
-              <View style={styles.center}>
-                <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-              </View>
-            )}
-
-            {!isLoading && (
-              <FlatList
-                ref={listRef}
-                data={messages}
-                renderItem={renderItem}
-                keyExtractor={keyExtractor}
-                contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
-                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-                onEndReached={handleLoadMore}
-                onEndReachedThreshold={0.2}
-                ListHeaderComponent={
-                  isLoadingMore ? (
-                    <View style={styles.loadMoreSpinner}>
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    </View>
-                  ) : null
-                }
-                ListEmptyComponent={
-                  <View style={styles.center}>
-                    <Feather name="message-circle" size={36} color={colors.mutedForeground} />
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                      No messages yet. Say hello!
-                    </Text>
-                  </View>
-                }
-              />
-            )}
-
-            <TypingIndicator label={typingLabel} />
-
-            <ChatInput
-              replyTo={replyTo}
-              onCancelReply={() => setReplyTo(null)}
-              onSend={handleSend}
-              onTypingChange={onInputChange}
-              disabled={isSending}
-            />
-          </View>
-        </KeyboardAvoidingView>
-      ) : (
-        /* ── Android: KeyboardStickyView pins the input precisely above the keyboard ── */
-        <View style={styles.flex}>
-          {isLoading && (
-            <View style={styles.center}>
-              <ActivityIndicator color={colors.primary} />
-            </View>
-          )}
-
-          {!isLoading && error && (
-            <View style={styles.center}>
-              <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-            </View>
-          )}
-
-          {!isLoading && (
-            <FlatList
-              ref={listRef}
-              data={messages}
-              renderItem={renderItem}
-              keyExtractor={keyExtractor}
-              contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.2}
-              ListHeaderComponent={
-                isLoadingMore ? (
-                  <View style={styles.loadMoreSpinner}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                <View style={styles.center}>
-                  <Feather name="message-circle" size={36} color={colors.mutedForeground} />
-                  <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                    No messages yet. Say hello!
-                  </Text>
-                </View>
-              }
-            />
-          )}
-
-          <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
-            <TypingIndicator label={typingLabel} />
-            <ChatInput
-              replyTo={replyTo}
-              onCancelReply={() => setReplyTo(null)}
-              onSend={handleSend}
-              onTypingChange={onInputChange}
-              disabled={isSending}
-            />
-          </KeyboardStickyView>
-        </View>
+          {chatContent}
+        </RNKeyboardAvoidingView>
       )}
 
       {/* Long-press action sheet */}
       <EmojiPicker
         message={selectedMessage}
-        isOwn={selectedMessage?.user_id === user?.id ?? false}
+        isOwn={Boolean(selectedMessage && selectedMessage.user_id === user?.id)}
         onClose={() => setSelectedMessage(null)}
         onReact={handleReaction}
         onReply={(msg) => {
