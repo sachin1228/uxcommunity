@@ -351,8 +351,100 @@ export function MessageBubble({
               colors={colors}
             />
           </View>
+        ) : message.image_url && !message.content ? (
+          /* ── Image-only: no bubble wrapper, just a bordered image card ── */
+          <Fragment>
+            <Pressable
+              onPress={() => onImagePress?.(message.image_url!)}
+              onLongPress={() => onLongPress(message)}
+              delayLongPress={350}
+              accessibilityLabel="View full image"
+              accessibilityRole="button"
+              style={[styles.imageCard, { borderColor: colors.primary }]}
+            >
+              <Image
+                source={{ uri: message.image_url }}
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
+              <View style={styles.imageTimeOverlay}>
+                <Text style={styles.imageTimeText}>
+                  {formatTime(message.created_at)}
+                </Text>
+                {isOwn && (
+                  <Ionicons
+                    name="checkmark-done-sharp"
+                    size={13}
+                    color="rgba(255,255,255,0.95)"
+                  />
+                )}
+              </View>
+            </Pressable>
+            <ReactionChips
+              reactions={message.reactions}
+              currentUserId={currentUserId}
+              messageId={message.id}
+              onReactionPress={onReactionPress}
+              colors={colors}
+            />
+          </Fragment>
+        ) : message.image_url && message.content ? (
+          /* ── Image + caption: blue bubble, image flush at top, text below ── */
+          <Fragment>
+            <Pressable
+              onLongPress={() => onLongPress(message)}
+              delayLongPress={350}
+              style={[
+                styles.bubble,
+                styles.bubbleImageCaption,
+                {
+                  backgroundColor: isOwn ? colors.primary : colors.card,
+                  borderColor: isOwn ? 'transparent' : colors.border,
+                },
+              ]}
+            >
+              <Pressable
+                onPress={() => onImagePress?.(message.image_url!)}
+                onLongPress={() => onLongPress(message)}
+                delayLongPress={350}
+                accessibilityLabel="View full image"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={{ uri: message.image_url }}
+                  style={styles.captionImage}
+                  resizeMode="cover"
+                />
+              </Pressable>
+              <View style={styles.captionPadding}>
+                <Text
+                  style={[
+                    styles.content,
+                    { color: isOwn ? colors.primaryForeground : colors.foreground },
+                  ]}
+                >
+                  {message.content}
+                </Text>
+              </View>
+              <View style={styles.captionTimeRow}>
+                <Text style={[styles.timeText, { color: timeColor }]}>
+                  {formatTime(message.created_at)}
+                </Text>
+                {isOwn && (
+                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                )}
+              </View>
+            </Pressable>
+            <ReactionChips
+              reactions={message.reactions}
+              currentUserId={currentUserId}
+              messageId={message.id}
+              onReactionPress={onReactionPress}
+              colors={colors}
+            />
+          </Fragment>
         ) : (
-          /* ── Normal bubble ── */
+          /* ── Text-only bubble ── */
           <Fragment>
             <Pressable
               onLongPress={() => onLongPress(message)}
@@ -362,89 +454,29 @@ export function MessageBubble({
                 {
                   backgroundColor: isOwn ? colors.primary : colors.card,
                   borderColor: isOwn ? 'transparent' : colors.border,
-                  // Remove all padding when there's an image so the 3px border
-                  // on imageContainer is the only gap — no blue/card bleed.
-                  ...(message.image_url ? { padding: 0 } : {}),
                 },
               ]}
             >
-              {/* Reply preview inside bubble */}
               {message.reply_to && !message.reply_to.id.startsWith('deleted') && (
                 <ReplyPreview replyTo={message.reply_to} colors={colors} />
               )}
-
-              {/* Image — tap opens full-screen viewer */}
-              {message.image_url && (
-                <View style={[styles.imageContainer, { borderColor: colors.primary }]}>
-                  <Pressable
-                    onPress={() => onImagePress?.(message.image_url!)}
-                    onLongPress={() => onLongPress(message)}
-                    delayLongPress={350}
-                    accessibilityLabel="View full image"
-                    accessibilityRole="button"
-                  >
-                    <Image
-                      source={{ uri: message.image_url }}
-                      style={styles.messageImage}
-                      resizeMode="cover"
-                    />
-                  </Pressable>
-                  {/* Time + checkmark overlaid on bottom-right of image */}
-                  <View style={styles.imageTimeOverlay}>
-                    <Text style={styles.imageTimeText}>
-                      {formatTime(message.created_at)}
-                    </Text>
-                    {isOwn && (
-                      <Ionicons
-                        name="checkmark-done-sharp"
-                        size={13}
-                        color="rgba(255,255,255,0.95)"
-                      />
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Text content — wrapped in padding when following an image */}
-              {message.content && (
-                <View style={message.image_url ? styles.captionPadding : undefined}>
-                  <Text
-                    style={[
-                      styles.content,
-                      { color: isOwn ? colors.primaryForeground : colors.foreground },
-                    ]}
-                  >
-                    {message.content}
-                  </Text>
-                </View>
-              )}
-
-              {/* Time row — hidden for image-only messages (overlay handles it).
-                  Shown below caption when message has image + text. */}
-              {(!message.image_url || message.content) && !message.image_url && (
-                <View style={styles.timeRow}>
-                  <Text style={[styles.timeText, { color: timeColor }]}>
-                    {formatTime(message.created_at)}
-                  </Text>
-                  {isOwn && (
-                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                  )}
-                </View>
-              )}
-              {/* Caption + time row when message has both image and text */}
-              {message.image_url && message.content && (
-                <View style={styles.captionTimeRow}>
-                  <Text style={[styles.timeText, { color: timeColor }]}>
-                    {formatTime(message.created_at)}
-                  </Text>
-                  {isOwn && (
-                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                  )}
-                </View>
-              )}
+              <Text
+                style={[
+                  styles.content,
+                  { color: isOwn ? colors.primaryForeground : colors.foreground },
+                ]}
+              >
+                {message.content}
+              </Text>
+              <View style={styles.timeRow}>
+                <Text style={[styles.timeText, { color: timeColor }]}>
+                  {formatTime(message.created_at)}
+                </Text>
+                {isOwn && (
+                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                )}
+              </View>
             </Pressable>
-
-            {/* Reactions below bubble */}
             <ReactionChips
               reactions={message.reactions}
               currentUserId={currentUserId}
@@ -575,18 +607,27 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_400Regular',
   },
 
-  imageContainer: {
-    position: 'relative',
-    borderRadius: 10,
-    borderWidth: 3,
+  // Image-only: standalone pressable card — 2px border, no outer bubble
+  imageCard: {
+    borderRadius: 14,
+    borderWidth: 2,
     overflow: 'hidden',
-    marginBottom: 4,
     alignSelf: 'flex-start',
   },
   messageImage: {
     width: 220,
     height: 160,
-    borderRadius: 7, // inner radius = container radius - border width
+  },
+
+  // Image+caption bubble modifier — zero padding so image sits flush at top
+  bubbleImageCaption: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  // Image inside an image+caption bubble — full width, no border (bubble provides the shape)
+  captionImage: {
+    width: 220,
+    height: 160,
   },
   imageTimeOverlay: {
     position: 'absolute',
