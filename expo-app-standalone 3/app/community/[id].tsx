@@ -19,6 +19,7 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
+import { ImageViewer } from '@/components/chat/ImageViewer';
 import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { EmojiPicker } from '@/components/chat/EmojiPicker';
@@ -70,6 +71,11 @@ export default function CommunityChat() {
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
+
+  const handleImagePress = useCallback((uri: string) => {
+    setViewingImageUri(uri);
+  }, []);
   // True while uploading an image or waiting for the send API response
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList>(null);
@@ -204,11 +210,12 @@ export default function CommunityChat() {
           isSameAuthor={isSameAuthor}
           onLongPress={handleLongPress}
           onReactionPress={handleReaction}
+          onImagePress={handleImagePress}
           currentUserId={user?.id ?? ''}
         />
       );
     },
-    [user?.id, handleLongPress, handleReaction, messages]
+    [user?.id, handleLongPress, handleReaction, handleImagePress, messages]
   );
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
@@ -347,6 +354,12 @@ export default function CommunityChat() {
           the app background color, exactly like WhatsApp. On iOS this covers
           the home-indicator inset; on Android it covers the gesture nav bar. */}
       <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+
+      {/* Full-screen image viewer */}
+      <ImageViewer
+        uri={viewingImageUri}
+        onClose={() => setViewingImageUri(null)}
+      />
 
       {/* Long-press action sheet */}
       <EmojiPicker

@@ -20,6 +20,7 @@ interface Props {
   isSameAuthor: boolean;
   onLongPress: (message: Message) => void;
   onReactionPress: (messageId: string, emoji: string) => void;
+  onImagePress?: (uri: string) => void;
   currentUserId: string;
 }
 
@@ -262,6 +263,7 @@ export function MessageBubble({
   isSameAuthor,
   onLongPress,
   onReactionPress,
+  onImagePress,
   currentUserId,
 }: Props) {
   const colors = useColors();
@@ -360,6 +362,9 @@ export function MessageBubble({
                 {
                   backgroundColor: isOwn ? colors.primary : colors.card,
                   borderColor: isOwn ? 'transparent' : colors.border,
+                  // Remove all padding when there's an image so the 3px border
+                  // on imageContainer is the only gap — no blue/card bleed.
+                  ...(message.image_url ? { padding: 0 } : {}),
                 },
               ]}
             >
@@ -368,36 +373,75 @@ export function MessageBubble({
                 <ReplyPreview replyTo={message.reply_to} colors={colors} />
               )}
 
-              {/* Image */}
+              {/* Image — tap opens full-screen viewer */}
               {message.image_url && (
-                <Image
-                  source={{ uri: message.image_url }}
-                  style={styles.messageImage}
-                  resizeMode="cover"
-                />
+                <View style={[styles.imageContainer, { borderColor: colors.primary }]}>
+                  <Pressable
+                    onPress={() => onImagePress?.(message.image_url!)}
+                    onLongPress={() => onLongPress(message)}
+                    delayLongPress={350}
+                    accessibilityLabel="View full image"
+                    accessibilityRole="button"
+                  >
+                    <Image
+                      source={{ uri: message.image_url }}
+                      style={styles.messageImage}
+                      resizeMode="cover"
+                    />
+                  </Pressable>
+                  {/* Time + checkmark overlaid on bottom-right of image */}
+                  <View style={styles.imageTimeOverlay}>
+                    <Text style={styles.imageTimeText}>
+                      {formatTime(message.created_at)}
+                    </Text>
+                    {isOwn && (
+                      <Ionicons
+                        name="checkmark-done-sharp"
+                        size={13}
+                        color="rgba(255,255,255,0.95)"
+                      />
+                    )}
+                  </View>
+                </View>
               )}
 
-              {/* Fix #1/#2: text content without inline time (no flex-wrap hack) */}
+              {/* Text content — wrapped in padding when following an image */}
               {message.content && (
-                <Text
-                  style={[
-                    styles.content,
-                    { color: isOwn ? colors.primaryForeground : colors.foreground },
-                  ]}
-                >
-                  {message.content}
-                </Text>
+                <View style={message.image_url ? styles.captionPadding : undefined}>
+                  <Text
+                    style={[
+                      styles.content,
+                      { color: isOwn ? colors.primaryForeground : colors.foreground },
+                    ]}
+                  >
+                    {message.content}
+                  </Text>
+                </View>
               )}
 
-              {/* Fix #1: time always on its own line, right-aligned — mirrors web */}
-              <View style={styles.timeRow}>
-                <Text style={[styles.timeText, { color: timeColor }]}>
-                  {formatTime(message.created_at)}
-                </Text>
-                {isOwn && (
-                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                )}
-              </View>
+              {/* Time row — hidden for image-only messages (overlay handles it).
+                  Shown below caption when message has image + text. */}
+              {(!message.image_url || message.content) && !message.image_url && (
+                <View style={styles.timeRow}>
+                  <Text style={[styles.timeText, { color: timeColor }]}>
+                    {formatTime(message.created_at)}
+                  </Text>
+                  {isOwn && (
+                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                  )}
+                </View>
+              )}
+              {/* Caption + time row when message has both image and text */}
+              {message.image_url && message.content && (
+                <View style={styles.captionTimeRow}>
+                  <Text style={[styles.timeText, { color: timeColor }]}>
+                    {formatTime(message.created_at)}
+                  </Text>
+                  {isOwn && (
+                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                  )}
+                </View>
+              )}
             </Pressable>
 
             {/* Reactions below bubble */}
@@ -531,11 +575,52 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_400Regular',
   },
 
+  imageContainer: {
+    position: 'relative',
+    borderRadius: 10,
+    borderWidth: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
   messageImage: {
     width: 220,
     height: 160,
-    borderRadius: 10,
-    marginBottom: 4,
+    borderRadius: 7, // inner radius = container radius - border width
+  },
+  imageTimeOverlay: {
+    position: 'absolute',
+    bottom: 6,
+    right: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  imageTimeText: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 10,
+    fontFamily: 'Geist_400Regular',
+  },
+
+  // Padding wrapper for caption text that follows an image
+  // (bubble padding is zeroed for images, so we re-add it here)
+  captionPadding: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+  },
+  // Time row shown below caption on image+text messages
+  captionTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 3,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
+    marginTop: 2,
   },
 
   content: {
