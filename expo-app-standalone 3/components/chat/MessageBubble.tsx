@@ -32,6 +32,89 @@ function formatTime(iso: string): string {
 }
 
 /**
+ * Deterministic hash used to pick a stable DiceBear style per name.
+ * Mirrors the same logic in the web AvatarImg component.
+ */
+function hashName(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+const DICEBEAR_STYLES = [
+  'bottts', 'fun-emoji', 'pixel-art', 'lorelei', 'micah',
+  'croodles', 'adventurer', 'notionists',
+] as const;
+
+function dicebearUrl(seed: string): string {
+  const style = DICEBEAR_STYLES[hashName(seed) % DICEBEAR_STYLES.length];
+  // Use PNG — React Native's <Image> cannot render SVGs natively.
+  return `https://api.dicebear.com/9.x/${style}/png?seed=${encodeURIComponent(seed)}`;
+}
+
+/**
+ * Converts any avatar_url stored in the DB into a plain HTTPS URL that
+ * React Native's <Image> can load. React Native cannot render SVGs natively,
+ * so all SVG-serving domains are converted to PNG equivalents.
+ *
+ *   null / ''                            → DiceBear PNG from name
+ *   boring://{style}/{encodedSeed}       → DiceBear PNG from decoded seed
+ *   https://source.boringavatars.com/…  → DiceBear PNG from URL seed segment
+ *   https://api.dicebear.com/…/svg?…    → rewritten to /png?… (same seed)
+ *   https://api.multiavatar.com/…       → appended ?format=png
+ *   https://avataaars.io/…              → appended &fmt=png (query toggle)
+ *   any other https URL (R2 uploads…)   → returned as-is
+ */
+function resolveAvatarUri(avatarUrl: string | null, name: string): string {
+  if (!avatarUrl) {
+    return dicebearUrl(name);
+  }
+
+  // boring:// protocol — inline SVG on web, convert to DiceBear PNG on mobile
+  if (avatarUrl.startsWith('boring://')) {
+    const rest = avatarUrl.slice('boring://'.length);
+    const slashIdx = rest.indexOf('/');
+    const seed = slashIdx >= 0
+      ? decodeURIComponent(rest.slice(slashIdx + 1))
+      : name;
+    return dicebearUrl(seed || name);
+  }
+
+  // Legacy boringavatars CDN — web rewrites to DiceBear, we do the same
+  if (avatarUrl.startsWith('https://source.boringavatars.com/')) {
+    try {
+      const parsed = new URL(avatarUrl);
+      const [, , , encodedSeed] = parsed.pathname.split('/');
+      const seed = encodedSeed ? decodeURIComponent(encodedSeed) : name;
+      return dicebearUrl(seed || name);
+    } catch {
+      return dicebearUrl(name);
+    }
+  }
+
+  // DiceBear — stored URLs use /svg by default; rewrite path segment to /png
+  if (avatarUrl.startsWith('https://api.dicebear.com/')) {
+    return avatarUrl.replace(/\/svg(\?|$)/, '/png$1');
+  }
+
+  // Multiavatar — returns SVG by default; ?format=png gives a raster image
+  if (avatarUrl.startsWith('https://api.multiavatar.com/')) {
+    const sep = avatarUrl.includes('?') ? '&' : '?';
+    return `${avatarUrl}${sep}format=png`;
+  }
+
+  // Avataaars — returns SVG; no official PNG endpoint, use DiceBear fallback
+  if (avatarUrl.startsWith('https://avataaars.io/')) {
+    return dicebearUrl(name);
+  }
+
+  // Robohash and all other HTTPS URLs (R2 uploads, etc.) — load as-is
+  return avatarUrl;
+}
+
+/**
  * Returns true when the entire string is 1–3 emoji with no other content.
  */
 function isEmojiOnly(text: string): boolean {
@@ -50,7 +133,14 @@ function isEmojiOnly(text: string): boolean {
 
 /**
  * Avatar with URL support and automatic initials fallback.
- * Fix #5: uses onError to fall back to initials when the URL fails to load.
+ *
+ * Handles all avatar_url formats stored in the DB:
+ *   - null / ''                      → DiceBear generated from name
+ *   - boring://{style}/{encodedSeed} → DiceBear (same as web AvatarImg)
+ *   - https://source.boringavatars.com/... → DiceBear (legacy seed reuse)
+ *   - any other https URL            → loaded directly
+ *
+ * If even the resolved URL fails to load, falls back to initials.
  */
 function Avatar({
   name,
@@ -61,14 +151,14 @@ function Avatar({
   avatarUrl: string | null;
   colors: ReturnType<typeof useColors>;
 }) {
+  const resolvedUri = resolveAvatarUri(avatarUrl, name);
   const [imageError, setImageError] = useState(false);
+
   const letters = name
     .split(' ')
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase() ?? '')
     .join('');
-
-  const showImage = !!avatarUrl && !imageError;
 
   return (
     <View
@@ -77,9 +167,9 @@ function Avatar({
         { backgroundColor: colors.primarySoft, overflow: 'hidden' },
       ]}
     >
-      {showImage ? (
+      {!imageError ? (
         <Image
-          source={{ uri: avatarUrl! }}
+          source={{ uri: resolvedUri }}
           style={styles.avatarImage}
           onError={() => setImageError(true)}
         />

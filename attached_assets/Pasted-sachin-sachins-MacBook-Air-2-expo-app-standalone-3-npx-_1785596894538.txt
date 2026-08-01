@@ -1,0 +1,54 @@
+sachin@sachins-MacBook-Air-2 expo-app-standalone 3 % npx expo start --clear --dev-client
+env: load .env.local .env
+env: export EXPO_PUBLIC_API_URL EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+Starting project at /Users/sachin/Documents/GitHub/drafthub/expo-app-standalone 3
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+█ ▄▄▄▄▄ █▄▀▀▄▄▄▀█▄ ▀▀▄█ ███ ▄▄▄▄▄ █
+█ █   █ ███▄█  ▀▀▀██▄  ▄▄ █ █   █ █
+█ █▄▄▄█ ██▄▀▄▀███▀  ▄▄█▀▀██ █▄▄▄█ █
+█▄▄▄▄▄▄▄█ █ ▀▄▀ █▄█▄▀ █ █▄█▄▄▄▄▄▄▄█
+█ ▄█  ▀▄▀▀ ▄▄ ▀█▀▀▄  ▄█▀  █▄▀▀█▀▀▄█
+██▀▄▀█▀▄▀▀▀  ▀█  █ ██ ▄▄ ▄ ▄ ▀▄  ▄█
+█ █▀▄ ▀▄▄  █ ▀█  ██▄▄█▀█ ██▄ ██▀ ▄█
+█▄▀▀▀▀▀▄ ▀ ▀█ █ ▄▀▄ ▄██▀▀▄██▀▄█ ▀▀█
+█▀▀▀▄▀▄▄▀▀▄▄█▀▄    ▀▀▀█▄█▄▄ ▄ ▀█▄▀█
+█▀▀██  ▄▀█▀▄▄ ▀   █▀  ▄█▄██ ▀▀▄▀▄ █
+█▀▄█▄█▄▄▄   ▀▀██▀ ▄ ▀█▀ ▀▄██ ▀▀█ ▄█
+█ █  █▀▄▄█▀█  ▄  ▀ ██▀█▄ █▄█▄▀▀▀ ▄█
+█▄▄█▄▄█▄█▀ █▀▀█▄ ██▄█▀▀ █ ▄▄▄  █▀██
+█ ▄▄▄▄▄ ███▄█▀▄█▄▀▄ ▄███  █▄█  ▀▀▀█
+█ █   █ █ █▀ ▄▄▄▀  ▀  █▄   ▄ ▄▄▀███
+█ █▄▄▄█ █▀██ ▀ █▄██▀▄ ▄▀ ▄▄██▄▀ ▀ █
+█▄▄▄▄▄▄▄█▄██████▄█▄▄▄▄██▄▄█▄▄█▄████
+
+› Metro waiting on my-app://expo-development-client/?url=http%3A%2F%2F192.168.209.239%3A8081
+› Scan the QR code above to open the project in a development build. Learn more: https://expo.fyi/start
+
+› Web is waiting on http://localhost:8081
+
+› Using development build
+› Press s │ switch to Expo Go
+
+› Press a │ open Android
+› Press i │ open iOS simulator
+› Press w │ open web
+
+› Press j │ open debugger
+› Press r │ reload app
+› Press m │ toggle menu
+› shift+m │ more tools
+› Press o │ open project code in your editor
+
+› Press ? │ show all commands
+
+Logs for your project will appear below. Press Ctrl+C to exit.
+Recrawled this watch 1 time, most recently because:
+MustScanSubDirs UserDroppedTo resolve, please review the information on
+https://facebook.github.io/watchman/docs/troubleshooting.html#recrawl
+To clear this warning, run:
+`watchman watch-del '/Users/sachin/Documents/GitHub/drafthub' ; watchman watch-project '/Users/sachin/Documents/GitHub/drafthub'`
+
+Android Bundled 19702ms node_modules/expo-router/entry.js (1767 modules)
+
