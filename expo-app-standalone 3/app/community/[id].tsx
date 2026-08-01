@@ -314,6 +314,12 @@ export default function CommunityChat() {
         </RNKeyboardAvoidingView>
       )}
 
+      {/* Bottom safe-area strip — rendered outside the keyboard container so it
+          never moves with the keyboard. Fills the gesture-navigation area with
+          the app background color, exactly like WhatsApp. On iOS this covers
+          the home-indicator inset; on Android it covers the gesture nav bar. */}
+      <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+
       {/* Long-press action sheet */}
       <EmojiPicker
         message={selectedMessage}
