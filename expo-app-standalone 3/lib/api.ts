@@ -40,7 +40,8 @@ async function saveSessionCookie(setCookieHeader: string): Promise<void> {
  */
 export async function apiFormUpload<T = unknown>(
   path: string,
-  formData: FormData
+  formData: FormData,
+  signal?: AbortSignal
 ): Promise<{ data: T; status: number }> {
   const sessionToken = await getStoredSession();
   const cookieHeader = sessionToken
@@ -56,6 +57,7 @@ export async function apiFormUpload<T = unknown>(
     method: 'POST',
     headers,
     body: formData,
+    ...(signal ? { signal } : {}),
   });
 
   const setCookie = response.headers.get('set-cookie');
@@ -97,13 +99,14 @@ export async function getStoredSession(): Promise<string | null> {
 
 type FetchOptions = Omit<RequestInit, 'body'> & {
   body?: Record<string, unknown>;
+  signal?: AbortSignal;
 };
 
 export async function apiFetch<T = unknown>(
   path: string,
   options: FetchOptions = {}
 ): Promise<{ data: T; status: number }> {
-  const { body, headers: extraHeaders = {}, ...rest } = options;
+  const { body, headers: extraHeaders = {}, signal, ...rest } = options;
 
   const sessionToken = await getStoredSession();
   const cookieHeader = sessionToken
@@ -121,6 +124,7 @@ export async function apiFetch<T = unknown>(
     ...rest,
     headers,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(signal ? { signal } : {}),
   });
 
   // Capture session cookie on responses that set one

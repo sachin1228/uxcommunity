@@ -1,5 +1,7 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
   Image,
   Pressable,
   StyleSheet,
@@ -22,6 +24,8 @@ interface Props {
   onReactionPress: (messageId: string, emoji: string) => void;
   onImagePress?: (uri: string) => void;
   currentUserId: string;
+  onCancel?: (tempId: string) => void;
+  onRetry?: (tempId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,8 +269,23 @@ export function MessageBubble({
   onReactionPress,
   onImagePress,
   currentUserId,
+  onCancel,
+  onRetry,
 }: Props) {
   const colors = useColors();
+
+  // Pulse animation for the sending spinner ring
+  const spinAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (message.status === 'sending') {
+      Animated.loop(
+        Animated.timing(spinAnim, { toValue: 1, duration: 900, useNativeDriver: true })
+      ).start();
+    } else {
+      spinAnim.stopAnimation();
+      spinAnim.setValue(0);
+    }
+  }, [message.status, spinAnim]);
 
   const sender = message.users;
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
@@ -354,32 +373,66 @@ export function MessageBubble({
         ) : message.image_url && !message.content ? (
           /* ── Image-only: no bubble wrapper, just a bordered image card ── */
           <Fragment>
-            <Pressable
-              onPress={() => onImagePress?.(message.image_url!)}
-              onLongPress={() => onLongPress(message)}
-              delayLongPress={350}
-              accessibilityLabel="View full image"
-              accessibilityRole="button"
-              style={[styles.imageCard, { borderColor: colors.primary }]}
-            >
-              <Image
-                source={{ uri: message.image_url }}
-                style={styles.messageImage}
-                resizeMode="cover"
-              />
-              <View style={styles.imageTimeOverlay}>
-                <Text style={styles.imageTimeText}>
-                  {formatTime(message.created_at)}
-                </Text>
-                {isOwn && (
-                  <Ionicons
-                    name="checkmark-done-sharp"
-                    size={13}
-                    color="rgba(255,255,255,0.95)"
-                  />
+            <View style={{ alignSelf: 'flex-start' }}>
+              <Pressable
+                onPress={() => message.status !== 'sending' && message.status !== 'failed' && onImagePress?.(message.image_url!)}
+                onLongPress={() => onLongPress(message)}
+                delayLongPress={350}
+                accessibilityLabel="View full image"
+                accessibilityRole="button"
+                style={[styles.imageCard, { borderColor: colors.primary }]}
+              >
+                <Image
+                  source={{ uri: message.image_url }}
+                  style={[
+                    styles.messageImage,
+                    (message.status === 'sending' || message.status === 'failed') && { opacity: 0.45 },
+                  ]}
+                  resizeMode="cover"
+                />
+                {(!message.status || message.status === 'sent') && (
+                  <View style={styles.imageTimeOverlay}>
+                    <Text style={styles.imageTimeText}>
+                      {formatTime(message.created_at)}
+                    </Text>
+                    {isOwn && (
+                      <Ionicons
+                        name="checkmark-done-sharp"
+                        size={13}
+                        color="rgba(255,255,255,0.95)"
+                      />
+                    )}
+                  </View>
                 )}
-              </View>
-            </Pressable>
+              </Pressable>
+
+              {/* Sending overlay — spinner ring + cancel */}
+              {isOwn && message.status === 'sending' && (
+                <View style={styles.statusOverlay} pointerEvents="box-none">
+                  <View style={styles.spinnerRing} pointerEvents="none">
+                    <ActivityIndicator size="large" color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <Pressable
+                    onPress={() => onCancel?.(message.id)}
+                    style={styles.cancelCircle}
+                    hitSlop={10}
+                  >
+                    <Ionicons name="close" size={18} color="white" />
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Failed overlay — tap to retry */}
+              {isOwn && message.status === 'failed' && (
+                <Pressable
+                  style={styles.statusOverlay}
+                  onPress={() => onRetry?.(message.id)}
+                >
+                  <Ionicons name="reload-outline" size={28} color="white" />
+                  <Text style={styles.retryLabel}>Tap to retry</Text>
+                </Pressable>
+              )}
+            </View>
             <ReactionChips
               reactions={message.reactions}
               currentUserId={currentUserId}
@@ -391,50 +444,88 @@ export function MessageBubble({
         ) : message.image_url && message.content ? (
           /* ── Image + caption: blue bubble, image flush at top, text below ── */
           <Fragment>
-            <Pressable
-              onLongPress={() => onLongPress(message)}
-              delayLongPress={350}
-              style={[
-                styles.bubble,
-                styles.bubbleImageCaption,
-                {
-                  backgroundColor: isOwn ? colors.primary : colors.card,
-                  borderColor: isOwn ? 'transparent' : colors.border,
-                },
-              ]}
-            >
+            <View style={{ alignSelf: 'flex-start' }}>
               <Pressable
-                onPress={() => onImagePress?.(message.image_url!)}
                 onLongPress={() => onLongPress(message)}
                 delayLongPress={350}
-                accessibilityLabel="View full image"
-                accessibilityRole="button"
+                style={[
+                  styles.bubble,
+                  styles.bubbleImageCaption,
+                  {
+                    backgroundColor: isOwn ? colors.primary : colors.card,
+                    borderColor: isOwn ? 'transparent' : colors.border,
+                    opacity: (message.status === 'sending' || message.status === 'failed') ? 0.55 : 1,
+                  },
+                ]}
               >
-                <Image
-                  source={{ uri: message.image_url }}
-                  style={styles.captionImage}
-                  resizeMode="cover"
-                />
-              </Pressable>
-              <View style={styles.captionPadding}>
-                <Text
-                  style={[
-                    styles.content,
-                    { color: isOwn ? colors.primaryForeground : colors.foreground },
-                  ]}
+                <Pressable
+                  onPress={() => message.status !== 'sending' && message.status !== 'failed' && onImagePress?.(message.image_url!)}
+                  onLongPress={() => onLongPress(message)}
+                  delayLongPress={350}
+                  accessibilityLabel="View full image"
+                  accessibilityRole="button"
                 >
-                  {message.content}
-                </Text>
-              </View>
-              <View style={styles.captionTimeRow}>
-                <Text style={[styles.timeText, { color: timeColor }]}>
-                  {formatTime(message.created_at)}
-                </Text>
-                {isOwn && (
-                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                )}
-              </View>
-            </Pressable>
+                  <Image
+                    source={{ uri: message.image_url }}
+                    style={styles.captionImage}
+                    resizeMode="cover"
+                  />
+                </Pressable>
+                <View style={styles.captionPadding}>
+                  <Text
+                    style={[
+                      styles.content,
+                      { color: isOwn ? colors.primaryForeground : colors.foreground },
+                    ]}
+                  >
+                    {message.content}
+                  </Text>
+                </View>
+                <View style={styles.captionTimeRow}>
+                  {(!message.status || message.status === 'sent') && (
+                    <Text style={[styles.timeText, { color: timeColor }]}>
+                      {formatTime(message.created_at)}
+                    </Text>
+                  )}
+                  {isOwn && (!message.status || message.status === 'sent') && (
+                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                  )}
+                  {message.status === 'sending' && (
+                    <ActivityIndicator size="small" color={timeColor} />
+                  )}
+                  {isOwn && message.status === 'failed' && (
+                    <Ionicons name="warning-outline" size={15} color="rgba(255,100,100,0.9)" />
+                  )}
+                </View>
+              </Pressable>
+
+              {/* Sending overlay */}
+              {isOwn && message.status === 'sending' && (
+                <View style={[styles.statusOverlay, { borderRadius: 16 }]} pointerEvents="box-none">
+                  <View style={styles.spinnerRing} pointerEvents="none">
+                    <ActivityIndicator size="large" color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <Pressable
+                    onPress={() => onCancel?.(message.id)}
+                    style={styles.cancelCircle}
+                    hitSlop={10}
+                  >
+                    <Ionicons name="close" size={18} color="white" />
+                  </Pressable>
+                </View>
+              )}
+
+              {/* Failed overlay */}
+              {isOwn && message.status === 'failed' && (
+                <Pressable
+                  style={[styles.statusOverlay, { borderRadius: 16 }]}
+                  onPress={() => onRetry?.(message.id)}
+                >
+                  <Ionicons name="reload-outline" size={28} color="white" />
+                  <Text style={styles.retryLabel}>Tap to retry</Text>
+                </Pressable>
+              )}
+            </View>
             <ReactionChips
               reactions={message.reactions}
               currentUserId={currentUserId}
@@ -448,12 +539,14 @@ export function MessageBubble({
           <Fragment>
             <Pressable
               onLongPress={() => onLongPress(message)}
+              onPress={isOwn && message.status === 'failed' ? () => onRetry?.(message.id) : undefined}
               delayLongPress={350}
               style={[
                 styles.bubble,
                 {
                   backgroundColor: isOwn ? colors.primary : colors.card,
                   borderColor: isOwn ? 'transparent' : colors.border,
+                  opacity: message.status === 'sending' ? 0.65 : 1,
                 },
               ]}
             >
@@ -469,11 +562,24 @@ export function MessageBubble({
                 {message.content}
               </Text>
               <View style={styles.timeRow}>
-                <Text style={[styles.timeText, { color: timeColor }]}>
-                  {formatTime(message.created_at)}
-                </Text>
-                {isOwn && (
+                {(!message.status || message.status === 'sent') && (
+                  <Text style={[styles.timeText, { color: timeColor }]}>
+                    {formatTime(message.created_at)}
+                  </Text>
+                )}
+                {isOwn && (!message.status || message.status === 'sent') && (
                   <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
+                )}
+                {message.status === 'sending' && (
+                  <ActivityIndicator size="small" color={timeColor} />
+                )}
+                {isOwn && message.status === 'failed' && (
+                  <>
+                    <Ionicons name="warning-outline" size={14} color="rgba(255,120,120,0.9)" />
+                    <Text style={[styles.timeText, { color: 'rgba(255,120,120,0.9)' }]}>
+                      Tap to retry
+                    </Text>
+                  </>
                 )}
               </View>
             </Pressable>
@@ -682,6 +788,46 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 10,
     fontFamily: 'Geist_400Regular',
+  },
+
+  // ── send-status overlays ──────────────────────────────────────────────────
+
+  /** Fills the image card; hosts the spinner+cancel or retry UI. */
+  statusOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+
+  /** Transparent ring that sits behind the ActivityIndicator. */
+  spinnerRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+
+  /** The × button centred inside the spinner ring. */
+  cancelCircle: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  retryLabel: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontFamily: 'Geist_500Medium',
   },
 
   reactions: {

@@ -195,6 +195,7 @@ export function useChatMessages(communityId: string) {
 
   return {
     messages,
+    setMessages,
     isLoading,
     isLoadingMore,
     hasMore,

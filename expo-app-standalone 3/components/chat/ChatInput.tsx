@@ -133,7 +133,7 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
             style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
           >
             <Feather
-              name="paperclip"
+              name="image"
               size={20}
               color={pendingImage ? colors.primary : colors.mutedForeground}
             />
