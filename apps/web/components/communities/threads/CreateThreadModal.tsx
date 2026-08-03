@@ -38,6 +38,7 @@ export function CreateThreadModal({
   const [links, setLinks] = useState<string[]>([]);
   const [linkInput, setLinkInput] = useState("");
   const [allowReplies, setAllowReplies] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +120,7 @@ export function CreateThreadModal({
           attachments,
           links,
           allow_replies: allowReplies,
+          is_public: isPublic,
         }),
       });
       const data = await response.json();
@@ -364,6 +366,22 @@ export function CreateThreadModal({
                 className="sr-only"
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${allowReplies ? "translate-x-6" : "translate-x-1"}`} />
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span>
+              <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+              <span className="block font-body text-xs text-foreground-muted">This thread will appear on the home feed for all members.</span>
+            </span>
+            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                className="sr-only"
+              />
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
             </span>
           </label>
         </div>

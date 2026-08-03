@@ -161,6 +161,7 @@ export async function POST(
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
   const tags = normalizeTags(body.tags);
+  const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) {
     return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
@@ -183,8 +184,8 @@ export async function POST(
 
   const { data: inserted, error } = await db
     .from("community_resources")
-    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, tags })
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
+    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, tags, is_public: isPublic })
+    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
     .single();
 
   if (error || !inserted) {

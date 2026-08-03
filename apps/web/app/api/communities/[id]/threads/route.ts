@@ -222,6 +222,7 @@ export async function POST(
   const links = normalizeLinks(body.links);
   const attachments = normalizeAttachments(body.attachments);
   const allowReplies = body.allow_replies !== false;
+  const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) {
     return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
@@ -257,9 +258,10 @@ export async function POST(
       attachments,
       links,
       allow_replies: allowReplies,
+      is_public: isPublic,
     })
     .select(
-      "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at",
+      "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at",
     )
     .single();
 

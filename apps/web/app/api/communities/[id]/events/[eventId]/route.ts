@@ -125,6 +125,7 @@ export async function PATCH(
       ? body.cover_image_url.trim()
       : null;
   }
+  if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 422 });
 
@@ -132,7 +133,7 @@ export async function PATCH(
     .from("community_events")
     .update(patch)
     .eq("id", eventId)
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

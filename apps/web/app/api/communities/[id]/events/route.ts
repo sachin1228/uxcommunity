@@ -156,6 +156,7 @@ export async function POST(
   const rawCoverImageUrl = typeof body.cover_image_url === "string" && body.cover_image_url.trim()
     ? body.cover_image_url.trim()
     : null;
+  const isPublic = body.is_public === true;
 
   const { data, error } = await db
     .from("community_events")
@@ -171,8 +172,9 @@ export async function POST(
       meet_link: meetLink,
       max_attendees: maxAttendees,
       cover_image_url: rawCoverImageUrl,
+      is_public: isPublic,
     })
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, is_public, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

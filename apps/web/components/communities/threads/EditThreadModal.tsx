@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Check, ChevronDown, FilePlus2, Link as LinkIcon, Loader2, Plus, X } from "lucide-react";
+import { Check, ChevronDown, FilePlus2, Globe, Link as LinkIcon, Loader2, Plus, X } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -25,6 +25,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const [links, setLinks] = useState<string[]>(thread.links);
   const [linkInput, setLinkInput] = useState("");
   const [allowReplies, setAllowReplies] = useState(thread.allow_replies);
+  const [isPublic, setIsPublic] = useState(thread.is_public ?? false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +106,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
           attachments,
           links,
           allow_replies: allowReplies,
+          is_public: isPublic,
         }),
       });
       const data = await response.json();
@@ -351,6 +353,25 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                 className="sr-only"
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${allowReplies ? "translate-x-6" : "translate-x-1"}`} />
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span className="flex items-center gap-2.5">
+              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <span>
+                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
+              </span>
+            </span>
+            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                className="sr-only"
+              />
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
             </span>
           </label>
         </div>

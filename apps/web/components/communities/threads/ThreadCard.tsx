@@ -28,6 +28,8 @@ interface ThreadCardProps {
    * "detail"          — full expanded view with no link wrapper, used on the thread detail page.
    */
   variant?: "list" | "detail";
+  /** Override the link destination (e.g. public standalone detail page). */
+  detailHref?: string;
 }
 
 export function ThreadCard({
@@ -40,6 +42,7 @@ export function ThreadCard({
   onDeleted,
   communityName,
   variant = "list",
+  detailHref,
 }: ThreadCardProps) {
   const isDetail = variant === "detail";
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
@@ -123,7 +126,7 @@ export function ThreadCard({
 
   const authorName    = thread.users?.name ?? "Member";
   const authorInitial = authorName.charAt(0).toUpperCase();
-  const threadHref    = `/dashboard/communities/${communityId}/threads/${thread.id}`;
+  const threadHref    = detailHref ?? `/dashboard/communities/${communityId}/threads/${thread.id}`;
   const dateLabel     = isDetail
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.updated_at || thread.created_at);

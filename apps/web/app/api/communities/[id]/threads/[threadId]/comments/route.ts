@@ -54,7 +54,17 @@ export async function GET(
   const { id: communityId, threadId } = await params;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, session.userId!))) {
+  // Allow any authenticated user to read comments on public threads
+  const { data: threadAccess } = await db
+    .from("community_threads")
+    .select("is_public")
+    .eq("id", threadId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+
+  if (!threadAccess) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
+
+  if (!threadAccess.is_public && !(await isMember(db, communityId, session.userId!))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
@@ -93,20 +103,21 @@ export async function POST(
   const userId = session.userId!;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
-    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
-  }
-
-  // Check thread exists and allows replies
+  // Fetch thread to check access and allow_replies in one query
   const { data: thread } = await db
     .from("community_threads")
-    .select("id, user_id, title, allow_replies")
+    .select("id, user_id, title, allow_replies, is_public")
     .eq("id", threadId)
     .eq("community_id", communityId)
     .maybeSingle();
 
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (!thread.allow_replies) return NextResponse.json({ error: "This thread does not allow replies." }, { status: 403 });
+
+  // Private threads require community membership to comment
+  if (!thread.is_public && !(await isMember(db, communityId, userId))) {
+    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   const limit = await rateLimit(`comment:create:${userId}:60s`, 20, 60);
   if (!limit.success) {

@@ -63,18 +63,21 @@ export async function GET(
   const userId = session.userId!;
   const db = createServiceClient();
 
-  const { data: membership } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
-
   const { data, error } = await db
     .from("community_resources")
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
     .eq("id", resourceId)
     .eq("community_id", communityId)
     .maybeSingle();
 
   if (error) { console.error("[GET resource]", error); return NextResponse.json({ error: "Failed to fetch resource." }, { status: 500 }); }
   if (!data) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
+
+  // Non-members may view public resources; private resources require membership
+  if (!data.is_public) {
+    const { data: membership } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
+    if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   return NextResponse.json({ resource: await enrichResource(db, data as Record<string, unknown>, userId) });
 }
@@ -102,6 +105,7 @@ export async function PATCH(
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
   const tags = normalizeTags(body.tags);
+  const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
   if (!url || url.length > 2048) return NextResponse.json({ error: "URL is required." }, { status: 422 });
@@ -112,9 +116,9 @@ export async function PATCH(
 
   const { data: updated, error } = await db
     .from("community_resources")
-    .update({ title, description, resource_type: resourceType, url, tags })
+    .update({ title, description, resource_type: resourceType, url, tags, is_public: isPublic })
     .eq("id", resourceId)
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
     .single();
 
   if (error || !updated) { console.error("[PATCH resource]", error); return NextResponse.json({ error: "Failed to update resource." }, { status: 500 }); }

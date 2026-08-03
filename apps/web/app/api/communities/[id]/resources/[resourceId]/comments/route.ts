@@ -54,7 +54,17 @@ export async function GET(
   const { id: communityId, resourceId } = await params;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, session.userId!))) {
+  // Allow any authenticated user to read comments on public resources
+  const { data: resourceAccess } = await db
+    .from("community_resources")
+    .select("is_public")
+    .eq("id", resourceId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+
+  if (!resourceAccess) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
+
+  if (!resourceAccess.is_public && !(await isMember(db, communityId, session.userId!))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
@@ -93,18 +103,19 @@ export async function POST(
   const userId = session.userId!;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
-    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
-  }
-
-  // Verify resource exists
+  // Fetch resource to check access in one query
   const { data: resource } = await db
     .from("community_resources")
-    .select("id, user_id, title")
+    .select("id, user_id, title, is_public")
     .eq("id", resourceId)
     .eq("community_id", communityId)
     .maybeSingle();
   if (!resource) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
+
+  // Private resources require community membership to comment
+  if (!resource.is_public && !(await isMember(db, communityId, userId))) {
+    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   const limit = await rateLimit(`resource-comment:create:${userId}:60s`, 20, 60);
   if (!limit.success) {

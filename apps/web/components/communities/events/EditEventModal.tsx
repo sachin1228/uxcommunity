@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, ImagePlus, Loader2, MapPin, Users, Video, X } from "lucide-react";
+import { Calendar, Check, Clock, Globe, ImagePlus, Loader2, MapPin, Users, Video, X } from "lucide-react";
 import type { CommunityEvent } from "./types";
 
 interface EditEventModalProps {
@@ -41,6 +41,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [location, setLocation] = useState(event.location ?? "");
   const [meetLink, setMeetLink] = useState(event.meet_link ?? "");
   const [maxAttendees, setMaxAttendees] = useState(event.max_attendees ? String(event.max_attendees) : "");
+  const [isPublic, setIsPublic] = useState(event.is_public ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,6 +91,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
+          is_public: isPublic,
         }),
       });
       const data = await res.json();
@@ -265,6 +267,20 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="Leave blank for unlimited"
               className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+          </label>
+
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span className="flex items-center gap-2.5">
+              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <span>
+                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
+              </span>
+            </span>
+            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
+            </span>
           </label>
         </div>
 

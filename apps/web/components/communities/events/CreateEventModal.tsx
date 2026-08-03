@@ -24,6 +24,7 @@ export function CreateEventModal({ communityId, onClose, onCreated }: CreateEven
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +75,7 @@ export function CreateEventModal({ communityId, onClose, onCreated }: CreateEven
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
+          is_public: isPublic,
         }),
       });
       const data = await res.json();
@@ -294,6 +296,23 @@ export function CreateEventModal({ communityId, onClose, onCreated }: CreateEven
               placeholder="e.g. 50"
               className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
             />
+          </label>
+
+          {/* Make public toggle */}
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span>
+              <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+              <span className="block font-body text-xs text-foreground-muted">This event will appear on the home feed for all members.</span>
+            </span>
+            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+                className="sr-only"
+              />
+              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
+            </span>
           </label>
         </div>
 

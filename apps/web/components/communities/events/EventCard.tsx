@@ -61,9 +61,11 @@ interface EventCardProps {
   onDeleted: (eventId: string) => void;
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
+  /** Override the link destination (e.g. public standalone detail page). */
+  detailHref?: string;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged }: EventCardProps) {
+export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
@@ -161,7 +163,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
   }
 
   const authorName = event.users?.name ?? "Member";
-  const eventHref = `/dashboard/communities/${communityId}/events/${event.id}`;
+  const eventHref = detailHref ?? `/dashboard/communities/${communityId}/events/${event.id}`;
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
 
   // Gradient placeholder colors for events without a cover image
