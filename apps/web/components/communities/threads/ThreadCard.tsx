@@ -233,119 +233,199 @@ export function ThreadCard({
         </div>
       </div>
 
-      {/* ── Title ── */}
-      {isDetail ? (
-        <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
-          {thread.title}
-        </h1>
-      ) : (
-        <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-          {thread.title}
-        </h3>
-      )}
+      {/* ── Title + Body ──
+          New-format threads store the full body in description (first line = title).
+          Old-format threads have a separate title and description.
+          When description starts with the title we're in new-format: skip the
+          heading and show description directly. */}
+      {(() => {
+        const newFormat = thread.description.trimStart().startsWith(thread.title.trim());
+        if (newFormat) {
+          return (
+            <p className={`mt-3 font-body text-sm leading-relaxed text-foreground ${isDetail ? "whitespace-pre-wrap" : "line-clamp-4"}`}>
+              {thread.description}
+            </p>
+          );
+        }
+        return (
+          <>
+            {isDetail ? (
+              <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
+                {thread.title}
+              </h1>
+            ) : (
+              <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
+                {thread.title}
+              </h3>
+            )}
+            <p className={`mt-1.5 font-body text-xs leading-relaxed text-foreground-muted ${isDetail ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
+              {thread.description}
+            </p>
+          </>
+        );
+      })()}
 
-      {/* ── Description ── */}
-      <p className={`mt-1.5 font-body text-xs leading-relaxed text-foreground-muted ${isDetail ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
-        {thread.description}
-      </p>
-
-      {/* ── Links ── */}
+      {/* ── Links — blue chips ── */}
       {thread.links.length > 0 && (
-        <div className="mt-3 space-y-1.5">
+        <div className="mt-3 flex flex-wrap gap-2">
           {thread.links.map((link) =>
             isDetail ? (
-              // Detail: no outer <Link>, so a real <a> is safe
               <a
                 key={link}
                 href={link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent"
+                className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400 transition-colors hover:border-blue-400/60 hover:bg-blue-500/20"
               >
-                <LinkIcon size={12} />
-                <span className="min-w-0 truncate">{link}</span>
+                <LinkIcon size={11} />
+                <span className="max-w-[260px] truncate">{link}</span>
               </a>
             ) : (
-              // List: whole card is already a <Link> (<a>), so avoid nesting
               <div
                 key={link}
                 role="link"
                 tabIndex={0}
                 onClick={(e) => { e.preventDefault(); window.open(link, "_blank", "noopener,noreferrer"); }}
                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(link, "_blank", "noopener,noreferrer"); } }}
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400 transition-colors hover:border-blue-400/60 hover:bg-blue-500/20"
               >
-                <LinkIcon size={12} />
-                <span className="min-w-0 truncate">{link}</span>
+                <LinkIcon size={11} />
+                <span className="max-w-[260px] truncate">{link}</span>
               </div>
             )
           )}
         </div>
       )}
 
-      {/* ── Attachments ── */}
+      {/* ── Attachments — LinkedIn-style image grid ── */}
       {(() => {
         const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
         const files  = thread.attachments.filter((a) => !a.type.startsWith("image/"));
 
-        if (isDetail) {
-          if (thread.attachments.length === 0) return null;
-          return (
-            <>
-              {images.length > 0 && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {images.map((img) => (
-                    <a
-                      key={img.url}
-                      href={img.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block overflow-hidden rounded-xl border border-border"
-                    >
-                      <img src={img.url} alt={img.name} className="h-48 w-full object-cover transition-opacity hover:opacity-90" />
-                    </a>
-                  ))}
+        const fileList = files.length > 0 ? (
+          <div className="mt-3 space-y-1.5">
+            {files.map((att) =>
+              isDetail ? (
+                <a key={att.url} href={att.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
+                  <Paperclip size={12} />
+                  <span className="min-w-0 flex-1 truncate">{att.name}</span>
+                  <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
+                </a>
+              ) : (
+                <div key={att.url} role="link" tabIndex={0}
+                  onClick={(e) => { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); } }}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
+                  <Paperclip size={12} />
+                  <span className="min-w-0 flex-1 truncate">{att.name}</span>
+                  <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
                 </div>
-              )}
-              {files.length > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  {files.map((att) => (
-                    <a
-                      key={att.url}
-                      href={att.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent"
-                    >
-                      <Paperclip size={12} />
-                      <span className="min-w-0 flex-1 truncate">{att.name}</span>
-                      <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </>
+              )
+            )}
+          </div>
+        ) : null;
+
+        if (images.length === 0) return fileList;
+
+        // Wrap image in an anchor (detail) or a div-with-handler (list, avoids nested <a>)
+        function ImgWrap({ img, children, className }: { img: typeof images[0]; children: React.ReactNode; className?: string }) {
+          return isDetail ? (
+            <a href={img.url} target="_blank" rel="noopener noreferrer" className={className}>
+              {children}
+            </a>
+          ) : (
+            <div
+              role="link" tabIndex={0} className={className}
+              onClick={(e) => { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); } }}
+            >
+              {children}
+            </div>
           );
         }
 
-        // List mode: compact image row (max 4 thumbnails)
-        if (images.length === 0) return null;
-        const visible  = images.slice(0, 4);
-        const overflow = images.length - visible.length;
-        return (
-          <div className="mt-3 flex gap-2">
-            {visible.map((img, i) => (
-              <div key={img.url} className="relative h-24 w-32 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised">
-                <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-                {i === visible.length - 1 && overflow > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-                    <span className="font-display text-sm font-semibold text-white">+{overflow}</span>
-                  </div>
-                )}
+        let imageGrid: React.ReactNode = null;
+
+        // 1 image — full width
+        if (images.length === 1) {
+          imageGrid = (
+            <ImgWrap img={images[0]} className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer">
+              <img src={images[0].url} alt={images[0].name} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
+            </ImgWrap>
+          );
+        }
+
+        // 2 images — side by side
+        else if (images.length === 2) {
+          imageGrid = (
+            <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
+              {images.map((img) => (
+                <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
+                  <img src={img.url} alt={img.name} className="h-56 w-full object-cover transition-opacity hover:opacity-95" />
+                </ImgWrap>
+              ))}
+            </div>
+          );
+        }
+
+        // 3 images — left big (2/3) + right 2 stacked (1/3)
+        else if (images.length === 3) {
+          imageGrid = (
+            <div className="mt-3 flex h-64 gap-1 overflow-hidden rounded-xl">
+              <ImgWrap img={images[0]} className="block flex-[2] overflow-hidden cursor-pointer">
+                <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
+              </ImgWrap>
+              <div className="flex flex-1 flex-col gap-1">
+                {images.slice(1).map((img) => (
+                  <ImgWrap key={img.url} img={img} className="block flex-1 overflow-hidden cursor-pointer">
+                    <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
+                  </ImgWrap>
+                ))}
               </div>
-            ))}
-          </div>
-        );
+            </div>
+          );
+        }
+
+        // 4 images — 2×2 grid
+        else if (images.length === 4) {
+          imageGrid = (
+            <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
+              {images.map((img) => (
+                <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
+                  <img src={img.url} alt={img.name} className="h-44 w-full object-cover transition-opacity hover:opacity-95" />
+                </ImgWrap>
+              ))}
+            </div>
+          );
+        }
+
+        // 5+ images — top full-width + 4-col bottom row with +N overlay
+        else {
+          const visible  = images.slice(1, 5);
+          const overflow = images.length - 5; // images beyond the 5 shown
+          imageGrid = (
+            <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
+              <ImgWrap img={images[0]} className="block overflow-hidden cursor-pointer">
+                <img src={images[0].url} alt={images[0].name} className="h-52 w-full object-cover transition-opacity hover:opacity-95" />
+              </ImgWrap>
+              <div className="grid grid-cols-4 gap-1 h-28">
+                {visible.map((img, i) => (
+                  <ImgWrap key={img.url} img={img} className="relative block overflow-hidden cursor-pointer">
+                    <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
+                    {i === visible.length - 1 && overflow > 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/55">
+                        <span className="font-display text-lg font-bold text-white">+{overflow}</span>
+                      </div>
+                    )}
+                  </ImgWrap>
+                ))}
+              </div>
+            </div>
+          );
+        }
+
+        return <>{imageGrid}{fileList}</>;
       })()}
 
       {/* ── Divider ── */}
