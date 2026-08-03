@@ -283,8 +283,6 @@ export function ResourceCard({
             {getDomain(resource.url)}
           </p>
 
-          {/* ── Divider ── */}
-          <div className="mt-4 border-t border-border" />
 
           {/* ── Footer: like · bookmark ── */}
           <div className="mt-3 flex items-center gap-4">

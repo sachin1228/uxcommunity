@@ -101,7 +101,7 @@ function CommentBox({
         <button
           type="submit"
           disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
           {saving ? "Posting…" : "Post"}

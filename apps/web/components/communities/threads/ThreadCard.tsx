@@ -3,12 +3,57 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowUp, Bookmark, Flag, Link as LinkIcon, MessageSquare,
+  ArrowUp, Bookmark, Flag, MessageSquare,
   MoreHorizontal, Paperclip, Pencil, Share2, Trash2,
 } from "lucide-react";
 
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
+
+const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
+
+/** Render text with URLs highlighted blue.
+ *  isNested=true → uses <span onClick> to avoid <a> inside <a> (list card wrapper). */
+function renderWithLinks(text: string, isNested = false) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  URL_REGEX.lastIndex = 0;
+  while ((match = URL_REGEX.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const url = match[0];
+    if (isNested) {
+      parts.push(
+        <span
+          key={match.index}
+          role="link"
+          tabIndex={0}
+          className="text-blue-400 hover:underline break-all cursor-pointer"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); } }}
+        >
+          {url}
+        </span>
+      );
+    } else {
+      parts.push(
+        <a
+          key={match.index}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-400 hover:underline break-all"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {url}
+        </a>
+      );
+    }
+    lastIndex = match.index + url.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
 import { CATEGORY_COLORS, formatRelativeDate, formatFullDate } from "./threadShared";
@@ -30,6 +75,8 @@ interface ThreadCardProps {
   variant?: "list" | "detail";
   /** Override the link destination (e.g. public standalone detail page). */
   detailHref?: string;
+  /** When true, suppresses the bottom border (e.g. last item in a feed list). */
+  isLast?: boolean;
 }
 
 export function ThreadCard({
@@ -43,6 +90,7 @@ export function ThreadCard({
   communityName,
   variant = "list",
   detailHref,
+  isLast = false,
 }: ThreadCardProps) {
   const isDetail = variant === "detail";
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
@@ -243,7 +291,7 @@ export function ThreadCard({
         if (newFormat) {
           return (
             <p className={`mt-3 font-body text-sm leading-relaxed text-foreground ${isDetail ? "whitespace-pre-wrap" : "line-clamp-4"}`}>
-              {thread.description}
+              {renderWithLinks(thread.description, !isDetail)}
             </p>
           );
         }
@@ -259,43 +307,12 @@ export function ThreadCard({
               </h3>
             )}
             <p className={`mt-1.5 font-body text-xs leading-relaxed text-foreground-muted ${isDetail ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
-              {thread.description}
+              {renderWithLinks(thread.description, !isDetail)}
             </p>
           </>
         );
       })()}
 
-      {/* ── Links — blue chips ── */}
-      {thread.links.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {thread.links.map((link) =>
-            isDetail ? (
-              <a
-                key={link}
-                href={link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400 transition-colors hover:border-blue-400/60 hover:bg-blue-500/20"
-              >
-                <LinkIcon size={11} />
-                <span className="max-w-[260px] truncate">{link}</span>
-              </a>
-            ) : (
-              <div
-                key={link}
-                role="link"
-                tabIndex={0}
-                onClick={(e) => { e.preventDefault(); window.open(link, "_blank", "noopener,noreferrer"); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(link, "_blank", "noopener,noreferrer"); } }}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400 transition-colors hover:border-blue-400/60 hover:bg-blue-500/20"
-              >
-                <LinkIcon size={11} />
-                <span className="max-w-[260px] truncate">{link}</span>
-              </div>
-            )
-          )}
-        </div>
-      )}
 
       {/* ── Attachments — LinkedIn-style image grid ── */}
       {(() => {
@@ -428,8 +445,6 @@ export function ThreadCard({
         return <>{imageGrid}{fileList}</>;
       })()}
 
-      {/* ── Divider ── */}
-      <div className="mt-4 border-t border-border" />
 
       {/* ── Footer: upvote · comments · (bookmark · share in list only) ── */}
       <div className="mt-3 flex items-center gap-4">
@@ -504,8 +519,8 @@ export function ThreadCard({
           {innerContent}
         </div>
       ) : (
-        <article className="group rounded-2xl bg-surface transition-colors hover:border-border-strong">
-          <Link href={threadHref} className="block p-5">
+        <article className={`group ${isLast ? "" : "border-b border-border"}`}>
+          <Link href={threadHref} className="block py-8 px-8">
             {innerContent}
           </Link>
         </article>

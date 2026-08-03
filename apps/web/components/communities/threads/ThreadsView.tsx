@@ -159,7 +159,7 @@ export function ThreadsView({
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
             >
               <Plus size={14} />
               Create Thread
@@ -202,8 +202,6 @@ export function ThreadsView({
                   <div className="h-6 w-16 rounded-lg bg-surface-raised" />
                   <div className="h-6 w-20 rounded-lg bg-surface-raised" />
                 </div>
-                {/* Divider */}
-                <div className="mt-4 border-t border-border" />
                 {/* Footer */}
                 <div className="mt-3 flex items-center gap-4">
                   <div className="flex items-center gap-2">

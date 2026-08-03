@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import {
   Check, ChevronDown, Globe, Image as ImageIcon,
-  Link as LinkIcon, Loader2, Paperclip, X,
+  Loader2, Paperclip, X,
 } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
@@ -133,9 +133,6 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const tagDropdownRef   = useRef<HTMLDivElement>(null);
   const [attachments,    setAttachments]    = useState<ThreadAttachment[]>([]);
-  const [links,          setLinks]          = useState<string[]>([]);
-  const [showLinkInput,  setShowLinkInput]  = useState(false);
-  const [linkInput,      setLinkInput]      = useState("");
   const [allowReplies,   setAllowReplies]   = useState(true);
   const [isPublic,       setIsPublic]       = useState(false);
   const [uploading,      setUploading]      = useState(false);
@@ -162,21 +159,6 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  function addLink() {
-    const link = linkInput.trim();
-    if (!link || links.includes(link)) return;
-    try {
-      const url = new URL(link);
-      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
-    } catch {
-      setError("Links must start with http:// or https://.");
-      return;
-    }
-    setLinks((c) => [...c, link]);
-    setLinkInput("");
-    setError(null);
-  }
 
   async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -216,13 +198,14 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
       return;
     }
     const { title, description } = bodyToThread(body);
+    const extractedLinks = [...new Set(body.match(/https?:\/\/[^\s<>"]+/g) ?? [])];
     setSaving(true);
     setError(null);
     try {
       const response = await fetch(`/api/communities/${communityId}/threads`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic }),
+        body: JSON.stringify({ title, description, category, tags, attachments, links: extractedLinks, allow_replies: allowReplies, is_public: isPublic }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to post.");
@@ -277,43 +260,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
               {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
               {uploading ? "Uploading…" : "Photo"}
             </button>
-            <button
-              type="button"
-              onClick={() => { setShowLinkInput((p) => !p); setError(null); }}
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-body text-xs font-medium transition-colors ${
-                showLinkInput
-                  ? "border-accent/40 bg-accent/10 text-accent"
-                  : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"
-              }`}
-            >
-              <LinkIcon size={14} />
-              Link
-            </button>
           </div>
-
-          {/* ── Inline link input ── */}
-          {showLinkInput && (
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <LinkIcon size={13} className="absolute left-3 top-2.5 text-foreground-subtle" />
-                <input
-                  value={linkInput}
-                  onChange={(e) => setLinkInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addLink(); } }}
-                  placeholder="Paste a URL and press Enter…"
-                  className="w-full rounded-lg border border-border bg-surface-raised py-2 pl-8 pr-3 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-                  autoFocus
-                />
-              </div>
-              <button
-                type="button"
-                onClick={addLink}
-                className="rounded-lg border border-border px-3 font-body text-sm text-foreground-muted hover:border-accent/40 hover:text-foreground"
-              >
-                Add
-              </button>
-            </div>
-          )}
 
           {/* ── Main composer textarea ── */}
           <textarea
@@ -337,21 +284,6 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
                   <span className="min-w-0 flex-1 truncate">{att.name}</span>
                   <button type="button" onClick={() => setAttachments((c) => c.filter((a) => a.url !== att.url))} aria-label={`Remove ${att.name}`}>
                     <X size={13} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Link chips ── */}
-          {links.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {links.map((link) => (
-                <div key={link} className="flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400">
-                  <LinkIcon size={11} />
-                  <span className="max-w-[220px] truncate">{link}</span>
-                  <button type="button" onClick={() => setLinks((c) => c.filter((l) => l !== link))} aria-label={`Remove ${link}`}>
-                    <X size={10} />
                   </button>
                 </div>
               ))}

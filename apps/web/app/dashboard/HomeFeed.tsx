@@ -133,8 +133,10 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
   }
 
   return (
-    <ul className="space-y-3">
-      {items.map((item) => {
+    <ul className="border-t border-border">
+      {items.map((item, idx) => {
+        const isLast = idx === items.length - 1;
+
         if (item._type === "thread") {
           return (
             <li key={`thread-${item.id}`}>
@@ -148,6 +150,7 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
                 onVoteChanged={handleThreadVoteChanged}
                 onSaveChanged={handleThreadSaveChanged}
                 onDeleted={handleThreadDeleted}
+                isLast={isLast}
               />
             </li>
           );
@@ -155,43 +158,47 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
 
         if (item._type === "event") {
           return (
-            <li key={`event-${item.id}`}>
-              {item.community_name && (
-                <p className="mb-1.5 font-body text-[11px] text-foreground-subtle px-1">
-                  in <span className="text-foreground-muted">{item.community_name}</span>
-                </p>
-              )}
-              <EventCard
-                event={item}
-                currentUserId={currentUserId}
-                communityId={item.community_id}
-                detailHref={`/dashboard/events/${item.id}`}
-                onUpdated={handleEventUpdated}
-                onDeleted={handleEventDeleted}
-                onRsvpChanged={handleEventRsvpChanged}
-                onSaveChanged={handleEventSaveChanged}
-              />
+            <li key={`event-${item.id}`} className={isLast ? "" : "border-b border-border"}>
+              <div className="py-8 px-8">
+                {item.community_name && (
+                  <p className="mb-2 font-body text-[11px] text-foreground-subtle">
+                    in <span className="text-foreground-muted">{item.community_name}</span>
+                  </p>
+                )}
+                <EventCard
+                  event={item}
+                  currentUserId={currentUserId}
+                  communityId={item.community_id}
+                  detailHref={`/dashboard/events/${item.id}`}
+                  onUpdated={handleEventUpdated}
+                  onDeleted={handleEventDeleted}
+                  onRsvpChanged={handleEventRsvpChanged}
+                  onSaveChanged={handleEventSaveChanged}
+                />
+              </div>
             </li>
           );
         }
 
         // resource
         return (
-          <li key={`resource-${item.id}`}>
-            {item.community_name && (
-              <p className="mb-1.5 font-body text-[11px] text-foreground-subtle px-1">
-                in <span className="text-foreground-muted">{item.community_name}</span>
-              </p>
-            )}
-            <ResourceCard
-              resource={item}
-              currentUserId={currentUserId}
-              communityId={item.community_id}
-              onUpdated={handleResourceUpdated}
-              onSaveChanged={handleResourceSaveChanged}
-              onBookmarkChanged={handleResourceBookmarkChanged}
-              onDeleted={handleResourceDeleted}
-            />
+          <li key={`resource-${item.id}`} className={isLast ? "" : "border-b border-border"}>
+            <div className="py-8 px-8">
+              {item.community_name && (
+                <p className="mb-2 font-body text-[11px] text-foreground-subtle">
+                  in <span className="text-foreground-muted">{item.community_name}</span>
+                </p>
+              )}
+              <ResourceCard
+                resource={item}
+                currentUserId={currentUserId}
+                communityId={item.community_id}
+                onUpdated={handleResourceUpdated}
+                onSaveChanged={handleResourceSaveChanged}
+                onBookmarkChanged={handleResourceBookmarkChanged}
+                onDeleted={handleResourceDeleted}
+              />
+            </div>
           </li>
         );
       })}
