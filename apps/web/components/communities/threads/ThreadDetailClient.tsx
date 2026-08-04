@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
+  ArrowLeft, CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityThread, ThreadComment } from "./types";
@@ -231,6 +232,9 @@ interface Props {
   currentUserId: string;
   communityId: string;
   communityName: string;
+  /** When provided, renders a back link above the post (e.g. homepage context). */
+  backHref?: string;
+  backLabel?: string;
 }
 
 export function ThreadDetailClient({
@@ -238,6 +242,8 @@ export function ThreadDetailClient({
   initialComments,
   currentUserId,
   communityId,
+  backHref,
+  backLabel = "Home",
 }: Props) {
   const router = useRouter();
   const [thread, setThread] = useState(initialThread);
@@ -346,6 +352,17 @@ export function ThreadDetailClient({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
+
+        {/* ── Back link (homepage context only) ── */}
+        {backHref && (
+          <Link
+            href={backHref}
+            className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
+          >
+            <ArrowLeft size={14} />
+            {backLabel}
+          </Link>
+        )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
         <ThreadCard

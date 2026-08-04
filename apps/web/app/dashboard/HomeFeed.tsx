@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Globe, Loader2 } from "lucide-react";
+import { Globe } from "lucide-react";
 
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
@@ -11,9 +11,9 @@ import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 
 // Feed item as returned by /api/home/feed — typed union
-type FeedThread   = CommunityThread & { _type: "thread";   community_name: string | null };
-type FeedEvent    = CommunityEvent  & { _type: "event";    community_name: string | null };
-type FeedResource = CommunityResource & { _type: "resource"; community_name: string | null };
+type FeedThread   = CommunityThread   & { _type: "thread";   community_name: string | null; community_image: string | null };
+type FeedEvent    = CommunityEvent    & { _type: "event";    community_name: string | null; community_image: string | null };
+type FeedResource = CommunityResource & { _type: "resource"; community_name: string | null; community_image: string | null };
 type FeedItem = FeedThread | FeedEvent | FeedResource;
 
 interface HomeFeedProps {
@@ -114,9 +114,47 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={18} className="animate-spin text-foreground-muted" />
-      </div>
+      <ul className="border-t border-border animate-pulse">
+        {[1, 2, 3].map((item) => (
+          <li key={item} className="border-b border-border px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-20 rounded bg-surface-raised" />
+                <div className="h-3 w-12 rounded bg-surface-raised" />
+                <div className="h-5 w-16 rounded-full bg-surface-raised" />
+              </div>
+            </div>
+            <div className="mt-4 h-4 w-3/4 rounded bg-surface-raised" />
+            <div className="mt-2.5 space-y-2">
+              <div className="h-3 w-full rounded bg-surface-raised" />
+              <div className="h-3 w-5/6 rounded bg-surface-raised" />
+              <div className="h-3 w-2/3 rounded bg-surface-raised" />
+            </div>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="h-8 w-8 rounded-full bg-surface-raised" />
+              <div className="h-3 w-6 rounded bg-surface-raised" />
+              <div className="h-3 w-20 rounded bg-surface-raised" />
+            </div>
+          </li>
+        ))}
+        {/* Article grid skeleton row */}
+        <li className="border-b border-border">
+          <div className="grid grid-cols-2 gap-4 p-4">
+            {[1, 2].map((item) => (
+              <div key={item} className="rounded-2xl border border-border p-5">
+                <div className="h-32 w-full rounded-xl bg-surface-raised mb-4" />
+                <div className="h-3 w-20 rounded bg-surface-raised mb-3" />
+                <div className="h-4 w-3/4 rounded bg-surface-raised" />
+                <div className="mt-2 space-y-1.5">
+                  <div className="h-3 w-full rounded bg-surface-raised" />
+                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </li>
+      </ul>
     );
   }
 
@@ -132,44 +170,67 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
     );
   }
 
+  // Group items so consecutive resources are batched together into a
+  // 2-column grid, while threads and events stay full-width.
+  type Group =
+    | { kind: "thread"; item: FeedThread }
+    | { kind: "event";  item: FeedEvent }
+    | { kind: "resources"; items: FeedResource[] };
+
+  const groups: Group[] = [];
+  for (const item of items) {
+    if (item._type === "resource") {
+      const last = groups[groups.length - 1];
+      if (last?.kind === "resources") {
+        last.items.push(item);
+      } else {
+        groups.push({ kind: "resources", items: [item] });
+      }
+    } else if (item._type === "thread") {
+      groups.push({ kind: "thread", item });
+    } else {
+      groups.push({ kind: "event", item });
+    }
+  }
+
   return (
     <ul className="border-t border-border">
-      {items.map((item, idx) => {
-        const isLast = idx === items.length - 1;
+      {groups.map((group, gi) => {
+        const isLastGroup = gi === groups.length - 1;
 
-        if (item._type === "thread") {
+        if (group.kind === "thread") {
           return (
-            <li key={`thread-${item.id}`}>
+            <li key={`thread-${group.item.id}`}>
               <ThreadCard
-                thread={item}
+                thread={group.item}
                 currentUserId={currentUserId}
-                communityId={item.community_id}
-                communityName={item.community_name ?? undefined}
-                detailHref={`/dashboard/threads/${item.id}`}
+                communityId={group.item.community_id}
+                communityName={group.item.community_name ?? undefined}
+                detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
                 onVoteChanged={handleThreadVoteChanged}
                 onSaveChanged={handleThreadSaveChanged}
                 onDeleted={handleThreadDeleted}
-                isLast={isLast}
+                isLast={isLastGroup}
               />
             </li>
           );
         }
 
-        if (item._type === "event") {
+        if (group.kind === "event") {
           return (
-            <li key={`event-${item.id}`} className={isLast ? "" : "border-b border-border"}>
-              <div className="py-8 px-8">
-                {item.community_name && (
+            <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
+              <div className="px-8 py-6">
+                {group.item.community_name && (
                   <p className="mb-2 font-body text-[11px] text-foreground-subtle">
-                    in <span className="text-foreground-muted">{item.community_name}</span>
+                    in <span className="text-foreground-muted">{group.item.community_name}</span>
                   </p>
                 )}
                 <EventCard
-                  event={item}
+                  event={group.item}
                   currentUserId={currentUserId}
-                  communityId={item.community_id}
-                  detailHref={`/dashboard/events/${item.id}`}
+                  communityId={group.item.community_id}
+                  detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
                   onRsvpChanged={handleEventRsvpChanged}
@@ -180,24 +241,47 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
           );
         }
 
-        // resource
+        // ── Resource group — 2-column grid ────────────────────────────────
+        const resources = group.items;
+        const isOdd = resources.length % 2 !== 0;
         return (
-          <li key={`resource-${item.id}`} className={isLast ? "" : "border-b border-border"}>
-            <div className="py-8 px-8">
-              {item.community_name && (
-                <p className="mb-2 font-body text-[11px] text-foreground-subtle">
-                  in <span className="text-foreground-muted">{item.community_name}</span>
-                </p>
+          <li key={`resources-${gi}`} className={isLastGroup ? "" : "border-b border-border"}>
+            <div className="grid grid-cols-2 gap-4 px-8 py-6">
+              {resources.map((res) => (
+                <div key={`resource-${res.id}`} className="overflow-hidden">
+                  {res.community_name && (
+                    <div className="mb-2 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
+                      <span>posted in</span>
+                      {res.community_image ? (
+                        <img
+                          src={res.community_image}
+                          alt={res.community_name}
+                          className="h-4 w-4 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="h-4 w-4 rounded-full bg-accent/20 shrink-0" />
+                      )}
+                      <span className="text-foreground-muted">{res.community_name}</span>
+                    </div>
+                  )}
+                  <ResourceCard
+                    resource={res}
+                    currentUserId={currentUserId}
+                    communityId={res.community_id}
+                    onUpdated={handleResourceUpdated}
+                    onSaveChanged={handleResourceSaveChanged}
+                    onBookmarkChanged={handleResourceBookmarkChanged}
+                    onDeleted={handleResourceDeleted}
+                  />
+                </div>
+              ))}
+              {/* Placeholder for the empty second column when count is odd */}
+              {isOdd && (
+                <div className="rounded-2xl flex flex-col items-center justify-center gap-2 p-8 min-h-[200px]">
+                  <p className="font-body text-sm font-medium text-foreground-muted">More articles coming soon</p>
+                  <p className="font-body text-xs text-foreground-subtle">Check back later for new content.</p>
+                </div>
               )}
-              <ResourceCard
-                resource={item}
-                currentUserId={currentUserId}
-                communityId={item.community_id}
-                onUpdated={handleResourceUpdated}
-                onSaveChanged={handleResourceSaveChanged}
-                onBookmarkChanged={handleResourceBookmarkChanged}
-                onDeleted={handleResourceDeleted}
-              />
             </div>
           </li>
         );

@@ -105,12 +105,23 @@ export default async function PublicThreadDetailPage({ params }: Props) {
   const communityName = communityData?.name ?? "Community";
 
   return (
-    <ThreadDetailClient
-      thread={thread}
-      initialComments={initialComments}
-      currentUserId={userId}
-      communityId={thread.community_id}
-      communityName={communityName}
-    />
+    <div className="flex items-start h-full">
+      {/* Main content — mirrors homepage feed column */}
+      <div className="flex-1 min-w-0 border-r border-border">
+        <ThreadDetailClient
+          thread={thread}
+          initialComments={initialComments}
+          currentUserId={userId}
+          communityId={thread.community_id}
+          communityName={communityName}
+          backHref="/dashboard"
+        />
+      </div>
+
+      {/* Right sidebar — mirrors homepage Discover column */}
+      <aside className="hidden lg:block w-72 shrink-0 sticky top-6 p-4">
+        <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
+      </aside>
+    </div>
   );
 }

@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-    db.from("communities").select("id, name").in("id", communityIds),
+    db.from("communities").select("id, name, image_url").in("id", communityIds),
     // threads
     threadIds.length
       ? db.from("thread_comments").select("thread_id").in("thread_id", threadIds)
@@ -135,7 +135,8 @@ export async function GET(req: NextRequest) {
 
   const userMap      = Object.fromEntries((users      ?? []).map((u) => [u.id,      u.name]));
   const avatarMap    = Object.fromEntries((profiles   ?? []).map((p) => [p.user_id, p.avatar_url]));
-  const communityMap = Object.fromEntries((communities ?? []).map((c) => [c.id,     c.name]));
+  const communityMap    = Object.fromEntries((communities ?? []).map((c) => [c.id, c.name]));
+  const communityImgMap = Object.fromEntries((communities ?? []).map((c) => [c.id, (c as { image_url?: string | null }).image_url ?? null]));
 
   // Thread aggregates
   const threadCmtCount: Record<string, number> = {};
@@ -172,7 +173,8 @@ export async function GET(req: NextRequest) {
 
     const base = {
       ...item,
-      community_name: communityMap[item.community_id] ?? null,
+      community_name:  communityMap[item.community_id]    ?? null,
+      community_image: communityImgMap[item.community_id] ?? null,
       users: userObj,
     };
 

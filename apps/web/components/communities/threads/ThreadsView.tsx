@@ -147,7 +147,8 @@ export function ThreadsView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl px-6 py-6">
+      {/* Constrained header */}
+      <div className="mx-auto w-full max-w-4xl px-6 pt-6">
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-xl font-semibold text-foreground">Threads</h2>
@@ -176,7 +177,7 @@ export function ThreadsView({
           </div>
         )}
 
-        {loading ? (
+        {loading && (
           <div className="space-y-3 animate-pulse">
             {[1, 2, 3].map((item) => (
               <div key={item} className="rounded-2xl border border-border bg-surface p-5">
@@ -213,29 +214,35 @@ export function ThreadsView({
               </div>
             ))}
           </div>
-        ) : threads.length === 0 ? (
+        )}
+
+        {!loading && threads.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
             <MessageSquarePlus size={28} className="mx-auto text-foreground-subtle" />
             <h3 className="mt-3 font-display text-base font-semibold text-foreground">No threads yet</h3>
             <p className="mt-1 font-body text-sm text-foreground-muted">Be the first person to start a discussion.</p>
           </div>
-        ) : (
-          <div className="space-y-3">
-            {threads.map((thread) => (
-              <ThreadCard
-                key={thread.id}
-                thread={thread}
-                currentUserId={currentUserId}
-                communityId={communityId}
-                onUpdated={handleUpdated}
-                onVoteChanged={handleVoteChanged}
-                onSaveChanged={handleSaveChanged}
-                onDeleted={handleDeleted}
-              />
-            ))}
-          </div>
         )}
       </div>
+
+      {/* Cards are full-width so border-b runs edge to edge */}
+      {!loading && threads.length > 0 && (
+        <div>
+          {threads.map((thread, index) => (
+            <ThreadCard
+              key={thread.id}
+              thread={thread}
+              currentUserId={currentUserId}
+              communityId={communityId}
+              onUpdated={handleUpdated}
+              onVoteChanged={handleVoteChanged}
+              onSaveChanged={handleSaveChanged}
+              onDeleted={handleDeleted}
+              isLast={index === threads.length - 1}
+            />
+          ))}
+        </div>
+      )}
 
       {showCreateModal && (
         <CreateThreadModal
