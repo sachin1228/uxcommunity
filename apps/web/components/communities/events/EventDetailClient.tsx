@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Calendar, CornerDownRight, ExternalLink,
+  ArrowLeft, Calendar, CornerDownRight, ExternalLink,
   Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
   Send, Trash2, Users, Video,
 } from "lucide-react";
@@ -287,6 +287,9 @@ interface Props {
   currentUserAvatar: string | null;
   communityId: string;
   communityName: string;
+  /** When provided, renders a back link above the event (e.g. homepage context). */
+  backHref?: string;
+  backLabel?: string;
 }
 
 export function EventDetailClient({
@@ -297,6 +300,8 @@ export function EventDetailClient({
   currentUserAvatar,
   communityId,
   communityName,
+  backHref,
+  backLabel = "Home",
 }: Props) {
   const router = useRouter();
   const [event, setEvent] = useState(initialEvent);
@@ -426,6 +431,16 @@ export function EventDetailClient({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        {/* ── Back link (homepage context only) ── */}
+        {backHref && (
+          <a
+            href={backHref}
+            className="mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+          >
+            <ArrowLeft size={14} />
+            {backLabel}
+          </a>
+        )}
         {/* Main event card — horizontal */}
         <div className="rounded-xl border border-border bg-surface overflow-hidden">
           <div className="flex min-h-[160px]">
@@ -556,7 +571,7 @@ export function EventDetailClient({
                 {tab.icon}
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className="rounded-full bg-surface-raised px-1.5 py-0.5 font-body text-[10px] text-foreground-subtle">
+                  <span className="inline-flex items-center justify-center rounded-full bg-surface-raised min-w-[1.25rem] h-5 px-1.5 font-body text-[10px] leading-none text-foreground-subtle">
                     {tab.count}
                   </span>
                 )}
