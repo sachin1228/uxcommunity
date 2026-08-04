@@ -101,13 +101,10 @@ export function ThreadNotificationBubble({
 
             {/* Text */}
             <div className="flex-1 min-w-0">
-              <p className="font-body text-sm font-semibold text-foreground truncate leading-snug">
-                {event.title}
-              </p>
-              <p className="font-body text-xs text-foreground-muted line-clamp-1 leading-snug mt-0.5">
+              <p className="font-body text-sm font-medium text-foreground line-clamp-2 leading-snug">
                 {event.description}
               </p>
-              <p className="font-body text-xs text-accent mt-1 flex items-center gap-0.5 group-hover:underline">
+              <p className="font-body text-xs text-accent mt-1.5 flex items-center gap-0.5 group-hover:underline">
                 View Thread
                 <ChevronRight size={12} strokeWidth={2.5} />
               </p>

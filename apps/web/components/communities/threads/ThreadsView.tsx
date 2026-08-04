@@ -225,10 +225,10 @@ export function ThreadsView({
         )}
       </div>
 
-      {/* Cards are full-width so border-b runs edge to edge */}
+      {/* Cards with bg-surface styling, no border-b separators */}
       {!loading && threads.length > 0 && (
-        <div>
-          {threads.map((thread, index) => (
+        <div className="mx-auto w-full max-w-4xl space-y-3 px-6 pb-6">
+          {threads.map((thread) => (
             <ThreadCard
               key={thread.id}
               thread={thread}
@@ -238,7 +238,7 @@ export function ThreadsView({
               onVoteChanged={handleVoteChanged}
               onSaveChanged={handleSaveChanged}
               onDeleted={handleDeleted}
-              isLast={index === threads.length - 1}
+              cardStyle="card"
             />
           ))}
         </div>

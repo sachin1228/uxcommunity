@@ -365,16 +365,18 @@ export function ThreadDetailClient({
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
-        <ThreadCard
-          thread={thread}
-          currentUserId={currentUserId}
-          communityId={communityId}
-          variant="detail"
-          onVoteChanged={handleVoteChanged}
-          onSaveChanged={handleSaveChanged}
-          onUpdated={handleUpdated}
-          onDeleted={handleDeleted}
-        />
+        <div className="rounded-xl bg-surface px-6 py-5">
+          <ThreadCard
+            thread={thread}
+            currentUserId={currentUserId}
+            communityId={communityId}
+            variant="detail"
+            onVoteChanged={handleVoteChanged}
+            onSaveChanged={handleSaveChanged}
+            onUpdated={handleUpdated}
+            onDeleted={handleDeleted}
+          />
+        </div>
 
         {/* ── Comments section ── */}
         <div className="mt-6">

@@ -77,6 +77,11 @@ interface ThreadCardProps {
   detailHref?: string;
   /** When true, suppresses the bottom border (e.g. last item in a feed list). */
   isLast?: boolean;
+  /**
+   * "flat" (default) — border-b separator rows, no background (home feed style).
+   * "card"           — bg-surface rounded card with gap spacing, no border-b (community threads tab style).
+   */
+  cardStyle?: "flat" | "card";
 }
 
 export function ThreadCard({
@@ -91,6 +96,7 @@ export function ThreadCard({
   variant = "list",
   detailHref,
   isLast = false,
+  cardStyle = "flat",
 }: ThreadCardProps) {
   const isDetail = variant === "detail";
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
@@ -518,6 +524,12 @@ export function ThreadCard({
         <div>
           {innerContent}
         </div>
+      ) : cardStyle === "card" ? (
+        <article className="group mx-auto w-full max-w-4xl">
+          <Link href={threadHref} className="block rounded-xl bg-surface px-6 py-5">
+            {innerContent}
+          </Link>
+        </article>
       ) : (
         <article className={`group ${isLast ? "" : "border-b border-border"}`}>
           <Link href={threadHref} className="block px-8 py-6">
