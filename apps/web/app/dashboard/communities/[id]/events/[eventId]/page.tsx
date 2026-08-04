@@ -104,6 +104,8 @@ export default async function EventDetailPage({ params }: Props) {
       currentUserAvatar={profileRow.data?.avatar_url ?? null}
       communityId={communityId}
       communityName={communityData.data?.name ?? "Community"}
+      backHref={`/dashboard/communities/${communityId}?tab=events`}
+      backLabel="Events"
     />
   );
 }

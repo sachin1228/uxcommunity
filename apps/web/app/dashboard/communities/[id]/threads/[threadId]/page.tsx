@@ -124,6 +124,8 @@ export default async function ThreadDetailPage({ params }: Props) {
       currentUserId={userId}
       communityId={communityId}
       communityName={communityName}
+      backHref={`/dashboard/communities/${communityId}?tab=threads`}
+      backLabel="Threads"
     />
   );
 }
