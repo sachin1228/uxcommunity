@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,6 +53,11 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#000] px-6 py-12">
+      <BrandLogo
+        className="fixed left-6 top-6 z-20"
+        iconClassName="h-8 w-8"
+        wordmarkClassName="hidden"
+      />
       <section className="w-full max-w-sm">
         <div className="overflow-hidden rounded-xl border border-[#202024] bg-[#111111] p-8 shadow-sm">
           <h2 className="font-display text-2xl font-semibold text-[#EDEDED]">
