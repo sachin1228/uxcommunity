@@ -61,11 +61,8 @@ export default function LoginPage() {
       <section className="w-full max-w-sm">
         <div className="p-8">
           <h2 className="font-display text-2xl font-semibold text-[#EDEDED]">
-            Welcome back
+            Log in to your account
           </h2>
-          <p className="mt-1 font-body text-sm text-[#737373]">
-            Log in to keep working on your portfolio.
-          </p>
 
           <form className="mt-7 flex flex-col gap-5" onSubmit={handleLogin}>
             {error && (
