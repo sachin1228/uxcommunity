@@ -59,7 +59,7 @@ export default function LoginPage() {
         wordmarkClassName="hidden"
       />
       <section className="w-full max-w-sm">
-        <div className="overflow-hidden rounded-xl border border-[#202024] bg-[#111111] p-8 shadow-sm">
+        <div className="p-8">
           <h2 className="font-display text-2xl font-semibold text-[#EDEDED]">
             Welcome back
           </h2>

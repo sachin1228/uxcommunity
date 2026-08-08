@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
         </Link>
 
         {/* Card */}
-        <div className="rounded-xl border border-border bg-surface p-8 shadow-sm">
+        <div className="p-8">
           {step === "sent" ? (
             <div className="flex flex-col items-center gap-4 py-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">

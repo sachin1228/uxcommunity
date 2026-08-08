@@ -311,7 +311,7 @@ function SignupInner() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-overlay px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-[#000] px-4 py-12">
       <BrandLogo
         className="fixed left-5 top-5 z-20"
         iconClassName="h-6 w-6"
@@ -405,7 +405,7 @@ function SignupInner() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-overlay">
+      <div className="flex min-h-screen items-center justify-center bg-[#000]">
         <Spinner className="h-6 w-6 text-overlay-muted" />
       </div>
     }>
