@@ -151,7 +151,7 @@ export default function LoginPage() {
           <button
             type="button"
             disabled
-            className="flex w-full cursor-not-allowed rounded-md border border-[#202024] bg-[#09090B] py-2.5 font-body text-sm text-[#737373] opacity-50"
+            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-[#202024] bg-[#09090B] py-2.5 font-body text-sm text-[#737373] opacity-50"
           >
             Google{" "}
             <span className="font-mono text-[10px] tracking-wide">

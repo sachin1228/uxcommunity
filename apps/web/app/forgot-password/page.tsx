@@ -48,8 +48,6 @@ export default function ForgotPasswordPage() {
         iconClassName="h-8 w-8"
         wordmarkClassName="hidden"
       />
-      <div className="pointer-events-none fixed inset-0 grid-dots opacity-40" aria-hidden="true" />
-
       <div className="relative z-10 w-full max-w-sm">
         {/* Back link */}
         <Link
