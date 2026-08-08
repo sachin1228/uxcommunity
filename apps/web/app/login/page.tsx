@@ -59,13 +59,10 @@ export default function LoginPage() {
         wordmarkClassName="hidden"
       />
       <section className="w-full max-w-sm">
-        <div className="overflow-hidden rounded-xl border border-[#202024] bg-[#111111] p-8 shadow-sm">
+        <div className="p-8">
           <h2 className="font-display text-2xl font-semibold text-[#EDEDED]">
-            Welcome back
+            Log in to your account
           </h2>
-          <p className="mt-1 font-body text-sm text-[#737373]">
-            Log in to keep working on your portfolio.
-          </p>
 
           <form className="mt-7 flex flex-col gap-5" onSubmit={handleLogin}>
             {error && (
@@ -151,7 +148,7 @@ export default function LoginPage() {
           <button
             type="button"
             disabled
-            className="flex w-full cursor-not-allowed rounded-md border border-[#202024] bg-[#09090B] py-2.5 font-body text-sm text-[#737373] opacity-50"
+            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-[#202024] bg-[#09090B] py-2.5 font-body text-sm text-[#737373] opacity-50"
           >
             Google{" "}
             <span className="font-mono text-[10px] tracking-wide">
@@ -160,6 +157,15 @@ export default function LoginPage() {
           </button>
         </div>
 
+        <p className="mt-6 text-center font-body text-sm text-[#737373]">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-medium text-accent transition-colors hover:text-accent-hover"
+          >
+            Sign up
+          </Link>
+        </p>
       </section>
     </main>
   );
