@@ -39,7 +39,7 @@ export default function LoadTestPage() {
 
   // ── Run-test state ────────────────────────────────────────────────────────
   const [scenario,       setScenario]       = useState("smoke");
-  const [baseUrl,        setBaseUrl]        = useState("https://uxcommunity-web.vercel.app");
+  const [baseUrl,        setBaseUrl]        = useState("https://uxcommunity.in");
   const [communityId,    setCommunityId]    = useState("");
   const [concurrentVus,  setConcurrentVus]  = useState(50);
   const [floodVus,       setFloodVus]       = useState(500);
