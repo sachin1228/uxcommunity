@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#000] px-4 py-12">
       <BrandLogo
         className="fixed left-6 top-6 z-20"
         iconClassName="h-8 w-8"
