@@ -50,7 +50,7 @@ export function SignupStep1({
   );
 
   return (
-    <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
+    <div className="p-8">
       <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
         Create your account
       </h2>

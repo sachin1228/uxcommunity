@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { APP_NAME } from "@uxcommunity/shared";
 import { Spinner } from "@/components/ui/Spinner";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 import { compressImage } from "@/lib/compressImage";
 import { getAvatarSourceOptions, getAvatarTabLabel } from "@/lib/avatar";
 import type { AvatarOption, AvatarSource } from "@/lib/avatar";
@@ -311,15 +311,13 @@ function SignupInner() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-overlay px-4 py-12">
-      <div className="w-full max-w-xl">
-
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <span className="font-display text-xl font-semibold text-overlay-foreground">
-            {APP_NAME}<span className="text-accent mx-1">/</span>
-          </span>
-        </div>
+    <main className="flex min-h-screen items-center justify-center bg-[#000] px-4 py-12">
+      <BrandLogo
+        className="fixed left-5 top-5 z-20"
+        iconClassName="h-6 w-6"
+        wordmarkClassName="text-lg"
+      />
+      <div className="w-full max-w-md">
 
         {tokenState.status === "loading" && (
           <div className="flex justify-center py-16">
@@ -407,7 +405,7 @@ function SignupInner() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-overlay">
+      <div className="flex min-h-screen items-center justify-center bg-[#000]">
         <Spinner className="h-6 w-6 text-overlay-muted" />
       </div>
     }>
