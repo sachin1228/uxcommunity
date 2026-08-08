@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { APP_NAME } from "@uxcommunity/shared";
 import { Spinner } from "@/components/ui/Spinner";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 type Step = "form" | "sent";
 
@@ -43,6 +43,11 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <BrandLogo
+        className="fixed left-6 top-6 z-20"
+        iconClassName="h-8 w-8"
+        wordmarkClassName="hidden"
+      />
       <div className="pointer-events-none fixed inset-0 grid-dots opacity-40" aria-hidden="true" />
 
       <div className="relative z-10 w-full max-w-sm">
@@ -54,12 +59,6 @@ export default function ForgotPasswordPage() {
           <ArrowLeft size={14} />
           Back to login
         </Link>
-
-        {/* Brand */}
-        <p className="mb-1 font-display text-xl font-semibold text-foreground">
-          {APP_NAME}
-          <span className="text-accent mx-1">/</span>
-        </p>
 
         {/* Card */}
         <div className="rounded-xl border border-border bg-surface p-8 shadow-sm">
