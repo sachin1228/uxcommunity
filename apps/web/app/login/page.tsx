@@ -160,6 +160,15 @@ export default function LoginPage() {
           </button>
         </div>
 
+        <p className="mt-6 text-center font-body text-sm text-[#737373]">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-medium text-accent transition-colors hover:text-accent-hover"
+          >
+            Sign up
+          </Link>
+        </p>
       </section>
     </main>
   );
