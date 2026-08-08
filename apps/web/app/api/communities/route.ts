@@ -427,7 +427,7 @@ export async function POST(request: Request) {
   );
 
   const slug = slugify(name);
-  const host = request.headers.get("host") ?? "drafthub.co";
+  const host = request.headers.get("host") ?? "uxcommunity.in";
   const protocol = host.includes("localhost") ? "http" : "https";
 
   return NextResponse.json({

@@ -86,7 +86,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
     ) : null;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Apply to drafthub/" maxWidth="max-w-md">
+    <Modal open={open} onClose={handleClose} title="Apply to uxcommunity" maxWidth="max-w-md">
       {step === "success" ? (
         <div className="flex flex-col items-center gap-4 py-4 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">

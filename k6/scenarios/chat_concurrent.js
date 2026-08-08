@@ -3,7 +3,7 @@
  * in the same community at the same time.
  *
  * Each VU picks a pre-seeded user from k6/data/test-users.json and sets
- * their JWT directly as the draft_session cookie — NO login API calls,
+ * their JWT directly as the uxcommunity_session cookie — NO login API calls,
  * so the login rate limiter is completely bypassed.
  *
  * Prerequisites:
@@ -11,12 +11,12 @@
  *
  * Usage:
  *   k6 run k6/scenarios/chat_concurrent.js \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
+ *     -e BASE_URL=https://app.uxcommunity.in \
  *     -e TEST_COMMUNITY_ID=<uuid>
  *
  *   # Override concurrent VUs (must be ≤ users in test-users.json)
  *   k6 run k6/scenarios/chat_concurrent.js \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
+ *     -e BASE_URL=https://app.uxcommunity.in \
  *     -e TEST_COMMUNITY_ID=<uuid> \
  *     -e CONCURRENT_VUS=500
  */
@@ -74,12 +74,12 @@ export const options = {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /**
- * Inject the pre-signed JWT as the draft_session cookie so the app treats
+ * Inject the pre-signed JWT as the uxcommunity_session cookie so the app treats
  * this VU as already logged in — no /api/auth/login call needed.
  */
 function injectSession(token) {
   const jar = http.cookieJar();
-  jar.set(COOKIE_URL, 'draft_session', token, { path: '/' });
+  jar.set(COOKIE_URL, 'uxcommunity_session', token, { path: '/' });
 }
 
 const EMOJIS = ['👍', '❤️', '🔥', '😂', '👀', '🎉', '💯', '🙌', '😍', '🤩'];
@@ -89,7 +89,7 @@ export default function () {
   // Pick a unique user for this VU (wraps if VUs > user count)
   const user = users[(__VU - 1) % users.length];
 
-  // Set the session cookie — replaces login entirely
+  // Set the UX Community session cookie — replaces login entirely
   injectSession(user.sessionToken);
 
   // ── 1. Poll latest messages ──────────────────────────────────────────

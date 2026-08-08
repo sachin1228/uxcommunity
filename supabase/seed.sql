@@ -1,5 +1,5 @@
 -- ============================================================
--- drafthub — seed data
+-- uxcommunity — seed data
 -- Run after schema.sql to populate master-data tables.
 -- ============================================================
 

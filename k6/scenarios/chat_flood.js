@@ -14,7 +14,7 @@
  *
  * Usage:
  *   k6 run k6/scenarios/chat_flood.js \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
+ *     -e BASE_URL=https://app.uxcommunity.in \
  *     -e TEST_COMMUNITY_ID=<uuid>
  *
  * Tuning:
@@ -94,7 +94,7 @@ function randomMsg(vu, iter) {
 }
 
 function injectSession(token) {
-  http.cookieJar().set(BASE_URL, 'draft_session', token, { path: '/' });
+  http.cookieJar().set(BASE_URL, 'uxcommunity_session', token, { path: '/' });
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────

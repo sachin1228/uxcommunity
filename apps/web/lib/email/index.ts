@@ -1,6 +1,5 @@
 import { Resend } from "resend";
-
-const APP_NAME = "drafthub";
+import { APP_NAME } from "@uxcommunity/shared";
 
 /** Lazily instantiated so the module can be imported at build time without env vars. */
 function getResend() {

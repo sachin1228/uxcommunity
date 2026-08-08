@@ -13,7 +13,7 @@ export default function ApplyPage() {
 // import { useState } from "react";
 // import Link from "next/link";
 // import { ArrowLeft } from "lucide-react";
-// import { APP_NAME } from "@draft/shared";
+// import { APP_NAME } from "@uxcommunity/shared";
 // import { Spinner } from "@/components/ui/Spinner";
 //
 // type Step = "form" | "success";

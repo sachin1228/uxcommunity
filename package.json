@@ -1,5 +1,5 @@
 {
-  "name": "draft",
+  "name": "uxcommunity",
   "private": true,
   "workspaces": [
     "apps/*",

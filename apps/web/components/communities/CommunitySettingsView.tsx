@@ -112,7 +112,7 @@ export function CommunitySettingsView({
   // Build invite URL helper
   function buildInviteUrl(token: string) {
     if (!token) return "";
-    const host = typeof window !== "undefined" ? window.location.host : "drafthub.co";
+    const host = typeof window !== "undefined" ? window.location.host : "uxcommunity.in";
     const protocol = host.includes("localhost") ? "http" : "https";
     return `${protocol}://${host}/join/${slugify(name)}-${token}`;
   }

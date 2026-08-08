@@ -65,7 +65,7 @@ export default function CommunitiesScreen() {
       >
         {/* Logo */}
         <Text style={[styles.headerLogo, { color: colors.foreground }]}>
-          drafthub{' '}
+          uxcommunity{' '}
           <Text style={[styles.headerLogoSlash, { color: colors.primary }]}>/</Text>
         </Text>
 

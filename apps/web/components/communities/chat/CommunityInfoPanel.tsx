@@ -59,9 +59,9 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
     case "sector":           return `A community for designers in the ${name} industry.`;
     case "interest":         return `Designers who share a passion for ${name}.`;
     case "experience_level": return `A space for ${name} designers to connect and share.`;
-    case "general":          return "The default community for every Drafthub designer.";
-    case "user":             return "A member-created community on Drafthub.";
-    default:                 return "A designer community on Drafthub.";
+    case "general":          return "The default community for every UX Community designer.";
+    case "user":             return "A member-created community on UX Community.";
+    default:                 return "A designer community on UX Community.";
   }
 }
 

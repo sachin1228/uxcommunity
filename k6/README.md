@@ -1,6 +1,6 @@
 # k6 Stress Tests
 
-Performance and stress tests for the drafthub API, written with [k6](https://k6.io).
+Performance and stress tests for the UX Community API, written with [k6](https://k6.io).
 
 ## Directory layout
 
@@ -63,7 +63,7 @@ winget install k6 --source winget
 
 | Variable | Required | Description |
 |---|---|---|
-| `BASE_URL` | No | Target server. Default: `drafthub-web.vercel.app` |
+| `BASE_URL` | No | Target server. Default: `app.uxcommunity.in` |
 | `TEST_USER_EMAIL` | Yes* | Approved member account email |
 | `TEST_USER_PASSWORD` | Yes* | Approved member account password |
 | `ADMIN_EMAIL` | Smoke/admin only | Admin account email |
@@ -83,8 +83,8 @@ Always run the **smoke test first** to confirm the app is up and all routes resp
 ### Smoke test
 ```bash
 k6 run k6/scenarios/smoke.js \
-  -e BASE_URL=drafthub-web.vercel.app \
-  -e ADMIN_EMAIL=admin@drafthub.com \
+  -e BASE_URL=https://app.uxcommunity.in \
+  -e ADMIN_EMAIL=admin@uxcommunity.in \
   -e ADMIN_PASSWORD=sachingalaxy1228@ \
   -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
   -e TEST_USER_PASSWORD=sachin1228 \
@@ -94,7 +94,7 @@ k6 run k6/scenarios/smoke.js \
 ### Load test (steady-state)
 ```bash
 k6 run k6/scenarios/load.js \
-  -e BASE_URL=drafthub-web.vercel.app \
+  -e BASE_URL=https://app.uxcommunity.in \
   -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
   -e TEST_USER_PASSWORD=sachin1228 \
   -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
@@ -103,7 +103,7 @@ k6 run k6/scenarios/load.js \
 ### Stress test (spike to 200 VUs)
 ```bash
 k6 run k6/scenarios/stress.js \
-  -e BASE_URL=drafthub-web.vercel.app \
+  -e BASE_URL=https://app.uxcommunity.in \
   -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
   -e TEST_USER_PASSWORD=sachin1228 \
   -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
@@ -129,7 +129,7 @@ This creates 500 users with profiles + community membership and writes
 **Step 2 — run the concurrent chat scenario:**
 ```bash
 k6 run k6/scenarios/chat_concurrent.js \
-  -e BASE_URL=https://drafthub-web.vercel.app \
+  -e BASE_URL=https://app.uxcommunity.in \
   -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859 \
   -e CONCURRENT_VUS=500
 ```
@@ -150,7 +150,7 @@ node k6/scripts/cleanup-users.js
 ### Chat load test (20 VUs steady + 100 VU spike)
 ```bash
 k6 run k6/scenarios/chat_load.js \
-  -e BASE_URL=https://drafthub-web.vercel.app \
+  -e BASE_URL=https://app.uxcommunity.in \
   -e TEST_USER_EMAIL=member@example.com \
   -e TEST_USER_PASSWORD=your-user-password \
   -e TEST_COMMUNITY_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -159,7 +159,7 @@ k6 run k6/scenarios/chat_load.js \
 ### Soak test (30 minutes)
 ```bash
 k6 run k6/scenarios/soak.js \
-  -e BASE_URL=drafthub-web.vercel.app \
+  -e BASE_URL=https://app.uxcommunity.in \
   -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
   -e TEST_USER_PASSWORD=sachin1228 \
   -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
