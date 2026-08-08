@@ -42,26 +42,24 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#000] px-4 py-12">
       <BrandLogo
         className="fixed left-6 top-6 z-20"
         iconClassName="h-8 w-8"
         wordmarkClassName="hidden"
       />
-      <div className="pointer-events-none fixed inset-0 grid-dots opacity-40" aria-hidden="true" />
-
       <div className="relative z-10 w-full max-w-sm">
         {/* Back link */}
         <Link
           href="/login"
-          className="mb-6 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+          className="mb-6 ml-8 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft size={14} />
           Back to login
         </Link>
 
         {/* Card */}
-        <div className="rounded-xl border border-border bg-surface p-8 shadow-sm">
+        <div className="p-8">
           {step === "sent" ? (
             <div className="flex flex-col items-center gap-4 py-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
