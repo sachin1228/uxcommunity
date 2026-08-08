@@ -1,5 +1,5 @@
 -- ============================================================
--- drafthub — full authentication schema
+-- uxcommunity — full authentication schema
 -- Run this in your Supabase project SQL editor.
 -- ============================================================
 

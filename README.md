@@ -1,4 +1,4 @@
-# drafthub/ — a home for designers
+# uxcommunity/ — a home for designers
 
 A platform for UI/UX, product, and social media designers. Designers apply to join, admins review applications, approved members complete their profile and get access to a real-time community chat.
 
@@ -27,7 +27,7 @@ A platform for UI/UX, product, and social media designers. Designers apply to jo
 ## Project structure
 
 ```
-draft/
+uxcommunity/
 ├── apps/
 │   └── web/                    Next.js web app
 │       ├── app/
@@ -106,3 +106,9 @@ See `apps/web/.env.example` for the full list with comments. Summary:
 - **No CI/CD pipeline.** Deployments are manual.
 - **Admin auth is a single env-var credential** (`ADMIN_EMAIL` + `ADMIN_PASSWORD`). There is no multi-admin system, no admin user records in the database, and no per-admin audit log.
 - **Rate limiter fails open.** If Upstash Redis is unreachable, the rate limiter allows requests through and logs an error. This keeps the app available during Redis outages but means rate limits won't be enforced in that window.
+
+## Rebrand notes
+
+The product is branded **UX Community** in the web and mobile interfaces, metadata,
+emails, seed descriptions, performance-test examples, and documentation. Existing
+database table names remain unchanged for compatibility with existing data.

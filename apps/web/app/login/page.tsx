@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff, Heart } from "lucide-react";
-import { APP_NAME } from "@draft/shared";
+import { APP_NAME } from "@uxcommunity/shared";
 import { Spinner } from "@/components/ui/Spinner";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 // Force happy mouths + eyes so every avatar looks cheerful
 const HAPPY_PARAMS =
@@ -131,10 +132,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute inset-0 grid-dots" aria-hidden="true" />
 
         <div className="relative z-10">
-          <span className="font-display text-xl font-semibold text-foreground">
-            {APP_NAME}
-            <span className="text-accent mx-1">/</span>
-          </span>
+          <BrandLogo iconClassName="h-8 w-8" wordmarkClassName="text-xl" />
         </div>
 
         <div className="relative z-10 flex flex-1 items-center">
@@ -188,10 +186,7 @@ export default function LoginPage() {
         <div className="pointer-events-none absolute inset-0 grid-dots opacity-40" aria-hidden="true" />
 
         <div className="relative z-10 mb-8 flex flex-col items-center gap-2 lg:hidden">
-          <span className="font-display text-xl font-semibold text-foreground">
-            {APP_NAME}
-            <span className="text-accent">/</span>
-          </span>
+          <BrandLogo iconClassName="h-8 w-8" wordmarkClassName="text-xl" />
           <p className="font-body text-sm text-foreground-muted">
             For UI/UX, product &amp; social designers
           </p>

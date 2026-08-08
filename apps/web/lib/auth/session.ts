@@ -2,7 +2,8 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 
-export const SESSION_COOKIE = "draft_session";
+export const SESSION_COOKIE = "uxcommunity_session";
+export const LEGACY_SESSION_COOKIE = "draft_session";
 const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export interface SessionPayload {
@@ -39,7 +40,9 @@ export async function verifySession(
 /** Read the current session from server-side cookies (App Router). */
 export async function getSession(): Promise<SessionPayload | null> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token =
+    store.get(SESSION_COOKIE)?.value ??
+    store.get(LEGACY_SESSION_COOKIE)?.value;
   if (!token) return null;
   return verifySession(token);
 }
@@ -55,13 +58,15 @@ export function setSessionCookie(res: NextResponse, token: string) {
 }
 
 export function clearSessionCookie(res: NextResponse) {
-  res.cookies.set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 0,
-    path: "/",
-  });
+  for (const cookieName of [SESSION_COOKIE, LEGACY_SESSION_COOKIE]) {
+    res.cookies.set(cookieName, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    });
+  }
 }
 
 /**

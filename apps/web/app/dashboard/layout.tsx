@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { BrandLogo } from "@/components/ui/BrandLogo";
 
 
 export default async function DashboardLayout({
@@ -42,7 +43,7 @@ export default async function DashboardLayout({
       {/* Full-width topbar */}
       <header className="sticky top-0 z-20 flex h-12 items-center border-b border-border px-5 shrink-0">
         <span className="text-lg font-medium leading-none tracking-tight text-foreground">
-          drafthub <span className="text-accent">/</span>
+          <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-lg" />
         </span>
 
         <div className="ml-auto flex items-center gap-1">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { APP_NAME } from "@draft/shared";
+import { APP_NAME } from "@uxcommunity/shared";
 import { Spinner } from "@/components/ui/Spinner";
 import { compressImage } from "@/lib/compressImage";
 import { getAvatarSourceOptions, getAvatarTabLabel } from "@/lib/avatar";

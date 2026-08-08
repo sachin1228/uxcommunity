@@ -249,7 +249,7 @@ export function invalidateOnArchive(communityId: string): void {
   notifySidebarChanged();
 }
 
-export const SIDEBAR_CHANGED_EVENT = "drafthub:sidebar-changed";
+export const SIDEBAR_CHANGED_EVENT = "uxcommunity:sidebar-changed";
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {

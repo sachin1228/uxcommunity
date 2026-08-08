@@ -6,8 +6,8 @@
  *
  * Usage:
  *   k6 run k6/scenarios/smoke.js \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
- *     -e ADMIN_EMAIL=admin@drafthub.com \
+ *     -e BASE_URL=https://app.uxcommunity.in \
+ *     -e ADMIN_EMAIL=admin@uxcommunity.in \
  *     -e ADMIN_PASSWORD=your-admin-password \
  *     -e TEST_USER_EMAIL=member@example.com \
  *     -e TEST_USER_PASSWORD=your-user-password \

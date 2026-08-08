@@ -23,7 +23,7 @@ const nextConfig = {
     "*": ["../../k6/**"],
   },
   reactStrictMode: true,
-  transpilePackages: ["@draft/shared", "@draft/design-system"],
+  transpilePackages: ["@uxcommunity/shared", "@uxcommunity/design-system"],
   allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],
   images: {
     // Allow Next.js <Image> to optimise images from Supabase storage and the

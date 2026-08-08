@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { APP_NAME } from "@draft/shared";
+import { APP_NAME } from "@uxcommunity/shared";
 import { Spinner } from "@/components/ui/Spinner";
 
 type PageState = "loading" | "form" | "success" | "invalid";

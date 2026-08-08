@@ -384,7 +384,7 @@ async function main() {
       password:     PASSWORD,
       name:         u.name,
       userId,
-      sessionToken, // pre-signed JWT — k6 sets this as draft_session cookie
+      sessionToken, // pre-signed JWT — k6 sets this as uxcommunity_session cookie
     });
   }
   console.log(`   ✓ ${output.length} session tokens generated.\n`);

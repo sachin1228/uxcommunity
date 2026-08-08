@@ -1,6 +1,6 @@
 # apps/web
 
-The Next.js 14 (App Router) web application for the **draft/** platform.
+The Next.js 14 (App Router) web application for the **uxcommunity/** platform.
 
 ## What's in here
 
@@ -78,6 +78,10 @@ npm run dev        # starts the Next.js dev server on http://localhost:3000
 ```
 
 Copy `apps/web/.env.example` → `apps/web/.env.local` and fill in all values before starting.
+
+The app is branded **UX Community**. The existing `draft_session` cookie is
+accepted during rollout so rebranding does not invalidate active sessions;
+new logins use `uxcommunity_session`.
 
 ## Environment variables
 

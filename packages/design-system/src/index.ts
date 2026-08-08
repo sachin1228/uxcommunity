@@ -1,13 +1,13 @@
 /**
- * @draft/design-system
+ * @uxcommunity/design-system
  *
  * Single entry point for the design system.
  *
  * Usage (TypeScript):
- *   import { tokens, lightTheme, darkTheme } from "@draft/design-system";
+ *   import { tokens, lightTheme, darkTheme } from "@uxcommunity/design-system";
  *
  * Usage (CSS — import once in your global stylesheet):
- *   @import "@draft/design-system/css/tokens.css";
+ *   @import "@uxcommunity/design-system/css/tokens.css";
  */
 
 // Raw primitive tokens

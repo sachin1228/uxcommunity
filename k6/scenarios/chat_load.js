@@ -15,14 +15,14 @@
  * Usage:
  *   # Steady chat load
  *   k6 run k6/scenarios/chat_load.js \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
+ *     -e BASE_URL=https://app.uxcommunity.in \
  *     -e TEST_USER_EMAIL=member@example.com \
  *     -e TEST_USER_PASSWORD=secret \
  *     -e TEST_COMMUNITY_ID=<uuid>
  *
  *   # Run only the spike scenario
  *   k6 run k6/scenarios/chat_load.js --scenario spike \
- *     -e BASE_URL=https://drafthub-web.vercel.app \
+ *     -e BASE_URL=https://app.uxcommunity.in \
  *     ...
  */
 

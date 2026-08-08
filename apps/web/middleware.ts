@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySession, clearSessionCookie } from "@/lib/auth/session";
+import {
+  SESSION_COOKIE,
+  LEGACY_SESSION_COOKIE,
+  verifySession,
+  clearSessionCookie,
+} from "@/lib/auth/session";
 
 /** Lightweight Supabase REST check — Edge-compatible, no SDK needed. */
 async function fetchUserStatus(
@@ -33,7 +38,9 @@ async function fetchUserStatus(
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const token =
+    request.cookies.get(SESSION_COOKIE)?.value ??
+    request.cookies.get(LEGACY_SESSION_COOKIE)?.value;
   const session = token ? await verifySession(token) : null;
 
   // Redirect already-authenticated users away from / and /login
