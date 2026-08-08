@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 
 /**
  * Tailwind config — all colors reference CSS custom properties from
- * @draft/design-system/css/tokens.css (imported in globals.css).
+ * @uxcommunity/design-system/css/tokens.css (imported in globals.css).
  * Light/dark mode is handled entirely by `prefers-color-scheme` in CSS;
  * no class-based toggling needed.
  */

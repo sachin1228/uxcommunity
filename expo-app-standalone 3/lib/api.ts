@@ -2,7 +2,7 @@
  * Base API client for the web app backend.
  *
  * Session management: the web backend issues an HttpOnly JWT cookie named
- * `draft_session`. React Native can read `Set-Cookie` response headers from
+ * `uxcommunity_session`. React Native can read `Set-Cookie` response headers from
  * native fetch, so we capture the token value and replay it as a Cookie header
  * on every subsequent request.
  *
@@ -12,8 +12,10 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SESSION_COOKIE_NAME = 'draft_session';
-const SESSION_STORAGE_KEY = '@auth/draft_session';
+const SESSION_COOKIE_NAME = 'uxcommunity_session';
+const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
+// Read once for users upgrading from the pre-rebrand mobile app.
+const LEGACY_SESSION_STORAGE_KEY = '@auth/draft_session';
 
 export const API_BASE_URL =
   (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
@@ -22,9 +24,9 @@ export const API_BASE_URL =
 // Cookie helpers
 // ---------------------------------------------------------------------------
 
-/** Persist the draft_session cookie value extracted from a Set-Cookie header. */
+/** Persist the uxcommunity_session cookie value extracted from a Set-Cookie header. */
 async function saveSessionCookie(setCookieHeader: string): Promise<void> {
-  // Format: draft_session=<value>; Path=/; HttpOnly; ...
+  // Format: uxcommunity_session=<value>; Path=/; HttpOnly; ...
   const match = setCookieHeader.match(
     new RegExp(`${SESSION_COOKIE_NAME}=([^;]+)`)
   );
@@ -85,12 +87,24 @@ export async function apiFormUpload<T = unknown>(
 
 /** Clear a persisted session (on logout or 401). */
 export async function clearSession(): Promise<void> {
-  await AsyncStorage.removeItem(SESSION_STORAGE_KEY);
+  await AsyncStorage.multiRemove([
+    SESSION_STORAGE_KEY,
+    LEGACY_SESSION_STORAGE_KEY,
+  ]);
 }
 
 /** Retrieve the stored session token (or null). */
 export async function getStoredSession(): Promise<string | null> {
-  return AsyncStorage.getItem(SESSION_STORAGE_KEY);
+  const current = await AsyncStorage.getItem(SESSION_STORAGE_KEY);
+  if (current) return current;
+
+  const legacy = await AsyncStorage.getItem(LEGACY_SESSION_STORAGE_KEY);
+  if (legacy) {
+    await AsyncStorage.setItem(SESSION_STORAGE_KEY, legacy);
+    return legacy;
+  }
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------

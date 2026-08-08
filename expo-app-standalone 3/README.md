@@ -1,6 +1,6 @@
-# DraftHub Mobile App
+# UX Community Mobile App
 
-React Native (Expo) mobile app for the DraftHub platform.
+React Native (Expo) mobile app for the UX Community platform.
 
 ---
 
@@ -30,7 +30,7 @@ source ~/.zshrc
 Create a `.env` file in the root of this folder:
 
 ```
-EXPO_PUBLIC_API_URL=https://drafthub-web.vercel.app
+EXPO_PUBLIC_API_URL=https://app.uxcommunity.in
 EXPO_PUBLIC_SUPABASE_URL=https://eauupthwlnarkauwifmw.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl
 ```
@@ -163,11 +163,11 @@ expo-app-standalone 3/
 
 ## Notes
 
-- **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`draft_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. No Supabase Auth is used.
+- **Session handling:** The web backend sets an `HttpOnly` JWT cookie (`uxcommunity_session`). The mobile app captures it from `Set-Cookie` headers and replays it via `AsyncStorage`. No Supabase Auth is used.
 - **Rate limiting:** Login is rate-limited on the server (Upstash Redis). If you hit too many attempts, wait a few minutes.
 - **`EXPO_PUBLIC_*` vars** are baked into the JS bundle at build time. Changing them requires a rebuild.
 
 
 
 ## build locally
-- cd "/Users/sachin/Documents/GitHub/drafthub/expo-app-standalone 3/android" ./gradlew assembleRelease
+- cd "expo-app-standalone 3/android" && ./gradlew assembleRelease

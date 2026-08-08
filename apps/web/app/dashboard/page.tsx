@@ -2,7 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { HomeFeed } from "./HomeFeed";
 
-export const metadata = { title: `Home — drafthub` };
+export const metadata = { title: "Home — uxcommunity" };
 
 export default async function DashboardPage() {
   const session = await getSession();

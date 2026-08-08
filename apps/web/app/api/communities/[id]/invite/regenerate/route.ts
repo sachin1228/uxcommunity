@@ -40,7 +40,7 @@ export async function POST(
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "community";
   }
 
-  const host = _req.headers.get("host") ?? "drafthub.co";
+  const host = _req.headers.get("host") ?? "uxcommunity.in";
   const protocol = host.includes("localhost") ? "http" : "https";
   const slug = slugify(community.name);
 

@@ -1,4 +1,4 @@
-# draft/ — Design Guidelines
+# UX Community — Design Guidelines
 
 These rules apply everywhere in the product. When picking up styles from the design system, follow these principles first.
 

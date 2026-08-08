@@ -23,7 +23,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_communities_general_singleton
 INSERT INTO communities (name, description, type, reference_id, is_active)
 VALUES (
   'General',
-  'The default community for every Drafthub designer.',
+  'The default community for every UX Community designer.',
   'general',
   NULL,
   true
