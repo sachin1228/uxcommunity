@@ -1,5 +1,6 @@
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { HomeComposer } from "./HomeComposer";
 import { HomeFeed } from "./HomeFeed";
 
 export const metadata = { title: "Home — uxcommunity" };
@@ -25,6 +26,7 @@ export default async function DashboardPage() {
           </h1>
         </div>
 
+        <HomeComposer />
         <HomeFeed currentUserId={userId} />
       </div>
 

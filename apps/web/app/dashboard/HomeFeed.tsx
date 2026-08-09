@@ -24,13 +24,20 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadFeed = useCallback(() => {
+    setLoading(true);
     fetch("/api/home/feed")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.items) setItems(d.items); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void Promise.resolve().then(loadFeed);
+    window.addEventListener("home-feed-refresh", loadFeed);
+    return () => window.removeEventListener("home-feed-refresh", loadFeed);
+  }, [loadFeed]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 

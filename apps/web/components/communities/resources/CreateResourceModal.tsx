@@ -10,6 +10,7 @@ import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 
 interface CreateResourceModalProps {
   communityId: string;
+  initialIsPublic?: boolean;
   onClose: () => void;
   onCreated: (resource: CommunityResource) => void;
 }
@@ -21,14 +22,14 @@ function isValidHttpUrl(s: string) {
   } catch { return false; }
 }
 
-export function CreateResourceModal({ communityId, onClose, onCreated }: CreateResourceModalProps) {
+export function CreateResourceModal({ communityId, initialIsPublic = false, onClose, onCreated }: CreateResourceModalProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [resourceType, setResourceType] = useState<ResourceType>("article");
   const [tags, setTags] = useState<string[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

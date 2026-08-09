@@ -119,11 +119,12 @@ function ImageGrid({
 
 interface CreateThreadModalProps {
   communityId: string;
+  initialIsPublic?: boolean;
   onClose: () => void;
   onCreated: (thread: CommunityThread) => void;
 }
 
-export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThreadModalProps) {
+export function CreateThreadModal({ communityId, initialIsPublic = false, onClose, onCreated }: CreateThreadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -134,7 +135,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
   const tagDropdownRef   = useRef<HTMLDivElement>(null);
   const [attachments,    setAttachments]    = useState<ThreadAttachment[]>([]);
   const [allowReplies,   setAllowReplies]   = useState(true);
-  const [isPublic,       setIsPublic]       = useState(false);
+  const [isPublic,       setIsPublic]       = useState(initialIsPublic);
   const [uploading,      setUploading]      = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState<string | null>(null);
