@@ -247,6 +247,7 @@ export function ThreadsView({
       {showCreateModal && (
         <CreateThreadModal
           communityId={communityId}
+          initialIsPublic={false}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
         />

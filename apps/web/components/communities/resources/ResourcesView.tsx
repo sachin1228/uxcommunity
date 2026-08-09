@@ -248,6 +248,7 @@ export function ResourcesView({
       {showCreateModal && (
         <CreateResourceModal
           communityId={communityId}
+          initialIsPublic={false}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
         />

@@ -239,6 +239,7 @@ export function EventsView({
       {showCreateModal && (
         <CreateEventModal
           communityId={communityId}
+          initialIsPublic={false}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
         />

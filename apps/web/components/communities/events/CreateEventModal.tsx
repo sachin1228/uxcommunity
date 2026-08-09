@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, ImagePlus, Loader2, MapPin, Users, Video, X } from "lucide-react";
 import type { CommunityEvent } from "./types";
+import { VisibilitySelector } from "../VisibilitySelector";
 
 interface CreateEventModalProps {
   communityId: string;
@@ -299,22 +300,7 @@ export function CreateEventModal({ communityId, initialIsPublic = false, onClose
             />
           </label>
 
-          {/* Make public toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span>
-              <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-              <span className="block font-body text-xs text-foreground-muted">This event will appear on the home feed for all members.</span>
-            </span>
-            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="sr-only"
-              />
-              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
-            </span>
-          </label>
+          <VisibilitySelector isPublic={isPublic} onChange={setIsPublic} />
         </div>
 
         {error && (
