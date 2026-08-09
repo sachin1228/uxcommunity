@@ -146,8 +146,6 @@ function previewText(
 // CommunityRow
 // ---------------------------------------------------------------------------
 
-const GREEN = '#22c55e'; // matches web bg-green-500
-
 export function CommunityRow({ community, typingLabel, onPress }: Props) {
   const colors = useColors();
 
@@ -168,15 +166,18 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
         { backgroundColor: pressed ? colors.subtle : colors.background },
       ]}
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${community.name} community`}
+      accessibilityHint="Shows the community conversation"
     >
       {/* Avatar — start aligned */}
       <View style={styles.avatarWrap}>
         {community.image_url ? (
           <Image
             source={{ uri: community.image_url }}
-            style={[
+             style={[
               styles.avatarBase,
-              { width: 48, height: 48, borderRadius: 24, borderColor: colors.border },
+               { width: 48, height: 48, borderRadius: 24 },
             ]}
           />
         ) : (
@@ -242,7 +243,7 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
 
           {/* Unread badge — green, matches web */}
           {hasUnread && (
-            <View style={[styles.badge, { backgroundColor: GREEN }]}>
+             <View style={[styles.badge, { backgroundColor: colors.success }]}>
               <Text style={styles.badgeText}>
                 {community.unread_count > 99 ? '99+' : community.unread_count}
               </Text>
@@ -272,7 +273,6 @@ const styles = StyleSheet.create({
   avatarBase: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
   },
   avatarText: {
     fontFamily: 'Geist_600SemiBold',
@@ -330,7 +330,6 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontFamily: 'Geist_600SemiBold',
-    color: '#FFFFFF',
   },
   dotsRow: {
     flexDirection: 'row',

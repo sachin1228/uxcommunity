@@ -276,7 +276,13 @@ export default function CommunityChat() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={8}
+          style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
           <Feather name="arrow-left" size={26} color={colors.foreground} />
         </Pressable>
 
@@ -284,7 +290,7 @@ export default function CommunityChat() {
           {communityImage ? (
             <Image
               source={{ uri: communityImage }}
-              style={[styles.headerAvatar, { borderColor: colors.border }]}
+              style={styles.headerAvatar}
             />
           ) : (
             <View
@@ -307,7 +313,7 @@ export default function CommunityChat() {
           </Text>
         </View>
 
-        <View style={{ width: 36 }} />
+        <View style={{ width: 44 }} />
       </View>
 
       {Platform.OS === 'android' ? (
@@ -358,14 +364,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     gap: 8,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -379,10 +385,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   headerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: StyleSheet.hairlineWidth,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     flexShrink: 0,
   },
   headerAvatarFallback: {
@@ -416,10 +421,10 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flexGrow: 1,
-    paddingTop: 8,
+    paddingTop: 12,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Geist_400Regular',
     textAlign: 'center',
     marginTop: 8,

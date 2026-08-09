@@ -210,8 +210,8 @@ function ReactionChips({
             style={[
               styles.reactionChip,
               {
-                backgroundColor: isActive ? colors.primarySoft : '#2a2a2a',
-                borderColor: isActive ? colors.primary : '#000',
+                backgroundColor: isActive ? colors.primarySoft : colors.secondary,
+                borderColor: isActive ? colors.primary : colors.border,
               },
             ]}
           >
@@ -244,13 +244,13 @@ function ReplyPreview({
     <View
       style={[
         styles.replyPreview,
-        { borderLeftColor: colors.primary, backgroundColor: 'rgba(0,0,0,0.15)' },
+        { borderLeftColor: colors.primary, backgroundColor: colors.overlayRaised },
       ]}
     >
-      <Text style={[styles.replyName, { color: 'rgba(255,255,255,0.8)' }]}>
+      <Text style={[styles.replyName, { color: colors.overlayForeground }]}>
         {replyTo.user_name}
       </Text>
-      <Text style={[styles.replyContent, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>
+      <Text style={[styles.replyContent, { color: colors.overlayMuted }]} numberOfLines={1}>
         {replyTo.content ?? '📷 Image'}
       </Text>
     </View>
@@ -299,7 +299,7 @@ export function MessageBubble({
     isEmojiOnly(message.content);
 
   // Fix #1/#2: time color
-  const timeColor = isOwn ? 'rgba(255,255,255,0.6)' : colors.mutedForeground;
+  const timeColor = isOwn ? colors.onPrimaryMuted : colors.mutedForeground;
 
   return (
     <View
@@ -334,15 +334,15 @@ export function MessageBubble({
             style={[
               styles.deletedBubble,
               {
-                backgroundColor: isOwn ? 'rgba(0,112,243,0.3)' : colors.card,
-                borderColor: isOwn ? 'rgba(255,255,255,0.1)' : colors.border,
+                 backgroundColor: isOwn ? colors.primarySoft : colors.card,
+                 borderColor: isOwn ? colors.primary : colors.border,
               },
             ]}
           >
-            <Text style={[styles.deletedIcon, { color: isOwn ? 'rgba(255,255,255,0.4)' : colors.mutedForeground }]}>
+            <Text style={[styles.deletedIcon, { color: isOwn ? colors.onPrimaryMuted : colors.mutedForeground }]}>
               ⊘
             </Text>
-            <Text style={[styles.deletedText, { color: isOwn ? 'rgba(255,255,255,0.5)' : colors.mutedForeground }]}>
+            <Text style={[styles.deletedText, { color: isOwn ? colors.onPrimaryMuted : colors.mutedForeground }]}>
               {isOwn ? 'You deleted this message' : 'This message was deleted'}
             </Text>
             <Text style={[styles.deletedTime, { color: timeColor }]}>

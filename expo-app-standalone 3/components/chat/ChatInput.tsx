@@ -77,7 +77,13 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
               {replyTo.content ?? '📷 Image'}
             </Text>
           </View>
-          <Pressable onPress={onCancelReply} hitSlop={8}>
+          <Pressable
+            onPress={onCancelReply}
+            hitSlop={8}
+            style={styles.dismissButton}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel reply"
+          >
             <Feather name="x" size={18} color={colors.mutedForeground} />
           </Pressable>
         </View>
@@ -90,7 +96,13 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
           <Text style={[styles.imageReady, { color: colors.mutedForeground }]}>
             Image ready to send
           </Text>
-          <Pressable onPress={() => setPendingImage(null)} hitSlop={8}>
+          <Pressable
+            onPress={() => setPendingImage(null)}
+            hitSlop={8}
+            style={styles.dismissButton}
+            accessibilityRole="button"
+            accessibilityLabel="Remove selected image"
+          >
             <Feather name="x" size={16} color={colors.mutedForeground} />
           </Pressable>
         </View>
@@ -102,9 +114,11 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
         {/* Floating pill: emoji left | text | image right */}
         <View style={[styles.pill, { backgroundColor: colors.card }]}>
           {/* Emoji button — left inside pill */}
-          <Pressable
+           <Pressable
             hitSlop={6}
             style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+             accessibilityRole="button"
+             accessibilityLabel="Add emoji"
           >
             <Feather name="smile" size={20} color={colors.mutedForeground} />
           </Pressable>
@@ -131,6 +145,8 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
             disabled={disabled}
             hitSlop={6}
             style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+             accessibilityRole="button"
+             accessibilityLabel="Attach image"
           >
             <Feather
               name="image"
@@ -152,6 +168,9 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
                 : colors.subtle,
             },
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={disabled ? 'Sending message' : 'Send message'}
+          accessibilityState={{ disabled: !canSend, busy: disabled }}
         >
           {disabled ? (
             <ActivityIndicator size="small" color={colors.primaryForeground} />
@@ -187,6 +206,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   replyInfo: { flex: 1, gap: 2 },
+  dismissButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   replyLabel: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
   replyText: { fontSize: 12, fontFamily: 'Geist_400Regular' },
 
@@ -217,7 +242,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 6,
     gap: 2,
-    shadowColor: '#000',
+    shadowColor: 'black',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -226,8 +251,8 @@ const styles = StyleSheet.create({
 
   // Icon buttons inside the pill
   pillBtn: {
-    width: 36,
-    height: 34,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

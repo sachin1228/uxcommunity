@@ -73,11 +73,13 @@ export default function CommunitiesScreen() {
         <View style={styles.headerRight}>
           {/* Notification bell */}
           <Pressable
-            hitSlop={8}
+             hitSlop={8}
             style={({ pressed }) => [
               styles.iconBtn,
               { backgroundColor: pressed ? colors.subtle : 'transparent' },
             ]}
+             accessibilityRole="button"
+             accessibilityLabel="Notifications"
           >
             <Feather name="bell" size={22} color={colors.mutedForeground} />
           </Pressable>
@@ -87,12 +89,12 @@ export default function CommunitiesScreen() {
                loaded by RN's Image; fall back to initials for those and any
                failed loads. */}
           {user?.avatar_url && !user.avatar_url.startsWith('boring://') && !avatarError ? (
-            <Image
+             <Image
               source={{ uri: user.avatar_url }}
               style={[styles.avatar, styles.avatarImg]}
               onError={() => setAvatarError(true)}
             />
-          ) : (
+           ) : (
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
               <Text style={[styles.avatarText, { color: colors.primaryForeground }]}>
                 {user?.name
@@ -119,9 +121,11 @@ export default function CommunitiesScreen() {
       {!isLoading && error && (
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
-          <Pressable
+             <Pressable
             onPress={reload}
-            style={[styles.retryBtn, { borderColor: colors.border }]}
+             style={[styles.retryBtn, { backgroundColor: colors.secondary }]}
+             accessibilityRole="button"
+             accessibilityLabel="Retry loading communities"
           >
             <Text style={[styles.retryText, { color: colors.primary }]}>Retry</Text>
           </Pressable>
@@ -188,16 +192,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -221,10 +225,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryBtn: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
-    borderWidth: 1,
   },
   retryText: {
     fontSize: 14,
@@ -236,7 +242,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'Geist_400Regular',
     textAlign: 'center',
   },

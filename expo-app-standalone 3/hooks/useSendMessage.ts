@@ -86,6 +86,7 @@ export function useSendMessage({
           company: null,
         },
         reactions: [],
+        reply_to_id: replyTo?.id ?? null,
         reply_to: replyTo
           ? {
               id: replyTo.id,

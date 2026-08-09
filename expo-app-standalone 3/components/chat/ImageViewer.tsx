@@ -18,6 +18,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useColors } from '@/hooks/useColors';
 
 interface Props {
   uri: string | null;
@@ -27,6 +28,7 @@ interface Props {
 const SPRING = { damping: 20, stiffness: 200 };
 
 export function ImageViewer({ uri, onClose }: Props) {
+  const colors = useColors();
   // ── Zoom / pan state ────────────────────────────────────────────────────────
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -129,16 +131,16 @@ export function ImageViewer({ uri, onClose }: Props) {
     >
       <StatusBar hidden />
 
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
         {/* Close button ───────────────────────────────────────────────────── */}
         <Pressable
           onPress={onClose}
           hitSlop={12}
-          style={styles.closeBtn}
+          style={[styles.closeBtn, { backgroundColor: colors.overlayRaised }]}
           accessibilityLabel="Close image"
           accessibilityRole="button"
         >
-          <Text style={styles.closeBtnText}>✕</Text>
+          <Text style={[styles.closeBtnText, { color: colors.overlayForeground }]}>✕</Text>
         </Pressable>
 
         {/* Zoomable image ─────────────────────────────────────────────────── */}
@@ -169,15 +171,13 @@ const styles = StyleSheet.create({
     top: 52,
     right: 20,
     zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
-    color: '#fff',
     fontSize: 16,
     lineHeight: 18,
     fontWeight: '600',

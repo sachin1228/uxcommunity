@@ -68,7 +68,7 @@ export default function LoginScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={[styles.logoMark, { backgroundColor: colors.primary }]}>
-              <Text style={styles.logoLetter}>D</Text>
+              <Text style={[styles.logoLetter, { color: colors.primaryForeground }]}>U</Text>
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>
               Welcome back
@@ -111,7 +111,7 @@ export default function LoginScreen() {
                 style={[
                   styles.input,
                   {
-                    backgroundColor: colors.surface,
+                    backgroundColor: colors.input,
                     borderColor: emailFocused ? colors.primary : colors.border,
                     color: colors.foreground,
                   },
@@ -144,7 +144,7 @@ export default function LoginScreen() {
                 style={[
                   styles.inputRow,
                   {
-                    backgroundColor: colors.surface,
+                    backgroundColor: colors.input,
                     borderColor: passwordFocused ? colors.primary : colors.border,
                   },
                 ]}
@@ -171,6 +171,9 @@ export default function LoginScreen() {
                   onPress={() => setShowPassword((s) => !s)}
                   hitSlop={8}
                   style={styles.eyeBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  accessibilityState={{ checked: showPassword }}
                 >
                   <Text
                     style={[styles.eyeText, { color: colors.mutedForeground }]}
@@ -243,7 +246,6 @@ function makeStyles(colors: Colors) {
     logoLetter: {
       fontSize: 26,
       fontFamily: 'Geist_700Bold',
-      color: '#FFFFFF',
     },
     title: {
       fontSize: 26,
@@ -257,7 +259,6 @@ function makeStyles(colors: Colors) {
     },
     card: {
       borderRadius: 16,
-      borderWidth: 1,
       padding: 24,
       gap: 20,
       // subtle shadow
@@ -286,7 +287,7 @@ function makeStyles(colors: Colors) {
       fontFamily: 'Geist_500Medium',
     },
     input: {
-      height: 44,
+      height: 48,
       borderRadius: 8,
       borderWidth: 1,
       paddingHorizontal: 14,
@@ -294,7 +295,7 @@ function makeStyles(colors: Colors) {
       fontFamily: 'Geist_400Regular',
     },
     inputRow: {
-      height: 44,
+      minHeight: 48,
       borderRadius: 8,
       borderWidth: 1,
       flexDirection: 'row',
@@ -308,14 +309,17 @@ function makeStyles(colors: Colors) {
       fontFamily: 'Geist_400Regular',
     },
     eyeBtn: {
-      paddingHorizontal: 4,
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     eyeText: {
       fontSize: 13,
       fontFamily: 'Geist_500Medium',
     },
     button: {
-      height: 46,
+      height: 48,
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',

@@ -58,7 +58,12 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
       visible={!!message}
       onRequestClose={onClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable
+        style={[styles.backdrop, { backgroundColor: colors.scrim }]}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close message actions"
+      >
         <View
           style={[
             styles.sheet,
@@ -114,7 +119,7 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
               <Pressable
                 style={({ pressed }) => [
                   styles.action,
-                  { backgroundColor: pressed ? 'rgba(239,68,68,0.08)' : 'transparent' },
+                  { backgroundColor: pressed ? colors.dangerSoft : 'transparent' },
                 ]}
                 onPress={handleDelete}
               >
@@ -133,7 +138,6 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -142,7 +146,6 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 360,
     borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -171,8 +174,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 0,
   },
   action: {
+    minHeight: 48,
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
   },
   actionText: {
     fontSize: 15,

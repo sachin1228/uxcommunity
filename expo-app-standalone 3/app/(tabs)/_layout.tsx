@@ -48,7 +48,7 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarStyle: {
           position: 'absolute',
-          backgroundColor: isIOS ? 'transparent' : colors.background,
+          backgroundColor: isIOS ? 'transparent' : colors.subtle,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
@@ -56,6 +56,10 @@ function ClassicTabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 13,
+          fontFamily: 'Geist_500Medium',
+        },
+        tabBarItemStyle: {
+          minHeight: 48,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -68,7 +72,7 @@ function ClassicTabLayout() {
             <View
               style={[
                 StyleSheet.absoluteFill,
-                { backgroundColor: colors.background },
+                { backgroundColor: colors.subtle },
               ]}
             />
           ) : null,

@@ -10,7 +10,7 @@ const colors = {
     tint: '#0070F3',
 
     // Core surfaces
-    background: '#000000',
+    background: '#FAFAFA',
     foreground: '#0A0A0A',
 
     // Cards / elevated surfaces
@@ -48,6 +48,17 @@ const colors = {
     // Surface variants
     surface: '#FFFFFF',
     subtle: '#F5F5F5',
+
+    // Always-dark surfaces and feedback overlays
+    overlay: '#0A0A0A',
+    overlayRaised: '#111111',
+    overlayForeground: '#EDEDED',
+    overlayMuted: '#737373',
+    scrim: 'rgba(0, 0, 0, 0.5)',
+    onPrimaryMuted: 'rgba(255, 255, 255, 0.6)',
+    dangerSoft: 'rgba(239, 68, 68, 0.08)',
+    success: '#22C55E',
+    successForeground: '#FFFFFF',
   },
 
   dark: {
@@ -84,6 +95,17 @@ const colors = {
 
     surface: '#121214',
     subtle: '#0E0E10',
+
+    // Always-dark surfaces and feedback overlays
+    overlay: '#09090B',
+    overlayRaised: '#121214',
+    overlayForeground: '#EDEDED',
+    overlayMuted: '#737373',
+    scrim: 'rgba(0, 0, 0, 0.5)',
+    onPrimaryMuted: 'rgba(255, 255, 255, 0.6)',
+    dangerSoft: 'rgba(239, 68, 68, 0.12)',
+    success: '#22C55E',
+    successForeground: '#FFFFFF',
   },
 
   // Border radius (px) applied to cards, buttons, inputs, and modals.
