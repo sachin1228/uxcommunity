@@ -14,14 +14,8 @@ export function DashboardHome({ name, avatarUrl, userId }: DashboardHomeProps) {
   const [refreshToken, setRefreshToken] = useState(0);
 
   return (
-    <div className="flex h-full items-stretch">
-      <div className="min-w-0 flex-1 border-r border-border">
-        <div className="mb-6 p-6">
-          <h1 className="mb-1 font-display text-2xl font-semibold text-foreground">
-            Welcome back{name ? `, ${name.split(" ")[0]}` : ""}
-          </h1>
-        </div>
-
+    <div className="flex min-h-full items-stretch">
+      <div className="min-h-full min-w-0 flex-1 border-r border-border">
         <HomePostComposer
           name={name ?? "Designer"}
           avatarUrl={avatarUrl}
