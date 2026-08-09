@@ -5,19 +5,6 @@ import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreH
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 
-/** Convert a plural community-style level name to a singular job title.
- *  Strips trailing year-range parentheticals, then singularizes.
- *  e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- *       "Heads of Design"                 → "Head of Design"
- *       "VP of Design"                    → "VP of Design"  (unchanged)
- */
-function toJobTitle(name: string): string {
-  // Strip trailing parenthetical like "(3-5 years)" or "(5+ years)"
-  const clean = name.replace(/\s*\(.*?\)\s*$/, "").trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
@@ -123,20 +110,44 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status,
 }: {
-  url: string; isMe: boolean; uploading?: boolean; onCancel?: () => void;
+  url: string;
+  isMe: boolean;
+  uploading?: boolean;
+  onCancel?: () => void;
+  standalone?: boolean;
+  createdAt?: string;
+  status?: CachedMessage["status"];
 }) {
   return (
-    <div className="relative mb-1">
+    <div
+      className={`relative ${
+        standalone
+          ? "overflow-hidden rounded-xl border-2 border-accent"
+          : "mb-1"
+      }`}
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt="Image"
-        className={`block max-w-full rounded-xl object-cover ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""}`}
+        className={`block max-w-full object-cover ${
+          standalone ? "" : "rounded-xl"
+        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
       />
+      {standalone && createdAt && !uploading && status !== "failed" && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5">
+          <span className="font-mono text-[10px] text-white/90">
+            {fmtTime(createdAt)}
+          </span>
+          {isMe && (
+            <CheckCheck size={11} className="text-white/90" />
+          )}
+        </div>
+      )}
       {uploading && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl">
           <div className="relative w-12 h-12">
@@ -606,6 +617,7 @@ export function MessageBubble({
   const uploading = msg.status === "sending" && !!imageUrl;
   const failed    = msg.status === "failed";
   const isDeleted = !!msg.deleted_at;
+  const imageOnly = !!imageUrl && !msg.content && !replyTo;
 
   // Show as a large bubble-free emoji when the entire message is 1–3 emoji glyphs.
   const isEmojiMsg =
@@ -654,17 +666,8 @@ export function MessageBubble({
         <div className="max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
-            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted flex items-center gap-1.5 flex-wrap">
+            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
               <span>{sender.name}</span>
-              {(sender.designation || sender.company) && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
-                  {sender.designation && sender.company
-                    ? `${toJobTitle(sender.designation)} @ ${sender.company}`
-                    : sender.designation
-                    ? toJobTitle(sender.designation)
-                    : `@ ${sender.company}`}
-                </span>
-              )}
             </p>
           )}
 
@@ -713,16 +716,20 @@ export function MessageBubble({
               <div className="relative min-w-0">
                 <div
                   ref={bubbleRef}
-                  className={`relative rounded-2xl px-3 pt-2 pb-1.5 select-none transition-shadow duration-150 ${
+                  className={`relative select-none transition-shadow duration-150 ${
                     menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
                   } ${
-                    isMe
-                      ? msg.status === "sending"
-                        ? "bg-accent opacity-70"
-                        : msg.status === "failed"
-                        ? "bg-red-500/80"
-                        : "bg-accent"
-                      : "bg-surface-raised shadow-sm"
+                    imageOnly
+                      ? "flex flex-col items-end"
+                      : `rounded-2xl px-3 pt-2 pb-1.5 ${
+                          isMe
+                            ? msg.status === "sending"
+                              ? "bg-accent opacity-70"
+                              : msg.status === "failed"
+                              ? "bg-red-500/80"
+                              : "bg-accent"
+                            : "bg-surface-raised shadow-sm"
+                        }`
                   }`}
                 >
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
@@ -731,6 +738,9 @@ export function MessageBubble({
                       url={imageUrl}
                       isMe={isMe}
                       uploading={uploading}
+                      standalone={imageOnly}
+                      createdAt={msg.created_at}
+                      status={msg.status}
                       onCancel={() => onCancelSend(msg.id)}
                     />
                   )}
@@ -741,22 +751,24 @@ export function MessageBubble({
                       showPreview={msg.status !== "failed"}
                     />
                   )}
-                  <div className="flex items-center justify-end gap-1 mt-1">
-                    <span className={`font-mono text-[10px] ${
-                      isMe ? "text-accent-foreground/60" : "text-foreground-muted"
-                    }`}>
-                      {fmtTime(msg.created_at)}
-                    </span>
-                    {isMe && msg.status === "sending" && (
-                      <Clock size={10} className="text-accent-foreground/60 animate-pulse" />
-                    )}
-                    {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck size={11} className="text-accent-foreground/70" />
-                    )}
-                    {isMe && msg.status === "failed" && (
-                      <span className="text-[10px] text-red-200">!</span>
-                    )}
-                  </div>
+                  {!imageOnly && (
+                    <div className="flex items-center justify-end gap-1 mt-1">
+                      <span className={`font-mono text-[10px] ${
+                        isMe ? "text-accent-foreground/60" : "text-foreground-muted"
+                      }`}>
+                        {fmtTime(msg.created_at)}
+                      </span>
+                      {isMe && msg.status === "sending" && (
+                        <Clock size={10} className="text-accent-foreground/60 animate-pulse" />
+                      )}
+                      {isMe && (msg.status === "sent" || !msg.status) && (
+                        <CheckCheck size={11} className="text-accent-foreground/70" />
+                      )}
+                      {isMe && msg.status === "failed" && (
+                        <span className="text-[10px] text-red-200">!</span>
+                      )}
+                    </div>
+                  )}
                   <MessageHoverActions
                     msg={msg}
                     isMe={isMe}

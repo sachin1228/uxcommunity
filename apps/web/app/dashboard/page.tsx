@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   })();
 
   return (
-    <div className="flex items-start h-full">
+    <div className="flex items-stretch h-full">
       {/* ── Main feed — fills remaining space like community chat ── */}
       <div className="flex-1 min-w-0 border-r border-border">
         <div className="mb-6 p-6">
