@@ -24,10 +24,10 @@ const options = [
 
 export function VisibilitySelector({ isPublic, onChange }: VisibilitySelectorProps) {
   return (
-    <fieldset className="rounded-xl border border-border bg-surface-raised p-3.5">
-      <legend className="px-1 font-body text-sm font-semibold text-foreground">
+    <div className="rounded-xl border border-border bg-surface-raised p-3.5">
+      <h3 className="font-body text-sm font-semibold text-foreground">
         Who can see your post?
-      </legend>
+      </h3>
       <div className="mt-2 space-y-1.5" role="radiogroup" aria-label="Post visibility">
         {options.map(({ value, label, description, Icon }) => {
           const selected = isPublic === value;
@@ -67,6 +67,6 @@ export function VisibilitySelector({ isPublic, onChange }: VisibilitySelectorPro
           );
         })}
       </div>
-    </fieldset>
+    </div>
   );
 }
