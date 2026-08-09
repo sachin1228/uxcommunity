@@ -9,6 +9,7 @@ import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();

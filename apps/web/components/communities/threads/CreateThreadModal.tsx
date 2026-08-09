@@ -20,16 +20,14 @@ function bodyToThread(body: string): { title: string; description: string } {
 
 // ── Shared image grid (used inside the modal for previews with remove buttons) ──
 
-function ImageGrid({
-  images,
+function RemoveImageButton({
+  url,
   onRemove,
 }: {
-  images: ThreadAttachment[];
+  url: string;
   onRemove: (url: string) => void;
 }) {
-  if (images.length === 0) return null;
-
-  const RemoveBtn = ({ url }: { url: string }) => (
+  return (
     <button
       type="button"
       onClick={() => onRemove(url)}
@@ -39,13 +37,23 @@ function ImageGrid({
       <X size={12} />
     </button>
   );
+}
+
+function ImageGrid({
+  images,
+  onRemove,
+}: {
+  images: ThreadAttachment[];
+  onRemove: (url: string) => void;
+}) {
+  if (images.length === 0) return null;
 
   // 1 image — full width
   if (images.length === 1) {
     return (
       <div className="group relative mt-3 overflow-hidden rounded-xl border border-border">
         <img src={images[0].url} alt={images[0].name} className="max-h-72 w-full object-cover" />
-        <RemoveBtn url={images[0].url} />
+        <RemoveImageButton url={images[0].url} onRemove={onRemove} />
       </div>
     );
   }
@@ -57,7 +65,7 @@ function ImageGrid({
         {images.map((img) => (
           <div key={img.url} className="group relative h-52 overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -70,13 +78,13 @@ function ImageGrid({
       <div className="mt-3 flex h-60 gap-1 overflow-hidden rounded-xl">
         <div className="group relative flex-[2] overflow-hidden">
           <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover" />
-          <RemoveBtn url={images[0].url} />
+          <RemoveImageButton url={images[0].url} onRemove={onRemove} />
         </div>
         <div className="flex flex-1 flex-col gap-1">
           {images.slice(1).map((img) => (
             <div key={img.url} className="group relative flex-1 overflow-hidden">
               <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-              <RemoveBtn url={img.url} />
+              <RemoveImageButton url={img.url} onRemove={onRemove} />
             </div>
           ))}
         </div>
@@ -91,7 +99,7 @@ function ImageGrid({
         {images.map((img) => (
           <div key={img.url} className="group relative h-40 overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -103,13 +111,13 @@ function ImageGrid({
     <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
       <div className="group relative h-44 overflow-hidden">
         <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover" />
-        <RemoveBtn url={images[0].url} />
+        <RemoveImageButton url={images[0].url} onRemove={onRemove} />
       </div>
       <div className="grid grid-cols-4 gap-1 h-28">
         {images.slice(1).map((img) => (
           <div key={img.url} className="group relative overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -118,12 +126,20 @@ function ImageGrid({
 }
 
 interface CreateThreadModalProps {
-  communityId: string;
+  communityId?: string;
   onClose: () => void;
   onCreated: (thread: CommunityThread) => void;
+  initialIsPublic?: boolean;
+  publicOnly?: boolean;
 }
 
-export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThreadModalProps) {
+export function CreateThreadModal({
+  communityId,
+  onClose,
+  onCreated,
+  initialIsPublic = false,
+  publicOnly = false,
+}: CreateThreadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -134,7 +150,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
   const tagDropdownRef   = useRef<HTMLDivElement>(null);
   const [attachments,    setAttachments]    = useState<ThreadAttachment[]>([]);
   const [allowReplies,   setAllowReplies]   = useState(true);
-  const [isPublic,       setIsPublic]       = useState(false);
+  const [isPublic,       setIsPublic]       = useState(initialIsPublic);
   const [uploading,      setUploading]      = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState<string | null>(null);
@@ -175,10 +191,15 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        const response = await fetch(`/api/communities/${communityId}/threads/upload`, {
+        const response = await fetch(
+          publicOnly
+            ? "/api/home/uploads/threads"
+            : `/api/communities/${communityId}/threads/upload`,
+          {
           method: "POST",
           body: formData,
-        });
+          },
+        );
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Upload failed.");
         uploaded.push(data.attachment as ThreadAttachment);
@@ -202,11 +223,23 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/communities/${communityId}/threads`, {
+      const response = await fetch(
+        publicOnly ? "/api/home/posts/threads" : `/api/communities/${communityId}/threads`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, category, tags, attachments, links: extractedLinks, allow_replies: allowReplies, is_public: isPublic }),
-      });
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          tags,
+          attachments,
+          links: extractedLinks,
+          allow_replies: allowReplies,
+          is_public: publicOnly ? true : isPublic,
+        }),
+        },
+      );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to post.");
       onCreated(data.thread as CommunityThread);
@@ -385,7 +418,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
             </span>
           </label>
 
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2.5">
               <Globe size={15} className="shrink-0 text-foreground-muted" />
               <span>
@@ -397,7 +430,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
               <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
             </span>
-          </label>
+          </label>}
         </div>
 
         {/* ── Error ── */}

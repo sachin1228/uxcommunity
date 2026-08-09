@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function DELETE(
   _req: NextRequest,
@@ -9,15 +10,21 @@ export async function DELETE(
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
 
-  const { commentId } = await params;
+  const { id: communityId, threadId, commentId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
 
-  const { data: comment } = await db
+  const publicScope = isPublicContentScope(communityId);
+  let commentQuery = db
     .from("thread_comments")
     .select("id, user_id")
-    .eq("id", commentId)
-    .maybeSingle();
+    .eq("id", commentId);
+  if (publicScope) {
+    commentQuery = commentQuery.eq("thread_id", threadId);
+  } else {
+    commentQuery = commentQuery.eq("thread_id", threadId);
+  }
+  const { data: comment } = await commentQuery.maybeSingle();
 
   if (!comment) return NextResponse.json({ error: "Comment not found." }, { status: 404 });
   if (comment.user_id !== userId) {

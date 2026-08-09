@@ -9,18 +9,20 @@ import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 // Feed item as returned by /api/home/feed — typed union
-type FeedThread   = CommunityThread   & { _type: "thread";   community_name: string | null; community_image: string | null };
-type FeedEvent    = CommunityEvent    & { _type: "event";    community_name: string | null; community_image: string | null };
-type FeedResource = CommunityResource & { _type: "resource"; community_name: string | null; community_image: string | null };
+type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
+type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null };
+type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedItem = FeedThread | FeedEvent | FeedResource;
 
 interface HomeFeedProps {
   currentUserId: string;
+  refreshToken?: number;
 }
 
-export function HomeFeed({ currentUserId }: HomeFeedProps) {
+export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +32,7 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
       .then((d) => { if (d?.items) setItems(d.items); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshToken]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
@@ -202,9 +204,9 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
           return (
             <li key={`thread-${group.item.id}`}>
               <ThreadCard
-                thread={group.item}
+                thread={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
-                communityId={group.item.community_id}
+                communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                 communityName={group.item.community_name ?? undefined}
                 detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
@@ -227,9 +229,9 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
                   </p>
                 )}
                 <EventCard
-                  event={group.item}
+                  event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
-                  communityId={group.item.community_id}
+                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
@@ -265,9 +267,9 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
                     </div>
                   )}
                   <ResourceCard
-                    resource={res}
+                    resource={{ ...res, community_id: res.community_id ?? "" }}
                     currentUserId={currentUserId}
-                    communityId={res.community_id}
+                    communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
                     onUpdated={handleResourceUpdated}
                     onSaveChanged={handleResourceSaveChanged}
                     onBookmarkChanged={handleResourceBookmarkChanged}

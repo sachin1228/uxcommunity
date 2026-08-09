@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createNotification, getActorName, threadHref } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -53,18 +54,21 @@ export async function GET(
 
   const { id: communityId, threadId } = await params;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
   // Allow any authenticated user to read comments on public threads
-  const { data: threadAccess } = await db
+  let accessQuery = db
     .from("community_threads")
     .select("is_public")
-    .eq("id", threadId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", threadId);
+  accessQuery = publicScope
+    ? accessQuery.eq("is_public", true).is("community_id", null)
+    : accessQuery.eq("community_id", communityId);
+  const { data: threadAccess } = await accessQuery.maybeSingle();
 
   if (!threadAccess) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
-  if (!threadAccess.is_public && !(await isMember(db, communityId, session.userId!))) {
+  if (!threadAccess.is_public && !publicScope && !(await isMember(db, communityId, session.userId!))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
@@ -102,20 +106,23 @@ export async function POST(
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
   // Fetch thread to check access and allow_replies in one query
-  const { data: thread } = await db
+  let threadQuery = db
     .from("community_threads")
     .select("id, user_id, title, allow_replies, is_public")
-    .eq("id", threadId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", threadId);
+  threadQuery = publicScope
+    ? threadQuery.eq("is_public", true).is("community_id", null)
+    : threadQuery.eq("community_id", communityId);
+  const { data: thread } = await threadQuery.maybeSingle();
 
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (!thread.allow_replies) return NextResponse.json({ error: "This thread does not allow replies." }, { status: 403 });
 
   // Private threads require community membership to comment
-  if (!thread.is_public && !(await isMember(db, communityId, userId))) {
+  if (!thread.is_public && !publicScope && !(await isMember(db, communityId, userId))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 

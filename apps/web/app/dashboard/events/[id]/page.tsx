@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,7 +23,7 @@ async function getPublicEvent(
 
   if (!data) return null;
 
-  const authorId = data.user_id;
+  const authorId = (data as unknown as { user_id: string }).user_id;
   const [{ data: userRow }, { data: profileRow }, { data: allRsvps }, { data: myRsvp }] =
     await Promise.all([
       db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
@@ -33,7 +34,7 @@ async function getPublicEvent(
 
   return {
     ...(data as unknown as CommunityEvent),
-    users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
+    users: userRow ? { name: (userRow as { name: string }).name, avatar_url: (profileRow as { avatar_url: string | null } | null)?.avatar_url ?? null } : null,
     rsvp_count: (allRsvps ?? []).length,
     user_rsvped: Boolean(myRsvp),
   };
@@ -51,7 +52,7 @@ async function getRsvps(
 
   if (!data?.length) return [];
 
-  const userIds = data.map((r) => r.user_id);
+  const userIds = (data as Array<{ user_id: string }>).map((r) => r.user_id);
   const [{ data: users }, { data: profiles }] = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
@@ -82,7 +83,9 @@ export default async function PublicEventDetailPage({ params }: Props) {
   if (!event) redirect("/dashboard");
 
   const [communityData, userRow, profileRow] = await Promise.all([
-    db.from("communities").select("name").eq("id", event.community_id).maybeSingle(),
+    event.community_id
+      ? db.from("communities").select("name").eq("id", event.community_id).maybeSingle()
+      : Promise.resolve({ data: null }),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
   ]);
@@ -97,8 +100,8 @@ export default async function PublicEventDetailPage({ params }: Props) {
           currentUserId={userId}
           currentUserName={userRow.data?.name ?? ""}
           currentUserAvatar={profileRow.data?.avatar_url ?? null}
-          communityId={event.community_id}
-          communityName={communityData.data?.name ?? "Community"}
+           communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
+          communityName={communityData.data?.name ?? (event.community_id ? "Community" : "Public event")}
           backHref="/dashboard"
         />
       </div>

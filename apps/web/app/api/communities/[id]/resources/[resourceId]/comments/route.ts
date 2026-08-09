@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createNotification, getActorName, resourceHref } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -53,18 +54,21 @@ export async function GET(
 
   const { id: communityId, resourceId } = await params;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
   // Allow any authenticated user to read comments on public resources
-  const { data: resourceAccess } = await db
+  let accessQuery = db
     .from("community_resources")
     .select("is_public")
     .eq("id", resourceId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+  accessQuery = publicScope
+    ? accessQuery.eq("is_public", true).is("community_id", null)
+    : accessQuery.eq("community_id", communityId);
+  const { data: resourceAccess } = await accessQuery.maybeSingle();
 
   if (!resourceAccess) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
 
-  if (!resourceAccess.is_public && !(await isMember(db, communityId, session.userId!))) {
+  if (!resourceAccess.is_public && !publicScope && !(await isMember(db, communityId, session.userId!))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
@@ -102,18 +106,21 @@ export async function POST(
   const { id: communityId, resourceId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
   // Fetch resource to check access in one query
-  const { data: resource } = await db
+  let resourceQuery = db
     .from("community_resources")
     .select("id, user_id, title, is_public")
     .eq("id", resourceId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+  resourceQuery = publicScope
+    ? resourceQuery.eq("is_public", true).is("community_id", null)
+    : resourceQuery.eq("community_id", communityId);
+  const { data: resource } = await resourceQuery.maybeSingle();
   if (!resource) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
 
   // Private resources require community membership to comment
-  if (!resource.is_public && !(await isMember(db, communityId, userId))) {
+  if (!resource.is_public && !publicScope && !(await isMember(db, communityId, userId))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 

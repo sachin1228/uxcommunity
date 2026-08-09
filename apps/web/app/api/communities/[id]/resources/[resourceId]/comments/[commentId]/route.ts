@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function DELETE(
   _req: NextRequest,
@@ -12,15 +13,26 @@ export async function DELETE(
   const { id: communityId, resourceId, commentId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  // Verify membership
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  let resourceQuery = db
+    .from("community_resources")
+    .select("id, is_public")
+    .eq("id", resourceId);
+  resourceQuery = publicScope
+    ? resourceQuery.eq("is_public", true).is("community_id", null)
+    : resourceQuery.eq("community_id", communityId);
+  const { data: resource } = await resourceQuery.maybeSingle();
+  if (!resource) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
+  if (!resource.is_public && !publicScope) {
+    const { data: membership } = await db
+      .from("community_members")
+      .select("joined_at")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   const { data: existing } = await db
     .from("resource_comments")

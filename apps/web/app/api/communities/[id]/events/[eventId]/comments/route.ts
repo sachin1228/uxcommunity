@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { createNotification, eventHref, getActorName } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -12,8 +13,15 @@ export async function GET(
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
 
-  const { eventId } = await params;
+  const { id: communityId, eventId } = await params;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
+  let eventQuery = db.from("community_events").select("id, is_public").eq("id", eventId);
+  eventQuery = publicScope
+    ? eventQuery.eq("is_public", true).is("community_id", null)
+    : eventQuery.eq("community_id", communityId);
+  const { data: event } = await eventQuery.maybeSingle();
+  if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 
   const { data, error } = await db
     .from("event_comments")
@@ -55,12 +63,15 @@ export async function POST(
   const db = createServiceClient();
 
   // Verify event exists in this community
-  const { data: event } = await db
+  const publicScope = isPublicContentScope(communityId);
+  let eventQuery = db
     .from("community_events")
     .select("id, user_id, title")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", eventId);
+  eventQuery = publicScope
+    ? eventQuery.eq("is_public", true).is("community_id", null)
+    : eventQuery.eq("community_id", communityId);
+  const { data: event } = await eventQuery.maybeSingle();
 
   if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 
