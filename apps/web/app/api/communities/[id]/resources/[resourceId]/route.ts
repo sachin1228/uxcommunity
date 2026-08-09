@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { ResourceType } from "@/components/communities/resources/types";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 const RESOURCE_TYPES = new Set<ResourceType>([
   "figma", "article", "tool", "video", "book",
@@ -62,19 +63,22 @@ export async function GET(
   const { id: communityId, resourceId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data, error } = await db
+  let resourceQuery = db
     .from("community_resources")
     .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
-    .eq("id", resourceId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", resourceId);
+  resourceQuery = publicScope
+    ? resourceQuery.eq("is_public", true).is("community_id", null)
+    : resourceQuery.eq("community_id", communityId);
+  const { data, error } = await resourceQuery.maybeSingle();
 
   if (error) { console.error("[GET resource]", error); return NextResponse.json({ error: "Failed to fetch resource." }, { status: 500 }); }
   if (!data) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
 
   // Non-members may view public resources; private resources require membership
-  if (!data.is_public) {
+  if (!data.is_public && !publicScope) {
     const { data: membership } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
     if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
@@ -92,8 +96,13 @@ export async function PATCH(
   const { id: communityId, resourceId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db.from("community_resources").select("id, user_id, community_id").eq("id", resourceId).eq("community_id", communityId).maybeSingle();
+  let existingQuery = db.from("community_resources").select("id, user_id, community_id, is_public").eq("id", resourceId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
   if (!existing) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only edit your own resources." }, { status: 403 });
 
@@ -136,8 +145,13 @@ export async function DELETE(
   const { id: communityId, resourceId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db.from("community_resources").select("id, user_id, community_id").eq("id", resourceId).eq("community_id", communityId).maybeSingle();
+  let existingQuery = db.from("community_resources").select("id, user_id, community_id, is_public").eq("id", resourceId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
   if (!existing) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own resources." }, { status: 403 });
 
