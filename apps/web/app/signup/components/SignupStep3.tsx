@@ -23,18 +23,18 @@ export function SignupStep3({
   onContinue,
 }: SignupStep3Props) {
   return (
-    <div className="p-8">
-      <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+    <div className="rounded-xl bg-surface p-8 shadow-card">
+      <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         What are your design interests?
       </h2>
-      <p className="font-body text-sm text-overlay-muted mb-1">Step 3 of 4</p>
-      <p className="font-body text-xs text-overlay-muted mb-7">
+      <p className="font-body text-sm text-foreground-muted mb-1">Step 3 of 4</p>
+      <p className="font-body text-xs text-foreground-muted mb-7">
         Pick the topics you care about most. You can always update these later.
       </p>
 
       {error && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 mb-5">
-          <p className="font-body text-sm text-red-400">{error}</p>
+          <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
         </div>
       )}
 

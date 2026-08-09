@@ -36,21 +36,21 @@ export function SignupStep2({
   onSubmit,
 }: SignupStep2Props) {
   return (
-    <div className="p-8">
-      <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+    <div className="rounded-xl bg-surface p-8 shadow-card">
+      <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Complete your profile
       </h2>
-      <p className="font-body text-sm text-overlay-muted mb-7">Step 2 of 4</p>
+      <p className="font-body text-sm text-foreground-muted mb-7">Step 2 of 4</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <p className="font-body text-sm text-red-400">{error}</p>
+            <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
           </div>
         )}
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">
+          <span className="font-body text-xs font-medium text-foreground">
             Company <span className="text-red-400">*</span>
           </span>
           <SearchableSelect
@@ -63,7 +63,7 @@ export function SignupStep2({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">
+          <span className="font-body text-xs font-medium text-foreground">
             City <span className="text-red-400">*</span>
           </span>
           <SearchableSelect
@@ -76,7 +76,7 @@ export function SignupStep2({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">
+          <span className="font-body text-xs font-medium text-foreground">
             Industry Sector <span className="text-red-400">*</span>
           </span>
           <SearchableSelect
@@ -89,7 +89,7 @@ export function SignupStep2({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">
+          <span className="font-body text-xs font-medium text-foreground">
             Experience Level <span className="text-red-400">*</span>
           </span>
           <SearchableSelect

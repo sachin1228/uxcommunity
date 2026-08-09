@@ -52,7 +52,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#000] px-6 py-12">
+    <main className="grid min-h-screen place-items-center bg-background px-6 py-12">
       <BrandLogo
         className="fixed left-6 top-6 z-20"
         iconClassName="h-8 w-8"
@@ -60,9 +60,9 @@ export default function LoginPage() {
       />
       <section className="w-full max-w-sm">
         <div className="p-8">
-          <h2 className="font-display text-2xl font-semibold text-[#EDEDED]">
+          <h1 className="font-display text-2xl font-semibold text-foreground">
             Log in to your account
-          </h2>
+          </h1>
 
           <form className="mt-7 flex flex-col gap-5" onSubmit={handleLogin}>
             {error && (
@@ -80,7 +80,7 @@ export default function LoginPage() {
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="font-body text-xs font-medium text-[#EDEDED]">
+              <span className="font-body text-xs font-medium text-foreground">
                 Email address
               </span>
               <input
@@ -88,7 +88,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
                 placeholder="you@studio.com"
-                className="rounded-md border border-[#303036] bg-[#09090B] px-3.5 py-2.5 font-body text-sm text-[#EDEDED] outline-none transition-colors placeholder:text-[#737373] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                className="rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                 autoComplete="email"
                 required
               />
@@ -96,7 +96,7 @@ export default function LoginPage() {
 
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <span className="font-body text-xs font-medium text-[#EDEDED]">
+                <span className="font-body text-xs font-medium text-foreground">
                   Password
                 </span>
                 <Link
@@ -112,14 +112,14 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null); }}
                   placeholder="••••••••"
-                  className="w-full rounded-md border border-[#303036] bg-[#09090B] px-3.5 py-2.5 pr-10 font-body text-sm text-[#EDEDED] outline-none transition-colors placeholder:text-[#737373] focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                  className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 pr-10 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
                   autoComplete="current-password"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#737373] transition-colors hover:text-[#EDEDED]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle transition-colors hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -138,17 +138,17 @@ export default function LoginPage() {
           </form>
 
           <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-[#202024]" />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-[#737373]">
+            <span className="h-px flex-1 bg-border" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-foreground-subtle">
               or continue with
             </span>
-            <span className="h-px flex-1 bg-[#202024]" />
+            <span className="h-px flex-1 bg-border" />
           </div>
 
           <button
             type="button"
             disabled
-            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-[#202024] bg-[#09090B] py-2.5 font-body text-sm text-[#737373] opacity-50"
+            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-border bg-surface py-2.5 font-body text-sm text-foreground-subtle opacity-60"
           >
             Google{" "}
             <span className="font-mono text-[10px] tracking-wide">
@@ -157,7 +157,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-center font-body text-sm text-[#737373]">
+        <p className="mt-6 text-center font-body text-sm text-foreground-muted">
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"

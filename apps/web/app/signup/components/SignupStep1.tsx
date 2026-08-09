@@ -21,11 +21,11 @@ interface SignupStep1Props {
 
 function FieldError({ errors, field }: { errors: Record<string, string[]>; field: string }) {
   if (!errors[field]?.length) return null;
-  return <p className="mt-1 font-body text-xs text-red-400">{errors[field][0]}</p>;
+  return <p className="mt-1 font-body text-xs text-red-500 dark:text-red-400">{errors[field][0]}</p>;
 }
 
 const inputClass =
-  "rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+  "w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:ring-2 focus:ring-accent/20";
 
 export function SignupStep1({
   state,
@@ -50,21 +50,21 @@ export function SignupStep1({
   );
 
   return (
-    <div className="p-8">
-      <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+    <div className="rounded-xl bg-surface p-8 shadow-card">
+      <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Create your account
       </h2>
-      <p className="font-body text-sm text-overlay-muted mb-7">Step 1 of 4</p>
+      <p className="font-body text-sm text-foreground-muted mb-7">Step 1 of 4</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-            <p className="font-body text-sm text-red-400">{error}</p>
+            <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
           </div>
         )}
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">Full Name</span>
+          <span className="font-body text-xs font-medium text-foreground">Full Name</span>
           <input type="text" value={state.name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Jordan Lee" className={inputClass} autoComplete="name" required />
@@ -72,7 +72,7 @@ export function SignupStep1({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">Email</span>
+          <span className="font-body text-xs font-medium text-foreground">Email</span>
           <input type="email" value={state.email}
             onChange={(e) => onChange({ email: e.target.value })}
             placeholder="you@studio.com" className={inputClass} autoComplete="username" required />
@@ -80,7 +80,7 @@ export function SignupStep1({
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">Password</span>
+          <span className="font-body text-xs font-medium text-foreground">Password</span>
           <div className="relative">
             <input type={showPassword ? "text" : "password"} value={state.password}
               onChange={(e) => onChange({ password: e.target.value })}
@@ -88,7 +88,7 @@ export function SignupStep1({
               className={inputClass} autoComplete="new-password" required />
             <button type="button" tabIndex={-1}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-overlay-muted hover:text-overlay-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center text-foreground-subtle hover:text-foreground transition-colors">
               {showPassword ? <EyeOff /> : <EyeOpen />}
             </button>
           </div>
@@ -96,14 +96,14 @@ export function SignupStep1({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-overlay-foreground">Confirm Password</span>
+          <span className="font-body text-xs font-medium text-foreground">Confirm Password</span>
           <div className="relative">
             <input type={showConfirm ? "text" : "password"} value={state.confirm_password}
               onChange={(e) => onChange({ confirm_password: e.target.value })}
               placeholder="••••••••" className={inputClass} autoComplete="new-password" required />
             <button type="button" tabIndex={-1}
               onClick={() => setShowConfirm((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-overlay-muted hover:text-overlay-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center text-foreground-subtle hover:text-foreground transition-colors">
               {showConfirm ? <EyeOff /> : <EyeOpen />}
             </button>
           </div>

@@ -311,7 +311,7 @@ function SignupInner() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#000] px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <BrandLogo
         className="fixed left-5 top-5 z-20"
         iconClassName="h-6 w-6"
@@ -321,14 +321,14 @@ function SignupInner() {
 
         {tokenState.status === "loading" && (
           <div className="flex justify-center py-16">
-            <Spinner className="h-6 w-6 text-overlay-muted" />
+            <Spinner className="h-6 w-6 text-foreground-muted" />
           </div>
         )}
 
         {tokenState.status === "invalid" && (
-          <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 text-center">
-            <p className="font-display text-lg font-semibold text-overlay-foreground mb-2">Invalid link</p>
-            <p className="font-body text-sm text-overlay-muted">{tokenState.error}</p>
+          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
+            <p className="font-display text-lg font-semibold text-foreground mb-2">Invalid link</p>
+            <p className="font-body text-sm text-foreground-muted">{tokenState.error}</p>
           </div>
         )}
 
@@ -386,14 +386,14 @@ function SignupInner() {
         )}
 
         {step === "done" && (
-          <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 text-center shadow-xl">
+          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft mx-auto mb-4">
               <span className="text-2xl">✓</span>
             </div>
-            <h2 className="font-display text-xl font-semibold text-overlay-foreground mb-2">
+            <h2 className="font-display text-xl font-semibold text-foreground mb-2">
               You&apos;re in!
             </h2>
-            <p className="font-body text-sm text-overlay-muted">Redirecting to your dashboard…</p>
+            <p className="font-body text-sm text-foreground-muted">Redirecting to your dashboard…</p>
           </div>
         )}
 
@@ -405,8 +405,8 @@ function SignupInner() {
 export default function SignupPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-[#000]">
-        <Spinner className="h-6 w-6 text-overlay-muted" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Spinner className="h-6 w-6 text-foreground-muted" />
       </div>
     }>
       <SignupInner />

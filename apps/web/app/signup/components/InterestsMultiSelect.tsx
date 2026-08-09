@@ -65,29 +65,29 @@ export function InterestsMultiSelect({
         className={`min-h-[42px] flex flex-wrap items-center gap-1.5 cursor-pointer rounded-md border px-3 py-2 transition-colors ${
           open
             ? "border-accent ring-2 ring-accent/20"
-            : "border-overlay-elevated hover:border-overlay-muted"
-        } bg-overlay`}
+             : "border-border hover:border-foreground-subtle"
+          } bg-surface`}
       >
         {selectedOptions.map((o) => (
           <span
             key={o.id}
-            className="inline-flex items-center gap-1 rounded-md bg-overlay-elevated px-2 py-0.5 font-body text-xs text-overlay-foreground"
+            className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2 py-0.5 font-body text-xs text-foreground"
           >
             {o.name}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); remove(o.id); }}
-              className="text-overlay-muted hover:text-overlay-foreground transition-colors ml-0.5"
+              className="text-foreground-muted hover:text-foreground transition-colors ml-0.5"
             >
               ×
             </button>
           </span>
         ))}
-        <span className="flex-1 min-w-[80px] font-body text-sm text-overlay-muted select-none">
+         <span className="flex-1 min-w-[80px] font-body text-sm text-foreground-muted select-none">
           {selectedOptions.length === 0 ? "Select topics…" : ""}
         </span>
         <svg
-          className={`h-4 w-4 text-overlay-muted shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
+           className={`h-4 w-4 text-foreground-muted shrink-0 transition-transform ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20" fill="currentColor"
         >
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -95,7 +95,7 @@ export function InterestsMultiSelect({
       </div>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-md border border-overlay-elevated bg-overlay shadow-xl overflow-hidden">
+        <div className="absolute z-20 mt-1 w-full rounded-md border border-border bg-surface-raised shadow-md overflow-hidden">
           <div className="max-h-64 overflow-y-auto">
             {options.map((option) => {
               const isSelected = selected.includes(option.id);
@@ -104,15 +104,15 @@ export function InterestsMultiSelect({
                   key={option.id}
                   type="button"
                   onClick={() => toggle(option.id)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-overlay-elevated transition-colors"
+                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-background-subtle transition-colors"
                 >
                   <InterestIcon imageUrl={option.image_url} name={option.name} />
-                  <span className="flex-1 font-body text-sm text-overlay-foreground">
+                   <span className="flex-1 font-body text-sm text-foreground">
                     {option.name}
                   </span>
                   <span
                     className={`h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors ${
-                      isSelected ? "bg-accent" : "border border-overlay-muted"
+                       isSelected ? "bg-accent" : "border border-foreground-subtle"
                     }`}
                   >
                     {isSelected && (
