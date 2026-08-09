@@ -261,7 +261,7 @@ export default function CommunityChat() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       {/* Header measured for iOS keyboard offset. Android uses keyboard-controller height resize. */}
@@ -270,7 +270,7 @@ export default function CommunityChat() {
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
+            backgroundColor: colors.subtle,
             borderBottomColor: colors.border,
             paddingTop: insets.top + 8,
           },
@@ -328,7 +328,7 @@ export default function CommunityChat() {
           never moves with the keyboard. Fills the gesture-navigation area with
           the app background color, exactly like WhatsApp. On iOS this covers
           the home-indicator inset; on Android it covers the gesture nav bar. */}
-      <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
+      <View style={{ height: insets.bottom, backgroundColor: colors.subtle }} />
 
       {/* Full-screen image viewer */}
       <ImageViewer

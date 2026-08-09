@@ -52,7 +52,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       <KeyboardAvoidingView
@@ -243,7 +243,7 @@ function makeStyles(colors: Colors) {
     logoLetter: {
       fontSize: 26,
       fontFamily: 'Geist_700Bold',
-      color: '#FFFFFF',
+      color: colors.primaryForeground,
     },
     title: {
       fontSize: 26,
@@ -261,7 +261,7 @@ function makeStyles(colors: Colors) {
       padding: 24,
       gap: 20,
       // subtle shadow
-      shadowColor: '#000',
+      shadowColor: colors.foreground,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
       shadowRadius: 8,

@@ -210,8 +210,8 @@ function ReactionChips({
             style={[
               styles.reactionChip,
               {
-                backgroundColor: isActive ? colors.primarySoft : '#2a2a2a',
-                borderColor: isActive ? colors.primary : '#000',
+                backgroundColor: isActive ? colors.primarySoft : colors.secondary,
+                borderColor: isActive ? colors.primary : colors.border,
               },
             ]}
           >
@@ -244,13 +244,13 @@ function ReplyPreview({
     <View
       style={[
         styles.replyPreview,
-        { borderLeftColor: colors.primary, backgroundColor: 'rgba(0,0,0,0.15)' },
+        { borderLeftColor: colors.primary, backgroundColor: colors.subtle },
       ]}
     >
-      <Text style={[styles.replyName, { color: 'rgba(255,255,255,0.8)' }]}>
+      <Text style={[styles.replyName, { color: colors.cardForeground }]}>
         {replyTo.user_name}
       </Text>
-      <Text style={[styles.replyContent, { color: 'rgba(255,255,255,0.6)' }]} numberOfLines={1}>
+      <Text style={[styles.replyContent, { color: colors.mutedForeground }]} numberOfLines={1}>
         {replyTo.content ?? '📷 Image'}
       </Text>
     </View>
@@ -299,7 +299,7 @@ export function MessageBubble({
     isEmojiOnly(message.content);
 
   // Fix #1/#2: time color
-  const timeColor = isOwn ? 'rgba(255,255,255,0.6)' : colors.mutedForeground;
+  const timeColor = isOwn ? colors.primaryForeground : colors.mutedForeground;
 
   return (
     <View
@@ -334,15 +334,15 @@ export function MessageBubble({
             style={[
               styles.deletedBubble,
               {
-                backgroundColor: isOwn ? 'rgba(0,112,243,0.3)' : colors.card,
-                borderColor: isOwn ? 'rgba(255,255,255,0.1)' : colors.border,
+                backgroundColor: isOwn ? colors.primarySoft : colors.card,
+                borderColor: isOwn ? colors.primary : colors.border,
               },
             ]}
           >
-            <Text style={[styles.deletedIcon, { color: isOwn ? 'rgba(255,255,255,0.4)' : colors.mutedForeground }]}>
+            <Text style={[styles.deletedIcon, { color: isOwn ? colors.primaryForeground : colors.mutedForeground }]}>
               ⊘
             </Text>
-            <Text style={[styles.deletedText, { color: isOwn ? 'rgba(255,255,255,0.5)' : colors.mutedForeground }]}>
+            <Text style={[styles.deletedText, { color: isOwn ? colors.primaryForeground : colors.mutedForeground }]}>
               {isOwn ? 'You deleted this message' : 'This message was deleted'}
             </Text>
             <Text style={[styles.deletedTime, { color: timeColor }]}>
@@ -391,15 +391,15 @@ export function MessageBubble({
                   resizeMode="cover"
                 />
                 {(!message.status || message.status === 'sent') && (
-                  <View style={styles.imageTimeOverlay}>
-                    <Text style={styles.imageTimeText}>
+                  <View style={[styles.imageTimeOverlay, { backgroundColor: colors.foreground + '73' }]}>
+                    <Text style={[styles.imageTimeText, { color: colors.primaryForeground }]}>
                       {formatTime(message.created_at)}
                     </Text>
                     {isOwn && (
                       <Ionicons
                         name="checkmark-done-sharp"
                         size={13}
-                        color="rgba(255,255,255,0.95)"
+                        color={colors.primaryForeground}
                       />
                     )}
                   </View>
@@ -409,15 +409,15 @@ export function MessageBubble({
               {/* Sending overlay — spinner ring + cancel */}
               {isOwn && message.status === 'sending' && (
                 <View style={styles.statusOverlay} pointerEvents="box-none">
-                  <View style={styles.spinnerRing} pointerEvents="none">
-                    <ActivityIndicator size="large" color="rgba(255,255,255,0.9)" />
+                  <View style={[styles.spinnerRing, { backgroundColor: colors.foreground + '59' }]} pointerEvents="none">
+                    <ActivityIndicator size="large" color={colors.primaryForeground} />
                   </View>
                   <Pressable
                     onPress={() => onCancel?.(message.id)}
                     style={styles.cancelCircle}
                     hitSlop={10}
                   >
-                    <Ionicons name="close" size={18} color="white" />
+                    <Ionicons name="close" size={18} color={colors.primaryForeground} />
                   </Pressable>
                 </View>
               )}
@@ -428,7 +428,7 @@ export function MessageBubble({
                   style={styles.statusOverlay}
                   onPress={() => onRetry?.(message.id)}
                 >
-                  <Ionicons name="reload-outline" size={28} color="white" />
+                  <Ionicons name="reload-outline" size={28} color={colors.primaryForeground} />
                   <Text style={styles.retryLabel}>Tap to retry</Text>
                 </Pressable>
               )}
@@ -494,7 +494,7 @@ export function MessageBubble({
                     <ActivityIndicator size="small" color={timeColor} />
                   )}
                   {isOwn && message.status === 'failed' && (
-                    <Ionicons name="warning-outline" size={15} color="rgba(255,100,100,0.9)" />
+                    <Ionicons name="warning-outline" size={15} color={colors.destructive} />
                   )}
                 </View>
               </Pressable>
@@ -502,15 +502,15 @@ export function MessageBubble({
               {/* Sending overlay */}
               {isOwn && message.status === 'sending' && (
                 <View style={[styles.statusOverlay, { borderRadius: 16 }]} pointerEvents="box-none">
-                  <View style={styles.spinnerRing} pointerEvents="none">
-                    <ActivityIndicator size="large" color="rgba(255,255,255,0.9)" />
+                  <View style={[styles.spinnerRing, { backgroundColor: colors.foreground + '59' }]} pointerEvents="none">
+                    <ActivityIndicator size="large" color={colors.primaryForeground} />
                   </View>
                   <Pressable
                     onPress={() => onCancel?.(message.id)}
                     style={styles.cancelCircle}
                     hitSlop={10}
                   >
-                    <Ionicons name="close" size={18} color="white" />
+                    <Ionicons name="close" size={18} color={colors.primaryForeground} />
                   </Pressable>
                 </View>
               )}
@@ -521,8 +521,8 @@ export function MessageBubble({
                   style={[styles.statusOverlay, { borderRadius: 16 }]}
                   onPress={() => onRetry?.(message.id)}
                 >
-                  <Ionicons name="reload-outline" size={28} color="white" />
-                  <Text style={styles.retryLabel}>Tap to retry</Text>
+                  <Ionicons name="reload-outline" size={28} color={colors.primaryForeground} />
+                  <Text style={[styles.retryLabel, { color: colors.primaryForeground }]}>Tap to retry</Text>
                 </Pressable>
               )}
             </View>
@@ -575,8 +575,8 @@ export function MessageBubble({
                 )}
                 {isOwn && message.status === 'failed' && (
                   <>
-                    <Ionicons name="warning-outline" size={14} color="rgba(255,120,120,0.9)" />
-                    <Text style={[styles.timeText, { color: 'rgba(255,120,120,0.9)' }]}>
+                    <Ionicons name="warning-outline" size={14} color={colors.destructive} />
+                    <Text style={[styles.timeText, { color: colors.destructive }]}>
                       Tap to retry
                     </Text>
                   </>
@@ -742,13 +742,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   imageTimeText: {
-    color: 'rgba(255,255,255,0.95)',
     fontSize: 10,
     fontFamily: 'Geist_400Regular',
   },
@@ -811,7 +809,6 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
 
   /** The × button centred inside the spinner ring. */
@@ -825,7 +822,6 @@ const styles = StyleSheet.create({
   },
 
   retryLabel: {
-    color: 'rgba(255,255,255,0.9)',
     fontSize: 11,
     fontFamily: 'Geist_500Medium',
   },

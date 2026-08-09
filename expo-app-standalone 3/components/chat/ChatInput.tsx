@@ -100,7 +100,7 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
       <View style={styles.inputRow}>
 
         {/* Floating pill: emoji left | text | image right */}
-        <View style={[styles.pill, { backgroundColor: colors.card }]}>
+        <View style={[styles.pill, { backgroundColor: colors.card, shadowColor: colors.foreground }]}>
           {/* Emoji button — left inside pill */}
           <Pressable
             hitSlop={6}
@@ -217,7 +217,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 6,
     gap: 2,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
