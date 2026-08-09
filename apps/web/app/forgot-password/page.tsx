@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#000] px-4 py-12">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
       <BrandLogo
         className="fixed left-6 top-6 z-20"
         iconClassName="h-8 w-8"
@@ -59,11 +59,11 @@ export default function ForgotPasswordPage() {
         </Link>
 
         {/* Card */}
-        <div className="p-8">
+        <div className="rounded-xl bg-surface p-8 shadow-card">
           {step === "sent" ? (
             <div className="flex flex-col items-center gap-4 py-2 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
-                <span className="text-2xl">✉️</span>
+                    <span className="font-mono text-sm text-accent" aria-hidden="true">@</span>
               </div>
               <div>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-1">

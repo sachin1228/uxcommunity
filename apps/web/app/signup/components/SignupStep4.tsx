@@ -44,21 +44,21 @@ export function SignupStep4({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="p-8">
-      <h2 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+    <div className="rounded-xl bg-surface p-8 shadow-card">
+      <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Choose your avatar
       </h2>
-      <p className="font-body text-sm text-overlay-muted mb-6">Step 4 of 4</p>
+      <p className="font-body text-sm text-foreground-muted mb-6">Step 4 of 4</p>
 
       {error && (
         <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 mb-5">
-          <p className="font-body text-sm text-red-400">{error}</p>
+          <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
         </div>
       )}
 
       {/* Avatar library */}
-      <div className="mb-5 overflow-hidden rounded-xl border border-overlay-elevated">
-        <div className="flex gap-1 border-b border-overlay-elevated bg-overlay px-2 py-2">
+      <div className="mb-5 overflow-hidden rounded-xl border border-border">
+        <div className="flex gap-1 border-b border-border bg-surface-raised px-2 py-2">
           {avatarTabs.map((tab) => (
             <button
               key={tab.key}
@@ -67,7 +67,7 @@ export function SignupStep4({
               className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-2.5 py-2 font-body text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-accent text-accent-foreground"
-                  : "text-overlay-muted hover:bg-overlay-elevated hover:text-overlay-foreground"
+                   : "text-foreground-muted hover:bg-background-subtle hover:text-foreground"
               }`}
             >
               <span className="truncate">{tab.label}</span>
@@ -87,11 +87,11 @@ export function SignupStep4({
                   onClick={() => onPickAvatar(option)}
                   title={option.label}
                   className={`relative flex min-h-[84px] flex-col items-center justify-center gap-1.5 rounded-xl p-1.5 transition-all focus:outline-none ${
-                    isSelected ? "ring-2 ring-accent bg-accent/10" : "hover:bg-overlay-elevated"
+                   isSelected ? "ring-2 ring-accent bg-accent/10" : "hover:bg-background-subtle"
                   }`}
                 >
                   <AvatarPreview option={option} size={52} />
-                  <span className="w-full truncate text-center font-body text-[10px] leading-none text-overlay-muted">
+                    <span className="w-full truncate text-center font-body text-[10px] leading-none text-foreground-muted">
                     {option.label}
                   </span>
                   {isSelected && (
@@ -110,9 +110,9 @@ export function SignupStep4({
 
       {/* Divider */}
       <div className="flex items-center gap-3 mb-5">
-        <div className="flex-1 h-px bg-overlay-elevated" />
-        <span className="font-body text-xs text-overlay-muted">or upload your own</span>
-        <div className="flex-1 h-px bg-overlay-elevated" />
+         <div className="flex-1 h-px bg-border" />
+         <span className="font-body text-xs text-foreground-muted">or upload your own</span>
+         <div className="flex-1 h-px bg-border" />
       </div>
 
       {/* Upload */}
@@ -130,17 +130,17 @@ export function SignupStep4({
           <img src={uploadPreviewUrl} alt="Your uploaded photo"
             className="h-16 w-16 rounded-full object-cover ring-2 ring-accent" />
           <div>
-            <p className="font-body text-sm font-medium text-overlay-foreground">Photo ready</p>
-            <p className="font-body text-xs text-overlay-muted mt-0.5">Compressed &amp; cropped to 300×300</p>
+             <p className="font-body text-sm font-medium text-foreground">Photo ready</p>
+             <p className="font-body text-xs text-foreground-muted mt-0.5">Compressed &amp; cropped to 300×300</p>
             <button type="button" onClick={onRemoveUpload}
-              className="mt-1 font-body text-xs text-overlay-muted hover:text-red-400 transition-colors">
+               className="mt-1 font-body text-xs text-foreground-muted hover:text-red-500 dark:hover:text-red-400 transition-colors">
               Remove
             </button>
           </div>
         </div>
       ) : (
         <button type="button" onClick={() => fileInputRef.current?.click()}
-          className="mb-5 flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-overlay-elevated px-4 py-3 font-body text-sm text-overlay-muted hover:border-accent hover:text-overlay-foreground transition-colors">
+           className="mb-5 flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-border px-4 py-3 font-body text-sm text-foreground-muted hover:border-accent hover:text-foreground transition-colors">
           <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
             <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
