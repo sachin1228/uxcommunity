@@ -69,7 +69,7 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
 
   return (
     <>
-      <section className="mx-6 mb-4 overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <section className="mx-6 mb-4 overflow-hidden rounded-xl border border-border shadow-sm">
         <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 p-3 sm:p-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
           <div className="grid min-w-0 grid-cols-3 gap-0.5">
