@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   BookOpen,
   CalendarDays,
-  MessageSquarePlus,
+  Plus,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CreateEventModal } from "@/components/communities/events/CreateEventModal";
@@ -23,26 +23,26 @@ const postTypes: Array<{
   type: PostType;
   label: string;
   description: string;
-  icon: typeof MessageSquarePlus;
+  icon: typeof Plus;
   color: string;
 }> = [
   {
     type: "thread",
-    label: "Thread",
+    label: "Create Thread",
     description: "Start a discussion or ask a question",
-    icon: MessageSquarePlus,
+    icon: Plus,
     color: "text-accent",
   },
   {
     type: "resource",
-    label: "Resource",
+    label: "Create Resource",
     description: "Share a useful link with the community",
     icon: BookOpen,
     color: "text-emerald-600 dark:text-emerald-400",
   },
   {
     type: "event",
-    label: "Event",
+    label: "Create Event",
     description: "Invite members to something happening",
     icon: CalendarDays,
     color: "text-orange-600 dark:text-orange-400",
@@ -69,16 +69,16 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
 
   return (
     <>
-      <section className="mx-6 mb-4 overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <section className="mx-auto w-[calc(100%-3rem)] my-2 max-w-4xl overflow-hidden rounded-xl shadow-sm">
         <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 p-3 sm:p-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
-          <div className="grid min-w-0 grid-cols-3 gap-0.5">
+          <div className="grid min-w-0 grid-cols-3 justify-items-center gap-0.5">
             {postTypes.map(({ type, label, icon: Icon, color }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => openEditor(type)}
-                className="flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5 sm:px-2 sm:text-base"
+                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-2 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5 sm:text-base"
               >
                 <Icon size={20} className={color} />
                 <span className="truncate">{label}</span>
