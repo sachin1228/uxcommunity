@@ -12,6 +12,7 @@ interface CreateResourceModalProps {
   communityId: string;
   onClose: () => void;
   onCreated: (resource: CommunityResource) => void;
+  initialIsPublic?: boolean;
 }
 
 function isValidHttpUrl(s: string) {
@@ -21,14 +22,19 @@ function isValidHttpUrl(s: string) {
   } catch { return false; }
 }
 
-export function CreateResourceModal({ communityId, onClose, onCreated }: CreateResourceModalProps) {
+export function CreateResourceModal({
+  communityId,
+  onClose,
+  onCreated,
+  initialIsPublic = false,
+}: CreateResourceModalProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [resourceType, setResourceType] = useState<ResourceType>("article");
   const [tags, setTags] = useState<string[]>([]);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

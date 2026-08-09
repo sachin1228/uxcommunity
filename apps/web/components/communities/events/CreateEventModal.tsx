@@ -8,9 +8,15 @@ interface CreateEventModalProps {
   communityId: string;
   onClose: () => void;
   onCreated: (event: CommunityEvent) => void;
+  initialIsPublic?: boolean;
 }
 
-export function CreateEventModal({ communityId, onClose, onCreated }: CreateEventModalProps) {
+export function CreateEventModal({
+  communityId,
+  onClose,
+  onCreated,
+  initialIsPublic = false,
+}: CreateEventModalProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -24,7 +30,7 @@ export function CreateEventModal({ communityId, onClose, onCreated }: CreateEven
   const [location, setLocation] = useState("");
   const [meetLink, setMeetLink] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

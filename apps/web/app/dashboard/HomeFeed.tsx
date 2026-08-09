@@ -18,9 +18,10 @@ type FeedItem = FeedThread | FeedEvent | FeedResource;
 
 interface HomeFeedProps {
   currentUserId: string;
+  refreshToken?: number;
 }
 
-export function HomeFeed({ currentUserId }: HomeFeedProps) {
+export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +31,7 @@ export function HomeFeed({ currentUserId }: HomeFeedProps) {
       .then((d) => { if (d?.items) setItems(d.items); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [refreshToken]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 

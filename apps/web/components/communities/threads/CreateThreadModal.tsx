@@ -20,16 +20,14 @@ function bodyToThread(body: string): { title: string; description: string } {
 
 // ── Shared image grid (used inside the modal for previews with remove buttons) ──
 
-function ImageGrid({
-  images,
+function RemoveImageButton({
+  url,
   onRemove,
 }: {
-  images: ThreadAttachment[];
+  url: string;
   onRemove: (url: string) => void;
 }) {
-  if (images.length === 0) return null;
-
-  const RemoveBtn = ({ url }: { url: string }) => (
+  return (
     <button
       type="button"
       onClick={() => onRemove(url)}
@@ -39,13 +37,23 @@ function ImageGrid({
       <X size={12} />
     </button>
   );
+}
+
+function ImageGrid({
+  images,
+  onRemove,
+}: {
+  images: ThreadAttachment[];
+  onRemove: (url: string) => void;
+}) {
+  if (images.length === 0) return null;
 
   // 1 image — full width
   if (images.length === 1) {
     return (
       <div className="group relative mt-3 overflow-hidden rounded-xl border border-border">
         <img src={images[0].url} alt={images[0].name} className="max-h-72 w-full object-cover" />
-        <RemoveBtn url={images[0].url} />
+        <RemoveImageButton url={images[0].url} onRemove={onRemove} />
       </div>
     );
   }
@@ -57,7 +65,7 @@ function ImageGrid({
         {images.map((img) => (
           <div key={img.url} className="group relative h-52 overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -70,13 +78,13 @@ function ImageGrid({
       <div className="mt-3 flex h-60 gap-1 overflow-hidden rounded-xl">
         <div className="group relative flex-[2] overflow-hidden">
           <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover" />
-          <RemoveBtn url={images[0].url} />
+          <RemoveImageButton url={images[0].url} onRemove={onRemove} />
         </div>
         <div className="flex flex-1 flex-col gap-1">
           {images.slice(1).map((img) => (
             <div key={img.url} className="group relative flex-1 overflow-hidden">
               <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-              <RemoveBtn url={img.url} />
+              <RemoveImageButton url={img.url} onRemove={onRemove} />
             </div>
           ))}
         </div>
@@ -91,7 +99,7 @@ function ImageGrid({
         {images.map((img) => (
           <div key={img.url} className="group relative h-40 overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -103,13 +111,13 @@ function ImageGrid({
     <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
       <div className="group relative h-44 overflow-hidden">
         <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover" />
-        <RemoveBtn url={images[0].url} />
+        <RemoveImageButton url={images[0].url} onRemove={onRemove} />
       </div>
       <div className="grid grid-cols-4 gap-1 h-28">
         {images.slice(1).map((img) => (
           <div key={img.url} className="group relative overflow-hidden">
             <img src={img.url} alt={img.name} className="h-full w-full object-cover" />
-            <RemoveBtn url={img.url} />
+            <RemoveImageButton url={img.url} onRemove={onRemove} />
           </div>
         ))}
       </div>
@@ -121,9 +129,15 @@ interface CreateThreadModalProps {
   communityId: string;
   onClose: () => void;
   onCreated: (thread: CommunityThread) => void;
+  initialIsPublic?: boolean;
 }
 
-export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThreadModalProps) {
+export function CreateThreadModal({
+  communityId,
+  onClose,
+  onCreated,
+  initialIsPublic = false,
+}: CreateThreadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
@@ -134,7 +148,7 @@ export function CreateThreadModal({ communityId, onClose, onCreated }: CreateThr
   const tagDropdownRef   = useRef<HTMLDivElement>(null);
   const [attachments,    setAttachments]    = useState<ThreadAttachment[]>([]);
   const [allowReplies,   setAllowReplies]   = useState(true);
-  const [isPublic,       setIsPublic]       = useState(false);
+  const [isPublic,       setIsPublic]       = useState(initialIsPublic);
   const [uploading,      setUploading]      = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState<string | null>(null);
