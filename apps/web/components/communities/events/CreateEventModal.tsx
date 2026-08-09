@@ -315,7 +315,7 @@ export function CreateEventModal({
           </label>
 
           {/* Make public toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span>
               <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
               <span className="block font-body text-xs text-foreground-muted">This event will appear on the home feed for all members.</span>
@@ -329,7 +329,7 @@ export function CreateEventModal({
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
             </span>
-          </label>
+          </label>}
         </div>
 
         {error && (
