@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   BookOpen,
   CalendarDays,
-  MessageSquarePlus,
+  MessageCirclePlus,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CreateEventModal } from "@/components/communities/events/CreateEventModal";
@@ -23,14 +23,14 @@ const postTypes: Array<{
   type: PostType;
   label: string;
   description: string;
-  icon: typeof MessageSquarePlus;
+  icon: typeof MessageCirclePlus;
   color: string;
 }> = [
   {
     type: "thread",
     label: "Create Thread",
     description: "Start a discussion or ask a question",
-    icon: MessageSquarePlus,
+    icon: MessageCirclePlus,
     color: "text-accent",
   },
   {
