@@ -53,14 +53,14 @@ export default function CommunitiesScreen() {
   const keyExtractor = useCallback((item: Community) => item.id, []);
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       {/* Header */}
       <View
         style={[
           styles.header,
-          { backgroundColor: colors.background, borderBottomColor: colors.border, paddingTop: insets.top + 8 },
+          { backgroundColor: colors.subtle, borderBottomColor: colors.border, paddingTop: insets.top + 8 },
         ]}
       >
         {/* Logo */}

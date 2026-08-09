@@ -7,7 +7,7 @@ export default function JobsTab() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
+    <View style={[styles.root, { backgroundColor: colors.subtle, paddingTop: insets.top + 16 }]}>
       <Text style={[styles.text, { color: colors.mutedForeground }]}>Jobs — coming soon</Text>
     </View>
   );
