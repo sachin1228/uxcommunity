@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { createNotification, getActorName, threadHref } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
   _request: NextRequest,
@@ -17,13 +18,16 @@ export async function POST(
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: thread } = await db
+  let threadQuery = db
     .from("community_threads")
     .select("id, user_id, title")
-    .eq("id", threadId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", threadId);
+  threadQuery = publicScope
+    ? threadQuery.eq("is_public", true).is("community_id", null)
+    : threadQuery.eq("community_id", communityId);
+  const { data: thread } = await threadQuery.maybeSingle();
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   // Check if already voted

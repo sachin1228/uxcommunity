@@ -9,6 +9,7 @@ import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -205,7 +206,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               <ThreadCard
                 thread={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
-                communityId={group.item.community_id ?? ""}
+                communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                 communityName={group.item.community_name ?? undefined}
                 detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
@@ -230,7 +231,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 <EventCard
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
-                  communityId={group.item.community_id ?? ""}
+                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
@@ -268,7 +269,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   <ResourceCard
                     resource={{ ...res, community_id: res.community_id ?? "" }}
                     currentUserId={currentUserId}
-                    communityId={res.community_id ?? ""}
+                    communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
                     onUpdated={handleResourceUpdated}
                     onSaveChanged={handleResourceSaveChanged}
                     onBookmarkChanged={handleResourceBookmarkChanged}

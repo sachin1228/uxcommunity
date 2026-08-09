@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ThreadDetailClient } from "@/components/communities/threads/ThreadDetailClient";
 import type { CommunityThread, ThreadComment } from "@/components/communities/threads/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -110,7 +111,7 @@ export default async function PublicThreadDetailPage({ params }: Props) {
           thread={thread}
           initialComments={initialComments}
           currentUserId={userId}
-          communityId={thread.community_id ?? ""}
+           communityId={thread.community_id ?? PUBLIC_CONTENT_SCOPE}
           communityName={communityName}
           backHref="/dashboard"
         />

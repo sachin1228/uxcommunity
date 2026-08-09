@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
+import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -152,7 +153,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
 
   async function handleShare(e: React.MouseEvent) {
     e.preventDefault();
-    const url = `${window.location.origin}/dashboard/communities/${communityId}/events/${event.id}`;
+    const url = `${window.location.origin}${isPublicContentScope(communityId) ? publicContentHref("event", event.id) : `/dashboard/communities/${communityId}/events/${event.id}`}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.title, url }); } catch { /* dismissed */ }
     } else {
@@ -163,7 +164,9 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
   }
 
   const authorName = event.users?.name ?? "Member";
-  const eventHref = detailHref ?? `/dashboard/communities/${communityId}/events/${event.id}`;
+  const eventHref = detailHref ?? (isPublicContentScope(communityId)
+    ? publicContentHref("event", event.id)
+    : `/dashboard/communities/${communityId}/events/${event.id}`);
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
 
   // Gradient placeholder colors for events without a cover image

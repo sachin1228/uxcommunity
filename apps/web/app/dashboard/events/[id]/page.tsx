@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -99,7 +100,7 @@ export default async function PublicEventDetailPage({ params }: Props) {
           currentUserId={userId}
           currentUserName={userRow.data?.name ?? ""}
           currentUserAvatar={profileRow.data?.avatar_url ?? null}
-          communityId={event.community_id ?? ""}
+           communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
           communityName={communityData.data?.name ?? (event.community_id ? "Community" : "Public event")}
           backHref="/dashboard"
         />

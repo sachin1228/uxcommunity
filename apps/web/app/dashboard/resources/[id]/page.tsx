@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
+import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -116,7 +117,7 @@ export default async function PublicResourceDetailPage({ params }: Props) {
       resource={resource}
       initialComments={initialComments}
       currentUserId={userId}
-      communityId={resource.community_id ?? ""}
+       communityId={resource.community_id ?? PUBLIC_CONTENT_SCOPE}
       communityName={communityName}
     />
   );

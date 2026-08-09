@@ -57,6 +57,7 @@ function renderWithLinks(text: string, isNested = false) {
 import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
 import { CATEGORY_COLORS, formatRelativeDate, formatFullDate } from "./threadShared";
+import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 
 interface ThreadCardProps {
   thread: CommunityThread;
@@ -180,7 +181,9 @@ export function ThreadCard({
 
   const authorName    = thread.users?.name ?? "Member";
   const authorInitial = authorName.charAt(0).toUpperCase();
-  const threadHref    = detailHref ?? `/dashboard/communities/${communityId}/threads/${thread.id}`;
+  const threadHref    = detailHref ?? (isPublicContentScope(communityId)
+    ? publicContentHref("thread", thread.id)
+    : `/dashboard/communities/${communityId}/threads/${thread.id}`);
   const dateLabel     = isDetail
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.updated_at || thread.created_at);

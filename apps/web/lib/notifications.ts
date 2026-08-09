@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
+import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 
 export type NotificationType =
   | "community_thread"
@@ -113,13 +114,19 @@ export async function getActorName(
 }
 
 export function threadHref(communityId: string, threadId: string) {
-  return `/dashboard/communities/${communityId}/threads/${threadId}`;
+  return isPublicContentScope(communityId)
+    ? publicContentHref("thread", threadId)
+    : `/dashboard/communities/${communityId}/threads/${threadId}`;
 }
 
 export function resourceHref(communityId: string, resourceId: string) {
-  return `/dashboard/communities/${communityId}/resources/${resourceId}`;
+  return isPublicContentScope(communityId)
+    ? publicContentHref("resource", resourceId)
+    : `/dashboard/communities/${communityId}/resources/${resourceId}`;
 }
 
 export function eventHref(communityId: string, eventId: string) {
-  return `/dashboard/communities/${communityId}/events/${eventId}`;
+  return isPublicContentScope(communityId)
+    ? publicContentHref("event", eventId)
+    : `/dashboard/communities/${communityId}/events/${eventId}`;
 }
