@@ -22,7 +22,7 @@ async function getPublicResource(
 
   if (!data) return null;
 
-  const authorId = data.user_id;
+  const authorId = (data as unknown as { user_id: string }).user_id;
 
   const [
     { data: userRow },
@@ -44,7 +44,7 @@ async function getPublicResource(
 
   return {
     ...(data as unknown as CommunityResource),
-    users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
+    users: userRow ? { name: (userRow as { name: string }).name, avatar_url: (profileRow as { avatar_url: string | null } | null)?.avatar_url ?? null } : null,
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
     comment_count: commentCount ?? 0,
@@ -65,7 +65,7 @@ async function getResourceComments(
 
   if (!data?.length) return [];
 
-  const userIds = [...new Set(data.map((c) => c.user_id))];
+  const userIds = [...new Set((data as Array<{ user_id: string }>).map((c) => c.user_id))];
   const [{ data: users }, { data: profiles }] = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
@@ -105,20 +105,18 @@ export default async function PublicResourceDetailPage({ params }: Props) {
 
   if (!resource) redirect("/dashboard");
 
-  const { data: communityData } = await db
-    .from("communities")
-    .select("name")
-    .eq("id", resource.community_id)
-    .maybeSingle();
+  const { data: communityData } = resource.community_id
+    ? await db.from("communities").select("name").eq("id", resource.community_id).maybeSingle()
+    : { data: null };
 
-  const communityName = communityData?.name ?? "Community";
+  const communityName = communityData?.name ?? (resource.community_id ? "Community" : "Public post");
 
   return (
     <ResourceDetailClient
       resource={resource}
       initialComments={initialComments}
       currentUserId={userId}
-      communityId={resource.community_id}
+      communityId={resource.community_id ?? ""}
       communityName={communityName}
     />
   );

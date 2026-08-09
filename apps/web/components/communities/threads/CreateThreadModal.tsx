@@ -126,10 +126,11 @@ function ImageGrid({
 }
 
 interface CreateThreadModalProps {
-  communityId: string;
+  communityId?: string;
   onClose: () => void;
   onCreated: (thread: CommunityThread) => void;
   initialIsPublic?: boolean;
+  publicOnly?: boolean;
 }
 
 export function CreateThreadModal({
@@ -137,6 +138,7 @@ export function CreateThreadModal({
   onClose,
   onCreated,
   initialIsPublic = false,
+  publicOnly = false,
 }: CreateThreadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
@@ -189,10 +191,15 @@ export function CreateThreadModal({
       for (const file of files) {
         const formData = new FormData();
         formData.append("file", file);
-        const response = await fetch(`/api/communities/${communityId}/threads/upload`, {
+        const response = await fetch(
+          publicOnly
+            ? "/api/home/uploads/threads"
+            : `/api/communities/${communityId}/threads/upload`,
+          {
           method: "POST",
           body: formData,
-        });
+          },
+        );
         const data = await response.json();
         if (!response.ok) throw new Error(data.error ?? "Upload failed.");
         uploaded.push(data.attachment as ThreadAttachment);
@@ -216,11 +223,23 @@ export function CreateThreadModal({
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch(`/api/communities/${communityId}/threads`, {
+      const response = await fetch(
+        publicOnly ? "/api/home/posts/threads" : `/api/communities/${communityId}/threads`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, category, tags, attachments, links: extractedLinks, allow_replies: allowReplies, is_public: isPublic }),
-      });
+        body: JSON.stringify({
+          title,
+          description,
+          category,
+          tags,
+          attachments,
+          links: extractedLinks,
+          allow_replies: allowReplies,
+          is_public: publicOnly ? true : isPublic,
+        }),
+        },
+      );
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to post.");
       onCreated(data.thread as CommunityThread);
@@ -388,7 +407,7 @@ export function CreateThreadModal({
           </div>
 
           {/* ── Toggles ── */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span>
               <span className="block font-body text-sm font-medium text-foreground">Allow replies</span>
               <span className="block font-body text-xs text-foreground-muted">Other members can reply to this thread.</span>
@@ -397,7 +416,7 @@ export function CreateThreadModal({
               <input type="checkbox" checked={allowReplies} onChange={(e) => setAllowReplies(e.target.checked)} className="sr-only" />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${allowReplies ? "translate-x-6" : "translate-x-1"}`} />
             </span>
-          </label>
+          </label>}
 
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2.5">

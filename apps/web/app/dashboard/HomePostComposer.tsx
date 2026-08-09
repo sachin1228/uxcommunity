@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   BookOpen,
   CalendarDays,
@@ -12,12 +12,6 @@ import { CreateResourceModal } from "@/components/communities/resources/CreateRe
 import { CreateThreadModal } from "@/components/communities/threads/CreateThreadModal";
 
 type PostType = "thread" | "resource" | "event";
-
-interface CommunityOption {
-  id: string;
-  name: string;
-  image_url: string | null;
-}
 
 interface HomePostComposerProps {
   name: string;
@@ -58,35 +52,14 @@ const postTypes: Array<{
 export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostComposerProps) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [postType, setPostType] = useState<PostType>("thread");
-  const [communityId, setCommunityId] = useState("");
-  const [communities, setCommunities] = useState<CommunityOption[]>([]);
-  const [communityError, setCommunityError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/communities", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        const nextCommunities = (data?.communities ?? []) as CommunityOption[];
-        setCommunities(nextCommunities);
-        if (nextCommunities.length) setCommunityId((current) => current || nextCommunities[0].id);
-        if (!nextCommunities.length) setCommunityError("Join a community before creating a post.");
-      })
-      .catch(() => setCommunityError("We couldn't load your communities. Please try again."))
-  }, []);
 
   function openEditor(type: PostType) {
     setPostType(type);
-    if (communityId) {
-      setCommunityError(null);
-      setEditorOpen(true);
-    } else if (!communities.length) {
-      setCommunityError("Join a community before creating a post.");
-    }
+    setEditorOpen(true);
   }
 
   function closeEditor() {
     setEditorOpen(false);
-    setCommunityError(null);
   }
 
   function handleCreated() {
@@ -96,16 +69,16 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
 
   return (
     <>
-      <section className="mx-6 mb-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-        <div className="grid grid-cols-[auto_1fr] items-center gap-3 p-4 sm:p-5">
-          <AvatarImg url={avatarUrl} name={name} size={44} className="shrink-0" />
-          <div className="grid min-w-0 grid-cols-3 gap-1">
+      <section className="mx-6 mb-4 overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 p-3 sm:p-4">
+          <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
+          <div className="grid min-w-0 grid-cols-3 gap-0.5">
             {postTypes.map(({ type, label, icon: Icon, color }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => openEditor(type)}
-                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1 py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-2 sm:px-2 sm:text-base"
+                className="flex min-w-0 items-center justify-center gap-1 rounded-lg px-1 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5 sm:px-2 sm:text-base"
               >
                 <Icon size={20} className={color} />
                 <span className="truncate">{label}</span>
@@ -113,33 +86,25 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
             ))}
           </div>
         </div>
-        {communityError && (
-          <p className="border-t border-border px-4 py-2.5 font-body text-xs text-red-400">
-            {communityError}
-          </p>
-        )}
       </section>
 
-      {communityId && postType === "thread" && editorOpen && (
+      {postType === "thread" && editorOpen && (
         <CreateThreadModal
-          communityId={communityId}
-          initialIsPublic
+          publicOnly
           onClose={closeEditor}
           onCreated={handleCreated}
         />
       )}
-      {communityId && postType === "resource" && editorOpen && (
+      {postType === "resource" && editorOpen && (
         <CreateResourceModal
-          communityId={communityId}
-          initialIsPublic
+          publicOnly
           onClose={closeEditor}
           onCreated={handleCreated}
         />
       )}
-      {communityId && postType === "event" && editorOpen && (
+      {postType === "event" && editorOpen && (
         <CreateEventModal
-          communityId={communityId}
-          initialIsPublic
+          publicOnly
           onClose={closeEditor}
           onCreated={handleCreated}
         />

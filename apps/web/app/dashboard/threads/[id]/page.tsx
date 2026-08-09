@@ -22,7 +22,7 @@ async function getPublicThread(
 
   if (!data) return null;
 
-  const authorId = data.user_id;
+  const authorId = (data as unknown as { user_id: string }).user_id;
 
   const [{ data: userRow }, { data: profileRow }, { data: allVotes }, { data: myVote }, { data: mySave }, { count: commentCount }] =
     await Promise.all([
@@ -36,7 +36,7 @@ async function getPublicThread(
 
   return {
     ...(data as unknown as CommunityThread),
-    users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
+    users: userRow ? { name: (userRow as { name: string }).name, avatar_url: (profileRow as { avatar_url: string | null } | null)?.avatar_url ?? null } : null,
     vote_count: (allVotes ?? []).length,
     user_voted: Boolean(myVote),
     user_saved: Boolean(mySave),
@@ -56,7 +56,7 @@ async function getComments(
 
   if (!data?.length) return [];
 
-  const userIds = [...new Set(data.map((c) => c.user_id))];
+  const userIds = [...new Set((data as Array<{ user_id: string }>).map((c) => c.user_id))];
   const [{ data: users }, { data: profiles }] = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
@@ -96,13 +96,11 @@ export default async function PublicThreadDetailPage({ params }: Props) {
 
   if (!thread) redirect("/dashboard");
 
-  const { data: communityData } = await db
-    .from("communities")
-    .select("name")
-    .eq("id", thread.community_id)
-    .maybeSingle();
+  const { data: communityData } = thread.community_id
+    ? await db.from("communities").select("name").eq("id", thread.community_id).maybeSingle()
+    : { data: null };
 
-  const communityName = communityData?.name ?? "Community";
+  const communityName = communityData?.name ?? (thread.community_id ? "Community" : "Public post");
 
   return (
     <div className="flex items-start h-full">
@@ -112,7 +110,7 @@ export default async function PublicThreadDetailPage({ params }: Props) {
           thread={thread}
           initialComments={initialComments}
           currentUserId={userId}
-          communityId={thread.community_id}
+          communityId={thread.community_id ?? ""}
           communityName={communityName}
           backHref="/dashboard"
         />

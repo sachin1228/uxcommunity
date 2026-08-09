@@ -9,10 +9,11 @@ import { LinkPreviewCard } from "./LinkPreviewCard";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 
 interface CreateResourceModalProps {
-  communityId: string;
+  communityId?: string;
   onClose: () => void;
   onCreated: (resource: CommunityResource) => void;
   initialIsPublic?: boolean;
+  publicOnly?: boolean;
 }
 
 function isValidHttpUrl(s: string) {
@@ -27,6 +28,7 @@ export function CreateResourceModal({
   onClose,
   onCreated,
   initialIsPublic = false,
+  publicOnly = false,
 }: CreateResourceModalProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
@@ -109,7 +111,9 @@ export function CreateResourceModal({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/resources`, {
+      const res = await fetch(
+        publicOnly ? "/api/home/posts/resources" : `/api/communities/${communityId}/resources`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -118,9 +122,10 @@ export function CreateResourceModal({
           description: description.trim() || null,
           resource_type: resourceType,
           tags,
-          is_public: isPublic,
+           is_public: publicOnly ? true : isPublic,
         }),
-      });
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create resource.");
       onCreated(data.resource as CommunityResource);
@@ -265,7 +270,7 @@ export function CreateResourceModal({
           </label>
 
           {/* Make public toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span>
               <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
               <span className="block font-body text-xs text-foreground-muted">This resource will appear on the home feed for all members.</span>
@@ -279,7 +284,7 @@ export function CreateResourceModal({
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
             </span>
-          </label>
+          </label>}
 
           {/* Tags */}
           <div className="relative">

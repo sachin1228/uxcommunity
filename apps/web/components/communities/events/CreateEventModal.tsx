@@ -5,10 +5,11 @@ import { Calendar, Check, Clock, ImagePlus, Loader2, MapPin, Users, Video, X } f
 import type { CommunityEvent } from "./types";
 
 interface CreateEventModalProps {
-  communityId: string;
+  communityId?: string;
   onClose: () => void;
   onCreated: (event: CommunityEvent) => void;
   initialIsPublic?: boolean;
+  publicOnly?: boolean;
 }
 
 export function CreateEventModal({
@@ -16,6 +17,7 @@ export function CreateEventModal({
   onClose,
   onCreated,
   initialIsPublic = false,
+  publicOnly = false,
 }: CreateEventModalProps) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
@@ -43,7 +45,12 @@ export function CreateEventModal({
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(`/api/communities/${communityId}/events/upload`, { method: "POST", body: form });
+      const res = await fetch(
+        publicOnly
+          ? "/api/home/uploads/events"
+          : `/api/communities/${communityId}/events/upload`,
+        { method: "POST", body: form },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Upload failed.");
       setCoverImageUrl(data.url as string);
@@ -68,7 +75,9 @@ export function CreateEventModal({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events`, {
+      const res = await fetch(
+        publicOnly ? "/api/home/posts/events" : `/api/communities/${communityId}/events`,
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -81,9 +90,10 @@ export function CreateEventModal({
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
-          is_public: isPublic,
+           is_public: publicOnly ? true : isPublic,
         }),
-      });
+        },
+      );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create event.");
       onCreated(data.event as CommunityEvent);
@@ -242,7 +252,7 @@ export function CreateEventModal({
           </div>
 
           {/* Online toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2">
               <Video size={15} className="text-foreground-muted" />
               <span>
@@ -259,7 +269,7 @@ export function CreateEventModal({
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isOnline ? "translate-x-6" : "translate-x-1"}`} />
             </span>
-          </label>
+          </label>}
 
           {/* Location / Meet link */}
           {isOnline ? (

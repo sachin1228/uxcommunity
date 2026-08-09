@@ -2,10 +2,19 @@
 -- publicly visible on the home feed for all logged-in users.
 
 alter table community_threads
+  alter column community_id drop not null;
+
+alter table community_threads
   add column if not exists is_public boolean not null default false;
 
 alter table community_events
+  alter column community_id drop not null;
+
+alter table community_events
   add column if not exists is_public boolean not null default false;
+
+alter table community_resources
+  alter column community_id drop not null;
 
 alter table community_resources
   add column if not exists is_public boolean not null default false;
@@ -13,3 +22,7 @@ alter table community_resources
 comment on column community_threads.is_public   is 'When true, any logged-in user can view this thread and comment on it.';
 comment on column community_events.is_public    is 'When true, any logged-in user can view this event and comment on it.';
 comment on column community_resources.is_public is 'When true, any logged-in user can view this resource and comment on it.';
+
+comment on column community_threads.community_id is 'Null for posts created directly from the public home feed.';
+comment on column community_events.community_id is 'Null for events created directly from the public home feed.';
+comment on column community_resources.community_id is 'Null for resources created directly from the public home feed.';
