@@ -123,13 +123,15 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status,
 }: {
   url: string;
   isMe: boolean;
   uploading?: boolean;
   onCancel?: () => void;
   standalone?: boolean;
+  createdAt?: string;
+  status?: CachedMessage["status"];
 }) {
   return (
     <div
@@ -149,6 +151,16 @@ function BubbleImage({
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
       />
+      {standalone && createdAt && !uploading && status !== "failed" && (
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5">
+          <span className="font-mono text-[10px] text-white/90">
+            {fmtTime(createdAt)}
+          </span>
+          {isMe && (
+            <CheckCheck size={11} className="text-white/90" />
+          )}
+        </div>
+      )}
       {uploading && (
         <div className="absolute inset-0 flex items-center justify-center rounded-xl">
           <div className="relative w-12 h-12">
@@ -743,28 +755,14 @@ export function MessageBubble({
                   }`}
                 >
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
-                  {imageOnly && (
-                    <div className="mb-1 flex items-center justify-end gap-1 pr-1">
-                      <span className="font-mono text-[10px] text-foreground-muted">
-                        {fmtTime(msg.created_at)}
-                      </span>
-                      {isMe && msg.status === "sending" && (
-                        <Clock size={10} className="text-foreground-muted animate-pulse" />
-                      )}
-                      {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck size={11} className="text-foreground-muted" />
-                      )}
-                      {isMe && msg.status === "failed" && (
-                        <span className="text-[10px] text-red-400">!</span>
-                      )}
-                    </div>
-                  )}
                   {imageUrl && (
                     <BubbleImage
                       url={imageUrl}
                       isMe={isMe}
                       uploading={uploading}
                       standalone={imageOnly}
+                      createdAt={msg.created_at}
+                      status={msg.status}
                       onCancel={() => onCancelSend(msg.id)}
                     />
                   )}
