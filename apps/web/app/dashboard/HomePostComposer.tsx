@@ -78,7 +78,7 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
                 key={type}
                 type="button"
                 onClick={() => openEditor(type)}
-                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-2 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5 sm:text-base"
+                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-2 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5"
               >
                 <Icon size={20} className={color} />
                 <span className="truncate">{label}</span>
