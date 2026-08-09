@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 async function enrichOne(
   db: ReturnType<typeof createServiceClient>,
@@ -46,13 +47,16 @@ export async function GET(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data, error } = await db
+  let eventQuery = db
     .from("community_events")
     .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", eventId);
+  eventQuery = publicScope
+    ? eventQuery.eq("is_public", true).is("community_id", null)
+    : eventQuery.eq("community_id", communityId);
+  const { data, error } = await eventQuery.maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Event not found." }, { status: 404 });
@@ -71,13 +75,16 @@ export async function PATCH(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db
+  let existingQuery = db
     .from("community_events")
     .select("id, user_id")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", eventId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
@@ -152,13 +159,16 @@ export async function DELETE(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db
+  let existingQuery = db
     .from("community_events")
     .select("id, user_id")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", eventId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });

@@ -44,11 +44,13 @@ export async function GET(req: NextRequest) {
   ]);
 
   // Merge and sort newest-first, take top PAGE_SIZE
-  const all = [
-    ...(threads   ?? []).map((t) => ({ ...t, _type: "thread"   as const })),
-    ...(events    ?? []).map((e) => ({ ...e, _type: "event"    as const })),
-    ...(resources ?? []).map((r) => ({ ...r, _type: "resource" as const })),
-  ]
+  const all = ([
+    ...((threads ?? []) as Array<Record<string, any>>).map((t) => ({ ...t, _type: "thread" as const })),
+    ...((events ?? []) as Array<Record<string, any>>).map((e) => ({ ...e, _type: "event" as const })),
+    ...((resources ?? []) as Array<Record<string, any>>).map((r) => ({ ...r, _type: "resource" as const })),
+  ] as Array<Record<string, any> & {
+    _type: "thread" | "event" | "resource";
+  }>)
     .sort((a, b) => (b.created_at > a.created_at ? 1 : -1))
     .slice(0, PAGE_SIZE);
 
@@ -56,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   // Collect IDs for batch enrichment
   const userIds      = [...new Set(all.map((i) => i.user_id))];
-  const communityIds = [...new Set(all.map((i) => i.community_id))];
+  const communityIds = [...new Set(all.map((i) => i.community_id).filter((id): id is string => Boolean(id)))];
   const threadIds    = all.filter((i) => i._type === "thread").map((i) => i.id);
   const eventIds     = all.filter((i) => i._type === "event").map((i) => i.id);
   const resourceIds  = all.filter((i) => i._type === "resource").map((i) => i.id);
@@ -133,10 +135,10 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] as { resource_id: string }[] }),
   ]);
 
-  const userMap      = Object.fromEntries((users      ?? []).map((u) => [u.id,      u.name]));
-  const avatarMap    = Object.fromEntries((profiles   ?? []).map((p) => [p.user_id, p.avatar_url]));
-  const communityMap    = Object.fromEntries((communities ?? []).map((c) => [c.id, c.name]));
-  const communityImgMap = Object.fromEntries((communities ?? []).map((c) => [c.id, (c as { image_url?: string | null }).image_url ?? null]));
+  const userMap      = Object.fromEntries(((users ?? []) as Array<{ id: string; name: string }>).map((u) => [u.id, u.name]));
+  const avatarMap    = Object.fromEntries(((profiles ?? []) as Array<{ user_id: string; avatar_url: string | null }>).map((p) => [p.user_id, p.avatar_url]));
+  const communityMap    = Object.fromEntries(((communities ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
+  const communityImgMap = Object.fromEntries(((communities ?? []) as Array<{ id: string; image_url: string | null }>).map((c) => [c.id, c.image_url ?? null]));
 
   // Thread aggregates
   const threadCmtCount: Record<string, number> = {};

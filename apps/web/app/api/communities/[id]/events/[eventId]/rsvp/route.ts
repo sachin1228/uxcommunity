@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { createNotification, eventHref, getActorName } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
   _req: NextRequest,
@@ -13,14 +14,16 @@ export async function POST(
   const { id: communityId, eventId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  // Verify event belongs to community
-  const { data: event } = await db
+  let eventQuery = db
     .from("community_events")
     .select("id, user_id, title, max_attendees")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", eventId);
+  eventQuery = publicScope
+    ? eventQuery.eq("is_public", true).is("community_id", null)
+    : eventQuery.eq("community_id", communityId);
+  const { data: event } = await eventQuery.maybeSingle();
 
   if (!event) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 

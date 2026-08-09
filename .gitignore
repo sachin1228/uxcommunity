@@ -114,6 +114,12 @@ temp/
 uploads/
 storage/
 public/uploads/
+# The home upload API routes are source files, not generated uploads.
+!apps/web/app/api/home/uploads/
+!apps/web/app/api/home/uploads/events/
+!apps/web/app/api/home/uploads/events/route.ts
+!apps/web/app/api/home/uploads/threads/
+!apps/web/app/api/home/uploads/threads/route.ts
 
 # =========================
 # Local SQLite databases

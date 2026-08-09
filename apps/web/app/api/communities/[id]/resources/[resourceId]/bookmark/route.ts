@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { createNotification, getActorName, resourceHref } from "@/lib/notifications";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
   _req: NextRequest,
@@ -13,24 +14,27 @@ export async function POST(
   const { id: communityId, resourceId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
-
-  // Verify membership
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  const publicScope = isPublicContentScope(communityId);
 
   // Verify resource exists in this community
-  const { data: resource } = await db
+  let resourceQuery = db
     .from("community_resources")
-    .select("id, user_id, title")
-    .eq("id", resourceId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .select("id, user_id, title, is_public")
+    .eq("id", resourceId);
+  resourceQuery = publicScope
+    ? resourceQuery.eq("is_public", true).is("community_id", null)
+    : resourceQuery.eq("community_id", communityId);
+  const { data: resource } = await resourceQuery.maybeSingle();
   if (!resource) return NextResponse.json({ error: "Resource not found." }, { status: 404 });
+  if (!resource.is_public && !publicScope) {
+    const { data: membership } = await db
+      .from("community_members")
+      .select("joined_at")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   // Toggle: delete if exists, insert if not
   const { data: existing } = await db

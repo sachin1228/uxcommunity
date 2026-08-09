@@ -6,6 +6,7 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 const CATEGORIES = new Set<ThreadCategory>([
   "question", "discussion",
@@ -85,19 +86,22 @@ export async function GET(
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data, error } = await db
+  let threadQuery = db
     .from("community_threads")
     .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
-    .eq("id", threadId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", threadId);
+  threadQuery = publicScope
+    ? threadQuery.eq("is_public", true).is("community_id", null)
+    : threadQuery.eq("community_id", communityId);
+  const { data, error } = await threadQuery.maybeSingle();
 
   if (error) { console.error("[GET thread]", error); return NextResponse.json({ error: "Failed to fetch thread." }, { status: 500 }); }
   if (!data) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   // Non-members may view public threads; private threads require membership
-  if (!data.is_public) {
+  if (!data.is_public && !publicScope) {
     const { data: membership } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
     if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
@@ -115,8 +119,13 @@ export async function PATCH(
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db.from("community_threads").select("id, user_id, community_id").eq("id", threadId).eq("community_id", communityId).maybeSingle();
+  let existingQuery = db.from("community_threads").select("id, user_id, community_id").eq("id", threadId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only edit your own threads." }, { status: 403 });
 
@@ -165,13 +174,16 @@ export async function DELETE(
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
+  const publicScope = isPublicContentScope(communityId);
 
-  const { data: existing } = await db
+  let existingQuery = db
     .from("community_threads")
     .select("id, user_id, community_id")
-    .eq("id", threadId)
-    .eq("community_id", communityId)
-    .maybeSingle();
+    .eq("id", threadId);
+  existingQuery = publicScope
+    ? existingQuery.eq("is_public", true).is("community_id", null)
+    : existingQuery.eq("community_id", communityId);
+  const { data: existing } = await existingQuery.maybeSingle();
 
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
