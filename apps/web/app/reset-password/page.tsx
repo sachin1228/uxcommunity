@@ -64,7 +64,7 @@ function ResetPasswordInner() {
   }
 
   const inputClass =
-    "rounded-md border border-overlay-elevated bg-overlay px-3.5 py-2.5 font-body text-sm text-overlay-foreground outline-none transition-colors placeholder:text-overlay-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+    "w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20";
 
   const fieldError = (key: string) =>
     fieldErrors[key]?.length ? (
@@ -72,11 +72,11 @@ function ResetPasswordInner() {
     ) : null;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-overlay px-4 py-12">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 text-center">
-          <span className="font-display text-xl font-semibold text-overlay-foreground">
+          <span className="font-display text-xl font-semibold text-foreground">
             {APP_NAME}
             <span className="text-accent mx-1">/</span>
           </span>
@@ -84,20 +84,20 @@ function ResetPasswordInner() {
 
         {pageState === "loading" && (
           <div className="flex justify-center py-16">
-            <Spinner className="h-6 w-6 text-overlay-muted" />
+            <Spinner className="h-6 w-6 text-foreground-muted" />
           </div>
         )}
 
         {pageState === "invalid" && (
-          <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 text-center">
-            <p className="font-display text-lg font-semibold text-overlay-foreground mb-2">
+          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
+            <p className="font-display text-lg font-semibold text-foreground mb-2">
               Link invalid or expired
             </p>
-            <p className="font-body text-sm text-overlay-muted mb-6">
+            <p className="font-body text-sm text-foreground-muted mb-6">
               {error ?? "This password reset link is invalid or has already been used. Reset links expire after 1 hour."}
             </p>
             <a
-              href="/"
+              href="/login"
               className="inline-block font-body text-sm text-accent hover:text-accent-hover transition-colors"
             >
               ← Back to login
@@ -106,23 +106,23 @@ function ResetPasswordInner() {
         )}
 
         {pageState === "form" && (
-          <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 shadow-xl">
-            <h1 className="font-display text-2xl font-semibold text-overlay-foreground mb-1">
+          <div className="rounded-xl bg-surface p-8 shadow-card">
+            <h1 className="font-display text-2xl font-semibold text-foreground mb-1">
               Set new password
             </h1>
-            <p className="font-body text-sm text-overlay-muted mb-7">
+            <p className="font-body text-sm text-foreground-muted mb-7">
               Choose a strong password for your account.
             </p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               {error && (
                 <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
-                  <p className="font-body text-sm text-red-400">{error}</p>
+                  <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
                 </div>
               )}
 
               <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">
+                <span className="font-body text-xs font-medium text-foreground">
                   New password
                 </span>
                 <input
@@ -143,7 +143,7 @@ function ResetPasswordInner() {
               </label>
 
               <label className="flex flex-col gap-1.5">
-                <span className="font-body text-xs font-medium text-overlay-foreground">
+                <span className="font-body text-xs font-medium text-foreground">
                   Confirm new password
                 </span>
                 <input
@@ -175,18 +175,18 @@ function ResetPasswordInner() {
         )}
 
         {pageState === "success" && (
-          <div className="rounded-xl border border-overlay-elevated bg-overlay-raised p-8 text-center shadow-xl">
+          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft mx-auto mb-4">
               <span className="text-2xl">✓</span>
             </div>
-            <h2 className="font-display text-xl font-semibold text-overlay-foreground mb-2">
+            <h2 className="font-display text-xl font-semibold text-foreground mb-2">
               Password updated
             </h2>
-            <p className="font-body text-sm text-overlay-muted mb-6">
+            <p className="font-body text-sm text-foreground-muted mb-6">
               Your password has been changed. You can now log in with your new password.
             </p>
             <a
-              href="/"
+              href="/login"
               className="inline-block rounded-md bg-accent px-6 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
             >
               Go to login
@@ -202,8 +202,8 @@ export default function ResetPasswordPage() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-overlay">
-          <Spinner className="h-6 w-6 text-overlay-muted" />
+        <main className="flex min-h-screen items-center justify-center bg-background">
+          <Spinner className="h-6 w-6 text-foreground-muted" />
         </main>
       }
     >
