@@ -58,7 +58,10 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
       visible={!!message}
       onRequestClose={onClose}
     >
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <Pressable
+        style={[styles.backdrop, { backgroundColor: colors.foreground + '80' }]}
+        onPress={onClose}
+      >
         <View
           style={[
             styles.sheet,
@@ -114,7 +117,7 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
               <Pressable
                 style={({ pressed }) => [
                   styles.action,
-                  { backgroundColor: pressed ? 'rgba(239,68,68,0.08)' : 'transparent' },
+                  { backgroundColor: pressed ? colors.destructive + '14' : 'transparent' },
                 ]}
                 onPress={handleDelete}
               >
@@ -133,7 +136,6 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
@@ -144,7 +146,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 20,

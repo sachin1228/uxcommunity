@@ -146,8 +146,6 @@ function previewText(
 // CommunityRow
 // ---------------------------------------------------------------------------
 
-const GREEN = '#22c55e'; // matches web bg-green-500
-
 export function CommunityRow({ community, typingLabel, onPress }: Props) {
   const colors = useColors();
 
@@ -165,7 +163,7 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
     <Pressable
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: pressed ? colors.subtle : colors.background },
+        { backgroundColor: pressed ? colors.surface : colors.subtle },
       ]}
       onPress={onPress}
     >
@@ -240,10 +238,10 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
             </Text>
           )}
 
-          {/* Unread badge — green, matches web */}
+          {/* Unread badge */}
           {hasUnread && (
-            <View style={[styles.badge, { backgroundColor: GREEN }]}>
-              <Text style={styles.badgeText}>
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
                 {community.unread_count > 99 ? '99+' : community.unread_count}
               </Text>
             </View>
@@ -330,7 +328,6 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontFamily: 'Geist_600SemiBold',
-    color: '#FFFFFF',
   },
   dotsRow: {
     flexDirection: 'row',

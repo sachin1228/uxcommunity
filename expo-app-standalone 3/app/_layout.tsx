@@ -25,7 +25,7 @@ const queryClient = new QueryClient();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const bg = isDark ? colors.dark.background : colors.light.background;
+  const bg = isDark ? colors.dark.subtle : colors.light.subtle;
 
   const [fontsLoaded, fontError] = useFonts({
     Geist_400Regular,

@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -52,7 +53,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
 
       <KeyboardAvoidingView
@@ -67,8 +68,8 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoMark, { backgroundColor: colors.primary }]}>
-              <Text style={styles.logoLetter}>D</Text>
+            <View style={styles.logoMark}>
+              <BrandLogo size={56} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>
               Welcome back
@@ -243,7 +244,7 @@ function makeStyles(colors: Colors) {
     logoLetter: {
       fontSize: 26,
       fontFamily: 'Geist_700Bold',
-      color: '#FFFFFF',
+      color: colors.primaryForeground,
     },
     title: {
       fontSize: 26,
@@ -261,7 +262,7 @@ function makeStyles(colors: Colors) {
       padding: 24,
       gap: 20,
       // subtle shadow
-      shadowColor: '#000',
+      shadowColor: colors.foreground,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
       shadowRadius: 8,
