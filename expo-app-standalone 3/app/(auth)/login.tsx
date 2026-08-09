@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function LoginScreen() {
   const colors = useColors();
@@ -67,8 +68,8 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoMark, { backgroundColor: colors.primary }]}>
-              <Text style={styles.logoLetter}>D</Text>
+            <View style={styles.logoMark}>
+              <BrandLogo size={56} />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>
               Welcome back
