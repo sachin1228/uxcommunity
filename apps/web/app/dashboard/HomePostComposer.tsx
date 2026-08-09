@@ -97,28 +97,21 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
   return (
     <>
       <section className="mx-6 mb-6 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-        <div className="flex items-center gap-3 p-4 sm:p-5">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-3 p-4 sm:p-5">
           <AvatarImg url={avatarUrl} name={name} size={44} className="shrink-0" />
-          <button
-            type="button"
-            onClick={() => openEditor("thread")}
-            className="flex h-12 flex-1 items-center rounded-full border border-border px-5 text-left font-body text-base font-medium text-foreground-muted transition-colors hover:border-accent hover:text-foreground"
-          >
-            Start a post
-          </button>
-        </div>
-        <div className="grid grid-cols-3 border-t border-border px-2 py-2 sm:px-4 sm:py-3">
-          {postTypes.map(({ type, label, icon: Icon, color }) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => openEditor(type)}
-              className="flex items-center justify-center gap-2 rounded-lg py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:text-base"
-            >
-              <Icon size={20} className={color} />
-              <span>{label}</span>
-            </button>
-          ))}
+          <div className="grid min-w-0 grid-cols-3 gap-1">
+            {postTypes.map(({ type, label, icon: Icon, color }) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => openEditor(type)}
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1 py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-2 sm:px-2 sm:text-base"
+              >
+                <Icon size={20} className={color} />
+                <span className="truncate">{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
         {communityError && (
           <p className="border-t border-border px-4 py-2.5 font-body text-xs text-red-400">
