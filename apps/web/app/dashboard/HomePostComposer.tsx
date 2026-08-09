@@ -28,21 +28,21 @@ const postTypes: Array<{
 }> = [
   {
     type: "thread",
-    label: "Thread",
+    label: "Create Thread",
     description: "Start a discussion or ask a question",
     icon: MessageSquarePlus,
     color: "text-accent",
   },
   {
     type: "resource",
-    label: "Resource",
+    label: "Create Resource",
     description: "Share a useful link with the community",
     icon: BookOpen,
     color: "text-emerald-600 dark:text-emerald-400",
   },
   {
     type: "event",
-    label: "Event",
+    label: "Create Event",
     description: "Invite members to something happening",
     icon: CalendarDays,
     color: "text-orange-600 dark:text-orange-400",
