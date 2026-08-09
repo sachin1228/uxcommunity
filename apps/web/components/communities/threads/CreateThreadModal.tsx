@@ -233,7 +233,7 @@ export function CreateThreadModal({ communityId, initialIsPublic = false, onClos
         className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl"
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface px-6 py-4">
           <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
             Create Thread
           </h2>
@@ -398,7 +398,7 @@ export function CreateThreadModal({ communityId, initialIsPublic = false, onClos
         )}
 
         {/* ── Footer ── */}
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <div className="sticky bottom-0 z-20 flex justify-end gap-3 border-t border-border bg-surface px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">
             Cancel
           </button>

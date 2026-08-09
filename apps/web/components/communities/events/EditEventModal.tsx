@@ -118,7 +118,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
         onSubmit={handleSubmit}
         className="max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-border bg-surface px-6 py-4">
           <div>
             <h2 id="edit-event-title" className="font-display text-xl font-semibold text-foreground">
               Edit Event
@@ -277,7 +277,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">{error}</p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
+        <div className="sticky bottom-0 z-20 -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t border-border bg-surface px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">Cancel</button>
           <button type="submit" disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">

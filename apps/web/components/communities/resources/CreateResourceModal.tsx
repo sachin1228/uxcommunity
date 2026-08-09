@@ -142,7 +142,7 @@ export function CreateResourceModal({ communityId, initialIsPublic = false, onCl
         onSubmit={handleSubmit}
         className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="sticky top-0 z-20 -mx-6 -mt-6 flex items-start justify-between gap-4 border-b border-border bg-surface px-6 py-4">
           <div>
             <h2 id="create-resource-title" className="font-display text-xl font-semibold text-foreground">
               Share a Resource
@@ -329,7 +329,7 @@ export function CreateResourceModal({ communityId, initialIsPublic = false, onCl
           </p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
+        <div className="sticky bottom-0 z-20 -mx-6 -mb-6 mt-6 flex justify-end gap-3 border-t border-border bg-surface px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">
             Cancel
           </button>
