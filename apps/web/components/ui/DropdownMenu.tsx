@@ -102,7 +102,7 @@ export function DropdownMenu({
       ref={menuRef}
       role="menu"
       style={{ position: "fixed", zIndex: 9999 }}
-      className={`min-w-[8rem] rounded-xl bg-surface-raised border border-white/[0.1] shadow-2xl overflow-hidden
+      className={`min-w-[8rem] overflow-hidden rounded-lg border border-border bg-surface shadow-md
         animate-in fade-in zoom-in-95 duration-100 origin-top-right
         ${className}`}
     >

@@ -1,136 +1,169 @@
-/**
- * UX Community design system CSS custom properties.
- * Primary accent: #0070F3. Hover: #0060D1.
- */
-
-/* ─── Light mode (default) ─────────────────────────────────────────── */
-:root {
-  color-scheme: light dark;
-
-  --color-background:        #FAFAFA;
-  --color-background-subtle: #F5F5F5;
-
-  --color-surface:           #FFFFFF;
-  --color-surface-raised:    #F5F5F5;
-
-  --color-foreground:        #0A0A0A;
-  --color-foreground-muted:  #525252;
-  --color-foreground-subtle: #737373;
-
-  /* Accent */
-  --color-accent:            #0070F3;
-  --color-accent-rgb:        0 112 243;   /* RGB channels for opacity modifiers */
-  --color-accent-hover:      #0060D1;     /* darker hover shade */
-  --color-accent-soft:       #f0f8ff;     /* tinted bg */
-  --color-accent-foreground: #FFFFFF;
-
-  --color-border:            #EAEAEA;
-  --color-border-subtle:     #F5F5F5;
-
-  --color-signal:            #0070F3;
-
-  --color-overlay:            #0A0A0A;
-  --color-overlay-raised:     #111111;
-  --color-overlay-elevated:   #1A1A1A;
-  --color-overlay-foreground: #EDEDED;
-  --color-overlay-muted:      #737373;
-
-  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
-  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-card: 0 0 0 1px var(--color-border), 0 2px 4px rgb(0 0 0 / 0.04);
-
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   12px;
-  --radius-full: 9999px;
-
-  --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
-  --grid-size:       28px;
-}
-
-/* ─── Dark mode ─────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Backgrounds */
-    --color-background:        #09090B;
-    --color-background-subtle: #0E0E10;  /* sidebars */
-
-    --color-surface:           #121214;
-    --color-surface-raised:    #1B1B1F;  /* modals, dropdowns, popovers */
-    --color-surface-hover:     #17171A;  /* hover states */
-    --color-input-background:  #151517;  /* inputs & textareas */
-
-    --color-foreground:        #EDEDED;
-    --color-foreground-muted:  #737373;
-    --color-foreground-subtle: #525252;
-
-    /* Accent */
-    --color-accent:            #0070F3;
-    --color-accent-rgb:        0 112 243;
-    --color-accent-hover:      #0060D1;
-    --color-accent-soft:       #18243D;
-    --color-accent-foreground: #FFFFFF;
-
-    /* Borders */
-    --color-border:            #202024;
-    --color-border-subtle:     #1D1D21;  /* section dividers */
-    --color-border-strong:     #2D2D34;  /* active components */
-    --color-input-border:      #303036;  /* input fields */
-
-    --color-signal:            #0070F3;
-
-    /* Navigation */
-    --color-nav-hover:         #17171A;
-    --color-nav-active:        #18243D;
-    --color-nav-active-hover:  #1D2A46;
-
-    /* Neutral buttons */
-    --color-button-secondary:        #1A1A1E;
-    --color-button-secondary-hover:  #232329;
-    --color-button-secondary-active: #2A2A31;
-
-    --color-overlay:            #09090B;
-    --color-overlay-raised:     #121214;
-    --color-overlay-elevated:   #1B1B1F;
-    --color-overlay-foreground: #EDEDED;
-    --color-overlay-muted:      #737373;
-
-    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
-    --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
-    --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
-    --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
-
-    --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
-  }
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* UX Community — monochrome product system inspired by Vercel's clarity. */
+:root {
+  color-scheme: light dark;
+
+  --color-background: #ffffff;
+  --color-background-subtle: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f2f2f2;
+  --color-surface-hover: #f5f5f5;
+  --color-input-background: #ffffff;
+
+  --color-foreground: #1d1d1f;
+  --color-foreground-muted: #666666;
+  --color-foreground-subtle: #8f8f8f;
+
+  --color-accent: #1d1d1f;
+  --color-accent-rgb: 29 29 31;
+  --color-accent-hover: #38383a;
+  --color-accent-soft: #ededed;
+  --color-accent-foreground: #ffffff;
+
+  --color-border: #e5e5e5;
+  --color-border-subtle: #eeeeee;
+  --color-border-strong: #c9c9c9;
+  --color-input-border: #d6d6d6;
+  --color-signal: #1d1d1f;
+
+  --color-nav-hover: #f5f5f5;
+  --color-nav-active: #ededed;
+  --color-nav-active-hover: #e7e7e7;
+  --color-button-secondary: #ffffff;
+  --color-button-secondary-hover: #f5f5f5;
+  --color-button-secondary-active: #ebebeb;
+
+  --color-overlay: #111111;
+  --color-overlay-raised: #1a1a1a;
+  --color-overlay-elevated: #222222;
+  --color-overlay-foreground: #ededed;
+  --color-overlay-muted: #a1a1a1;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.03);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 0.08);
+  --shadow-card: 0 0 0 1px var(--color-border), 0 1px 2px rgb(0 0 0 / 0.04);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-full: 9999px;
+
+  --grid-line-color: rgb(0 0 0 / 0.055);
+  --grid-dot-color: rgb(0 0 0 / 0.11);
+  --grid-size: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: #000000;
+    --color-background-subtle: #0a0a0a;
+    --color-surface: #0a0a0a;
+    --color-surface-raised: #1a1a1a;
+    --color-surface-hover: #141414;
+    --color-input-background: #0a0a0a;
+
+    --color-foreground: #ededed;
+    --color-foreground-muted: #a1a1a1;
+    --color-foreground-subtle: #737373;
+
+    --color-accent: #ededed;
+    --color-accent-rgb: 237 237 237;
+    --color-accent-hover: #ffffff;
+    --color-accent-soft: #1f1f1f;
+    --color-accent-foreground: #000000;
+
+    --color-border: #2a2a2a;
+    --color-border-subtle: #1f1f1f;
+    --color-border-strong: #3f3f3f;
+    --color-input-border: #3a3a3a;
+    --color-signal: #ededed;
+
+    --color-nav-hover: #111111;
+    --color-nav-active: #1a1a1a;
+    --color-nav-active-hover: #222222;
+    --color-button-secondary: #0a0a0a;
+    --color-button-secondary-hover: #171717;
+    --color-button-secondary-active: #202020;
+
+    --color-overlay: #000000;
+    --color-overlay-raised: #0a0a0a;
+    --color-overlay-elevated: #1a1a1a;
+    --color-overlay-foreground: #ededed;
+    --color-overlay-muted: #8f8f8f;
+
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.55), 0 4px 12px rgb(0 0 0 / 0.35);
+    --shadow-md: 0 16px 40px rgb(0 0 0 / 0.55);
+    --shadow-card: 0 0 0 1px var(--color-border), 0 1px 2px rgb(0 0 0 / 0.5);
+
+    --grid-line-color: rgb(255 255 255 / 0.055);
+    --grid-dot-color: rgb(255 255 255 / 0.1);
+  }
+}
+
 html,
 body {
-  height: 100%;
+  min-height: 100%;
+}
+
+html {
+  background: var(--color-background);
 }
 
 body {
   font-family: var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif;
   background-color: var(--color-background);
   color: var(--color-foreground);
+  font-size: 14px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
 }
 
-/* ─── Grid theme utilities ───────────────────────────────────────────── */
+::selection {
+  background: var(--color-foreground);
+  color: var(--color-background);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: 150ms;
+    transition-timing-function: ease;
+  }
+
+  input,
+  textarea,
+  select {
+    background-color: var(--color-input-background);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-foreground);
+    outline-offset: 2px;
+  }
+}
+
 @layer utilities {
   .grid-dots {
-    background-image: radial-gradient(
-      circle,
-      var(--grid-dot-color) 1px,
-      transparent 1px
-    );
+    background-image: radial-gradient(circle, var(--grid-dot-color) 1px, transparent 1px);
     background-size: var(--grid-size) var(--grid-size);
   }
 
@@ -138,35 +171,46 @@ body {
     background-image:
       linear-gradient(var(--grid-line-color) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid-line-color) 1px, transparent 1px);
-    background-size: 14px 14px;
+    background-size: 16px 16px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .text-pretty {
+    text-wrap: pretty;
   }
 }
 
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: none;
-}
-
-/* ─── Custom scrollbar ───────────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255 255 255 / 0.12) transparent;
+  scrollbar-color: color-mix(in srgb, var(--color-foreground) 18%, transparent) transparent;
 }
 
-*::-webkit-scrollbar { width: 4px; height: 4px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: rgba(255 255 255 / 0.12); border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(255 255 255 / 0.22); }
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-@media (prefers-color-scheme: light) {
-  * { scrollbar-color: rgba(0 0 0 / 0.12) transparent; }
-  *::-webkit-scrollbar-thumb { background: rgba(0 0 0 / 0.12); }
-  *::-webkit-scrollbar-thumb:hover { background: rgba(0 0 0 / 0.22); }
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-foreground) 18%, transparent);
+  border-radius: var(--radius-full);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-foreground) 30%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;

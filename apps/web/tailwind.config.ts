@@ -21,15 +21,16 @@ const config: Config = {
         // Surfaces (cards, panels)
         surface:              "var(--color-surface)",
         "surface-raised":     "var(--color-surface-raised)",
+        "surface-hover":      "var(--color-surface-hover)",
+        "input-background":   "var(--color-input-background)",
 
         // Text
         foreground:           "var(--color-foreground)",
         "foreground-muted":   "var(--color-foreground-muted)",
         "foreground-subtle":  "var(--color-foreground-subtle)",
 
-        // Accent (Geist blue — primary)
-        // <alpha-value> is Tailwind's placeholder — replaced with the opacity
-        // fraction at build time so ring-accent/20, bg-accent/10, etc. work.
+        // Monochrome primary action and focus treatment.
+        // <alpha-value> lets opacity modifiers such as ring-accent/20 work.
         accent: "rgb(var(--color-accent-rgb) / <alpha-value>)",
         "accent-hover":       "var(--color-accent-hover)",
         "accent-soft":        "var(--color-accent-soft)",
@@ -38,6 +39,8 @@ const config: Config = {
         // Borders
         border:               "var(--color-border)",
         "border-subtle":      "var(--color-border-subtle)",
+        "border-strong":      "var(--color-border-strong)",
+        "input-border":       "var(--color-input-border)",
 
         // Brand signal
         signal:               "var(--color-signal)",

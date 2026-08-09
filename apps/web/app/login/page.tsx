@@ -59,7 +59,7 @@ export default function LoginPage() {
         wordmarkClassName="hidden"
       />
       <section className="w-full max-w-sm">
-        <div className="p-8">
+        <div className="rounded-xl border border-border bg-surface p-7 shadow-sm sm:p-8">
           <h1 className="font-display text-2xl font-semibold text-foreground">
             Log in to your account
           </h1>

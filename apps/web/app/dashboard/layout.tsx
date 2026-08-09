@@ -41,9 +41,9 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
       {/* Full-width topbar */}
-      <header className="sticky top-0 z-20 flex h-12 items-center border-b border-border px-5 shrink-0">
+      <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center border-b border-border bg-background/90 px-4 backdrop-blur-md md:px-6">
         <span className="text-lg font-medium leading-none tracking-tight text-foreground">
-          <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-lg" />
+          <BrandLogo iconClassName="size-6" wordmarkClassName="text-[15px]" />
         </span>
 
         <div className="ml-auto flex items-center gap-1">

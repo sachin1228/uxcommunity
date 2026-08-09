@@ -46,12 +46,12 @@ export function AdminSidebar() {
     : masterDataActive;
 
   return (
-    <nav className="flex flex-col gap-1">
+    <nav aria-label="Admin navigation" className="flex flex-col gap-0.5">
       {/* Applications */}
       <Link
         href="/admin"
         onClick={() => setPendingHref("/admin")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -65,7 +65,7 @@ export function AdminSidebar() {
       <Link
         href="/admin/lottie-animations"
         onClick={() => setPendingHref("/admin/lottie-animations")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin/lottie-animations")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -79,7 +79,7 @@ export function AdminSidebar() {
       <Link
         href="/admin/communities"
         onClick={() => setPendingHref("/admin/communities")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin/communities")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -93,7 +93,7 @@ export function AdminSidebar() {
       <Link
         href="/admin/moderation"
         onClick={() => setPendingHref("/admin/moderation")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin/moderation")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -107,7 +107,7 @@ export function AdminSidebar() {
       <Link
         href="/admin/tools"
         onClick={() => setPendingHref("/admin/tools")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin/tools")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -121,7 +121,7 @@ export function AdminSidebar() {
       <Link
         href="/admin/load-test"
         onClick={() => setPendingHref("/admin/load-test")}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+        className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
           active("/admin/load-test")
             ? "bg-surface-raised text-foreground"
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -135,7 +135,7 @@ export function AdminSidebar() {
       <div>
         <button
           onClick={() => setOpen((v) => !v)}
-          className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          className={`w-full flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
             masterGroupActive
               ? "bg-surface-raised text-foreground"
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -156,7 +156,7 @@ export function AdminSidebar() {
                 key={href}
                 href={href}
                 onClick={() => setPendingHref(href)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-[13px] font-medium transition-colors ${
                   active(href)
                     ? "bg-surface-raised text-foreground"
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"

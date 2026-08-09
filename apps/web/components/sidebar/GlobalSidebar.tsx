@@ -51,7 +51,7 @@ export function GlobalSidebar({ userId }: Props) {
   const exploreActive = pathname === "/dashboard/communities";
 
   return (
-    <aside className="h-full w-72 shrink-0 border-r border-border bg-background overflow-y-auto">
+    <aside className="hidden h-full w-60 shrink-0 overflow-y-auto border-r border-border bg-background md:block">
       {createOpen && (
         <CreateCommunityModal
           open
@@ -63,15 +63,15 @@ export function GlobalSidebar({ userId }: Props) {
         />
       )}
       {/* WORKSPACE nav */}
-      <div className="px-4 pt-5 pb-3">
-        <p className="px-1 mb-3 font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
+      <div className="px-3 pb-3 pt-5">
+        <p className="mb-2 px-2 font-mono text-[10px] font-medium uppercase tracking-wider text-foreground-subtle">
           Workspace
         </p>
         <ul className="space-y-1">
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-sm font-medium transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -87,7 +87,7 @@ export function GlobalSidebar({ userId }: Props) {
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 font-body text-sm font-medium transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"

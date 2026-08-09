@@ -52,14 +52,14 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-overlay/65 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-border bg-surface shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto ${panelClassName ?? "p-8"}`}
+        className={`relative z-10 max-h-[calc(100vh-2rem)] w-full ${maxWidth} overflow-y-auto rounded-lg border border-border bg-surface shadow-md ${panelClassName ?? "p-6 sm:p-8"}`}
       >
         {title && (
           <div className="mb-6 flex items-start justify-between gap-4">
