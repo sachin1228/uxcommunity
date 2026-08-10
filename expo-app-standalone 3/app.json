@@ -22,7 +22,7 @@
     },
     "android": {
       "backgroundColor": "#09090B",
-      "package": "com.sachinpatil1228.myapp",
+      "package": "in.uxcommunity.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
@@ -43,7 +43,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "82dc5762-bc64-4e40-94e1-737e5af0a9da"
+        "projectId": "be506e75-076e-4d15-9dcc-6c8761117174"
       }
     }
   }
