@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "UX Community",
-    "slug": "my-app",
+    "name": "uxcommunity",
+    "slug": "uxcommunity",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/uxcommunity-icon.png",
-    "scheme": "my-app",
+    "icon": "./assets/images/icon.png",
+    "scheme": "uxcommunity",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/uxcommunity-logo.png",
+      "image": "./assets/images/uxcommunity-splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#09090B"
     },
     "ios": {
       "supportsTablet": false,
@@ -25,12 +25,12 @@
       "package": "com.sachinpatil1228.myapp",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/uxcommunity-logo.png",
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
         "backgroundColor": "#09090B"
       }
     },
     "web": {
-      "favicon": "./assets/images/uxcommunity-logo.png"
+      "favicon": "./assets/images/icon.png"
     },
     "plugins": [
       "expo-router",

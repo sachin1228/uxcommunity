@@ -19,6 +19,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BrandLogo } from '@/components/BrandLogo';
 
 export default function CommunitiesScreen() {
   const colors = useColors();
@@ -63,11 +64,11 @@ export default function CommunitiesScreen() {
           { backgroundColor: colors.subtle, borderBottomColor: colors.border, paddingTop: insets.top + 8 },
         ]}
       >
-        {/* Logo */}
-        <Text style={[styles.headerLogo, { color: colors.foreground }]}>
-          uxcommunity{' '}
-          <Text style={[styles.headerLogoSlash, { color: colors.primary }]}>/</Text>
-        </Text>
+        {/* Brand */}
+        <View style={styles.headerBrand}>
+          <BrandLogo size={30} />
+          <Text style={[styles.headerLogo, { color: colors.foreground }]}>uxcommunity</Text>
+        </View>
 
         {/* Right actions */}
         <View style={styles.headerRight}>
@@ -174,13 +175,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerLogo: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Geist_700Bold',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
   },
-  headerLogoSlash: {
-    fontSize: 20,
-    fontFamily: 'Geist_400Regular',
+  headerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerRight: {
     flexDirection: 'row',
