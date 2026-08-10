@@ -6,38 +6,50 @@ interface BrandLogoProps {
 }
 
 /**
- * UX Community's logo mark, mirrored from the web dashboard BrandLogo.
+ * UX Community's logo mark, rendered from the provided SVG brand asset.
  */
 export function BrandLogo({ size = 56 }: BrandLogoProps) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Svg width={size} height={size} viewBox="0 0 256 256" fill="none">
       <Defs>
-        <LinearGradient
-          id="uxcommunity-mobile-logo-gradient"
-          x1="2"
-          y1="22"
-          x2="22"
-          y2="2"
-          gradientUnits="userSpaceOnUse"
-        >
-          <Stop offset="0%" stopColor="#FFFFFF" />
-          <Stop offset="11%" stopColor="#E6F2FF" />
-          <Stop offset="22%" stopColor="#BFDBFE" />
-          <Stop offset="33%" stopColor="#60A5FA" />
-          <Stop offset="44%" stopColor="#2563EB" />
-          <Stop offset="55%" stopColor="#0070F3" />
-          <Stop offset="66%" stopColor="#1D4ED8" />
-          <Stop offset="77%" stopColor="#1E3A8A" />
-          <Stop offset="88%" stopColor="#111827" />
-          <Stop offset="100%" stopColor="#000000" />
+        <LinearGradient id="bg" x1="128" y1="0" x2="128" y2="256" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#3D8DF4" />
+          <Stop offset="0.5" stopColor="#0070F3" />
+          <Stop offset="1" stopColor="#0064D9" />
+        </LinearGradient>
+
+        <LinearGradient id="bubble" x1="128" y1="45" x2="128" y2="180" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="0.75" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor="#E8F1FC" />
         </LinearGradient>
       </Defs>
-      <G transform="translate(12 12) scale(1.48) translate(-12 -12)">
+
+      <Path
+        d="M128 2 C77 2 44 8 25 26 C7 44 2 77 2 128 C2 179 7 212 26 230 C45 249 78 254 128 254 C178 254 211 249 230 230 C249 211 254 178 254 128 C254 77 249 44 230 26 C211 8 178 2 128 2Z"
+        fill="#000000"
+      />
+
+      <Path
+        d="M128 4 C79 4 47 10 28 28 C10 47 4 79 4 128 C4 177 10 209 28 228 C47 246 79 252 128 252 C177 252 209 246 228 228 C246 209 252 177 252 128 C252 79 246 47 228 28 C209 10 177 4 128 4Z"
+        fill="url(#bg)"
+        stroke="#0059BD"
+        strokeWidth={2}
+      />
+
+      <Path
+        d="M128 6 C80 6 48 12 30 30 C12 48 7 80 7 128"
+        fill="none"
+        stroke="#6FA9F5"
+        strokeWidth={2}
+        strokeLinecap="round"
+        opacity={0.45}
+      />
+
+      <G>
         <Path
-          fill="url(#uxcommunity-mobile-logo-gradient)"
-          fillRule="evenodd"
-          d="M13.407 5.06c.61-.123 1.227-.079 1.657.343l.135.15c.277.361.316.79.208 1.204-.115.44-.397.887-.734 1.314-.68.86-1.74 1.829-2.748 2.76-1.031.952-2.01 1.867-2.606 2.662-.3.4-.466.724-.517.97-.044.21-.003.34.12.46l.065.052c.072.044.167.062.313.039.217-.034.505-.155.866-.378.72-.445 1.561-1.183 2.445-1.966.862-.763 1.768-1.571 2.57-2.076.4-.252.817-.457 1.221-.527.427-.074.87.002 1.223.346l.102.112c.22.271.296.593.266.918-.032.344-.183.684-.364.993-.363.617-.963 1.296-1.515 1.922-.574.651-1.1 1.251-1.403 1.767-.151.257-.218.449-.23.581-.01.106.012.163.072.22l.054.04c.074.038.214.062.474-.031.356-.128.853-.456 1.465-1.1a.5.5 0 0 1 .725.687c-.666.702-1.291 1.153-1.853 1.354-.535.192-1.08.173-1.485-.163l-.08-.071a1.23 1.23 0 0 1-.369-1.03c.033-.344.183-.684.364-.993.363-.617.964-1.297 1.516-1.923.574-.651 1.1-1.25 1.402-1.766.152-.258.22-.449.232-.581.007-.08-.004-.132-.035-.177l-.038-.045c-.07-.068-.162-.108-.353-.075-.213.037-.5.161-.858.388-.717.451-1.555 1.194-2.44 1.978-.862.764-1.774 1.57-2.584 2.07-.404.249-.826.45-1.237.514-.38.06-.767 0-1.095-.247l-.136-.118c-.402-.394-.502-.887-.399-1.38.097-.46.367-.923.696-1.363.663-.885 1.718-1.865 2.728-2.798 1.033-.954 2.023-1.862 2.642-2.645.31-.393.489-.71.55-.946.04-.152.028-.246-.017-.32l-.057-.069c-.082-.08-.284-.172-.76-.076-.468.094-1.091.352-1.863.803-1.537.898-3.552 2.496-5.893 4.786a.5.5 0 0 1-.699-.715c2.37-2.319 4.45-3.98 6.087-4.935.815-.476 1.55-.794 2.17-.92"
-          clipRule="evenodd"
+          d="M128 47 C85 47 52 70 52 106 C52 126 63 142 83 152 C84 162 81 170 75 177 C74 179 76 181 79 181 C93 180 104 174 111 167 C116 168 122 168 128 168 C171 168 204 145 204 106 C204 70 171 47 128 47Z"
+          fill="url(#bubble)"
         />
       </G>
     </Svg>
