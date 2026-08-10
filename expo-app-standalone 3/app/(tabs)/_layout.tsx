@@ -7,6 +7,7 @@ import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { SymbolView } from 'expo-symbols';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // iOS 26+ uses NativeTabs with liquid glass. Older iOS / Android / web fall back
 // to the classic Tabs with a blurred tab bar.
@@ -39,6 +40,8 @@ function ClassicTabLayout() {
   const isDark = colorScheme === 'dark';
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  const insets = useSafeAreaInsets();
+  const bottomInset = isWeb ? 0 : insets.bottom;
 
   return (
     <Tabs
@@ -52,7 +55,8 @@ function ClassicTabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          ...(isWeb ? { height: 84 } : { height: 72 }),
+          height: isWeb ? 84 : 56 + bottomInset,
+          paddingBottom: bottomInset,
         },
         tabBarLabelStyle: {
           fontSize: 13,
