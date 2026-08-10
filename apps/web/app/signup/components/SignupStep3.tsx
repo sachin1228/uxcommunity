@@ -23,7 +23,7 @@ export function SignupStep3({
   onContinue,
 }: SignupStep3Props) {
   return (
-    <div className="rounded-xl bg-surface p-8 shadow-card">
+    <div className="p-8">
       <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         What are your design interests?
       </h2>
