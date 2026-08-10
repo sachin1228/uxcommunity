@@ -71,7 +71,7 @@ export function GlobalSidebar({ userId }: Props) {
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -87,7 +87,7 @@ export function GlobalSidebar({ userId }: Props) {
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-normal transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
