@@ -14,13 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 function NativeTabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="communities">
         <Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
         <Label>Communities</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="index">
+        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="explore">
         <Icon sf={{ default: 'safari', selected: 'safari.fill' }} />
@@ -79,18 +79,6 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="house" tintColor={color} size={28} />
-            ) : (
-              <Feather name="home" size={26} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="communities"
         options={{
           title: 'Communities',
@@ -99,6 +87,18 @@ function ClassicTabLayout() {
               <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={28} />
             ) : (
               <Feather name="message-circle" size={26} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="house" tintColor={color} size={28} />
+            ) : (
+              <Feather name="home" size={26} color={color} />
             ),
         }}
       />
