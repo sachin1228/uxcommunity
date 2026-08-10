@@ -6,7 +6,7 @@ export default function AuthLayout() {
 
   // As soon as login succeeds, redirect to the main app
   if (!isLoading && user) {
-    return <Redirect href="/(tabs)" />;
+    return <Redirect href="/(tabs)/communities" />;
   }
 
   return (
