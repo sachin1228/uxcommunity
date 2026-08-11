@@ -205,6 +205,7 @@ export function useSidebarRealtime({
                     : isOwn
                     ? c.last_message?.user ?? null
                     : null,
+                  is_own:     isOwn,
                   has_image:  !row.content && !!row.image_url,
                   is_reply:   !!row.reply_to_id,
                   is_deleted: false,

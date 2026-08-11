@@ -12,14 +12,17 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "now";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
+/** Absolute time — mirrors the mobile app: clock for today, "Yesterday",
+ *  weekday within the last week, then a short date. */
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 /** Formats the last-message text shown below the community name. */
@@ -27,7 +30,7 @@ function formatPreview(msg: NonNullable<Community["last_message"]>): {
   prefix?: string;
   text: string;
 } {
-  const sender = msg.user?.name.split(" ")[0];
+  const sender = msg.is_own ? "You" : msg.user?.name.split(" ")[0];
   if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
   if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
   if (msg.is_reply) {
@@ -91,7 +94,7 @@ export function CommunityRow({
             )}
             {c.last_message && !typingText && (
               <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
-                {timeAgo(c.last_message.created_at)}
+                {formatTime(c.last_message.created_at)}
               </span>
             )}
           </div>
@@ -105,7 +108,7 @@ export function CommunityRow({
           </div>
 
           {/* Preview line */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-start gap-1.5">
             {typingText ? (
               /* Typing — highest priority */
               <p className="font-body text-[13px] text-accent truncate flex-1">
@@ -124,7 +127,7 @@ export function CommunityRow({
 
             ) : preview ? (
               /* Standard message preview */
-              <p className="font-body text-[13px] truncate flex-1 text-foreground-muted">
+              <p className="font-body text-[13px] leading-5 truncate flex-1 text-foreground-muted">
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}

@@ -131,9 +131,9 @@ function previewText(
   // Last message — mirrors web formatPreview() priority exactly:
   // deleted → image-only → reply → plain content
   if (community.last_message) {
-    const { content, user, is_reply, reply_to_user, is_deleted, has_image } =
+    const { content, user, is_own, is_reply, reply_to_user, is_deleted, has_image } =
       community.last_message;
-    const sender = user.name ? user.name.split(' ')[0] : '';
+    const sender = is_own ? 'You' : user.name ? user.name.split(' ')[0] : '';
 
     if (is_deleted) {
       return { prefix: sender, text: 'Message deleted' };
