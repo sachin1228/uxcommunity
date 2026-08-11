@@ -91,8 +91,22 @@ export function ResourceCard({
   const isOwner    = resource.user_id === currentUserId;
   const ogImage    = useOgImage(resource.url);
 
-  const [savePending, setSavePending]         = useState(false);
-  const [bookmarkPending, setBookmarkPending] = useState(false);
+  const [optimisticSave, setOptimisticSave] = useState<{ saved: boolean; count: number } | null>(null);
+  const confirmedSaveRef = useRef(resource.user_saved);
+  const desiredSaveRef = useRef(resource.user_saved);
+  const optimisticSaveCountRef = useRef(resource.save_count);
+  const saveRequestRunningRef = useRef(false);
+  const displayedSaved = optimisticSave?.saved ?? resource.user_saved;
+  const displayedSaveCount = optimisticSave?.count ?? resource.save_count;
+
+  const [optimisticBookmark, setOptimisticBookmark] = useState<{ bookmarked: boolean; count: number } | null>(null);
+  const confirmedBookmarkRef = useRef(resource.user_bookmarked);
+  const desiredBookmarkRef = useRef(resource.user_bookmarked);
+  const optimisticBookmarkCountRef = useRef(resource.bookmark_count);
+  const bookmarkRequestRunningRef = useRef(false);
+  const displayedBookmarked = optimisticBookmark?.bookmarked ?? resource.user_bookmarked;
+  const displayedBookmarkCount = optimisticBookmark?.count ?? resource.bookmark_count;
+
   const [menuOpen, setMenuOpen]               = useState(false);
   const [showEditModal, setShowEditModal]     = useState(false);
   const [deleting, setDeleting]               = useState(false);
@@ -121,38 +135,95 @@ export function ResourceCard({
     }
   }
 
-  async function handleSave(e: React.MouseEvent) {
-    e.preventDefault(); e.stopPropagation();
-    if (savePending) return;
-    const newSaved = !resource.user_saved;
-    const newCount = resource.save_count + (newSaved ? 1 : -1);
-    onSaveChanged(resource.id, newSaved, newCount);
-    setSavePending(true);
+  async function flushSaveIntent() {
+    if (saveRequestRunningRef.current) return;
+    saveRequestRunningRef.current = true;
+
     try {
-      const res = await fetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" });
-      if (!res.ok) onSaveChanged(resource.id, resource.user_saved, resource.save_count);
+      while (confirmedSaveRef.current !== desiredSaveRef.current) {
+        const response = await fetch(
+          `/api/communities/${communityId}/resources/${resource.id}/save`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error("Failed to update resource like");
+
+        const result = (await response.json()) as { saved: boolean };
+        confirmedSaveRef.current = result.saved;
+      }
     } catch {
-      onSaveChanged(resource.id, resource.user_saved, resource.save_count);
+      desiredSaveRef.current = confirmedSaveRef.current;
+      const rollbackCount = Math.max(
+        0,
+        optimisticSaveCountRef.current + (confirmedSaveRef.current ? 1 : -1),
+      );
+      optimisticSaveCountRef.current = rollbackCount;
+      setOptimisticSave({ saved: confirmedSaveRef.current, count: rollbackCount });
+      onSaveChanged(resource.id, confirmedSaveRef.current, rollbackCount);
     } finally {
-      setSavePending(false);
+      saveRequestRunningRef.current = false;
+      setOptimisticSave(null);
     }
   }
 
-  async function handleBookmark(e: React.MouseEvent) {
+  function handleSave(e: React.MouseEvent) {
     e.preventDefault(); e.stopPropagation();
-    if (bookmarkPending) return;
-    const newBookmarked = !resource.user_bookmarked;
-    const newCount = resource.bookmark_count + (newBookmarked ? 1 : -1);
-    onBookmarkChanged(resource.id, newBookmarked, newCount);
-    setBookmarkPending(true);
+
+    const newSaved = !desiredSaveRef.current;
+    const newCount = Math.max(
+      0,
+      optimisticSaveCountRef.current + (newSaved ? 1 : -1),
+    );
+    desiredSaveRef.current = newSaved;
+    optimisticSaveCountRef.current = newCount;
+    setOptimisticSave({ saved: newSaved, count: newCount });
+    onSaveChanged(resource.id, newSaved, newCount);
+    void flushSaveIntent();
+  }
+
+  async function flushBookmarkIntent() {
+    if (bookmarkRequestRunningRef.current) return;
+    bookmarkRequestRunningRef.current = true;
+
     try {
-      const res = await fetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" });
-      if (!res.ok) onBookmarkChanged(resource.id, resource.user_bookmarked, resource.bookmark_count);
+      while (confirmedBookmarkRef.current !== desiredBookmarkRef.current) {
+        const response = await fetch(
+          `/api/communities/${communityId}/resources/${resource.id}/bookmark`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error("Failed to update resource bookmark");
+
+        const result = (await response.json()) as { bookmarked: boolean; bookmark_count: number };
+        confirmedBookmarkRef.current = result.bookmarked;
+        optimisticBookmarkCountRef.current = result.bookmark_count;
+      }
     } catch {
-      onBookmarkChanged(resource.id, resource.user_bookmarked, resource.bookmark_count);
+      desiredBookmarkRef.current = confirmedBookmarkRef.current;
+      const rollbackCount = Math.max(
+        0,
+        optimisticBookmarkCountRef.current + (confirmedBookmarkRef.current ? 1 : -1),
+      );
+      optimisticBookmarkCountRef.current = rollbackCount;
+      setOptimisticBookmark({ bookmarked: confirmedBookmarkRef.current, count: rollbackCount });
+      onBookmarkChanged(resource.id, confirmedBookmarkRef.current, rollbackCount);
     } finally {
-      setBookmarkPending(false);
+      bookmarkRequestRunningRef.current = false;
+      setOptimisticBookmark(null);
     }
+  }
+
+  function handleBookmark(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation();
+
+    const newBookmarked = !desiredBookmarkRef.current;
+    const newCount = Math.max(
+      0,
+      optimisticBookmarkCountRef.current + (newBookmarked ? 1 : -1),
+    );
+    desiredBookmarkRef.current = newBookmarked;
+    optimisticBookmarkCountRef.current = newCount;
+    setOptimisticBookmark({ bookmarked: newBookmarked, count: newCount });
+    onBookmarkChanged(resource.id, newBookmarked, newCount);
+    void flushBookmarkIntent();
   }
 
   const authorName    = resource.users?.name ?? "Member";
@@ -291,21 +362,21 @@ export function ResourceCard({
             <button
               type="button"
               onClick={handleSave}
-              disabled={savePending}
-              aria-label={resource.user_saved ? "Unlike" : "Like"}
-              className="flex items-center gap-1.5 disabled:opacity-60"
+              aria-label={displayedSaved ? "Unlike" : "Like"}
+              aria-pressed={displayedSaved}
+              className="group/like flex items-center gap-2"
             >
               <Heart
-                size={16}
-                className={`transition-colors ${
-                  resource.user_saved
+                size={20}
+                strokeWidth={2}
+                className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+                  displayedSaved
                     ? "fill-red-500 text-red-500"
-                    : "fill-none text-foreground-subtle hover:text-red-400"
+                    : "fill-none text-white"
                 }`}
-                strokeWidth={resource.user_saved ? 0 : 1.75}
               />
-              <span className={`font-body text-xs font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-foreground-muted"}`}>
-                {resource.save_count}
+              <span className={`font-body text-sm font-semibold tabular-nums ${displayedSaved ? "text-red-500" : "text-white"}`}>
+                {displayedSaveCount}
               </span>
             </button>
 
@@ -313,17 +384,18 @@ export function ResourceCard({
             <button
               type="button"
               onClick={handleBookmark}
-              aria-label={resource.user_bookmarked ? "Remove bookmark" : "Bookmark"}
-              className="flex items-center gap-1.5"
+              aria-label={displayedBookmarked ? "Remove bookmark" : "Bookmark"}
+              aria-pressed={displayedBookmarked}
+              className="group/save flex items-center gap-2 text-white"
             >
               <Bookmark
-                size={16}
-                fill={resource.user_bookmarked ? "currentColor" : "none"}
-                strokeWidth={1.75}
-                className={`transition-colors ${resource.user_bookmarked ? "text-emerald-500" : "text-foreground-subtle"}`}
+                size={20}
+                strokeWidth={2}
+                fill={displayedBookmarked ? "currentColor" : "none"}
+                className="transition-transform duration-150 ease-out group-hover/save:scale-110"
               />
-              <span className={`font-body text-xs font-semibold tabular-nums ${resource.user_bookmarked ? "text-emerald-500" : "text-foreground-muted"}`}>
-                {resource.bookmark_count}
+              <span className="font-body text-sm font-semibold tabular-nums">
+                {displayedBookmarkCount}
               </span>
             </button>
 
