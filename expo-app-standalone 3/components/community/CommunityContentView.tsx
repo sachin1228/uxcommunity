@@ -116,13 +116,13 @@ function ContentDetail({ visible, item, kind, onClose, onAction, onEdit, onDelet
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const previewImage = useResourcePreview(kind === 'resources' ? (item as CommunityResource | null)?.url : undefined);
   if (!item) return null;
   const thread = kind === 'threads' ? item as CommunityThread : null;
   const event = kind === 'events' ? item as CommunityEvent : null;
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const images = thread?.attachments.filter((attachment) => attachment.type.startsWith('image/')) ?? [];
   const files = thread?.attachments.filter((attachment) => !attachment.type.startsWith('image/')) ?? [];
-  const previewImage = useResourcePreview(resource?.url);
 
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
     <View style={[styles.detailRoot, { backgroundColor: colors.subtle }]}>
