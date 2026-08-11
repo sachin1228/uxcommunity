@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   Heart, Bookmark, Flag, MessageSquare,
-  MoreHorizontal, Paperclip, Pencil, Share2, Trash2,
+  MoreHorizontal, Paperclip, Pencil, Trash2,
 } from "lucide-react";
 
 import type { CommunityThread } from "./types";
@@ -490,7 +490,7 @@ export function ThreadCard({
       })()}
 
 
-      {/* ── Footer: like · comments · (bookmark · share in list only) ── */}
+      {/* ── Footer: like · comments · bookmark ── */}
       <div className="mt-3 flex items-center gap-4">
         {/* Like (Instagram-style heart) */}
         <button
@@ -520,36 +520,26 @@ export function ThreadCard({
 
         {/* Comments */}
         <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-subtle">
-          <MessageSquare size={14} />
+          <MessageSquare size={20} strokeWidth={2} className="text-white" />
           {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
         </span>
 
         <div className="flex-1" />
 
-        {/* Bookmark + Share */}
+        {/* Bookmark */}
         {!isDetail && (
-          <>
-            <button
-              type="button"
-              aria-label={thread.user_saved ? "Unsave thread" : "Save thread"}
-              onClick={handleSave}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                thread.user_saved
-                  ? "text-emerald-500"
-                  : "text-foreground-subtle"
-              }`}
-            >
-              <Bookmark size={14} fill={thread.user_saved ? "currentColor" : "none"} />
-            </button>
-            <button
-              type="button"
-              aria-label="Share"
-              onClick={(e) => { e.preventDefault(); navigator.clipboard?.writeText(window.location.origin + `/dashboard/communities/${communityId}/threads/${thread.id}`).catch(() => {}); }}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:text-foreground transition-colors"
-            >
-              <Share2 size={14} />
-            </button>
-          </>
+          <button
+            type="button"
+            aria-label={thread.user_saved ? "Unsave thread" : "Save thread"}
+            onClick={handleSave}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors"
+          >
+            <Bookmark
+              size={20}
+              strokeWidth={2}
+              fill={thread.user_saved ? "currentColor" : "none"}
+            />
+          </button>
         )}
       </div>
     </>
