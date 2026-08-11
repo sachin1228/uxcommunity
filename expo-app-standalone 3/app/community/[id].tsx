@@ -6,6 +6,7 @@ import {
   KeyboardAvoidingView as RNKeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -35,15 +36,29 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CommunityContentView } from '@/components/community/CommunityContentView';
+import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
 export default function CommunityChat() {
-  const { id, name, image } = useLocalSearchParams<{ id: string; name: string; image?: string }>();
+  const { id, name, image, tabs: enabledTabsParam } = useLocalSearchParams<{ id: string; name: string; image?: string; tabs?: string }>();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
+  const enabledTabs = new Set(
+    (enabledTabsParam ? decodeURIComponent(enabledTabsParam).split(',') : ['chat', 'threads', 'events', 'resources'])
+      .map((tab) => tab.trim().toLowerCase())
+  );
+  const allTabs: Array<{ key: CommunityTab; label: string }> = [
+    { key: 'chat', label: 'Chat' },
+    { key: 'threads', label: 'Threads' },
+    { key: 'events', label: 'Events' },
+    { key: 'resources', label: 'Resources' },
+  ];
+  const tabs = allTabs.filter((tab) => tab.key === 'chat' || enabledTabs.has(tab.key));
 
   // Track this as the active community so useCommunities won't increment
   // unread_count for incoming messages while we're looking at this chat.
@@ -306,29 +321,51 @@ export default function CommunityChat() {
             {communityName}
           </Text>
         </View>
-
-        <View style={{ width: 36 }} />
       </View>
 
-      {Platform.OS === 'android' ? (
-        <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
-          {chatContent}
-        </KeyboardControllerAvoidingView>
-      ) : (
-        <RNKeyboardAvoidingView
-          style={styles.flex}
-          behavior="padding"
-          keyboardVerticalOffset={headerHeight}
-        >
-          {chatContent}
-        </RNKeyboardAvoidingView>
-      )}
+      <View style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                style={[styles.tab, active && { borderBottomColor: colors.primary }]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={[styles.tabText, { color: active ? colors.primary : colors.mutedForeground }]}>{tab.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-      {/* Bottom safe-area strip — rendered outside the keyboard container so it
-          never moves with the keyboard. Fills the gesture-navigation area with
-          the app background color, exactly like WhatsApp. On iOS this covers
-          the home-indicator inset; on Android it covers the gesture nav bar. */}
-      <View style={{ height: insets.bottom, backgroundColor: colors.subtle }} />
+      {activeTab === 'chat' ? (
+        <>
+          {Platform.OS === 'android' ? (
+            <KeyboardControllerAvoidingView style={styles.flex} behavior="height">
+              {chatContent}
+            </KeyboardControllerAvoidingView>
+          ) : (
+            <RNKeyboardAvoidingView
+              style={styles.flex}
+              behavior="padding"
+              keyboardVerticalOffset={headerHeight}
+            >
+              {chatContent}
+            </RNKeyboardAvoidingView>
+          )}
+          <View style={{ height: insets.bottom, backgroundColor: colors.subtle }} />
+        </>
+      ) : (
+        <CommunityContentView
+          communityId={id}
+          kind={activeTab as ContentKind}
+          currentUserId={user?.id ?? ''}
+        />
+      )}
 
       {/* Full-screen image viewer */}
       <ImageViewer
@@ -374,9 +411,29 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: 8,
     minWidth: 0,
+  },
+  tabsShell: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tabs: {
+    minWidth: '100%',
+    paddingHorizontal: 12,
+  },
+  tab: {
+    minWidth: 82,
+    height: 48,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 14,
+    fontFamily: 'Geist_600SemiBold',
   },
   headerAvatar: {
     width: 38,
