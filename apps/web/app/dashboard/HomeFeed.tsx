@@ -118,7 +118,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     return (
       <ul className="border-t border-border animate-pulse">
         {[1, 2, 3].map((item) => (
-          <li key={item} className="border-b border-border px-8 py-6">
+          <li key={item} className="border-b border-border px-16 py-6">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
               <div className="flex items-center gap-2">
@@ -142,7 +142,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         ))}
         {/* Article grid skeleton row */}
         <li className="border-b border-border">
-          <div className="grid grid-cols-2 gap-4 p-4">
+          <div className="grid grid-cols-2 gap-4 px-16 py-6">
             {[1, 2].map((item) => (
               <div key={item} className="rounded-2xl border border-border p-5">
                 <div className="h-32 w-full rounded-xl bg-surface-raised mb-4" />
