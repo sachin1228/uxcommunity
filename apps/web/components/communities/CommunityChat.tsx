@@ -4,12 +4,20 @@ import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } fr
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import {
+  applyReactionDelete,
+  applyReactionInsert,
   markSidebarReactionRemoved,
   patchSidebarReaction,
   sidebarStore,
   msgCache,
 } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import {
+  clearReactionIntentsForCommunity,
+  ReactionIntentCoordinator,
+  trackReactionIntent,
+  type ReactionIntent,
+} from "@/lib/reaction-intent-coordinator";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
@@ -171,116 +179,108 @@ export function CommunityChat({
     [communityId, setMessages]
   );
 
-  // Tracks the newest request for each message so a slower response cannot
-  // overwrite a more recent reaction choice.
-  const reactionRequestRef = useRef(new Map<string, number>());
+  const reactionCoordinatorsRef = useRef(
+    new Map<string, ReactionIntentCoordinator<MessageReaction[]>>(),
+  );
+
+  const projectOwnReaction = useCallback(
+    (reactions: MessageReaction[], desiredEmoji: ReactionIntent) => {
+      const currentEmoji = reactions.find((reaction) =>
+        reaction.user_ids.includes(currentUserId),
+      )?.emoji;
+      const withoutCurrent = currentEmoji
+        ? applyReactionDelete(reactions, currentEmoji, currentUserId)
+        : reactions;
+      return desiredEmoji
+        ? applyReactionInsert(withoutCurrent, desiredEmoji, currentUserId)
+        : withoutCurrent;
+    },
+    [currentUserId],
+  );
+
+  useEffect(() => {
+    const coordinators = reactionCoordinatorsRef.current;
+    return () => {
+      for (const coordinator of coordinators.values()) coordinator.dispose();
+      coordinators.clear();
+      clearReactionIntentsForCommunity(communityId);
+    };
+  }, [communityId]);
 
   // ── Inline hover reaction handler ─────────────────────────────────────────
   const handleReaction = useCallback(
-    async (msgId: string, emoji: string) => {
+    (msgId: string, emoji: string) => {
       const message = msgCache.get(communityId)?.find((item) => item.id === msgId);
       if (!message) return;
 
-      const previousReactions = message.reactions ?? [];
-      const previousSidebarReaction =
-        sidebarStore.data?.communities.find((item) => item.id === communityId)
-          ?.lastReaction ?? null;
-      const isRemoving = previousReactions.some(
-        (reaction) =>
-          reaction.emoji === emoji && reaction.user_ids.includes(currentUserId),
-      );
+      let coordinator = reactionCoordinatorsRef.current.get(msgId);
+      if (!coordinator) {
+        const initialEmoji = message.reactions?.find((reaction) =>
+          reaction.user_ids.includes(currentUserId),
+        )?.emoji ?? null;
+        const messagePreview = message.content
+          ? `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`
+          : message.image_url
+            ? "📷 Photo"
+            : "a message";
 
-      const optimisticReactions = isRemoving
-        ? previousReactions
-            .map((reaction) =>
-              reaction.emoji === emoji
-                ? {
-                    ...reaction,
-                    user_ids: reaction.user_ids.filter(
-                      (id) => id !== currentUserId,
-                    ),
-                  }
-                : reaction,
-            )
-            .filter((reaction) => reaction.user_ids.length > 0)
-        : (() => {
-            const withoutUser = previousReactions
-              .map((reaction) => ({
-                ...reaction,
-                user_ids: reaction.user_ids.filter(
-                  (id) => id !== currentUserId,
-                ),
-              }))
-              .filter((reaction) => reaction.user_ids.length > 0);
-            const group = withoutUser.find(
-              (reaction) => reaction.emoji === emoji,
+        const paintIntent = (desiredEmoji: ReactionIntent) => {
+          const latest = msgCache.get(communityId)?.find((item) => item.id === msgId);
+          if (latest) {
+            handleReactionToggled(
+              msgId,
+              projectOwnReaction(latest.reactions ?? [], desiredEmoji),
             );
-            return group
-              ? withoutUser.map((reaction) =>
-                  reaction.emoji === emoji
-                    ? {
-                        ...reaction,
-                        user_ids: [...reaction.user_ids, currentUserId],
-                      }
-                    : reaction,
-                )
-              : [...withoutUser, { emoji, user_ids: [currentUserId] }];
-          })();
+          }
+          if (desiredEmoji === null) markSidebarReactionRemoved(communityId, msgId);
+          patchSidebarReaction(
+            communityId,
+            desiredEmoji === null
+              ? null
+              : {
+                  messageId: msgId,
+                  emoji: desiredEmoji,
+                  createdAt: new Date().toISOString(),
+                  firstName: "You",
+                  isOwn: true,
+                  messagePreview,
+                },
+          );
+        };
 
-      handleReactionToggled(msgId, optimisticReactions);
-
-      const messagePreview = message.content
-        ? `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`
-        : message.image_url
-          ? "📷 Photo"
-          : "a message";
-      if (isRemoving) {
-        markSidebarReactionRemoved(communityId, msgId);
-      }
-      patchSidebarReaction(
-        communityId,
-        isRemoving
-          ? null
-          : {
-              messageId: msgId,
-              emoji,
-              createdAt: new Date().toISOString(),
-              firstName: "You",
-              isOwn: true,
-              messagePreview,
-            },
-      );
-
-      const requestNumber = (reactionRequestRef.current.get(msgId) ?? 0) + 1;
-      reactionRequestRef.current.set(msgId, requestNumber);
-
-      try {
-        const res = await fetch(
-          `/api/communities/${communityId}/messages/${msgId}/reactions`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emoji }),
+        coordinator = new ReactionIntentCoordinator<MessageReaction[]>({
+          initialValue: initialEmoji,
+          onOptimisticChange: paintIntent,
+          onIntentChange: (value, pending) => {
+            trackReactionIntent(communityId, msgId, currentUserId, value, pending);
           },
-        );
-
-        if (reactionRequestRef.current.get(msgId) !== requestNumber) return;
-
-        if (!res.ok) {
-          handleReactionToggled(msgId, previousReactions);
-          patchSidebarReaction(communityId, previousSidebarReaction);
-          return;
-        }
-
-        const { reactions } = await res.json();
-        handleReactionToggled(msgId, reactions);
-      } catch {
-        if (reactionRequestRef.current.get(msgId) !== requestNumber) return;
-        handleReactionToggled(msgId, previousReactions);
-        patchSidebarReaction(communityId, previousSidebarReaction);
+          persist: async (desiredEmoji) => {
+            const res = await fetch(
+              `/api/communities/${communityId}/messages/${msgId}/reactions`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ desiredEmoji }),
+              },
+            );
+            if (!res.ok) throw new Error("Unable to update reaction");
+            const data = await res.json() as {
+              reactions: MessageReaction[];
+              currentUserEmoji: ReactionIntent;
+            };
+            return { value: data.currentUserEmoji, data: data.reactions };
+          },
+          onConfirmed: ({ value, data }) => {
+            handleReactionToggled(msgId, data);
+            paintIntent(value);
+          },
+        });
+        reactionCoordinatorsRef.current.set(msgId, coordinator);
       }
+
+      coordinator.toggle(emoji);
     },
-    [communityId, currentUserId, handleReactionToggled],
+    [communityId, currentUserId, handleReactionToggled, projectOwnReaction],
   );
 
   // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
@@ -424,6 +424,7 @@ export function CommunityChat({
   // ── Realtime subscription ──���──────────────────────────────────────────────
   useRealtimeChat({
     communityId,
+    currentUserId,
     fetchMessages,
     setMessages,
     setThreadEvents,

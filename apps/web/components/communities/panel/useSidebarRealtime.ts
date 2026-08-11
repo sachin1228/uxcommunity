@@ -7,6 +7,7 @@ import {
   sidebarStore,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
+import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -331,6 +332,10 @@ export function useSidebarRealtime({
           },
           (payload) => {
             const r = payload.new as ReactionRow;
+            if (
+              r.user_id === userId &&
+              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+            ) return;
             fetchAndApplyReaction(r);
 
             // Async: resolve reactor name for others so it shows correctly.
@@ -371,6 +376,10 @@ export function useSidebarRealtime({
           },
           (payload) => {
             const r = payload.new as ReactionRow;
+            if (
+              r.user_id === userId &&
+              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+            ) return;
             fetchAndApplyReaction(r);
           },
         )
@@ -392,6 +401,10 @@ export function useSidebarRealtime({
               created_at?: string;
             };
             if (!r.message_id || !r.user_id || !r.emoji) return;
+            if (
+              r.user_id === userId &&
+              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+            ) return;
 
             setCommunities((prev) =>
               applyUpdate(prev, comm.id, (c) => {

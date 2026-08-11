@@ -5,11 +5,13 @@ import { createBrowserClient } from "@/lib/supabase/browser";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
+import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 
 type Message = CachedMessage;
 
 interface UseRealtimeChatOptions {
   communityId: string;
+  currentUserId: string;
   fetchMessages: (after?: string) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
@@ -23,6 +25,7 @@ interface UseRealtimeChatOptions {
 
 export function useRealtimeChat({
   communityId,
+  currentUserId,
   fetchMessages,
   setMessages,
   setThreadEvents,
@@ -277,6 +280,10 @@ export function useRealtimeChat({
             user_id: string;
             emoji: string;
           };
+          if (
+            r.user_id === currentUserId &&
+            shouldSuppressReactionEcho(communityId, r.message_id, r.user_id)
+          ) return;
           setMessages((prev) => {
             const next = prev.map((m) =>
               m.id === r.message_id
@@ -307,6 +314,10 @@ export function useRealtimeChat({
         (payload) => {
           const oldR = payload.old as { message_id: string; user_id: string; emoji: string };
           const newR = payload.new as { message_id: string; user_id: string; emoji: string };
+          if (
+            newR.user_id === currentUserId &&
+            shouldSuppressReactionEcho(communityId, newR.message_id, newR.user_id)
+          ) return;
           setMessages((prev) => {
             const next = prev.map((m) => {
               if (m.id !== newR.message_id) return m;
@@ -338,6 +349,10 @@ export function useRealtimeChat({
           // has REPLICA IDENTITY FULL. Without the migration applied they will
           // be undefined, so skip the update to avoid corrupting local state.
           if (!r.message_id || !r.user_id || !r.emoji) return;
+          if (
+            r.user_id === currentUserId &&
+            shouldSuppressReactionEcho(communityId, r.message_id, r.user_id)
+          ) return;
           setMessages((prev) => {
             const next = prev.map((m) =>
               m.id === r.message_id
