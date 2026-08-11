@@ -174,6 +174,8 @@ export function useCommunities() {
                 user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
                 is_reply:     !!row.reply_to_id,
                 reply_to_user: null,
+                has_image:    !row.content && !!row.image_url,
+                is_deleted:   false,
               };
 
               setCommunities((prev) => {
@@ -236,7 +238,15 @@ export function useCommunities() {
               setCommunities((prev) =>
                 prev.map((c) => {
                   if (c.id !== cid || c.last_message?.created_at !== row.created_at) return c;
-                  return { ...c, last_message: { ...c.last_message!, content: null } };
+                  return {
+                    ...c,
+                    last_message: {
+                      ...c.last_message!,
+                      content: null,
+                      is_deleted: true,
+                      has_image: false,
+                    },
+                  };
                 })
               );
             }
@@ -466,7 +476,9 @@ export function useCommunities() {
   );
 
   return {
-    communities,
+    // Archived communities stay in state so realtime can un-archive them on a
+    // new message, but they are hidden from the list — mirrors web sidebar.
+    communities: communities.filter((c) => !c.is_archived),
     isLoading,
     error,
     reload: load,

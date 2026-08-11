@@ -1,7 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Community } from '@/lib/communities';
+
+// ---------------------------------------------------------------------------
+// Member count formatting — mirrors web's fmtCount (1.2k / 3M)
+// ---------------------------------------------------------------------------
+
+function fmtCount(n: number): string {
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,26 +128,31 @@ function previewText(
     return { text: `${who} reacted ${emoji}${to}` };
   }
 
-  // Last message
+  // Last message — mirrors web formatPreview() priority exactly:
+  // deleted → image-only → reply → plain content
   if (community.last_message) {
-    const { content, user, is_reply, reply_to_user } = community.last_message;
+    const { content, user, is_reply, reply_to_user, is_deleted, has_image } =
+      community.last_message;
     const sender = user.name ? user.name.split(' ')[0] : '';
 
-    if (!content && community.last_message.hasOwnProperty('image_url')) {
+    if (is_deleted) {
+      return { prefix: sender, text: 'Message deleted' };
+    }
+
+    if (has_image && !content) {
       return { prefix: sender, text: '📷 Photo' };
     }
 
     if (is_reply) {
-      const replyTo = reply_to_user;
       return {
         prefix: sender,
-        text: replyTo
-          ? `replied to ${replyTo}: ${content ?? ''}`
+        text: reply_to_user
+          ? `replied to ${reply_to_user}: ${content ?? ''}`
           : `replied: ${content ?? ''}`,
       };
     }
 
-    return { prefix: sender, text: content ?? '📷 Photo' };
+    return { prefix: sender, text: content ?? '' };
   }
 
   return { text: 'No messages yet' };
@@ -186,26 +202,40 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
       <View style={styles.body}>
         {/* Name + time */}
         <View style={styles.topRow}>
-          <Text
-            style={[
-              styles.name,
-              { color: colors.foreground },
-              hasUnread && styles.nameBold,
-            ]}
-            numberOfLines={1}
-          >
-            {community.name}
-          </Text>
+          <View style={styles.nameGroup}>
+            <Text
+              style={[
+                styles.name,
+                { color: colors.foreground },
+                hasUnread && styles.nameBold,
+              ]}
+              numberOfLines={1}
+            >
+              {community.name}
+            </Text>
+            {community.is_private && (
+              <Feather
+                name="lock"
+                size={11}
+                color={colors.mutedForeground}
+                style={styles.lockIcon}
+                accessibilityLabel="Private community"
+              />
+            )}
+          </View>
           <Text style={[styles.time, { color: colors.foregroundSoft }]}>
             {formatTime(lastTime)}
           </Text>
         </View>
 
-        {/* Member count */}
-        <Text style={[styles.memberCount, { color: colors.foregroundSoft }]}>
+        {/* Member count + city reference name */}
+        <Text style={[styles.memberCount, { color: colors.foregroundSoft }]} numberOfLines={1}>
           {community.member_count === 1
             ? '1 member'
-            : `${community.member_count} members`}
+            : `${fmtCount(community.member_count)} members`}
+          {community.type === 'city' && community.reference_name
+            ? ` · ${community.reference_name}`
+            : ''}
         </Text>
 
         {/* Preview / typing */}
@@ -240,8 +270,8 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
 
           {/* Unread badge */}
           {hasUnread && (
-            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.badgeText, { color: colors.primaryForeground }]}>
+            <View style={[styles.badge, { backgroundColor: colors.success }]}>
+              <Text style={[styles.badgeText, { color: colors.successForeground }]}>
                 {community.unread_count > 99 ? '99+' : community.unread_count}
               </Text>
             </View>
@@ -285,13 +315,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  nameGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    minWidth: 0,
+  },
   name: {
     fontSize: 16,
     fontFamily: 'Geist_500Medium',
-    flex: 1,
+    flexShrink: 1,
   },
   nameBold: {
     fontFamily: 'Geist_600SemiBold',
+  },
+  lockIcon: {
+    marginTop: 1,
   },
   time: {
     fontSize: 13,

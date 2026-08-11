@@ -41,6 +41,10 @@ const colors = {
     destructive: '#ef4444',
     destructiveForeground: '#FFFFFF',
 
+    // Success / positive states — unread badge (mirrors web bg-green-500)
+    success: '#22c55e',
+    successForeground: '#FFFFFF',
+
     // Borders and input outlines
     border: '#EAEAEA',
     input: '#EAEAEA',
@@ -78,6 +82,9 @@ const colors = {
 
     destructive: '#ef4444',
     destructiveForeground: '#FFFFFF',
+
+    success: '#22c55e',
+    successForeground: '#FFFFFF',
 
     border: '#202024',
     input: '#151517',
