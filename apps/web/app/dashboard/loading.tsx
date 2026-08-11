@@ -7,15 +7,22 @@ export default function DashboardLoading() {
     <div className="flex items-start h-full animate-pulse">
       {/* ── Main feed column ── */}
       <div className="flex-1 min-w-0 border-r border-border">
-        {/* Welcome heading */}
-        <div className="p-6">
-          <div className="h-8 w-56 rounded bg-surface-raised" />
+        {/* Post composer */}
+        <div className="mx-16 my-1">
+          <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
+            <div className="h-[38px] w-[38px] shrink-0 rounded-full bg-surface-raised" />
+            <div className="grid min-w-0 grid-cols-3 justify-items-center gap-0.5">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="h-10 w-28 rounded-lg bg-surface-raised" />
+              ))}
+            </div>
+          </div>
         </div>
 
         <ul className="border-t border-border">
           {/* Full-width thread/event skeleton rows */}
           {[1, 2, 3].map((item) => (
-            <li key={item} className="border-b border-border px-6 py-6">
+            <li key={item} className="border-b border-border px-16 py-6">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
                 <div className="flex items-center gap-2">
@@ -40,7 +47,7 @@ export default function DashboardLoading() {
 
           {/* 2-col article grid skeleton row */}
           <li className="border-b border-border">
-            <div className="grid grid-cols-2 gap-4 p-4">
+            <div className="grid grid-cols-2 gap-4 px-16 py-6">
               {[1, 2].map((item) => (
                 <div key={item} className="rounded-2xl border border-border p-5">
                   <div className="h-32 w-full rounded-xl bg-surface-raised mb-4" />
