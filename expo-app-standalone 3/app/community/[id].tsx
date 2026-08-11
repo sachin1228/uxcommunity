@@ -323,7 +323,7 @@ export default function CommunityChat() {
         </View>
       </View>
 
-      <View style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}>
+      <View style={[styles.tabsShell, { backgroundColor: colors.subtle }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
@@ -415,9 +415,7 @@ const styles = StyleSheet.create({
     gap: 8,
     minWidth: 0,
   },
-  tabsShell: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  tabsShell: {},
   tabs: {
     minWidth: '100%',
     paddingHorizontal: 12,
