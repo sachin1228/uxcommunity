@@ -98,7 +98,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
         <View style={styles.authorCopy}><Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>{item.users?.name ?? 'Community member'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{event ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : date.toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text></View>
         <OptionsMenu isOwner={isOwner} onEdit={onEdit} onDelete={onDelete} />
       </View>
-      <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
+      {!thread ? <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text> : null}
       {!thread && item.description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text> : null}
       {images.length ? <ThreadImages images={images} /> : null}
       {thread ? <View style={styles.tags}><Tag text={thread.category} />{thread.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
