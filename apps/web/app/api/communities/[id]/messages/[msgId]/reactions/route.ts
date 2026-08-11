@@ -13,16 +13,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   const userId = session.userId!;
   const { id: communityId, msgId: messageId } = await params;
 
-  let emoji: string;
+  let desiredEmoji: string | null;
   try {
-    const body = await req.json();
-    emoji = (body.emoji ?? "").trim();
+    const body = await req.json() as { desiredEmoji?: unknown };
+    if (body.desiredEmoji === null) {
+      desiredEmoji = null;
+    } else if (typeof body.desiredEmoji === "string") {
+      desiredEmoji = body.desiredEmoji.trim();
+    } else {
+      return NextResponse.json(
+        { error: "desiredEmoji must be a string or null." },
+        { status: 422 },
+      );
+    }
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  if (!emoji) {
-    return NextResponse.json({ error: "emoji is required." }, { status: 422 });
+  if (desiredEmoji !== null && !desiredEmoji) {
+    return NextResponse.json({ error: "desiredEmoji cannot be empty." }, { status: 422 });
   }
 
   const db = createServiceClient();
@@ -50,36 +59,36 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Message not found." }, { status: 404 });
   }
 
-  // Check existing reaction for this user on this message
-  const { data: existing } = await db
-    .from("message_reactions")
-    .select("id, emoji")
-    .eq("message_id", messageId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existing) {
-    if (existing.emoji === emoji) {
-      // Same emoji — toggle OFF (delete)
-      await db.from("message_reactions").delete().eq("id", existing.id);
-    } else {
-      // Different emoji — update to new one
-      await db
+  // Persist an explicit desired state. This contract is idempotent, so retries
+  // and coalesced rapid clicks cannot accidentally invert the final reaction.
+  const mutation = desiredEmoji === null
+    ? db
         .from("message_reactions")
-        .update({ emoji, created_at: new Date().toISOString() })
-        .eq("id", existing.id);
-    }
-  } else {
-    // No existing reaction — insert
-    await db.from("message_reactions").insert({
-      message_id: messageId,
-      community_id: communityId,
-      user_id: userId,
-      emoji,
-    });
+        .delete()
+        .eq("message_id", messageId)
+        .eq("user_id", userId)
+    : db
+        .from("message_reactions")
+        .upsert(
+          {
+            message_id: messageId,
+            community_id: communityId,
+            user_id: userId,
+            emoji: desiredEmoji,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: "message_id,user_id" },
+        );
+
+  const { error: mutationError } = await mutation;
+  if (mutationError) {
+    return NextResponse.json(
+      { error: "Unable to update reaction." },
+      { status: 500 },
+    );
   }
 
-  // Return updated reactions for this message
+  // Return authoritative state for this user plus grouped message reactions.
   const { data: rows } = await db
     .from("message_reactions")
     .select("emoji, user_id")
@@ -95,5 +104,5 @@ export async function POST(req: NextRequest, { params }: Params) {
     ([emoji, user_ids]) => ({ emoji, user_ids })
   );
 
-  return NextResponse.json({ reactions });
+  return NextResponse.json({ reactions, currentUserEmoji: desiredEmoji });
 }

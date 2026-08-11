@@ -133,7 +133,7 @@ export default function () {
       const emoji = EMOJIS[__VU % EMOJIS.length];
       const res = http.post(
         `${BASE_MSG_URL}/${reactTarget}/reactions`,
-        JSON.stringify({ emoji }),
+        JSON.stringify({ desiredEmoji: emoji }),
         { headers: JSON_HEADERS, tags: { name: 'chat/reactions-add' } },
       );
       check(res, {
