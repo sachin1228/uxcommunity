@@ -58,6 +58,7 @@ import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
 import { CATEGORY_COLORS, formatRelativeDate, formatFullDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 
 interface ThreadCardProps {
   thread: CommunityThread;
@@ -105,17 +106,14 @@ export function ThreadCard({
   const isOwner = thread.user_id === currentUserId;
 
   const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
-  const confirmedVoteRef = useRef(thread.user_voted);
-  const desiredVoteRef = useRef(thread.user_voted);
   const optimisticCountRef = useRef(thread.vote_count);
-  const voteRequestRunningRef = useRef(false);
+  const displayedVoteRef = useRef(thread.user_voted);
   const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
   const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
-  const confirmedSaveRef = useRef(thread.user_saved);
-  const desiredSaveRef = useRef(thread.user_saved);
-  const saveRequestRunningRef = useRef(false);
   const displayedSaved = optimisticSaved ?? thread.user_saved;
+  const voteCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
+  const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting]       = useState(false);
@@ -146,91 +144,89 @@ export function ThreadCard({
     }
   }
 
-  async function flushSaveIntent() {
-    if (saveRequestRunningRef.current) return;
-
-    saveRequestRunningRef.current = true;
-
-    try {
-      // Serialize toggles so rapid save/unsave clicks remain instant while the
-      // server catches up to the user's latest intent.
-      while (confirmedSaveRef.current !== desiredSaveRef.current) {
-        const response = await fetch(
-          `/api/communities/${communityId}/threads/${thread.id}/save`,
-          { method: "POST" },
-        );
-        if (!response.ok) throw new Error("Failed to update save");
-
-        const result = (await response.json()) as { saved: boolean };
-        confirmedSaveRef.current = result.saved;
-      }
-    } catch {
-      desiredSaveRef.current = confirmedSaveRef.current;
-      setOptimisticSaved(confirmedSaveRef.current);
-      onSaveChanged(thread.id, confirmedSaveRef.current);
-    } finally {
-      saveRequestRunningRef.current = false;
-      setOptimisticSaved(null);
-    }
+  function applyVoteState(voted: boolean) {
+    if (displayedVoteRef.current === voted) return;
+    const newCount = Math.max(0, optimisticCountRef.current + (voted ? 1 : -1));
+    displayedVoteRef.current = voted;
+    optimisticCountRef.current = newCount;
+    setOptimisticVote({ voted, count: newCount });
+    onVoteChanged(thread.id, voted, newCount);
   }
+
+  function getVoteCoalescer() {
+    if (!voteCoalescerRef.current) {
+      voteCoalescerRef.current = new BooleanIntentCoalescer({
+        initialValue: displayedVoteRef.current,
+        onOptimisticChange: applyVoteState,
+        persist: async (voted) => {
+          const response = await fetch(
+            `/api/communities/${communityId}/threads/${thread.id}/vote`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ voted }),
+            },
+          );
+          if (!response.ok) throw new Error("Failed to update like");
+          const result = (await response.json()) as { voted: boolean };
+          return result.voted;
+        },
+      });
+    }
+    return voteCoalescerRef.current;
+  }
+
+  function getSaveCoalescer() {
+    if (!saveCoalescerRef.current) {
+      saveCoalescerRef.current = new BooleanIntentCoalescer({
+        initialValue: thread.user_saved,
+        onOptimisticChange: (saved) => {
+          setOptimisticSaved(saved);
+          onSaveChanged(thread.id, saved);
+        },
+        persist: async (saved) => {
+          const response = await fetch(
+            `/api/communities/${communityId}/threads/${thread.id}/save`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ saved }),
+            },
+          );
+          if (!response.ok) throw new Error("Failed to update save");
+          const result = (await response.json()) as { saved: boolean };
+          return result.saved;
+        },
+      });
+    }
+    return saveCoalescerRef.current;
+  }
+
+  useEffect(() => () => {
+    voteCoalescerRef.current?.dispose();
+    saveCoalescerRef.current?.dispose();
+  }, []);
+
+  useEffect(() => {
+    voteCoalescerRef.current?.syncConfirmed(thread.user_voted);
+    if (!voteCoalescerRef.current?.isPending()) {
+      displayedVoteRef.current = thread.user_voted;
+      optimisticCountRef.current = thread.vote_count;
+    }
+  }, [thread.user_voted, thread.vote_count]);
+
+  useEffect(() => {
+    saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
+  }, [thread.user_saved]);
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
-
-    const newSaved = !desiredSaveRef.current;
-    desiredSaveRef.current = newSaved;
-    setOptimisticSaved(newSaved);
-    onSaveChanged(thread.id, newSaved);
-    void flushSaveIntent();
-  }
-
-  async function flushVoteIntent() {
-    if (voteRequestRunningRef.current) return;
-
-    voteRequestRunningRef.current = true;
-
-    try {
-      // Serialize toggle requests and keep going until the server matches the
-      // latest click, even when the user likes/unlikes repeatedly in flight.
-      while (confirmedVoteRef.current !== desiredVoteRef.current) {
-        const response = await fetch(
-          `/api/communities/${communityId}/threads/${thread.id}/vote`,
-          { method: "POST" },
-        );
-        if (!response.ok) throw new Error("Failed to update like");
-
-        const result = (await response.json()) as { voted: boolean };
-        confirmedVoteRef.current = result.voted;
-      }
-    } catch {
-      desiredVoteRef.current = confirmedVoteRef.current;
-      const rollbackCount = Math.max(
-        0,
-        optimisticCountRef.current + (confirmedVoteRef.current ? 1 : -1),
-      );
-      optimisticCountRef.current = rollbackCount;
-      setOptimisticVote({ voted: confirmedVoteRef.current, count: rollbackCount });
-      onVoteChanged(thread.id, confirmedVoteRef.current, rollbackCount);
-    } finally {
-      voteRequestRunningRef.current = false;
-      setOptimisticVote(null);
-    }
+    getSaveCoalescer().toggle();
   }
 
   function handleVote(e: React.MouseEvent) {
     e.preventDefault();
-
-    const newVoted = !desiredVoteRef.current;
-    const newCount = Math.max(
-      0,
-      optimisticCountRef.current + (newVoted ? 1 : -1),
-    );
-
-    desiredVoteRef.current = newVoted;
-    optimisticCountRef.current = newCount;
-    setOptimisticVote({ voted: newVoted, count: newCount });
-    onVoteChanged(thread.id, newVoted, newCount);
-    void flushVoteIntent();
+    getVoteCoalescer().toggle();
   }
 
   const authorName    = thread.users?.name ?? "Member";
