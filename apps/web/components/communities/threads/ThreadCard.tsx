@@ -501,7 +501,7 @@ export function ThreadCard({
           className="group/like flex items-center gap-2"
         >
           <Heart
-            size={26}
+            size={20}
             strokeWidth={2}
             className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
               optimisticVoted
