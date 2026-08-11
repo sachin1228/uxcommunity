@@ -3,7 +3,12 @@
 import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { sidebarStore, msgCache } from "@/lib/communities/cache";
+import {
+  markSidebarReactionRemoved,
+  patchSidebarReaction,
+  sidebarStore,
+  msgCache,
+} from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
@@ -137,77 +142,6 @@ export function CommunityChat({
     navigator.clipboard.writeText(msg.content).catch(() => {});
   }, []);
 
-  const handleReactionToggled = useCallback(
-    (msgId: string, reactions: MessageReaction[]) => {
-      setMessages((prev) => {
-        const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
-        msgCache.set(communityId, next);
-        return next;
-      });
-    },
-    [communityId]
-  );
-
-  // ── Inline hover reaction handler ─────────────────────────────────────────
-  const handleReaction = useCallback(
-    async (msgId: string, emoji: string) => {
-      let optimisticReactions: MessageReaction[] = [];
-
-      setMessages((prev) => {
-        const msg = prev.find((m) => m.id === msgId);
-        if (!msg) return prev;
-
-        const existing = (msg.reactions ?? []).find(
-          (r) => r.emoji === emoji && r.user_ids.includes(currentUserId)
-        );
-
-        if (existing) {
-          optimisticReactions = (msg.reactions ?? [])
-            .map((r) =>
-              r.emoji === emoji
-                ? { ...r, user_ids: r.user_ids.filter((id) => id !== currentUserId) }
-                : r
-            )
-            .filter((r) => r.user_ids.length > 0);
-        } else {
-          const withoutUser = (msg.reactions ?? [])
-            .map((r) => ({ ...r, user_ids: r.user_ids.filter((id) => id !== currentUserId) }))
-            .filter((r) => r.user_ids.length > 0);
-          const group = withoutUser.find((r) => r.emoji === emoji);
-          optimisticReactions = group
-            ? withoutUser.map((r) =>
-                r.emoji === emoji ? { ...r, user_ids: [...r.user_ids, currentUserId] } : r
-              )
-            : [...withoutUser, { emoji, user_ids: [currentUserId] }];
-        }
-
-        const next = prev.map((m) =>
-          m.id === msgId ? { ...m, reactions: optimisticReactions } : m
-        );
-        msgCache.set(communityId, next);
-        return next;
-      });
-
-      try {
-        const res = await fetch(
-          `/api/communities/${communityId}/messages/${msgId}/reactions`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emoji }),
-          }
-        );
-        if (res.ok) {
-          const { reactions } = await res.json();
-          handleReactionToggled(msgId, reactions);
-        }
-      } catch {
-        // Network error — realtime will correct state when reconnected
-      }
-    },
-    [communityId, currentUserId, handleReactionToggled]
-  );
-
   // ── Data fetching + message state ─────────────────────────────────────────
   const {
     community,
@@ -225,6 +159,129 @@ export function CommunityChat({
     membersRef,
     pendingProfileFetchRef,
   } = useChatData({ communityId, initialMeta, initialMessages });
+
+  const handleReactionToggled = useCallback(
+    (msgId: string, reactions: MessageReaction[]) => {
+      setMessages((prev) => {
+        const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
+        msgCache.set(communityId, next);
+        return next;
+      });
+    },
+    [communityId, setMessages]
+  );
+
+  // Tracks the newest request for each message so a slower response cannot
+  // overwrite a more recent reaction choice.
+  const reactionRequestRef = useRef(new Map<string, number>());
+
+  // ── Inline hover reaction handler ─────────────────────────────────────────
+  const handleReaction = useCallback(
+    async (msgId: string, emoji: string) => {
+      const message = msgCache.get(communityId)?.find((item) => item.id === msgId);
+      if (!message) return;
+
+      const previousReactions = message.reactions ?? [];
+      const previousSidebarReaction =
+        sidebarStore.data?.communities.find((item) => item.id === communityId)
+          ?.lastReaction ?? null;
+      const isRemoving = previousReactions.some(
+        (reaction) =>
+          reaction.emoji === emoji && reaction.user_ids.includes(currentUserId),
+      );
+
+      const optimisticReactions = isRemoving
+        ? previousReactions
+            .map((reaction) =>
+              reaction.emoji === emoji
+                ? {
+                    ...reaction,
+                    user_ids: reaction.user_ids.filter(
+                      (id) => id !== currentUserId,
+                    ),
+                  }
+                : reaction,
+            )
+            .filter((reaction) => reaction.user_ids.length > 0)
+        : (() => {
+            const withoutUser = previousReactions
+              .map((reaction) => ({
+                ...reaction,
+                user_ids: reaction.user_ids.filter(
+                  (id) => id !== currentUserId,
+                ),
+              }))
+              .filter((reaction) => reaction.user_ids.length > 0);
+            const group = withoutUser.find(
+              (reaction) => reaction.emoji === emoji,
+            );
+            return group
+              ? withoutUser.map((reaction) =>
+                  reaction.emoji === emoji
+                    ? {
+                        ...reaction,
+                        user_ids: [...reaction.user_ids, currentUserId],
+                      }
+                    : reaction,
+                )
+              : [...withoutUser, { emoji, user_ids: [currentUserId] }];
+          })();
+
+      handleReactionToggled(msgId, optimisticReactions);
+
+      const messagePreview = message.content
+        ? `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`
+        : message.image_url
+          ? "📷 Photo"
+          : "a message";
+      if (isRemoving) {
+        markSidebarReactionRemoved(communityId, msgId);
+      }
+      patchSidebarReaction(
+        communityId,
+        isRemoving
+          ? null
+          : {
+              messageId: msgId,
+              emoji,
+              createdAt: new Date().toISOString(),
+              firstName: "You",
+              isOwn: true,
+              messagePreview,
+            },
+      );
+
+      const requestNumber = (reactionRequestRef.current.get(msgId) ?? 0) + 1;
+      reactionRequestRef.current.set(msgId, requestNumber);
+
+      try {
+        const res = await fetch(
+          `/api/communities/${communityId}/messages/${msgId}/reactions`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          },
+        );
+
+        if (reactionRequestRef.current.get(msgId) !== requestNumber) return;
+
+        if (!res.ok) {
+          handleReactionToggled(msgId, previousReactions);
+          patchSidebarReaction(communityId, previousSidebarReaction);
+          return;
+        }
+
+        const { reactions } = await res.json();
+        handleReactionToggled(msgId, reactions);
+      } catch {
+        if (reactionRequestRef.current.get(msgId) !== requestNumber) return;
+        handleReactionToggled(msgId, previousReactions);
+        patchSidebarReaction(communityId, previousSidebarReaction);
+      }
+    },
+    [communityId, currentUserId, handleReactionToggled],
+  );
 
   // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
   const topSentinelRef   = useRef<HTMLDivElement>(null);
@@ -364,7 +421,7 @@ export function CommunityChat({
     highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
   }, [scrollContainerRef]);
 
-  // ── Realtime subscription ─────────────────────────────────────────────────
+  // ── Realtime subscription ──���──────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     fetchMessages,

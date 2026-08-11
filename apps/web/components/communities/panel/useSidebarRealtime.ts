@@ -2,7 +2,11 @@
 
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import { sidebarStore, type CachedSidebarCommunity } from "@/lib/communities/cache";
+import {
+  isSidebarReactionStale,
+  sidebarStore,
+  type CachedSidebarCommunity,
+} from "@/lib/communities/cache";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -107,6 +111,16 @@ export function useSidebarRealtime({
       row: ReactionRow,
       message?: ReactionMessage | null,
     ) {
+      if (
+        isSidebarReactionStale(
+          row.community_id,
+          row.message_id,
+          row.created_at,
+        )
+      ) {
+        return;
+      }
+
       const isOwn = row.user_id === userId;
 
       setCommunities((prev) =>
@@ -151,10 +165,24 @@ export function useSidebarRealtime({
     }
 
     function fetchAndApplyReaction(row: ReactionRow) {
-      applyReaction(row);
+      const community = sidebarStore.data?.communities.find(
+        (item) => item.id === row.community_id,
+      );
+      const fallbackMessage =
+        community?.last_message?.id === row.message_id
+          ? {
+              content: community.last_message.content,
+              image_url: community.last_message.has_image ? "present" : null,
+            }
+          : null;
 
-      // The reacted message may not be the community's last message. Fetch it
-      // so reactions on older messages still have the correct sidebar snippet.
+      // Apply exactly once with complete message data. Publishing a placeholder
+      // first caused the sidebar to flash "a message" while this lookup ran.
+      if (fallbackMessage) {
+        applyReaction(row, fallbackMessage);
+        return;
+      }
+
       fetch(`/api/communities/${row.community_id}/messages/${row.message_id}`)
         .then((res) => (res.ok ? (res.json() as Promise<ReactionMessage>) : null))
         .then((message) => {

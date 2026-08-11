@@ -236,6 +236,65 @@ export function patchSidebarCommunity(
   notifySidebarChanged();
 }
 
+const removedSidebarReactions = new Map<string, number>();
+
+function sidebarReactionKey(communityId: string, messageId: string): string {
+  return `${communityId}:${messageId}`;
+}
+
+/** Marks a local removal so an older, still-pending Realtime lookup cannot restore it. */
+export function markSidebarReactionRemoved(
+  communityId: string,
+  messageId: string,
+): void {
+  removedSidebarReactions.set(
+    sidebarReactionKey(communityId, messageId),
+    Date.now(),
+  );
+}
+
+/** Returns true when a Realtime reaction predates the latest local removal. */
+export function isSidebarReactionStale(
+  communityId: string,
+  messageId: string,
+  createdAt?: string,
+): boolean {
+  const removedAt = removedSidebarReactions.get(
+    sidebarReactionKey(communityId, messageId),
+  );
+  if (!removedAt) return false;
+
+  const reactionTime = createdAt ? Date.parse(createdAt) : Number.NaN;
+  return Number.isNaN(reactionTime) || reactionTime <= removedAt;
+}
+
+/**
+ * Optimistically updates a community's reaction preview in the shared sidebar
+ * cache. The sidebar listens for this event, so chat actions render there in
+ * the same frame instead of waiting for the database and Realtime round trip.
+ */
+export function patchSidebarReaction(
+  communityId: string,
+  lastReaction: SidebarLastReaction | null,
+): void {
+  if (lastReaction) {
+    removedSidebarReactions.delete(
+      sidebarReactionKey(communityId, lastReaction.messageId),
+    );
+  }
+  if (!sidebarStore.data) return;
+
+  sidebarStore.data = {
+    ...sidebarStore.data,
+    communities: sidebarStore.data.communities.map((community) =>
+      community.id === communityId
+        ? { ...community, lastReaction }
+        : community
+    ),
+  };
+  notifySidebarChanged();
+}
+
 export function invalidateOnArchive(communityId: string): void {
   if (sidebarStore.data) {
     sidebarStore.data = {
