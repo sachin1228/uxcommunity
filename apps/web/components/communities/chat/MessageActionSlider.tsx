@@ -93,7 +93,7 @@ export function MessageActionSlider({
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ emoji }),
+            body: JSON.stringify({ desiredEmoji: existing ? null : emoji }),
           }
         );
         if (res.ok) {

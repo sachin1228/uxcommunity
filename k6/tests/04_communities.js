@@ -107,7 +107,7 @@ export function communityTests() {
     group('communities — react to message', () => {
       const res = http.post(
         `${BASE_URL}/api/communities/${COMMUNITY_ID}/messages/${createdMsgId}/reactions`,
-        JSON.stringify({ emoji: '👍' }),
+        JSON.stringify({ desiredEmoji: '👍' }),
         { headers: JSON_HEADERS, tags: { name: 'communities/reactions-post' } },
       );
       check(res, {

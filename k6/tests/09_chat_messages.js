@@ -179,7 +179,7 @@ export function chatMessageTests() {
     group('chat — POST reaction (add 👍)', () => {
       const res = http.post(
         `${BASE_MSG_URL}/${targetForReaction}/reactions`,
-        JSON.stringify({ emoji: '👍' }),
+        JSON.stringify({ desiredEmoji: '👍' }),
         { headers: JSON_HEADERS, tags: { name: 'chat/reactions-add' } },
       );
       check(res, {
@@ -191,11 +191,11 @@ export function chatMessageTests() {
       sleep(0.1);
     });
 
-    // ── 8. POST reaction — toggle (same emoji = remove) ────────────────────
-    group('chat — POST reaction (toggle 👍 off)', () => {
+    // ── 8. POST reaction — explicit removal ──────────────────────────────
+    group('chat — POST reaction (remove 👍)', () => {
       const res = http.post(
         `${BASE_MSG_URL}/${targetForReaction}/reactions`,
-        JSON.stringify({ emoji: '👍' }),
+        JSON.stringify({ desiredEmoji: null }),
         { headers: JSON_HEADERS, tags: { name: 'chat/reactions-toggle-off' } },
       );
       check(res, {
@@ -212,14 +212,14 @@ export function chatMessageTests() {
       // Add 👍 first, then send 🔥 — server should replace it
       http.post(
         `${BASE_MSG_URL}/${targetForReaction}/reactions`,
-        JSON.stringify({ emoji: '👍' }),
+        JSON.stringify({ desiredEmoji: '👍' }),
         { headers: JSON_HEADERS },
       );
       sleep(0.1);
 
       const res = http.post(
         `${BASE_MSG_URL}/${targetForReaction}/reactions`,
-        JSON.stringify({ emoji: '🔥' }),
+        JSON.stringify({ desiredEmoji: '🔥' }),
         { headers: JSON_HEADERS, tags: { name: 'chat/reactions-switch' } },
       );
       check(res, {
@@ -236,7 +236,7 @@ export function chatMessageTests() {
       const emoji = EMOJIS[__VU % EMOJIS.length];
       const res = http.post(
         `${BASE_MSG_URL}/${targetForReaction}/reactions`,
-        JSON.stringify({ emoji }),
+        JSON.stringify({ desiredEmoji: emoji }),
         { headers: JSON_HEADERS, tags: { name: 'chat/reactions-variety' } },
       );
       check(res, {
