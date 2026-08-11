@@ -236,6 +236,28 @@ export function patchSidebarCommunity(
   notifySidebarChanged();
 }
 
+/**
+ * Optimistically updates a community's reaction preview in the shared sidebar
+ * cache. The sidebar listens for this event, so chat actions render there in
+ * the same frame instead of waiting for the database and Realtime round trip.
+ */
+export function patchSidebarReaction(
+  communityId: string,
+  lastReaction: SidebarLastReaction | null,
+): void {
+  if (!sidebarStore.data) return;
+
+  sidebarStore.data = {
+    ...sidebarStore.data,
+    communities: sidebarStore.data.communities.map((community) =>
+      community.id === communityId
+        ? { ...community, lastReaction }
+        : community
+    ),
+  };
+  notifySidebarChanged();
+}
+
 export function invalidateOnArchive(communityId: string): void {
   if (sidebarStore.data) {
     sidebarStore.data = {

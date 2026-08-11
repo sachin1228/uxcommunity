@@ -151,10 +151,24 @@ export function useSidebarRealtime({
     }
 
     function fetchAndApplyReaction(row: ReactionRow) {
-      applyReaction(row);
+      const community = sidebarStore.data?.communities.find(
+        (item) => item.id === row.community_id,
+      );
+      const fallbackMessage =
+        community?.last_message?.id === row.message_id
+          ? {
+              content: community.last_message.content,
+              image_url: community.last_message.has_image ? "present" : null,
+            }
+          : null;
 
-      // The reacted message may not be the community's last message. Fetch it
-      // so reactions on older messages still have the correct sidebar snippet.
+      // Apply exactly once with complete message data. Publishing a placeholder
+      // first caused the sidebar to flash "a message" while this lookup ran.
+      if (fallbackMessage) {
+        applyReaction(row, fallbackMessage);
+        return;
+      }
+
       fetch(`/api/communities/${row.community_id}/messages/${row.message_id}`)
         .then((res) => (res.ok ? (res.json() as Promise<ReactionMessage>) : null))
         .then((message) => {
