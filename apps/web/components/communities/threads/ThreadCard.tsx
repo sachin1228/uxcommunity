@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowUp, Bookmark, Flag, MessageSquare,
+  Heart, Bookmark, Flag, MessageSquare,
   MoreHorizontal, Paperclip, Pencil, Share2, Trash2,
 } from "lucide-react";
 
@@ -457,28 +457,29 @@ export function ThreadCard({
       })()}
 
 
-      {/* ── Footer: upvote · comments · (bookmark · share in list only) ── */}
+      {/* ── Footer: like · comments · (bookmark · share in list only) ── */}
       <div className="mt-3 flex items-center gap-4">
-        {/* Upvote */}
+        {/* Like (Instagram-style heart) */}
         <button
           type="button"
           onClick={handleVote}
           disabled={votePending}
-          aria-label={thread.user_voted ? "Remove upvote" : "Upvote"}
-          className="flex items-center gap-2 disabled:opacity-60"
+          aria-label={thread.user_voted ? "Unlike" : "Like"}
+          aria-pressed={thread.user_voted}
+          className="group/like flex items-center gap-2 disabled:opacity-60"
         >
-          <span
-            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${
+          <Heart
+            size={26}
+            strokeWidth={2}
+            className={`transition-all duration-150 ease-out group-hover/like:scale-110 group-active/like:scale-90 ${
               thread.user_voted
-                ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                : "border-border text-foreground-subtle hover:border-emerald-500/60 hover:text-emerald-400"
+                ? "scale-110 fill-red-500 text-red-500"
+                : "fill-none text-white"
             }`}
-          >
-            <ArrowUp size={14} strokeWidth={thread.user_voted ? 2.5 : 2} />
-          </span>
+          />
           <span
-            className={`font-body text-xs font-semibold tabular-nums ${
-              thread.user_voted ? "text-emerald-400" : "text-foreground-muted"
+            className={`font-body text-sm font-semibold tabular-nums ${
+              thread.user_voted ? "text-red-500" : "text-white"
             }`}
           >
             {thread.vote_count}
