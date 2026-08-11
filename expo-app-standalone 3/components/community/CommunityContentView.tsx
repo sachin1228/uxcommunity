@@ -10,8 +10,9 @@ import { useColors } from '@/hooks/useColors';
 import { useCommunityContent, communityContentKey } from '@/hooks/useCommunityContent';
 import {
   CommunityContent, CommunityEvent, CommunityResource, CommunityThread, ContentKind,
-  deleteCommunityContent, getLinkPreviewImage, toggleContentAction,
+  deleteCommunityContent, getLinkPreviewImage, setContentAction, toggleContentAction,
 } from '@/lib/communityContent';
+import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import { CommunityContentEditor } from './CommunityContentEditor';
 
 interface Props { communityId: string; kind: ContentKind; currentUserId: string }
@@ -25,7 +26,16 @@ export function CommunityContentView({ communityId, kind, currentUserId }: Props
   const [editorVisible, setEditorVisible] = useState(false);
   const [editing, setEditing] = useState<CommunityContent | null>(null);
   const [selected, setSelected] = useState<CommunityContent | null>(null);
+  const actionCoalescersRef = useRef(new Map<string, BooleanIntentCoalescer>());
   const items = query.data ?? [];
+
+  useEffect(() => {
+    const coalescers = actionCoalescersRef.current;
+    return () => {
+      coalescers.forEach((coalescer) => coalescer.dispose());
+      coalescers.clear();
+    };
+  }, []);
 
   const replace = (item: CommunityContent) => {
     queryClient.setQueryData<CommunityContent[]>(communityContentKey(communityId, kind), (old = []) => {
@@ -46,7 +56,52 @@ export function CommunityContentView({ communityId, kind, currentUserId }: Props
     } },
   ]);
 
+  const patchThreadAction = (itemId: string, actionName: 'vote' | 'save', desired: boolean) => {
+    const patch = (entry: CommunityContent): CommunityContent => {
+      if (entry.id !== itemId) return entry;
+      const thread = entry as CommunityThread;
+      if (actionName === 'vote') {
+        if (thread.user_voted === desired) return thread;
+        return {
+          ...thread,
+          user_voted: desired,
+          vote_count: Math.max(0, thread.vote_count + (desired ? 1 : -1)),
+        };
+      }
+      return thread.user_saved === desired ? thread : { ...thread, user_saved: desired };
+    };
+
+    queryClient.setQueryData<CommunityContent[]>(
+      communityContentKey(communityId, kind),
+      (old = []) => old.map(patch),
+    );
+    setSelected((current) => current ? patch(current) : current);
+  };
+
   const action = async (item: CommunityContent, actionName: 'vote' | 'save' | 'rsvp' | 'bookmark') => {
+    if (kind === 'threads' && (actionName === 'vote' || actionName === 'save')) {
+      const thread = item as CommunityThread;
+      const key = `${item.id}:${actionName}`;
+      let coalescer = actionCoalescersRef.current.get(key);
+
+      if (!coalescer) {
+        coalescer = new BooleanIntentCoalescer({
+          initialValue: actionName === 'vote' ? thread.user_voted : thread.user_saved,
+          onOptimisticChange: (desired) => patchThreadAction(item.id, actionName, desired),
+          persist: (desired) => setContentAction(communityId, kind, item.id, actionName, desired),
+          onError: (error) => Alert.alert(
+            'Action failed',
+            error instanceof Error ? error.message : 'Please try again.',
+          ),
+        });
+        actionCoalescersRef.current.set(key, coalescer);
+      }
+
+      await queryClient.cancelQueries({ queryKey: communityContentKey(communityId, kind) });
+      coalescer.toggle();
+      return;
+    }
+
     try {
       await toggleContentAction(communityId, kind, item.id, actionName);
       const result = await query.refetch();
@@ -210,7 +265,7 @@ function ThreadImages({ images }: { images: CommunityThread['attachments'] }) {
 function ContentActions({ item, thread, event, resource, onAction }: { item: CommunityContent; thread: CommunityThread | null; event: CommunityEvent | null; resource: CommunityResource | null; onAction: (item: CommunityContent, action: 'vote' | 'save' | 'rsvp' | 'bookmark') => void }) {
   const colors = useColors();
   return <View style={[styles.actions, { borderTopColor: colors.border }]}>
-    {thread ? <><Action icon="arrow-up" active={thread.user_voted} label={String(thread.vote_count)} onPress={() => onAction(item, 'vote')} /><Action icon="message-circle" label={String(thread.comment_count)} /><Action icon="bookmark" active={thread.user_saved} label="Save" onPress={() => onAction(item, 'save')} /></> : null}
+    {thread ? <><Action icon="heart" active={thread.user_voted} label={String(thread.vote_count)} onPress={() => onAction(item, 'vote')} /><Action icon="message-circle" label={String(thread.comment_count)} /><Action icon="bookmark" active={thread.user_saved} label="Save" onPress={() => onAction(item, 'save')} /></> : null}
     {event ? <><Action icon="check-circle" active={event.user_rsvped} label={`${event.rsvp_count} going`} onPress={() => onAction(item, 'rsvp')} /><Action icon="bookmark" active={event.user_saved} label="Save" onPress={() => onAction(item, 'save')} /></> : null}
     {resource ? <><Action icon="heart" active={resource.user_saved} label={String(resource.save_count)} onPress={() => onAction(item, 'save')} /><Action icon="message-circle" label={String(resource.comment_count)} /><Action icon="bookmark" active={resource.user_bookmarked} label="Bookmark" onPress={() => onAction(item, 'bookmark')} /></> : null}
   </View>;

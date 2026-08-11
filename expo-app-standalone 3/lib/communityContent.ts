@@ -89,6 +89,21 @@ export async function deleteCommunityContent(communityId: string, kind: ContentK
   await apiFetch(`/api/communities/${communityId}/${kind}/${itemId}`, { method: 'DELETE' });
 }
 
+export async function setContentAction(
+  communityId: string,
+  kind: ContentKind,
+  itemId: string,
+  action: 'vote' | 'save',
+  desired: boolean,
+): Promise<boolean> {
+  const stateKey = action === 'vote' ? 'voted' : 'saved';
+  const { data } = await apiFetch<Record<string, boolean>>(
+    `/api/communities/${communityId}/${kind}/${itemId}/${action}`,
+    { method: 'POST', body: { [stateKey]: desired } },
+  );
+  return data[stateKey];
+}
+
 export async function toggleContentAction(communityId: string, kind: ContentKind, itemId: string, action: 'vote' | 'save' | 'rsvp' | 'bookmark'): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/${kind}/${itemId}/${action}`, { method: 'POST' });
 }
