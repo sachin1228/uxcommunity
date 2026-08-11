@@ -11,6 +11,10 @@ export interface LastMessage {
   user: { name: string };
   is_reply: boolean;
   reply_to_user: string | null;
+  /** True when the message was soft-deleted after it became the last preview. */
+  is_deleted?: boolean;
+  /** True when the message is an image-only post (no text content). */
+  has_image?: boolean;
 }
 
 export interface LastReaction {
@@ -27,6 +31,8 @@ export interface Community {
   name: string;
   type: string;
   image_url: string | null;
+  /** Master-data display name (e.g. the city name for a `city` community). */
+  reference_name: string | null;
   is_private: boolean;
   enabled_tabs: string[];
   owner_id: string;
