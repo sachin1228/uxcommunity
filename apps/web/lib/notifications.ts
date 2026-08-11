@@ -45,16 +45,24 @@ interface CommunityNotificationInput {
   metadata?: Record<string, unknown>;
 }
 
+export type NotificationResult =
+  | { ok: true; skipped?: "self" }
+  | { ok: false; error: unknown };
+
 export async function createNotification(
   db: ReturnType<typeof createServiceClient>,
   input: NotificationInput,
-) {
-  if (input.userId === input.actorId) return;
+): Promise<NotificationResult> {
+  if (input.userId === input.actorId) return { ok: true, skipped: "self" };
 
+  const communityId =
+    input.communityId && !isPublicContentScope(input.communityId)
+      ? input.communityId
+      : null;
   const { error } = await db.from("notifications").insert({
     user_id: input.userId,
     actor_id: input.actorId ?? null,
-    community_id: input.communityId ?? null,
+    community_id: communityId,
     type: input.type,
     entity_type: input.entityType,
     entity_id: input.entityId,
@@ -66,7 +74,10 @@ export async function createNotification(
 
   if (error) {
     console.error("[notifications] insert failed", error);
+    return { ok: false, error };
   }
+
+  return { ok: true };
 }
 
 export async function notifyCommunityMembers(
