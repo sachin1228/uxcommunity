@@ -10,7 +10,7 @@ const colors = {
     tint: '#0070F3',
 
     // Core surfaces
-    background: '#000000',
+    background: '#FAFAFA',
     foreground: '#0A0A0A',
 
     // Cards / elevated surfaces
@@ -54,7 +54,7 @@ const colors = {
     text: '#EDEDED',
     tint: '#52a8ff',
 
-    background: '#000000',
+    background: '#09090B',
     foreground: '#EDEDED',
 
     card: '#121214',

@@ -1,5 +1,4 @@
 {
-  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- .",
   "regions": ["syd1"],
   "functions": {
     "app/api/communities/[id]/messages/route.ts": {
