@@ -222,7 +222,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "event") {
           return (
             <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
-              <div className="px-8 py-6">
+              <div className="px-16 py-6">
                 {group.item.community_name && (
                   <p className="mb-2 font-body text-[11px] text-foreground-subtle">
                     in <span className="text-foreground-muted">{group.item.community_name}</span>
@@ -248,7 +248,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         const isOdd = resources.length % 2 !== 0;
         return (
           <li key={`resources-${gi}`} className={isLastGroup ? "" : "border-b border-border"}>
-            <div className="grid grid-cols-2 gap-4 px-8 py-6">
+            <div className="grid grid-cols-2 gap-4 px-16 py-6">
               {resources.map((res) => (
                 <div key={`resource-${res.id}`} className="overflow-hidden">
                   {res.community_name && (
