@@ -104,8 +104,11 @@ export function ThreadCard({
   const categoryColor = CATEGORY_COLORS[thread.category] ?? CATEGORY_COLORS["discussion"];
   const isOwner = thread.user_id === currentUserId;
 
-  const [votePending, setVotePending] = useState(false);
   const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
+  const confirmedVoteRef = useRef(thread.user_voted);
+  const desiredVoteRef = useRef(thread.user_voted);
+  const optimisticCountRef = useRef(thread.vote_count);
+  const voteRequestRunningRef = useRef(false);
   const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
   const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
   const [savePending, setSavePending] = useState(false);
@@ -160,32 +163,53 @@ export function ThreadCard({
     }
   }
 
-  async function handleVote(e: React.MouseEvent) {
-    e.preventDefault();
-    if (votePending) return;
+  async function flushVoteIntent() {
+    if (voteRequestRunningRef.current) return;
 
-    const previousVoted = optimisticVoted;
-    const previousCount = optimisticVoteCount;
-    const newVoted = !previousVoted;
-    const newCount = Math.max(0, previousCount + (newVoted ? 1 : -1));
-
-    // Update locally before starting the request so the heart responds instantly.
-    setOptimisticVote({ voted: newVoted, count: newCount });
-    onVoteChanged(thread.id, newVoted, newCount);
-    setVotePending(true);
+    voteRequestRunningRef.current = true;
 
     try {
-      const response = await fetch(
-        `/api/communities/${communityId}/threads/${thread.id}/vote`,
-        { method: "POST" },
-      );
-      if (!response.ok) throw new Error("Failed to update like");
+      // Serialize toggle requests and keep going until the server matches the
+      // latest click, even when the user likes/unlikes repeatedly in flight.
+      while (confirmedVoteRef.current !== desiredVoteRef.current) {
+        const response = await fetch(
+          `/api/communities/${communityId}/threads/${thread.id}/vote`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error("Failed to update like");
+
+        const result = (await response.json()) as { voted: boolean };
+        confirmedVoteRef.current = result.voted;
+      }
     } catch {
-      onVoteChanged(thread.id, previousVoted, previousCount);
+      desiredVoteRef.current = confirmedVoteRef.current;
+      const rollbackCount = Math.max(
+        0,
+        optimisticCountRef.current + (confirmedVoteRef.current ? 1 : -1),
+      );
+      optimisticCountRef.current = rollbackCount;
+      setOptimisticVote({ voted: confirmedVoteRef.current, count: rollbackCount });
+      onVoteChanged(thread.id, confirmedVoteRef.current, rollbackCount);
     } finally {
+      voteRequestRunningRef.current = false;
       setOptimisticVote(null);
-      setVotePending(false);
     }
+  }
+
+  function handleVote(e: React.MouseEvent) {
+    e.preventDefault();
+
+    const newVoted = !desiredVoteRef.current;
+    const newCount = Math.max(
+      0,
+      optimisticCountRef.current + (newVoted ? 1 : -1),
+    );
+
+    desiredVoteRef.current = newVoted;
+    optimisticCountRef.current = newCount;
+    setOptimisticVote({ voted: newVoted, count: newCount });
+    onVoteChanged(thread.id, newVoted, newCount);
+    void flushVoteIntent();
   }
 
   const authorName    = thread.users?.name ?? "Member";
@@ -474,7 +498,6 @@ export function ThreadCard({
           onClick={handleVote}
           aria-label={optimisticVoted ? "Unlike" : "Like"}
           aria-pressed={optimisticVoted}
-          aria-disabled={votePending}
           className="group/like flex items-center gap-2"
         >
           <Heart
