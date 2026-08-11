@@ -121,9 +121,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const inputStyle = [styles.input, { color: colors.foreground, backgroundColor: colors.input, borderColor: colors.border }];
   const choices = kind === 'threads' ? OPTIONS.threads : kind === 'resources' ? OPTIONS.resources : [];
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={onClose}>
       <KeyboardAvoidingView style={[styles.root, { backgroundColor: colors.subtle }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? insets.top + 8 : 8, borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose} style={styles.iconButton} accessibilityLabel="Close editor"><Feather name="x" size={24} color={colors.foreground} /></Pressable>
           <Text style={[styles.title, { color: colors.foreground }]}>{item ? 'Edit' : kind === 'resources' ? 'Share' : 'Create'} {labelFor(kind)}</Text>
           <Pressable onPress={submit} disabled={saving || uploading} style={[styles.save, { backgroundColor: colors.primary }]} accessibilityRole="button">
