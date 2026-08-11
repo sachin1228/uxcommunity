@@ -105,6 +105,9 @@ export function ThreadCard({
   const isOwner = thread.user_id === currentUserId;
 
   const [votePending, setVotePending] = useState(false);
+  const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
+  const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
+  const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
   const [savePending, setSavePending] = useState(false);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -160,21 +163,27 @@ export function ThreadCard({
   async function handleVote(e: React.MouseEvent) {
     e.preventDefault();
     if (votePending) return;
-    const newVoted = !thread.user_voted;
-    const newCount = thread.vote_count + (newVoted ? 1 : -1);
+
+    const previousVoted = optimisticVoted;
+    const previousCount = optimisticVoteCount;
+    const newVoted = !previousVoted;
+    const newCount = Math.max(0, previousCount + (newVoted ? 1 : -1));
+
+    // Update locally before starting the request so the heart responds instantly.
+    setOptimisticVote({ voted: newVoted, count: newCount });
     onVoteChanged(thread.id, newVoted, newCount);
     setVotePending(true);
+
     try {
       const response = await fetch(
         `/api/communities/${communityId}/threads/${thread.id}/vote`,
         { method: "POST" },
       );
-      if (!response.ok) {
-        onVoteChanged(thread.id, thread.user_voted, thread.vote_count);
-      }
+      if (!response.ok) throw new Error("Failed to update like");
     } catch {
-      onVoteChanged(thread.id, thread.user_voted, thread.vote_count);
+      onVoteChanged(thread.id, previousVoted, previousCount);
     } finally {
+      setOptimisticVote(null);
       setVotePending(false);
     }
   }
@@ -463,26 +472,26 @@ export function ThreadCard({
         <button
           type="button"
           onClick={handleVote}
-          disabled={votePending}
-          aria-label={thread.user_voted ? "Unlike" : "Like"}
-          aria-pressed={thread.user_voted}
-          className="group/like flex items-center gap-2 disabled:opacity-60"
+          aria-label={optimisticVoted ? "Unlike" : "Like"}
+          aria-pressed={optimisticVoted}
+          aria-disabled={votePending}
+          className="group/like flex items-center gap-2"
         >
           <Heart
             size={26}
             strokeWidth={2}
-            className={`transition-all duration-150 ease-out group-hover/like:scale-110 group-active/like:scale-90 ${
-              thread.user_voted
-                ? "scale-110 fill-red-500 text-red-500"
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+              optimisticVoted
+                ? "fill-red-500 text-red-500"
                 : "fill-none text-white"
             }`}
           />
           <span
             className={`font-body text-sm font-semibold tabular-nums ${
-              thread.user_voted ? "text-red-500" : "text-white"
+              optimisticVoted ? "text-red-500" : "text-white"
             }`}
           >
-            {thread.vote_count}
+            {optimisticVoteCount}
           </span>
         </button>
 
