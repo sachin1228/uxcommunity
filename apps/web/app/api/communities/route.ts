@@ -295,6 +295,7 @@ export async function GET() {
               content: lastMsg.content,
               created_at: lastMsg.created_at,
               user: { name: senderMap[lastMsg.user_id] ?? "Unknown" },
+              is_own: lastMsg.user_id === userId,
               is_reply: !!lastMsg.reply_to_id,
               reply_to_user: lastMsg.reply_to_id
                 ? (replyParentNameMap[lastMsg.reply_to_id] ?? null)
