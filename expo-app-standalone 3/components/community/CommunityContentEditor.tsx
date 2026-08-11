@@ -50,7 +50,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   useEffect(() => {
     if (!visible) return;
     setTitle(item?.title ?? '');
-    setDescription(item?.description ?? '');
+    setDescription(kind === 'threads' && item ? threadToBody(item.title, item.description) : item?.description ?? '');
     setTags('tags' in (item ?? {}) ? ((item as { tags: string[] }).tags ?? []).join(', ') : '');
     setIsPublic(Boolean(item?.is_public));
     setAttachments(item && 'attachments' in item ? item.attachments : []);
@@ -91,16 +91,18 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   };
 
   const submit = async () => {
-    if (!title.trim()) return setError('Title is required.');
     const cleanTags = tags.split(',').map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean).slice(0, 3);
     let body: Record<string, unknown>;
     if (kind === 'threads') {
-      if (!description.trim()) return setError('Description is required.');
-      body = { title: title.trim(), description: description.trim(), category: type, tags: cleanTags, attachments, links: extractLinks(description), allow_replies: allowReplies, is_public: isPublic };
+      if (!description.trim()) return setError('Write something before saving.');
+      const thread = bodyToThread(description);
+      body = { ...thread, category: type, tags: cleanTags, attachments, links: extractLinks(description), allow_replies: allowReplies, is_public: isPublic };
     } else if (kind === 'resources') {
+      if (!title.trim()) return setError('Title is required.');
       if (!/^https?:\/\//i.test(url.trim())) return setError('Enter a URL beginning with http:// or https://.');
       body = { title: title.trim(), description: description.trim() || null, resource_type: type, url: url.trim(), tags: cleanTags, is_public: isPublic };
     } else {
+      if (!title.trim()) return setError('Title is required.');
       const start = parseDateTime(eventDate);
       const end = endDate.trim() ? parseDateTime(endDate) : null;
       if (!start) return setError('Use YYYY-MM-DD HH:MM for the event date.');
@@ -133,8 +135,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         <ScrollView contentContainerStyle={[styles.form, { paddingBottom: insets.bottom + 40 }]} keyboardShouldPersistTaps="handled">
           {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
           {kind === 'resources' ? <Field label="URL"><TextInput value={url} onChangeText={setUrl} style={inputStyle} placeholder="https://" placeholderTextColor={colors.foregroundSoft} autoCapitalize="none" keyboardType="url" /></Field> : null}
-          <Field label="Title"><TextInput value={title} onChangeText={setTitle} style={inputStyle} maxLength={120} placeholder={`Give your ${labelFor(kind).toLowerCase()} a title`} placeholderTextColor={colors.foregroundSoft} /></Field>
-          <Field label="Description"><TextInput value={description} onChangeText={setDescription} style={[inputStyle, styles.multiline]} multiline maxLength={kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000} textAlignVertical="top" placeholder="Add helpful details" placeholderTextColor={colors.foregroundSoft} /></Field>
+          {kind !== 'threads' ? <Field label="Title"><TextInput value={title} onChangeText={setTitle} style={inputStyle} maxLength={120} placeholder={`Give your ${labelFor(kind).toLowerCase()} a title`} placeholderTextColor={colors.foregroundSoft} /></Field> : null}
+          <Field label={kind === 'threads' ? 'What do you want to talk about?' : 'Description'}><TextInput value={description} onChangeText={setDescription} style={[inputStyle, styles.multiline]} multiline maxLength={kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000} textAlignVertical="top" placeholder={kind === 'threads' ? 'What do you want to talk about?' : 'Add helpful details'} placeholderTextColor={colors.foregroundSoft} /></Field>
           {kind === 'threads' ? <Field label="Images (up to 5)"><View style={styles.imageList}>{attachments.filter((attachment) => attachment.type.startsWith('image/')).map((attachment) => <View key={attachment.url} style={styles.imagePreviewShell}><Image source={{ uri: attachment.url }} style={styles.imagePreview} /><Pressable onPress={() => setAttachments((current) => current.filter((entry) => entry.url !== attachment.url))} style={[styles.removeImage, { backgroundColor: colors.surface }]} accessibilityLabel="Remove image"><Feather name="x" size={16} color={colors.foreground} /></Pressable></View>)}</View><Pressable onPress={pickThreadImage} disabled={uploading || attachments.length >= 5} style={[styles.addImage, { borderColor: colors.border, backgroundColor: colors.surface }]}>{uploading ? <ActivityIndicator color={colors.primary} /> : <Feather name="image" size={19} color={colors.primary} />}<Text style={[styles.addImageText, { color: colors.primary }]}>{uploading ? 'Uploading image…' : 'Add image'}</Text></Pressable></Field> : null}
           {choices.length ? <Field label={kind === 'threads' ? 'Category' : 'Type'}><View style={styles.chips}>{choices.map((choice) => <Pressable key={choice} onPress={() => setType(choice)} style={[styles.chip, { borderColor: type === choice ? colors.primary : colors.border, backgroundColor: type === choice ? colors.primarySoft : colors.surface }]}><Text style={[styles.chipText, { color: type === choice ? colors.primary : colors.mutedForeground }]}>{choice.replace('_', ' ')}</Text></Pressable>)}</View></Field> : null}
           {kind !== 'events' ? <Field label="Tags (up to 3, comma separated)"><TextInput value={tags} onChangeText={setTags} style={inputStyle} placeholder="design, research" placeholderTextColor={colors.foregroundSoft} /></Field> : null}
@@ -156,6 +158,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 function Field({ label, children }: { label: string; children: React.ReactNode }) { const colors = useColors(); return <View style={styles.field}><Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>{children}</View>; }
 function Toggle({ label, description, value, onValueChange, colors }: { label: string; description?: string; value: boolean; onValueChange: (v: boolean) => void; colors: ReturnType<typeof useColors> }) { return <View style={styles.toggle}><View style={styles.toggleCopy}><Text style={[styles.toggleLabel, { color: colors.foreground }]}>{label}</Text>{description ? <Text style={[styles.toggleDescription, { color: colors.mutedForeground }]}>{description}</Text> : null}</View><Switch value={value} onValueChange={onValueChange} trackColor={{ false: colors.border, true: colors.primary }} /></View>; }
 function labelFor(kind: ContentKind) { return kind === 'threads' ? 'Thread' : kind === 'events' ? 'Event' : 'Resource'; }
+function bodyToThread(body: string) { const trimmed = body.trim(); const firstLine = trimmed.split('\n')[0]?.trim() ?? ''; const title = (firstLine || trimmed).slice(0, 120) || 'Thread'; return { title, description: trimmed || title }; }
+function threadToBody(title: string, description: string | null) { if (description?.startsWith(title)) return description; return description ? `${title}\n\n${description}` : title; }
 function extractLinks(text: string) { return [...new Set(text.match(/https?:\/\/[^\s<>"]+/g) ?? [])]; }
 function toLocalDateTime(iso: string) { const d = new Date(iso); const pad = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
 function parseDateTime(value: string) { const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/); if (!match) return null; const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), Number(match[4]), Number(match[5])); return Number.isNaN(d.getTime()) ? null : d.toISOString(); }
