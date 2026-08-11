@@ -87,6 +87,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const date = event ? new Date(event.event_date) : new Date(item.created_at);
   const images = thread?.attachments.filter((attachment) => attachment.type.startsWith('image/')) ?? [];
+  const description = thread ? threadDescription(thread.title, thread.description) : item.description;
   const previewImage = useResourcePreview(resource?.url);
 
   return <Pressable onPress={onOpen} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`View ${singular(kind)}: ${item.title}`}>
@@ -99,7 +100,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
         <OptionsMenu isOwner={isOwner} onEdit={onEdit} onDelete={onDelete} />
       </View>
       <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
-      {item.description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text> : null}
+      {description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{description}</Text> : null}
       {images.length ? <ThreadImages images={images} /> : null}
       {thread ? <View style={styles.tags}><Tag text={thread.category} />{thread.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
       {resource ? <View style={styles.tags}><Tag text={resource.resource_type.replace('_', ' ')} />{resource.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
@@ -123,6 +124,7 @@ function ContentDetail({ visible, item, kind, onClose, onAction, onEdit, onDelet
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const images = thread?.attachments.filter((attachment) => attachment.type.startsWith('image/')) ?? [];
   const files = thread?.attachments.filter((attachment) => !attachment.type.startsWith('image/')) ?? [];
+  const description = thread ? threadDescription(thread.title, thread.description) : item.description;
 
   return <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onClose}>
     <View style={[styles.detailRoot, { backgroundColor: colors.subtle }]}>
@@ -139,7 +141,7 @@ function ContentDetail({ visible, item, kind, onClose, onAction, onEdit, onDelet
           <View style={styles.authorCopy}><Text style={[styles.author, { color: colors.foreground }]}>{item.users?.name ?? 'Community member'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{new Date(event?.event_date ?? item.created_at).toLocaleString()}</Text></View>
         </View>
         <Text style={[styles.detailTitle, { color: colors.foreground }]}>{item.title}</Text>
-        {item.description ? <Text style={[styles.detailDescription, { color: colors.mutedForeground }]}>{item.description}</Text> : null}
+        {description ? <Text style={[styles.detailDescription, { color: colors.mutedForeground }]}>{description}</Text> : null}
         {images.length ? <ThreadImages images={images} /> : null}
         {files.map((file) => <Pressable key={file.url} onPress={() => Linking.openURL(file.url)} style={[styles.linkButton, { borderColor: colors.border }]}><Feather name="paperclip" size={16} color={colors.primary} /><Text style={[styles.linkText, { color: colors.primary }]} numberOfLines={1}>{file.name}</Text></Pressable>)}
         {thread ? <View style={styles.tags}><Tag text={thread.category} />{thread.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
@@ -219,6 +221,13 @@ function DetailRow({ icon, text }: { icon: React.ComponentProps<typeof Feather>[
 function Action({ icon, label, active, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; active?: boolean; onPress?: () => void }) { const colors = useColors(); return <Pressable onPress={(e) => { e.stopPropagation(); onPress?.(); }} disabled={!onPress} style={styles.action}><Feather name={icon} size={16} color={active ? colors.primary : colors.mutedForeground} /><Text style={[styles.actionText, { color: active ? colors.primary : colors.mutedForeground }]}>{label}</Text></Pressable>; }
 function Tag({ text }: { text: string }) { const colors = useColors(); return <View style={[styles.tag, { backgroundColor: colors.primarySoft }]}><Text style={[styles.tagText, { color: colors.primary }]}>{text}</Text></View>; }
 function Centered({ children }: { children: React.ReactNode }) { return <View style={styles.center}>{children}</View>; }
+function threadDescription(title: string, description: string | null) {
+  const body = description?.trim();
+  if (!body || body === title.trim()) return null;
+  if (body.startsWith(`${title.trim()}\n`)) return body.slice(title.trim().length).trim() || null;
+  return body;
+}
+
 function singular(kind: ContentKind) { return kind === 'threads' ? 'Thread' : kind === 'events' ? 'Event' : 'Resource'; }
 
 const styles = StyleSheet.create({
