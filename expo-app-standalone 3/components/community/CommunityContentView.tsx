@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, FlatList, Image, Linking, Modal, Pressable,
   RefreshControl, ScrollView, StyleSheet, Text, View,
@@ -164,15 +164,42 @@ function useResourcePreview(url?: string) {
 
 function OptionsMenu({ isOwner, onEdit, onDelete }: { isOwner: boolean; onEdit: () => void; onDelete: () => void }) {
   const colors = useColors();
+  const triggerRef = useRef<View>(null);
+  const [visible, setVisible] = useState(false);
+  const [position, setPosition] = useState({ top: 0, right: 12 });
+
   const open = () => {
-    if (!isOwner) return Alert.alert('Post options', 'No actions are available for this post.');
-    Alert.alert('Post options', undefined, [
-      { text: 'Edit', onPress: onEdit },
-      { text: 'Delete', style: 'destructive', onPress: onDelete },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    if (!isOwner) return;
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setPosition({ top: y + height, right: Math.max(12, 12 + (x < 160 ? 160 - x - width : 0)) });
+      setVisible(true);
+    });
   };
-  return <Pressable onPress={(event) => { event.stopPropagation(); open(); }} style={styles.menuButton} hitSlop={8} accessibilityLabel="Post options"><Feather name="more-horizontal" size={21} color={colors.mutedForeground} /></Pressable>;
+  const choose = (action: () => void) => {
+    setVisible(false);
+    action();
+  };
+
+  return <>
+    <Pressable ref={triggerRef} onPress={(event) => { event.stopPropagation(); open(); }} style={styles.menuButton} hitSlop={8} accessibilityRole="button" accessibilityLabel="Post options" accessibilityState={{ expanded: visible }}>
+      <Feather name="more-vertical" size={21} color={colors.mutedForeground} />
+    </Pressable>
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setVisible(false)}>
+      <Pressable style={styles.menuBackdrop} onPress={() => setVisible(false)} accessibilityLabel="Close post options">
+        <View style={[styles.optionsPopover, { top: position.top, right: position.right, backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Pressable onPress={() => choose(onEdit)} style={styles.optionRow} accessibilityRole="button">
+            <Feather name="edit-2" size={16} color={colors.foreground} />
+            <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
+          </Pressable>
+          <View style={[styles.optionDivider, { backgroundColor: colors.border }]} />
+          <Pressable onPress={() => choose(onDelete)} style={styles.optionRow} accessibilityRole="button">
+            <Feather name="trash-2" size={16} color={colors.foreground} />
+            <Text style={[styles.optionText, { color: colors.foreground }]}>Delete</Text>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
+  </>;
 }
 
 function ThreadImages({ images }: { images: CommunityThread['attachments'] }) {
@@ -196,7 +223,7 @@ function singular(kind: ContentKind) { return kind === 'threads' ? 'Thread' : ki
 
 const styles = StyleSheet.create({
   root: { flex: 1 }, list: { padding: 12, gap: 12, flexGrow: 1 }, center: { flex: 1, minHeight: 260, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 28 }, stateTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 17 }, stateBody: { fontFamily: 'Geist_400Regular', fontSize: 14, textAlign: 'center' }, retry: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' }, cover: { width: '100%', height: 160 }, cardBody: { padding: 14, gap: 11 }, authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 }, avatar: { width: 34, height: 34, borderRadius: 17 }, avatarFallback: { alignItems: 'center', justifyContent: 'center' }, avatarText: { fontFamily: 'Geist_600SemiBold', fontSize: 13 }, authorCopy: { flex: 1 }, author: { fontFamily: 'Geist_600SemiBold', fontSize: 14 }, meta: { fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 1 }, menuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' }, cover: { width: '100%', height: 160 }, cardBody: { padding: 14, gap: 11 }, authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 }, avatar: { width: 34, height: 34, borderRadius: 17 }, avatarFallback: { alignItems: 'center', justifyContent: 'center' }, avatarText: { fontFamily: 'Geist_600SemiBold', fontSize: 13 }, authorCopy: { flex: 1 }, author: { fontFamily: 'Geist_600SemiBold', fontSize: 14 }, meta: { fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 1 }, menuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }, menuBackdrop: { flex: 1 }, optionsPopover: { position: 'absolute', width: 152, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, paddingVertical: 5, elevation: 8, shadowColor: '#000000', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 5 } }, optionRow: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 11 }, optionText: { fontFamily: 'Geist_500Medium', fontSize: 14 }, optionDivider: { height: StyleSheet.hairlineWidth, marginHorizontal: 12 },
   cardTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 18, lineHeight: 24 }, description: { fontFamily: 'Geist_400Regular', fontSize: 14, lineHeight: 21 }, tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 }, tag: { borderRadius: 12, paddingHorizontal: 9, paddingVertical: 5 }, tagText: { fontFamily: 'Geist_500Medium', fontSize: 11, textTransform: 'capitalize' }, eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 }, eventMetaText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 13 }, linkButton: { height: 44, borderWidth: StyleSheet.hairlineWidth, borderRadius: 10, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }, linkText: { flex: 1, fontFamily: 'Geist_500Medium', fontSize: 13 },
   actions: { minHeight: 36, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 20 }, action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6 }, actionText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
   imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, borderRadius: 10, overflow: 'hidden' }, imageSingle: { width: '100%', height: 210 }, imageCell: { width: '49.5%', height: 130 }, threadImage: { width: '100%', height: '100%' }, moreImages: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }, moreImagesText: { color: '#FFFFFF', fontFamily: 'Geist_600SemiBold', fontSize: 22 },
