@@ -12,14 +12,17 @@ function fmtCount(n: number): string {
   return String(n);
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "now";
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
+/** Absolute time — mirrors the mobile app: clock for today, "Yesterday",
+ *  weekday within the last week, then a short date. */
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0)
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 /** Formats the last-message text shown below the community name. */
@@ -91,7 +94,7 @@ export function CommunityRow({
             )}
             {c.last_message && !typingText && (
               <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
-                {timeAgo(c.last_message.created_at)}
+                {formatTime(c.last_message.created_at)}
               </span>
             )}
           </div>
