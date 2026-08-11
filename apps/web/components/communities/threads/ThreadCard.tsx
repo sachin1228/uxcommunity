@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
-  ArrowUp, Bookmark, Flag, MessageSquare,
+  Heart, Bookmark, Flag, MessageSquare,
   MoreHorizontal, Paperclip, Pencil, Share2, Trash2,
 } from "lucide-react";
 
@@ -104,7 +104,13 @@ export function ThreadCard({
   const categoryColor = CATEGORY_COLORS[thread.category] ?? CATEGORY_COLORS["discussion"];
   const isOwner = thread.user_id === currentUserId;
 
-  const [votePending, setVotePending] = useState(false);
+  const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
+  const confirmedVoteRef = useRef(thread.user_voted);
+  const desiredVoteRef = useRef(thread.user_voted);
+  const optimisticCountRef = useRef(thread.vote_count);
+  const voteRequestRunningRef = useRef(false);
+  const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
+  const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
   const [savePending, setSavePending] = useState(false);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -157,26 +163,53 @@ export function ThreadCard({
     }
   }
 
-  async function handleVote(e: React.MouseEvent) {
-    e.preventDefault();
-    if (votePending) return;
-    const newVoted = !thread.user_voted;
-    const newCount = thread.vote_count + (newVoted ? 1 : -1);
-    onVoteChanged(thread.id, newVoted, newCount);
-    setVotePending(true);
+  async function flushVoteIntent() {
+    if (voteRequestRunningRef.current) return;
+
+    voteRequestRunningRef.current = true;
+
     try {
-      const response = await fetch(
-        `/api/communities/${communityId}/threads/${thread.id}/vote`,
-        { method: "POST" },
-      );
-      if (!response.ok) {
-        onVoteChanged(thread.id, thread.user_voted, thread.vote_count);
+      // Serialize toggle requests and keep going until the server matches the
+      // latest click, even when the user likes/unlikes repeatedly in flight.
+      while (confirmedVoteRef.current !== desiredVoteRef.current) {
+        const response = await fetch(
+          `/api/communities/${communityId}/threads/${thread.id}/vote`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error("Failed to update like");
+
+        const result = (await response.json()) as { voted: boolean };
+        confirmedVoteRef.current = result.voted;
       }
     } catch {
-      onVoteChanged(thread.id, thread.user_voted, thread.vote_count);
+      desiredVoteRef.current = confirmedVoteRef.current;
+      const rollbackCount = Math.max(
+        0,
+        optimisticCountRef.current + (confirmedVoteRef.current ? 1 : -1),
+      );
+      optimisticCountRef.current = rollbackCount;
+      setOptimisticVote({ voted: confirmedVoteRef.current, count: rollbackCount });
+      onVoteChanged(thread.id, confirmedVoteRef.current, rollbackCount);
     } finally {
-      setVotePending(false);
+      voteRequestRunningRef.current = false;
+      setOptimisticVote(null);
     }
+  }
+
+  function handleVote(e: React.MouseEvent) {
+    e.preventDefault();
+
+    const newVoted = !desiredVoteRef.current;
+    const newCount = Math.max(
+      0,
+      optimisticCountRef.current + (newVoted ? 1 : -1),
+    );
+
+    desiredVoteRef.current = newVoted;
+    optimisticCountRef.current = newCount;
+    setOptimisticVote({ voted: newVoted, count: newCount });
+    onVoteChanged(thread.id, newVoted, newCount);
+    void flushVoteIntent();
   }
 
   const authorName    = thread.users?.name ?? "Member";
@@ -457,31 +490,31 @@ export function ThreadCard({
       })()}
 
 
-      {/* ── Footer: upvote · comments · (bookmark · share in list only) ── */}
+      {/* ── Footer: like · comments · (bookmark · share in list only) ── */}
       <div className="mt-3 flex items-center gap-4">
-        {/* Upvote */}
+        {/* Like (Instagram-style heart) */}
         <button
           type="button"
           onClick={handleVote}
-          disabled={votePending}
-          aria-label={thread.user_voted ? "Remove upvote" : "Upvote"}
-          className="flex items-center gap-2 disabled:opacity-60"
+          aria-label={optimisticVoted ? "Unlike" : "Like"}
+          aria-pressed={optimisticVoted}
+          className="group/like flex items-center gap-2"
         >
+          <Heart
+            size={26}
+            strokeWidth={2}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+              optimisticVoted
+                ? "fill-red-500 text-red-500"
+                : "fill-none text-white"
+            }`}
+          />
           <span
-            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${
-              thread.user_voted
-                ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                : "border-border text-foreground-subtle hover:border-emerald-500/60 hover:text-emerald-400"
+            className={`font-body text-sm font-semibold tabular-nums ${
+              optimisticVoted ? "text-red-500" : "text-white"
             }`}
           >
-            <ArrowUp size={14} strokeWidth={thread.user_voted ? 2.5 : 2} />
-          </span>
-          <span
-            className={`font-body text-xs font-semibold tabular-nums ${
-              thread.user_voted ? "text-emerald-400" : "text-foreground-muted"
-            }`}
-          >
-            {thread.vote_count}
+            {optimisticVoteCount}
           </span>
         </button>
 
