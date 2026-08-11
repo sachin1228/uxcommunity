@@ -75,7 +75,9 @@ export interface SidebarLastReaction {
   /** First name of the person who reacted (or "You" if isOwn). */
   firstName: string;
   isOwn: boolean;
-  /** Content snippet of the message that was reacted to. */
+  /** Whether the reacted-to message was authored by the current user. */
+  targetIsOwn?: boolean;
+  /** Content snippet of the message that was reacted to. Empty while pending. */
   messagePreview: string;
 }
 
@@ -112,6 +114,8 @@ export interface CachedSidebarCommunity {
     is_reply?: boolean;
     /** First name of the user whose message was replied to. */
     reply_to_user?: string | null;
+    /** True when the replied-to message was authored by the current user. */
+    reply_to_is_own?: boolean;
     /** Unique emoji strings that have been reacted to this message. */
     reactions?: string[];
   } | null;

@@ -57,7 +57,7 @@ export async function DELETE(
  * Lightweight endpoint used by the realtime handler to fetch the reply preview
  * of a parent message that may not be in the local message cache.
  *
- * Returns: { id: string; content: string | null; image_url: string | null; user_name: string }
+ * Returns: { id: string; content: string | null; image_url: string | null; user_id: string; user_name: string }
  */
 export async function GET(
   _req: NextRequest,
@@ -103,6 +103,7 @@ export async function GET(
     id: msg.id,
     content: (msg as any).content ?? null,
     image_url: (msg as any).image_url ?? null,
+    user_id: msg.user_id,
     user_name: user?.name ?? "Unknown",
   });
 }

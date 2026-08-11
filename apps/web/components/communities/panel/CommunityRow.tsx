@@ -34,6 +34,11 @@ function formatPreview(msg: NonNullable<Community["last_message"]>): {
   if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
   if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
   if (msg.is_reply) {
+    // A reply to the current user's own message reads as a clean sentence:
+    // "John replied to your message" (no colon prefix, no snippet).
+    if (msg.reply_to_is_own) {
+      return { text: `${sender} replied to your message` };
+    }
     const to = msg.reply_to_user ?? null;
     return {
       prefix: sender,
@@ -116,13 +121,19 @@ export function CommunityRow({
               </p>
 
             ) : lastReaction ? (
-              /* Reaction preview: "You reacted 👍 to: "message"" */
+              /* Reaction preview:
+                 - own message reacted to → "John reacted ❤️ to your message"
+                 - other message with text → "John reacted ❤️ to: "message""
+                 - pending (text not resolved yet) → "John reacted ❤️" */
               <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
-                {lastReaction.isOwn ? " reacted " : " reacted "}
+                {" reacted "}
                 <span>{lastReaction.emoji}</span>
-                {" to: "}
-                <span>{lastReaction.messagePreview}</span>
+                {lastReaction.targetIsOwn
+                  ? " to your message"
+                  : lastReaction.messagePreview
+                    ? <>{" to: "}<span>{lastReaction.messagePreview}</span></>
+                    : null}
               </p>
 
             ) : preview ? (

@@ -78,6 +78,7 @@ export function useSidebarRealtime({
     type ReactionMessage = {
       content?: string | null;
       image_url?: string | null;
+      user_id?: string | null;
     };
 
     /** Fetch a member's profile and cache their name. */
@@ -92,15 +93,17 @@ export function useSidebarRealtime({
       return null;
     }
 
-    function reactionPreview(
-      row: ReactionRow,
-      message: ReactionMessage | null,
-    ): string {
+    /**
+     * Snippet of the reacted-to message. Returns "" when the content is not
+     * known yet so the preview never flashes a generic "a message" placeholder
+     * before the real text arrives.
+     */
+    function reactionPreview(message: ReactionMessage | null): string {
       if (message?.content) {
         return `"${message.content.slice(0, 40)}${message.content.length > 40 ? "…" : ""}"`;
       }
       if (message?.image_url) return "📷 Photo";
-      return "a message";
+      return "";
     }
 
     function applyReaction(
@@ -121,8 +124,33 @@ export function useSidebarRealtime({
             return c;
           }
 
+          // When the reacted message is this community's last message we can
+          // resolve both its content and its author synchronously — no flash.
           const fallbackMessage =
             c.last_message?.id === row.message_id ? c.last_message : null;
+
+          const resolved: ReactionMessage | null =
+            message ??
+            (fallbackMessage
+              ? {
+                  content: fallbackMessage.content,
+                  image_url: fallbackMessage.has_image ? "present" : null,
+                  user_id: fallbackMessage.is_own ? userId : null,
+                }
+              : null);
+
+          // Preserve an already-resolved reactor name across the two-phase
+          // apply (immediate + after message fetch) so it is not reset.
+          const existing =
+            c.lastReaction?.messageId === row.message_id ? c.lastReaction : null;
+
+          // Ownership of the reacted-to message: known only once we have either
+          // the fetched message or a matching local last_message.
+          const targetIsOwn: boolean | undefined = message
+            ? message.user_id === userId
+            : fallbackMessage
+            ? !!fallbackMessage.is_own
+            : existing?.targetIsOwn;
 
           return {
             ...c,
@@ -132,18 +160,14 @@ export function useSidebarRealtime({
               emoji: row.emoji,
               firstName: isOwn
                 ? "You"
-                : (resolvedNames.get(row.user_id)?.split(" ")[0] ?? "Someone"),
+                : (resolvedNames.get(row.user_id)?.split(" ")[0] ??
+                   existing?.firstName ??
+                   "Someone"),
               isOwn,
-              messagePreview: reactionPreview(
-                row,
-                message ??
-                  (fallbackMessage
-                    ? {
-                        content: fallbackMessage.content,
-                        image_url: fallbackMessage.has_image ? "present" : null,
-                      }
-                    : null),
-              ),
+              targetIsOwn,
+              // When someone reacts to the current user's message the preview
+              // reads "… reacted to your message", so no snippet is needed.
+              messagePreview: targetIsOwn ? "" : reactionPreview(resolved),
             },
           };
         }),
@@ -239,15 +263,20 @@ export function useSidebarRealtime({
               const replyId = row.reply_to_id;
               fetch(`/api/communities/${commId}/messages/${replyId}`)
                 .then((r) => (r.ok ? r.json() : null))
-                .then((parent: { user_name?: string } | null) => {
+                .then((parent: { user_name?: string; user_id?: string } | null) => {
                   if (!parent?.user_name) return;
                   const firstName = parent.user_name.split(" ")[0];
+                  const replyToIsOwn = parent.user_id === userId;
                   setCommunities((prev) =>
                     applyUpdate(prev, commId, (c) => {
                       if (c.last_message?.created_at !== msgAt) return c;
                       return {
                         ...c,
-                        last_message: { ...c.last_message!, reply_to_user: firstName },
+                        last_message: {
+                          ...c.last_message!,
+                          reply_to_user: firstName,
+                          reply_to_is_own: replyToIsOwn,
+                        },
                       };
                     }),
                   );

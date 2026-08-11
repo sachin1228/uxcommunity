@@ -157,10 +157,13 @@ export async function GET() {
 
   // Map: parent message id → first name of original sender.
   const replyParentNameMap: Record<string, string> = {};
+  // Map: parent message id → whether the current user authored it.
+  const replyParentIsOwnMap: Record<string, boolean> = {};
   const replyParentUserMap = Object.fromEntries((replyParentUsers ?? []).map((u) => [u.id, u.name]));
   for (const m of replyParentRows ?? []) {
     const name = replyParentUserMap[m.user_id];
     if (name) replyParentNameMap[m.id] = name.split(" ")[0];
+    replyParentIsOwnMap[m.id] = m.user_id === userId;
   }
 
   // Pick the most-recent reaction per community.
@@ -191,10 +194,10 @@ export async function GET() {
     reactionMessageIds.length
       ? db
           .from("community_messages")
-          .select("id, content, image_url")
+          .select("id, content, image_url, user_id")
           .in("id", reactionMessageIds)
       : Promise.resolve({
-          data: [] as { id: string; content: string | null; image_url: string | null }[],
+          data: [] as { id: string; content: string | null; image_url: string | null; user_id: string }[],
         }),
     reactorIds.length
       ? db.from("users").select("id, name").in("id", reactorIds)
@@ -273,6 +276,8 @@ export async function GET() {
                 ? "You"
                 : (senderMap[latestReaction!.user_id]?.split(" ")[0] ?? "Someone"),
             isOwn: latestReaction!.user_id === userId,
+            /** Whether the reacted-to message was authored by the current user. */
+            targetIsOwn: reactionMessage?.user_id === userId,
             messagePreview: reactionMessage?.content
               ? `"${reactionMessage.content.slice(0, 40)}${reactionMessage.content.length > 40 ? "…" : ""}"`
               : "📷 Photo",
@@ -301,6 +306,9 @@ export async function GET() {
               reply_to_user: lastMsg.reply_to_id
                 ? (replyParentNameMap[lastMsg.reply_to_id] ?? null)
                 : null,
+              reply_to_is_own: lastMsg.reply_to_id
+                ? (replyParentIsOwnMap[lastMsg.reply_to_id] ?? false)
+                : false,
             }
           : null,
         lastReaction,

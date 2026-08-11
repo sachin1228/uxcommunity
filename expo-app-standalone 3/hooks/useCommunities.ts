@@ -57,14 +57,18 @@ function bubbleToTop(list: Community[], communityId: string): Community[] {
   return [list[idx], ...list.slice(0, idx), ...list.slice(idx + 1)];
 }
 
-/** Build reaction snippet text — mirrors web's reactionPreview(). */
+/**
+ * Build reaction snippet text — mirrors web's reactionPreview().
+ * Returns '' when the content is unknown so the preview never flashes a
+ * generic "a message" placeholder before the real text arrives.
+ */
 function reactionSnippet(content: string | null | undefined, hasImage: boolean): string {
   if (content) {
     const trimmed = content.slice(0, 40);
     return `"${trimmed}${content.length > 40 ? '…' : ''}"`;
   }
   if (hasImage) return '📷 Photo';
-  return 'a message';
+  return '';
 }
 
 // ---------------------------------------------------------------------------
@@ -213,14 +217,22 @@ export function useCommunities() {
               if (row.reply_to_id) {
                 const msgAt   = row.created_at;
                 const replyId = row.reply_to_id;
-                apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
+                apiFetch<{ user_name?: string; user_id?: string }>(`/api/communities/${cid}/messages/${replyId}`)
                   .then(({ data }) => {
                     if (!data?.user_name) return;
                     const firstName = data.user_name.split(' ')[0];
+                    const replyToIsOwn = data.user_id === user?.id;
                     setCommunities((prev) =>
                       prev.map((c) => {
                         if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                        return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
+                        return {
+                          ...c,
+                          last_message: {
+                            ...c.last_message!,
+                            reply_to_user: firstName,
+                            reply_to_is_own: replyToIsOwn,
+                          },
+                        };
                       })
                     );
                   })
@@ -265,13 +277,16 @@ export function useCommunities() {
               const isOwn     = r.user_id === user?.id;
               const knownName = resolvedNames.current.get(r.user_id);
 
-              // Apply with what we know now
+              // Apply with what we know now. When the reacted message is this
+              // community's last message we can resolve its content and author
+              // synchronously — no flash.
               setCommunities((prev) =>
                 prev.map((c) => {
                   if (c.id !== cid) return c;
                   // Out-of-order guard — mirror web
                   if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
                   const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
+                  const targetIsOwn = fallback ? !!fallback.is_own : undefined;
                   return {
                     ...c,
                     lastReaction: {
@@ -280,24 +295,27 @@ export function useCommunities() {
                       createdAt:    r.created_at ?? new Date().toISOString(),
                       firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
                       isOwn,
-                      messagePreview: reactionSnippet(fallback?.content, false),
+                      targetIsOwn,
+                      // "… reacted to your message" needs no snippet.
+                      messagePreview: targetIsOwn ? '' : reactionSnippet(fallback?.content, false),
                     } as LastReaction,
                   };
                 })
               );
 
-              // Async: fetch message content for accurate snippet
-              apiFetch<{ content?: string | null; image_url?: string | null }>(
+              // Async: fetch message content + author for accurate preview
+              apiFetch<{ content?: string | null; image_url?: string | null; user_id?: string }>(
                 `/api/communities/${cid}/messages/${r.message_id}`
               )
                 .then(({ data: msg }) => {
-                  const preview = reactionSnippet(msg?.content, !!msg?.image_url);
+                  const targetIsOwn = msg?.user_id === user?.id;
+                  const preview = targetIsOwn ? '' : reactionSnippet(msg?.content, !!msg?.image_url);
                   const rAt = r.created_at;
                   setCommunities((prev) =>
                     prev.map((c) => {
                       if (c.id !== cid || !c.lastReaction) return c;
                       if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
-                      return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
+                      return { ...c, lastReaction: { ...c.lastReaction!, targetIsOwn, messagePreview: preview } };
                     })
                   );
                 })
@@ -337,15 +355,17 @@ export function useCommunities() {
                 prev.map((c) => {
                   if (c.id !== cid) return c;
                   if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+                  const existing = c.lastReaction?.messageId === r.message_id ? c.lastReaction : null;
                   return {
                     ...c,
                     lastReaction: {
                       messageId:     r.message_id,
                       emoji:         r.emoji,
                       createdAt:     r.created_at ?? new Date().toISOString(),
-                      firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                      firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? existing?.firstName ?? 'Someone'),
                       isOwn,
-                      messagePreview: c.lastReaction?.messagePreview ?? 'a message',
+                      targetIsOwn:   existing?.targetIsOwn,
+                      messagePreview: existing?.messagePreview ?? '',
                     } as LastReaction,
                   };
                 })

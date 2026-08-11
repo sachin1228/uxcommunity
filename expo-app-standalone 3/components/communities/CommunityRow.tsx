@@ -120,18 +120,25 @@ function previewText(
   // Typing takes priority — handled separately via TypingDots
   if (typingLabel) return { text: typingLabel };
 
-  // Reaction: "<Name> reacted 👍 to: <preview>"
+  // Reaction:
+  //  - own message reacted to → "John reacted 👍 to your message"
+  //  - other message with text → "John reacted 👍 to: <preview>"
+  //  - pending (text not resolved yet) → "John reacted 👍"
   if (community.lastReaction) {
-    const { emoji, firstName, isOwn, messagePreview } = community.lastReaction;
+    const { emoji, firstName, isOwn, targetIsOwn, messagePreview } = community.lastReaction;
     const who = isOwn ? 'You' : firstName;
-    const to = messagePreview ? ` to: ${messagePreview}` : '';
+    const to = targetIsOwn
+      ? ' to your message'
+      : messagePreview
+        ? ` to: ${messagePreview}`
+        : '';
     return { text: `${who} reacted ${emoji}${to}` };
   }
 
   // Last message — mirrors web formatPreview() priority exactly:
   // deleted → image-only → reply → plain content
   if (community.last_message) {
-    const { content, user, is_own, is_reply, reply_to_user, is_deleted, has_image } =
+    const { content, user, is_own, is_reply, reply_to_user, reply_to_is_own, is_deleted, has_image } =
       community.last_message;
     const sender = is_own ? 'You' : user.name ? user.name.split(' ')[0] : '';
 
@@ -144,6 +151,11 @@ function previewText(
     }
 
     if (is_reply) {
+      // A reply to the current user's own message reads as a clean sentence:
+      // "John replied to your message" (no colon prefix, no snippet).
+      if (reply_to_is_own) {
+        return { text: `${sender} replied to your message` };
+      }
       return {
         prefix: sender,
         text: reply_to_user

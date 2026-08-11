@@ -13,6 +13,8 @@ export interface LastMessage {
   is_own?: boolean;
   is_reply: boolean;
   reply_to_user: string | null;
+  /** True when the replied-to message was authored by the current user. */
+  reply_to_is_own?: boolean;
   /** True when the message was soft-deleted after it became the last preview. */
   is_deleted?: boolean;
   /** True when the message is an image-only post (no text content). */
@@ -25,6 +27,8 @@ export interface LastReaction {
   createdAt: string;
   firstName: string;
   isOwn: boolean;
+  /** Whether the reacted-to message was authored by the current user. */
+  targetIsOwn?: boolean;
   messagePreview: string | null;
 }
 
