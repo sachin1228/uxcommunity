@@ -75,7 +75,7 @@ export async function GET() {
     // Fetch the latest messages across all communities.
     db
       .from("community_messages")
-      .select("id, community_id, content, created_at, user_id, reply_to_id")
+      .select("id, community_id, content, created_at, user_id, reply_to_id, deleted_at")
       .in("community_id", ids)
       .order("created_at", { ascending: false })
       .limit(ids.length * 10),
@@ -92,7 +92,7 @@ export async function GET() {
   // 4. Pick the latest message per community AND count unread messages in JS.
   //    Only consider messages sent after the user joined — pre-join messages
   //    must never appear as previews or contribute to unread counts.
-  const lastMsgByComm: Record<string, { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null }> = {};
+  const lastMsgByComm: Record<string, { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; deleted_at?: string | null }> = {};
   const msgCountMap: Record<string, number> = {};
   for (const m of recentMessages ?? []) {
     const joinedAt = joinedAtMap[m.community_id] ?? null;
@@ -295,6 +295,8 @@ export async function GET() {
               content: lastMsg.content,
               created_at: lastMsg.created_at,
               user: { name: senderMap[lastMsg.user_id] ?? "Unknown" },
+              is_own: lastMsg.user_id === userId,
+              is_deleted: !!lastMsg.deleted_at,
               is_reply: !!lastMsg.reply_to_id,
               reply_to_user: lastMsg.reply_to_id
                 ? (replyParentNameMap[lastMsg.reply_to_id] ?? null)

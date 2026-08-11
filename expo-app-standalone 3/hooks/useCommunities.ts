@@ -172,6 +172,7 @@ export function useCommunities() {
                 content:      row.content,
                 created_at:   row.created_at,
                 user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
+                is_own:       isOwn,
                 is_reply:     !!row.reply_to_id,
                 reply_to_user: null,
                 has_image:    !row.content && !!row.image_url,

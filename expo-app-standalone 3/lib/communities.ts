@@ -9,6 +9,8 @@ export interface LastMessage {
   content: string | null;
   created_at: string;
   user: { name: string };
+  /** True when the message was sent by the current user (preview shows "You:"). */
+  is_own?: boolean;
   is_reply: boolean;
   reply_to_user: string | null;
   /** True when the message was soft-deleted after it became the last preview. */
