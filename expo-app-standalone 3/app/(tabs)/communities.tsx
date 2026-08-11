@@ -31,8 +31,9 @@ export default function CommunitiesScreen() {
       const imageParam = community.image_url
         ? `&image=${encodeURIComponent(community.image_url)}`
         : '';
+      const tabsParam = `&tabs=${encodeURIComponent(community.enabled_tabs.join(','))}`;
       router.push(
-        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}`
+        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}`
       );
     },
     [router, markCommunityRead]

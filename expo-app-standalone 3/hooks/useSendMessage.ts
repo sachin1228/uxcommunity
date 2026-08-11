@@ -79,6 +79,7 @@ export function useSendMessage({
         content: text || null,
         created_at: new Date().toISOString(),
         user_id: currentUser.id,
+        reply_to_id: replyTo?.id ?? null,
         users: {
           name: currentUser.name,
           avatar_url: currentUser.avatar_url,
