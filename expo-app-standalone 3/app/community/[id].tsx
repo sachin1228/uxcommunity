@@ -434,9 +434,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_600SemiBold',
   },
   headerAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: StyleSheet.hairlineWidth,
     flexShrink: 0,
   },
@@ -445,11 +445,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerAvatarText: {
-    fontSize: 15,
+    fontSize: 12,
     fontFamily: 'Geist_600SemiBold',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 17,
     fontFamily: 'Geist_600SemiBold',
     flexShrink: 1,
   },
