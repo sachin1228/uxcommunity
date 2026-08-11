@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, apiFormUpload } from './api';
 
 export type CommunityTab = 'chat' | 'threads' | 'events' | 'resources';
 export type ContentKind = Exclude<CommunityTab, 'chat'>;
@@ -10,16 +10,24 @@ interface BaseContent {
   user_id: string;
   title: string;
   description: string | null;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
   users: Author | null;
 }
 
+export interface ThreadAttachment {
+  url: string;
+  name: string;
+  type: string;
+  size: number;
+}
+
 export interface CommunityThread extends BaseContent {
-  category: 'question' | 'feedback' | 'showcase' | 'discussion' | 'resource';
+  category: 'question' | 'discussion' | 'idea' | 'feedback' | 'referral' | 'collaboration';
   tags: string[];
   links: string[];
-  attachments: Array<{ url: string; name: string; type: string; size?: number }>;
+  attachments: ThreadAttachment[];
   allow_replies: boolean;
   vote_count: number;
   comment_count: number;
@@ -83,4 +91,22 @@ export async function deleteCommunityContent(communityId: string, kind: ContentK
 
 export async function toggleContentAction(communityId: string, kind: ContentKind, itemId: string, action: 'vote' | 'save' | 'rsvp' | 'bookmark'): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/${kind}/${itemId}/${action}`, { method: 'POST' });
+}
+
+export async function getLinkPreviewImage(url: string): Promise<string | null> {
+  const { data } = await apiFetch<{ image?: string | null }>(`/api/link-preview?url=${encodeURIComponent(url)}`);
+  return data.image ?? null;
+}
+
+export async function uploadThreadImage(
+  communityId: string,
+  image: { uri: string; name: string; type: string },
+): Promise<ThreadAttachment> {
+  const formData = new FormData();
+  formData.append('file', image as unknown as Blob);
+  const { data } = await apiFormUpload<{ attachment: ThreadAttachment }>(
+    `/api/communities/${communityId}/threads/upload`,
+    formData,
+  );
+  return data.attachment;
 }

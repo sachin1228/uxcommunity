@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  ActivityIndicator, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
   StyleSheet, Switch, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
-  CommunityContent, ContentKind, createCommunityContent, updateCommunityContent,
+  CommunityContent, ContentKind, ThreadAttachment, createCommunityContent,
+  updateCommunityContent, uploadThreadImage,
 } from '@/lib/communityContent';
 
 interface Props {
@@ -20,7 +22,7 @@ interface Props {
 }
 
 const OPTIONS = {
-  threads: ['question', 'feedback', 'showcase', 'discussion', 'resource'],
+  threads: ['question', 'discussion', 'idea', 'feedback', 'referral', 'collaboration'],
   resources: ['article', 'figma', 'tool', 'video', 'book', 'font', 'icon_pack', 'color', 'template', 'inspiration', 'other'],
 } as const;
 
@@ -39,6 +41,9 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
   const [meetLink, setMeetLink] = useState('');
   const [maxAttendees, setMaxAttendees] = useState('');
   const [allowReplies, setAllowReplies] = useState(true);
+  const [isPublic, setIsPublic] = useState(false);
+  const [attachments, setAttachments] = useState<ThreadAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +52,8 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setTitle(item?.title ?? '');
     setDescription(item?.description ?? '');
     setTags('tags' in (item ?? {}) ? ((item as { tags: string[] }).tags ?? []).join(', ') : '');
+    setIsPublic(Boolean(item?.is_public));
+    setAttachments(item && 'attachments' in item ? item.attachments : []);
     if (kind === 'threads') {
       setType(item && 'category' in item ? item.category : 'question');
       setAllowReplies(item && 'allow_replies' in item ? item.allow_replies : true);
@@ -64,22 +71,41 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     setError(null);
   }, [item, kind, visible]);
 
+  const pickThreadImage = async () => {
+    if (attachments.length >= 5) return setError('You can add up to 5 images.');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') return setError('Photo library permission is required.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: false });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    setUploading(true); setError(null);
+    try {
+      const attachment = await uploadThreadImage(communityId, {
+        uri: asset.uri,
+        name: asset.fileName ?? `thread-image-${Date.now()}.jpg`,
+        type: asset.mimeType ?? 'image/jpeg',
+      });
+      setAttachments((current) => [...current, attachment]);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not upload image.'); }
+    finally { setUploading(false); }
+  };
+
   const submit = async () => {
     if (!title.trim()) return setError('Title is required.');
     const cleanTags = tags.split(',').map((tag) => tag.trim().replace(/^#/, '')).filter(Boolean).slice(0, 3);
     let body: Record<string, unknown>;
     if (kind === 'threads') {
       if (!description.trim()) return setError('Description is required.');
-      body = { title: title.trim(), description: description.trim(), category: type, tags: cleanTags, attachments: 'attachments' in (item ?? {}) ? (item as { attachments: unknown[] }).attachments : [], links: extractLinks(description), allow_replies: allowReplies };
+      body = { title: title.trim(), description: description.trim(), category: type, tags: cleanTags, attachments, links: extractLinks(description), allow_replies: allowReplies, is_public: isPublic };
     } else if (kind === 'resources') {
       if (!/^https?:\/\//i.test(url.trim())) return setError('Enter a URL beginning with http:// or https://.');
-      body = { title: title.trim(), description: description.trim() || null, resource_type: type, url: url.trim(), tags: cleanTags };
+      body = { title: title.trim(), description: description.trim() || null, resource_type: type, url: url.trim(), tags: cleanTags, is_public: isPublic };
     } else {
       const start = parseDateTime(eventDate);
       const end = endDate.trim() ? parseDateTime(endDate) : null;
       if (!start) return setError('Use YYYY-MM-DD HH:MM for the event date.');
       if (endDate.trim() && !end) return setError('Use YYYY-MM-DD HH:MM for the end date.');
-      body = { title: title.trim(), description: description.trim() || null, event_date: start, end_date: end, is_online: isOnline, location: location.trim() || null, meet_link: meetLink.trim() || null, max_attendees: maxAttendees ? Number(maxAttendees) : null, cover_image_url: item && 'cover_image_url' in item ? item.cover_image_url : null };
+      body = { title: title.trim(), description: description.trim() || null, event_date: start, end_date: end, is_online: isOnline, location: location.trim() || null, meet_link: meetLink.trim() || null, max_attendees: maxAttendees ? Number(maxAttendees) : null, cover_image_url: item && 'cover_image_url' in item ? item.cover_image_url : null, is_public: isPublic };
     }
     setSaving(true); setError(null);
     try {
@@ -100,7 +126,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
         <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: colors.border }]}>
           <Pressable onPress={onClose} style={styles.iconButton} accessibilityLabel="Close editor"><Feather name="x" size={24} color={colors.foreground} /></Pressable>
           <Text style={[styles.title, { color: colors.foreground }]}>{item ? 'Edit' : kind === 'resources' ? 'Share' : 'Create'} {labelFor(kind)}</Text>
-          <Pressable onPress={submit} disabled={saving} style={[styles.save, { backgroundColor: colors.primary }]} accessibilityRole="button">
+          <Pressable onPress={submit} disabled={saving || uploading} style={[styles.save, { backgroundColor: colors.primary }]} accessibilityRole="button">
             {saving ? <ActivityIndicator color={colors.primaryForeground} /> : <Text style={[styles.saveText, { color: colors.primaryForeground }]}>Save</Text>}
           </Pressable>
         </View>
@@ -109,6 +135,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
           {kind === 'resources' ? <Field label="URL"><TextInput value={url} onChangeText={setUrl} style={inputStyle} placeholder="https://" placeholderTextColor={colors.foregroundSoft} autoCapitalize="none" keyboardType="url" /></Field> : null}
           <Field label="Title"><TextInput value={title} onChangeText={setTitle} style={inputStyle} maxLength={120} placeholder={`Give your ${labelFor(kind).toLowerCase()} a title`} placeholderTextColor={colors.foregroundSoft} /></Field>
           <Field label="Description"><TextInput value={description} onChangeText={setDescription} style={[inputStyle, styles.multiline]} multiline maxLength={kind === 'resources' ? 2000 : kind === 'events' ? 5000 : 10000} textAlignVertical="top" placeholder="Add helpful details" placeholderTextColor={colors.foregroundSoft} /></Field>
+          {kind === 'threads' ? <Field label="Images (up to 5)"><View style={styles.imageList}>{attachments.filter((attachment) => attachment.type.startsWith('image/')).map((attachment) => <View key={attachment.url} style={styles.imagePreviewShell}><Image source={{ uri: attachment.url }} style={styles.imagePreview} /><Pressable onPress={() => setAttachments((current) => current.filter((entry) => entry.url !== attachment.url))} style={[styles.removeImage, { backgroundColor: colors.surface }]} accessibilityLabel="Remove image"><Feather name="x" size={16} color={colors.foreground} /></Pressable></View>)}</View><Pressable onPress={pickThreadImage} disabled={uploading || attachments.length >= 5} style={[styles.addImage, { borderColor: colors.border, backgroundColor: colors.surface }]}>{uploading ? <ActivityIndicator color={colors.primary} /> : <Feather name="image" size={19} color={colors.primary} />}<Text style={[styles.addImageText, { color: colors.primary }]}>{uploading ? 'Uploading image…' : 'Add image'}</Text></Pressable></Field> : null}
           {choices.length ? <Field label={kind === 'threads' ? 'Category' : 'Type'}><View style={styles.chips}>{choices.map((choice) => <Pressable key={choice} onPress={() => setType(choice)} style={[styles.chip, { borderColor: type === choice ? colors.primary : colors.border, backgroundColor: type === choice ? colors.primarySoft : colors.surface }]}><Text style={[styles.chipText, { color: type === choice ? colors.primary : colors.mutedForeground }]}>{choice.replace('_', ' ')}</Text></Pressable>)}</View></Field> : null}
           {kind !== 'events' ? <Field label="Tags (up to 3, comma separated)"><TextInput value={tags} onChangeText={setTags} style={inputStyle} placeholder="design, research" placeholderTextColor={colors.foregroundSoft} /></Field> : null}
           {kind === 'threads' ? <Toggle label="Allow replies" value={allowReplies} onValueChange={setAllowReplies} colors={colors} /> : null}
@@ -119,6 +146,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
             <Field label={isOnline ? 'Meeting link' : 'Location'}><TextInput value={isOnline ? meetLink : location} onChangeText={isOnline ? setMeetLink : setLocation} style={inputStyle} autoCapitalize="none" placeholder={isOnline ? 'https://meet.example.com' : 'Venue or address'} placeholderTextColor={colors.foregroundSoft} /></Field>
             <Field label="Maximum attendees (optional)"><TextInput value={maxAttendees} onChangeText={setMaxAttendees} style={inputStyle} keyboardType="number-pad" placeholder="No limit" placeholderTextColor={colors.foregroundSoft} /></Field>
           </> : null}
+          <Toggle label="Share publicly" description="Also show this post in the public community feed." value={isPublic} onValueChange={setIsPublic} colors={colors} />
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
@@ -126,7 +154,7 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { const colors = useColors(); return <View style={styles.field}><Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>{children}</View>; }
-function Toggle({ label, value, onValueChange, colors }: { label: string; value: boolean; onValueChange: (v: boolean) => void; colors: ReturnType<typeof useColors> }) { return <View style={styles.toggle}><Text style={[styles.toggleLabel, { color: colors.foreground }]}>{label}</Text><Switch value={value} onValueChange={onValueChange} trackColor={{ false: colors.border, true: colors.primary }} /></View>; }
+function Toggle({ label, description, value, onValueChange, colors }: { label: string; description?: string; value: boolean; onValueChange: (v: boolean) => void; colors: ReturnType<typeof useColors> }) { return <View style={styles.toggle}><View style={styles.toggleCopy}><Text style={[styles.toggleLabel, { color: colors.foreground }]}>{label}</Text>{description ? <Text style={[styles.toggleDescription, { color: colors.mutedForeground }]}>{description}</Text> : null}</View><Switch value={value} onValueChange={onValueChange} trackColor={{ false: colors.border, true: colors.primary }} /></View>; }
 function labelFor(kind: ContentKind) { return kind === 'threads' ? 'Thread' : kind === 'events' ? 'Event' : 'Resource'; }
 function extractLinks(text: string) { return [...new Set(text.match(/https?:\/\/[^\s<>"]+/g) ?? [])]; }
 function toLocalDateTime(iso: string) { const d = new Date(iso); const pad = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -139,5 +167,6 @@ const styles = StyleSheet.create({
   form: { padding: 20, gap: 20 }, field: { gap: 8 }, label: { fontFamily: 'Geist_500Medium', fontSize: 13 },
   input: { minHeight: 48, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, fontFamily: 'Geist_400Regular', fontSize: 15 }, multiline: { minHeight: 124, paddingTop: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, chip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 }, chipText: { fontFamily: 'Geist_500Medium', fontSize: 13, textTransform: 'capitalize' },
-  toggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, toggleLabel: { fontFamily: 'Geist_500Medium', fontSize: 15 }, error: { fontFamily: 'Geist_500Medium', fontSize: 14, lineHeight: 20 },
+  toggle: { minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }, toggleCopy: { flex: 1, gap: 3 }, toggleLabel: { fontFamily: 'Geist_500Medium', fontSize: 15 }, toggleDescription: { fontFamily: 'Geist_400Regular', fontSize: 12, lineHeight: 17 }, error: { fontFamily: 'Geist_500Medium', fontSize: 14, lineHeight: 20 },
+  imageList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, imagePreviewShell: { width: 86, height: 86 }, imagePreview: { width: '100%', height: '100%', borderRadius: 10 }, removeImage: { position: 'absolute', right: 4, top: 4, width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, addImage: { minHeight: 48, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, addImageText: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
 });
