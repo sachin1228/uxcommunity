@@ -99,7 +99,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
         <OptionsMenu isOwner={isOwner} onEdit={onEdit} onDelete={onDelete} />
       </View>
       {!thread ? <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text> : null}
-      {!thread && item.description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text> : null}
+      {thread ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{threadDescription(thread.title, thread.description)}</Text> : item.description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text> : null}
       {images.length ? <ThreadImages images={images} /> : null}
       {thread ? <View style={styles.tags}><Tag text={thread.category} />{thread.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
       {resource ? <View style={styles.tags}><Tag text={resource.resource_type.replace('_', ' ')} />{resource.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
