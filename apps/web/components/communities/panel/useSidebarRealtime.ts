@@ -2,7 +2,11 @@
 
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import { sidebarStore, type CachedSidebarCommunity } from "@/lib/communities/cache";
+import {
+  isSidebarReactionStale,
+  sidebarStore,
+  type CachedSidebarCommunity,
+} from "@/lib/communities/cache";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -107,6 +111,16 @@ export function useSidebarRealtime({
       row: ReactionRow,
       message?: ReactionMessage | null,
     ) {
+      if (
+        isSidebarReactionStale(
+          row.community_id,
+          row.message_id,
+          row.created_at,
+        )
+      ) {
+        return;
+      }
+
       const isOwn = row.user_id === userId;
 
       setCommunities((prev) =>

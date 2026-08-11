@@ -3,7 +3,12 @@
 import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { patchSidebarReaction, sidebarStore, msgCache } from "@/lib/communities/cache";
+import {
+  markSidebarReactionRemoved,
+  patchSidebarReaction,
+  sidebarStore,
+  msgCache,
+} from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
@@ -229,6 +234,9 @@ export function CommunityChat({
         : message.image_url
           ? "📷 Photo"
           : "a message";
+      if (isRemoving) {
+        markSidebarReactionRemoved(communityId, msgId);
+      }
       patchSidebarReaction(
         communityId,
         isRemoving
@@ -413,7 +421,7 @@ export function CommunityChat({
     highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
   }, [scrollContainerRef]);
 
-  // ── Realtime subscription ─────────────────────────────────────────────────
+  // ── Realtime subscription ──���──────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     fetchMessages,
