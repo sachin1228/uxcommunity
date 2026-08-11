@@ -14,6 +14,7 @@ import {
   Reaction,
 } from '@/lib/communities';
 import { useAuth } from '@/context/AuthContext';
+import { playNotificationSound } from '@/lib/notificationSound';
 
 export function useChatMessages(communityId: string) {
   const { user } = useAuth();
@@ -109,9 +110,10 @@ export function useChatMessages(communityId: string) {
               },
             ];
           });
-          // Mark read since user is in the chat
+          // Mark read since user is in the chat, and chime for incoming messages
           if (row.user_id !== user?.id) {
             markRead(communityId).catch(() => {});
+            playNotificationSound();
           }
         }
       )
