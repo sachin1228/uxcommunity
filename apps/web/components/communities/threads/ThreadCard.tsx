@@ -111,7 +111,11 @@ export function ThreadCard({
   const voteRequestRunningRef = useRef(false);
   const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
   const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
-  const [savePending, setSavePending] = useState(false);
+  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
+  const confirmedSaveRef = useRef(thread.user_saved);
+  const desiredSaveRef = useRef(thread.user_saved);
+  const saveRequestRunningRef = useRef(false);
+  const displayedSaved = optimisticSaved ?? thread.user_saved;
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting]       = useState(false);
@@ -142,25 +146,42 @@ export function ThreadCard({
     }
   }
 
-  async function handleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    if (savePending) return;
-    const newSaved = !thread.user_saved;
-    onSaveChanged(thread.id, newSaved);
-    setSavePending(true);
+  async function flushSaveIntent() {
+    if (saveRequestRunningRef.current) return;
+
+    saveRequestRunningRef.current = true;
+
     try {
-      const response = await fetch(
-        `/api/communities/${communityId}/threads/${thread.id}/save`,
-        { method: "POST" },
-      );
-      if (!response.ok) {
-        onSaveChanged(thread.id, thread.user_saved);
+      // Serialize toggles so rapid save/unsave clicks remain instant while the
+      // server catches up to the user's latest intent.
+      while (confirmedSaveRef.current !== desiredSaveRef.current) {
+        const response = await fetch(
+          `/api/communities/${communityId}/threads/${thread.id}/save`,
+          { method: "POST" },
+        );
+        if (!response.ok) throw new Error("Failed to update save");
+
+        const result = (await response.json()) as { saved: boolean };
+        confirmedSaveRef.current = result.saved;
       }
     } catch {
-      onSaveChanged(thread.id, thread.user_saved);
+      desiredSaveRef.current = confirmedSaveRef.current;
+      setOptimisticSaved(confirmedSaveRef.current);
+      onSaveChanged(thread.id, confirmedSaveRef.current);
     } finally {
-      setSavePending(false);
+      saveRequestRunningRef.current = false;
+      setOptimisticSaved(null);
     }
+  }
+
+  function handleSave(e: React.MouseEvent) {
+    e.preventDefault();
+
+    const newSaved = !desiredSaveRef.current;
+    desiredSaveRef.current = newSaved;
+    setOptimisticSaved(newSaved);
+    onSaveChanged(thread.id, newSaved);
+    void flushSaveIntent();
   }
 
   async function flushVoteIntent() {
@@ -519,8 +540,8 @@ export function ThreadCard({
         </button>
 
         {/* Comments */}
-        <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-subtle">
-          <MessageSquare size={20} strokeWidth={2} className="text-white" />
+        <span className="inline-flex items-center gap-1.5 font-body text-xs text-white">
+          <MessageSquare size={20} strokeWidth={2} />
           {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
         </span>
 
@@ -530,14 +551,16 @@ export function ThreadCard({
         {!isDetail && (
           <button
             type="button"
-            aria-label={thread.user_saved ? "Unsave thread" : "Save thread"}
+            aria-label={displayedSaved ? "Unsave thread" : "Save thread"}
+            aria-pressed={displayedSaved}
             onClick={handleSave}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-white transition-colors"
+            className="group/save flex h-7 w-7 items-center justify-center rounded-md text-white"
           >
             <Bookmark
               size={20}
               strokeWidth={2}
-              fill={thread.user_saved ? "currentColor" : "none"}
+              fill={displayedSaved ? "currentColor" : "none"}
+              className="transition-transform duration-150 ease-out group-hover/save:scale-110"
             />
           </button>
         )}
