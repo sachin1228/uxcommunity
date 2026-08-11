@@ -87,7 +87,6 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const date = event ? new Date(event.event_date) : new Date(item.created_at);
   const images = thread?.attachments.filter((attachment) => attachment.type.startsWith('image/')) ?? [];
-  const description = thread ? threadDescription(thread.title, thread.description) : item.description;
   const previewImage = useResourcePreview(resource?.url);
 
   return <Pressable onPress={onOpen} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} accessibilityRole="button" accessibilityLabel={`View ${singular(kind)}: ${item.title}`}>
@@ -100,7 +99,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
         <OptionsMenu isOwner={isOwner} onEdit={onEdit} onDelete={onDelete} />
       </View>
       <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
-      {description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{description}</Text> : null}
+      {!thread && item.description ? <Text style={[styles.description, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text> : null}
       {images.length ? <ThreadImages images={images} /> : null}
       {thread ? <View style={styles.tags}><Tag text={thread.category} />{thread.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
       {resource ? <View style={styles.tags}><Tag text={resource.resource_type.replace('_', ' ')} />{resource.tags.map((tag) => <Tag key={tag} text={`#${tag}`} />)}</View> : null}
