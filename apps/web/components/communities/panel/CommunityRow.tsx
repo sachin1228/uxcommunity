@@ -105,7 +105,7 @@ export function CommunityRow({
           </div>
 
           {/* Preview line */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-start gap-1.5">
             {typingText ? (
               /* Typing — highest priority */
               <p className="font-body text-[13px] text-accent truncate flex-1">
@@ -124,7 +124,7 @@ export function CommunityRow({
 
             ) : preview ? (
               /* Standard message preview */
-              <p className="font-body text-[13px] truncate flex-1 text-foreground-muted">
+              <p className="font-body text-[13px] leading-5 truncate flex-1 text-foreground-muted">
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}
