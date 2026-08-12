@@ -2,34 +2,434 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bookmark, Box, CalendarClock, ChevronDown, CircleEllipsis, ExternalLink, Heart, Image, LayoutGrid, MessageCircle, Monitor, MoreHorizontal, PenTool, Pencil, Play, Plus, Tag, Trash2 } from "lucide-react";
+import {
+  Bookmark,
+  Box,
+  CalendarClock,
+  ChevronDown,
+  CircleEllipsis,
+  ExternalLink,
+  Heart,
+  Image,
+  LayoutGrid,
+  MessageCircle,
+  Monitor,
+  MoreHorizontal,
+  PenTool,
+  Pencil,
+  Play,
+  Plus,
+  Tag,
+  Trash2,
+} from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
-import { SHOWCASE_CATEGORIES, SHOWCASE_TYPES, type ShowcaseCategory, type ShowcasePost } from "./types";
+import {
+  SHOWCASE_CATEGORIES,
+  SHOWCASE_TYPES,
+  type ShowcaseCategory,
+  type ShowcasePost,
+} from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
-const cache = new Map<string, { posts: ShowcasePost[]; at: number }>(); const STALE = 30_000;
+const cache = new Map<string, { posts: ShowcasePost[]; at: number }>();
+const STALE = 30_000;
 
-export function ShowcaseView({ communityId, currentUserId }: { communityId: string; currentUserId: string }) {
-  const router = useRouter(); const cached = cache.get(communityId);
-  const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []); const [loading, setLoading] = useState(!cached); const [error, setError] = useState<string | null>(null);
-  const [category, setCategory] = useState<ShowcaseCategory | "all">("all"); const [sort, setSort] = useState<"newest" | "popular">("newest"); const [creating, setCreating] = useState(false); const [editing, setEditing] = useState<ShowcasePost | null>(null); const [menu, setMenu] = useState<string | null>(null); const menuRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { const hit = cache.get(communityId); if (hit && Date.now() - hit.at < STALE) return; fetch(`/api/communities/${communityId}/showcase`).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error); cache.set(communityId, { posts: data.posts, at: Date.now() }); setPosts(data.posts); }).catch(() => setError("We couldn't load the showcase.")).finally(() => setLoading(false)); }, [communityId]);
-  useEffect(() => { if (!menu) return; const close = (event: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenu(null); }; document.addEventListener("mousedown", close); return () => document.removeEventListener("mousedown", close); }, [menu]);
-  const visible = useMemo(() => posts.filter((post) => category === "all" || post.category === category).sort((a, b) => sort === "popular" ? b.like_count + b.comment_count - a.like_count - a.comment_count : Date.parse(b.created_at) - Date.parse(a.created_at)), [posts, category, sort]);
-  function replacePosts(next: ShowcasePost[]) { setPosts(next); }
-  function patch(id: string, change: Partial<ShowcasePost>) { replacePosts(posts.map((post) => post.id === id ? { ...post, ...change } : post)); }
-  async function toggle(post: ShowcasePost, action: "like" | "save") { const key = action === "like" ? "user_liked" : "user_saved"; const active = post[key]; patch(post.id, { [key]: !active, ...(action === "like" ? { like_count: post.like_count + (active ? -1 : 1) } : {}) }); const response = await fetch(`/api/communities/${communityId}/showcase/${post.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); if (!response.ok) patch(post.id, { [key]: active, ...(action === "like" ? { like_count: post.like_count } : {}) }); }
-  async function remove(post: ShowcasePost) { if (!confirm("Delete this showcase post? This cannot be undone.")) return; const response = await fetch(`/api/communities/${communityId}/showcase/${post.id}`, { method: "DELETE" }); if (response.ok) replacePosts(posts.filter((item) => item.id !== post.id)); }
-  const open = (post: ShowcasePost) => router.push(`/dashboard/communities/${communityId}/showcase/${post.id}`);
-  return <div className="flex-1 overflow-y-auto bg-background">
-    <div className={`${communityFeedLayout.content} ${!loading && posts.length ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}><div className={communityFeedLayout.pageHeaderMain}><div className="min-w-0"><h2 className="font-display text-xl font-semibold text-foreground">Showcase</h2><p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">Share what you&apos;re making, unpack your process, and get useful feedback from fellow designers.</p></div><button type="button" onClick={() => setCreating(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"><Plus size={14}/>Share your work</button></div>
-      {!loading && posts.length > 0 && <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>{SHOWCASE_CATEGORIES.map((item) => { const Icon = { all: LayoutGrid, ui_ux: Monitor, branding: Tag, illustration: PenTool, motion: Play, product: Box, other: CircleEllipsis }[item.value]; return <button key={item.value} type="button" onClick={() => setCategory(item.value)} aria-pressed={category === item.value} className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs ${category === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted"}`}><Icon size={14}/>{item.label}</button>; })}<div className="relative shrink-0"><CalendarClock size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"/><select value={sort} onChange={(event) => setSort(event.target.value as "newest" | "popular")} aria-label="Sort showcase posts" className="h-8 appearance-none rounded-lg border border-border bg-surface-raised py-1 pl-8 pr-8 font-body text-xs text-foreground"><option value="newest">Newest first</option><option value="popular">Most discussed</option></select><ChevronDown size={14} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"/></div></div>}
+export function ShowcaseView({
+  communityId,
+  currentUserId,
+}: {
+  communityId: string;
+  currentUserId: string;
+}) {
+  const router = useRouter();
+  const cached = cache.get(communityId);
+  const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []);
+  const [loading, setLoading] = useState(!cached);
+  const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<ShowcaseCategory | "all">("all");
+  const [sort, setSort] = useState<"newest" | "popular">("newest");
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<ShowcasePost | null>(null);
+  const [menu, setMenu] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const hit = cache.get(communityId);
+    if (hit && Date.now() - hit.at < STALE) return;
+
+    fetch(`/api/communities/${communityId}/showcase`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error);
+        cache.set(communityId, { posts: data.posts, at: Date.now() });
+        setPosts(data.posts);
+      })
+      .catch(() => setError("We couldn't load the showcase."))
+      .finally(() => setLoading(false));
+  }, [communityId]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menu]);
+
+  const visible = useMemo(
+    () =>
+      posts
+        .filter((post) => category === "all" || post.category === category)
+        .sort((a, b) =>
+          sort === "popular"
+            ? b.like_count + b.comment_count - a.like_count - a.comment_count
+            : Date.parse(b.created_at) - Date.parse(a.created_at),
+        ),
+    [posts, category, sort],
+  );
+
+  function replacePosts(next: ShowcasePost[]) {
+    setPosts(next);
+  }
+
+  function patch(id: string, change: Partial<ShowcasePost>) {
+    replacePosts(
+      posts.map((post) => (post.id === id ? { ...post, ...change } : post)),
+    );
+  }
+
+  async function toggle(post: ShowcasePost, action: "like" | "save") {
+    const key = action === "like" ? "user_liked" : "user_saved";
+    const active = post[key];
+    patch(post.id, {
+      [key]: !active,
+      ...(action === "like"
+        ? { like_count: post.like_count + (active ? -1 : 1) }
+        : {}),
+    });
+
+    const response = await fetch(
+      `/api/communities/${communityId}/showcase/${post.id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      },
+    );
+
+    if (!response.ok) {
+      patch(post.id, {
+        [key]: active,
+        ...(action === "like" ? { like_count: post.like_count } : {}),
+      });
+    }
+  }
+
+  async function remove(post: ShowcasePost) {
+    if (!confirm("Delete this showcase post? This cannot be undone.")) return;
+    const response = await fetch(
+      `/api/communities/${communityId}/showcase/${post.id}`,
+      { method: "DELETE" },
+    );
+    if (response.ok) {
+      replacePosts(posts.filter((item) => item.id !== post.id));
+    }
+  }
+
+  const open = (post: ShowcasePost) =>
+    router.push(`/dashboard/communities/${communityId}/showcase/${post.id}`);
+
+  return (
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div
+        className={`${communityFeedLayout.content} ${
+          !loading && posts.length
+            ? communityFeedLayout.pageHeaderWithFilters
+            : communityFeedLayout.pageHeader
+        }`}
+      >
+        <div className={communityFeedLayout.pageHeaderMain}>
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-semibold text-foreground">
+              Showcase
+            </h2>
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              Share what you&apos;re making, unpack your process, and get useful
+              feedback from fellow designers.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+          >
+            <Plus size={14} />
+            Share your work
+          </button>
+        </div>
+        {!loading && posts.length > 0 && (
+          <div
+            className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}
+          >
+            {SHOWCASE_CATEGORIES.map((item) => {
+              const Icon = {
+                all: LayoutGrid,
+                ui_ux: Monitor,
+                branding: Tag,
+                illustration: PenTool,
+                motion: Play,
+                product: Box,
+                other: CircleEllipsis,
+              }[item.value];
+
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setCategory(item.value)}
+                  aria-pressed={category === item.value}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs ${
+                    category === item.value
+                      ? "border-accent bg-accent/5 text-accent"
+                      : "border-border text-foreground-muted"
+                  }`}
+                >
+                  <Icon size={14} />
+                  {item.label}
+                </button>
+              );
+            })}
+            <div className="relative shrink-0">
+              <CalendarClock
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
+              />
+              <select
+                value={sort}
+                onChange={(event) =>
+                  setSort(event.target.value as "newest" | "popular")
+                }
+                aria-label="Sort showcase posts"
+                className="h-8 appearance-none rounded-lg border border-border bg-surface-raised py-1 pl-8 pr-8 font-body text-xs text-foreground"
+              >
+                <option value="newest">Newest first</option>
+                <option value="popular">Most discussed</option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={communityFeedLayout.content}>
+        {loading ? (
+          <p className="py-24 text-center font-body text-sm text-foreground-muted">
+            Loading showcase…
+          </p>
+        ) : error ? (
+          <p className="py-24 text-center font-body text-sm text-foreground-muted">
+            {error}
+          </p>
+        ) : !visible.length ? (
+          <div className={communityFeedLayout.emptyState}>
+            <Image size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>
+              No showcase posts yet
+            </h3>
+            <p className={communityFeedLayout.emptyDescription}>
+              Be the first to share your work.
+            </p>
+          </div>
+        ) : (
+          <div>
+            {visible.map((post, index) => (
+              <article
+                key={post.id}
+                tabIndex={0}
+                role="link"
+                onClick={() => open(post)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") open(post);
+                }}
+                className={`${communityFeedLayout.row} cursor-pointer ${
+                  index === visible.length - 1
+                    ? ""
+                    : communityFeedLayout.dividerBottom
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                    <PostAuthorMeta
+                      name={post.author.name}
+                      avatarUrl={post.author.avatar_url}
+                      createdAt={post.created_at}
+                    />
+                    <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
+                      {
+                        SHOWCASE_TYPES.find(
+                          (item) => item.value === post.post_type,
+                        )?.label
+                      }
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
+                      {
+                        SHOWCASE_CATEGORIES.find(
+                          (item) => item.value === post.category,
+                        )?.label
+                      }
+                    </span>
+                    {post.user_id === currentUserId && (
+                      <div
+                        className="relative"
+                        ref={menu === post.id ? menuRef : undefined}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          aria-label="Showcase options"
+                          onClick={() =>
+                            setMenu(menu === post.id ? null : post.id)
+                          }
+                          className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+                        {menu === post.id && (
+                          <div className="absolute right-0 top-8 z-20 min-w-36 rounded-lg border border-border bg-surface py-1 shadow-lg">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditing(post);
+                                setMenu(null);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+                            >
+                              <Pencil size={12} />
+                              Edit showcase
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void remove(post)}
+                              className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
+                            >
+                              <Trash2 size={12} />
+                              Delete showcase
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">
+                  {post.title}
+                </h2>
+                {post.description && (
+                  <p className="mt-1.5 line-clamp-3 font-body text-xs leading-relaxed text-foreground-muted">
+                    {post.description}
+                  </p>
+                )}
+                <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
+                  <img
+                    src={post.image_url}
+                    alt={`Preview of ${post.title}`}
+                    className="max-h-[480px] w-full object-cover"
+                  />
+                </div>
+
+                <div
+                  className="mt-3 flex items-center gap-4"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => void toggle(post, "like")}
+                    aria-pressed={post.user_liked}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <Heart
+                      size={20}
+                      fill={post.user_liked ? "currentColor" : "none"}
+                      className={
+                        post.user_liked
+                          ? "text-red-500"
+                          : "text-foreground"
+                      }
+                    />
+                    <span className="font-body text-sm font-semibold text-foreground">
+                      {post.like_count}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => open(post)}
+                    className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
+                  >
+                    <MessageCircle size={20} />
+                    {post.comment_count}{" "}
+                    {post.comment_count === 1 ? "comment" : "comments"}
+                  </button>
+                  <div className="flex-1" />
+                  {post.project_url && (
+                    <a
+                      href={post.project_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent"
+                    >
+                      View project
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void toggle(post, "save")}
+                    aria-pressed={post.user_saved}
+                    aria-label={
+                      post.user_saved ? "Unsave showcase" : "Save showcase"
+                    }
+                  >
+                    <Bookmark
+                      size={20}
+                      fill={post.user_saved ? "currentColor" : "none"}
+                    />
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {creating && (
+        <CreateShowcaseModal
+          communityId={communityId}
+          onClose={() => setCreating(false)}
+          onCreated={(post) => replacePosts([post, ...posts])}
+        />
+      )}
+      {editing && (
+        <CreateShowcaseModal
+          communityId={communityId}
+          post={editing}
+          onClose={() => setEditing(null)}
+          onUpdated={(post) =>
+            replacePosts(
+              posts.map((item) => (item.id === post.id ? post : item)),
+            )
+          }
+        />
+      )}
     </div>
-    <div className={communityFeedLayout.content}>{loading ? <p className="py-24 text-center font-body text-sm text-foreground-muted">Loading showcase…</p> : error ? <p className="py-24 text-center font-body text-sm text-foreground-muted">{error}</p> : !visible.length ? <div className={communityFeedLayout.emptyState}><Image size={24} className={communityFeedLayout.emptyIcon}/><h3 className={communityFeedLayout.emptyTitle}>No showcase posts yet</h3><p className={communityFeedLayout.emptyDescription}>Be the first to share your work.</p></div> : <div>{visible.map((post, index) => <article key={post.id} tabIndex={0} role="link" onClick={() => open(post)} onKeyDown={(event) => { if (event.key === "Enter") open(post); }} className={`${communityFeedLayout.row} cursor-pointer ${index === visible.length - 1 ? "" : communityFeedLayout.dividerBottom}`}>
-      <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3">{post.author.avatar_url ? <img src={post.author.avatar_url} alt={post.author.name} className="size-10 rounded-full object-cover"/> : <div className="flex size-10 items-center justify-center rounded-full bg-accent/15 font-body text-sm font-semibold text-accent">{post.author.name.slice(0, 1)}</div>}<div><p className="font-body text-[15px] font-semibold text-foreground">{post.author.name}</p><p className="font-body text-[11px] text-foreground-subtle">{SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label}</p></div></div><div className="flex items-center gap-2"><span className="rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">{SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label}</span>{post.user_id === currentUserId && <div className="relative" ref={menu === post.id ? menuRef : undefined} onClick={(event) => event.stopPropagation()}><button type="button" aria-label="Showcase options" onClick={() => setMenu(menu === post.id ? null : post.id)} className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"><MoreHorizontal size={16}/></button>{menu === post.id && <div className="absolute right-0 top-8 z-20 min-w-36 rounded-lg border border-border bg-surface py-1 shadow-lg"><button type="button" onClick={() => { setEditing(post); setMenu(null); }} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"><Pencil size={12}/>Edit showcase</button><button type="button" onClick={() => void remove(post)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"><Trash2 size={12}/>Delete showcase</button></div>}</div>}</div></div>
-      <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">{post.title}</h2>{post.description && <p className="mt-1.5 line-clamp-3 font-body text-xs leading-relaxed text-foreground-muted">{post.description}</p>}<div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised"><img src={post.image_url} alt={`Preview of ${post.title}`} className="max-h-[480px] w-full object-cover"/></div>
-      <div className="mt-3 flex items-center gap-4" onClick={(event) => event.stopPropagation()}><button type="button" onClick={() => void toggle(post, "like")} aria-pressed={post.user_liked} className="inline-flex items-center gap-2"><Heart size={20} fill={post.user_liked ? "currentColor" : "none"} className={post.user_liked ? "text-red-500" : "text-foreground"}/><span className="font-body text-sm font-semibold text-foreground">{post.like_count}</span></button><button type="button" onClick={() => open(post)} className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"><MessageCircle size={20}/>{post.comment_count} {post.comment_count === 1 ? "comment" : "comments"}</button><div className="flex-1"/>{post.project_url && <a href={post.project_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent">View project<ExternalLink size={14}/></a>}<button type="button" onClick={() => void toggle(post, "save")} aria-pressed={post.user_saved} aria-label={post.user_saved ? "Unsave showcase" : "Save showcase"}><Bookmark size={20} fill={post.user_saved ? "currentColor" : "none"}/></button></div>
-    </article>)}</div>}</div>
-    {creating && <CreateShowcaseModal communityId={communityId} onClose={() => setCreating(false)} onCreated={(post) => replacePosts([post, ...posts])}/>} {editing && <CreateShowcaseModal communityId={communityId} post={editing} onClose={() => setEditing(null)} onUpdated={(post) => replacePosts(posts.map((item) => item.id === post.id ? post : item))}/>}
-  </div>;
+  );
 }
