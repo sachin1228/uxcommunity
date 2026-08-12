@@ -366,7 +366,7 @@ export function ThreadDetailClient({
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
-        <div className="border-y border-border py-6">
+        <div className={`${communityFeedLayout.dividerY} py-6`}>
           <ThreadCard
             thread={thread}
             currentUserId={currentUserId}

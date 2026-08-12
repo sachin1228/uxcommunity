@@ -207,6 +207,7 @@ export function EventsView({
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
                       onSaveChanged={handleSaveChanged}
+                      edgeToEdgeDivider
                     />
                   ))}
                 </div>
@@ -228,6 +229,7 @@ export function EventsView({
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
                       onSaveChanged={handleSaveChanged}
+                      edgeToEdgeDivider
                     />
                   ))}
                 </div>

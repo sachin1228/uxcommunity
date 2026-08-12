@@ -6,6 +6,7 @@ import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { communityFeedLayout } from "../feed-layout";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -64,9 +65,11 @@ interface EventCardProps {
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
   /** Override the link destination (e.g. public standalone detail page). */
   detailHref?: string;
+  /** Extends the row divider to the bounds of the scrollable center column. */
+  edgeToEdgeDivider?: boolean;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref }: EventCardProps) {
+export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref, edgeToEdgeDivider = false }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
@@ -180,7 +183,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
 
   return (
     <>
-      <article className="group border-b border-border py-5">
+      <article className={`group py-5 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
         <Link href={eventHref} className="block">
           <div className="flex gap-4">
             {/* Cover image / gradient — left panel */}

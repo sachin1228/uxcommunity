@@ -616,7 +616,7 @@ export function ThreadCard({
           </Link>
         </article>
       ) : (
-        <article className={`group ${isLast ? "" : "border-b border-border"}`}>
+        <article className={`group ${isLast ? "" : communityFeedLayout.dividerBottom}`}>
           <Link href={threadHref} className={`block ${communityFeedLayout.row}`}>
             <div className={communityFeedLayout.content}>
               {innerContent}

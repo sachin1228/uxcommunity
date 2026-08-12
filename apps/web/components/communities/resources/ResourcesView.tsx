@@ -240,6 +240,7 @@ export function ResourcesView({
                 onSaveChanged={handleSaveChanged}
                 onBookmarkChanged={handleBookmarkChanged}
                 onDeleted={handleDeleted}
+                edgeToEdgeDivider
               />
             ))}
           </div>

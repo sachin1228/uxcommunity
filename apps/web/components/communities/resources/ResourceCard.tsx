@@ -10,6 +10,7 @@ import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { communityFeedLayout } from "../feed-layout";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
@@ -75,6 +76,8 @@ interface ResourceCardProps {
   onSaveChanged: (resourceId: string, saved: boolean, newCount: number) => void;
   onBookmarkChanged: (resourceId: string, bookmarked: boolean, newCount: number) => void;
   onDeleted: (resourceId: string) => void;
+  /** Extends the row divider to the bounds of the scrollable center column. */
+  edgeToEdgeDivider?: boolean;
 }
 
 export function ResourceCard({
@@ -85,6 +88,7 @@ export function ResourceCard({
   onSaveChanged,
   onBookmarkChanged,
   onDeleted,
+  edgeToEdgeDivider = false,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
   const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
@@ -231,7 +235,7 @@ export function ResourceCard({
 
   return (
     <>
-      <article className="group cursor-pointer border-b border-border py-6">
+      <article className={`group cursor-pointer py-6 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href={resource.url} target="_blank" rel="noopener noreferrer">
 

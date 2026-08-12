@@ -370,7 +370,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
         <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
 
           {/* Resource card */}
-          <div className="border-y border-border py-6">
+          <div className={`${communityFeedLayout.dividerY} py-6`}>
             {/* Top row: type badge + actions */}
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[10px] text-foreground-muted">
