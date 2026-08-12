@@ -5,7 +5,7 @@
 export default function ThreadDetailLoading() {
   return (
     <div className="flex-1 overflow-y-auto animate-pulse">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <div className="mx-auto w-full max-w-4xl px-5 py-6 md:px-8">
 
         {/* Back nav */}
         <div className="mb-5 h-3 w-40 rounded bg-surface-raised" />
