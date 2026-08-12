@@ -28,6 +28,7 @@ import { ThreadsView } from "./threads/ThreadsView";
 import { EventsView } from "./events/EventsView";
 import { ResourcesView } from "./resources/ResourcesView";
 import { MembersView } from "./members/MembersView";
+import { ShowcaseView } from "./showcase/ShowcaseView";
 import { CommunitySettingsView } from "./CommunitySettingsView";
 import { Modal } from "@/components/ui/Modal";
 import { useChatData } from "./chat/useChatData";
@@ -582,7 +583,7 @@ export function CommunityChat({
     : null);
 
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "events", "resources"]), "members"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "showcase", "threads", "events", "resources"]), "showcase", "members"]).has(activeTab)
       ? "chat"
       : activeTab;
 
@@ -643,7 +644,9 @@ export function CommunityChat({
             />
           )}
         </Modal>
-        {renderedTab === "threads" ? (
+        {renderedTab === "showcase" ? (
+          <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
+        ) : renderedTab === "threads" ? (
           <ThreadsView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "events" ? (
           <EventsView communityId={communityId} currentUserId={currentUserId} />

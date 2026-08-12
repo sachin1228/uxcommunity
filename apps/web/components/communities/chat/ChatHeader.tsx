@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { TYPE_EMOJI } from "./chatUtils";
 
@@ -26,8 +26,8 @@ interface ChatHeaderProps {
   onSettingsClick?: () => void;
 }
 
-export type ChatTab = "chat" | "threads" | "events" | "resources" | "members";
-const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "events", "resources", "members"];
+export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members";
+const DEFAULT_TABS: ChatTab[] = ["chat", "showcase", "threads", "events", "resources", "members"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -156,7 +156,7 @@ export function ChatHeader({
   }
 
   const visibleTabs = community
-    ? DEFAULT_TABS.filter((tab) => tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
     : DEFAULT_TABS;
 
   return (
@@ -268,9 +268,10 @@ export function ChatHeader({
                 </div>
               </div>
             </div>
-            <nav className="flex items-center gap-5" aria-label="Community views">
+            <nav className="flex items-center gap-1 overflow-x-auto md:gap-3" aria-label="Community views">
               {([
                 ["chat",      "Chat",      MessageCircle],
+                ["showcase",  "Showcase",  Sparkles],
                 ["threads",   "Threads",   MessagesSquare],
                 ["events",    "Events",    Calendar],
                 ["resources", "Resources", BookMarked],
