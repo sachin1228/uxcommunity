@@ -239,20 +239,6 @@ export function ResourceCard({
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href={resource.url} target="_blank" rel="noopener noreferrer">
 
-          {/* ── OG image ── */}
-          {ogImage && (
-            <div className="h-52 w-full overflow-hidden rounded-xl bg-surface">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={ogImage}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-              />
-            </div>
-          )}
-
-          <div className={ogImage ? "pt-5" : ""}>
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -359,6 +345,18 @@ export function ResourceCard({
             {getDomain(resource.url)}
           </p>
 
+          {/* ── OG image ── */}
+          {ogImage && (
+            <div className="mt-4 h-52 w-full overflow-hidden rounded-xl bg-surface">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ogImage}
+                alt=""
+                className="h-full w-full object-cover"
+                onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
+              />
+            </div>
+          )}
 
           {/* ── Footer: like · bookmark ── */}
           <div className="mt-3 flex items-center gap-4">
@@ -405,7 +403,6 @@ export function ResourceCard({
 
             <div className="flex-1" />
           </div>
-          </div>{/* end p-5 */}
         </a>
       </article>
 

@@ -157,20 +157,18 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
             </div>
           </li>
         ))}
-        {/* Article grid skeleton row */}
-        <li className="border-b border-border">
-          <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${communityFeedLayout.row}`}>
-            {[1, 2].map((item) => (
-              <div key={item} className="rounded-2xl border border-border p-5">
-                <div className="h-32 w-full rounded-xl bg-surface-raised mb-4" />
-                <div className="h-3 w-20 rounded bg-surface-raised mb-3" />
-                <div className="h-4 w-3/4 rounded bg-surface-raised" />
-                <div className="mt-2 space-y-1.5">
-                  <div className="h-3 w-full rounded bg-surface-raised" />
-                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                </div>
-              </div>
-            ))}
+        {/* Resource skeleton row */}
+        <li className={`border-b border-border ${communityFeedLayout.row}`}>
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
+            <div className="h-3 w-28 rounded bg-surface-raised" />
+          </div>
+          <div className="mt-4 h-4 w-3/4 rounded bg-surface-raised" />
+          <div className="mt-2 h-3 w-1/2 rounded bg-surface-raised" />
+          <div className="mt-4 h-52 w-full rounded-xl bg-surface-raised" />
+          <div className="mt-4 flex items-center gap-4">
+            <div className="h-5 w-12 rounded bg-surface-raised" />
+            <div className="h-5 w-12 rounded bg-surface-raised" />
           </div>
         </li>
       </ul>
@@ -269,50 +267,41 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           );
         }
 
-        // ── Resource group — 2-column grid ────────────────────────────────
-        const resources = group.items;
-        const isOdd = resources.length % 2 !== 0;
-        return (
-          <li key={`resources-${gi}`} className={isLastGroup ? "" : "border-b border-border"}>
-            <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${communityFeedLayout.row}`}>
-              {resources.map((res) => (
-                <div key={`resource-${res.id}`} className="overflow-hidden">
-                  {res.community_name && (
-                    <div className="mb-2 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
-                      <span>posted in</span>
-                      {res.community_image ? (
-                        <img
-                          src={res.community_image}
-                          alt={res.community_name}
-                          className="h-4 w-4 rounded-full object-cover shrink-0"
-                        />
-                      ) : (
-                        <div className="h-4 w-4 rounded-full bg-accent/20 shrink-0" />
-                      )}
-                      <span className="text-foreground-muted">{res.community_name}</span>
-                    </div>
+        // ── Resource group — same full-width layout as community resources ──
+        return group.items.map((res, resourceIndex) => {
+          const isLastResource = resourceIndex === group.items.length - 1;
+          const showDivider = !isLastGroup || !isLastResource;
+
+          return (
+            <li key={`resource-${res.id}`} className={communityFeedLayout.gutters}>
+              {res.community_name && (
+                <div className="pt-6 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
+                  <span>posted in</span>
+                  {res.community_image ? (
+                    <img
+                      src={res.community_image}
+                      alt={res.community_name}
+                      className="h-4 w-4 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-4 w-4 shrink-0 rounded-full bg-accent/20" />
                   )}
-                  <ResourceCard
-                    resource={{ ...res, community_id: res.community_id ?? "" }}
-                    currentUserId={currentUserId}
-                    communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
-                    onUpdated={handleResourceUpdated}
-                    onSaveChanged={handleResourceSaveChanged}
-                    onBookmarkChanged={handleResourceBookmarkChanged}
-                    onDeleted={handleResourceDeleted}
-                  />
-                </div>
-              ))}
-              {/* Placeholder for the empty second column when count is odd */}
-              {isOdd && (
-                <div className="rounded-2xl flex flex-col items-center justify-center gap-2 p-8 min-h-[200px]">
-                  <p className="font-body text-sm font-medium text-foreground-muted">More articles coming soon</p>
-                  <p className="font-body text-xs text-foreground-subtle">Check back later for new content.</p>
+                  <span className="text-foreground-muted">{res.community_name}</span>
                 </div>
               )}
-            </div>
-          </li>
-        );
+              <ResourceCard
+                resource={{ ...res, community_id: res.community_id ?? "" }}
+                currentUserId={currentUserId}
+                communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
+                onUpdated={handleResourceUpdated}
+                onSaveChanged={handleResourceSaveChanged}
+                onBookmarkChanged={handleResourceBookmarkChanged}
+                onDeleted={handleResourceDeleted}
+                edgeToEdgeDivider={showDivider}
+              />
+            </li>
+          );
+        });
       })}
     </ul>
   );
