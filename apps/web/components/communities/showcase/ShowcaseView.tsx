@@ -289,7 +289,9 @@ export function ShowcaseView({
         )}
       </div>
 
-      <div className={`${communityFeedLayout.content} ${communityFeedLayout.gutters}`}>
+      <div
+        className={`${communityFeedLayout.content} ${visible.length > 0 ? communityFeedLayout.gutters : ""}`}
+      >
         {loading ? (
           <div className="flex justify-center py-24">
             <Loader2 className="animate-spin text-accent" />
