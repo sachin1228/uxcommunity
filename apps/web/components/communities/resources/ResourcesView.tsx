@@ -134,15 +134,15 @@ export function ResourcesView({
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
         <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-display text-lg font-semibold text-foreground">Resources</h2>
-            <p className="mt-0.5 max-w-xl text-pretty font-body text-xs leading-5 text-foreground-muted">
+            <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
+            <p className="mt-1 max-w-xl text-pretty font-body text-sm text-foreground-muted">
               Figma files, articles, tools, and more — shared by your community.
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
             <Plus size={14} /> Share Resource
           </button>
