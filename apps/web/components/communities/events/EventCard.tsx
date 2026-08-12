@@ -184,7 +184,10 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
   return (
     <>
       <article className={`group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border border-border rounded-xl overflow-hidden"}`}>
-        <Link href={eventHref} className="block">
+        <Link
+          href={eventHref}
+          className={`block ${edgeToEdgeDivider ? communityFeedLayout.gutters : ""}`}
+        >
           <div className="flex gap-4">
             {/* Cover image / gradient — left panel */}
             <div className="relative w-36 shrink-0 overflow-hidden rounded-none">

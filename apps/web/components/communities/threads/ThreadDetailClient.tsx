@@ -365,7 +365,7 @@ export function ThreadDetailClient({
 
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
-          <div className={flushLayout ? communityFeedLayout.gutters : undefined}>
+          <div className={communityFeedLayout.detailSection}>
             <Link
               href={backHref}
               className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
@@ -378,7 +378,7 @@ export function ThreadDetailClient({
 
         {/* ── Thread card (shared component, detail variant) ── */}
         <div className={`${communityFeedLayout.dividerY} py-6`}>
-          <div className={flushLayout ? communityFeedLayout.gutters : undefined}>
+          <div className={communityFeedLayout.detailSection}>
             <ThreadCard
               thread={thread}
               currentUserId={currentUserId}
@@ -393,7 +393,7 @@ export function ThreadDetailClient({
         </div>
 
         {/* ── Comments section ── */}
-        <div className={`mt-6 ${flushLayout ? communityFeedLayout.gutters : ""}`}>
+        <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
           <div className="mb-4 flex items-center gap-2">
             <span className="font-display text-sm font-semibold text-foreground">
               {totalComments} {totalComments === 1 ? "Comment" : "Comments"}

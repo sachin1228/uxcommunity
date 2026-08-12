@@ -371,6 +371,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
 
           {/* Resource card */}
           <div className={`${communityFeedLayout.dividerY} py-6`}>
+            <div className={communityFeedLayout.detailSection}>
             {/* Top row: type badge + actions */}
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[10px] text-foreground-muted">
@@ -487,10 +488,11 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                 <MessageSquare size={11} /> {totalComments} {totalComments === 1 ? "comment" : "comments"}
               </span>
             </div>
+            </div>
           </div>
 
           {/* Comments section */}
-          <div className="mt-6">
+          <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
             <div className="mb-4 flex items-center gap-2">
               <span className="font-display text-sm font-semibold text-foreground">
                 {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
