@@ -307,7 +307,7 @@ export function ShowcaseView({
             </p>
           </div>
         ) : (
-          <div className="relative mt-6 before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border">
+          <div className="relative before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border">
             {visible.map((post, index) => (
               <article
                 key={post.id}
