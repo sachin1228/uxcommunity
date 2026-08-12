@@ -3,6 +3,8 @@ export const communityFeedLayout = {
   detailContent: "mx-auto w-full max-w-4xl",
   gutters: "px-5 md:px-8",
   pageHeader: "px-5 py-7 md:px-8",
+  pageHeaderMain: "flex min-w-0 items-start justify-between gap-3",
+  pageHeaderFilters: "mt-6",
   row: "px-5 py-6 md:px-8",
   detailPage: "py-6",
   detailSection: "px-5 md:px-8",

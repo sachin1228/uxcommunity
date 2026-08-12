@@ -218,7 +218,7 @@ export function ShowcaseView({
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+        <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">
               Showcase
@@ -238,7 +238,7 @@ export function ShowcaseView({
           </button>
         </div>
         {!loading && posts.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
             {SHOWCASE_CATEGORIES.map((item) => {
               const Icon = {
                 all: LayoutGrid,
