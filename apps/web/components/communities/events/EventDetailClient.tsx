@@ -443,8 +443,8 @@ export function EventDetailClient({
           </a>
         )}
         {/* Main event card — horizontal */}
-        <div className={`${communityFeedLayout.dividerY} py-6`}>
-          <div className={`${communityFeedLayout.detailSection} flex min-h-[160px] gap-5`}>
+        <div className="mx-5 overflow-hidden rounded-xl border border-border bg-surface md:mx-8">
+          <div className="flex min-h-[160px] gap-5 p-4 md:p-6">
             <div className="relative w-44 shrink-0 overflow-hidden rounded-xl">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
