@@ -266,22 +266,22 @@ export function ShowcaseView({
             <div className="mx-2 h-8 w-px shrink-0 bg-border" aria-hidden="true" />
             <div className="relative shrink-0">
               <CalendarClock
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+                size={14}
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
                 aria-hidden="true"
               />
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as "newest" | "popular")}
                 aria-label="Sort showcase posts"
-                className="h-10 appearance-none rounded-lg border border-border bg-surface-raised py-2 pl-9 pr-9 font-body text-xs text-foreground outline-none transition-colors hover:border-foreground-subtle focus:border-accent"
+                className="h-8 appearance-none rounded-lg border border-border bg-surface-raised py-1 pl-8 pr-8 font-body text-xs text-foreground outline-none transition-colors hover:border-foreground-subtle focus:border-accent"
               >
                 <option value="newest">Newest first</option>
                 <option value="popular">Most discussed</option>
               </select>
               <ChevronDown
-                size={15}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+                size={14}
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
                 aria-hidden="true"
               />
             </div>
