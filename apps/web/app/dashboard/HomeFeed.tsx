@@ -273,7 +273,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           const showDivider = !isLastGroup || !isLastResource;
 
           return (
-            <li key={`resource-${res.id}`} className={communityFeedLayout.gutters}>
+            <li
+              key={`resource-${res.id}`}
+              className={`${communityFeedLayout.gutters} ${showDivider ? communityFeedLayout.dividerBottom : ""}`}
+            >
               {res.community_name && (
                 <div className="pt-6 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
                   <span>posted in</span>
@@ -297,7 +300,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onSaveChanged={handleResourceSaveChanged}
                 onBookmarkChanged={handleResourceBookmarkChanged}
                 onDeleted={handleResourceDeleted}
-                edgeToEdgeDivider={showDivider}
+                hideDivider
               />
             </li>
           );
