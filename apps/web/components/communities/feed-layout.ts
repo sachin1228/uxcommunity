@@ -12,7 +12,7 @@ export const communityFeedLayout = {
   dividerList: "relative before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:border-t before:border-border",
   dividerBottom: "relative after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border",
   dividerY: "relative before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:border-t before:border-border after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border",
-  emptyState: "relative flex min-h-52 flex-col items-center justify-center px-6 py-12 text-center before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:border-t before:border-border after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border",
+  emptyState: "relative flex min-h-52 flex-col items-center justify-center px-6 py-12 text-center",
   emptyIcon: "mb-4 text-foreground-subtle",
   emptyTitle: "font-display text-base font-semibold text-foreground",
   emptyDescription: "mt-1 max-w-md text-pretty font-body text-sm leading-6 text-foreground-muted",
