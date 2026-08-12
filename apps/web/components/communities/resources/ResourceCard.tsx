@@ -78,6 +78,8 @@ interface ResourceCardProps {
   onDeleted: (resourceId: string) => void;
   /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
+  /** Lets a parent list render the divider outside the card gutters. */
+  hideDivider?: boolean;
 }
 
 export function ResourceCard({
@@ -89,6 +91,7 @@ export function ResourceCard({
   onBookmarkChanged,
   onDeleted,
   edgeToEdgeDivider = false,
+  hideDivider = false,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
   const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
@@ -235,7 +238,15 @@ export function ResourceCard({
 
   return (
     <>
-      <article className={`group cursor-pointer py-6 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
+      <article
+        className={`group cursor-pointer py-6 ${
+          hideDivider
+            ? ""
+            : edgeToEdgeDivider
+              ? communityFeedLayout.dividerBottom
+              : "border-b border-border"
+        }`}
+      >
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href={resource.url} target="_blank" rel="noopener noreferrer">
 

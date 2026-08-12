@@ -194,6 +194,9 @@ export function ResourcesView({
           </div>
         )}
 
+      </div>
+
+      <div className={communityFeedLayout.content}>
         {loading ? (
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
@@ -232,17 +235,21 @@ export function ResourcesView({
         ) : (
           <div className={communityFeedLayout.dividerList}>
             {filtered.map((resource) => (
-              <ResourceCard
+              <div
                 key={resource.id}
-                resource={resource}
-                currentUserId={currentUserId}
-                communityId={communityId}
-                onUpdated={handleUpdated}
-                onSaveChanged={handleSaveChanged}
-                onBookmarkChanged={handleBookmarkChanged}
-                onDeleted={handleDeleted}
-                edgeToEdgeDivider
-              />
+                className={`${communityFeedLayout.gutters} ${communityFeedLayout.dividerBottom}`}
+              >
+                <ResourceCard
+                  resource={resource}
+                  currentUserId={currentUserId}
+                  communityId={communityId}
+                  onUpdated={handleUpdated}
+                  onSaveChanged={handleSaveChanged}
+                  onBookmarkChanged={handleBookmarkChanged}
+                  onDeleted={handleDeleted}
+                  hideDivider
+                />
+              </div>
             ))}
           </div>
         )}
