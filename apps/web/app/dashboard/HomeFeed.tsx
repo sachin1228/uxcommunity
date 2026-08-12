@@ -25,13 +25,29 @@ interface HomeFeedProps {
 export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [items, setItems] = useState<FeedItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/home/feed")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.items) setItems(d.items); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const controller = new AbortController();
+
+    fetch("/api/home/feed", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const data = (await response.json().catch(() => null)) as {
+          items?: FeedItem[];
+          error?: string;
+        } | null;
+        if (!response.ok) throw new Error(data?.error ?? "Failed to load the feed.");
+        setItems(data?.items ?? []);
+      })
+      .catch((fetchError: unknown) => {
+        if (fetchError instanceof DOMException && fetchError.name === "AbortError") return;
+        setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
   }, [refreshToken]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
@@ -157,6 +173,15 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           </div>
         </li>
       </ul>
+    );
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="flex flex-col items-center justify-center gap-2 py-20 text-center">
+        <p className="font-body text-sm font-medium text-red-400">Couldn&apos;t load your feed</p>
+        <p className="max-w-sm font-body text-xs text-foreground-subtle">{error}</p>
+      </div>
     );
   }
 
