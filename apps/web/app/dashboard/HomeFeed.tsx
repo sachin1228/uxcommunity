@@ -278,7 +278,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
-                  showAuthorMeta={false}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
