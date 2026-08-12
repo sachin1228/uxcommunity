@@ -194,9 +194,9 @@ export function ResourcesView({
         )}
 
         {loading ? (
-          <div className="space-y-3 animate-pulse">
+          <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface p-4">
+              <div key={i} className={communityFeedLayout.skeletonRow}>
                 <div className="flex items-center justify-between">
                   <div className="h-5 w-20 rounded-full bg-surface-raised" />
                   <div className="h-5 w-5 rounded bg-surface-raised" />
@@ -215,18 +215,18 @@ export function ResourcesView({
             ))}
           </div>
         ) : resources.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <BookMarked size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No resources yet</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
+          <div className={communityFeedLayout.emptyState}>
+            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <BookMarked size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No resources in this category</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">Try a different filter or share one yourself.</p>
+          <div className={communityFeedLayout.emptyState}>
+            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
+            <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>
         ) : (
           <div className={communityFeedLayout.dividerList}>

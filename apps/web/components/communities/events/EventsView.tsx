@@ -167,11 +167,11 @@ export function EventsView({
         )}
 
         {loading ? (
-          <div className="space-y-3 animate-pulse">
+          <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface overflow-hidden">
-                <div className="h-9 bg-surface-raised border-b border-border" />
-                <div className="px-4 py-3 space-y-2">
+              <div key={i} className={communityFeedLayout.skeletonRow}>
+                <div className="h-3 w-28 rounded bg-surface-raised" />
+                <div className="mt-4 space-y-2">
                   <div className="h-4 w-2/3 rounded bg-surface-raised" />
                   <div className="h-3 w-full rounded bg-surface-raised" />
                   <div className="h-3 w-4/5 rounded bg-surface-raised" />
@@ -184,10 +184,10 @@ export function EventsView({
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <CalendarX2 size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No events yet</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">Create the first event for your community.</p>
+          <div className={communityFeedLayout.emptyState}>
+            <CalendarX2 size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (
           <div className="space-y-8">

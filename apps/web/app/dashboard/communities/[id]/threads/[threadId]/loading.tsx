@@ -10,8 +10,8 @@ export default function ThreadDetailLoading() {
         {/* Back nav */}
         <div className="mb-5 h-3 w-40 rounded bg-surface-raised" />
 
-        {/* Thread card */}
-        <div className="rounded-xl border border-border bg-surface">
+        {/* Thread content */}
+        <div className="border-y border-border py-2">
           <div className="flex items-stretch">
 
             {/* Upvote column */}

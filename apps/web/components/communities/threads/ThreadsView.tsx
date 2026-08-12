@@ -176,9 +176,9 @@ export function ThreadsView({
         )}
 
         {loading && (
-          <div className="space-y-3 animate-pulse">
+          <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((item) => (
-              <div key={item} className="rounded-2xl border border-border bg-surface p-5">
+              <div key={item} className={communityFeedLayout.skeletonRow}>
                 {/* Top row: avatar + name + category */}
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
@@ -215,10 +215,10 @@ export function ThreadsView({
         )}
 
         {!loading && threads.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <MessageSquarePlus size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No threads yet</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">Be the first person to start a discussion.</p>
+          <div className={communityFeedLayout.emptyState}>
+            <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
           </div>
         )}
       </div>
