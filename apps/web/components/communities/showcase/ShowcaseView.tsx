@@ -10,7 +10,6 @@ import {
   MessageCircle,
   Plus,
   Send,
-  Sparkles,
   X,
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
@@ -209,25 +208,22 @@ export function ShowcaseView({
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="mx-auto w-full max-w-4xl px-5 py-7 md:px-8">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="mb-2 inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent">
-              <Sparkles size={14} />
-              Community showcase
-            </p>
-            <h1 className="text-balance font-display text-2xl font-semibold text-foreground md:text-3xl">
-              Work worth talking about.
-            </h1>
-            <p className="mt-2 max-w-xl font-body text-sm leading-relaxed text-foreground-muted">
-              Share what you&apos;re making, unpack your process, and get useful
-              feedback from fellow designers.
+        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-display text-xl font-semibold text-foreground">
+              Showcase
+            </h2>
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              <span className="block">Share what you&apos;re making, unpack your process, and get</span>
+              <span className="block">useful feedback from fellow designers.</span>
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setCreating(true)}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            <Plus size={16} />
+            <Plus size={14} />
             Share your work
           </button>
         </div>
