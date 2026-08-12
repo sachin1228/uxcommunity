@@ -236,6 +236,8 @@ interface Props {
   /** When provided, renders a back link above the post (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
+  /** Removes the centered max-width and horizontal page padding for homepage details. */
+  flushLayout?: boolean;
 }
 
 export function ThreadDetailClient({
@@ -245,6 +247,7 @@ export function ThreadDetailClient({
   communityId,
   backHref,
   backLabel = "Home",
+  flushLayout = false,
 }: Props) {
   const router = useRouter();
   const [thread, setThread] = useState(initialThread);
@@ -352,7 +355,13 @@ export function ThreadDetailClient({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
+      <div
+        className={
+          flushLayout
+            ? "w-full py-6"
+            : `${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`
+        }
+      >
 
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
