@@ -574,7 +574,7 @@ export function ThreadCard({
         </button>
 
         {/* Comments */}
-        <span className="inline-flex items-center gap-1.5 font-body text-xs text-white">
+        <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
           <MessageSquare size={20} strokeWidth={2} />
           {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
         </span>
