@@ -7,6 +7,7 @@ import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
+import { formatRelativeDate } from "../threads/threadShared";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -167,6 +168,8 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
   }
 
   const authorName = event.users?.name ?? "Member";
+  const authorInitial = authorName.charAt(0).toUpperCase();
+  const dateLabel = formatRelativeDate(event.created_at);
   const eventHref = detailHref ?? (isPublicContentScope(communityId)
     ? publicContentHref("event", event.id)
     : `/dashboard/communities/${communityId}/events/${event.id}`);
@@ -204,6 +207,21 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
 
             {/* Content — right panel */}
             <div className="flex min-w-0 py-5 pl-2 pr-4 flex-1 flex-col gap-1.5">
+              {/* Author + posted time */}
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
+                  {event.users?.avatar_url ? (
+                    <img src={event.users.avatar_url} alt={authorName} className="h-10 w-10 object-cover" />
+                  ) : (
+                    <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-body text-[15px] font-semibold text-foreground">{authorName}</span>
+                  <span className="font-body text-[11px] text-foreground-subtle">{dateLabel}</span>
+                </div>
+              </div>
+
               {/* Top row: badge + action buttons */}
               <div className="flex items-start justify-between gap-2">
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
