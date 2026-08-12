@@ -382,13 +382,15 @@ export function ResourceCard({
               </span>
             </button>
 
+            <div className="flex-1" />
+
             {/* Bookmark / save */}
             <button
               type="button"
               onClick={handleBookmark}
               aria-label={displayedBookmarked ? "Remove bookmark" : "Bookmark"}
               aria-pressed={displayedBookmarked}
-              className="group/save ml-auto flex items-center gap-2 text-white"
+              className="group/save flex items-center gap-2 text-white"
             >
               <Bookmark
                 size={20}
@@ -400,8 +402,6 @@ export function ResourceCard({
                 {displayedBookmarkCount}
               </span>
             </button>
-
-            <div className="flex-1" />
           </div>
         </a>
       </article>
