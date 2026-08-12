@@ -194,7 +194,7 @@ export function EventsView({
 
       </div>
 
-      <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? "pt-6" : ""}`}>
+      <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? "pt-3" : ""}`}>
         {loading ? (
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
