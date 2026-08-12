@@ -228,9 +228,6 @@ export function EventsView({
           <div className="flex flex-col gap-8">
             {(filter === "all" || filter === "upcoming") && upcoming.length > 0 && (
               <section className="px-5 md:px-8">
-                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
-                  Upcoming
-                </h3>
                 <div className="flex flex-col gap-4">
                   {upcoming.map((event) => (
                     <EventCard
@@ -249,9 +246,6 @@ export function EventsView({
             )}
             {(filter === "all" || filter === "past") && past.length > 0 && (
               <section className="px-5 md:px-8">
-                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
-                  Past
-                </h3>
                 <div className="flex flex-col gap-4 opacity-60">
                   {past.map((event) => (
                     <EventCard
