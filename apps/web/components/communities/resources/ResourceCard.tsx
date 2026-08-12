@@ -388,7 +388,7 @@ export function ResourceCard({
               onClick={handleBookmark}
               aria-label={displayedBookmarked ? "Remove bookmark" : "Bookmark"}
               aria-pressed={displayedBookmarked}
-              className="group/save flex items-center gap-2 text-white"
+              className="group/save ml-auto flex items-center gap-2 text-white"
             >
               <Bookmark
                 size={20}
