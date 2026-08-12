@@ -253,10 +253,12 @@ export function ResourceCard({
 
               {/* Name + time + type pill */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
-                <span className="font-body text-[11px] text-foreground-subtle">
-                  {formatRelativeDate(resource.created_at)}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
+                  <span className="font-body text-[11px] text-foreground-subtle">
+                    {formatRelativeDate(resource.created_at)}
+                  </span>
+                </div>
                 <span className="font-body text-[11px] text-foreground-subtle">·</span>
                 <span
                   className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
