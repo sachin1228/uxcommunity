@@ -1,7 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookMarked, Plus } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  Box,
+  CircleEllipsis,
+  FileText,
+  Grid2X2,
+  Image,
+  LayoutGrid,
+  Palette,
+  Play,
+  Plus,
+  Shapes,
+  Type,
+  Wrench,
+} from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
@@ -131,7 +146,7 @@ export function ResourcesView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
+      <div className={`${communityFeedLayout.content} ${!loading && resources.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
@@ -149,36 +164,37 @@ export function ResourcesView({
           </button>
         </div>
 
-        {/* Type filter tabs */}
         {!loading && resources.length > 0 && (
-          <div className={`${communityFeedLayout.pageHeaderFilters} flex flex-wrap gap-1.5`}>
-            <button
-              type="button"
-              onClick={() => setFilter("all")}
-              className={`rounded-full border px-3 py-1.5 font-body text-xs transition-colors ${
-                filter === "all"
-                  ? "border-accent bg-accent/15 text-accent"
-                  : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-              }`}
-            >
-              All
-              <span className="ml-1.5 font-mono text-[10px]">{resources.length}</span>
-            </button>
-            {RESOURCE_TYPES.filter((t) => typesWithData.has(t.value)).map((t) => {
-              const count = resources.filter((r) => r.resource_type === t.value).length;
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
+            {[{ value: "all" as const, label: "All", icon: LayoutGrid }, ...RESOURCE_TYPES.filter((item) => typesWithData.has(item.value)).map((item) => ({
+              ...item,
+              icon: {
+                figma: Shapes,
+                article: FileText,
+                tool: Wrench,
+                video: Play,
+                book: BookOpen,
+                font: Type,
+                icon_pack: Grid2X2,
+                color: Palette,
+                template: Box,
+                inspiration: Image,
+                other: CircleEllipsis,
+              }[item.value],
+            }))].map((item) => {
+              const Icon = item.icon;
+              const count = item.value === "all" ? resources.length : resources.filter((resource) => resource.resource_type === item.value).length;
               return (
                 <button
-                  key={t.value}
+                  key={item.value}
                   type="button"
-                  onClick={() => setFilter(t.value)}
-                  className={`rounded-full border px-3 py-1.5 font-body text-xs transition-colors ${
-                    filter === t.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-                  }`}
+                  onClick={() => setFilter(item.value)}
+                  aria-pressed={filter === item.value}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  {t.label}
-                  <span className="ml-1.5 font-mono text-[10px]">{count}</span>
+                  <Icon size={14} aria-hidden="true" />
+                  {item.label}
+                  <span className="font-mono text-[10px]">{count}</span>
                 </button>
               );
             })}
@@ -233,7 +249,7 @@ export function ResourcesView({
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>
         ) : (
-          <div className={communityFeedLayout.dividerList}>
+          <div>
             {filtered.map((resource) => (
               <div
                 key={resource.id}
