@@ -57,10 +57,11 @@ function renderWithLinks(text: string, isNested = false) {
 }
 import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
-import { CATEGORY_COLORS, formatRelativeDate, formatFullDate } from "./threadShared";
+import { CATEGORY_COLORS, formatFullDate, formatRelativeDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 interface ThreadCardProps {
   thread: CommunityThread;
@@ -268,7 +269,6 @@ export function ThreadCard({
   }
 
   const authorName    = thread.users?.name ?? "Member";
-  const authorInitial = authorName.charAt(0).toUpperCase();
   const threadHref    = detailHref ?? (isPublicContentScope(communityId)
     ? publicContentHref("thread", thread.id)
     : `/dashboard/communities/${communityId}/threads/${thread.id}`);
@@ -281,22 +281,16 @@ export function ThreadCard({
     <>
       {/* ── Top row: avatar · name · date · category pill · community · menu ── */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          {/* Avatar */}
-          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
-            {thread.users?.avatar_url ? (
-              <img src={thread.users.avatar_url} alt={authorName} className="h-10 w-10 object-cover" />
-            ) : (
-              <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
-            )}
-          </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <PostAuthorMeta
+            name={authorName}
+            avatarUrl={thread.users?.avatar_url}
+            createdAt={thread.updated_at || thread.created_at}
+            dateLabel={dateLabel}
+          />
 
-          {/* Name + date + category + community */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-            <div className="flex flex-col">
-              <span className="font-body text-[15px] font-semibold text-foreground">{authorName}</span>
-              <span className="font-body text-[11px] text-foreground-subtle">{dateLabel}</span>
-            </div>
+          {/* Category + community */}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             {category && (
               <>
                 <span className="font-body text-[11px] text-foreground-subtle">·</span>
