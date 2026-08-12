@@ -10,6 +10,7 @@ import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { formatRelativeDate } from "./threadShared";
+import { communityFeedLayout } from "../feed-layout";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -351,7 +352,7 @@ export function ThreadDetailClient({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
 
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
@@ -365,7 +366,7 @@ export function ThreadDetailClient({
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
-        <div className="rounded-xl bg-surface px-6 py-5">
+        <div className={`${communityFeedLayout.dividerY} py-6`}>
           <ThreadCard
             thread={thread}
             currentUserId={currentUserId}

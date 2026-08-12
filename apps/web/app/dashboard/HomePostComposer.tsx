@@ -10,6 +10,7 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CreateEventModal } from "@/components/communities/events/CreateEventModal";
 import { CreateResourceModal } from "@/components/communities/resources/CreateResourceModal";
 import { CreateThreadModal } from "@/components/communities/threads/CreateThreadModal";
+import { communityFeedLayout } from "@/components/communities/feed-layout";
 
 type PostType = "thread" | "resource" | "event";
 
@@ -69,7 +70,7 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
 
   return (
     <>
-      <section className="mx-16 my-1">
+      <section className={`${communityFeedLayout.gutters} my-1`}>
         <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
           <div className="grid min-w-0 grid-cols-3 justify-items-center gap-0.5">

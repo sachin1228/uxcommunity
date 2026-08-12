@@ -10,6 +10,7 @@ import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { communityFeedLayout } from "../feed-layout";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
@@ -75,6 +76,8 @@ interface ResourceCardProps {
   onSaveChanged: (resourceId: string, saved: boolean, newCount: number) => void;
   onBookmarkChanged: (resourceId: string, bookmarked: boolean, newCount: number) => void;
   onDeleted: (resourceId: string) => void;
+  /** Extends the row divider to the bounds of the scrollable center column. */
+  edgeToEdgeDivider?: boolean;
 }
 
 export function ResourceCard({
@@ -85,6 +88,7 @@ export function ResourceCard({
   onSaveChanged,
   onBookmarkChanged,
   onDeleted,
+  edgeToEdgeDivider = false,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
   const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
@@ -231,24 +235,10 @@ export function ResourceCard({
 
   return (
     <>
-      <article className="group rounded-2xl border border-border bg-surface transition-colors hover:border-border-strong cursor-pointer">
+      <article className={`group cursor-pointer py-6 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
         {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href={resource.url} target="_blank" rel="noopener noreferrer">
 
-          {/* ── OG image ── */}
-          {ogImage && (
-            <div className="h-40 w-full overflow-hidden rounded-t-2xl bg-surface">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={ogImage}
-                alt=""
-                className="h-full w-full object-cover"
-                onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-              />
-            </div>
-          )}
-
-          <div className="p-5">
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -263,10 +253,12 @@ export function ResourceCard({
 
               {/* Name + time + type pill */}
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
-                <span className="font-body text-[11px] text-foreground-subtle">
-                  {formatRelativeDate(resource.created_at)}
-                </span>
+                <div className="flex flex-col">
+                  <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
+                  <span className="font-body text-[11px] text-foreground-subtle">
+                    {formatRelativeDate(resource.created_at)}
+                  </span>
+                </div>
                 <span className="font-body text-[11px] text-foreground-subtle">·</span>
                 <span
                   className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
@@ -355,6 +347,18 @@ export function ResourceCard({
             {getDomain(resource.url)}
           </p>
 
+          {/* ── OG image ── */}
+          {ogImage && (
+            <div className="mt-4 h-52 w-full overflow-hidden rounded-xl bg-surface">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={ogImage}
+                alt=""
+                className="h-full w-full object-cover"
+                onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
+              />
+            </div>
+          )}
 
           {/* ── Footer: like · bookmark ── */}
           <div className="mt-3 flex items-center gap-4">
@@ -380,6 +384,8 @@ export function ResourceCard({
               </span>
             </button>
 
+            <div className="flex-1" />
+
             {/* Bookmark / save */}
             <button
               type="button"
@@ -398,10 +404,7 @@ export function ResourceCard({
                 {displayedBookmarkCount}
               </span>
             </button>
-
-            <div className="flex-1" />
           </div>
-          </div>{/* end p-5 */}
         </a>
       </article>
 

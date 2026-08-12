@@ -9,6 +9,7 @@ import {
 
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
+import { communityFeedLayout } from "../feed-layout";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -573,7 +574,7 @@ export function ThreadCard({
         </button>
 
         {/* Comments */}
-        <span className="inline-flex items-center gap-1.5 font-body text-xs text-white">
+        <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
           <MessageSquare size={20} strokeWidth={2} />
           {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
         </span>
@@ -615,9 +616,9 @@ export function ThreadCard({
           </Link>
         </article>
       ) : (
-        <article className={`group ${isLast ? "" : "border-b border-border"}`}>
-          <Link href={threadHref} className="block px-16 py-6">
-            <div className="mx-auto w-full max-w-4xl">
+        <article className={`group ${isLast ? "" : communityFeedLayout.dividerBottom}`}>
+          <Link href={threadHref} className={`block ${communityFeedLayout.row}`}>
+            <div className={communityFeedLayout.content}>
               {innerContent}
             </div>
           </Link>
