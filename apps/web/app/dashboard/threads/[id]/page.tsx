@@ -114,6 +114,7 @@ export default async function PublicThreadDetailPage({ params }: Props) {
            communityId={thread.community_id ?? PUBLIC_CONTENT_SCOPE}
           communityName={communityName}
           backHref="/dashboard"
+          flushLayout
         />
       </div>
 
