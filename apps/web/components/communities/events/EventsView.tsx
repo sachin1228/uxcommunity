@@ -143,11 +143,12 @@ export function EventsView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
+        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Events</h2>
-            <p className="mt-1 max-w-xl text-pretty font-body text-sm text-foreground-muted">
-              Community meetups, workshops, and get-togethers.
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              <span className="block">Community meetups, workshops, and</span>
+              <span className="block">get-togethers.</span>
             </p>
           </div>
           <button

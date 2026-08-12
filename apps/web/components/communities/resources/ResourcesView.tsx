@@ -132,11 +132,12 @@ export function ResourcesView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
+        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
-            <p className="mt-1 max-w-xl text-pretty font-body text-sm text-foreground-muted">
-              Figma files, articles, tools, and more — shared by your community.
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              <span className="block">Figma files, articles, tools, and more — shared by your</span>
+              <span className="block">community.</span>
             </p>
           </div>
           <button
