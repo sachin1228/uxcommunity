@@ -132,7 +132,7 @@ export function ResourcesView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+        <div className="flex mb-6 min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
             <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
@@ -151,7 +151,7 @@ export function ResourcesView({
 
         {/* Type filter tabs */}
         {!loading && resources.length > 0 && (
-          <div className="mb-5 flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             <button
               type="button"
               onClick={() => setFilter("all")}
