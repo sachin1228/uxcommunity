@@ -220,10 +220,12 @@ export function ThreadsView({
       )}
 
       {!loading && threads.length === 0 && (
-        <div className={communityFeedLayout.emptyState}>
-          <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
-          <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
-          <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
+        <div className={communityFeedLayout.content}>
+          <div className={communityFeedLayout.emptyState}>
+            <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
+          </div>
         </div>
       )}
 

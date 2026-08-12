@@ -167,16 +167,19 @@ export function EventsView({
           </div>
         )}
 
+      </div>
+
+      <div className={communityFeedLayout.content}>
         {loading ? (
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
               <div key={i} className={communityFeedLayout.skeletonRow}>
                 <div className="h-3 w-28 rounded bg-surface-raised" />
-                <div className="mt-4 space-y-2">
+                <div className="mt-4 flex flex-col gap-2">
                   <div className="h-4 w-2/3 rounded bg-surface-raised" />
                   <div className="h-3 w-full rounded bg-surface-raised" />
                   <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                  <div className="mt-3 flex justify-between">
+                  <div className="mt-1 flex justify-between">
                     <div className="h-3 w-24 rounded bg-surface-raised" />
                     <div className="h-7 w-16 rounded-lg bg-surface-raised" />
                   </div>
@@ -191,7 +194,7 @@ export function EventsView({
             <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="flex flex-col gap-8">
             {upcoming.length > 0 && (
               <section>
                 <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">

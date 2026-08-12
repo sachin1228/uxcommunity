@@ -19,6 +19,7 @@ import {
   type ShowcaseCategory,
   type ShowcasePost,
 } from "./types";
+import { communityFeedLayout } from "../feed-layout";
 
 const cache = new Map<string, { posts: ShowcasePost[]; at: number }>();
 const STALE = 30_000;
@@ -207,7 +208,7 @@ export function ShowcaseView({
   }
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="mx-auto w-full max-w-4xl px-5 py-7 md:px-8">
+      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
         <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">
@@ -227,30 +228,35 @@ export function ShowcaseView({
             Share your work
           </button>
         </div>
-        <div className="mt-7 flex flex-col gap-4">
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {SHOWCASE_CATEGORIES.map((item) => (
-              <button
-                key={item.value}
-                onClick={() => setCategory(item.value)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 font-body text-xs ${category === item.value ? "border-accent bg-accent/10 text-accent" : "border-border text-foreground-muted hover:text-foreground"}`}
+        {!loading && posts.length > 0 && (
+          <div className="flex flex-col gap-4">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {SHOWCASE_CATEGORIES.map((item) => (
+                <button
+                  key={item.value}
+                  onClick={() => setCategory(item.value)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 font-body text-xs ${category === item.value ? "border-accent bg-accent/10 text-accent" : "border-border text-foreground-muted hover:text-foreground"}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as "newest" | "popular")}
+                aria-label="Sort showcase posts"
+                className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground outline-none"
               >
-                {item.label}
-              </button>
-            ))}
+                <option value="newest">Newest first</option>
+                <option value="popular">Most discussed</option>
+              </select>
+            </div>
           </div>
-          <div className="flex justify-end">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as "newest" | "popular")}
-              aria-label="Sort showcase posts"
-              className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground outline-none"
-            >
-              <option value="newest">Newest first</option>
-              <option value="popular">Most discussed</option>
-            </select>
-          </div>
-        </div>
+        )}
+      </div>
+
+      <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex justify-center py-24">
             <Loader2 className="animate-spin text-accent" />
@@ -260,23 +266,12 @@ export function ShowcaseView({
             {error}
           </p>
         ) : visible.length === 0 ? (
-          <div className="flex flex-col items-center py-24 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-surface-raised">
-              <Image className="text-foreground-muted" />
-            </div>
-            <h2 className="mt-5 font-display text-lg font-semibold text-foreground">
-              The wall is ready for your work.
-            </h2>
-            <p className="mt-2 max-w-sm font-body text-sm text-foreground-muted">
-              Share a polished project, a rough idea, or something you want the
-              community to critique.
+          <div className={communityFeedLayout.emptyState}>
+            <Image size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No showcase posts yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>
+              Be the first to share a polished project, rough idea, or work in progress.
             </p>
-            <button
-              onClick={() => setCreating(true)}
-              className="mt-5 rounded-xl border border-accent/40 px-4 py-2 font-body text-sm text-accent"
-            >
-              Be the first to share
-            </button>
           </div>
         ) : (
           <div className="relative mt-6 before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border">
