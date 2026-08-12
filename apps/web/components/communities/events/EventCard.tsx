@@ -6,6 +6,7 @@ import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { communityFeedLayout } from "../feed-layout";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -64,9 +65,11 @@ interface EventCardProps {
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
   /** Override the link destination (e.g. public standalone detail page). */
   detailHref?: string;
+  /** Extends the row divider to the bounds of the scrollable center column. */
+  edgeToEdgeDivider?: boolean;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref }: EventCardProps) {
+export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref, edgeToEdgeDivider = false }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
@@ -180,11 +183,11 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
 
   return (
     <>
-      <article className="group rounded-xl border border-border bg-surface overflow-hidden transition-colors hover:border-border-hover">
+      <article className={`group py-5 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
         <Link href={eventHref} className="block">
-          <div className="flex">
+          <div className="flex gap-4">
             {/* Cover image / gradient — left panel */}
-            <div className="relative w-36 shrink-0 overflow-hidden">
+            <div className="relative w-36 shrink-0 overflow-hidden rounded-xl">
               {event.cover_image_url ? (
                 <img
                   src={event.cover_image_url}
@@ -197,7 +200,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
             </div>
 
             {/* Content — right panel */}
-            <div className="flex flex-1 flex-col gap-1.5 px-4 py-3 min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1">
               {/* Top row: badge + action buttons */}
               <div className="flex items-start justify-between gap-2">
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
