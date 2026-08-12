@@ -35,7 +35,17 @@ export class BooleanIntentCoalescer {
     this.desired = value;
     this.version += 1;
     this.options.onOptimisticChange(value);
-    this.schedule(this.quietWindowMs);
+
+    // Start the first write immediately. Deferring it to a quiet-window timer
+    // allowed an optimistic parent update to replace this card and dispose the
+    // coalescer before persist() (and therefore fetch()) ever ran. While a
+    // request is in flight, subsequent taps are still coalesced and flushed
+    // after the quiet window.
+    if (this.inFlight) {
+      this.schedule(this.quietWindowMs);
+    } else {
+      void this.flush();
+    }
   }
 
   syncConfirmed(value: boolean) {
