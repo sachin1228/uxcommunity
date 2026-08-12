@@ -208,7 +208,7 @@ export function ShowcaseView({
   }
   return (
     <div className="flex-1 overflow-y-auto bg-background">
-      <div className="mx-auto w-full max-w-5xl px-5 py-7 md:px-8">
+      <div className="mx-auto w-full max-w-4xl px-5 py-7 md:px-8">
         <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-2 inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent">
@@ -280,73 +280,63 @@ export function ShowcaseView({
             </button>
           </div>
         ) : (
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            {visible.map((post) => (
+          <div className="relative mt-6 before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border">
+            {visible.map((post, index) => (
               <article
                 key={post.id}
-                className="overflow-hidden rounded-2xl border border-border bg-surface"
+                className={`relative py-6 ${index === visible.length - 1 ? "" : "after:pointer-events-none after:absolute after:bottom-0 after:left-1/2 after:w-screen after:-translate-x-1/2 after:border-b after:border-border"}`}
               >
-                <div className="aspect-[16/10] overflow-hidden bg-surface-raised">
-                  <img
-                    src={post.image_url}
-                    alt={`Preview of ${post.title}`}
-                    className="h-full w-full object-cover transition-transform duration-500 hover:scale-[1.02]"
-                  />
-                </div>
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      {post.author.avatar_url ? (
-                        <img
-                          src={post.author.avatar_url}
-                          alt=""
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/15 font-body text-xs text-accent">
-                          {post.author.name.slice(0, 1)}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate font-body text-sm font-medium text-foreground">
-                          {post.author.name}
-                        </p>
-                        <p className="font-body text-[11px] text-foreground-muted">
-                          {
-                            SHOWCASE_TYPES.find(
-                              (item) => item.value === post.post_type,
-                            )?.label
-                          }
-                        </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {post.author.avatar_url ? (
+                      <img
+                        src={post.author.avatar_url}
+                        alt={post.author.name}
+                        className="size-10 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-10 items-center justify-center rounded-full bg-accent/15 font-body text-sm font-semibold text-accent">
+                        {post.author.name.slice(0, 1)}
                       </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-body text-[15px] font-semibold text-foreground">
+                        {post.author.name}
+                      </p>
+                      <p className="font-body text-[11px] text-foreground-subtle">
+                        {SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label}
+                      </p>
                     </div>
-                    <span className="rounded-full bg-surface-raised px-2.5 py-1 font-body text-[10px] text-foreground-muted">
-                      {
-                        SHOWCASE_CATEGORIES.find(
-                          (item) => item.value === post.category,
-                        )?.label
-                      }
-                    </span>
                   </div>
-                  <h2 className="mt-4 text-pretty font-display text-xl font-semibold text-foreground">
-                    {post.title}
-                  </h2>
-                  {post.description && (
-                    <p className="mt-2 line-clamp-3 font-body text-sm leading-relaxed text-foreground-muted">
-                      {post.description}
-                    </p>
-                  )}
+                  <span className="shrink-0 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
+                    {SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label}
+                  </span>
+                </div>
+                <h2 className="mt-3 text-pretty font-display text-base font-semibold leading-snug text-foreground">
+                  {post.title}
+                </h2>
+                {post.description && (
+                  <p className="mt-1.5 line-clamp-3 font-body text-xs leading-relaxed text-foreground-muted">
+                    {post.description}
+                  </p>
+                )}
+                {post.tags.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {post.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="font-body text-xs text-foreground-subtle"
-                      >
+                      <span key={tag} className="font-body text-xs text-foreground-subtle">
                         #{tag}
                       </span>
                     ))}
                   </div>
-                  <div className="-mx-5 mt-5 flex items-center gap-4 border-t border-border px-5 pt-4">
+                )}
+                <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
+                  <img
+                    src={post.image_url}
+                    alt={`Preview of ${post.title}`}
+                    className="max-h-[480px] w-full object-cover transition-opacity hover:opacity-95"
+                  />
+                </div>
+                <div className="mt-3 flex items-center gap-4">
                     <button
                       type="button"
                       onClick={() => toggle(post, "like")}
@@ -406,7 +396,6 @@ export function ShowcaseView({
                       />
                     </button>
                   </div>
-                </div>
               </article>
             ))}
           </div>
