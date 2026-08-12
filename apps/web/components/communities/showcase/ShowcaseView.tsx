@@ -231,7 +231,7 @@ export function ShowcaseView({
             Share your work
           </button>
         </div>
-        <div className="mt-7 flex flex-col gap-3 border-y border-border py-4 md:flex-row md:items-center md:justify-between">
+        <div className="mt-7 flex flex-col gap-4">
           <div className="flex gap-2 overflow-x-auto pb-1">
             {SHOWCASE_CATEGORIES.map((item) => (
               <button
@@ -243,14 +243,17 @@ export function ShowcaseView({
               </button>
             ))}
           </div>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as "newest" | "popular")}
-            className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground outline-none"
-          >
-            <option value="newest">Newest first</option>
-            <option value="popular">Most discussed</option>
-          </select>
+          <div className="flex justify-end">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as "newest" | "popular")}
+              aria-label="Sort showcase posts"
+              className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground outline-none"
+            >
+              <option value="newest">Newest first</option>
+              <option value="popular">Most discussed</option>
+            </select>
+          </div>
         </div>
         {loading ? (
           <div className="flex justify-center py-24">
