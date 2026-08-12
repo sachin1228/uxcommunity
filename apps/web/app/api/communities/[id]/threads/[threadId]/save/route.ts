@@ -32,7 +32,11 @@ export async function POST(
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
     : threadQuery.eq("community_id", communityId);
-  const { data: thread } = await threadQuery.maybeSingle();
+  const { data: thread, error: threadError } = await threadQuery.maybeSingle();
+  if (threadError) {
+    console.error("[LOOKUP thread for save]", threadError);
+    return NextResponse.json({ error: "Failed to update save." }, { status: 500 });
+  }
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   const { data: existing, error: lookupError } = await db
@@ -77,6 +81,18 @@ export async function POST(
       if (!notification.ok) notificationWarning = "Thread saved, but notification delivery failed.";
     }
 
+    const { data: persisted, error: confirmationError } = await db
+      .from("thread_saves")
+      .select("thread_id")
+      .eq("thread_id", threadId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (confirmationError || !persisted) {
+      console.error("[CONFIRM save]", confirmationError);
+      return NextResponse.json({ error: "Save could not be confirmed." }, { status: 500 });
+    }
+
     return NextResponse.json({ saved: true, notificationWarning });
   }
 
@@ -89,6 +105,18 @@ export async function POST(
   if (error) {
     console.error("[DELETE save]", error);
     return NextResponse.json({ error: "Failed to unsave thread." }, { status: 500 });
+  }
+
+  const { data: persisted, error: confirmationError } = await db
+    .from("thread_saves")
+    .select("thread_id")
+    .eq("thread_id", threadId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (confirmationError || persisted) {
+    console.error("[CONFIRM unsave]", confirmationError);
+    return NextResponse.json({ error: "Unsave could not be confirmed." }, { status: 500 });
   }
 
   return NextResponse.json({ saved: false });

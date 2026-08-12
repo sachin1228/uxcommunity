@@ -4,6 +4,8 @@ import { requireSession } from "@/lib/auth/session";
 
 const PAGE_SIZE = 30;
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
@@ -39,9 +41,22 @@ export async function GET(req: NextRequest) {
     resourcesQ = resourcesQ.lt("created_at", before);
   }
 
-  const [{ data: threads }, { data: events }, { data: resources }] = await Promise.all([
+  const [threadsResult, eventsResult, resourcesResult] = await Promise.all([
     threadsQ, eventsQ, resourcesQ,
   ]);
+
+  const feedError = threadsResult.error ?? eventsResult.error ?? resourcesResult.error;
+  if (feedError) {
+    console.error("[GET home feed]", feedError);
+    return NextResponse.json(
+      { error: "Failed to load the latest posts." },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const threads = threadsResult.data;
+  const events = eventsResult.data;
+  const resources = resourcesResult.data;
 
   // Merge and sort newest-first, take top PAGE_SIZE
   const all = ([
@@ -54,7 +69,12 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => (b.created_at > a.created_at ? 1 : -1))
     .slice(0, PAGE_SIZE);
 
-  if (!all.length) return NextResponse.json({ items: [] });
+  if (!all.length) {
+    return NextResponse.json(
+      { items: [] },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   // Collect IDs for batch enrichment
   const userIds      = [...new Set(all.map((i) => i.user_id))];
@@ -63,28 +83,7 @@ export async function GET(req: NextRequest) {
   const eventIds     = all.filter((i) => i._type === "event").map((i) => i.id);
   const resourceIds  = all.filter((i) => i._type === "resource").map((i) => i.id);
 
-  const [
-    { data: users },
-    { data: profiles },
-    { data: communities },
-    // threads
-    { data: threadComments },
-    { data: threadVotes },
-    { data: myThreadVotes },
-    { data: myThreadSaves },
-    // events
-    { data: eventRsvps },
-    { data: myEventRsvps },
-    { data: eventSaves },
-    { data: myEventSaves },
-    { data: eventComments },
-    // resources
-    { data: resourceSaves },
-    { data: myResourceSaves },
-    { data: resourceBookmarks },
-    { data: myResourceBookmarks },
-    { data: resourceComments },
-  ] = await Promise.all([
+  const enrichmentResults = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
     db.from("communities").select("id, name, image_url").in("id", communityIds),
@@ -134,6 +133,39 @@ export async function GET(req: NextRequest) {
       ? db.from("resource_comments").select("resource_id").in("resource_id", resourceIds)
       : Promise.resolve({ data: [] as { resource_id: string }[] }),
   ]);
+
+  const enrichmentError = enrichmentResults.find(
+    (result): result is typeof enrichmentResults[number] & { error: NonNullable<typeof result.error> } =>
+      "error" in result && Boolean(result.error),
+  )?.error;
+
+  if (enrichmentError) {
+    console.error("[GET home feed enrichment]", enrichmentError);
+    return NextResponse.json(
+      { error: "Failed to load post interactions." },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  const [
+    { data: users },
+    { data: profiles },
+    { data: communities },
+    { data: threadComments },
+    { data: threadVotes },
+    { data: myThreadVotes },
+    { data: myThreadSaves },
+    { data: eventRsvps },
+    { data: myEventRsvps },
+    { data: eventSaves },
+    { data: myEventSaves },
+    { data: eventComments },
+    { data: resourceSaves },
+    { data: myResourceSaves },
+    { data: resourceBookmarks },
+    { data: myResourceBookmarks },
+    { data: resourceComments },
+  ] = enrichmentResults;
 
   const userMap      = Object.fromEntries(((users ?? []) as Array<{ id: string; name: string }>).map((u) => [u.id, u.name]));
   const avatarMap    = Object.fromEntries(((profiles ?? []) as Array<{ user_id: string; avatar_url: string | null }>).map((p) => [p.user_id, p.avatar_url]));
@@ -219,5 +251,8 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  return NextResponse.json({ items });
+  return NextResponse.json(
+    { items },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
