@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarX2, Plus } from "lucide-react";
+import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
@@ -24,6 +24,7 @@ export function EventsView({
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
 
   const fetchEvents = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -160,6 +161,30 @@ export function EventsView({
           </button>
         </div>
 
+        {!loading && events.length > 0 && (
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
+            {[
+              { value: "all" as const, label: "All events", icon: CalendarDays },
+              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock },
+              { value: "past" as const, label: "Past", icon: CalendarCheck2 },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setFilter(item.value)}
+                  aria-pressed={filter === item.value}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {error && (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="font-body text-sm text-red-400">{error}</p>
@@ -193,9 +218,15 @@ export function EventsView({
             <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
+        ) : (filter === "upcoming" && upcoming.length === 0) || (filter === "past" && past.length === 0) ? (
+          <div className={communityFeedLayout.emptyState}>
+            <CalendarX2 size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No {filter} events</h3>
+            <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-8">
-            {upcoming.length > 0 && (
+            {(filter === "all" || filter === "upcoming") && upcoming.length > 0 && (
               <section className="px-5 md:px-8">
                 <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Upcoming
@@ -216,7 +247,7 @@ export function EventsView({
                 </div>
               </section>
             )}
-            {past.length > 0 && (
+            {(filter === "all" || filter === "past") && past.length > 0 && (
               <section className="px-5 md:px-8">
                 <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Past
