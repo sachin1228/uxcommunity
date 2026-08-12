@@ -149,7 +149,7 @@ export function ThreadsView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Threads</h2>
             <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
@@ -220,15 +220,17 @@ export function ThreadsView({
       )}
 
       {!loading && threads.length === 0 && (
-        <div className={communityFeedLayout.emptyState}>
-          <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
-          <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
-          <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
+        <div className={communityFeedLayout.content}>
+          <div className={communityFeedLayout.emptyState}>
+            <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
+          </div>
         </div>
       )}
 
       {!loading && threads.length > 0 && (
-        <div className={communityFeedLayout.dividerList}>
+        <div className={`${communityFeedLayout.content} ${communityFeedLayout.dividerList}`}>
           {threads.map((thread, index) => (
             <ThreadCard
               key={thread.id}
