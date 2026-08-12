@@ -197,7 +197,7 @@ export function EventsView({
           <div className="flex flex-col gap-8">
             {upcoming.length > 0 && (
               <section>
-                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
+                <h3 className={`${communityFeedLayout.sectionLabel} mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle`}>
                   Upcoming
                 </h3>
                 <div className={communityFeedLayout.dividerList}>
@@ -219,7 +219,7 @@ export function EventsView({
             )}
             {past.length > 0 && (
               <section>
-                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
+                <h3 className={`${communityFeedLayout.sectionLabel} mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle`}>
                   Past
                 </h3>
                 <div className={`${communityFeedLayout.dividerList} opacity-60`}>

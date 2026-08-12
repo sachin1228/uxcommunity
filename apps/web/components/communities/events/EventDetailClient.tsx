@@ -436,7 +436,7 @@ export function EventDetailClient({
         {backHref && (
           <a
             href={backHref}
-            className="mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+            className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
           >
             <ArrowLeft size={14} />
             {backLabel}
@@ -444,7 +444,7 @@ export function EventDetailClient({
         )}
         {/* Main event card — horizontal */}
         <div className={`${communityFeedLayout.dividerY} py-6`}>
-          <div className="flex min-h-[160px] gap-5">
+          <div className={`${communityFeedLayout.detailSection} flex min-h-[160px] gap-5`}>
             <div className="relative w-44 shrink-0 overflow-hidden rounded-xl">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
@@ -553,7 +553,7 @@ export function EventDetailClient({
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className="mt-6">
+        <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare size={14} />, count: topLevelCount },

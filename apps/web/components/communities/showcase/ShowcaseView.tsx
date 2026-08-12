@@ -289,12 +289,29 @@ export function ShowcaseView({
         )}
       </div>
 
-      <div
-        className={`${communityFeedLayout.content} ${visible.length > 0 ? communityFeedLayout.gutters : ""}`}
-      >
+      <div className={communityFeedLayout.content}>
         {loading ? (
-          <div className="flex justify-center py-24">
-            <Loader2 className="animate-spin text-accent" />
+          <div className={communityFeedLayout.skeletonList}>
+            {[1, 2].map((item) => (
+              <div key={item} className={communityFeedLayout.skeletonRow}>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-full bg-surface-raised" />
+                    <div className="flex flex-col gap-2">
+                      <div className="h-3 w-24 rounded bg-surface-raised" />
+                      <div className="h-2.5 w-16 rounded bg-surface-raised" />
+                    </div>
+                  </div>
+                  <div className="h-6 w-20 rounded-full bg-surface-raised" />
+                </div>
+                <div className="mt-4 h-4 w-2/3 rounded bg-surface-raised" />
+                <div className="mt-3 aspect-video w-full rounded-xl bg-surface-raised" />
+                <div className="mt-3 flex gap-4">
+                  <div className="h-4 w-10 rounded bg-surface-raised" />
+                  <div className="h-4 w-24 rounded bg-surface-raised" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <p className="py-24 text-center font-body text-sm text-foreground-muted">
@@ -309,11 +326,11 @@ export function ShowcaseView({
             </p>
           </div>
         ) : (
-          <div className="relative before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border">
+          <div className={communityFeedLayout.dividerList}>
             {visible.map((post, index) => (
               <article
                 key={post.id}
-                className={`relative py-6 ${index === visible.length - 1 ? "" : "after:pointer-events-none after:absolute after:bottom-0 after:left-1/2 after:w-screen after:-translate-x-1/2 after:border-b after:border-border"}`}
+                className={`${communityFeedLayout.row} ${index === visible.length - 1 ? "" : communityFeedLayout.dividerBottom}`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
