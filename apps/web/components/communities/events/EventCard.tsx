@@ -8,6 +8,7 @@ import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { formatRelativeDate } from "../threads/threadShared";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -68,9 +69,23 @@ interface EventCardProps {
   detailHref?: string;
   /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
+  communityName?: string;
+  communityImage?: string | null;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref, edgeToEdgeDivider = false }: EventCardProps) {
+export function EventCard({
+  event,
+  currentUserId,
+  communityId,
+  onUpdated,
+  onDeleted,
+  onRsvpChanged,
+  onSaveChanged,
+  detailHref,
+  edgeToEdgeDivider = false,
+  communityName,
+  communityImage,
+}: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
@@ -350,6 +365,13 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
               </div>
             </div>
           </div>
+          {communityName && (
+            <CommunityPostLabel
+              communityName={communityName}
+              communityImage={communityImage}
+              className="mx-4 mb-4 mt-3"
+            />
+          )}
         </Link>
       </article>
 

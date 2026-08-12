@@ -232,6 +232,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 currentUserId={currentUserId}
                 communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                 communityName={group.item.community_name ?? undefined}
+                communityImage={group.item.community_image}
+                communityNamePlacement="below"
                 detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
                 onVoteChanged={handleThreadVoteChanged}
@@ -255,7 +257,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 <EventCard
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
-                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                  communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                  communityName={group.item.community_name ?? undefined}
+                  communityImage={group.item.community_image}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
@@ -277,25 +281,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               key={`resource-${res.id}`}
               className={`${communityFeedLayout.gutters} ${showDivider ? communityFeedLayout.dividerBottom : ""}`}
             >
-              {res.community_name && (
-                <div className="pt-6 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
-                  <span>posted in</span>
-                  {res.community_image ? (
-                    <img
-                      src={res.community_image}
-                      alt={res.community_name}
-                      className="h-4 w-4 shrink-0 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-4 w-4 shrink-0 rounded-full bg-accent/20" />
-                  )}
-                  <span className="text-foreground-muted">{res.community_name}</span>
-                </div>
-              )}
               <ResourceCard
                 resource={{ ...res, community_id: res.community_id ?? "" }}
                 currentUserId={currentUserId}
                 communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
+                communityName={res.community_name ?? undefined}
+                communityImage={res.community_image}
                 onUpdated={handleResourceUpdated}
                 onSaveChanged={handleResourceSaveChanged}
                 onBookmarkChanged={handleResourceBookmarkChanged}

@@ -11,6 +11,7 @@ import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
@@ -80,6 +81,8 @@ interface ResourceCardProps {
   edgeToEdgeDivider?: boolean;
   /** Lets a parent list render the divider outside the card gutters. */
   hideDivider?: boolean;
+  communityName?: string;
+  communityImage?: string | null;
 }
 
 export function ResourceCard({
@@ -92,6 +95,8 @@ export function ResourceCard({
   onDeleted,
   edgeToEdgeDivider = false,
   hideDivider = false,
+  communityName,
+  communityImage,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
   const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
@@ -369,6 +374,14 @@ export function ResourceCard({
                 onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
               />
             </div>
+          )}
+
+          {communityName && (
+            <CommunityPostLabel
+              communityName={communityName}
+              communityImage={communityImage}
+              className="mt-3"
+            />
           )}
 
           {/* ── Footer: like · bookmark ── */}

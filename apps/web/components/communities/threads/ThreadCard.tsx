@@ -60,6 +60,7 @@ import { EditThreadModal } from "./EditThreadModal";
 import { CATEGORY_COLORS, formatRelativeDate, formatFullDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 
 interface ThreadCardProps {
   thread: CommunityThread;
@@ -71,6 +72,9 @@ interface ThreadCardProps {
   onDeleted: (threadId: string) => void;
   /** When set, shows a small "in CommunityName" badge — used on the profile page */
   communityName?: string;
+  communityImage?: string | null;
+  /** Controls where the home-feed community label is rendered. */
+  communityNamePlacement?: "header" | "below";
   /**
    * "list" (default) — compact card wrapped in a <Link>, used in ThreadsView and ProfileThreads.
    * "detail"          — full expanded view with no link wrapper, used on the thread detail page.
@@ -96,6 +100,8 @@ export function ThreadCard({
   onSaveChanged,
   onDeleted,
   communityName,
+  communityImage,
+  communityNamePlacement = "header",
   variant = "list",
   detailHref,
   isLast = false,
@@ -307,7 +313,7 @@ export function ThreadCard({
                 </span>
               </>
             )}
-            {communityName && (
+            {communityName && communityNamePlacement === "header" && (
               <>
                 <span className="font-body text-[11px] text-foreground-subtle">·</span>
                 <span className="font-body text-[11px] text-foreground-subtle">
@@ -538,6 +544,13 @@ export function ThreadCard({
         return <>{imageGrid}{fileList}</>;
       })()}
 
+      {communityName && communityNamePlacement === "below" && (
+        <CommunityPostLabel
+          communityName={communityName}
+          communityImage={communityImage}
+          className="mt-3"
+        />
+      )}
 
       {interactionError && (
         <p role="status" className="mt-3 font-body text-xs text-red-400">
