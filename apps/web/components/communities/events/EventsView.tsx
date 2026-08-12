@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
+import { communityFeedLayout } from "../feed-layout";
 
 // ── Module-level cache ────────────────────────────────────────────────────────
 const eventsCache = new Map<string, { data: CommunityEvent[]; fetchedAt: number }>();
@@ -141,7 +142,7 @@ export function EventsView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl px-6 py-6">
+      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-xl font-semibold text-foreground">Events</h2>
@@ -195,7 +196,7 @@ export function EventsView({
                 <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Upcoming
                 </h3>
-                <div className="space-y-3">
+                <div className={communityFeedLayout.dividerList}>
                   {upcoming.map((event) => (
                     <EventCard
                       key={event.id}
@@ -216,7 +217,7 @@ export function EventsView({
                 <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Past
                 </h3>
-                <div className="space-y-3 opacity-60">
+                <div className={`${communityFeedLayout.dividerList} opacity-60`}>
                   {past.map((event) => (
                     <EventCard
                       key={event.id}

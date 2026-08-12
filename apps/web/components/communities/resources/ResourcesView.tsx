@@ -7,6 +7,7 @@ import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { CreateResourceModal } from "./CreateResourceModal";
 import { ResourceCard } from "./ResourceCard";
+import { communityFeedLayout } from "../feed-layout";
 
 // ── Module-level cache ────────────────────────────────────────────────────────
 const resourcesCache = new Map<string, { data: CommunityResource[]; fetchedAt: number }>();
@@ -130,7 +131,7 @@ export function ResourcesView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-4xl px-6 py-6">
+      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
@@ -228,7 +229,7 @@ export function ResourcesView({
             <p className="mt-1 font-body text-sm text-foreground-muted">Try a different filter or share one yourself.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-3">
+          <div className={communityFeedLayout.dividerList}>
             {filtered.map((resource) => (
               <ResourceCard
                 key={resource.id}

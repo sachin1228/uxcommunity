@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityThread } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
+import { communityFeedLayout } from "../feed-layout";
 
 // ── Module-level cache (survives tab switches within the same session) ─────────
 const threadsCache = new Map<string, { data: CommunityThread[]; fetchedAt: number }>();
@@ -147,8 +148,7 @@ export function ThreadsView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {/* Constrained header */}
-      <div className="mx-auto w-full max-w-4xl px-6 pt-6">
+      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h2 className="font-display text-xl font-semibold text-foreground">Threads</h2>
@@ -225,10 +225,9 @@ export function ThreadsView({
         )}
       </div>
 
-      {/* Cards with bg-surface styling, no border-b separators */}
       {!loading && threads.length > 0 && (
-        <div className="mx-auto w-full max-w-4xl space-y-3 px-6 pb-6">
-          {threads.map((thread) => (
+        <div className={communityFeedLayout.dividerList}>
+          {threads.map((thread, index) => (
             <ThreadCard
               key={thread.id}
               thread={thread}
@@ -238,7 +237,7 @@ export function ThreadsView({
               onVoteChanged={handleVoteChanged}
               onSaveChanged={handleSaveChanged}
               onDeleted={handleDeleted}
-              cardStyle="card"
+              isLast={index === threads.length - 1}
             />
           ))}
         </div>

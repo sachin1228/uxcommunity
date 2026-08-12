@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
+import { communityFeedLayout } from "../feed-layout";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -430,7 +431,7 @@ export function EventDetailClient({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-4 py-6">
+      <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
           <a
@@ -442,15 +443,15 @@ export function EventDetailClient({
           </a>
         )}
         {/* Main event card — horizontal */}
-        <div className="rounded-xl border border-border bg-surface overflow-hidden">
-          <div className="flex min-h-[160px]">
-            <div className="relative w-44 shrink-0 overflow-hidden">
+        <div className="border-y border-border py-6">
+          <div className="flex min-h-[160px] gap-5">
+            <div className="relative w-44 shrink-0 overflow-hidden rounded-xl">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
                 : <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]}`} />}
             </div>
 
-            <div className="flex flex-1 flex-col gap-2 px-5 py-4 min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
                   past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"
@@ -584,7 +585,7 @@ export function EventDetailClient({
             <div className="mt-5 space-y-5">
               {/* Composer */}
               <form onSubmit={handlePostComment} className="space-y-2">
-                <div className="rounded-xl border border-border bg-surface overflow-hidden">
+                <div className="overflow-hidden rounded-xl border border-border bg-surface">
                   <textarea
                     ref={textareaRef}
                     value={commentText}

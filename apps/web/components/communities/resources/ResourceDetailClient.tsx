@@ -11,6 +11,7 @@ import { ResourceTypeIcon } from "./resourceTypeIcons";
 import type { CommunityResource, ResourceComment } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { EditResourceModal } from "./EditResourceModal";
+import { communityFeedLayout } from "../feed-layout";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -366,10 +367,10 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   return (
     <>
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6">
+        <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
 
           {/* Resource card */}
-          <div className="rounded-xl border border-border bg-surface p-5">
+          <div className="border-y border-border py-6">
             {/* Top row: type badge + actions */}
             <div className="flex items-center justify-between gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[10px] text-foreground-muted">

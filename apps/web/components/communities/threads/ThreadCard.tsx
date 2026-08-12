@@ -9,6 +9,7 @@ import {
 
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
+import { communityFeedLayout } from "../feed-layout";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -616,8 +617,8 @@ export function ThreadCard({
         </article>
       ) : (
         <article className={`group ${isLast ? "" : "border-b border-border"}`}>
-          <Link href={threadHref} className="block px-16 py-6">
-            <div className="mx-auto w-full max-w-4xl">
+          <Link href={threadHref} className={`block ${communityFeedLayout.row}`}>
+            <div className={communityFeedLayout.content}>
               {innerContent}
             </div>
           </Link>
