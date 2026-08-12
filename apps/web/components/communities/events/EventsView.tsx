@@ -143,7 +143,7 @@ export function EventsView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
+      <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Events</h2>
@@ -194,7 +194,7 @@ export function EventsView({
 
       </div>
 
-      <div className={communityFeedLayout.content}>
+      <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? "pt-6" : ""}`}>
         {loading ? (
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (

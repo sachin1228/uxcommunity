@@ -146,7 +146,7 @@ export function ResourcesView({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
+      <div className={`${communityFeedLayout.content} ${!loading && resources.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
