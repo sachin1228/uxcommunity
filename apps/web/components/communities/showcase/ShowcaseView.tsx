@@ -256,9 +256,9 @@ export function ShowcaseView({
                   type="button"
                   onClick={() => setCategory(item.value)}
                   aria-pressed={category === item.value}
-                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 font-body text-xs transition-colors ${category === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${category === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  <Icon size={16} aria-hidden="true" />
+                  <Icon size={14} aria-hidden="true" />
                   {item.label}
                 </button>
               );
