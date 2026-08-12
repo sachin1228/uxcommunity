@@ -176,7 +176,10 @@ export function ThreadsView({
           </div>
         )}
 
-        {loading && (
+      </div>
+
+      {loading && (
+        <div className={communityFeedLayout.content}>
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((item) => (
               <div key={item} className={communityFeedLayout.skeletonRow}>
@@ -213,16 +216,16 @@ export function ThreadsView({
               </div>
             ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {!loading && threads.length === 0 && (
-          <div className={communityFeedLayout.emptyState}>
-            <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
-            <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
-            <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
-          </div>
-        )}
-      </div>
+      {!loading && threads.length === 0 && (
+        <div className={communityFeedLayout.emptyState}>
+          <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+          <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
+          <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
+        </div>
+      )}
 
       {!loading && threads.length > 0 && (
         <div className={communityFeedLayout.dividerList}>

@@ -236,6 +236,8 @@ interface Props {
   /** When provided, renders a back link above the post (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
+  /** Removes the centered max-width and horizontal page padding for homepage details. */
+  flushLayout?: boolean;
 }
 
 export function ThreadDetailClient({
@@ -245,6 +247,7 @@ export function ThreadDetailClient({
   communityId,
   backHref,
   backLabel = "Home",
+  flushLayout = false,
 }: Props) {
   const router = useRouter();
   const [thread, setThread] = useState(initialThread);
@@ -352,35 +355,45 @@ export function ThreadDetailClient({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
+      <div
+        className={
+          flushLayout
+            ? "w-full py-6"
+            : `${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`
+        }
+      >
 
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
-          <Link
-            href={backHref}
-            className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
-          >
-            <ArrowLeft size={14} />
-            {backLabel}
-          </Link>
+          <div className={flushLayout ? communityFeedLayout.gutters : undefined}>
+            <Link
+              href={backHref}
+              className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
+            >
+              <ArrowLeft size={14} />
+              {backLabel}
+            </Link>
+          </div>
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
         <div className={`${communityFeedLayout.dividerY} py-6`}>
-          <ThreadCard
-            thread={thread}
-            currentUserId={currentUserId}
-            communityId={communityId}
-            variant="detail"
-            onVoteChanged={handleVoteChanged}
-            onSaveChanged={handleSaveChanged}
-            onUpdated={handleUpdated}
-            onDeleted={handleDeleted}
-          />
+          <div className={flushLayout ? communityFeedLayout.gutters : undefined}>
+            <ThreadCard
+              thread={thread}
+              currentUserId={currentUserId}
+              communityId={communityId}
+              variant="detail"
+              onVoteChanged={handleVoteChanged}
+              onSaveChanged={handleSaveChanged}
+              onUpdated={handleUpdated}
+              onDeleted={handleDeleted}
+            />
+          </div>
         </div>
 
         {/* ── Comments section ── */}
-        <div className="mt-6">
+        <div className={`mt-6 ${flushLayout ? communityFeedLayout.gutters : ""}`}>
           <div className="mb-4 flex items-center gap-2">
             <span className="font-display text-sm font-semibold text-foreground">
               {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
