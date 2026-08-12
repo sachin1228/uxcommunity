@@ -196,11 +196,11 @@ export function EventsView({
         ) : (
           <div className="flex flex-col gap-8">
             {upcoming.length > 0 && (
-              <section>
-                <h3 className={`${communityFeedLayout.sectionLabel} mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle`}>
+              <section className="px-5 md:px-8">
+                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Upcoming
                 </h3>
-                <div className={communityFeedLayout.dividerList}>
+                <div className="flex flex-col gap-4">
                   {upcoming.map((event) => (
                     <EventCard
                       key={event.id}
@@ -211,18 +211,17 @@ export function EventsView({
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
                       onSaveChanged={handleSaveChanged}
-                      edgeToEdgeDivider
                     />
                   ))}
                 </div>
               </section>
             )}
             {past.length > 0 && (
-              <section>
-                <h3 className={`${communityFeedLayout.sectionLabel} mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle`}>
+              <section className="px-5 md:px-8">
+                <h3 className="mb-3 font-body text-xs font-semibold uppercase tracking-wider text-foreground-subtle">
                   Past
                 </h3>
-                <div className={`${communityFeedLayout.dividerList} opacity-60`}>
+                <div className="flex flex-col gap-4 opacity-60">
                   {past.map((event) => (
                     <EventCard
                       key={event.id}
@@ -233,7 +232,6 @@ export function EventsView({
                       onDeleted={handleDeleted}
                       onRsvpChanged={handleRsvpChanged}
                       onSaveChanged={handleSaveChanged}
-                      edgeToEdgeDivider
                     />
                   ))}
                 </div>
