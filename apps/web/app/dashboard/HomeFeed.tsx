@@ -12,6 +12,7 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { formatRelativeDate } from "@/components/communities/threads/threadShared";
+import { CommunityPostLabel } from "@/components/communities/CommunityPostLabel";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -250,11 +251,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           return (
             <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
               <div className={communityFeedLayout.row}>
-                {group.item.community_name && (
-                  <p className="mb-2 font-body text-[11px] text-foreground-subtle">
-                    in <span className="text-foreground-muted">{group.item.community_name}</span>
-                  </p>
-                )}
                 <div className="mb-3 flex items-center gap-3">
                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
                     {group.item.users?.avatar_url ? (
@@ -289,6 +285,13 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   onRsvpChanged={handleEventRsvpChanged}
                   onSaveChanged={handleEventSaveChanged}
                 />
+                {group.item.community_name && (
+                  <CommunityPostLabel
+                    communityName={group.item.community_name}
+                    communityImage={group.item.community_image}
+                    className="mt-3"
+                  />
+                )}
               </div>
             </li>
           );
