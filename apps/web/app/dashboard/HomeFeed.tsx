@@ -11,6 +11,8 @@ import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
+import { CommunityPostLabel } from "@/components/communities/CommunityPostLabel";
+import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -232,6 +234,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 currentUserId={currentUserId}
                 communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                 communityName={group.item.community_name ?? undefined}
+                communityImage={group.item.community_image}
+                communityNamePlacement="below"
                 detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
                 onVoteChanged={handleThreadVoteChanged}
@@ -247,21 +251,29 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           return (
             <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
               <div className={communityFeedLayout.row}>
-                {group.item.community_name && (
-                  <p className="mb-2 font-body text-[11px] text-foreground-subtle">
-                    in <span className="text-foreground-muted">{group.item.community_name}</span>
-                  </p>
-                )}
+                <PostAuthorMeta
+                  name={group.item.users?.name}
+                  avatarUrl={group.item.users?.avatar_url}
+                  createdAt={group.item.created_at}
+                  className="mb-3"
+                />
                 <EventCard
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
-                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                  communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
                   onRsvpChanged={handleEventRsvpChanged}
                   onSaveChanged={handleEventSaveChanged}
                 />
+                {group.item.community_name && (
+                  <CommunityPostLabel
+                    communityName={group.item.community_name}
+                    communityImage={group.item.community_image}
+                    className="mt-3"
+                  />
+                )}
               </div>
             </li>
           );
@@ -277,25 +289,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               key={`resource-${res.id}`}
               className={`${communityFeedLayout.gutters} ${showDivider ? communityFeedLayout.dividerBottom : ""}`}
             >
-              {res.community_name && (
-                <div className="pt-6 flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
-                  <span>posted in</span>
-                  {res.community_image ? (
-                    <img
-                      src={res.community_image}
-                      alt={res.community_name}
-                      className="h-4 w-4 shrink-0 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-4 w-4 shrink-0 rounded-full bg-accent/20" />
-                  )}
-                  <span className="text-foreground-muted">{res.community_name}</span>
-                </div>
-              )}
               <ResourceCard
                 resource={{ ...res, community_id: res.community_id ?? "" }}
                 currentUserId={currentUserId}
                 communityId={res.community_id ?? PUBLIC_CONTENT_SCOPE}
+                communityName={res.community_name ?? undefined}
+                communityImage={res.community_image}
                 onUpdated={handleResourceUpdated}
                 onSaveChanged={handleResourceSaveChanged}
                 onBookmarkChanged={handleResourceBookmarkChanged}

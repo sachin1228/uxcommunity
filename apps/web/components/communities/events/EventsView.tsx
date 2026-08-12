@@ -7,6 +7,7 @@ import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { communityFeedLayout } from "../feed-layout";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 // ── Module-level cache ────────────────────────────────────────────────────────
 const eventsCache = new Map<string, { data: CommunityEvent[]; fetchedAt: number }>();
@@ -230,16 +231,23 @@ export function EventsView({
               <section className="px-5 md:px-8">
                 <div className="flex flex-col gap-4">
                   {upcoming.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      currentUserId={currentUserId}
-                      communityId={communityId}
-                      onUpdated={handleUpdated}
-                      onDeleted={handleDeleted}
-                      onRsvpChanged={handleRsvpChanged}
-                      onSaveChanged={handleSaveChanged}
-                    />
+                    <div key={event.id}>
+                      <PostAuthorMeta
+                        name={event.users?.name}
+                        avatarUrl={event.users?.avatar_url}
+                        createdAt={event.created_at}
+                        className="mb-3"
+                      />
+                      <EventCard
+                        event={event}
+                        currentUserId={currentUserId}
+                        communityId={communityId}
+                        onUpdated={handleUpdated}
+                        onDeleted={handleDeleted}
+                        onRsvpChanged={handleRsvpChanged}
+                        onSaveChanged={handleSaveChanged}
+                      />
+                    </div>
                   ))}
                 </div>
               </section>
@@ -248,16 +256,23 @@ export function EventsView({
               <section className="px-5 md:px-8">
                 <div className="flex flex-col gap-4 opacity-60">
                   {past.map((event) => (
-                    <EventCard
-                      key={event.id}
-                      event={event}
-                      currentUserId={currentUserId}
-                      communityId={communityId}
-                      onUpdated={handleUpdated}
-                      onDeleted={handleDeleted}
-                      onRsvpChanged={handleRsvpChanged}
-                      onSaveChanged={handleSaveChanged}
-                    />
+                    <div key={event.id}>
+                      <PostAuthorMeta
+                        name={event.users?.name}
+                        avatarUrl={event.users?.avatar_url}
+                        createdAt={event.created_at}
+                        className="mb-3"
+                      />
+                      <EventCard
+                        event={event}
+                        currentUserId={currentUserId}
+                        communityId={communityId}
+                        onUpdated={handleUpdated}
+                        onDeleted={handleDeleted}
+                        onRsvpChanged={handleRsvpChanged}
+                        onSaveChanged={handleSaveChanged}
+                      />
+                    </div>
                   ))}
                 </div>
               </section>

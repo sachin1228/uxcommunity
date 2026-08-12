@@ -29,6 +29,7 @@ import {
   type ShowcasePost,
 } from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 const cache = new Map<string, { posts: ShowcasePost[]; at: number }>();
 const STALE = 30_000;
@@ -333,26 +334,15 @@ export function ShowcaseView({
                 className={`${communityFeedLayout.row} ${index === visible.length - 1 ? "" : communityFeedLayout.dividerBottom}`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    {post.author.avatar_url ? (
-                      <img
-                        src={post.author.avatar_url}
-                        alt={post.author.name}
-                        className="size-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-10 items-center justify-center rounded-full bg-accent/15 font-body text-sm font-semibold text-accent">
-                        {post.author.name.slice(0, 1)}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="truncate font-body text-[15px] font-semibold text-foreground">
-                        {post.author.name}
-                      </p>
-                      <p className="font-body text-[11px] text-foreground-subtle">
-                        {SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label}
-                      </p>
-                    </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+                    <PostAuthorMeta
+                      name={post.author.name}
+                      avatarUrl={post.author.avatar_url}
+                      createdAt={post.created_at}
+                    />
+                    <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
+                      {SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label}
+                    </span>
                   </div>
                   <span className="shrink-0 rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
                     {SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label}
