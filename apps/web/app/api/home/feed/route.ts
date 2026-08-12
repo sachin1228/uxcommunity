@@ -134,18 +134,40 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [] as { resource_id: string }[] }),
   ]);
 
-  const enrichmentError = enrichmentResults.find(
-    (result): result is typeof enrichmentResults[number] & { error: NonNullable<typeof result.error> } =>
-      "error" in result && Boolean(result.error),
-  )?.error;
+  // Enrichment is supplementary: comment/vote/save counts, author avatars, and
+  // the current user's vote/save state. The primary posts already loaded
+  // successfully above, so a failure in any single enrichment query must NOT
+  // blank out the entire home feed. Log the specific failing query for
+  // diagnosis and fall back to empty data, so its aggregate defaults to 0 /
+  // false while the rest of the feed renders normally.
+  const enrichmentLabels = [
+    "users",
+    "designer_profiles",
+    "communities",
+    "thread_comments",
+    "thread_votes",
+    "my_thread_votes",
+    "thread_saves",
+    "event_rsvps",
+    "my_event_rsvps",
+    "event_saves",
+    "my_event_saves",
+    "event_comments",
+    "resource_saves",
+    "my_resource_saves",
+    "resource_bookmarks",
+    "my_resource_bookmarks",
+    "resource_comments",
+  ] as const;
 
-  if (enrichmentError) {
-    console.error("[GET home feed enrichment]", enrichmentError);
-    return NextResponse.json(
-      { error: "Failed to load post interactions." },
-      { status: 500, headers: { "Cache-Control": "no-store" } },
-    );
-  }
+  enrichmentResults.forEach((result, index) => {
+    if (result && "error" in result && result.error) {
+      console.error(
+        `[GET home feed enrichment] "${enrichmentLabels[index]}" query failed:`,
+        result.error,
+      );
+    }
+  });
 
   const [
     { data: users },
