@@ -11,7 +11,7 @@ export default function ThreadDetailLoading() {
         <div className="mb-5 h-3 w-40 rounded bg-surface-raised" />
 
         {/* Thread content */}
-        <div className="border-y border-border py-2">
+        <div className="relative py-2 before:pointer-events-none before:absolute before:left-1/2 before:top-0 before:w-screen before:-translate-x-1/2 before:border-t before:border-border after:pointer-events-none after:absolute after:bottom-0 after:left-1/2 after:w-screen after:-translate-x-1/2 after:border-b after:border-border">
           <div className="flex items-stretch">
 
             {/* Upvote column */}
