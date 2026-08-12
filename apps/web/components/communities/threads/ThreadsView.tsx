@@ -1,9 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MessageSquarePlus, Plus } from "lucide-react";
+import {
+  CircleHelp,
+  LayoutGrid,
+  Lightbulb,
+  MessageSquarePlus,
+  MessageSquareText,
+  MessagesSquare,
+  Plus,
+  UserRoundPlus,
+  UsersRound,
+} from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import type { CommunityThread } from "./types";
+import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
@@ -25,6 +35,7 @@ export function ThreadsView({
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<ThreadCategory | "all">("all");
 
   const fetchThreads = useCallback(async (background = false) => {
     if (!background) setLoading(true);
@@ -146,9 +157,11 @@ export function ThreadsView({
     writeCache((cur) => cur.filter((t) => t.id !== threadId));
   }
 
+  const filteredThreads = filter === "all" ? threads : threads.filter((thread) => thread.category === filter);
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
+      <div className={`${communityFeedLayout.content} ${!loading && threads.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Threads</h2>
@@ -166,6 +179,36 @@ export function ThreadsView({
             Create Thread
           </button>
         </div>
+
+        {!loading && threads.length > 0 && (
+          <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
+            {[{ value: "all" as const, label: "All", icon: LayoutGrid }, ...THREAD_CATEGORIES.map((item) => ({
+              ...item,
+              icon: {
+                question: CircleHelp,
+                discussion: MessagesSquare,
+                idea: Lightbulb,
+                feedback: MessageSquareText,
+                referral: UserRoundPlus,
+                collaboration: UsersRound,
+              }[item.value],
+            }))].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => setFilter(item.value)}
+                  aria-pressed={filter === item.value}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {error && (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
@@ -230,8 +273,14 @@ export function ThreadsView({
       )}
 
       {!loading && threads.length > 0 && (
-        <div className={`${communityFeedLayout.content} ${communityFeedLayout.dividerList}`}>
-          {threads.map((thread, index) => (
+        <div className={communityFeedLayout.content}>
+          {filteredThreads.length === 0 ? (
+            <div className={communityFeedLayout.emptyState}>
+              <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+              <h3 className={communityFeedLayout.emptyTitle}>No threads in this category</h3>
+              <p className={communityFeedLayout.emptyDescription}>Try a different filter or start a new thread.</p>
+            </div>
+          ) : filteredThreads.map((thread, index) => (
             <ThreadCard
               key={thread.id}
               thread={thread}
@@ -241,7 +290,7 @@ export function ThreadsView({
               onVoteChanged={handleVoteChanged}
               onSaveChanged={handleSaveChanged}
               onDeleted={handleDeleted}
-              isLast={index === threads.length - 1}
+              isLast={index === filteredThreads.length - 1}
             />
           ))}
         </div>
