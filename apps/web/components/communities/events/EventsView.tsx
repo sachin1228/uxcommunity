@@ -143,17 +143,18 @@ export function EventsView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
+        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Events</h2>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
-              Community meetups, workshops, and get-togethers.
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              <span className="block">Community meetups, workshops, and</span>
+              <span className="block">get-togethers.</span>
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
             <Plus size={14} /> Create Event
           </button>
@@ -167,11 +168,11 @@ export function EventsView({
         )}
 
         {loading ? (
-          <div className="space-y-3 animate-pulse">
+          <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface overflow-hidden">
-                <div className="h-9 bg-surface-raised border-b border-border" />
-                <div className="px-4 py-3 space-y-2">
+              <div key={i} className={communityFeedLayout.skeletonRow}>
+                <div className="h-3 w-28 rounded bg-surface-raised" />
+                <div className="mt-4 space-y-2">
                   <div className="h-4 w-2/3 rounded bg-surface-raised" />
                   <div className="h-3 w-full rounded bg-surface-raised" />
                   <div className="h-3 w-4/5 rounded bg-surface-raised" />
@@ -184,10 +185,10 @@ export function EventsView({
             ))}
           </div>
         ) : events.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <CalendarX2 size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No events yet</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">Create the first event for your community.</p>
+          <div className={communityFeedLayout.emptyState}>
+            <CalendarX2 size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (
           <div className="space-y-8">

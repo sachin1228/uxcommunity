@@ -396,7 +396,7 @@ export function ThreadDetailClient({
               onPosted={handleCommentPosted}
             />
           ) : (
-            <div className="rounded-lg border border-dashed border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
+            <div className="border-y border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
               Replies are closed for this thread.
             </div>
           )}
@@ -434,9 +434,9 @@ export function ThreadDetailClient({
           )}
 
           {comments.length === 0 && (
-            <div className="mt-6 rounded-xl border border-dashed border-border px-6 py-10 text-center">
-              <MessageSquare size={22} className="mx-auto text-foreground-subtle" />
-              <p className="mt-2 font-body text-sm text-foreground-muted">No comments yet. Be the first!</p>
+            <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
+              <MessageSquare size={22} className={communityFeedLayout.emptyIcon} />
+              <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
             </div>
           )}
         </div>

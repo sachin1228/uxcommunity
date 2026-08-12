@@ -132,17 +132,18 @@ export function ResourcesView({
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.content} ${communityFeedLayout.pageHeader}`}>
-        <div className="mb-6 flex items-start justify-between gap-4">
-          <div>
+        <div className="mb-6 flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Resources</h2>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
-              Figma files, articles, tools, and more — shared by your community.
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+              <span className="block">Figma files, articles, tools, and more — shared by your</span>
+              <span className="block">community.</span>
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
             <Plus size={14} /> Share Resource
           </button>
@@ -194,9 +195,9 @@ export function ResourcesView({
         )}
 
         {loading ? (
-          <div className="space-y-3 animate-pulse">
+          <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-border bg-surface p-4">
+              <div key={i} className={communityFeedLayout.skeletonRow}>
                 <div className="flex items-center justify-between">
                   <div className="h-5 w-20 rounded-full bg-surface-raised" />
                   <div className="h-5 w-5 rounded bg-surface-raised" />
@@ -215,18 +216,18 @@ export function ResourcesView({
             ))}
           </div>
         ) : resources.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <BookMarked size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No resources yet</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
+          <div className={communityFeedLayout.emptyState}>
+            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
+            <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
             </p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
-            <BookMarked size={28} className="mx-auto text-foreground-subtle" />
-            <h3 className="mt-3 font-display text-base font-semibold text-foreground">No resources in this category</h3>
-            <p className="mt-1 font-body text-sm text-foreground-muted">Try a different filter or share one yourself.</p>
+          <div className={communityFeedLayout.emptyState}>
+            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
+            <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>
         ) : (
           <div className={communityFeedLayout.dividerList}>

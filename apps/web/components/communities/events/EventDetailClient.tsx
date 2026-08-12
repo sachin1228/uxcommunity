@@ -624,9 +624,9 @@ export function EventDetailClient({
 
               {/* Comments list */}
               {commentsLoading ? (
-                <div className="space-y-4 animate-pulse">
+                <div className="animate-pulse border-t border-border">
                   {[1, 2].map((i) => (
-                    <div key={i} className="flex gap-3">
+                    <div key={i} className="flex gap-3 border-b border-border py-5">
                       <div className="h-8 w-8 rounded-full bg-surface-raised shrink-0" />
                       <div className="flex-1 space-y-2 pt-1">
                         <div className="h-3 w-24 rounded bg-surface-raised" />
@@ -636,9 +636,9 @@ export function EventDetailClient({
                   ))}
                 </div>
               ) : rootComments.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
-                  <MessageSquare size={22} className="mx-auto text-foreground-subtle" />
-                  <p className="mt-2 font-body text-sm text-foreground-muted">No comments yet. Be the first to start the discussion!</p>
+                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                  <MessageSquare size={22} className={communityFeedLayout.emptyIcon} />
+                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
                 </div>
               ) : (
                 <div className="space-y-5">
@@ -680,9 +680,9 @@ export function EventDetailClient({
           {activeTab === "attendees" && (
             <div className="mt-5">
               {rsvps.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border px-6 py-10 text-center">
-                  <Users size={22} className="mx-auto text-foreground-subtle" />
-                  <p className="mt-2 font-body text-sm text-foreground-muted">No attendees yet. Be the first to join!</p>
+                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                  <Users size={22} className={communityFeedLayout.emptyIcon} />
+                  <p className={communityFeedLayout.emptyDescription}>No attendees yet. Be the first to join!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
