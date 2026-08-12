@@ -118,6 +118,8 @@ export function ThreadCard({
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
+  const [interactionError, setInteractionError] = useState<string | null>(null);
+  const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -130,6 +132,12 @@ export function ThreadCard({
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
+
+  function showInteractionError(message: string) {
+    setInteractionError(message);
+    if (interactionErrorTimerRef.current) clearTimeout(interactionErrorTimerRef.current);
+    interactionErrorTimerRef.current = setTimeout(() => setInteractionError(null), 4000);
+  }
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault();
@@ -167,9 +175,23 @@ export function ThreadCard({
               body: JSON.stringify({ voted }),
             },
           );
-          if (!response.ok) throw new Error("Failed to update like");
-          const result = (await response.json()) as { voted: boolean };
+          const result = (await response.json().catch(() => null)) as {
+            voted?: boolean;
+            count?: number;
+            error?: string;
+          } | null;
+          if (!response.ok || typeof result?.voted !== "boolean") {
+            throw new Error(result?.error ?? "Failed to update like.");
+          }
+          if (typeof result.count === "number") {
+            optimisticCountRef.current = result.count;
+            setOptimisticVote({ voted: result.voted, count: result.count });
+            onVoteChanged(thread.id, result.voted, result.count);
+          }
           return result.voted;
+        },
+        onError: (error) => {
+          showInteractionError(error instanceof Error ? error.message : "Failed to update like.");
         },
       });
     }
@@ -193,9 +215,17 @@ export function ThreadCard({
               body: JSON.stringify({ saved }),
             },
           );
-          if (!response.ok) throw new Error("Failed to update save");
-          const result = (await response.json()) as { saved: boolean };
+          const result = (await response.json().catch(() => null)) as {
+            saved?: boolean;
+            error?: string;
+          } | null;
+          if (!response.ok || typeof result?.saved !== "boolean") {
+            throw new Error(result?.error ?? "Failed to update save.");
+          }
           return result.saved;
+        },
+        onError: (error) => {
+          showInteractionError(error instanceof Error ? error.message : "Failed to update save.");
         },
       });
     }
@@ -205,6 +235,7 @@ export function ThreadCard({
   useEffect(() => () => {
     voteCoalescerRef.current?.dispose();
     saveCoalescerRef.current?.dispose();
+    if (interactionErrorTimerRef.current) clearTimeout(interactionErrorTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -506,6 +537,12 @@ export function ThreadCard({
         return <>{imageGrid}{fileList}</>;
       })()}
 
+
+      {interactionError && (
+        <p role="status" className="mt-3 font-body text-xs text-red-400">
+          {interactionError}
+        </p>
+      )}
 
       {/* ── Footer: like · comments · bookmark ── */}
       <div className="mt-3 flex items-center gap-4">

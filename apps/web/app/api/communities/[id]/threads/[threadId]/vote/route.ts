@@ -32,7 +32,11 @@ export async function POST(
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
     : threadQuery.eq("community_id", communityId);
-  const { data: thread } = await threadQuery.maybeSingle();
+  const { data: thread, error: threadError } = await threadQuery.maybeSingle();
+  if (threadError) {
+    console.error("[LOOKUP thread for vote]", threadError);
+    return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
+  }
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   const { data: existing, error: lookupError } = await db
@@ -77,7 +81,17 @@ export async function POST(
       if (!notification.ok) notificationWarning = "Like saved, but notification delivery failed.";
     }
 
-    return NextResponse.json({ voted: true, notificationWarning });
+    const { count, error: countError } = await db
+      .from("thread_votes")
+      .select("thread_id", { count: "exact", head: true })
+      .eq("thread_id", threadId);
+
+    if (countError) {
+      console.error("[COUNT votes]", countError);
+      return NextResponse.json({ error: "Like saved, but its count could not be confirmed." }, { status: 500 });
+    }
+
+    return NextResponse.json({ voted: true, count: count ?? 0, notificationWarning });
   }
 
   const { error } = await db
@@ -91,5 +105,15 @@ export async function POST(
     return NextResponse.json({ error: "Failed to remove like." }, { status: 500 });
   }
 
-  return NextResponse.json({ voted: false });
+  const { count, error: countError } = await db
+    .from("thread_votes")
+    .select("thread_id", { count: "exact", head: true })
+    .eq("thread_id", threadId);
+
+  if (countError) {
+    console.error("[COUNT votes]", countError);
+    return NextResponse.json({ error: "Like removed, but its count could not be confirmed." }, { status: 500 });
+  }
+
+  return NextResponse.json({ voted: false, count: count ?? 0 });
 }
