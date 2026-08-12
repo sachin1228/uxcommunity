@@ -3,13 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Bookmark,
+  Box,
+  CalendarClock,
+  ChevronDown,
+  CircleEllipsis,
   ExternalLink,
   Heart,
   Image,
+  LayoutGrid,
   Loader2,
   MessageCircle,
+  Monitor,
+  PenTool,
+  Play,
   Plus,
   Send,
+  Tag,
   X,
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
@@ -229,28 +238,52 @@ export function ShowcaseView({
           </button>
         </div>
         {!loading && posts.length > 0 && (
-          <div className="flex flex-col gap-4">
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {SHOWCASE_CATEGORIES.map((item) => (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {SHOWCASE_CATEGORIES.map((item) => {
+              const Icon = {
+                all: LayoutGrid,
+                ui_ux: Monitor,
+                branding: Tag,
+                illustration: PenTool,
+                motion: Play,
+                product: Box,
+                other: CircleEllipsis,
+              }[item.value];
+
+              return (
                 <button
                   key={item.value}
+                  type="button"
                   onClick={() => setCategory(item.value)}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 font-body text-xs ${category === item.value ? "border-accent bg-accent/10 text-accent" : "border-border text-foreground-muted hover:text-foreground"}`}
+                  aria-pressed={category === item.value}
+                  className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 font-body text-xs transition-colors ${category === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
+                  <Icon size={16} aria-hidden="true" />
                   {item.label}
                 </button>
-              ))}
-            </div>
-            <div className="flex justify-end">
+              );
+            })}
+            <div className="mx-2 h-8 w-px shrink-0 bg-border" aria-hidden="true" />
+            <div className="relative shrink-0">
+              <CalendarClock
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+                aria-hidden="true"
+              />
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as "newest" | "popular")}
                 aria-label="Sort showcase posts"
-                className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground outline-none"
+                className="h-10 appearance-none rounded-lg border border-border bg-surface-raised py-2 pl-9 pr-9 font-body text-xs text-foreground outline-none transition-colors hover:border-foreground-subtle focus:border-accent"
               >
                 <option value="newest">Newest first</option>
                 <option value="popular">Most discussed</option>
               </select>
+              <ChevronDown
+                size={15}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-foreground-muted"
+                aria-hidden="true"
+              />
             </div>
           </div>
         )}
