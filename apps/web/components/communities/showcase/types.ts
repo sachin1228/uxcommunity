@@ -11,7 +11,13 @@ export const SHOWCASE_TYPES: { value: ShowcasePostType; label: string }[] = [
 ];
 export interface ShowcasePost {
   id: string; community_id: string; user_id: string; post_type: ShowcasePostType; title: string; description: string;
-  image_url: string; project_url: string | null; category: ShowcaseCategory; tags: string[]; created_at: string;
+  image_url: string; project_url: string | null; category: ShowcaseCategory; tags: string[]; created_at: string; updated_at: string;
   like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean;
   author: { name: string; avatar_url: string | null };
+}
+
+export interface ShowcaseComment {
+  id: string; post_id: string; user_id: string; parent_id: string | null; body: string; created_at: string; updated_at: string;
+  users: { name: string; avatar_url: string | null } | null;
+  replies: ShowcaseComment[];
 }

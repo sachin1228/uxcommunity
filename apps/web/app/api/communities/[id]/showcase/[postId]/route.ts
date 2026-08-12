@@ -1,49 +1,82 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
-import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
-  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
-  const { id, postId } = await params;
-  const userId = session.userId!;
-  const db = createServiceClient();
-  const [{ data: membership }, { data: post }] = await Promise.all([
-    db.from("community_members").select("joined_at").eq("community_id", id).eq("user_id", userId).maybeSingle(),
-    db.from("community_showcase_posts").select("id").eq("id", postId).eq("community_id", id).maybeSingle(),
+const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
+const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
+
+async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
+  return db.from("community_showcase_posts").select("*").eq("id", postId).eq("community_id", communityId).maybeSingle();
+}
+
+async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<string, unknown>, userId: string) {
+  const postId = row.id as string;
+  const authorId = row.user_id as string;
+  const [{ data: user }, { data: profile }, { data: likes }, { data: myLike }, { data: mySave }, { count }] = await Promise.all([
+    db.from("users").select("name").eq("id", authorId).maybeSingle(),
+    db.from("designer_profiles").select("avatar_url").eq("user_id", authorId).maybeSingle(),
+    db.from("showcase_likes").select("post_id").eq("post_id", postId),
+    db.from("showcase_likes").select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+    db.from("showcase_saves").select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+    db.from("showcase_comments").select("id", { count: "exact", head: true }).eq("post_id", postId),
   ]);
-  if (!membership || !post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
-  let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const action = body.action;
-  if (action === "like" || action === "save") {
-    const table = action === "like" ? "showcase_likes" : "showcase_saves";
-    const { data: existing } = await db.from(table).select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle();
-    const result = existing ? await db.from(table).delete().eq("post_id", postId).eq("user_id", userId) : await db.from(table).insert({ post_id: postId, user_id: userId });
-    if (result.error) return NextResponse.json({ error: "Could not update post." }, { status: 500 });
-    return NextResponse.json({ active: !existing });
-  }
-  if (action === "comment") {
-    const limit = await rateLimit(`showcase:comment:${userId}:60s`, 15, 60);
-    if (!limit.success) return NextResponse.json({ error: "Too many comments." }, { status: 429 });
-    const comment = typeof body.body === "string" ? body.body.trim() : "";
-    if (!comment || comment.length > 1000) return NextResponse.json({ error: "Comment must be 1–1000 characters." }, { status: 422 });
-    const { data, error } = await db.from("showcase_comments").insert({ post_id: postId, user_id: userId, body: comment }).select("id, body, created_at").single();
-    if (error) return NextResponse.json({ error: "Could not add comment." }, { status: 500 });
-    return NextResponse.json({ comment: data }, { status: 201 });
-  }
-  return NextResponse.json({ error: "Invalid action." }, { status: 422 });
+  return { ...row, author: { name: user?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: count ?? 0, user_liked: Boolean(myLike), user_saved: Boolean(mySave) };
+}
+
+async function requireMember(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
+  const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
+  return Boolean(data);
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
-  const { id, postId } = await params;
-  const db = createServiceClient();
-  const { data: membership } = await db.from("community_members").select("joined_at").eq("community_id", id).eq("user_id", session.userId!).maybeSingle();
-  if (!membership) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const { data, error } = await db.from("showcase_comments").select("id, user_id, body, created_at").eq("post_id", postId).order("created_at");
-  if (error) return NextResponse.json({ error: "Could not load comments." }, { status: 500 });
-  const userIds = [...new Set((data ?? []).map((item) => item.user_id))];
-  const { data: users } = userIds.length ? await db.from("users").select("id, name").in("id", userIds) : { data: [] };
-  const names = Object.fromEntries((users ?? []).map((item) => [item.id, item.name]));
-  return NextResponse.json({ comments: (data ?? []).map((item) => ({ ...item, author_name: names[item.user_id] ?? "Community member" })) });
+  const { id, postId } = await params; const db = createServiceClient(); const userId = session.userId!;
+  if (!(await requireMember(db, id, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
+  const { data, error } = await getPost(db, id, postId);
+  if (error) return NextResponse.json({ error: "Failed to load showcase post." }, { status: 500 });
+  if (!data) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  return NextResponse.json({ post: await enrich(db, data, userId) });
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
+  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
+  if (!(await requireMember(db, id, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
+  const { data: post } = await getPost(db, id, postId); if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  if (body.action !== "like" && body.action !== "save") return NextResponse.json({ error: "Invalid action." }, { status: 422 });
+  const table = body.action === "like" ? "showcase_likes" : "showcase_saves";
+  const { data: existing } = await db.from(table).select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle();
+  const result = existing ? await db.from(table).delete().eq("post_id", postId).eq("user_id", userId) : await db.from(table).insert({ post_id: postId, user_id: userId });
+  if (result.error) return NextResponse.json({ error: "Could not update post." }, { status: 500 });
+  return NextResponse.json({ active: !existing });
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
+  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
+  const { data: existing } = await getPost(db, id, postId);
+  if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only edit your own showcase posts." }, { status: 403 });
+  let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  const title = typeof body.title === "string" ? body.title.trim() : ""; const description = typeof body.description === "string" ? body.description.trim() : "";
+  const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : ""; const projectUrl = typeof body.project_url === "string" ? body.project_url.trim() || null : null;
+  const postType = typeof body.post_type === "string" ? body.post_type : ""; const category = typeof body.category === "string" ? body.category : "";
+  const tags = Array.isArray(body.tags) ? [...new Set(body.tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.trim()).filter(Boolean))] : [];
+  if (!title || title.length > 120 || description.length > 1200 || !imageUrl || imageUrl.length > 2048 || !TYPES.has(postType) || !CATEGORIES.has(category) || tags.length > 5 || tags.some((tag) => tag.length > 30)) return NextResponse.json({ error: "One or more showcase fields are invalid." }, { status: 422 });
+  if (projectUrl) { try { const url = new URL(projectUrl); if (!["http:", "https:"].includes(url.protocol)) throw new Error(); } catch { return NextResponse.json({ error: "Project URL must be a valid web address." }, { status: 422 }); } }
+  const { data, error } = await db.from("community_showcase_posts").update({ title, description, image_url: imageUrl, project_url: projectUrl, post_type: postType, category, tags }).eq("id", postId).eq("user_id", userId).select("*").single();
+  if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
+  return NextResponse.json({ post: await enrich(db, data, userId) });
+}
+
+export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
+  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
+  const { data: existing } = await getPost(db, id, postId);
+  if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
+  const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
+  if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+  return new NextResponse(null, { status: 204 });
 }
