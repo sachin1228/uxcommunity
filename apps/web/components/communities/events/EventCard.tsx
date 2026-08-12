@@ -183,11 +183,11 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
 
   return (
     <>
-      <article className={`group py-5 ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
+      <article className={`group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border border-border rounded-xl overflow-hidden"}`}>
         <Link href={eventHref} className="block">
           <div className="flex gap-4">
             {/* Cover image / gradient — left panel */}
-            <div className="relative w-36 shrink-0 overflow-hidden rounded-xl">
+            <div className="relative w-36 shrink-0 overflow-hidden rounded-none">
               {event.cover_image_url ? (
                 <img
                   src={event.cover_image_url}
@@ -200,7 +200,7 @@ export function EventCard({ event, currentUserId, communityId, onUpdated, onDele
             </div>
 
             {/* Content — right panel */}
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5 py-1">
+            <div className="flex min-w-0 py-5 pl-2 pr-4 flex-1 flex-col gap-1.5">
               {/* Top row: badge + action buttons */}
               <div className="flex items-start justify-between gap-2">
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
