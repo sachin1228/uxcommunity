@@ -326,7 +326,7 @@ export function ShowcaseView({
             </p>
           </div>
         ) : (
-          <div className={communityFeedLayout.dividerList}>
+          <div>
             {visible.map((post, index) => (
               <article
                 key={post.id}

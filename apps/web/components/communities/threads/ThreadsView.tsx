@@ -230,7 +230,7 @@ export function ThreadsView({
       )}
 
       {!loading && threads.length > 0 && (
-        <div className={`${communityFeedLayout.content} ${communityFeedLayout.dividerList}`}>
+        <div className={communityFeedLayout.content}>
           {threads.map((thread, index) => (
             <ThreadCard
               key={thread.id}

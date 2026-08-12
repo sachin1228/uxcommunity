@@ -233,7 +233,7 @@ export function ResourcesView({
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>
         ) : (
-          <div className={communityFeedLayout.dividerList}>
+          <div>
             {filtered.map((resource) => (
               <div
                 key={resource.id}
