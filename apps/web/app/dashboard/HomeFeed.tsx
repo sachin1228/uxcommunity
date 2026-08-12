@@ -11,6 +11,7 @@ import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
+import { formatRelativeDate } from "@/components/communities/threads/threadShared";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -254,12 +255,34 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                     in <span className="text-foreground-muted">{group.item.community_name}</span>
                   </p>
                 )}
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
+                    {group.item.users?.avatar_url ? (
+                      <img
+                        src={group.item.users.avatar_url}
+                        alt={group.item.users.name}
+                        className="h-10 w-10 object-cover"
+                      />
+                    ) : (
+                      <span className="font-display text-sm font-bold text-accent">
+                        {(group.item.users?.name ?? "Member").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-body text-[15px] font-semibold text-foreground">
+                      {group.item.users?.name ?? "Member"}
+                    </span>
+                    <span className="font-body text-[11px] text-foreground-subtle">
+                      {formatRelativeDate(group.item.created_at)}
+                    </span>
+                  </div>
+                </div>
                 <EventCard
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   currentUserId={currentUserId}
                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
-                  communityName={group.item.community_name ?? undefined}
-                  communityImage={group.item.community_image}
+                  showAuthorMeta={false}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}

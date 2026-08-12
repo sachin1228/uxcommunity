@@ -8,7 +8,6 @@ import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { formatRelativeDate } from "../threads/threadShared";
-import { CommunityPostLabel } from "../CommunityPostLabel";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -69,8 +68,8 @@ interface EventCardProps {
   detailHref?: string;
   /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
-  communityName?: string;
-  communityImage?: string | null;
+  /** Lets the home feed render author metadata outside the event card. */
+  showAuthorMeta?: boolean;
 }
 
 export function EventCard({
@@ -83,8 +82,7 @@ export function EventCard({
   onSaveChanged,
   detailHref,
   edgeToEdgeDivider = false,
-  communityName,
-  communityImage,
+  showAuthorMeta = true,
 }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -222,20 +220,21 @@ export function EventCard({
 
             {/* Content — right panel */}
             <div className="flex min-w-0 py-5 pl-2 pr-4 flex-1 flex-col gap-1.5">
-              {/* Author + posted time */}
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
-                  {event.users?.avatar_url ? (
-                    <img src={event.users.avatar_url} alt={authorName} className="h-10 w-10 object-cover" />
-                  ) : (
-                    <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
-                  )}
+              {showAuthorMeta && (
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
+                    {event.users?.avatar_url ? (
+                      <img src={event.users.avatar_url} alt={authorName} className="h-10 w-10 object-cover" />
+                    ) : (
+                      <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-body text-[15px] font-semibold text-foreground">{authorName}</span>
+                    <span className="font-body text-[11px] text-foreground-subtle">{dateLabel}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-body text-[15px] font-semibold text-foreground">{authorName}</span>
-                  <span className="font-body text-[11px] text-foreground-subtle">{dateLabel}</span>
-                </div>
-              </div>
+              )}
 
               {/* Top row: badge + action buttons */}
               <div className="flex items-start justify-between gap-2">
@@ -365,13 +364,6 @@ export function EventCard({
               </div>
             </div>
           </div>
-          {communityName && (
-            <CommunityPostLabel
-              communityName={communityName}
-              communityImage={communityImage}
-              className="mx-4 mb-4 mt-3"
-            />
-          )}
         </Link>
       </article>
 
