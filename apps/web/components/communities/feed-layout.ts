@@ -1,9 +1,9 @@
 export const communityFeedLayout = {
   content: "mx-auto w-full max-w-4xl",
   detailContent: "mx-auto w-full max-w-3xl",
-  gutters: "px-4 sm:px-6 lg:px-16",
-  pageHeader: "px-4 py-6 sm:px-6 lg:px-16",
-  row: "px-4 py-6 sm:px-6 lg:px-16",
+  gutters: "px-5 md:px-8",
+  pageHeader: "px-5 py-7 md:px-8",
+  row: "px-5 py-6 md:px-8",
   detailPage: "px-4 py-6 sm:px-6 lg:px-16",
   dividerList: "relative before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:border-t before:border-border",
   dividerBottom: "relative after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border",
@@ -13,6 +13,6 @@ export const communityFeedLayout = {
   emptyTitle: "font-display text-base font-semibold text-foreground",
   emptyDescription: "mt-1 max-w-md text-pretty font-body text-sm leading-6 text-foreground-muted",
   skeletonList: "relative animate-pulse before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:border-t before:border-border",
-  skeletonRow: "relative px-4 py-6 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border sm:px-6 lg:px-16",
+  skeletonRow: "relative px-5 py-6 after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:border-b after:border-border md:px-8",
   skeletonLine: "rounded bg-surface-raised",
 } as const;
