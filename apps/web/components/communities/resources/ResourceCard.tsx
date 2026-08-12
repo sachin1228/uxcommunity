@@ -11,6 +11,8 @@ import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
+import { CommunityPostLabel } from "../CommunityPostLabel";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
@@ -37,16 +39,6 @@ function useOgImage(url: string): string | null {
   }, [url]);
 
   return image;
-}
-
-function formatRelativeDate(value: string) {
-  const elapsed = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(1, Math.floor(elapsed / 60_000));
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
 }
 
 function getDomain(url: string) {
@@ -80,6 +72,8 @@ interface ResourceCardProps {
   edgeToEdgeDivider?: boolean;
   /** Lets a parent list render the divider outside the card gutters. */
   hideDivider?: boolean;
+  communityName?: string;
+  communityImage?: string | null;
 }
 
 export function ResourceCard({
@@ -92,6 +86,8 @@ export function ResourceCard({
   onDeleted,
   edgeToEdgeDivider = false,
   hideDivider = false,
+  communityName,
+  communityImage,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
   const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
@@ -233,9 +229,6 @@ export function ResourceCard({
     void flushBookmarkIntent();
   }
 
-  const authorName    = resource.users?.name ?? "Member";
-  const authorInitial = authorName.charAt(0).toUpperCase();
-
   return (
     <>
       <article
@@ -252,37 +245,24 @@ export function ResourceCard({
 
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {/* Avatar */}
-              <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center">
-                {resource.users?.avatar_url ? (
-                  <img src={resource.users.avatar_url} alt={authorName} className="h-9 w-9 object-cover" />
-                ) : (
-                  <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
-                )}
-              </div>
-
-              {/* Name + time + type pill */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                <div className="flex flex-col">
-                  <span className="font-body text-xs font-medium text-foreground">{authorName}</span>
-                  <span className="font-body text-[11px] text-foreground-subtle">
-                    {formatRelativeDate(resource.created_at)}
-                  </span>
-                </div>
-                <span className="font-body text-[11px] text-foreground-subtle">·</span>
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
-                  style={{
-                    border: `1px solid ${typeColor.border}`,
-                    color: typeColor.text,
-                    background: typeColor.bg,
-                  }}
-                >
-                  <ResourceTypeIcon type={resource.resource_type} size={10} />
-                  {typeInfo?.label ?? resource.resource_type}
-                </span>
-              </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+              <PostAuthorMeta
+                name={resource.users?.name}
+                avatarUrl={resource.users?.avatar_url}
+                createdAt={resource.created_at}
+              />
+              <span className="font-body text-[11px] text-foreground-subtle">·</span>
+              <span
+                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
+                style={{
+                  border: `1px solid ${typeColor.border}`,
+                  color: typeColor.text,
+                  background: typeColor.bg,
+                }}
+              >
+                <ResourceTypeIcon type={resource.resource_type} size={10} />
+                {typeInfo?.label ?? resource.resource_type}
+              </span>
             </div>
 
             {/* ··· menu */}
@@ -369,6 +349,14 @@ export function ResourceCard({
                 onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
               />
             </div>
+          )}
+
+          {communityName && (
+            <CommunityPostLabel
+              communityName={communityName}
+              communityImage={communityImage}
+              className="mt-3"
+            />
           )}
 
           {/* ── Footer: like · bookmark ── */}

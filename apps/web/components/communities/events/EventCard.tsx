@@ -69,7 +69,17 @@ interface EventCardProps {
   edgeToEdgeDivider?: boolean;
 }
 
-export function EventCard({ event, currentUserId, communityId, onUpdated, onDeleted, onRsvpChanged, onSaveChanged, detailHref, edgeToEdgeDivider = false }: EventCardProps) {
+export function EventCard({
+  event,
+  currentUserId,
+  communityId,
+  onUpdated,
+  onDeleted,
+  onRsvpChanged,
+  onSaveChanged,
+  detailHref,
+  edgeToEdgeDivider = false,
+}: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
