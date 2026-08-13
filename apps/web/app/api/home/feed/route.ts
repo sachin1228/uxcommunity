@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { createServerTimer } from "@/lib/server-timing";
+
+type InteractionCounts = {
+  threads: Record<string, { comment_count: number; vote_count: number; user_voted: boolean; user_saved: boolean }>;
+  events: Record<string, { comment_count: number; rsvp_count: number; user_rsvped: boolean; save_count: number; user_saved: boolean }>;
+  resources: Record<string, { comment_count: number; save_count: number; user_saved: boolean; bookmark_count: number; user_bookmarked: boolean }>;
+};
 
 const PAGE_SIZE = 30;
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const timer = createServerTimer("GET /api/home/feed");
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  timer.checkpoint("auth");
   const userId = session.userId!;
   const db = createServiceClient();
 
@@ -83,55 +92,18 @@ export async function GET(req: NextRequest) {
   const eventIds     = all.filter((i) => i._type === "event").map((i) => i.id);
   const resourceIds  = all.filter((i) => i._type === "resource").map((i) => i.id);
 
+  timer.checkpoint("feed_queries");
+
   const enrichmentResults = await Promise.all([
     db.from("users").select("id, name").in("id", userIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
     db.from("communities").select("id, name, image_url").in("id", communityIds),
-    // threads
-    threadIds.length
-      ? db.from("thread_comments").select("thread_id").in("thread_id", threadIds)
-      : Promise.resolve({ data: [] as { thread_id: string }[] }),
-    threadIds.length
-      ? db.from("thread_votes").select("thread_id").in("thread_id", threadIds)
-      : Promise.resolve({ data: [] as { thread_id: string }[] }),
-    threadIds.length
-      ? db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { thread_id: string }[] }),
-    threadIds.length
-      ? db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { thread_id: string }[] }),
-    // events
-    eventIds.length
-      ? db.from("event_rsvps").select("event_id").in("event_id", eventIds)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
-    eventIds.length
-      ? db.from("event_rsvps").select("event_id").in("event_id", eventIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
-    eventIds.length
-      ? db.from("event_saves").select("event_id").in("event_id", eventIds)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
-    eventIds.length
-      ? db.from("event_saves").select("event_id").in("event_id", eventIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
-    eventIds.length
-      ? db.from("event_comments").select("event_id").in("event_id", eventIds)
-      : Promise.resolve({ data: [] as { event_id: string }[] }),
-    // resources
-    resourceIds.length
-      ? db.from("resource_saves").select("resource_id").in("resource_id", resourceIds)
-      : Promise.resolve({ data: [] as { resource_id: string }[] }),
-    resourceIds.length
-      ? db.from("resource_saves").select("resource_id").in("resource_id", resourceIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { resource_id: string }[] }),
-    resourceIds.length
-      ? db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds)
-      : Promise.resolve({ data: [] as { resource_id: string }[] }),
-    resourceIds.length
-      ? db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds).eq("user_id", userId)
-      : Promise.resolve({ data: [] as { resource_id: string }[] }),
-    resourceIds.length
-      ? db.from("resource_comments").select("resource_id").in("resource_id", resourceIds)
-      : Promise.resolve({ data: [] as { resource_id: string }[] }),
+    db.rpc("get_home_feed_interactions", {
+      p_user_id: userId,
+      p_thread_ids: threadIds,
+      p_event_ids: eventIds,
+      p_resource_ids: resourceIds,
+    }),
   ]);
 
   // Enrichment is supplementary: comment/vote/save counts, author avatars, and
@@ -144,20 +116,7 @@ export async function GET(req: NextRequest) {
     "users",
     "designer_profiles",
     "communities",
-    "thread_comments",
-    "thread_votes",
-    "my_thread_votes",
-    "thread_saves",
-    "event_rsvps",
-    "my_event_rsvps",
-    "event_saves",
-    "my_event_saves",
-    "event_comments",
-    "resource_saves",
-    "my_resource_saves",
-    "resource_bookmarks",
-    "my_resource_bookmarks",
-    "resource_comments",
+    "home_feed_interactions",
   ] as const;
 
   enrichmentResults.forEach((result, index) => {
@@ -173,54 +132,19 @@ export async function GET(req: NextRequest) {
     { data: users },
     { data: profiles },
     { data: communities },
-    { data: threadComments },
-    { data: threadVotes },
-    { data: myThreadVotes },
-    { data: myThreadSaves },
-    { data: eventRsvps },
-    { data: myEventRsvps },
-    { data: eventSaves },
-    { data: myEventSaves },
-    { data: eventComments },
-    { data: resourceSaves },
-    { data: myResourceSaves },
-    { data: resourceBookmarks },
-    { data: myResourceBookmarks },
-    { data: resourceComments },
+    { data: interactionData },
   ] = enrichmentResults;
+  timer.checkpoint("enrichment");
 
+  const interactions = (interactionData ?? {
+    threads: {},
+    events: {},
+    resources: {},
+  }) as InteractionCounts;
   const userMap      = Object.fromEntries(((users ?? []) as Array<{ id: string; name: string }>).map((u) => [u.id, u.name]));
   const avatarMap    = Object.fromEntries(((profiles ?? []) as Array<{ user_id: string; avatar_url: string | null }>).map((p) => [p.user_id, p.avatar_url]));
   const communityMap    = Object.fromEntries(((communities ?? []) as Array<{ id: string; name: string }>).map((c) => [c.id, c.name]));
   const communityImgMap = Object.fromEntries(((communities ?? []) as Array<{ id: string; image_url: string | null }>).map((c) => [c.id, c.image_url ?? null]));
-
-  // Thread aggregates
-  const threadCmtCount: Record<string, number> = {};
-  for (const c of (threadComments ?? [])) threadCmtCount[c.thread_id] = (threadCmtCount[c.thread_id] ?? 0) + 1;
-  const voteCount: Record<string, number> = {};
-  for (const v of (threadVotes ?? [])) voteCount[v.thread_id] = (voteCount[v.thread_id] ?? 0) + 1;
-  const myVoteSet  = new Set((myThreadVotes  ?? []).map((v) => v.thread_id));
-  const mySaveSet  = new Set((myThreadSaves  ?? []).map((s) => s.thread_id));
-
-  // Event aggregates
-  const eventRsvpCount: Record<string, number> = {};
-  for (const r of (eventRsvps ?? [])) eventRsvpCount[r.event_id] = (eventRsvpCount[r.event_id] ?? 0) + 1;
-  const eventSaveCount: Record<string, number> = {};
-  for (const s of (eventSaves ?? [])) eventSaveCount[s.event_id] = (eventSaveCount[s.event_id] ?? 0) + 1;
-  const eventCmtCount: Record<string, number> = {};
-  for (const c of (eventComments ?? [])) eventCmtCount[c.event_id] = (eventCmtCount[c.event_id] ?? 0) + 1;
-  const myEventRsvpSet = new Set((myEventRsvps ?? []).map((r) => r.event_id));
-  const myEventSaveSet = new Set((myEventSaves ?? []).map((s) => s.event_id));
-
-  // Resource aggregates
-  const resSaveCount: Record<string, number> = {};
-  for (const s of (resourceSaves ?? [])) resSaveCount[s.resource_id] = (resSaveCount[s.resource_id] ?? 0) + 1;
-  const resBookmarkCount: Record<string, number> = {};
-  for (const b of (resourceBookmarks ?? [])) resBookmarkCount[b.resource_id] = (resBookmarkCount[b.resource_id] ?? 0) + 1;
-  const resCmtCount: Record<string, number> = {};
-  for (const c of (resourceComments ?? [])) resCmtCount[c.resource_id] = (resCmtCount[c.resource_id] ?? 0) + 1;
-  const myResSaveSet     = new Set((myResourceSaves     ?? []).map((s) => s.resource_id));
-  const myResBookmarkSet = new Set((myResourceBookmarks ?? []).map((b) => b.resource_id));
 
   const items = all.map((item) => {
     const userObj = userMap[item.user_id]
@@ -241,10 +165,10 @@ export async function GET(req: NextRequest) {
         links: (base as { links?: unknown }).links ?? [],
         allow_replies: (base as { allow_replies?: unknown }).allow_replies ?? true,
         updated_at: base.created_at,
-        comment_count: threadCmtCount[item.id] ?? 0,
-        vote_count: voteCount[item.id] ?? 0,
-        user_voted: myVoteSet.has(item.id),
-        user_saved: mySaveSet.has(item.id),
+        comment_count: interactions.threads[item.id]?.comment_count ?? 0,
+        vote_count: interactions.threads[item.id]?.vote_count ?? 0,
+        user_voted: interactions.threads[item.id]?.user_voted ?? false,
+        user_saved: interactions.threads[item.id]?.user_saved ?? false,
       };
     }
     if (item._type === "event") {
@@ -254,24 +178,27 @@ export async function GET(req: NextRequest) {
         meet_link: (base as { meet_link?: string | null }).meet_link ?? null,
         max_attendees: (base as { max_attendees?: number | null }).max_attendees ?? null,
         updated_at: base.created_at,
-        comment_count: eventCmtCount[item.id] ?? 0,
-        rsvp_count: eventRsvpCount[item.id] ?? 0,
-        user_rsvped: myEventRsvpSet.has(item.id),
-        save_count: eventSaveCount[item.id] ?? 0,
-        user_saved: myEventSaveSet.has(item.id),
+        comment_count: interactions.events[item.id]?.comment_count ?? 0,
+        rsvp_count: interactions.events[item.id]?.rsvp_count ?? 0,
+        user_rsvped: interactions.events[item.id]?.user_rsvped ?? false,
+        save_count: interactions.events[item.id]?.save_count ?? 0,
+        user_saved: interactions.events[item.id]?.user_saved ?? false,
       };
     }
     // resource
     return {
       ...base,
       updated_at: base.created_at,
-      comment_count: resCmtCount[item.id] ?? 0,
-      save_count: resSaveCount[item.id] ?? 0,
-      user_saved: myResSaveSet.has(item.id),
-      bookmark_count: resBookmarkCount[item.id] ?? 0,
-      user_bookmarked: myResBookmarkSet.has(item.id),
+      comment_count: interactions.resources[item.id]?.comment_count ?? 0,
+      save_count: interactions.resources[item.id]?.save_count ?? 0,
+      user_saved: interactions.resources[item.id]?.user_saved ?? false,
+      bookmark_count: interactions.resources[item.id]?.bookmark_count ?? 0,
+      user_bookmarked: interactions.resources[item.id]?.user_bookmarked ?? false,
     };
   });
+
+  timer.checkpoint("serialization");
+  timer.finish();
 
   return NextResponse.json(
     { items },
