@@ -111,24 +111,17 @@ export async function GET() {
   let enrichedEvents: unknown[] = events;
   if (events.length) {
     const ids = events.map((e) => e.id);
-    const [{ data: allRsvps }, { data: myRsvps }, { data: allLikes }, { data: myLikes }] = await Promise.all([
+    const [{ data: allRsvps }, { data: myRsvps }] = await Promise.all([
       db.from("event_rsvps").select("event_id").in("event_id", ids),
       db.from("event_rsvps").select("event_id").in("event_id", ids).eq("user_id", userId),
-      db.from("event_likes").select("event_id").in("event_id", ids),
-      db.from("event_likes").select("event_id").in("event_id", ids).eq("user_id", userId),
     ]);
     const rsvpCounts: Record<string, number> = {};
     for (const r of allRsvps ?? []) rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] ?? 0) + 1;
     const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
-    const likeCounts: Record<string, number> = {};
-    for (const like of allLikes ?? []) likeCounts[like.event_id] = (likeCounts[like.event_id] ?? 0) + 1;
-    const myLikeSet = new Set((myLikes ?? []).map((like) => like.event_id));
     enrichedEvents = events.map((e) => ({
       ...e,
       rsvp_count: rsvpCounts[e.id] ?? 0,
       user_rsvped: myRsvpSet.has(e.id),
-      like_count: likeCounts[e.id] ?? 0,
-      user_liked: myLikeSet.has(e.id),
     }));
   }
 

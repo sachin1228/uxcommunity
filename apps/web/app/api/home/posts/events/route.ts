@@ -85,8 +85,6 @@ export async function POST(request: NextRequest) {
       user_rsvped: false,
       save_count: 0,
       user_saved: false,
-      like_count: 0,
-      user_liked: false,
     },
   }, { status: 201 });
 }
