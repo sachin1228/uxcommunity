@@ -4,12 +4,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Calendar, CornerDownRight, ExternalLink,
-  Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
-  Send, Trash2, Users, Video,
+  Heart, Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
+  Send, Share2, Trash2, Users, Video,
 } from "lucide-react";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { communityFeedLayout } from "../feed-layout";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -313,6 +314,7 @@ export function EventDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
+  const [savePending, setSavePending] = useState(false);
   const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
 
   // Comments (flat list, built into tree on render)
@@ -383,6 +385,28 @@ export function EventDetailClient({
     }
   }
 
+  async function handleSave() {
+    if (savePending) return;
+    const previousSaved = event.user_saved;
+    const previousCount = event.save_count;
+    setEvent((current) => ({
+      ...current,
+      user_saved: !previousSaved,
+      save_count: previousCount + (previousSaved ? -1 : 1),
+    }));
+    setSavePending(true);
+    try {
+      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { method: "POST" });
+      if (!res.ok) throw new Error("Unable to update like");
+      const data = await res.json();
+      setEvent((current) => ({ ...current, user_saved: data.saved, save_count: data.save_count }));
+    } catch {
+      setEvent((current) => ({ ...current, user_saved: previousSaved, save_count: previousCount }));
+    } finally {
+      setSavePending(false);
+    }
+  }
+
   // ── Composer ──
 
   async function handlePostComment(e?: React.FormEvent) {
@@ -442,17 +466,73 @@ export function EventDetailClient({
             {backLabel}
           </a>
         )}
-        {/* Main event card — horizontal */}
-        <div className="mx-5 overflow-hidden rounded-xl border border-border bg-surface md:mx-8">
-          <div className="flex min-h-[160px] gap-5 p-4 md:p-6">
-            <div className="relative w-44 shrink-0 overflow-hidden rounded-xl">
+        {/* Feed-style author header */}
+        <div className={`relative mb-4 flex items-center gap-3 ${communityFeedLayout.detailSection}`}>
+          <Avatar
+            name={event.users?.name ?? "Community member"}
+            avatarUrl={event.users?.avatar_url ?? null}
+            size="lg"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-baseline gap-2">
+              <span className="truncate font-display text-base font-semibold text-foreground">
+                {event.users?.name ?? "Community member"}
+              </span>
+              <span className="shrink-0 font-body text-xs text-foreground-subtle">
+                {fmtRelative(event.created_at)}
+              </span>
+            </div>
+            <p className="truncate font-body text-xs text-foreground-muted">
+              Event · {event.is_online ? "Online" : event.location ?? communityName}
+            </p>
+          </div>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Event options"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-9 z-20 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { void handleShare(); setMenuOpen(false); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                >
+                  <Share2 size={12} /> {shared ? "Copied!" : "Share event"}
+                </button>
+                {isOwner && (
+                  <>
+                    <button type="button" onClick={() => { setMenuOpen(false); setShowEditModal(true); }}
+                      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                      <Pencil size={12} /> Edit event
+                    </button>
+                    <button type="button" onClick={handleDeleteEvent} disabled={deleting}
+                      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+                      {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                      {deleting ? "Deleting…" : "Delete event"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Main event card — matches the homepage card */}
+        <div className={`overflow-hidden rounded-xl border border-border bg-surface ${communityFeedLayout.detailSection}`}>
+          <div className="flex min-h-[190px] flex-col sm:flex-row">
+            <div className="relative aspect-video w-full shrink-0 overflow-hidden sm:aspect-auto sm:w-44">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
                 : <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]}`} />}
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
-              <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-2">
                 <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
                   past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"
                 }`}>
@@ -476,31 +556,7 @@ export function EventDetailClient({
                       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
                     </button>
                   )}
-                  <button type="button" onClick={handleShare}
-                    className="rounded-md border border-border px-3 py-1 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
-                    {shared ? "Copied!" : "Share"}
-                  </button>
-                  {isOwner && (
-                    <div className="relative">
-                      <button type="button" onClick={() => setMenuOpen((p) => !p)} aria-label="Event options"
-                        className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                        <MoreHorizontal size={13} />
-                      </button>
-                      {menuOpen && (
-                        <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                          <button type="button" onClick={() => { setMenuOpen(false); setShowEditModal(true); }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                            <Pencil size={11} /> Edit event
-                          </button>
-                          <button type="button" onClick={handleDeleteEvent} disabled={deleting}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
-                            {deleting ? "Deleting…" : "Delete event"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+
                 </div>
               </div>
 
@@ -552,6 +608,30 @@ export function EventDetailClient({
           </div>
         </div>
 
+        {/* Engagement and community metadata — same hierarchy as the homepage */}
+        <div className={`mt-3 flex items-center justify-between gap-4 ${communityFeedLayout.detailSection}`}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={savePending}
+            aria-label={event.user_saved ? "Unlike" : "Like"}
+            aria-pressed={event.user_saved}
+            className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Heart
+              size={20}
+              strokeWidth={2}
+              className={`transition-transform duration-150 group-hover/like:scale-110 ${
+                event.user_saved ? "fill-red-500 text-red-500" : "fill-none text-foreground"
+              }`}
+            />
+            <span className={`font-body text-sm font-semibold tabular-nums ${event.user_saved ? "text-red-500" : "text-foreground"}`}>
+              {event.save_count}
+            </span>
+          </button>
+          <CommunityPostLabel communityName={communityName} communityImage={null} className="min-w-0 justify-end text-right" />
+        </div>
+
         {/* ── Tabs ────────────────────────────────────────────────── */}
         <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
           <div className="flex border-b border-border">
@@ -591,6 +671,7 @@ export function EventDetailClient({
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handlePostComment();
                     }}
                     placeholder="Write a comment… (⌘↵ to post)"
