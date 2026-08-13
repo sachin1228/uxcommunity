@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Loader2, Maximize2 } from "lucide-react";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 interface FigmaEmbedProps {
@@ -13,11 +13,19 @@ interface FigmaEmbedProps {
 export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedProps) {
   const embedUrl = useMemo(() => getFigmaEmbedUrl(url), [url]);
   const [loaded, setLoaded] = useState(false);
+  const embedRef = useRef<HTMLDivElement>(null);
 
   if (!embedUrl) return null;
 
+  async function viewFullscreen() {
+    await embedRef.current?.requestFullscreen();
+  }
+
   return (
-    <div className={`overflow-hidden rounded-xl border border-border bg-surface-raised ${className}`}>
+    <div
+      ref={embedRef}
+      className={`overflow-hidden rounded-xl border border-border bg-surface-raised ${className}`}
+    >
       <div className={`relative w-full ${compact ? "aspect-[4/3] sm:aspect-video" : "aspect-[4/3] md:aspect-video"}`}>
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-foreground-muted">
@@ -39,14 +47,14 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
         <span className="font-body text-xs text-foreground-muted">Interactive prototype</span>
-        <a
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={viewFullscreen}
           className="inline-flex min-h-8 items-center gap-1.5 font-body text-xs font-medium text-accent hover:text-accent-hover"
+          aria-label="View prototype in full screen"
         >
-          Open in Figma <ExternalLink size={12} />
-        </a>
+          View full screen <Maximize2 size={12} />
+        </button>
       </div>
     </div>
   );
