@@ -236,6 +236,8 @@ export function EventsView({
                         name={event.users?.name}
                         avatarUrl={event.users?.avatar_url}
                         createdAt={event.created_at}
+                        dateInline
+                        secondaryLabel="Events · Event"
                         className="mb-3"
                       />
                       <EventCard
@@ -261,6 +263,8 @@ export function EventsView({
                         name={event.users?.name}
                         avatarUrl={event.users?.avatar_url}
                         createdAt={event.created_at}
+                        dateInline
+                        secondaryLabel="Events · Event"
                         className="mb-3"
                       />
                       <EventCard

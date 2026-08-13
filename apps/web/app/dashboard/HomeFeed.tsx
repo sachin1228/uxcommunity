@@ -255,6 +255,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   name={group.item.users?.name}
                   avatarUrl={group.item.users?.avatar_url}
                   createdAt={group.item.created_at}
+                  dateInline
+                  secondaryLabel="Events · Event"
                   className="mb-3"
                 />
                 <EventCard

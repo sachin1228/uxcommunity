@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
-import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { EditResourceModal } from "./EditResourceModal";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
@@ -45,21 +44,6 @@ function getDomain(url: string) {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 }
 
-/** Per-type color tokens — border, icon/text, background tint */
-const TYPE_COLORS: Record<string, { border: string; text: string; bg: string }> = {
-  figma:       { border: "#7C3AED", text: "#A78BFA", bg: "rgba(124,58,237,0.10)" },
-  article:     { border: "#0070F3", text: "#60A5FA", bg: "rgba(0,112,243,0.10)"  },
-  tool:        { border: "#EA580C", text: "#FB923C", bg: "rgba(234,88,12,0.10)"  },
-  video:       { border: "#DC2626", text: "#F87171", bg: "rgba(220,38,38,0.10)"  },
-  book:        { border: "#D97706", text: "#FCD34D", bg: "rgba(217,119,6,0.10)"  },
-  font:        { border: "#0891B2", text: "#67E8F9", bg: "rgba(8,145,178,0.10)"  },
-  icon_pack:   { border: "#16A34A", text: "#4ADE80", bg: "rgba(22,163,74,0.10)"  },
-  color:       { border: "#DB2777", text: "#F472B6", bg: "rgba(219,39,119,0.10)" },
-  template:    { border: "#4F46E5", text: "#818CF8", bg: "rgba(79,70,229,0.10)"  },
-  inspiration: { border: "#CA8A04", text: "#FDE047", bg: "rgba(202,138,4,0.10)"  },
-  other:       { border: "#525252", text: "#A3A3A3", bg: "rgba(82,82,82,0.10)"   },
-};
-
 interface ResourceCardProps {
   resource: CommunityResource;
   currentUserId: string;
@@ -90,7 +74,6 @@ export function ResourceCard({
   communityImage,
 }: ResourceCardProps) {
   const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
-  const typeColor  = TYPE_COLORS[resource.resource_type] ?? TYPE_COLORS["other"];
   const isOwner    = resource.user_id === currentUserId;
   const ogImage    = useOgImage(resource.url);
 
@@ -245,25 +228,13 @@ export function ResourceCard({
 
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-              <PostAuthorMeta
-                name={resource.users?.name}
-                avatarUrl={resource.users?.avatar_url}
-                createdAt={resource.created_at}
-              />
-              <span className="font-body text-[11px] text-foreground-subtle">·</span>
-              <span
-                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
-                style={{
-                  border: `1px solid ${typeColor.border}`,
-                  color: typeColor.text,
-                  background: typeColor.bg,
-                }}
-              >
-                <ResourceTypeIcon type={resource.resource_type} size={10} />
-                {typeInfo?.label ?? resource.resource_type}
-              </span>
-            </div>
+            <PostAuthorMeta
+              name={resource.users?.name}
+              avatarUrl={resource.users?.avatar_url}
+              createdAt={resource.created_at}
+              dateInline
+              secondaryLabel={`Resources · ${typeInfo?.label ?? "Post"}`}
+            />
 
             {/* ··· menu */}
             <div
