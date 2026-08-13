@@ -303,7 +303,19 @@ export function ThreadCard({
             <MoreHorizontal size={15} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-8 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={(e) => {
+                  handleSave(e);
+                  setMenuOpen(false);
+                }}
+                aria-pressed={displayedSaved}
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+              >
+                <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
+                {displayedSaved ? "Unsave thread" : "Save thread"}
+              </button>
               {isOwner ? (
                 <>
                   <button
@@ -522,7 +534,7 @@ export function ThreadCard({
         </p>
       )}
 
-      {/* ── Footer: like · comments · bookmark ── */}
+      {/* ── Footer: like · comments ── */}
       <div className="mt-3 flex items-center gap-4">
         {/* Like (Instagram-style heart) */}
         <button
@@ -556,25 +568,6 @@ export function ThreadCard({
           {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
         </span>
 
-        <div className="flex-1" />
-
-        {/* Bookmark */}
-        {!isDetail && (
-          <button
-            type="button"
-            aria-label={displayedSaved ? "Unsave thread" : "Save thread"}
-            aria-pressed={displayedSaved}
-            onClick={handleSave}
-            className="group/save flex h-7 w-7 items-center justify-center rounded-md text-white"
-          >
-            <Bookmark
-              size={20}
-              strokeWidth={2}
-              fill={displayedSaved ? "currentColor" : "none"}
-              className="transition-transform duration-150 ease-out group-hover/save:scale-110"
-            />
-          </button>
-        )}
       </div>
     </>
   );
