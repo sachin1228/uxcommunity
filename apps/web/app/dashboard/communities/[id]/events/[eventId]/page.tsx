@@ -24,19 +24,29 @@ async function getEvent(
   if (!data) return null;
 
   const authorId = data.user_id;
-  const [{ data: userRow }, { data: profileRow }, { data: allRsvps }, { data: myRsvp }] =
-    await Promise.all([
-      db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
-      db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
-      db.from("event_rsvps").select("event_id").eq("event_id", eventId),
-      db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-    ]);
+  const [
+    { data: userRow },
+    { data: profileRow },
+    { data: allRsvps },
+    { data: myRsvp },
+    { data: allSaves },
+    { data: mySave },
+  ] = await Promise.all([
+    db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
+    db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
+    db.from("event_rsvps").select("event_id").eq("event_id", eventId),
+    db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
+    db.from("event_saves").select("event_id").eq("event_id", eventId),
+    db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
+  ]);
 
   return {
     ...(data as unknown as CommunityEvent),
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     rsvp_count: (allRsvps ?? []).length,
     user_rsvped: Boolean(myRsvp),
+    save_count: (allSaves ?? []).length,
+    user_saved: Boolean(mySave),
   };
 }
 

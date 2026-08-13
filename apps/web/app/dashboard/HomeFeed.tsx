@@ -12,6 +12,7 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
+import { createBrowserClient } from "@/lib/supabase/browser";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -29,28 +30,50 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchFeed = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
+    try {
+      const response = await fetch("/api/home/feed", { cache: "no-store" });
+      const data = (await response.json().catch(() => null)) as {
+        items?: FeedItem[];
+        error?: string;
+      } | null;
+      if (!response.ok) throw new Error(data?.error ?? "Failed to load the feed.");
+      setItems(data?.items ?? []);
+      setError(null);
+    } catch (fetchError: unknown) {
+      setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const controller = new AbortController();
+    void fetchFeed();
+    let supabase: ReturnType<typeof createBrowserClient>;
+    try { supabase = createBrowserClient(); } catch { return; }
 
-    fetch("/api/home/feed", { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const data = (await response.json().catch(() => null)) as {
-          items?: FeedItem[];
-          error?: string;
-        } | null;
-        if (!response.ok) throw new Error(data?.error ?? "Failed to load the feed.");
-        setItems(data?.items ?? []);
-      })
-      .catch((fetchError: unknown) => {
-        if (fetchError instanceof DOMException && fetchError.name === "AbortError") return;
-        setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+    const saveChannel = supabase
+      .channel("home-event-saves")
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "event_saves",
+      }, () => void fetchFeed(true))
+      .subscribe();
 
-    return () => controller.abort();
-  }, [refreshToken]);
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void fetchFeed(true);
+    };
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    window.addEventListener("focus", refreshOnFocus);
+
+    return () => {
+      supabase.removeChannel(saveChannel);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [fetchFeed, refreshToken]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
