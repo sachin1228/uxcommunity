@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, Heart, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
@@ -351,6 +351,28 @@ export function EventCard({
           </div>
         </Link>
       </article>
+
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={savePending}
+        aria-label={event.user_saved ? "Unlike" : "Like"}
+        aria-pressed={event.user_saved}
+        className="group/like mt-3 flex items-center gap-2 disabled:cursor-not-allowed"
+      >
+        <Heart
+          size={20}
+          strokeWidth={2}
+          className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+            event.user_saved
+              ? "fill-red-500 text-red-500"
+              : "fill-none text-white"
+          }`}
+        />
+        <span className={`font-body text-sm font-semibold tabular-nums ${event.user_saved ? "text-red-500" : "text-white"}`}>
+          {event.save_count}
+        </span>
+      </button>
 
       {showEditModal && (
         <EditEventModal

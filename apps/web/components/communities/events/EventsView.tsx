@@ -76,19 +76,7 @@ export function EventsView({
         event: "*",
         schema: "public",
         table: "event_saves",
-      }, (payload) => {
-        // Optimistically update save_count without a full refetch
-        const row = (payload.new ?? payload.old) as { event_id?: string; user_id?: string } | null;
-        if (!row?.event_id) return;
-        setEvents((prev) => prev.map((e) => {
-          if (e.id !== row.event_id) return e;
-          const delta = payload.eventType === "INSERT" ? 1 : payload.eventType === "DELETE" ? -1 : 0;
-          const user_saved = row.user_id === currentUserId
-            ? payload.eventType === "INSERT"
-            : e.user_saved;
-          return { ...e, save_count: Math.max(0, e.save_count + delta), user_saved };
-        }));
-      })
+      }, () => void fetchEvents(true))
       .subscribe();
 
     const handleFocus = () => { if (document.visibilityState === "visible") void fetchEvents(true); };
