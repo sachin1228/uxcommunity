@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
@@ -67,6 +67,8 @@ interface EventCardProps {
   detailHref?: string;
   /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
+  /** Positions the options menu in the surrounding post-author header. */
+  menuInPostHeader?: boolean;
 }
 
 export function EventCard({
@@ -79,6 +81,7 @@ export function EventCard({
   onSaveChanged,
   detailHref,
   edgeToEdgeDivider = false,
+  menuInPostHeader = false,
 }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -242,24 +245,18 @@ export function EventCard({
                       {rsvpPending ? "…" : event.user_rsvped ? "Going ✓" : full ? "Full" : "Join Event"}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className="rounded-md border border-border px-2.5 py-1 font-body text-[11px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  >
-                    {shared ? "Copied!" : "Share"}
-                  </button>
-
-
                   {/* Options menu — visible to all users */}
-                  <div ref={menuRef} className="relative">
+                  <div
+                    ref={menuRef}
+                    className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : "relative"}
+                  >
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p); }}
                       aria-label="Event options"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+                      className={`flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground ${menuInPostHeader ? "" : "border border-border"}`}
                     >
-                      <MoreHorizontal size={13} />
+                      <MoreHorizontal size={menuInPostHeader ? 15 : 13} />
                     </button>
                     {menuOpen && (
                       <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -274,6 +271,17 @@ export function EventCard({
                         >
                           <Bookmark size={11} fill={event.user_saved ? "currentColor" : "none"} />
                           {event.user_saved ? "Unsave event" : "Save event"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            void handleShare(e);
+                            setMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                        >
+                          <Share2 size={11} />
+                          {shared ? "Copied!" : "Share event"}
                         </button>
                         {isOwner && (
                           <>

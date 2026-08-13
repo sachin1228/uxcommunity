@@ -250,7 +250,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "event") {
           return (
             <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
-              <div className={communityFeedLayout.row}>
+              <div className={`${communityFeedLayout.row} relative`}>
                 <PostAuthorMeta
                   name={group.item.users?.name}
                   avatarUrl={group.item.users?.avatar_url}
@@ -264,6 +264,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   currentUserId={currentUserId}
                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
+                  menuInPostHeader
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
                   onRsvpChanged={handleEventRsvpChanged}
