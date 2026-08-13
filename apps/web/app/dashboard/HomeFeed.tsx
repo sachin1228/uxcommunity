@@ -11,7 +11,6 @@ import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
-import { CommunityPostLabel } from "@/components/communities/CommunityPostLabel";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 
 // Feed item as returned by /api/home/feed — typed union
@@ -265,18 +264,13 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   menuInPostHeader
+                  communityName={group.item.community_name ?? undefined}
+                  communityImage={group.item.community_image}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
                   onRsvpChanged={handleEventRsvpChanged}
                   onSaveChanged={handleEventSaveChanged}
                 />
-                {group.item.community_name && (
-                  <CommunityPostLabel
-                    communityName={group.item.community_name}
-                    communityImage={group.item.community_image}
-                    className="mt-3"
-                  />
-                )}
               </div>
             </li>
           );

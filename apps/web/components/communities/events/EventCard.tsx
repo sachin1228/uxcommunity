@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, Heart, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -69,6 +70,8 @@ interface EventCardProps {
   edgeToEdgeDivider?: boolean;
   /** Positions the options menu in the surrounding post-author header. */
   menuInPostHeader?: boolean;
+  communityName?: string;
+  communityImage?: string | null;
 }
 
 export function EventCard({
@@ -82,6 +85,8 @@ export function EventCard({
   detailHref,
   edgeToEdgeDivider = false,
   menuInPostHeader = false,
+  communityName,
+  communityImage,
 }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -351,6 +356,39 @@ export function EventCard({
           </div>
         </Link>
       </article>
+
+      {/* Footer: engagement · community */}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={savePending}
+          aria-label={event.user_saved ? "Unlike" : "Like"}
+          aria-pressed={event.user_saved}
+          className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed"
+        >
+          <Heart
+            size={20}
+            strokeWidth={2}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+              event.user_saved
+                ? "fill-red-500 text-red-500"
+                : "fill-none text-white"
+            }`}
+          />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_saved ? "text-red-500" : "text-white"}`}>
+            {event.save_count}
+          </span>
+        </button>
+
+        {communityName && (
+          <CommunityPostLabel
+            communityName={communityName}
+            communityImage={communityImage}
+            className="min-w-0 justify-end text-right"
+          />
+        )}
+      </div>
 
       {showEditModal && (
         <EditEventModal
