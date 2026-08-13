@@ -52,27 +52,28 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const db = createServiceClient();
   if (!(await member(db, id, session.userId!))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
   const cursor = request.nextUrl.searchParams.get("cursor");
-  let query = db.from("community_showcase_posts")
-    .select("id, community_id, user_id, title, description, image_url, project_url, post_type, category, tags, created_at, updated_at")
-    .eq("community_id", id)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(SHOWCASE_PAGE_SIZE + 1);
+  let cursorCreatedAt: string | null = null;
+  let cursorId: string | null = null;
   if (cursor) {
-    const [createdAt, postId] = cursor.split("|");
-    if (!createdAt || !postId || Number.isNaN(Date.parse(createdAt))) {
+    [cursorCreatedAt, cursorId] = cursor.split("|");
+    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
       return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
     }
-    query = query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${postId})`);
   }
-  const { data, error } = await query;
+  const { data, error } = await db.rpc("get_showcase_list_page", {
+    p_community_id: id,
+    p_user_id: session.userId!,
+    p_cursor_created_at: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_limit: SHOWCASE_PAGE_SIZE + 1,
+  });
   if (error) return NextResponse.json({ error: "Failed to load showcase posts." }, { status: 500 });
   const page = (data ?? []).slice(0, SHOWCASE_PAGE_SIZE) as Record<string, unknown>[];
   const last = page.at(-1);
   const nextCursor = (data?.length ?? 0) > SHOWCASE_PAGE_SIZE && last
     ? `${last.created_at as string}|${last.id as string}`
     : null;
-  return NextResponse.json({ posts: await enrich(db, page, session.userId!), nextCursor });
+  return NextResponse.json({ posts: page, nextCursor });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
