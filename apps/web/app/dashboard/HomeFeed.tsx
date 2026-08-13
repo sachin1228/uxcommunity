@@ -55,6 +55,15 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
+    const likeChannel = supabase
+      .channel("home-event-likes")
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "event_likes",
+      }, () => void fetchFeed(true, true))
+      .subscribe();
+
     const saveChannel = supabase
       .channel("home-event-saves")
       .on("postgres_changes", {
@@ -72,6 +81,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
     return () => {
       window.clearTimeout(initialFetch);
+      supabase.removeChannel(likeChannel);
       supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", refreshOnFocus);
       window.removeEventListener("focus", refreshOnFocus);
@@ -118,6 +128,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     setItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === id
         ? { ...it, user_rsvped: rsvped, rsvp_count: count }
+        : it
+    ));
+  }, []);
+
+  const handleEventLikeChanged = useCallback((id: string, liked: boolean, count: number) => {
+    setItems((prev) => prev.map((it) =>
+      it._type === "event" && it.id === id
+        ? { ...it, user_liked: liked, like_count: count }
         : it
     ));
   }, []);
@@ -294,8 +312,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   communityImage={group.item.community_image}
                   onUpdated={handleEventUpdated}
                   onDeleted={handleEventDeleted}
-                  onRsvpChanged={handleEventRsvpChanged}
-                  onSaveChanged={handleEventSaveChanged}
+                onRsvpChanged={handleEventRsvpChanged}
+                onLikeChanged={handleEventLikeChanged}
+                onSaveChanged={handleEventSaveChanged}
                 />
               </div>
             </li>

@@ -83,6 +83,8 @@ export async function POST(request: NextRequest) {
       users: user ? { name: user.name, avatar_url: profile?.avatar_url ?? null } : null,
       rsvp_count: 0,
       user_rsvped: false,
+      like_count: 0,
+      user_liked: false,
       save_count: 0,
       user_saved: false,
     },

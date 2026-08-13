@@ -17,6 +17,8 @@ export interface CommunityEvent {
   // enriched
   rsvp_count: number;
   user_rsvped: boolean;
+  like_count: number;
+  user_liked: boolean;
   save_count: number;
   user_saved: boolean;
   users: { name: string; avatar_url: string | null } | null;
