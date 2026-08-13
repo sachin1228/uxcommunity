@@ -34,14 +34,14 @@ export function PostAuthorMeta({
       </div>
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-body text-[15px] font-semibold text-foreground">
+            {authorName}
+          </span>
           {dateInline && (
             <span className="shrink-0 font-body text-[11px] text-foreground-subtle">
               {relativeDate}
             </span>
           )}
-          <span className="truncate font-body text-[15px] font-semibold text-foreground">
-            {authorName}
-          </span>
         </div>
         <span className="font-body text-[11px] text-foreground-subtle">
           {secondaryLabel ?? (!dateInline ? relativeDate : null)}
