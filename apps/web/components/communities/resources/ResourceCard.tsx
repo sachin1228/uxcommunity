@@ -327,23 +327,15 @@ export function ResourceCard({
             </a>
           ) : null}
 
-          {communityName && (
-            <CommunityPostLabel
-              communityName={communityName}
-              communityImage={communityImage}
-              className="mt-3"
-            />
-          )}
-
-          {/* ── Footer: like ── */}
-          <div className="mt-3 flex items-center gap-4">
+          {/* ── Footer: engagement · community ── */}
+          <div className="mt-3 flex items-center justify-between gap-4">
             {/* Heart / like */}
             <button
               type="button"
               onClick={handleSave}
               aria-label={displayedSaved ? "Unlike" : "Like"}
               aria-pressed={displayedSaved}
-              className="group/like flex items-center gap-2"
+              className="group/like flex shrink-0 items-center gap-2"
             >
               <Heart
                 size={20}
@@ -359,6 +351,13 @@ export function ResourceCard({
               </span>
             </button>
 
+            {communityName && (
+              <CommunityPostLabel
+                communityName={communityName}
+                communityImage={communityImage}
+                className="min-w-0 justify-end text-right"
+              />
+            )}
           </div>
         </div>
       </article>
