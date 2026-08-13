@@ -45,10 +45,12 @@ export function ShowcaseView({
   const router = useRouter();
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/showcase`;
-  const cached = getCachedRequest<{ posts?: ShowcasePost[] }>(requestUrl, currentUserId);
+  const cached = getCachedRequest<{ posts?: ShowcasePost[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [category, setCategory] = useState<ShowcaseCategory | "all">("all");
   const [sort, setSort] = useState<"newest" | "popular">("newest");
   const [creating, setCreating] = useState(false);
@@ -58,13 +60,16 @@ export function ShowcaseView({
 
   useEffect(() => {
     let cancelled = false;
-    void fetchJsonCached<{ posts?: ShowcasePost[] }>(
+    void fetchJsonCached<{ posts?: ShowcasePost[]; nextCursor?: string | null }>(
       requestUrl,
       { staleMs: STALE },
       currentUserId,
     )
       .then((data) => {
-        if (!cancelled) setPosts(data.posts ?? []);
+        if (!cancelled) {
+          setPosts(data.posts ?? []);
+          setNextCursor(data.nextCursor ?? null);
+        }
       })
       .catch(() => setError("We couldn't load the showcase."))
       .finally(() => setLoading(false));
@@ -101,6 +106,25 @@ export function ShowcaseView({
       (current) => ({ ...current, posts: next }),
       currentUserId,
     );
+  }
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const response = await fetch(`${requestUrl}?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!response.ok) throw new Error();
+      const data = await response.json() as { posts?: ShowcasePost[]; nextCursor?: string | null };
+      const byId = new Map(posts.map((post) => [post.id, post]));
+      for (const post of data.posts ?? []) byId.set(post.id, post);
+      replacePosts([...byId.values()]);
+      setNextCursor(data.nextCursor ?? null);
+      setError(null);
+    } catch {
+      setError("We couldn't load more showcase posts.");
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   function patch(id: string, change: Partial<ShowcasePost>) {
@@ -405,6 +429,18 @@ export function ShowcaseView({
                 </div>
               </article>
             ))}
+            {nextCursor && (
+              <div className="flex justify-center py-6">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

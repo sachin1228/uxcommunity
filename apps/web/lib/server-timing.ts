@@ -1,11 +1,21 @@
 type TimingDetails = Record<string, number>
 
+const encoder = new TextEncoder()
+const round = (value: number) => Math.round(value * 100) / 100
+
+export function estimateJsonBytes(value: unknown) {
+  try {
+    return encoder.encode(JSON.stringify(value)).byteLength
+  } catch {
+    return 0
+  }
+}
+
 export function createServerTimer(label: string) {
   const startedAt = performance.now()
   let checkpointAt = startedAt
   const details: TimingDetails = {}
-
-  const round = (value: number) => Math.round(value * 100) / 100
+  let finished = false
 
   return {
     checkpoint(name: string) {
@@ -25,11 +35,24 @@ export function createServerTimer(label: string) {
       details[name] = round(value)
     },
     finish(extra: TimingDetails = {}) {
-      if (process.env.NODE_ENV !== "development") return
+      if (finished) return
+      finished = true
 
       Object.assign(details, extra)
       details.total = round(performance.now() - startedAt)
-      console.debug(`[server-timing] ${label}`, details)
+
+      if (process.env.NODE_ENV === "development") {
+        console.debug(`[server-timing] ${label}`, details)
+        return
+      }
+
+      if (process.env.NODE_ENV === "production") {
+        console.info(JSON.stringify({
+          event: "performance.server",
+          route: label,
+          metrics: details,
+        }))
+      }
     },
   }
 }

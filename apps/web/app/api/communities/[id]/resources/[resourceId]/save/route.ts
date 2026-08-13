@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { createNotification, getActorName, resourceHref } from "@/lib/notifications";
+import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -60,15 +60,14 @@ export async function POST(
       .insert({ resource_id: resourceId, user_id: userId });
     if (error) { console.error("[INSERT save]", error); return NextResponse.json({ error: "Failed to save resource." }, { status: 500 }); }
 
-    const actorName = await getActorName(db, userId);
-    await createNotification(db, {
+    deferNotification({
       userId: resource.user_id,
       actorId: userId,
       communityId,
       type: "resource_save",
       entityType: "resource",
       entityId: resourceId,
-      title: `${actorName} saved your resource`,
+      title: (actorName) => `${actorName} saved your resource`,
       body: resource.title,
       href: resourceHref(communityId, resourceId),
     });

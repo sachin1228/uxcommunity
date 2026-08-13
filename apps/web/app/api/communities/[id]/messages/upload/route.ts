@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compressChatImage } from "@/lib/image-utils";
@@ -22,7 +22,7 @@ export async function POST(
 ) {
   const timer = createServerTimer("POST /api/communities/[id]/messages/upload");
   const finish = (response: Response) => {
-    timer.finish();
+    timer.finish({ status: response.status });
     return response;
   };
 
@@ -66,6 +66,7 @@ export async function POST(
   if (file.size > MAX_INPUT_BYTES) {
     return finish(NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 }));
   }
+  timer.record("input_bytes", file.size);
 
   let source: Buffer;
   try {
@@ -82,13 +83,18 @@ export async function POST(
     timer.measure("compression", () => compressChatImage(source).catch(() => null)),
   ]);
 
-  await timer.measure("moderation_audit_insert", () =>
-    logModerationDecision(db, {
-      userId,
-      contentType: "image_upload",
-      decision: moderation.decision,
-    }),
-  );
+  const moderationDecision = moderation.decision;
+  after(async () => {
+    try {
+      await logModerationDecision(createServiceClient(), {
+        userId,
+        contentType: "image_upload",
+        decision: moderationDecision,
+      });
+    } catch (error) {
+      console.error("[chat-image-upload] deferred moderation audit failed:", error);
+    }
+  });
 
   if (!moderation.decision.allowed || !moderation.buffer) {
     return finish(moderationFailureResponse(moderation.decision));
@@ -96,6 +102,7 @@ export async function POST(
   if (!compression) {
     return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
   }
+  timer.record("output_bytes", compression.data.byteLength);
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
 
