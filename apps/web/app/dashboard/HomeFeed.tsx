@@ -256,7 +256,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   avatarUrl={group.item.users?.avatar_url}
                   createdAt={group.item.created_at}
                   dateInline
-                  secondaryLabel="Events · Event"
+                  secondaryLabel={`Event · ${group.item.is_online ? "Online" : group.item.location ?? "Offline"}`}
                   className="mb-3"
                 />
                 <EventCard

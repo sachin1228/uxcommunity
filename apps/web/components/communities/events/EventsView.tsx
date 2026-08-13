@@ -237,7 +237,7 @@ export function EventsView({
                         avatarUrl={event.users?.avatar_url}
                         createdAt={event.created_at}
                         dateInline
-                        secondaryLabel="Events · Event"
+                        secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
                         className="mb-3"
                       />
                       <EventCard
@@ -264,7 +264,7 @@ export function EventsView({
                         avatarUrl={event.users?.avatar_url}
                         createdAt={event.created_at}
                         dateInline
-                        secondaryLabel="Events · Event"
+                        secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
                         className="mb-3"
                       />
                       <EventCard
