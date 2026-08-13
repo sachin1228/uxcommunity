@@ -11,6 +11,7 @@ import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { createBrowserClient } from "@/lib/supabase/browser";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -340,6 +341,45 @@ export function EventDetailClient({
   }, [communityId, event.id]);
 
   useEffect(() => { void fetchComments(); }, [fetchComments]);
+
+  const fetchSaveState = useCallback(async () => {
+    const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setEvent((current) => ({
+      ...current,
+      user_saved: data.saved,
+      save_count: data.save_count,
+    }));
+  }, [communityId, event.id]);
+
+  useEffect(() => {
+    void fetchSaveState();
+    let supabase: ReturnType<typeof createBrowserClient>;
+    try { supabase = createBrowserClient(); } catch { return; }
+
+    const channel = supabase
+      .channel(`event-save-detail:${event.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "event_saves",
+        filter: `event_id=eq.${event.id}`,
+      }, () => void fetchSaveState())
+      .subscribe();
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void fetchSaveState();
+    };
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    window.addEventListener("focus", refreshOnFocus);
+
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, [event.id, fetchSaveState]);
 
   // Auto-grow textarea
   useEffect(() => {
