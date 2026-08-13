@@ -30,7 +30,6 @@ export function CreateResourceModal({
   initialIsPublic = false,
   publicOnly = false,
 }: CreateResourceModalProps) {
-  const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [resourceType, setResourceType] = useState<ResourceType>("article");
@@ -46,9 +45,6 @@ export function CreateResourceModal({
   const [previewDismissed, setPreviewDismissed] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track whether the user has manually edited the title so we don't overwrite it
-  const titleEditedRef = useRef(false);
-
   const fetchPreview = useCallback(async (rawUrl: string) => {
     if (previewAbortRef.current) previewAbortRef.current.abort();
     const ctrl = new AbortController();
@@ -64,13 +60,10 @@ export function CreateResourceModal({
       const data: LinkPreviewData = await res.json();
       if (!ctrl.signal.aborted) {
         setPreview(data);
-        // Auto-fill title if the user hasn't touched it yet
-        if (!titleEditedRef.current && data.title) {
-          setTitle(data.title.slice(0, 120));
-        }
-        // Auto-fill description if empty
-        if (!description.trim() && data.description) {
-          setDescription(data.description.slice(0, 2000));
+        // Auto-fill the single description field from the most useful preview copy.
+        if (!description.trim()) {
+          const previewDescription = data.description ?? data.title;
+          if (previewDescription) setDescription(previewDescription.slice(0, 2000));
         }
       }
     } catch {
@@ -104,7 +97,7 @@ export function CreateResourceModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError("Title is required."); return; }
+    if (!description.trim()) { setError("Description is required."); return; }
     if (!url.trim()) { setError("URL is required."); return; }
     if (!isValidHttpUrl(url.trim())) { setError("URL must start with http:// or https://"); return; }
 
@@ -117,9 +110,9 @@ export function CreateResourceModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
+          title: description.trim().slice(0, 120),
           url: url.trim(),
-          description: description.trim() || null,
+          description: description.trim(),
           resource_type: resourceType,
           tags,
            is_public: publicOnly ? true : isPublic,
@@ -166,7 +159,7 @@ export function CreateResourceModal({
         </div>
 
         <div className="mt-6 space-y-5">
-          {/* URL first — so metadata can auto-fill title */}
+          {/* URL first — so metadata can auto-fill the description */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
               URL <span className="text-accent">*</span>
@@ -211,25 +204,6 @@ export function CreateResourceModal({
             </div>
           )}
 
-          {/* Title */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Title <span className="text-accent">*</span>
-            </span>
-            <div className="relative">
-              <input
-                value={title}
-                maxLength={120}
-                onChange={(e) => { setTitle(e.target.value); titleEditedRef.current = true; }}
-                placeholder="Give this resource a clear, descriptive title"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-14 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-              />
-              <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">
-                {title.length}/120
-              </span>
-            </div>
-          </label>
-
           {/* Resource type */}
           <fieldset>
             <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
@@ -257,14 +231,15 @@ export function CreateResourceModal({
           {/* Description */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="font-normal text-foreground-subtle">(optional)</span>
+              Description <span className="text-accent">*</span>
             </span>
             <textarea
               value={description}
               maxLength={2000}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Why is this worth sharing? What will people learn or find useful?"
+              placeholder="What makes this resource worth sharing?"
               rows={4}
+              required
               className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
             />
           </label>

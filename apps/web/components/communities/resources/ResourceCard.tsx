@@ -40,10 +40,6 @@ function useOgImage(url: string): string | null {
   return image;
 }
 
-function getDomain(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
-}
-
 interface ResourceCardProps {
   resource: CommunityResource;
   currentUserId: string;
@@ -223,7 +219,6 @@ export function ResourceCard({
               : "border-b border-border"
         }`}
       >
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href={resource.url} target="_blank" rel="noopener noreferrer">
 
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
@@ -292,22 +287,10 @@ export function ResourceCard({
             </div>
           </div>
 
-          {/* ── Title ── */}
-          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-            {resource.title}
-          </h3>
-
           {/* ── Description ── */}
-          {resource.description && (
-            <p className="mt-1.5 line-clamp-2 font-body text-xs leading-relaxed text-foreground-muted">
-              {resource.description}
-            </p>
-          )}
-
-          {/* ── Domain label ── */}
-          <p className="mt-2 font-body text-[11px] text-foreground-subtle">
-            {getDomain(resource.url)}
-          </p>
+          <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-semibold leading-snug text-foreground">
+            {resource.description || resource.title}
+          </h3>
 
           {/* ── OG image ── */}
           {ogImage && (
