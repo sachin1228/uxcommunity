@@ -174,7 +174,7 @@ export function CommunityChat({
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,
-  } = useChatData({ communityId, initialMeta, initialMessages });
+  } = useChatData({ communityId, currentUserId, initialMeta, initialMessages });
 
   const handleReactionToggled = useCallback(
     (msgId: string, reactions: MessageReaction[]) => {

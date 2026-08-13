@@ -5,12 +5,16 @@ import {
   msgCache,
   metaCache,
   msgFetchedAt,
-  inFlightMsgFetch,
   evictIfNeeded,
   META_STALE_MS,
   type CachedMessage,
   type CachedMeta,
 } from "@/lib/communities/cache";
+import {
+  fetchJsonCached,
+  getCachedRequest,
+  setCachedRequest,
+} from "@/lib/request-cache";
 
 /** Must match PAGE_SIZE in the messages API route. */
 const PAGE_SIZE = 50;
@@ -41,6 +45,7 @@ type Message = CachedMessage;
 
 interface UseChatDataOptions {
   communityId: string;
+  currentUserId: string;
   initialMeta?: CachedMeta;
   initialMessages?: CachedMessage[];
   /** Called once on mount if SSR provided a lastReadAt and no cached messages exist. */
@@ -51,6 +56,7 @@ interface UseChatDataOptions {
 
 export function useChatData({
   communityId,
+  currentUserId,
   initialMeta,
   initialMessages,
   onSeedLastReadAt,
@@ -83,6 +89,11 @@ export function useChatData({
       setMembers(cachedMeta.members);
     } else if (initialMeta) {
       metaCache.set(communityId, { ...initialMeta, fetchedAt: Date.now() });
+      setCachedRequest(
+        `/api/communities/${communityId}`,
+        { community: initialMeta.community, members: initialMeta.members },
+        currentUserId,
+      );
       setCommunity(initialMeta.community);
       setMembers(initialMeta.members);
     }
@@ -90,6 +101,11 @@ export function useChatData({
       setMessages(cachedMsgs);
     } else if (initialMessages?.length) {
       msgCache.set(communityId, initialMessages);
+      setCachedRequest(
+        `/api/communities/${communityId}/messages`,
+        { messages: initialMessages },
+        currentUserId,
+      );
       msgFetchedAt.set(communityId, Date.now());
       evictIfNeeded();
       setMessages(initialMessages);
@@ -105,9 +121,10 @@ export function useChatData({
   // ── Fetch community metadata ──────────────────────────────────────────────
   const fetchMeta = useCallback(async () => {
     const targetId = communityId;
-    const res = await fetch(`/api/communities/${targetId}`);
-    if (!res.ok) return;
-    const d = await res.json();
+    const d = await fetchJsonCached<{
+      community: Community;
+      members?: Member[];
+    }>(`/api/communities/${targetId}`, { staleMs: META_STALE_MS }, currentUserId);
     if (communityIdRef.current !== targetId) return;
     const cached: CachedMeta = {
       community: d.community,
@@ -117,28 +134,21 @@ export function useChatData({
     metaCache.set(targetId, cached);
     setCommunity(d.community);
     setMembers(d.members ?? []);
-  }, [communityId]);
+  }, [communityId, currentUserId]);
 
   // ── Fetch messages (full or incremental via ?after=ISO) ───────────────────
   const fetchMessages = useCallback(
     (after?: string): Promise<void> => {
       const targetId = communityId;
-      if (!after) {
-        const inflight = inFlightMsgFetch.get(targetId);
-        if (inflight) {
-          return inflight.then(() => {
-            const cached = msgCache.get(targetId);
-            if (communityIdRef.current === targetId && cached?.length)
-              setMessages(cached);
-          });
-        }
-      }
       const url = after
         ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(after)}`
         : `/api/communities/${targetId}/messages`;
 
-      const p: Promise<void> = fetch(url)
-        .then((res) => (res.ok ? res.json() : undefined))
+      return fetchJsonCached<{ messages?: Message[] }>(
+        url,
+        { staleMs: after ? 30_000 : 3 * 60_000 },
+        currentUserId,
+      )
         .then((d) => {
           if (!d) return;
           const incoming: Message[] = d.messages ?? [];
@@ -184,15 +194,9 @@ export function useChatData({
             }
           }
         })
-        .catch(() => {})
-        .finally(() => {
-          if (!after) inFlightMsgFetch.delete(targetId);
-        });
-
-      if (!after) inFlightMsgFetch.set(targetId, p);
-      return p;
+        .catch(() => {});
     },
-    [communityId]
+    [communityId, currentUserId]
   );
 
   // ── Fetch older messages (upward pagination via ?before=ISO) ─────────────
@@ -204,9 +208,11 @@ export function useChatData({
       const targetId = communityId;
       try {
         const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(before)}`;
-        const res = await fetch(url);
-        if (!res.ok) return;
-        const d = await res.json();
+        const d = await fetchJsonCached<{ messages?: Message[] }>(
+          url,
+          { staleMs: 30_000 },
+          currentUserId,
+        );
         if (communityIdRef.current !== targetId) return;
         const incoming: Message[] = d.messages ?? [];
         if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
@@ -231,7 +237,7 @@ export function useChatData({
         setLoadingOlder(false);
       }
     },
-    [communityId]
+    [communityId, currentUserId]
   );
 
   // ── On communityId change: show cache instantly, then catch up ────────────
@@ -241,8 +247,22 @@ export function useChatData({
     setHasMoreAbove(true);
     isFetchingOlderRef.current = false;
     let cancelled = false;
-    const cachedMsgs = msgCache.get(communityId);
-    const cachedMeta = metaCache.get(communityId);
+    const canonicalMessages = getCachedRequest<{ messages?: Message[] }>(
+      `/api/communities/${communityId}/messages`,
+      currentUserId,
+    )?.messages;
+    const canonicalMeta = getCachedRequest<{
+      community: Community;
+      members?: Member[];
+    }>(`/api/communities/${communityId}`, currentUserId);
+    const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
+    const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
+      ? {
+          community: canonicalMeta.community,
+          members: canonicalMeta.members ?? [],
+          fetchedAt: Date.now(),
+        }
+      : undefined);
     setMessages(cachedMsgs ?? []);
     if (cachedMeta) {
       setCommunity(cachedMeta.community);

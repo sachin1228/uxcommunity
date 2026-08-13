@@ -20,7 +20,7 @@ type Community = CachedSidebarCommunity;
 export function useSidebarCommunities(userId: string) {
   const router   = useRouter();
   const pathname = usePathname();
-  const { onEnter, onLeave } = usePrefetch();
+  const { onEnter, onLeave } = usePrefetch(userId);
 
   const activeCommunityId = pathname.match(
     /\/dashboard\/communities\/([^/]+)/

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { createClient } from "@/lib/supabase/client";
+import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
 
 interface Member {
   user_id: string;
@@ -192,8 +193,11 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
     if (!communityId) return;
 
     // ── Fetch events, stats, rules in parallel ─────────────────────────────
-    fetch(`/api/communities/${communityId}/events`)
-      .then((r) => r.ok ? r.json() : null)
+    fetchJsonCached<{ events: UpcomingEvent[] }>(
+      `/api/communities/${communityId}/events`,
+      { staleMs: 60_000 },
+      currentUserId,
+    )
       .then((data: { events: UpcomingEvent[] } | null) => {
         if (!data?.events?.length) return;
         const now = new Date();
@@ -207,15 +211,21 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
       })
       .catch(() => {/* silent */});
 
-    fetch(`/api/communities/${communityId}/stats`)
-      .then((r) => r.ok ? r.json() : null)
+    fetchJsonCached<{ posts_today: number }>(
+      `/api/communities/${communityId}/stats`,
+      { staleMs: 60_000 },
+      currentUserId,
+    )
       .then((data: { posts_today: number } | null) => {
         if (data != null) setPostsToday(data.posts_today);
       })
       .catch(() => {/* silent */});
 
-    fetch(`/api/communities/${communityId}/rules`)
-      .then((r) => r.ok ? r.json() : null)
+    fetchJsonCached<{ rules: CommunityRule[] }>(
+      `/api/communities/${communityId}/rules`,
+      { staleMs: 60_000 },
+      currentUserId,
+    )
       .then((data: { rules: CommunityRule[] } | null) => {
         if (data?.rules) setRules(data.rules);
       })
@@ -235,22 +245,27 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
           filter: `community_id=eq.${communityId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT") {
-            const newRule = payload.new as CommunityRule;
-            setRules((prev) =>
-              [...prev, newRule].sort((a, b) => a.order_index - b.order_index)
-            );
-          } else if (payload.eventType === "UPDATE") {
-            const updated = payload.new as CommunityRule;
-            setRules((prev) =>
-              prev
-                .map((r) => (r.id === updated.id ? updated : r))
-                .sort((a, b) => a.order_index - b.order_index)
-            );
-          } else if (payload.eventType === "DELETE") {
+          const updateRules = (prev: CommunityRule[]) => {
+            if (payload.eventType === "INSERT") {
+              const newRule = payload.new as CommunityRule;
+              if (prev.some((rule) => rule.id === newRule.id)) return prev;
+              return [...prev, newRule].sort((a, b) => a.order_index - b.order_index);
+            }
+            if (payload.eventType === "UPDATE") {
+              const updated = payload.new as CommunityRule;
+              return prev
+                .map((rule) => (rule.id === updated.id ? updated : rule))
+                .sort((a, b) => a.order_index - b.order_index);
+            }
             const deletedId = (payload.old as { id: string }).id;
-            setRules((prev) => prev.filter((r) => r.id !== deletedId));
-          }
+            return prev.filter((rule) => rule.id !== deletedId);
+          };
+          setRules(updateRules);
+          patchCachedRequest<{ rules: CommunityRule[] }>(
+            `/api/communities/${communityId}/rules`,
+            (current) => ({ ...current, rules: updateRules(current.rules) }),
+            currentUserId,
+          );
         }
       )
       .subscribe();

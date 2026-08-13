@@ -13,7 +13,7 @@ import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import { fetchJsonCached, getCachedRequest, initRequestCache } from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -90,89 +90,101 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
+  const updateItems = useCallback((update: (current: FeedItem[]) => FeedItem[]) => {
+    setItems((current) => {
+      const next = update(current);
+      patchCachedRequest<{ items?: FeedItem[] }>(
+        "/api/home/feed",
+        (cachedFeed) => ({ ...cachedFeed, items: next }),
+        currentUserId,
+      );
+      return next;
+    });
+  }, [currentUserId]);
+
   const handleThreadUpdated = useCallback((updated: CommunityThread) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "thread" && it.id === updated.id ? { ...it, ...updated } : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleThreadVoteChanged = useCallback((id: string, voted: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "thread" && it.id === id
         ? { ...it, user_voted: voted, vote_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleThreadSaveChanged = useCallback((id: string, saved: boolean) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "thread" && it.id === id ? { ...it, user_saved: saved } : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleThreadDeleted = useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => !(it._type === "thread" && it.id === id)));
-  }, []);
+    updateItems((prev) => prev.filter((it) => !(it._type === "thread" && it.id === id)));
+  }, [updateItems]);
 
   const handleEventUpdated = useCallback((updated: CommunityEvent) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === updated.id ? { ...it, ...updated } : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleEventDeleted = useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => !(it._type === "event" && it.id === id)));
-  }, []);
+    updateItems((prev) => prev.filter((it) => !(it._type === "event" && it.id === id)));
+  }, [updateItems]);
 
   const handleEventRsvpChanged = useCallback((id: string, rsvped: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === id
         ? { ...it, user_rsvped: rsvped, rsvp_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleEventLikeChanged = useCallback((id: string, liked: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === id
         ? { ...it, user_liked: liked, like_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleEventSaveChanged = useCallback((id: string, saved: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === id
         ? { ...it, user_saved: saved, save_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleResourceUpdated = useCallback((updated: CommunityResource) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "resource" && it.id === updated.id ? { ...it, ...updated } : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleResourceSaveChanged = useCallback((id: string, saved: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "resource" && it.id === id
         ? { ...it, user_saved: saved, save_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleResourceBookmarkChanged = useCallback((id: string, bookmarked: boolean, count: number) => {
-    setItems((prev) => prev.map((it) =>
+    updateItems((prev) => prev.map((it) =>
       it._type === "resource" && it.id === id
         ? { ...it, user_bookmarked: bookmarked, bookmark_count: count }
         : it
     ));
-  }, []);
+  }, [updateItems]);
 
   const handleResourceDeleted = useCallback((id: string) => {
-    setItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
-  }, []);
+    updateItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
+  }, [updateItems]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 

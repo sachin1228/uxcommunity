@@ -133,6 +133,68 @@ test("seeds canonical event state without a network request", async () => {
   assert.equal(getCachedRequest(url, "user-b"), undefined)
 })
 
+test("deduplicates identical message cursors and preserves distinct pagination keys", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    calls.push(String(input))
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    return new Response(JSON.stringify({ messages: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  const afterA = "/api/communities/community-a/messages?after=2026-01-01T00%3A00%3A00.000Z"
+  const afterEquivalent = "/api/communities/community-a/messages?after=2026-01-01T00%3A00%3A00.000Z"
+  const before = "/api/communities/community-a/messages?before=2026-01-01T00%3A00%3A00.000Z"
+
+  await Promise.all([
+    fetchJsonCached(afterA, {}, "user-a"),
+    fetchJsonCached(afterEquivalent, {}, "user-a"),
+    fetchJsonCached(before, {}, "user-a"),
+  ])
+
+  assert.equal(calls.length, 2)
+  assert.equal(calls.filter((url) => url === afterA).length, 1)
+  assert.equal(calls.filter((url) => url === before).length, 1)
+})
+
+test("reuses SSR-seeded community metadata and messages", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return new Response(JSON.stringify({}), { status: 200 })
+  }) as typeof fetch
+
+  setCachedRequest(
+    "/api/communities/community-a",
+    { community: { id: "community-a" }, members: [] },
+    "user-a",
+  )
+  setCachedRequest(
+    "/api/communities/community-a/messages",
+    { messages: [{ id: "message-a" }] },
+    "user-a",
+  )
+
+  const [metadata, messages] = await Promise.all([
+    fetchJsonCached<{ community: { id: string } }>(
+      "/api/communities/community-a",
+      {},
+      "user-a",
+    ),
+    fetchJsonCached<{ messages: Array<{ id: string }> }>(
+      "/api/communities/community-a/messages",
+      {},
+      "user-a",
+    ),
+  ])
+
+  assert.equal(metadata.community.id, "community-a")
+  assert.equal(messages.messages[0]?.id, "message-a")
+  assert.equal(calls, 0)
+})
+
 test("patches and invalidates only the requested user key", async () => {
   globalThis.fetch = (async () => new Response(
     JSON.stringify({ count: 1 }),
