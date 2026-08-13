@@ -290,6 +290,8 @@ interface Props {
   currentUserAvatar: string | null;
   communityId: string;
   communityName: string;
+  communityImage?: string | null;
+  showCommunityAttribution?: boolean;
   /** When provided, renders a back link above the event (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -303,6 +305,8 @@ export function EventDetailClient({
   currentUserAvatar,
   communityId,
   communityName,
+  communityImage,
+  showCommunityAttribution = false,
   backHref,
   backLabel = "Home",
 }: Props) {
@@ -506,8 +510,11 @@ export function EventDetailClient({
             {backLabel}
           </a>
         )}
+        {/* Event post — follows the shared thread/resource detail layout */}
+        <section className={`${communityFeedLayout.dividerY} py-6`}>
+          <div className={communityFeedLayout.detailSection}>
         {/* Feed-style author header */}
-        <div className={`relative mb-4 flex items-center gap-3 ${communityFeedLayout.detailSection}`}>
+        <div className="relative mb-4 flex items-center gap-3">
           <Avatar
             name={event.users?.name ?? "Community member"}
             avatarUrl={event.users?.avatar_url ?? null}
@@ -563,7 +570,7 @@ export function EventDetailClient({
         </div>
 
         {/* Main event card — matches the homepage card */}
-        <div className={communityFeedLayout.detailSection}>
+        <div>
           <div className="overflow-hidden rounded-xl border border-border bg-surface">
             <div className="flex min-h-[190px] flex-col sm:flex-row">
             <div className="relative aspect-video w-full shrink-0 overflow-hidden sm:aspect-auto sm:w-44">
@@ -651,7 +658,7 @@ export function EventDetailClient({
         </div>
 
         {/* Engagement and community metadata — same hierarchy as the homepage */}
-        <div className={`mt-3 flex items-center justify-between gap-4 ${communityFeedLayout.detailSection}`}>
+        <div className="mt-3 flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={handleSave}
@@ -671,8 +678,16 @@ export function EventDetailClient({
               {event.save_count}
             </span>
           </button>
-          <CommunityPostLabel communityName={communityName} communityImage={null} className="min-w-0 justify-end text-right" />
+          {showCommunityAttribution && (
+            <CommunityPostLabel
+              communityName={communityName}
+              communityImage={communityImage}
+              className="min-w-0 justify-end text-right"
+            />
+          )}
         </div>
+          </div>
+        </section>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
         <div className={`mt-6 ${communityFeedLayout.detailSection}`}>

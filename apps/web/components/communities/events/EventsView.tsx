@@ -183,7 +183,7 @@ export function EventsView({
 
       </div>
 
-      <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? "pt-3" : ""}`}>
+      <div className={communityFeedLayout.content}>
         {loading ? (
           <div className={communityFeedLayout.skeletonList}>
             {[1, 2, 3].map((i) => (
@@ -214,61 +214,38 @@ export function EventsView({
             <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
-            {(filter === "all" || filter === "upcoming") && upcoming.length > 0 && (
-              <section className="px-5 md:px-8">
-                <div className="flex flex-col gap-4">
-                  {upcoming.map((event) => (
-                    <div key={event.id}>
-                      <PostAuthorMeta
-                        name={event.users?.name}
-                        avatarUrl={event.users?.avatar_url}
-                        createdAt={event.created_at}
-                        dateInline
-                        secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                        className="mb-3"
-                      />
-                      <EventCard
-                        event={event}
-                        currentUserId={currentUserId}
-                        communityId={communityId}
-                        onUpdated={handleUpdated}
-                        onDeleted={handleDeleted}
-                        onRsvpChanged={handleRsvpChanged}
-                        onSaveChanged={handleSaveChanged}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-            {(filter === "all" || filter === "past") && past.length > 0 && (
-              <section className="px-5 md:px-8">
-                <div className="flex flex-col gap-4 opacity-60">
-                  {past.map((event) => (
-                    <div key={event.id}>
-                      <PostAuthorMeta
-                        name={event.users?.name}
-                        avatarUrl={event.users?.avatar_url}
-                        createdAt={event.created_at}
-                        dateInline
-                        secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                        className="mb-3"
-                      />
-                      <EventCard
-                        event={event}
-                        currentUserId={currentUserId}
-                        communityId={communityId}
-                        onUpdated={handleUpdated}
-                        onDeleted={handleDeleted}
-                        onRsvpChanged={handleRsvpChanged}
-                        onSaveChanged={handleSaveChanged}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
+          <div>
+            {[
+              ...(filter === "all" || filter === "upcoming" ? upcoming : []),
+              ...(filter === "all" || filter === "past" ? past : []),
+            ].map((event) => {
+              const isPast = new Date(event.end_date ?? event.event_date) < now;
+
+              return (
+                <article
+                  key={event.id}
+                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} ${isPast ? "opacity-60" : ""}`}
+                >
+                  <PostAuthorMeta
+                    name={event.users?.name}
+                    avatarUrl={event.users?.avatar_url}
+                    createdAt={event.created_at}
+                    dateInline
+                    secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
+                    className="mb-3"
+                  />
+                  <EventCard
+                    event={event}
+                    currentUserId={currentUserId}
+                    communityId={communityId}
+                    onUpdated={handleUpdated}
+                    onDeleted={handleDeleted}
+                    onRsvpChanged={handleRsvpChanged}
+                    onSaveChanged={handleSaveChanged}
+                  />
+                </article>
+              );
+            })}
           </div>
         )}
       </div>
