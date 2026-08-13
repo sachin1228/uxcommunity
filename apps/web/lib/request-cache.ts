@@ -16,10 +16,38 @@ const entries = new Map<string, CacheEntry<unknown>>()
 const inFlight = new Map<string, Promise<unknown>>()
 const listeners = new Map<string, Set<() => void>>()
 let activeUserId: string | null = null
+const cacheTelemetry: Record<CacheEvent, number> = {
+  hit: 0,
+  miss: 0,
+  dedup: 0,
+  revalidate: 0,
+  invalidate: 0,
+}
+let telemetryEvents = 0
+
+export function getRequestCacheTelemetry() {
+  const requests = cacheTelemetry.hit + cacheTelemetry.miss + cacheTelemetry.revalidate
+  return {
+    ...cacheTelemetry,
+    requests,
+    hit_rate: requests ? Math.round((cacheTelemetry.hit / requests) * 10_000) / 100 : 0,
+  }
+}
 
 function log(event: CacheEvent, key: string) {
+  cacheTelemetry[event] += 1
+  telemetryEvents += 1
+
   if (process.env.NODE_ENV === "development") {
     console.debug(`[request-cache] ${event}`, key)
+    return
+  }
+
+  if (process.env.NODE_ENV === "production" && telemetryEvents % 20 === 0) {
+    console.info(JSON.stringify({
+      event: "performance.request_cache",
+      metrics: getRequestCacheTelemetry(),
+    }))
   }
 }
 

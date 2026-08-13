@@ -16,6 +16,20 @@ interface Options {
   setCommunities: React.Dispatch<React.SetStateAction<CachedSidebarCommunity[]>>;
 }
 
+let activeRealtimeChannels = 0;
+
+function reportRealtimeChannel(status: string, communityCount: number) {
+  if (process.env.NODE_ENV !== "production") return;
+  console.info(JSON.stringify({
+    event: "performance.realtime_channel",
+    status,
+    metrics: {
+      active_channels: activeRealtimeChannels,
+      community_count: communityCount,
+    },
+  }));
+}
+
 /**
  * Applies a patch to one community in React state and mirrors it into
  * sidebarStore, preserving last_read_at from the store.
@@ -193,6 +207,7 @@ export function useSidebarRealtime({
     }
 
     const joinedCommunityIds = new Set(communities.map((community) => community.id));
+    let subscribed = false;
     const channel = supabase
         .channel(`panel:${userId}`)
 
@@ -425,9 +440,21 @@ export function useSidebarRealtime({
           },
         )
 
-        .subscribe();
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED" && !subscribed) {
+            subscribed = true;
+            activeRealtimeChannels += 1;
+          }
+          reportRealtimeChannel(status, joinedCommunityIds.size);
+        });
 
+    let removed = false;
     return () => {
+      if (!removed) {
+        removed = true;
+        if (subscribed) activeRealtimeChannels = Math.max(0, activeRealtimeChannels - 1);
+        reportRealtimeChannel("REMOVED", joinedCommunityIds.size);
+      }
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -22,7 +22,7 @@ export async function POST(
 ) {
   const timer = createServerTimer("POST /api/communities/[id]/messages/upload");
   const finish = (response: Response) => {
-    timer.finish();
+    timer.finish({ status: response.status });
     return response;
   };
 
@@ -66,6 +66,7 @@ export async function POST(
   if (file.size > MAX_INPUT_BYTES) {
     return finish(NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 }));
   }
+  timer.record("input_bytes", file.size);
 
   let source: Buffer;
   try {
@@ -101,6 +102,7 @@ export async function POST(
   if (!compression) {
     return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
   }
+  timer.record("output_bytes", compression.data.byteLength);
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
 

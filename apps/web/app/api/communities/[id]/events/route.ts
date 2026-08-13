@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferCommunityNotification, eventHref } from "@/lib/notifications";
+import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -27,57 +28,40 @@ async function enrichEvents(
   const eventIds = rows.map((r) => r.id as string);
   const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
 
-  const [
-    { data: users },
-    { data: profiles },
-    { data: allRsvps },
-    { data: myRsvps },
-    { data: allLikes },
-    { data: myLikes },
-    { data: allSaves },
-    { data: mySaves },
-  ] = await Promise.all([
+  const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
     db.from("users").select("id, name").in("id", authorIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
-    db.from("event_rsvps").select("event_id").in("event_id", eventIds),
-    db.from("event_rsvps").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
-    db.from("event_likes").select("event_id").in("event_id", eventIds),
-    db.from("event_likes").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
-    db.from("event_saves").select("event_id").in("event_id", eventIds),
-    db.from("event_saves").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
+    db.rpc("get_event_list_aggregates", {
+      p_user_id: currentUserId,
+      p_event_ids: eventIds,
+    }),
   ]);
+
+  if (aggregatesResult.error) {
+    console.error("[event list aggregates]", aggregatesResult.error);
+    throw new Error("Failed to load event interaction aggregates.");
+  }
 
   const nameMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
-  const rsvpCounts = (allRsvps ?? []).reduce<Record<string, number>>((acc, r) => {
-    acc[r.event_id] = (acc[r.event_id] ?? 0) + 1;
-    return acc;
-  }, {});
-  const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
-  const likeCounts = (allLikes ?? []).reduce<Record<string, number>>((acc, row) => {
-    acc[row.event_id] = (acc[row.event_id] ?? 0) + 1;
-    return acc;
-  }, {});
-  const myLikeSet = new Set((myLikes ?? []).map((row) => row.event_id));
-  const saveCounts = (allSaves ?? []).reduce<Record<string, number>>((acc, r) => {
-    acc[r.event_id] = (acc[r.event_id] ?? 0) + 1;
-    return acc;
-  }, {});
-  const mySaveSet = new Set((mySaves ?? []).map((r) => r.event_id));
+  const aggregateMap = new Map(
+    (aggregatesResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]),
+  );
 
   return rows.map((row) => {
     const authorId = row.user_id as string;
+    const aggregate = aggregateMap.get(row.id as string);
     return {
       ...row,
       users: nameMap[authorId]
         ? { name: nameMap[authorId], avatar_url: avatarMap[authorId] ?? null }
         : null,
-      rsvp_count: rsvpCounts[row.id as string] ?? 0,
-      user_rsvped: myRsvpSet.has(row.id as string),
-      like_count: likeCounts[row.id as string] ?? 0,
-      user_liked: myLikeSet.has(row.id as string),
-      save_count: saveCounts[row.id as string] ?? 0,
-      user_saved: mySaveSet.has(row.id as string),
+      rsvp_count: Number(aggregate?.rsvp_count ?? 0),
+      user_rsvped: aggregate?.user_rsvped === true,
+      like_count: Number(aggregate?.like_count ?? 0),
+      user_liked: aggregate?.user_liked === true,
+      save_count: Number(aggregate?.save_count ?? 0),
+      user_saved: aggregate?.user_saved === true,
     };
   });
 }
@@ -88,14 +72,19 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const timer = createServerTimer("GET /api/communities/[id]/events");
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await timer.measure("auth", () => requireSession("user")); } catch (e) {
+    timer.finish({ status: (e as Response).status ?? 401 });
+    return e as Response;
+  }
 
   const { id: communityId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
+  if (!(await timer.measure("membership_query", () => isMember(db, communityId, userId)))) {
+    timer.finish({ status: 403 });
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
@@ -110,20 +99,26 @@ export async function GET(
   if (cursor) {
     const [eventDate, id] = cursor.split("|");
     if (!eventDate || !id || Number.isNaN(Date.parse(eventDate))) {
+      timer.finish({ status: 400 });
       return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
     }
     query = query.or(`event_date.gt.${eventDate},and(event_date.eq.${eventDate},id.gt.${id})`);
   }
-  const { data, error } = await query;
+  const { data, error } = await timer.measure("events_query", async () => await query);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    timer.finish({ status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   const page = (data ?? []).slice(0, EVENT_PAGE_SIZE) as Array<Record<string, unknown>>;
-  const enriched = await enrichEvents(db, page, userId);
+  const enriched = await timer.measure("enrichment_queries", () => enrichEvents(db, page, userId));
   const last = page.at(-1);
   const nextCursor = (data?.length ?? 0) > EVENT_PAGE_SIZE && last
     ? `${last.event_date as string}|${last.id as string}`
     : null;
-  return NextResponse.json({ events: enriched, nextCursor });
+  const body = { events: enriched, nextCursor };
+  timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: enriched.length });
+  return NextResponse.json(body);
 }
 
 export async function POST(

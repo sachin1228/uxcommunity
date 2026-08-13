@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferCommunityNotification, resourceHref } from "@/lib/notifications";
 import type { ResourceType } from "@/components/communities/resources/types";
+import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 
 const PAGE_SIZE = 100;
 
@@ -46,88 +47,84 @@ async function withAuthorAndMeta(
   const resourceIds = rows.map((r) => r.id).filter((id): id is string => typeof id === "string");
   const userIds = [...new Set(rows.map((r) => r.user_id).filter((id): id is string => typeof id === "string"))];
 
-  const [
-    { data: users },
-    { data: profiles },
-    { data: allSaves },
-    { data: mySaves },
-    { data: allComments },
-    { data: allBookmarks },
-    { data: myBookmarks },
-  ] = await Promise.all([
+  const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
     userIds.length ? db.from("users").select("id, name").in("id", userIds) : { data: [] },
     userIds.length ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds) : { data: [] },
-    db.from("resource_saves").select("resource_id").in("resource_id", resourceIds),
-    db.from("resource_saves").select("resource_id").in("resource_id", resourceIds).eq("user_id", currentUserId),
-    db.from("resource_comments").select("resource_id").in("resource_id", resourceIds),
-    db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds),
-    db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds).eq("user_id", currentUserId),
+    db.rpc("get_resource_list_aggregates", {
+      p_user_id: currentUserId,
+      p_resource_ids: resourceIds,
+    }),
   ]);
+
+  if (aggregatesResult.error) {
+    console.error("[resource list aggregates]", aggregatesResult.error);
+    throw new Error("Failed to load resource interaction aggregates.");
+  }
 
   const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
+  const aggregateMap = new Map(
+    (aggregatesResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]),
+  );
 
-  const saveCountMap: Record<string, number> = {};
-  for (const s of allSaves ?? []) {
-    saveCountMap[s.resource_id] = (saveCountMap[s.resource_id] ?? 0) + 1;
-  }
-
-  const commentCountMap: Record<string, number> = {};
-  for (const c of allComments ?? []) {
-    commentCountMap[c.resource_id] = (commentCountMap[c.resource_id] ?? 0) + 1;
-  }
-
-  const bookmarkCountMap: Record<string, number> = {};
-  for (const b of allBookmarks ?? []) {
-    bookmarkCountMap[b.resource_id] = (bookmarkCountMap[b.resource_id] ?? 0) + 1;
-  }
-
-  const mySaveSet     = new Set((mySaves     ?? []).map((s) => s.resource_id));
-  const myBookmarkSet = new Set((myBookmarks ?? []).map((b) => b.resource_id));
-
-  return rows.map((row) => ({
-    ...row,
-    users: userMap[row.user_id as string]
-      ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
-      : null,
-    save_count:      saveCountMap[row.id as string] ?? 0,
-    user_saved:      mySaveSet.has(row.id as string),
-    comment_count:   commentCountMap[row.id as string] ?? 0,
-    bookmark_count:  bookmarkCountMap[row.id as string] ?? 0,
-    user_bookmarked: myBookmarkSet.has(row.id as string),
-  }));
+  return rows.map((row) => {
+    const aggregate = aggregateMap.get(row.id as string);
+    return {
+      ...row,
+      users: userMap[row.user_id as string]
+        ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
+        : null,
+      save_count: Number(aggregate?.save_count ?? 0),
+      user_saved: aggregate?.user_saved === true,
+      comment_count: Number(aggregate?.comment_count ?? 0),
+      bookmark_count: Number(aggregate?.bookmark_count ?? 0),
+      user_bookmarked: aggregate?.user_bookmarked === true,
+    };
+  });
 }
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const timer = createServerTimer("GET /api/communities/[id]/resources");
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await timer.measure("auth", () => requireSession("user")); } catch (e) {
+    timer.finish({ status: (e as Response).status ?? 401 });
+    return e as Response;
+  }
 
   const { id: communityId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
 
-  if (!(await isMember(db, communityId, userId))) {
+  if (!(await timer.measure("membership_query", () => isMember(db, communityId, userId)))) {
+    timer.finish({ status: 403 });
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const { data, error } = await db
-    .from("community_resources")
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
-    .eq("community_id", communityId)
-    .order("created_at", { ascending: false })
-    .limit(PAGE_SIZE);
+  const { data, error } = await timer.measure("resources_query", async () =>
+    await db
+      .from("community_resources")
+      .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
+      .eq("community_id", communityId)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE),
+  );
 
   if (error) {
     console.error("[GET resources]", error);
+    timer.finish({ status: 500 });
     return NextResponse.json({ error: "Failed to fetch resources." }, { status: 500 });
   }
 
-  return NextResponse.json({
-    resources: await withAuthorAndMeta(db, (data ?? []) as Array<Record<string, unknown>>, userId),
-  });
+  const body = {
+    resources: await timer.measure("enrichment_queries", () =>
+      withAuthorAndMeta(db, (data ?? []) as Array<Record<string, unknown>>, userId),
+    ),
+  };
+  timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: body.resources.length });
+  return NextResponse.json(body);
 }
 
 export async function POST(

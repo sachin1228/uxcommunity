@@ -8,6 +8,7 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { deferCommunityNotification, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
+import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 
 const PAGE_SIZE = 50;
 const CATEGORIES = new Set<ThreadCategory>([
@@ -101,85 +102,86 @@ async function withAuthorAndVotes(
   const threadIds = rows.map((row) => row.id).filter((id): id is string => typeof id === "string");
   const userIds = [...new Set(rows.map((row) => row.user_id).filter((id): id is string => typeof id === "string"))];
 
-  const [
-    { data: users },
-    { data: profiles },
-    { data: allVotes },
-    { data: myVotes },
-    { data: mySaves },
-    { data: allComments },
-  ] = await Promise.all([
+  const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
     userIds.length ? db.from("users").select("id, name").in("id", userIds) : { data: [] },
     userIds.length ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds) : { data: [] },
-    db.from("thread_votes").select("thread_id").in("thread_id", threadIds),
-    db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", currentUserId),
-    db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", currentUserId),
-    db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
+    db.rpc("get_thread_list_aggregates", {
+      p_user_id: currentUserId,
+      p_thread_ids: threadIds,
+    }),
   ]);
+
+  if (aggregatesResult.error) {
+    console.error("[thread list aggregates]", aggregatesResult.error);
+    throw new Error("Failed to load thread interaction aggregates.");
+  }
 
   const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
+  const aggregateMap = new Map(
+    (aggregatesResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]),
+  );
 
-  const voteCountMap: Record<string, number> = {};
-  for (const vote of allVotes ?? []) {
-    voteCountMap[vote.thread_id] = (voteCountMap[vote.thread_id] ?? 0) + 1;
-  }
-
-  const commentCountMap: Record<string, number> = {};
-  for (const c of allComments ?? []) {
-    commentCountMap[c.thread_id] = (commentCountMap[c.thread_id] ?? 0) + 1;
-  }
-
-  const myVoteSet = new Set((myVotes ?? []).map((v) => v.thread_id));
-  const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
-
-  return rows.map((row) => ({
-    ...row,
-    users: userMap[row.user_id as string]
-      ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
-      : null,
-    vote_count: voteCountMap[row.id as string] ?? 0,
-    user_voted: myVoteSet.has(row.id as string),
-    user_saved: mySaveSet.has(row.id as string),
-    comment_count: commentCountMap[row.id as string] ?? 0,
-  }));
+  return rows.map((row) => {
+    const aggregate = aggregateMap.get(row.id as string);
+    return {
+      ...row,
+      users: userMap[row.user_id as string]
+        ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
+        : null,
+      vote_count: Number(aggregate?.vote_count ?? 0),
+      user_voted: aggregate?.user_voted === true,
+      user_saved: aggregate?.user_saved === true,
+      comment_count: Number(aggregate?.comment_count ?? 0),
+    };
+  });
 }
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const timer = createServerTimer("GET /api/communities/[id]/threads");
   let session;
   try {
-    session = await requireSession("user");
+    session = await timer.measure("auth", () => requireSession("user"));
   } catch (error) {
+    timer.finish({ status: (error as Response).status ?? 401 });
     return error as Response;
   }
 
   const { id: communityId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
-  if (!(await isMember(db, communityId, userId))) {
+  if (!(await timer.measure("membership_query", () => isMember(db, communityId, userId)))) {
+    timer.finish({ status: 403 });
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  const { data, error } = await db
-    .from("community_threads")
-    .select(
-      "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at",
-    )
-    .eq("community_id", communityId)
-    .order("created_at", { ascending: false })
-    .limit(PAGE_SIZE);
+  const { data, error } = await timer.measure("threads_query", async () =>
+    await db
+      .from("community_threads")
+      .select(
+        "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at",
+      )
+      .eq("community_id", communityId)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE),
+  );
 
   if (error) {
     console.error("[GET threads]", error);
+    timer.finish({ status: 500 });
     return NextResponse.json({ error: "Failed to fetch threads." }, { status: 500 });
   }
 
-  return NextResponse.json({
-    threads: await withAuthorAndVotes(db, (data ?? []) as Array<Record<string, unknown>>, userId),
-  });
+  const body = {
+    threads: await timer.measure("enrichment_queries", () =>
+      withAuthorAndVotes(db, (data ?? []) as Array<Record<string, unknown>>, userId),
+    ),
+  };
+  timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: body.threads.length });
+  return NextResponse.json(body);
 }
 
 export async function POST(
