@@ -23,7 +23,6 @@ function isValidHttpUrl(s: string) {
 }
 
 export function EditResourceModal({ resource, communityId, onClose, onUpdated }: EditResourceModalProps) {
-  const [title, setTitle] = useState(resource.title);
   const [url, setUrl] = useState(resource.url);
   const [description, setDescription] = useState(resource.description ?? "");
   const [resourceType, setResourceType] = useState<ResourceType>(resource.resource_type);
@@ -107,7 +106,7 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) { setError("Title is required."); return; }
+    if (!description.trim()) { setError("Description is required."); return; }
     if (!url.trim()) { setError("URL is required."); return; }
     if (!isValidHttpUrl(url.trim())) { setError("URL must start with http:// or https://"); return; }
 
@@ -118,9 +117,9 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: title.trim(),
+          title: description.trim().slice(0, 120),
           url: url.trim(),
-          description: description.trim() || null,
+          description: description.trim(),
           resource_type: resourceType,
           tags,
           is_public: isPublic,
@@ -205,24 +204,6 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
             </div>
           )}
 
-          {/* Title */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Title <span className="text-accent">*</span>
-            </span>
-            <div className="relative">
-              <input
-                value={title}
-                maxLength={120}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-14 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-              />
-              <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">
-                {title.length}/120
-              </span>
-            </div>
-          </label>
-
           {/* Resource type */}
           <fieldset>
             <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">Type</legend>
@@ -248,13 +229,14 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
           {/* Description */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="font-normal text-foreground-subtle">(optional)</span>
+              Description <span className="text-accent">*</span>
             </span>
             <textarea
               value={description}
               maxLength={2000}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
+              required
               className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
             />
           </label>
