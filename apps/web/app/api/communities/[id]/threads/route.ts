@@ -6,7 +6,7 @@ import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
-import { getActorName, notifyCommunityMembers, threadHref } from "@/lib/notifications";
+import { deferCommunityNotification, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 
 const PAGE_SIZE = 50;
@@ -278,14 +278,13 @@ export async function POST(
     decision,
   });
 
-  const actorName = await getActorName(db, userId);
-  await notifyCommunityMembers(db, {
+  deferCommunityNotification({
     communityId,
     actorId: userId,
     type: "community_thread",
     entityType: "thread",
     entityId: inserted.id,
-    title: `${actorName} started a new thread`,
+    title: (actorName) => `${actorName} started a new thread`,
     body: title,
     href: threadHref(communityId, inserted.id),
     metadata: { category },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { createNotification, eventHref, getActorName } from "@/lib/notifications";
+import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -51,15 +51,14 @@ export async function POST(
   }
 
   await db.from("event_rsvps").insert({ event_id: eventId, user_id: userId });
-  const actorName = await getActorName(db, userId);
-  await createNotification(db, {
+  deferNotification({
     userId: event.user_id,
     actorId: userId,
     communityId,
     type: "event_rsvp",
     entityType: "event",
     entityId: eventId,
-    title: `${actorName} RSVPed to your event`,
+    title: (actorName) => `${actorName} RSVPed to your event`,
     body: event.title,
     href: eventHref(communityId, eventId),
   });

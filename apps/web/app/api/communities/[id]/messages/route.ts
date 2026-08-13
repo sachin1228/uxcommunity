@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import type { MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
 import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
@@ -11,44 +10,6 @@ import { contentHash } from "@/lib/moderation/normalize";
 import { createServerTimer } from "@/lib/server-timing";
 
 const PAGE_SIZE = 50;
-
-/**
- * Strip year-range suffixes and singularize experience level names for display.
- * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- *      "Heads of Design"                 → "Head of Design"
- */
-function cleanDesignation(name: string): string {
-  const clean = name.split("(")[0].trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
-
-/** Fetch reply previews for a batch of reply_to_ids. */
-async function fetchReplyPreviews(
-  db: ReturnType<typeof createServiceClient>,
-  replyToIds: string[],
-): Promise<Record<string, ReplyPreview>> {
-  if (!replyToIds.length) return {};
-
-  const { data: msgs } = await db
-    .from("community_messages")
-    .select("id, content, user_id")
-    .in("id", replyToIds);
-
-  const userIds = [...new Set((msgs ?? []).map((m) => m.user_id))];
-  const { data: users } = userIds.length
-    ? await db.from("users").select("id, name").in("id", userIds)
-    : { data: [] as { id: string; name: string }[] };
-
-  const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
-
-  const out: Record<string, ReplyPreview> = {};
-  for (const m of msgs ?? []) {
-    out[m.id] = { id: m.id, content: (m as any).content ?? "", user_name: userMap[m.user_id] ?? "Unknown" };
-  }
-  return out;
-}
 
 export async function GET(
   req: NextRequest,
@@ -86,96 +47,23 @@ export async function GET(
     ? membership.history_cleared_at
     : membership.joined_at;
 
-  let msgQuery = db
-    .from("community_messages")
-    .select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at")
-    .eq("community_id", communityId)
-    .gte("created_at", historyStart)   // never show messages before join/archive
-    .order("created_at", { ascending: false });
+  const { data, error } = await db.rpc("get_community_message_page", {
+    p_community_id: communityId,
+    p_user_id: userId,
+    p_history_start: historyStart,
+    p_before: after ? null : before,
+    p_after: after,
+    p_limit: PAGE_SIZE,
+  });
 
-  if (after)        msgQuery = msgQuery.gt("created_at", after);
-  else if (before)  msgQuery = msgQuery.lt("created_at", before).limit(PAGE_SIZE);
-  else              msgQuery = msgQuery.limit(PAGE_SIZE);
-
-  const { data, error } = await msgQuery;
   if (error) {
     console.error("[GET messages]", error);
     return NextResponse.json({ error: "Failed to fetch messages." }, { status: 500 });
   }
 
-  const rows = data ?? [];
-  const uniqueUserIds = [...new Set(rows.map((m) => m.user_id))];
-  const messageIds    = rows.map((m) => m.id);
-  const replyToIds    = [...new Set(rows.map((m) => m.reply_to_id).filter(Boolean) as string[])];
-
-  const userMap: Record<string, { name: string; avatar_url: string | null; designation: string | null; company: string | null }> = {};
-
-  const [usersResult, reactionsResult, replyMap] = await Promise.all([
-    uniqueUserIds.length
-      ? Promise.all([
-          db.from("users").select("id, name").in("id", uniqueUserIds),
-          db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", uniqueUserIds),
-        ])
-      : Promise.resolve([
-          { data: [] as { id: string; name: string }[] },
-          { data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] },
-        ]),
-    messageIds.length
-      ? db.from("message_reactions").select("message_id, user_id, emoji").in("message_id", messageIds)
-      : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string }[] }),
-    fetchReplyPreviews(db, replyToIds),
-  ]);
-
-  if (uniqueUserIds.length) {
-    const [{ data: users }, { data: profiles }] = usersResult as [
-      { data: { id: string; name: string }[] | null },
-      { data: { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] | null },
-    ];
-
-    // Resolve experience level display names from slugs in a single batch query.
-    const slugs = [...new Set((profiles ?? []).map((p) => p.experience_level).filter(Boolean) as string[])];
-    const expLevelMap: Record<string, string> = {};
-    if (slugs.length) {
-      const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", slugs);
-      for (const l of levels ?? []) expLevelMap[l.slug] = cleanDesignation(l.name);
-    }
-
-    const avatarMap:    Record<string, string | null> = {};
-    const desigMap:     Record<string, string | null> = {};
-    const companyMap:   Record<string, string | null> = {};
-    for (const p of profiles ?? []) {
-      avatarMap[p.user_id]  = p.avatar_url;
-      desigMap[p.user_id]   = p.experience_level ? (expLevelMap[p.experience_level] ?? null) : null;
-      companyMap[p.user_id] = (p.companies as any)?.name ?? null;
-    }
-    for (const u of users ?? []) {
-      userMap[u.id] = {
-        name:        u.name,
-        avatar_url:  avatarMap[u.id] ?? null,
-        designation: desigMap[u.id]  ?? null,
-        company:     companyMap[u.id] ?? null,
-      };
-    }
-  }
-
-  const reactionsMap: Record<string, MessageReaction[]> = {};
-  for (const r of (reactionsResult.data ?? [])) {
-    if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
-    const group = reactionsMap[r.message_id].find((g) => g.emoji === r.emoji);
-    if (group) group.user_ids.push(r.user_id);
-    else reactionsMap[r.message_id].push({ emoji: r.emoji, user_ids: [r.user_id] });
-  }
-
-  const messages = rows.reverse().map((m) => ({
-    ...m,
-    users:      userMap[m.user_id] ?? null,
-    reactions:  reactionsMap[m.id] ?? [],
-    reply_to:   m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
-    image_url:  (m as any).image_url  ?? null,
-    deleted_at: (m as any).deleted_at ?? null,
-  }));
-
-  return NextResponse.json({ messages });
+  // The RPC reads newest-first for index-friendly pagination. Chat consumers
+  // expect chronological order, so reverse only the bounded result page.
+  return NextResponse.json({ messages: (data ?? []).reverse() });
 }
 
 export async function POST(

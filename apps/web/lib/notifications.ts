@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 
@@ -44,6 +45,14 @@ interface CommunityNotificationInput {
   href: string;
   metadata?: Record<string, unknown>;
 }
+
+type DeferredNotificationInput = Omit<NotificationInput, "title"> & {
+  title: (actorName: string) => string;
+};
+
+type DeferredCommunityNotificationInput = Omit<CommunityNotificationInput, "title"> & {
+  title: (actorName: string) => string;
+};
 
 export type NotificationResult =
   | { ok: true; skipped?: "self" }
@@ -122,6 +131,32 @@ export async function getActorName(
 ) {
   const { data } = await db.from("users").select("name").eq("id", userId).maybeSingle();
   return data?.name ?? "Someone";
+}
+
+export function deferNotification(input: DeferredNotificationInput) {
+  after(async () => {
+    try {
+      const db = createServiceClient();
+      const actorName = input.actorId
+        ? await getActorName(db, input.actorId)
+        : "Someone";
+      await createNotification(db, { ...input, title: input.title(actorName) });
+    } catch (error) {
+      console.error("[notifications] deferred delivery failed", error);
+    }
+  });
+}
+
+export function deferCommunityNotification(input: DeferredCommunityNotificationInput) {
+  after(async () => {
+    try {
+      const db = createServiceClient();
+      const actorName = await getActorName(db, input.actorId);
+      await notifyCommunityMembers(db, { ...input, title: input.title(actorName) });
+    } catch (error) {
+      console.error("[notifications] deferred community delivery failed", error);
+    }
+  });
 }
 
 export function threadHref(communityId: string, threadId: string) {

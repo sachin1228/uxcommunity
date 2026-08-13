@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { eventHref, getActorName, notifyCommunityMembers } from "@/lib/notifications";
+import { deferCommunityNotification, eventHref } from "@/lib/notifications";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -207,14 +207,13 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const actorName = await getActorName(db, userId);
-  await notifyCommunityMembers(db, {
+  deferCommunityNotification({
     communityId,
     actorId: userId,
     type: "community_event",
     entityType: "event",
     entityId: data.id,
-    title: `${actorName} created a new event`,
+    title: (actorName) => `${actorName} created a new event`,
     body: title,
     href: eventHref(communityId, data.id),
     metadata: { event_date: eventDate },

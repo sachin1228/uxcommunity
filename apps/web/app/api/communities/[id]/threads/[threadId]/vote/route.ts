@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { createNotification, getActorName, threadHref } from "@/lib/notifications";
+import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -64,21 +64,18 @@ export async function POST(
       return NextResponse.json({ error: "Failed to add like." }, { status: 500 });
     }
 
-    let notificationWarning: string | undefined;
     if (!existing) {
-      const actorName = await getActorName(db, userId);
-      const notification = await createNotification(db, {
+      deferNotification({
         userId: thread.user_id,
         actorId: userId,
         communityId,
         type: "thread_vote",
         entityType: "thread",
         entityId: threadId,
-        title: `${actorName} liked your thread`,
+        title: (actorName) => `${actorName} liked your thread`,
         body: thread.title,
         href: threadHref(communityId, threadId),
       });
-      if (!notification.ok) notificationWarning = "Like saved, but notification delivery failed.";
     }
 
     const { count, error: countError } = await db
@@ -91,7 +88,7 @@ export async function POST(
       return NextResponse.json({ error: "Like saved, but its count could not be confirmed." }, { status: 500 });
     }
 
-    return NextResponse.json({ voted: true, count: count ?? 0, notificationWarning });
+    return NextResponse.json({ voted: true, count: count ?? 0 });
   }
 
   const { error } = await db
