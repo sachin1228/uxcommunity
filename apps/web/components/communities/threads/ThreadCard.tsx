@@ -55,9 +55,8 @@ function renderWithLinks(text: string, isNested = false) {
   if (lastIndex < text.length) parts.push(text.slice(lastIndex));
   return parts;
 }
-import { CategoryIcon } from "./categoryIcons";
 import { EditThreadModal } from "./EditThreadModal";
-import { CATEGORY_COLORS, formatFullDate, formatRelativeDate } from "./threadShared";
+import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -110,7 +109,6 @@ export function ThreadCard({
 }: ThreadCardProps) {
   const isDetail = variant === "detail";
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
-  const categoryColor = CATEGORY_COLORS[thread.category] ?? CATEGORY_COLORS["discussion"];
   const isOwner = thread.user_id === currentUserId;
 
   const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
@@ -281,42 +279,14 @@ export function ThreadCard({
     <>
       {/* ── Top row: avatar · name · date · category pill · community · menu ── */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <PostAuthorMeta
-            name={authorName}
-            avatarUrl={thread.users?.avatar_url}
-            createdAt={thread.updated_at || thread.created_at}
-            dateLabel={dateLabel}
-          />
-
-          {/* Category + community */}
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-            {category && (
-              <>
-                <span className="font-body text-[11px] text-foreground-subtle">·</span>
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 font-body text-[11px] font-medium"
-                  style={{
-                    border: `1px solid ${categoryColor.border}`,
-                    color: categoryColor.text,
-                    background: categoryColor.bg,
-                  }}
-                >
-                  <CategoryIcon category={category.value} size={10} />
-                  {category.label}
-                </span>
-              </>
-            )}
-            {communityName && communityNamePlacement === "header" && (
-              <>
-                <span className="font-body text-[11px] text-foreground-subtle">·</span>
-                <span className="font-body text-[11px] text-foreground-subtle">
-                  in <span className="text-foreground-muted">{communityName}</span>
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <PostAuthorMeta
+          name={authorName}
+          avatarUrl={thread.users?.avatar_url}
+          createdAt={thread.updated_at || thread.created_at}
+          dateLabel={dateLabel}
+          dateInline
+          secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
+        />
 
         {/* ··· menu */}
         <div

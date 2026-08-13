@@ -7,11 +7,11 @@ import {
   Loader2, MessageSquare, MoreHorizontal, Pencil, Send, Trash2,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
-import { ResourceTypeIcon } from "./resourceTypeIcons";
 import type { CommunityResource, ResourceComment } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { EditResourceModal } from "./EditResourceModal";
 import { communityFeedLayout } from "../feed-layout";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -21,10 +21,6 @@ function formatRelativeDate(value: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-function formatFullDate(value: string) {
-  return new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function getDomain(url: string) {
@@ -372,12 +368,15 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
           {/* Resource card */}
           <div className={`${communityFeedLayout.dividerY} py-6`}>
             <div className={communityFeedLayout.detailSection}>
-            {/* Top row: type badge + actions */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-[10px] text-foreground-muted">
-                <ResourceTypeIcon type={resource.resource_type} size={11} />
-                {typeInfo?.label ?? resource.resource_type}
-              </span>
+            {/* Top row: author metadata + actions */}
+            <div className="flex items-start justify-between gap-3">
+              <PostAuthorMeta
+                name={authorName}
+                avatarUrl={resource.users?.avatar_url}
+                createdAt={resource.created_at}
+                dateInline
+                secondaryLabel={`Resources · ${typeInfo?.label ?? "Post"}`}
+              />
 
               <div className="flex items-center gap-2">
                 {/* Save / bookmark */}
@@ -477,17 +476,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
               </div>
             )}
 
-            {/* Author row */}
-            <div className="mt-4 flex items-center gap-2 border-t border-border pt-4">
-              <Avatar name={authorName} avatarUrl={resource.users?.avatar_url ?? null} size="sm" />
-              <span className="font-body text-xs text-foreground-muted">{authorName}</span>
-              <span className="font-body text-[11px] text-foreground-subtle">·</span>
-              <span className="font-body text-[11px] text-foreground-subtle">{formatFullDate(resource.created_at)}</span>
-              <span className="font-body text-[11px] text-foreground-subtle">·</span>
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle">
-                <MessageSquare size={11} /> {totalComments} {totalComments === 1 ? "comment" : "comments"}
-              </span>
-            </div>
             </div>
           </div>
 
