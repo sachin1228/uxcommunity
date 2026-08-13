@@ -250,19 +250,6 @@ export function EventCard({
                     {shared ? "Copied!" : "Share"}
                   </button>
 
-                  {/* Save / bookmark */}
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    aria-label={event.user_saved ? "Unsave event" : "Save event"}
-                    className={`flex h-7 w-7 items-center justify-center rounded-md border transition-colors ${
-                      event.user_saved
-                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-500"
-                        : "border-border text-foreground-subtle"
-                    }`}
-                  >
-                    <Bookmark size={13} fill={event.user_saved ? "currentColor" : "none"} />
-                  </button>
 
                   {/* Options menu — visible to all users */}
                   <div ref={menuRef} className="relative">
@@ -276,6 +263,18 @@ export function EventCard({
                     </button>
                     {menuOpen && (
                       <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            void handleSave(e);
+                            setMenuOpen(false);
+                          }}
+                          aria-pressed={event.user_saved}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                        >
+                          <Bookmark size={11} fill={event.user_saved ? "currentColor" : "none"} />
+                          {event.user_saved ? "Unsave event" : "Save event"}
+                        </button>
                         {isOwner && (
                           <>
                             <button type="button"
