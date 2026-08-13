@@ -13,6 +13,7 @@ import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { fetchJsonCached, getCachedRequest, initRequestCache } from "@/lib/request-cache";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
@@ -26,30 +27,31 @@ interface HomeFeedProps {
 }
 
 export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  initRequestCache(currentUserId);
+  const cached = getCachedRequest<{ items?: FeedItem[] }>("/api/home/feed", currentUserId);
+  const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
+  const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchFeed = useCallback(async (background = false) => {
+  const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const response = await fetch("/api/home/feed", { cache: "no-store" });
-      const data = (await response.json().catch(() => null)) as {
-        items?: FeedItem[];
-        error?: string;
-      } | null;
-      if (!response.ok) throw new Error(data?.error ?? "Failed to load the feed.");
-      setItems(data?.items ?? []);
+      const data = await fetchJsonCached<{ items?: FeedItem[] }>(
+        "/api/home/feed",
+        { staleMs: 30_000, force },
+        currentUserId,
+      );
+      setItems(data.items ?? []);
       setError(null);
     } catch (fetchError: unknown) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
-    void fetchFeed();
+    const initialFetch = window.setTimeout(() => void fetchFeed(true, refreshToken > 0), 0);
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
@@ -59,7 +61,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         event: "*",
         schema: "public",
         table: "event_saves",
-      }, () => void fetchFeed(true))
+      }, () => void fetchFeed(true, true))
       .subscribe();
 
     const refreshOnFocus = () => {
@@ -69,6 +71,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     window.addEventListener("focus", refreshOnFocus);
 
     return () => {
+      window.clearTimeout(initialFetch);
       supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", refreshOnFocus);
       window.removeEventListener("focus", refreshOnFocus);

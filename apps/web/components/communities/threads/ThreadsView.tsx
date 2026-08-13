@@ -17,9 +17,8 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
-// ── Module-level cache (survives tab switches within the same session) ─────────
-const threadsCache = new Map<string, { data: CommunityThread[]; fetchedAt: number }>();
 const THREADS_STALE_MS = 60_000;
 
 export function ThreadsView({
@@ -29,35 +28,35 @@ export function ThreadsView({
   communityId: string;
   currentUserId: string;
 }) {
-  const cached = threadsCache.get(communityId);
-  const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.data ?? []);
+  initRequestCache(currentUserId);
+  const requestUrl = `/api/communities/${communityId}/threads`;
+  const cached = getCachedRequest<{ threads?: CommunityThread[] }>(requestUrl, currentUserId);
+  const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.threads ?? []);
   const [loading, setLoading] = useState(() => !cached);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ThreadCategory | "all">("all");
 
-  const fetchThreads = useCallback(async (background = false) => {
+  const fetchThreads = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const response = await fetch(`/api/communities/${communityId}/threads`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Failed to load threads.");
-      const fresh = data.threads as CommunityThread[];
-      setThreads(fresh);
-      threadsCache.set(communityId, { data: fresh, fetchedAt: Date.now() });
+      const data = await fetchJsonCached<{ threads?: CommunityThread[] }>(
+        requestUrl,
+        { staleMs: THREADS_STALE_MS, force },
+        currentUserId,
+      );
+      setThreads(data.threads ?? []);
       setError(null);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load threads.");
     } finally {
       setLoading(false);
     }
-  }, [communityId]);
+  }, [currentUserId, requestUrl]);
 
   useEffect(() => {
-    const hit = threadsCache.get(communityId);
-    const isStale = !hit || Date.now() - hit.fetchedAt > THREADS_STALE_MS;
-    void fetchThreads(!isStale); // background-only when cache is fresh
+    const initialFetch = window.setTimeout(() => void fetchThreads(true), 0);
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
       supabase = createBrowserClient();
@@ -76,7 +75,7 @@ export function ThreadsView({
           table: "community_threads",
           filter: `community_id=eq.${communityId}`,
         },
-        () => void fetchThreads(true),
+        () => void fetchThreads(true, true),
       )
       .subscribe();
 
@@ -120,6 +119,7 @@ export function ThreadsView({
     window.addEventListener("focus", handleFocus);
 
     return () => {
+      window.clearTimeout(initialFetch);
       supabase.removeChannel(threadChannel);
       supabase.removeChannel(voteChannel);
       document.removeEventListener("visibilitychange", handleFocus);
@@ -130,7 +130,11 @@ export function ThreadsView({
   function writeCache(updater: (prev: CommunityThread[]) => CommunityThread[]) {
     setThreads((prev) => {
       const next = updater(prev);
-      threadsCache.set(communityId, { data: next, fetchedAt: threadsCache.get(communityId)?.fetchedAt ?? Date.now() });
+      patchCachedRequest<{ threads?: CommunityThread[] }>(
+        requestUrl,
+        (current) => ({ ...current, threads: next }),
+        currentUserId,
+      );
       return next;
     });
   }

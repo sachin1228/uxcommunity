@@ -14,6 +14,7 @@ import {
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 type NotificationType =
   | "community_thread"
@@ -70,22 +71,33 @@ function formatRelativeTime(value: string) {
 }
 
 export function NotificationBell({ userId }: Props) {
+  initRequestCache(userId);
+  const cached = getCachedRequest<{ notifications?: NotificationItem[]; unread_count?: number }>("/api/notifications", userId);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [loading, setLoading] = useState(() => !cached);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => cached?.notifications ?? []);
+  const [unreadCount, setUnreadCount] = useState(() => cached?.unread_count ?? 0);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const hasUnread = unreadCount > 0;
   const visibleCount = unreadCount > 99 ? "99+" : String(unreadCount);
 
+  const patchNotificationCache = useCallback((
+    update: (current: { notifications: NotificationItem[]; unread_count: number }) => { notifications: NotificationItem[]; unread_count: number },
+  ) => {
+    patchCachedRequest("/api/notifications", (current: { notifications?: NotificationItem[]; unread_count?: number }) =>
+      update({ notifications: current.notifications ?? [], unread_count: current.unread_count ?? 0 }), userId);
+  }, [userId]);
+
   const fetchNotifications = useCallback(async () => {
-    const res = await fetch("/api/notifications", { cache: "no-store" });
-    if (!res.ok) throw new Error("Failed to load notifications.");
-    const data = await res.json();
-    setNotifications((data.notifications ?? []) as NotificationItem[]);
+    const data = await fetchJsonCached<{ notifications?: NotificationItem[]; unread_count?: number }>(
+      "/api/notifications",
+      { staleMs: 30_000 },
+      userId,
+    );
+    setNotifications(data.notifications ?? []);
     setUnreadCount(data.unread_count ?? 0);
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +162,10 @@ export function NotificationBell({ userId }: Props) {
       prev.map((item) => (item.id === id ? { ...item, read_at: item.read_at ?? new Date().toISOString() } : item)),
     );
     setUnreadCount((count) => Math.max(0, count - 1));
+    patchNotificationCache((current) => ({
+      notifications: current.notifications.map((item) => item.id === id ? { ...item, read_at: item.read_at ?? new Date().toISOString() } : item),
+      unread_count: Math.max(0, current.unread_count - 1),
+    }));
     await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -162,6 +178,10 @@ export function NotificationBell({ userId }: Props) {
     const now = new Date().toISOString();
     setNotifications((prev) => prev.map((item) => ({ ...item, read_at: item.read_at ?? now })));
     setUnreadCount(0);
+    patchNotificationCache((current) => ({
+      notifications: current.notifications.map((item) => ({ ...item, read_at: item.read_at ?? now })),
+      unread_count: 0,
+    }));
     await fetch("/api/notifications", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
