@@ -8,9 +8,8 @@ import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
-// ── Module-level cache ────────────────────────────────────────────────────────
-const eventsCache = new Map<string, { data: CommunityEvent[]; fetchedAt: number }>();
 const EVENTS_STALE_MS = 60_000;
 
 export function EventsView({
@@ -20,34 +19,34 @@ export function EventsView({
   communityId: string;
   currentUserId: string;
 }) {
-  const cached = eventsCache.get(communityId);
-  const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.data ?? []);
+  initRequestCache(currentUserId);
+  const requestUrl = `/api/communities/${communityId}/events`;
+  const cached = getCachedRequest<{ events?: CommunityEvent[] }>(requestUrl, currentUserId);
+  const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.events ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
 
-  const fetchEvents = useCallback(async (background = false) => {
+  const fetchEvents = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events`, { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load events.");
-      const fresh = data.events as CommunityEvent[];
-      setEvents(fresh);
-      eventsCache.set(communityId, { data: fresh, fetchedAt: Date.now() });
+      const data = await fetchJsonCached<{ events?: CommunityEvent[] }>(
+        requestUrl,
+        { staleMs: EVENTS_STALE_MS, force },
+        currentUserId,
+      );
+      setEvents(data.events ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
     } finally {
       setLoading(false);
     }
-  }, [communityId]);
+  }, [currentUserId, requestUrl]);
 
   useEffect(() => {
-    const hit = eventsCache.get(communityId);
-    const isStale = !hit || Date.now() - hit.fetchedAt > EVENTS_STALE_MS;
-    void fetchEvents(!isStale);
+    queueMicrotask(() => void fetchEvents(true));
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
@@ -58,7 +57,7 @@ export function EventsView({
         schema: "public",
         table: "community_events",
         filter: `community_id=eq.${communityId}`,
-      }, () => void fetchEvents(true))
+      }, () => void fetchEvents(true, true))
       .subscribe();
 
     const rsvpChannel = supabase
@@ -67,7 +66,7 @@ export function EventsView({
         event: "*",
         schema: "public",
         table: "event_rsvps",
-      }, () => void fetchEvents(true))
+      }, () => void fetchEvents(true, true))
       .subscribe();
 
     const saveChannel = supabase
@@ -76,7 +75,7 @@ export function EventsView({
         event: "*",
         schema: "public",
         table: "event_saves",
-      }, () => void fetchEvents(true))
+      }, () => void fetchEvents(true, true))
       .subscribe();
 
     const handleFocus = () => { if (document.visibilityState === "visible") void fetchEvents(true); };
@@ -95,7 +94,11 @@ export function EventsView({
   function writeCache(updater: (prev: CommunityEvent[]) => CommunityEvent[]) {
     setEvents((prev) => {
       const next = updater(prev);
-      eventsCache.set(communityId, { data: next, fetchedAt: eventsCache.get(communityId)?.fetchedAt ?? Date.now() });
+      patchCachedRequest<{ events?: CommunityEvent[] }>(
+        requestUrl,
+        (current) => ({ ...current, events: next }),
+        currentUserId,
+      );
       return next;
     });
   }
