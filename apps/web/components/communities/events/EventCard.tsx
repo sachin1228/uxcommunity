@@ -204,6 +204,7 @@ export function EventCard({
       <article className={`group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border border-border rounded-xl overflow-hidden"}`}>
         <Link
           href={eventHref}
+          prefetch={false}
           className={`block ${edgeToEdgeDivider ? communityFeedLayout.gutters : ""}`}
         >
           <div className="flex gap-4">
