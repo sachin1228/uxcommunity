@@ -300,12 +300,17 @@ export function ResourceCard({
           {hasFigmaPrototype ? (
             <FigmaEmbed url={resource.url} compact className="mt-4" />
           ) : ogImage ? (
-            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-4 block h-52 w-full overflow-hidden rounded-xl bg-surface">
+            <a
+              href={resource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 block w-fit max-w-full overflow-hidden rounded-xl bg-surface"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={ogImage}
                 alt=""
-                className="h-full w-full object-cover"
+                className="block h-auto max-h-96 max-w-full object-contain"
                 onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
               />
             </a>
