@@ -15,25 +15,31 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Record<s
   if (!rows.length) return [];
   const ids = rows.map((row) => row.id as string);
   const users = [...new Set(rows.map((row) => row.user_id as string))];
-  const [{ data: names }, { data: profiles }, { data: likes }, { data: saves }, { data: comments }] = await Promise.all([
+  const [{ data: names }, { data: profiles }, { data: interactions, error: interactionsError }] = await Promise.all([
     db.from("users").select("id, name").in("id", users),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", users),
-    db.from("showcase_likes").select("post_id, user_id").in("post_id", ids),
-    db.from("showcase_saves").select("post_id, user_id").in("post_id", ids),
-    db.from("showcase_comments").select("post_id").in("post_id", ids),
+    db.rpc("get_showcase_interactions", { p_user_id: userId, p_post_ids: ids }),
   ]);
+  if (interactionsError) throw interactionsError;
+
   const nameMap = Object.fromEntries((names ?? []).map((item) => [item.id, item.name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((item) => [item.user_id, item.avatar_url]));
+  const interactionMap = (interactions ?? {}) as Record<string, {
+    like_count?: number;
+    comment_count?: number;
+    user_liked?: boolean;
+    user_saved?: boolean;
+  }>;
+
   return rows.map((row) => {
-    const postLikes = (likes ?? []).filter((item) => item.post_id === row.id);
-    const postSaves = (saves ?? []).filter((item) => item.post_id === row.id);
+    const interaction = interactionMap[row.id as string] ?? {};
     return {
       ...row,
       author: { name: nameMap[row.user_id as string] ?? "Community member", avatar_url: avatarMap[row.user_id as string] ?? null },
-      like_count: postLikes.length,
-      comment_count: (comments ?? []).filter((item) => item.post_id === row.id).length,
-      user_liked: postLikes.some((item) => item.user_id === userId),
-      user_saved: postSaves.some((item) => item.user_id === userId),
+      like_count: interaction.like_count ?? 0,
+      comment_count: interaction.comment_count ?? 0,
+      user_liked: interaction.user_liked ?? false,
+      user_saved: interaction.user_saved ?? false,
     };
   });
 }

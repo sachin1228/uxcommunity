@@ -21,12 +21,12 @@ export function EventsView({
 }) {
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/events`;
-  const cached = getCachedRequest<{ events?: CommunityEvent[] }>(requestUrl, currentUserId);
+  const cached = getCachedRequest<{ events?: CommunityEvent[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.events ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
 
