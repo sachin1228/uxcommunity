@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Loader2, Maximize2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Loader2, Maximize2, Minimize2 } from "lucide-react";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 interface FigmaEmbedProps {
@@ -13,11 +13,26 @@ interface FigmaEmbedProps {
 export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedProps) {
   const embedUrl = useMemo(() => getFigmaEmbedUrl(url), [url]);
   const [loaded, setLoaded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const embedRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === embedRef.current);
+    }
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   if (!embedUrl) return null;
 
-  async function viewFullscreen() {
+  async function toggleFullscreen() {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
     await embedRef.current?.requestFullscreen();
   }
 
@@ -49,11 +64,19 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
         <span className="font-body text-xs text-foreground-muted">Interactive prototype</span>
         <button
           type="button"
-          onClick={viewFullscreen}
+          onClick={toggleFullscreen}
           className="inline-flex min-h-8 items-center gap-1.5 font-body text-xs font-medium text-accent hover:text-accent-hover"
-          aria-label="View prototype in full screen"
+          aria-label={isFullscreen ? "Exit full screen" : "View prototype in full screen"}
         >
-          View full screen <Maximize2 size={12} />
+          {isFullscreen ? (
+            <>
+              Exit full screen <Minimize2 size={12} />
+            </>
+          ) : (
+            <>
+              View full screen <Maximize2 size={12} />
+            </>
+          )}
         </button>
       </div>
     </div>
