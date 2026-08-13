@@ -88,6 +88,14 @@ export async function fetchJsonCached<T>(
   return request
 }
 
+export function setCachedRequest<T>(url: string, value: T, userId?: string) {
+  const key = canonicalRequestKey(url, userId)
+  entries.delete(key)
+  entries.set(key, { value, fetchedAt: Date.now() })
+  while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
+  listeners.get(key)?.forEach((listener) => listener())
+}
+
 export function patchCachedRequest<T>(
   url: string,
   update: (current: T) => T,
@@ -96,8 +104,7 @@ export function patchCachedRequest<T>(
   const key = canonicalRequestKey(url, userId)
   const cached = entries.get(key) as CacheEntry<T> | undefined
   if (!cached) return
-  entries.set(key, { ...cached, value: update(cached.value) })
-  listeners.get(key)?.forEach((listener) => listener())
+  setCachedRequest(url, update(cached.value), userId)
 }
 
 export function invalidateRequest(url: string, userId?: string) {
