@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { deferCommunityNotification, eventHref } from "@/lib/notifications";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
@@ -31,7 +32,7 @@ async function enrichEvents(
   const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
     db.from("users").select("id, name").in("id", authorIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
-    db.rpc("get_event_list_aggregates", {
+    callPerformanceRpc(db, "get_event_list_aggregates", {
       p_user_id: currentUserId,
       p_event_ids: eventIds,
     }),
@@ -108,7 +109,7 @@ export async function GET(
 
   if (phase === "upcoming") {
     query = query
-      .gte("event_date", now)
+      .or(`end_date.gte.${now},and(end_date.is.null,event_date.gte.${now})`)
       .order("event_date", { ascending: true })
       .order("id", { ascending: true });
     if (eventDate && cursorId) {
@@ -116,7 +117,7 @@ export async function GET(
     }
   } else {
     query = query
-      .lt("event_date", now)
+      .or(`end_date.lt.${now},and(end_date.is.null,event_date.lt.${now})`)
       .order("event_date", { ascending: false })
       .order("id", { ascending: false });
     if (eventDate && cursorId) {
@@ -136,7 +137,7 @@ export async function GET(
         .from("community_events")
         .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
         .eq("community_id", communityId)
-        .lt("event_date", now)
+        .or(`end_date.lt.${now},and(end_date.is.null,event_date.lt.${now})`)
         .order("event_date", { ascending: false })
         .order("id", { ascending: false })
         .limit(EVENT_PAGE_SIZE + 1),

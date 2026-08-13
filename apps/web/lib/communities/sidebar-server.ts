@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 
 type ActivityRow = {
@@ -33,7 +34,7 @@ type ActivityRow = {
 
 export async function getSidebarCommunities(userId: string) {
   const db = createServiceClient();
-  const { data: activity, error: activityError } = await db.rpc("get_sidebar_activity", {
+  const { data: activity, error: activityError } = await callPerformanceRpc(db, "get_sidebar_activity", {
     p_user_id: userId,
   });
   if (activityError) {

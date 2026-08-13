@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
@@ -16,13 +17,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   let session;
-  console.time("requireSession");
   try {
     session = await requireSession("user");
   } catch (e) {
     return e as Response;
   }
-  console.timeEnd("requireSession");
   const userId = session.userId!;
   const { id: communityId } = await params;
 
@@ -47,7 +46,7 @@ export async function GET(
     ? membership.history_cleared_at
     : membership.joined_at;
 
-  const { data, error } = await db.rpc("get_community_message_page", {
+  const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
     p_community_id: communityId,
     p_user_id: userId,
     p_history_start: historyStart,

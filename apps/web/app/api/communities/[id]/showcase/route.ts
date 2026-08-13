@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
@@ -18,7 +19,7 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Record<s
   const [{ data: names }, { data: profiles }, { data: interactions, error: interactionsError }] = await Promise.all([
     db.from("users").select("id, name").in("id", users),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", users),
-    db.rpc("get_showcase_interactions", { p_user_id: userId, p_post_ids: ids }),
+    callPerformanceRpc(db, "get_showcase_interactions", { p_user_id: userId, p_post_ids: ids }),
   ]);
   if (interactionsError) throw interactionsError;
 
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
     }
   }
-  const { data, error } = await db.rpc("get_showcase_list_page", {
+  const { data, error } = await callPerformanceRpc(db, "get_showcase_list_page", {
     p_community_id: id,
     p_user_id: session.userId!,
     p_cursor_created_at: cursorCreatedAt,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
@@ -105,7 +106,7 @@ async function withAuthorAndVotes(
   const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
     userIds.length ? db.from("users").select("id, name").in("id", userIds) : { data: [] },
     userIds.length ? db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds) : { data: [] },
-    db.rpc("get_thread_list_aggregates", {
+    callPerformanceRpc(db, "get_thread_list_aggregates", {
       p_user_id: currentUserId,
       p_thread_ids: threadIds,
     }),
