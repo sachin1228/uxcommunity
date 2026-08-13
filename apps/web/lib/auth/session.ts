@@ -5,6 +5,9 @@ import type { NextResponse } from "next/server";
 export const SESSION_COOKIE = "uxcommunity_session";
 export const LEGACY_SESSION_COOKIE = "draft_session";
 const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const USER_LIVENESS_TTL_MS = 15_000;
+const activeUserChecks = new Map<string, number>();
+const activeUserChecksInFlight = new Map<string, Promise<void>>();
 
 export interface SessionPayload {
   userId?: string;
@@ -75,22 +78,41 @@ export function clearSessionCookie(res: NextResponse) {
  * a valid JWT (sessions are stateless, so we must verify liveness explicitly).
  */
 async function assertUserActive(userId: string): Promise<void> {
-  // Lazy import to keep the session module edge-compatible when only the
-  // JWT helpers are used (e.g. in middleware).
-  const { createServiceClient } = await import("@/lib/supabase/service");
-  const db = createServiceClient();
-  const { data } = await db
-    .from("users")
-    .select("id, is_blocked")
-    .eq("id", userId)
-    .maybeSingle();
+  const checkedAt = activeUserChecks.get(userId);
+  if (checkedAt && Date.now() - checkedAt < USER_LIVENESS_TTL_MS) return;
 
-  if (!data || data.is_blocked) {
-    throw new Response(
-      JSON.stringify({ error: "Account has been deactivated or deleted." }),
-      { status: 401, headers: { "Content-Type": "application/json" } }
-    );
-  }
+  const pending = activeUserChecksInFlight.get(userId);
+  if (pending) return pending;
+
+  const check = (async () => {
+    // Lazy import keeps JWT-only consumers edge-compatible.
+    const { createServiceClient } = await import("@/lib/supabase/service");
+    const db = createServiceClient();
+    const { data, error } = await db
+      .from("users")
+      .select("id, is_blocked")
+      .eq("id", userId)
+      .maybeSingle();
+
+    const activeUser = data as { id: string; is_blocked: boolean } | null;
+    if (error || !activeUser || activeUser.is_blocked) {
+      activeUserChecks.delete(userId);
+      throw new Response(
+        JSON.stringify({ error: "Account has been deactivated or deleted." }),
+        { status: 401, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    activeUserChecks.set(userId, Date.now());
+  })().finally(() => activeUserChecksInFlight.delete(userId));
+
+  activeUserChecksInFlight.set(userId, check);
+  return check;
+}
+
+/** Clear a cached liveness result immediately after blocking or deleting a user. */
+export function invalidateUserLiveness(userId: string): void {
+  activeUserChecks.delete(userId);
+  activeUserChecksInFlight.delete(userId);
 }
 
 /** Throws a Response if session is missing, role doesn't match, or user is blocked/deleted. */

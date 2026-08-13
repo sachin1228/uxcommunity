@@ -23,9 +23,8 @@ import { RESOURCE_TYPES } from "./types";
 import { CreateResourceModal } from "./CreateResourceModal";
 import { ResourceCard } from "./ResourceCard";
 import { communityFeedLayout } from "../feed-layout";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
-// ── Module-level cache ────────────────────────────────────────────────────────
-const resourcesCache = new Map<string, { data: CommunityResource[]; fetchedAt: number }>();
 const RESOURCES_STALE_MS = 60_000;
 
 type FilterType = "all" | CommunityResource["resource_type"];
@@ -37,34 +36,34 @@ export function ResourcesView({
   communityId: string;
   currentUserId: string;
 }) {
-  const cached = resourcesCache.get(communityId);
-  const [resources, setResources] = useState<CommunityResource[]>(() => cached?.data ?? []);
+  initRequestCache(currentUserId);
+  const requestUrl = `/api/communities/${communityId}/resources`;
+  const cached = getCachedRequest<{ resources?: CommunityResource[] }>(requestUrl, currentUserId);
+  const [resources, setResources] = useState<CommunityResource[]>(() => cached?.resources ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
 
-  const fetchResources = useCallback(async (background = false) => {
+  const fetchResources = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const res = await fetch(`/api/communities/${communityId}/resources`, { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to load resources.");
-      const fresh = data.resources as CommunityResource[];
-      setResources(fresh);
-      resourcesCache.set(communityId, { data: fresh, fetchedAt: Date.now() });
+      const data = await fetchJsonCached<{ resources?: CommunityResource[] }>(
+        requestUrl,
+        { staleMs: RESOURCES_STALE_MS, force },
+        currentUserId,
+      );
+      setResources(data.resources ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load resources.");
     } finally {
       setLoading(false);
     }
-  }, [communityId]);
+  }, [currentUserId, requestUrl]);
 
   useEffect(() => {
-    const hit = resourcesCache.get(communityId);
-    const isStale = !hit || Date.now() - hit.fetchedAt > RESOURCES_STALE_MS;
-    void fetchResources(!isStale);
+    const initialFetch = window.setTimeout(() => void fetchResources(true), 0);
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
@@ -75,7 +74,7 @@ export function ResourcesView({
         schema: "public",
         table: "community_resources",
         filter: `community_id=eq.${communityId}`,
-      }, () => void fetchResources(true))
+      }, () => void fetchResources(true, true))
       .subscribe();
 
     const saveChannel = supabase
@@ -105,6 +104,7 @@ export function ResourcesView({
     window.addEventListener("focus", handleFocus);
 
     return () => {
+      window.clearTimeout(initialFetch);
       supabase.removeChannel(channel);
       supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", handleFocus);
@@ -115,7 +115,11 @@ export function ResourcesView({
   function writeCache(updater: (prev: CommunityResource[]) => CommunityResource[]) {
     setResources((prev) => {
       const next = updater(prev);
-      resourcesCache.set(communityId, { data: next, fetchedAt: resourcesCache.get(communityId)?.fetchedAt ?? Date.now() });
+      patchCachedRequest<{ resources?: CommunityResource[] }>(
+        requestUrl,
+        (current) => ({ ...current, resources: next }),
+        currentUserId,
+      );
       return next;
     });
   }

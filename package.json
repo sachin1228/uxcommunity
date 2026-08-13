@@ -11,7 +11,8 @@
     "start": "npm run start --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
-    "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts"
+    "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
+    "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts"
   },
   "engines": {
     "node": ">=20.0.0",
