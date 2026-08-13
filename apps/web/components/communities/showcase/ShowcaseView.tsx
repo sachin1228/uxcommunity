@@ -265,28 +265,18 @@ export function ShowcaseView({
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                    <PostAuthorMeta
-                      name={post.author.name}
-                      avatarUrl={post.author.avatar_url}
-                      createdAt={post.created_at}
-                    />
-                    <span className="inline-flex shrink-0 items-center rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
-                      {
-                        SHOWCASE_TYPES.find(
-                          (item) => item.value === post.post_type,
-                        )?.label
-                      }
-                    </span>
-                  </div>
+                  <PostAuthorMeta
+                    name={post.author.name}
+                    avatarUrl={post.author.avatar_url}
+                    createdAt={post.created_at}
+                    dateInline
+                    secondaryLabel={`Showcase · ${
+                      SHOWCASE_TYPES.find(
+                        (item) => item.value === post.post_type,
+                      )?.label ?? "Post"
+                    }`}
+                  />
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-border px-2.5 py-1 font-body text-[11px] text-foreground-muted">
-                      {
-                        SHOWCASE_CATEGORIES.find(
-                          (item) => item.value === post.category,
-                        )?.label
-                      }
-                    </span>
                     {post.user_id === currentUserId && (
                       <div
                         className="relative"

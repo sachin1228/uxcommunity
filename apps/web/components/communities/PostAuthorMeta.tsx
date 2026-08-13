@@ -5,6 +5,8 @@ interface PostAuthorMetaProps {
   avatarUrl?: string | null;
   createdAt: string;
   dateLabel?: string;
+  secondaryLabel?: string;
+  dateInline?: boolean;
   className?: string;
 }
 
@@ -13,10 +15,13 @@ export function PostAuthorMeta({
   avatarUrl,
   createdAt,
   dateLabel,
+  secondaryLabel,
+  dateInline = false,
   className = "",
 }: PostAuthorMetaProps) {
   const authorName = name ?? "Member";
   const authorInitial = authorName.charAt(0).toUpperCase();
+  const relativeDate = dateLabel ?? formatRelativeDate(createdAt);
 
   return (
     <div className={`flex min-w-0 items-center gap-3 ${className}`}>
@@ -28,11 +33,18 @@ export function PostAuthorMeta({
         )}
       </div>
       <div className="flex min-w-0 flex-col">
-        <span className="truncate font-body text-[15px] font-semibold text-foreground">
-          {authorName}
-        </span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate font-body text-[15px] font-semibold text-foreground">
+            {authorName}
+          </span>
+          {dateInline && (
+            <span className="shrink-0 font-body text-[11px] text-foreground-subtle">
+              {relativeDate}
+            </span>
+          )}
+        </div>
         <span className="font-body text-[11px] text-foreground-subtle">
-          {dateLabel ?? formatRelativeDate(createdAt)}
+          {secondaryLabel ?? (!dateInline ? relativeDate : null)}
         </span>
       </div>
     </div>
