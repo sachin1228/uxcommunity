@@ -89,22 +89,61 @@ export async function GET(
   }
 
   const cursor = req.nextUrl.searchParams.get("cursor");
+  const now = new Date().toISOString();
+  const [phase = "upcoming", eventDate, cursorId] = cursor?.split("|") ?? [];
+  if (cursor && phase !== "upcoming" && phase !== "past") {
+    timer.finish({ status: 400 });
+    return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+  }
+  if (eventDate && (!cursorId || Number.isNaN(Date.parse(eventDate)))) {
+    timer.finish({ status: 400 });
+    return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+  }
+
   let query = db
     .from("community_events")
     .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
     .eq("community_id", communityId)
-    .order("event_date", { ascending: true })
-    .order("id", { ascending: true })
     .limit(EVENT_PAGE_SIZE + 1);
-  if (cursor) {
-    const [eventDate, id] = cursor.split("|");
-    if (!eventDate || !id || Number.isNaN(Date.parse(eventDate))) {
-      timer.finish({ status: 400 });
-      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+
+  if (phase === "upcoming") {
+    query = query
+      .gte("event_date", now)
+      .order("event_date", { ascending: true })
+      .order("id", { ascending: true });
+    if (eventDate && cursorId) {
+      query = query.or(`event_date.gt.${eventDate},and(event_date.eq.${eventDate},id.gt.${cursorId})`);
     }
-    query = query.or(`event_date.gt.${eventDate},and(event_date.eq.${eventDate},id.gt.${id})`);
+  } else {
+    query = query
+      .lt("event_date", now)
+      .order("event_date", { ascending: false })
+      .order("id", { ascending: false });
+    if (eventDate && cursorId) {
+      query = query.or(`event_date.lt.${eventDate},and(event_date.eq.${eventDate},id.lt.${cursorId})`);
+    }
   }
-  const { data, error } = await timer.measure("events_query", async () => await query);
+
+  let { data, error } = await timer.measure("events_query", async () => await query);
+  let resultPhase = phase;
+
+  // If there are no upcoming events, show recent history immediately rather
+  // than rendering an empty list that requires an extra "Load more" click.
+  if (!error && !cursor && phase === "upcoming" && (data?.length ?? 0) === 0) {
+    resultPhase = "past";
+    const fallback = await timer.measure("past_events_fallback", async () =>
+      await db
+        .from("community_events")
+        .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+        .eq("community_id", communityId)
+        .lt("event_date", now)
+        .order("event_date", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(EVENT_PAGE_SIZE + 1),
+    );
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) {
     timer.finish({ status: 500 });
@@ -113,9 +152,12 @@ export async function GET(
   const page = (data ?? []).slice(0, EVENT_PAGE_SIZE) as Array<Record<string, unknown>>;
   const enriched = await timer.measure("enrichment_queries", () => enrichEvents(db, page, userId));
   const last = page.at(-1);
-  const nextCursor = (data?.length ?? 0) > EVENT_PAGE_SIZE && last
-    ? `${last.event_date as string}|${last.id as string}`
-    : null;
+  const hasMoreInPhase = (data?.length ?? 0) > EVENT_PAGE_SIZE;
+  const nextCursor = hasMoreInPhase && last
+    ? `${resultPhase}|${last.event_date as string}|${last.id as string}`
+    : resultPhase === "upcoming"
+      ? "past"
+      : null;
   const body = { events: enriched, nextCursor };
   timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: enriched.length });
   return NextResponse.json(body);

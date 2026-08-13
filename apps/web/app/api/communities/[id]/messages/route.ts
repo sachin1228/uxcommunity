@@ -104,9 +104,22 @@ export async function POST(
     );
   }
 
-  // Membership is verified by the DB insert itself — only members can insert
-  // (enforced by RLS). Doing a pre-flight SELECT here added a full round-trip
-  // before every message with no security benefit on top of RLS.
+  // This route uses the service-role client, which bypasses RLS. Authorize the
+  // actor explicitly before allowing any community-scoped reads or writes.
+  const { data: membership, error: membershipError } = await timer.measure("membership_query", async () =>
+    await db
+      .from("community_members")
+      .select("community_id")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  );
+  if (membershipError) {
+    return NextResponse.json({ error: "Failed to verify community membership." }, { status: 500 });
+  }
+  if (!membership) {
+    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
 
   let content: string;
   let reply_to_id: string | null = null;
