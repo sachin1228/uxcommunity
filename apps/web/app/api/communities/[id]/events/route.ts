@@ -32,6 +32,8 @@ async function enrichEvents(
     { data: profiles },
     { data: allRsvps },
     { data: myRsvps },
+    { data: allLikes },
+    { data: myLikes },
     { data: allSaves },
     { data: mySaves },
   ] = await Promise.all([
@@ -39,6 +41,8 @@ async function enrichEvents(
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
     db.from("event_rsvps").select("event_id").in("event_id", eventIds),
     db.from("event_rsvps").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
+    db.from("event_likes").select("event_id").in("event_id", eventIds),
+    db.from("event_likes").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
     db.from("event_saves").select("event_id").in("event_id", eventIds),
     db.from("event_saves").select("event_id").in("event_id", eventIds).eq("user_id", currentUserId),
   ]);
@@ -50,6 +54,11 @@ async function enrichEvents(
     return acc;
   }, {});
   const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
+  const likeCounts = (allLikes ?? []).reduce<Record<string, number>>((acc, row) => {
+    acc[row.event_id] = (acc[row.event_id] ?? 0) + 1;
+    return acc;
+  }, {});
+  const myLikeSet = new Set((myLikes ?? []).map((row) => row.event_id));
   const saveCounts = (allSaves ?? []).reduce<Record<string, number>>((acc, r) => {
     acc[r.event_id] = (acc[r.event_id] ?? 0) + 1;
     return acc;
@@ -65,6 +74,8 @@ async function enrichEvents(
         : null,
       rsvp_count: rsvpCounts[row.id as string] ?? 0,
       user_rsvped: myRsvpSet.has(row.id as string),
+      like_count: likeCounts[row.id as string] ?? 0,
+      user_liked: myLikeSet.has(row.id as string),
       save_count: saveCounts[row.id as string] ?? 0,
       user_saved: mySaveSet.has(row.id as string),
     };

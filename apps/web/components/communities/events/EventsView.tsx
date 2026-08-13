@@ -69,6 +69,15 @@ export function EventsView({
       }, () => void fetchEvents(true, true))
       .subscribe();
 
+    const likeChannel = supabase
+      .channel(`event-likes:${communityId}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "event_likes",
+      }, () => void fetchEvents(true, true))
+      .subscribe();
+
     const saveChannel = supabase
       .channel(`event-saves:${communityId}`)
       .on("postgres_changes", {
@@ -85,6 +94,7 @@ export function EventsView({
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(rsvpChannel);
+      supabase.removeChannel(likeChannel);
       supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
@@ -122,6 +132,10 @@ export function EventsView({
 
   function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {
     writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e));
+  }
+
+  function handleLikeChanged(eventId: string, liked: boolean, count: number) {
+    writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_liked: liked, like_count: count } : e));
   }
 
   function handleSaveChanged(eventId: string, saved: boolean, count: number) {
@@ -244,6 +258,7 @@ export function EventsView({
                     onUpdated={handleUpdated}
                     onDeleted={handleDeleted}
                     onRsvpChanged={handleRsvpChanged}
+                    onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
                   />
                 </article>

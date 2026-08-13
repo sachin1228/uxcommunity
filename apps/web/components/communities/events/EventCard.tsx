@@ -8,6 +8,7 @@ import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { useEventInteractions } from "./useEventInteractions";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -63,6 +64,7 @@ interface EventCardProps {
   onUpdated: (event: CommunityEvent) => void;
   onDeleted: (eventId: string) => void;
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
+  onLikeChanged: (eventId: string, liked: boolean, count: number) => void;
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
   /** Override the link destination (e.g. public standalone detail page). */
   detailHref?: string;
@@ -81,6 +83,7 @@ export function EventCard({
   onUpdated,
   onDeleted,
   onRsvpChanged,
+  onLikeChanged,
   onSaveChanged,
   detailHref,
   edgeToEdgeDivider = false,
@@ -97,8 +100,17 @@ export function EventCard({
   const [rsvpPending, setRsvpPending] = useState(false);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
-  const [savePending, setSavePending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { toggleLike, toggleSave } = useEventInteractions({
+    eventId: event.id,
+    communityId,
+    liked: event.user_liked,
+    likeCount: event.like_count,
+    saved: event.user_saved,
+    saveCount: event.save_count,
+    onLikeChanged,
+    onSaveChanged,
+  });
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -144,26 +156,16 @@ export function EventCard({
     }
   }
 
-  async function handleSave(e: React.MouseEvent) {
+  function handleLike(e: React.MouseEvent) {
     e.preventDefault();
-    if (savePending) return;
-    const newSaved = !event.user_saved;
-    const newCount = event.save_count + (newSaved ? 1 : -1);
-    onSaveChanged(event.id, newSaved, newCount);
-    setSavePending(true);
-    try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        onSaveChanged(event.id, data.saved, data.save_count);
-      } else {
-        onSaveChanged(event.id, event.user_saved, event.save_count);
-      }
-    } catch {
-      onSaveChanged(event.id, event.user_saved, event.save_count);
-    } finally {
-      setSavePending(false);
-    }
+    e.stopPropagation();
+    toggleLike();
+  }
+
+  function handleSave(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleSave();
   }
 
   function handleReport(e: React.MouseEvent) {
@@ -362,23 +364,22 @@ export function EventCard({
       <div className="mt-3 flex items-center justify-between gap-4">
         <button
           type="button"
-          onClick={handleSave}
-          disabled={savePending}
-          aria-label={event.user_saved ? "Unlike" : "Like"}
-          aria-pressed={event.user_saved}
-          className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed"
+          onClick={handleLike}
+          aria-label={event.user_liked ? "Unlike event" : "Like event"}
+          aria-pressed={event.user_liked}
+          className="group/like flex shrink-0 items-center gap-2"
         >
           <Heart
             size={20}
             strokeWidth={2}
             className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
-              event.user_saved
+              event.user_liked
                 ? "fill-red-500 text-red-500"
-                : "fill-none text-white"
+                : "fill-none text-foreground"
             }`}
           />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_saved ? "text-red-500" : "text-white"}`}>
-            {event.save_count}
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>
+            {event.like_count}
           </span>
         </button>
 
