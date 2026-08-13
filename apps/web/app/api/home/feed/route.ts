@@ -51,7 +51,9 @@ export async function GET(req: NextRequest) {
   }
 
   const [threadsResult, eventsResult, resourcesResult] = await Promise.all([
-    threadsQ, eventsQ, resourcesQ,
+    timer.measure("threads_query", async () => await threadsQ),
+    timer.measure("events_query", async () => await eventsQ),
+    timer.measure("resources_query", async () => await resourcesQ),
   ]);
 
   const feedError = threadsResult.error ?? eventsResult.error ?? resourcesResult.error;
@@ -95,15 +97,23 @@ export async function GET(req: NextRequest) {
   timer.checkpoint("feed_queries");
 
   const enrichmentResults = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-    db.from("communities").select("id, name, image_url").in("id", communityIds),
-    db.rpc("get_home_feed_interactions", {
-      p_user_id: userId,
-      p_thread_ids: threadIds,
-      p_event_ids: eventIds,
-      p_resource_ids: resourceIds,
-    }),
+    timer.measure("users_query", async () =>
+      await db.from("users").select("id, name").in("id", userIds),
+    ),
+    timer.measure("profiles_query", async () =>
+      await db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
+    ),
+    timer.measure("communities_query", async () =>
+      await db.from("communities").select("id, name, image_url").in("id", communityIds),
+    ),
+    timer.measure("interactions_query", async () =>
+      await db.rpc("get_home_feed_interactions", {
+        p_user_id: userId,
+        p_thread_ids: threadIds,
+        p_event_ids: eventIds,
+        p_resource_ids: resourceIds,
+      }),
+    ),
   ]);
 
   // Enrichment is supplementary: comment/vote/save counts, author avatars, and
@@ -200,7 +210,14 @@ export async function GET(req: NextRequest) {
   });
 
   timer.checkpoint("serialization");
-  timer.finish();
+  timer.finish({
+    query_count: 7,
+    candidate_rows: (threads?.length ?? 0) + (events?.length ?? 0) + (resources?.length ?? 0),
+    returned_rows: items.length,
+    author_ids: userIds.length,
+    community_ids: communityIds.length,
+    interaction_ids: threadIds.length + eventIds.length + resourceIds.length,
+  });
 
   return NextResponse.json(
     { items },

@@ -5,16 +5,30 @@ export function createServerTimer(label: string) {
   let checkpointAt = startedAt
   const details: TimingDetails = {}
 
+  const round = (value: number) => Math.round(value * 100) / 100
+
   return {
     checkpoint(name: string) {
       const now = performance.now()
-      details[name] = Math.round((now - checkpointAt) * 100) / 100
+      details[name] = round(now - checkpointAt)
       checkpointAt = now
     },
-    finish() {
+    async measure<T>(name: string, operation: () => Promise<T>): Promise<T> {
+      const operationStartedAt = performance.now()
+      try {
+        return await operation()
+      } finally {
+        details[name] = round(performance.now() - operationStartedAt)
+      }
+    },
+    record(name: string, value: number) {
+      details[name] = round(value)
+    },
+    finish(extra: TimingDetails = {}) {
       if (process.env.NODE_ENV !== "development") return
 
-      details.total = Math.round((performance.now() - startedAt) * 100) / 100
+      Object.assign(details, extra)
+      details.total = round(performance.now() - startedAt)
       console.debug(`[server-timing] ${label}`, details)
     },
   }
