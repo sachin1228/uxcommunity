@@ -8,8 +8,7 @@ import {
   Send, Trash2, Users, Video,
 } from "lucide-react";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
-import { EventCard } from "./EventCard";
-import { PostAuthorMeta } from "../PostAuthorMeta";
+import { EditEventModal } from "./EditEventModal";
 import { communityFeedLayout } from "../feed-layout";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -289,7 +288,6 @@ interface Props {
   currentUserAvatar: string | null;
   communityId: string;
   communityName: string;
-  communityImage?: string | null;
   /** When provided, renders a back link above the event (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -303,13 +301,18 @@ export function EventDetailClient({
   currentUserAvatar,
   communityId,
   communityName,
-  communityImage,
   backHref,
   backLabel = "Home",
 }: Props) {
   const router = useRouter();
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
+  const [rsvpPending, setRsvpPending] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shared, setShared] = useState(false);
   const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
 
   // Comments (flat list, built into tree on render)
@@ -344,19 +347,40 @@ export function EventDetailClient({
     ta.style.height = `${ta.scrollHeight}px`;
   }, [commentText]);
 
-  function handleRsvpChanged(_eventId: string, rsvped: boolean, count: number) {
-    setEvent((current) => ({ ...current, user_rsvped: rsvped, rsvp_count: count }));
-    void fetch(`/api/communities/${communityId}/events/${event.id}/rsvp/list`)
-      .then((response) => response.ok ? response.json() : null)
-      .then((data) => { if (data) setRsvps(data.rsvps ?? []); });
+  // ── Event actions ──
+
+  async function handleJoin() {
+    if (rsvpPending || past) return;
+    setRsvpPending(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Failed to RSVP."); return; }
+      setEvent((e) => ({ ...e, user_rsvped: data.rsvped, rsvp_count: data.rsvp_count }));
+      const listRes = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp/list`);
+      if (listRes.ok) { const d = await listRes.json(); setRsvps(d.rsvps ?? []); }
+    } finally { setRsvpPending(false); }
   }
 
-  function handleSaveChanged(_eventId: string, saved: boolean, count: number) {
-    setEvent((current) => ({ ...current, user_saved: saved, save_count: count }));
+  async function handleDeleteEvent() {
+    if (!confirm("Delete this event? This cannot be undone.")) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
+      if (res.ok) router.push(`/dashboard/communities/${communityId}`);
+    } finally { setDeleting(false); }
   }
 
-  function handleDeleted() {
-    router.push(`/dashboard/communities/${communityId}`);
+  async function handleShare() {
+    const url = window.location.href;
+    if (navigator.share) {
+      try { await navigator.share({ title: event.title, url }); } catch { /* dismissed */ }
+    } else {
+      await navigator.clipboard.writeText(url);
+      setShared(true);
+      setTimeout(() => setShared(false), 2000);
+    }
   }
 
   // ── Composer ──
@@ -418,31 +442,113 @@ export function EventDetailClient({
             {backLabel}
           </a>
         )}
-        {/* Main event post — shared feed design */}
-        <div className={`${communityFeedLayout.dividerY} py-6`}>
-          <div className={`relative ${communityFeedLayout.detailSection}`}>
-            <div className="mb-4">
-              <PostAuthorMeta
-                name={event.users?.name}
-                avatarUrl={event.users?.avatar_url}
-                createdAt={event.created_at}
-                dateInline
-                secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Location TBD"}`}
-              />
+        {/* Main event card — horizontal */}
+        <div className="mx-5 overflow-hidden rounded-xl border border-border bg-surface md:mx-8">
+          <div className="flex min-h-[160px] gap-5 p-4 md:p-6">
+            <div className="relative w-44 shrink-0 overflow-hidden rounded-xl">
+              {event.cover_image_url
+                ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
+                : <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]}`} />}
             </div>
 
-            <EventCard
-              event={event}
-              currentUserId={currentUserId}
-              communityId={communityId}
-              menuInPostHeader
-              communityName={communityName}
-              communityImage={communityImage}
-              onUpdated={(updated) => setEvent((current) => ({ ...current, ...updated }))}
-              onDeleted={handleDeleted}
-              onRsvpChanged={handleRsvpChanged}
-              onSaveChanged={handleSaveChanged}
-            />
+            <div className="flex min-w-0 flex-1 flex-col gap-2 py-1">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
+                  past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"
+                }`}>
+                  {past ? "Past Event" : "Upcoming Event"}
+                </span>
+
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {!past && (
+                    <button
+                      type="button"
+                      onClick={handleJoin}
+                      disabled={rsvpPending || (full && !event.user_rsvped)}
+                      className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        event.user_rsvped
+                          ? "bg-accent/15 text-accent hover:bg-accent/25"
+                          : full
+                          ? "border border-border text-foreground-subtle"
+                          : "bg-accent text-accent-foreground hover:bg-accent-hover"
+                      }`}
+                    >
+                      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                    </button>
+                  )}
+                  <button type="button" onClick={handleShare}
+                    className="rounded-md border border-border px-3 py-1 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+                    {shared ? "Copied!" : "Share"}
+                  </button>
+                  {isOwner && (
+                    <div className="relative">
+                      <button type="button" onClick={() => setMenuOpen((p) => !p)} aria-label="Event options"
+                        className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                        <MoreHorizontal size={13} />
+                      </button>
+                      {menuOpen && (
+                        <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                          <button type="button" onClick={() => { setMenuOpen(false); setShowEditModal(true); }}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                            <Pencil size={11} /> Edit event
+                          </button>
+                          <button type="button" onClick={handleDeleteEvent} disabled={deleting}
+                            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+                            {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                            {deleting ? "Deleting…" : "Delete event"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
+
+              {event.description && (
+                <p className="font-body text-xs leading-relaxed text-foreground-muted">{event.description}</p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                  <Calendar size={12} className="shrink-0 text-accent" />
+                  {fmtEventDateTime(event.event_date)}
+                  {event.end_date && ` – ${fmtTime(event.end_date)}`}
+                </span>
+                {event.is_online ? (
+                  <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                    <Video size={12} className="shrink-0" />
+                    {event.meet_link
+                      ? <a href={event.meet_link} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-accent hover:underline">
+                          Online (Google Meet) <ExternalLink size={10} />
+                        </a>
+                      : "Online"}
+                  </span>
+                ) : event.location ? (
+                  <span className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted">
+                    <MapPin size={12} className="shrink-0" />
+                    {event.location}
+                  </span>
+                ) : null}
+              </div>
+
+              <p className="font-body text-xs text-foreground-muted">
+                Hosted by <span className="font-semibold text-foreground">{event.users?.name ?? "Community member"}</span>
+              </p>
+
+              <AvatarStack rsvps={rsvps} count={event.rsvp_count} />
+
+              {event.max_attendees && (
+                <p className="font-body text-xs text-foreground-subtle">
+                  {event.max_attendees - event.rsvp_count > 0
+                    ? `${event.max_attendees - event.rsvp_count} spots remaining`
+                    : "No spots remaining"}
+                </p>
+              )}
+              {error && <p className="font-body text-xs text-red-400">{error}</p>}
+            </div>
           </div>
         </div>
 
