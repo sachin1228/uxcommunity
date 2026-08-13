@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { directSignupStep1Schema } from "@/lib/validations";
-import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
@@ -37,11 +35,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { name, email, password } = parsed.data;
-
   const db = createServiceClient();
-
-  // Moderate the display name
+  const { name, email } = parsed.data;
   const nameDecision = await moderateText({ content: name, contentType: "username" });
   await logModerationDecision(db, {
     contentType: "username",
@@ -50,7 +45,6 @@ export async function POST(request: NextRequest) {
   });
   if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
-  // Guard against duplicate email
   const { data: existingByEmail } = await db
     .from("users")
     .select("id")
@@ -64,40 +58,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  // Create the user without an application_id (direct signup)
-  const { data: user, error: userError } = await db
-    .from("users")
-    .insert({
-      application_id: null,
-      name,
-      email: email.toLowerCase(),
-      password_hash: passwordHash,
-    })
-    .select("id, name, email")
-    .single();
-
-  if (userError) {
-    console.error("[signup/direct] user insert error:", userError);
-    return NextResponse.json(
-      { error: "Failed to create account. Please try again." },
-      { status: 500 }
-    );
-  }
-
-  // Issue a session so steps 2–4 can use requireSession
-  const sessionToken = await createSession({
-    userId: user.id,
-    email: user.email,
-    role: "user",
-  });
-
-  const response = NextResponse.json({
-    success: true,
-    userId: user.id,
-    name: user.name,
-  });
-  setSessionCookie(response, sessionToken);
-  return response;
+  // Step one is validation-only. No account or session exists until step four.
+  return NextResponse.json({ success: true });
 }
