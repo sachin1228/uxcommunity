@@ -38,14 +38,35 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Record<s
   });
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const SHOWCASE_PAGE_SIZE = 25;
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id } = await params;
   const db = createServiceClient();
   if (!(await member(db, id, session.userId!))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const { data, error } = await db.from("community_showcase_posts").select("*").eq("community_id", id).order("created_at", { ascending: false }).limit(100);
+  const cursor = request.nextUrl.searchParams.get("cursor");
+  let query = db.from("community_showcase_posts")
+    .select("id, community_id, user_id, title, description, image_url, project_url, post_type, category, tags, created_at, updated_at")
+    .eq("community_id", id)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(SHOWCASE_PAGE_SIZE + 1);
+  if (cursor) {
+    const [createdAt, postId] = cursor.split("|");
+    if (!createdAt || !postId || Number.isNaN(Date.parse(createdAt))) {
+      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+    }
+    query = query.or(`created_at.lt.${createdAt},and(created_at.eq.${createdAt},id.lt.${postId})`);
+  }
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: "Failed to load showcase posts." }, { status: 500 });
-  return NextResponse.json({ posts: await enrich(db, (data ?? []) as Record<string, unknown>[], session.userId!) });
+  const page = (data ?? []).slice(0, SHOWCASE_PAGE_SIZE) as Record<string, unknown>[];
+  const last = page.at(-1);
+  const nextCursor = (data?.length ?? 0) > SHOWCASE_PAGE_SIZE && last
+    ? `${last.created_at as string}|${last.id as string}`
+    : null;
+  return NextResponse.json({ posts: await enrich(db, page, session.userId!), nextCursor });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

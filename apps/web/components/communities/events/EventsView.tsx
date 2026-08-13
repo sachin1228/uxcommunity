@@ -26,17 +26,20 @@ export function EventsView({
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
 
   const fetchEvents = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ events?: CommunityEvent[] }>(
+      const data = await fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
         requestUrl,
         { staleMs: EVENTS_STALE_MS, force },
         currentUserId,
       );
       setEvents(data.events ?? []);
+      setNextCursor(data.nextCursor ?? null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
@@ -100,6 +103,26 @@ export function EventsView({
       window.removeEventListener("focus", handleFocus);
     };
   }, [communityId, fetchEvents]);
+
+  async function loadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const response = await fetch(`${requestUrl}?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!response.ok) throw new Error();
+      const data = await response.json() as { events?: CommunityEvent[]; nextCursor?: string | null };
+      setEvents((current) => {
+        const byId = new Map(current.map((event) => [event.id, event]));
+        for (const event of data.events ?? []) byId.set(event.id, event);
+        return [...byId.values()];
+      });
+      setNextCursor(data.nextCursor ?? null);
+    } catch {
+      setError("Failed to load more events.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   function writeCache(updater: (prev: CommunityEvent[]) => CommunityEvent[]) {
     setEvents((prev) => {
@@ -264,6 +287,13 @@ export function EventsView({
                 </article>
               );
             })}
+            {nextCursor && (
+              <div className="flex justify-center py-6">
+                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60">
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

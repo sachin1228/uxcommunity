@@ -8,6 +8,7 @@ import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
+import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -39,6 +40,7 @@ export async function GET() {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
   const userId = session.userId!;
+  return getSidebarCommunities(userId);
 
   const db = createServiceClient();
 

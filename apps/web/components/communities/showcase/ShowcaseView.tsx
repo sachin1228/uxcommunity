@@ -49,6 +49,8 @@ export function ShowcaseView({
   const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [category, setCategory] = useState<ShowcaseCategory | "all">("all");
   const [sort, setSort] = useState<"newest" | "popular">("newest");
   const [creating, setCreating] = useState(false);
@@ -58,13 +60,16 @@ export function ShowcaseView({
 
   useEffect(() => {
     let cancelled = false;
-    void fetchJsonCached<{ posts?: ShowcasePost[] }>(
+    void fetchJsonCached<{ posts?: ShowcasePost[]; nextCursor?: string | null }>(
       requestUrl,
       { staleMs: STALE },
       currentUserId,
     )
       .then((data) => {
-        if (!cancelled) setPosts(data.posts ?? []);
+        if (!cancelled) {
+          setPosts(data.posts ?? []);
+          setNextCursor(data.nextCursor ?? null);
+        }
       })
       .catch(() => setError("We couldn't load the showcase."))
       .finally(() => setLoading(false));

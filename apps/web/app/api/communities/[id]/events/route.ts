@@ -82,8 +82,10 @@ async function enrichEvents(
   });
 }
 
+const EVENT_PAGE_SIZE = 25;
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   let session;
@@ -97,16 +99,31 @@ export async function GET(
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
-  const { data, error } = await db
+  const cursor = req.nextUrl.searchParams.get("cursor");
+  let query = db
     .from("community_events")
     .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
     .eq("community_id", communityId)
-    .order("event_date", { ascending: true });
+    .order("event_date", { ascending: true })
+    .order("id", { ascending: true })
+    .limit(EVENT_PAGE_SIZE + 1);
+  if (cursor) {
+    const [eventDate, id] = cursor.split("|");
+    if (!eventDate || !id || Number.isNaN(Date.parse(eventDate))) {
+      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+    }
+    query = query.or(`event_date.gt.${eventDate},and(event_date.eq.${eventDate},id.gt.${id})`);
+  }
+  const { data, error } = await query;
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const enriched = await enrichEvents(db, (data ?? []) as Array<Record<string, unknown>>, userId);
-  return NextResponse.json({ events: enriched });
+  const page = (data ?? []).slice(0, EVENT_PAGE_SIZE) as Array<Record<string, unknown>>;
+  const enriched = await enrichEvents(db, page, userId);
+  const last = page.at(-1);
+  const nextCursor = (data?.length ?? 0) > EVENT_PAGE_SIZE && last
+    ? `${last.event_date as string}|${last.id as string}`
+    : null;
+  return NextResponse.json({ events: enriched, nextCursor });
 }
 
 export async function POST(

@@ -192,9 +192,9 @@ export function useSidebarRealtime({
         .catch(() => {});
     }
 
-    const channels = communities.map((comm) =>
-      supabase
-        .channel(`panel:${comm.id}`)
+    const joinedCommunityIds = new Set(communities.map((community) => community.id));
+    const channel = supabase
+        .channel(`panel:${userId}`)
 
         // ── New message ────────────────────────────────────────────────────
         .on(
@@ -203,7 +203,6 @@ export function useSidebarRealtime({
             event: "INSERT",
             schema: "public",
             table: "community_messages",
-            filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
             const row = payload.new as {
@@ -216,6 +215,7 @@ export function useSidebarRealtime({
               image_url?: string | null;
             };
 
+            if (!joinedCommunityIds.has(row.community_id)) return;
             const isOwn    = row.user_id === userId;
             const isActive = row.community_id === activeCommunityIdRef.current;
             const knownName = resolvedNames.get(row.user_id) ?? null;
@@ -293,7 +293,6 @@ export function useSidebarRealtime({
             event: "UPDATE",
             schema: "public",
             table: "community_messages",
-            filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
             const updated = payload.new as {
@@ -301,7 +300,7 @@ export function useSidebarRealtime({
               created_at: string;
               deleted_at: string | null;
             };
-            if (!updated.deleted_at) return;
+            if (!joinedCommunityIds.has(updated.community_id) || !updated.deleted_at) return;
 
             setCommunities((prev) =>
               applyUpdate(prev, updated.community_id, (c) => {
@@ -328,13 +327,13 @@ export function useSidebarRealtime({
             event: "INSERT",
             schema: "public",
             table: "message_reactions",
-            filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
             const r = payload.new as ReactionRow;
+            if (!joinedCommunityIds.has(r.community_id)) return;
             if (
               r.user_id === userId &&
-              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+              shouldSuppressReactionEcho(r.community_id, r.message_id, r.user_id)
             ) return;
             fetchAndApplyReaction(r);
 
@@ -344,10 +343,10 @@ export function useSidebarRealtime({
               const rEmoji = r.emoji;
               const uid    = r.user_id;
               const createdAt = r.created_at;
-              resolveName(comm.id, uid).then((name) => {
+              resolveName(r.community_id, uid).then((name) => {
                 if (!name) return;
                 setCommunities((prev) =>
-                  applyUpdate(prev, comm.id, (c) => {
+                  applyUpdate(prev, r.community_id, (c) => {
                     if (
                       !c.lastReaction ||
                       c.lastReaction.messageId !== msgId ||
@@ -372,13 +371,13 @@ export function useSidebarRealtime({
             event: "UPDATE",
             schema: "public",
             table: "message_reactions",
-            filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
             const r = payload.new as ReactionRow;
+            if (!joinedCommunityIds.has(r.community_id)) return;
             if (
               r.user_id === userId &&
-              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+              shouldSuppressReactionEcho(r.community_id, r.message_id, r.user_id)
             ) return;
             fetchAndApplyReaction(r);
           },
@@ -391,23 +390,23 @@ export function useSidebarRealtime({
             event: "DELETE",
             schema: "public",
             table: "message_reactions",
-            filter: `community_id=eq.${comm.id}`,
           },
           (payload) => {
             const r = payload.old as {
+              community_id?: string;
               message_id?: string;
               user_id?: string;
               emoji?: string;
               created_at?: string;
             };
-            if (!r.message_id || !r.user_id || !r.emoji) return;
+            if (!r.community_id || !joinedCommunityIds.has(r.community_id) || !r.message_id || !r.user_id || !r.emoji) return;
             if (
               r.user_id === userId &&
-              shouldSuppressReactionEcho(comm.id, r.message_id, r.user_id)
+              shouldSuppressReactionEcho(r.community_id, r.message_id, r.user_id)
             ) return;
 
             setCommunities((prev) =>
-              applyUpdate(prev, comm.id, (c) => {
+              applyUpdate(prev, r.community_id, (c) => {
                 // Clear lastReaction only if it matches the removed reaction.
                 const current = c.lastReaction;
                 if (!current) return c;
@@ -426,11 +425,10 @@ export function useSidebarRealtime({
           },
         )
 
-        .subscribe(),
-    );
+        .subscribe();
 
     return () => {
-      channels.forEach((ch) => supabase.removeChannel(ch));
+      supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityIds, userId]);
