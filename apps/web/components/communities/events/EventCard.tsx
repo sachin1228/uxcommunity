@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
@@ -242,15 +242,6 @@ export function EventCard({
                       {rsvpPending ? "…" : event.user_rsvped ? "Going ✓" : full ? "Full" : "Join Event"}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleShare}
-                    className="rounded-md border border-border px-2.5 py-1 font-body text-[11px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  >
-                    {shared ? "Copied!" : "Share"}
-                  </button>
-
-
                   {/* Options menu — visible to all users */}
                   <div ref={menuRef} className="relative">
                     <button
@@ -274,6 +265,17 @@ export function EventCard({
                         >
                           <Bookmark size={11} fill={event.user_saved ? "currentColor" : "none"} />
                           {event.user_saved ? "Unsave event" : "Save event"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            void handleShare(e);
+                            setMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                        >
+                          <Share2 size={11} />
+                          {shared ? "Copied!" : "Share event"}
                         </button>
                         {isOwner && (
                           <>
