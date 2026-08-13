@@ -18,6 +18,8 @@ async function enrichOne(
     { data: myRsvp },
     { data: allSaves },
     { data: mySave },
+    { data: allLikes },
+    { data: myLike },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
@@ -25,6 +27,8 @@ async function enrichOne(
     db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
+    db.from("event_likes").select("event_id").eq("event_id", eventId),
+    db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
   ]);
 
   return {
@@ -34,6 +38,8 @@ async function enrichOne(
     user_rsvped: Boolean(myRsvp),
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
+    like_count: (allLikes ?? []).length,
+    user_liked: Boolean(myLike),
   };
 }
 

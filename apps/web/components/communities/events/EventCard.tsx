@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
+import { Bookmark, Calendar, Flag, Heart, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
@@ -93,6 +93,8 @@ export function EventCard({
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  const [likeState, setLikeState] = useState({ liked: event.user_liked, count: event.like_count });
+  const [likePending, setLikePending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -158,6 +160,27 @@ export function EventCard({
       onSaveChanged(event.id, event.user_saved, event.save_count);
     } finally {
       setSavePending(false);
+    }
+  }
+
+  async function handleLike(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (likePending) return;
+
+    const previous = likeState;
+    setLikeState({ liked: !previous.liked, count: Math.max(0, previous.count + (previous.liked ? -1 : 1)) });
+    setLikePending(true);
+
+    try {
+      const response = await fetch(`/api/communities/${communityId}/events/${event.id}/like`, { method: "POST" });
+      if (!response.ok) throw new Error("Failed to update event like");
+      const result = (await response.json()) as { liked: boolean; like_count: number };
+      setLikeState({ liked: result.liked, count: result.like_count });
+    } catch {
+      setLikeState(previous);
+    } finally {
+      setLikePending(false);
     }
   }
 
@@ -338,14 +361,33 @@ export function EventCard({
                 ) : null}
               </div>
 
-              {/* Host + Attendees */}
-              <div className="mt-auto flex items-center justify-between">
+              {/* Host + engagement */}
+              <div className="mt-auto flex items-end justify-between gap-4">
                 <div className="space-y-1">
                   <p className="font-body text-[11px] text-foreground-muted">
                     Hosted by <span className="font-medium text-foreground">{authorName}</span>
                   </p>
                   <AvatarStack host={event.users} count={event.rsvp_count} />
                 </div>
+                <button
+                  type="button"
+                  onClick={handleLike}
+                  disabled={likePending}
+                  aria-label={likeState.liked ? "Unlike" : "Like"}
+                  aria-pressed={likeState.liked}
+                  className="group/like flex shrink-0 items-center gap-2 disabled:cursor-wait"
+                >
+                  <Heart
+                    size={20}
+                    strokeWidth={2}
+                    className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+                      likeState.liked ? "fill-red-500 text-red-500" : "fill-none text-white"
+                    }`}
+                  />
+                  <span className={`font-body text-sm font-semibold tabular-nums ${likeState.liked ? "text-red-500" : "text-white"}`}>
+                    {likeState.count}
+                  </span>
+                </button>
               </div>
             </div>
           </div>

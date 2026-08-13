@@ -37,21 +37,28 @@ export async function GET() {
   if (!events.length) return NextResponse.json({ events: [] });
 
   const eventIds = events.map((e) => e.id);
-  const [{ data: allRsvps }, { data: myRsvps }, { data: profile }] = await Promise.all([
+  const [{ data: allRsvps }, { data: myRsvps }, { data: allLikes }, { data: myLikes }, { data: profile }] = await Promise.all([
     db.from("event_rsvps").select("event_id").in("event_id", eventIds),
     db.from("event_rsvps").select("event_id").in("event_id", eventIds).eq("user_id", userId),
+    db.from("event_likes").select("event_id").in("event_id", eventIds),
+    db.from("event_likes").select("event_id").in("event_id", eventIds).eq("user_id", userId),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
   ]);
 
   const rsvpCounts: Record<string, number> = {};
   for (const r of allRsvps ?? []) rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] ?? 0) + 1;
   const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
+  const likeCounts: Record<string, number> = {};
+  for (const like of allLikes ?? []) likeCounts[like.event_id] = (likeCounts[like.event_id] ?? 0) + 1;
+  const myLikeSet = new Set((myLikes ?? []).map((like) => like.event_id));
 
   return NextResponse.json({
     events: events.map((e) => ({
       ...e,
       rsvp_count: rsvpCounts[e.id] ?? 0,
       user_rsvped: myRsvpSet.has(e.id),
+      like_count: likeCounts[e.id] ?? 0,
+      user_liked: myLikeSet.has(e.id),
       users: null, // patched client-side with current user info
     })),
     avatarUrl: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null,

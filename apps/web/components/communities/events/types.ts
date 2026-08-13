@@ -19,6 +19,8 @@ export interface CommunityEvent {
   user_rsvped: boolean;
   save_count: number;
   user_saved: boolean;
+  like_count: number;
+  user_liked: boolean;
   users: { name: string; avatar_url: string | null } | null;
 }
 

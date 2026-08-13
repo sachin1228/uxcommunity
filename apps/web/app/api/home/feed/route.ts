@@ -116,6 +116,12 @@ export async function GET(req: NextRequest) {
     eventIds.length
       ? db.from("event_comments").select("event_id").in("event_id", eventIds)
       : Promise.resolve({ data: [] as { event_id: string }[] }),
+    eventIds.length
+      ? db.from("event_likes").select("event_id").in("event_id", eventIds)
+      : Promise.resolve({ data: [] as { event_id: string }[] }),
+    eventIds.length
+      ? db.from("event_likes").select("event_id").in("event_id", eventIds).eq("user_id", userId)
+      : Promise.resolve({ data: [] as { event_id: string }[] }),
     // resources
     resourceIds.length
       ? db.from("resource_saves").select("resource_id").in("resource_id", resourceIds)
@@ -153,6 +159,8 @@ export async function GET(req: NextRequest) {
     "event_saves",
     "my_event_saves",
     "event_comments",
+    "event_likes",
+    "my_event_likes",
     "resource_saves",
     "my_resource_saves",
     "resource_bookmarks",
@@ -182,6 +190,8 @@ export async function GET(req: NextRequest) {
     { data: eventSaves },
     { data: myEventSaves },
     { data: eventComments },
+    { data: eventLikes },
+    { data: myEventLikes },
     { data: resourceSaves },
     { data: myResourceSaves },
     { data: resourceBookmarks },
@@ -211,6 +221,9 @@ export async function GET(req: NextRequest) {
   for (const c of (eventComments ?? [])) eventCmtCount[c.event_id] = (eventCmtCount[c.event_id] ?? 0) + 1;
   const myEventRsvpSet = new Set((myEventRsvps ?? []).map((r) => r.event_id));
   const myEventSaveSet = new Set((myEventSaves ?? []).map((s) => s.event_id));
+  const eventLikeCount: Record<string, number> = {};
+  for (const like of (eventLikes ?? [])) eventLikeCount[like.event_id] = (eventLikeCount[like.event_id] ?? 0) + 1;
+  const myEventLikeSet = new Set((myEventLikes ?? []).map((like) => like.event_id));
 
   // Resource aggregates
   const resSaveCount: Record<string, number> = {};
@@ -259,6 +272,8 @@ export async function GET(req: NextRequest) {
         user_rsvped: myEventRsvpSet.has(item.id),
         save_count: eventSaveCount[item.id] ?? 0,
         user_saved: myEventSaveSet.has(item.id),
+        like_count: eventLikeCount[item.id] ?? 0,
+        user_liked: myEventLikeSet.has(item.id),
       };
     }
     // resource
