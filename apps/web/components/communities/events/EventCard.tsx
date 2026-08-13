@@ -67,6 +67,8 @@ interface EventCardProps {
   detailHref?: string;
   /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
+  /** Positions the options menu in the surrounding post-author header. */
+  menuInPostHeader?: boolean;
 }
 
 export function EventCard({
@@ -79,6 +81,7 @@ export function EventCard({
   onSaveChanged,
   detailHref,
   edgeToEdgeDivider = false,
+  menuInPostHeader = false,
 }: EventCardProps) {
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -243,14 +246,17 @@ export function EventCard({
                     </button>
                   )}
                   {/* Options menu — visible to all users */}
-                  <div ref={menuRef} className="relative">
+                  <div
+                    ref={menuRef}
+                    className={menuInPostHeader ? "absolute right-0 top-0 z-10" : "relative"}
+                  >
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p); }}
                       aria-label="Event options"
-                      className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+                      className={`flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground ${menuInPostHeader ? "" : "border border-border"}`}
                     >
-                      <MoreHorizontal size={13} />
+                      <MoreHorizontal size={menuInPostHeader ? 15 : 13} />
                     </button>
                     {menuOpen && (
                       <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
