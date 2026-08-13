@@ -22,6 +22,7 @@ test("builds an official embed URL and preserves prototype navigation", () => {
   assert.equal(url.searchParams.get("node-id"), "1-2");
   assert.equal(url.searchParams.get("scaling"), "scale-down");
   assert.equal(url.searchParams.get("embed-host"), "share");
+  assert.equal(url.searchParams.get("footer"), "false");
 });
 
 test("rejects malformed, unrelated, and spoofed URLs", () => {

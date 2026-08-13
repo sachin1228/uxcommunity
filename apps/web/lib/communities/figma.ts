@@ -29,5 +29,6 @@ export function getFigmaEmbedUrl(value: string): string | null {
     if (parameterName !== "embed-host") embedUrl.searchParams.append(parameterName, parameterValue);
   });
   embedUrl.searchParams.set("embed-host", "share");
+  embedUrl.searchParams.set("footer", "false");
   return embedUrl.toString();
 }
