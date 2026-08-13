@@ -290,6 +290,8 @@ interface Props {
   currentUserAvatar: string | null;
   communityId: string;
   communityName: string;
+  communityImage?: string | null;
+  showCommunityAttribution?: boolean;
   /** When provided, renders a back link above the event (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -303,6 +305,8 @@ export function EventDetailClient({
   currentUserAvatar,
   communityId,
   communityName,
+  communityImage,
+  showCommunityAttribution = false,
   backHref,
   backLabel = "Home",
 }: Props) {
@@ -671,7 +675,13 @@ export function EventDetailClient({
               {event.save_count}
             </span>
           </button>
-          <CommunityPostLabel communityName={communityName} communityImage={null} className="min-w-0 justify-end text-right" />
+          {showCommunityAttribution && (
+            <CommunityPostLabel
+              communityName={communityName}
+              communityImage={communityImage}
+              className="min-w-0 justify-end text-right"
+            />
+          )}
         </div>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}

@@ -94,7 +94,7 @@ export default async function PublicEventDetailPage({ params }: Props) {
 
   const [communityData, userRow, profileRow] = await Promise.all([
     event.community_id
-      ? db.from("communities").select("name").eq("id", event.community_id).maybeSingle()
+      ? db.from("communities").select("name, image_url").eq("id", event.community_id).maybeSingle()
       : Promise.resolve({ data: null }),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
@@ -110,8 +110,10 @@ export default async function PublicEventDetailPage({ params }: Props) {
           currentUserId={userId}
           currentUserName={userRow.data?.name ?? ""}
           currentUserAvatar={profileRow.data?.avatar_url ?? null}
-           communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
+          communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
           communityName={communityData.data?.name ?? (event.community_id ? "Community" : "Public event")}
+          communityImage={communityData.data?.image_url ?? null}
+          showCommunityAttribution
           backHref="/dashboard"
         />
       </div>
