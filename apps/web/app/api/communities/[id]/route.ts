@@ -6,6 +6,12 @@ import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
+import {
+  getExperienceLevelNameMap,
+  getMasterImageMap,
+  getMasterNameMap,
+  TABLE_LOOKUP,
+} from "@/lib/master-data-cache";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -23,14 +29,6 @@ function cleanDesignation(name: string): string {
   if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
   return clean;
 }
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
 
 export async function GET(
   _req: NextRequest,
@@ -66,32 +64,30 @@ export async function GET(
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
 
-  // Resolve image_url + fetch member rows + member count — all in parallel
-  const lookup = TABLE_LOOKUP[community.type];
-  const [resolvedImageResult, { data: memberRows }, { count: member_count }] = await Promise.all([
-    lookup && community.reference_id
-      ? db
-          .from(lookup.table as any)
-          .select(`${lookup.idCol}, name, image_url`)
-          .eq(lookup.idCol, community.reference_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+  // Use cached master data and return the first member page + total count in one query.
+  const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
+  const [masterImageMap, masterNameMap, experienceLevelNameMap, { data: memberRows, count: member_count }] = await Promise.all([
+    hasMasterData
+      ? getMasterImageMap(community.type)
+      : Promise.resolve({} as Record<string, string | null>),
+    hasMasterData
+      ? getMasterNameMap(community.type)
+      : Promise.resolve({} as Record<string, string>),
+    getExperienceLevelNameMap(),
     db
       .from("community_members")
-      .select("user_id, joined_at, role")
+      .select("user_id, joined_at, role", { count: "exact" })
       .eq("community_id", id)
       .order("joined_at", { ascending: false })
       .limit(10),
-    db
-      .from("community_members")
-      .select("*", { count: "exact", head: true })
-      .eq("community_id", id),
   ]);
 
   const resolvedImageUrl: string | null =
-    (resolvedImageResult as any)?.data?.image_url ?? community.image_url ?? null;
+    (community.reference_id ? masterImageMap[community.reference_id] : undefined) ??
+    community.image_url ??
+    null;
   const resolvedReferenceName: string | null =
-    (resolvedImageResult as any)?.data?.name ?? null;
+    (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null;
 
   // Batch-fetch member user info (1 query instead of N)
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
@@ -101,14 +97,6 @@ export async function GET(
         db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
       ])
     : [{ data: [] }, { data: [] }];
-
-  // Resolve experience level display names from slugs in a single batch query.
-  const expSlugs = [...new Set((memberProfiles ?? []).map((p: any) => p.experience_level).filter(Boolean) as string[])];
-  const expLevelMap: Record<string, string> = {};
-  if (expSlugs.length) {
-    const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", expSlugs);
-    for (const l of levels ?? []) expLevelMap[l.slug] = cleanDesignation(l.name);
-  }
 
   const userMap     = Object.fromEntries((memberUsers    ?? []).map((u: any) => [u.id, u]));
   const profileMap  = Object.fromEntries((memberProfiles ?? []).map((p: any) => [p.user_id, p]));
@@ -123,7 +111,9 @@ export async function GET(
         ? {
             name:        userMap[m.user_id].name,
             avatar_url:  p?.avatar_url  ?? null,
-            designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+            designation: p?.experience_level
+              ? cleanDesignation(experienceLevelNameMap[p.experience_level] ?? p.experience_level)
+              : null,
             company:     (p?.companies as any)?.name ?? null,
           }
         : null,
