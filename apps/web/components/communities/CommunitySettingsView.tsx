@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { fetchJsonCached, setCachedRequest } from "@/lib/request-cache";
 import {
   BookOpen,
   Calendar,
@@ -98,16 +99,17 @@ export function CommunitySettingsView({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Fetch rules on mount
+  const rulesUrl = `/api/communities/${communityId}/rules`;
+
+  // Fetch rules on mount through the canonical request cache.
   useEffect(() => {
-    fetch(`/api/communities/${communityId}/rules`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { rules: Array<{ id: string; rule_text: string }> } | null) => {
-        setRules((data?.rules ?? []).map((r) => r.rule_text));
-        setRulesLoaded(true);
-      })
-      .catch(() => setRulesLoaded(true));
-  }, [communityId]);
+    void fetchJsonCached<{ rules?: Array<{ id: string; rule_text: string }> }>(
+      rulesUrl,
+      { staleMs: 60_000 },
+    )
+      .then((data) => setRules((data.rules ?? []).map((rule) => rule.rule_text)))
+      .finally(() => setRulesLoaded(true));
+  }, [rulesUrl]);
 
   // Build invite URL helper
   function buildInviteUrl(token: string) {
@@ -184,6 +186,9 @@ export function CommunitySettingsView({
       });
       if (res.ok) {
         const data = await res.json().catch(() => null);
+        setCachedRequest(rulesUrl, {
+          rules: rules.map((rule_text, index) => ({ id: `local-${index}`, rule_text })),
+        });
         const newImageUrl = data?.image_url !== undefined ? data.image_url : (removeImage ? null : (community.image_url ?? null));
         onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs, image_url: newImageUrl });
         setSaveMsg("Settings saved.");

@@ -50,6 +50,61 @@ test("deduplicates concurrent GET requests", async () => {
   assert.deepEqual(first, second)
 })
 
+test("deduplicates three concurrent GET requests", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    return new Response(JSON.stringify({ value: calls }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await Promise.all([
+    fetchJsonCached("/api/communities/community-a/events", {}, "user-a"),
+    fetchJsonCached("/api/communities/community-a/events", {}, "user-a"),
+    fetchJsonCached("/api/communities/community-a/events", {}, "user-a"),
+  ])
+
+  assert.equal(calls, 1)
+})
+
+test("deduplicates stale revalidation", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    return new Response(JSON.stringify({ value: calls }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await fetchJsonCached("/api/feed", {}, "user-a")
+  await Promise.all([
+    fetchJsonCached("/api/feed", { staleMs: 0 }, "user-a"),
+    fetchJsonCached("/api/feed", { staleMs: 0 }, "user-a"),
+  ])
+
+  assert.equal(calls, 2)
+})
+
+test("does not deduplicate user-specific requests across users", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => new Response(
+    JSON.stringify({ value: ++calls }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  )) as typeof fetch
+
+  await Promise.all([
+    fetchJsonCached("/api/notifications", {}, "user-a"),
+    fetchJsonCached("/api/notifications", {}, "user-b"),
+  ])
+
+  assert.equal(calls, 2)
+})
+
 test("reuses fresh data and force-revalidates stale data", async () => {
   let calls = 0
   globalThis.fetch = (async () => new Response(

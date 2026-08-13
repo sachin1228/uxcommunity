@@ -31,8 +31,8 @@ import {
 } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
-const cache = new Map<string, { posts: ShowcasePost[]; at: number }>();
 const STALE = 30_000;
 
 export function ShowcaseView({
@@ -43,7 +43,9 @@ export function ShowcaseView({
   currentUserId: string;
 }) {
   const router = useRouter();
-  const cached = cache.get(communityId);
+  initRequestCache(currentUserId);
+  const requestUrl = `/api/communities/${communityId}/showcase`;
+  const cached = getCachedRequest<{ posts?: ShowcasePost[] }>(requestUrl, currentUserId);
   const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []);
   const [loading, setLoading] = useState(!cached);
   const [error, setError] = useState<string | null>(null);
@@ -55,19 +57,19 @@ export function ShowcaseView({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const hit = cache.get(communityId);
-    if (hit && Date.now() - hit.at < STALE) return;
-
-    fetch(`/api/communities/${communityId}/showcase`)
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error);
-        cache.set(communityId, { posts: data.posts, at: Date.now() });
-        setPosts(data.posts);
+    let cancelled = false;
+    void fetchJsonCached<{ posts?: ShowcasePost[] }>(
+      requestUrl,
+      { staleMs: STALE },
+      currentUserId,
+    )
+      .then((data) => {
+        if (!cancelled) setPosts(data.posts ?? []);
       })
       .catch(() => setError("We couldn't load the showcase."))
       .finally(() => setLoading(false));
-  }, [communityId]);
+    return () => { cancelled = true; };
+  }, [currentUserId, requestUrl]);
 
   useEffect(() => {
     if (!menu) return;
@@ -94,6 +96,11 @@ export function ShowcaseView({
 
   function replacePosts(next: ShowcasePost[]) {
     setPosts(next);
+    patchCachedRequest<{ posts?: ShowcasePost[] }>(
+      requestUrl,
+      (current) => ({ ...current, posts: next }),
+      currentUserId,
+    );
   }
 
   function patch(id: string, change: Partial<ShowcasePost>) {
