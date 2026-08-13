@@ -37,8 +37,8 @@ export function detectImageMime(buffer: Buffer): "image/jpeg" | "image/png" | "i
 }
 
 export async function validateAndModerateImage(file: File | Blob): Promise<{ decision: ModerationDecision; buffer?: Buffer; mime?: string }> {
-  const start = Date.now();
   const config = getModerationConfig();
+  const start = Date.now();
 
   if (!config.images.allowedMimeTypes.includes(file.type)) {
     return { decision: { ...decision("rejected", "Unsupported image content type.", 1), duration_ms: Date.now() - start } };
@@ -48,13 +48,22 @@ export async function validateAndModerateImage(file: File | Blob): Promise<{ dec
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  return moderateImageBuffer(buffer, file.type, start);
+}
+
+export async function moderateImageBuffer(
+  buffer: Buffer,
+  declaredMime: string,
+  startedAt = Date.now(),
+): Promise<{ decision: ModerationDecision; buffer?: Buffer; mime?: string }> {
+  const config = getModerationConfig();
   const realMime = detectImageMime(buffer);
-  if (!realMime || realMime !== file.type) {
-    return { decision: { ...decision("rejected", "Image bytes do not match an allowed MIME type.", 1), duration_ms: Date.now() - start } };
+  if (!realMime || realMime !== declaredMime) {
+    return { decision: { ...decision("rejected", "Image bytes do not match an allowed MIME type.", 1), duration_ms: Date.now() - startedAt } };
   }
 
   if (!config.images.serviceUrl) {
-    return { decision: { ...decision("review", "Image moderation service is not configured.", 1), duration_ms: Date.now() - start }, buffer, mime: realMime };
+    return { decision: { ...decision("review", "Image moderation service is not configured.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
   }
 
   const controller = new AbortController();
@@ -70,7 +79,7 @@ export async function validateAndModerateImage(file: File | Blob): Promise<{ dec
     });
 
     if (!response.ok) {
-      return { decision: { ...decision("review", "Image moderation service returned an error.", 1), duration_ms: Date.now() - start }, buffer, mime: realMime };
+      return { decision: { ...decision("review", "Image moderation service returned an error.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
     }
 
     const payload = (await response.json()) as Partial<ModerationDecision>;
@@ -86,14 +95,14 @@ export async function validateAndModerateImage(file: File | Blob): Promise<{ dec
         confidence: typeof payload.confidence === "number" ? payload.confidence : 0,
         triggered_rules: Array.isArray(payload.triggered_rules) ? payload.triggered_rules : [],
         scores: payload.scores && typeof payload.scores === "object" ? payload.scores as Record<string, number> : {},
-        duration_ms: Date.now() - start,
+        duration_ms: Date.now() - startedAt,
       },
       buffer,
       mime: realMime,
     };
   } catch (error) {
     console.error("[moderation:image]", error);
-    return { decision: { ...decision("review", "Image moderation service failed.", 1), duration_ms: Date.now() - start }, buffer, mime: realMime };
+    return { decision: { ...decision("review", "Image moderation service failed.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
   } finally {
     clearTimeout(timeout);
   }

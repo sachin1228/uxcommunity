@@ -8,6 +8,7 @@ import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import { createServerTimer } from "@/lib/server-timing";
 
 const PAGE_SIZE = 50;
 
@@ -181,28 +182,26 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const totalStart = performance.now();
+  const timer = createServerTimer("POST /api/communities/[id]/messages");
 
   let session;
-  console.time("requireSession");
   try {
-    session = await requireSession("user");
+    session = await timer.measure("auth", () => requireSession("user"));
   } catch (e) {
     return e as Response;
   }
-  console.timeEnd("requireSession");
   const userId = session.userId!;
   const { id: communityId } = await params;
 
   const db = createServiceClient();
 
   // Run both rate-limit checks in parallel — each is an independent Redis call.
-  console.time("rateLimit");
-  const [burst, minute] = await Promise.all([
-    rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
-    rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
-  ]);
-  console.timeEnd("rateLimit");
+  const [burst, minute] = await timer.measure("rate_limits", () =>
+    Promise.all([
+      rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
+      rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
+    ]),
+  );
 
   if (!burst.success) {
     return NextResponse.json(
@@ -264,15 +263,13 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
-  console.time("insertMessage");
-
-  const { data: inserted, error: insertErr } = await db
-    .from("community_messages")
-    .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
-    .select("id, content, created_at, user_id, reply_to_id, image_url")
-    .single();
-
-  console.timeEnd("insertMessage");
+  const { data: inserted, error: insertErr } = await timer.measure("message_insert", async () =>
+    await db
+      .from("community_messages")
+      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
+      .select("id, content, created_at, user_id, reply_to_id, image_url")
+      .single(),
+  );
 
   if (insertErr || !inserted) {
     console.error("[POST message] insert error:", insertErr);
@@ -318,7 +315,7 @@ export async function POST(
     });
   }
 
-  console.log("TOTAL:", Math.round(performance.now() - totalStart), "ms");
+  timer.finish({ query_count: reply_to_id ? 2 : 1 });
 
   // Return only the inserted row. The client already has the sender's own
   // name/avatar (passed as props) and the reply preview (passed in the

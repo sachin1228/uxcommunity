@@ -193,16 +193,32 @@ export function useSendMessage({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
+    const sendStartedAt = performance.now();
+    const clientTimings: Record<string, number> = {};
+    const measureClient = async <T,>(name: string, operation: () => Promise<T>) => {
+      const startedAt = performance.now();
+      try {
+        return await operation();
+      } finally {
+        clientTimings[name] = Math.round((performance.now() - startedAt) * 100) / 100;
+      }
+    };
+
     try {
       let uploadedImageUrl: string | null = null;
 
       if (imageFile) {
+        // The client currently sends the original File. Server-side Sharp
+        // compression is measured separately by the upload route.
+        clientTimings.client_compression = 0;
         const fd = new FormData();
         fd.append("file", imageFile);
 
-        const uploadRes = await fetch(
-          `/api/communities/${communityId}/messages/upload`,
-          { method: "POST", body: fd, signal: abortController.signal }
+        const uploadRes = await measureClient("image_upload_request", () =>
+          fetch(
+            `/api/communities/${communityId}/messages/upload`,
+            { method: "POST", body: fd, signal: abortController.signal },
+          ),
         );
 
         if (!uploadRes.ok) {
@@ -214,16 +230,18 @@ export function useSendMessage({
         uploadedImageUrl = url;
       }
 
-      const res = await fetch(`/api/communities/${communityId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content,
-          reply_to_id: msgReplyTo?.id ?? null,
-          image_url: uploadedImageUrl,
+      const res = await measureClient("message_create_request", () =>
+        fetch(`/api/communities/${communityId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content,
+            reply_to_id: msgReplyTo?.id ?? null,
+            image_url: uploadedImageUrl,
+          }),
+          signal: abortController.signal,
         }),
-        signal: abortController.signal,
-      });
+      );
 
       const data = await res.json().catch(() => ({}));
 
@@ -322,6 +340,10 @@ export function useSendMessage({
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllerRef.current = null;
+      if (process.env.NODE_ENV === "development") {
+        clientTimings.total_send = Math.round((performance.now() - sendStartedAt) * 100) / 100;
+        console.debug("[client-timing] community message send", clientTimings);
+      }
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }
@@ -397,6 +419,7 @@ export function useSendMessage({
   }, [communityId, sending, setMessages]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();

@@ -3,9 +3,10 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compressChatImage } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
-import { validateAndModerateImage } from "@/lib/moderation/image";
+import { moderateImageBuffer } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
+import { createServerTimer } from "@/lib/server-timing";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
 
@@ -19,66 +20,92 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const timer = createServerTimer("POST /api/communities/[id]/messages/upload");
+  const finish = (response: Response) => {
+    timer.finish();
+    return response;
+  };
+
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try {
+    session = await timer.measure("auth", () => requireSession("user"));
+  } catch (e) {
+    return finish(e as Response);
+  }
   const userId = session.userId!;
   const { id: communityId } = await params;
-
-  // Verify membership
   const db = createServiceClient();
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
+
+  const { data: membership } = await timer.measure("membership_query", async () =>
+    await db
+      .from("community_members")
+      .select("joined_at")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  );
 
   if (!membership) {
-    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+    return finish(NextResponse.json({ error: "Not a member of this community." }, { status: 403 }));
   }
 
   let formData: FormData;
   try {
-    formData = await request.formData();
+    formData = await timer.measure("form_parse", () => request.formData());
   } catch {
-    return NextResponse.json({ error: "Invalid form data." }, { status: 400 });
+    return finish(NextResponse.json({ error: "Invalid form data." }, { status: 400 }));
   }
 
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    return finish(NextResponse.json({ error: "No file provided." }, { status: 400 }));
   }
-
   if (!ALLOWED_TYPES.has(file.type)) {
-    return NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed." }, { status: 422 });
+    return finish(NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed." }, { status: 422 }));
   }
-
   if (file.size > MAX_INPUT_BYTES) {
-    return NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 });
+    return finish(NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 }));
   }
 
-  const moderation = await validateAndModerateImage(file);
-  await logModerationDecision(db, {
-    userId,
-    contentType: "image_upload",
-    decision: moderation.decision,
-  });
-  if (!moderation.decision.allowed || !moderation.buffer) return moderationFailureResponse(moderation.decision);
-
-  let compressed;
+  let source: Buffer;
   try {
-    compressed = await compressChatImage(moderation.buffer);
+    source = await timer.measure("file_decode", async () => Buffer.from(await file.arrayBuffer()));
   } catch {
-    return NextResponse.json({ error: "Failed to process image." }, { status: 422 });
+    return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
+  }
+
+  // Compression is CPU-bound while moderation is a remote request. Running
+  // them concurrently removes compression from the critical path, but storage
+  // remains strictly gated on an approved moderation decision.
+  const [moderation, compression] = await Promise.all([
+    timer.measure("moderation_request", () => moderateImageBuffer(source, file.type)),
+    timer.measure("compression", () => compressChatImage(source).catch(() => null)),
+  ]);
+
+  await timer.measure("moderation_audit_insert", () =>
+    logModerationDecision(db, {
+      userId,
+      contentType: "image_upload",
+      decision: moderation.decision,
+    }),
+  );
+
+  if (!moderation.decision.allowed || !moderation.buffer) {
+    return finish(moderationFailureResponse(moderation.decision));
+  }
+  if (!compression) {
+    return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
   }
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
 
   try {
-    const url = await uploadToR2(key, compressed.data, compressed.contentType);
-    return NextResponse.json({ url }, { status: 201 });
+    const url = await timer.measure("r2_upload", () =>
+      uploadToR2(key, compression.data, compression.contentType),
+    );
+    return finish(NextResponse.json({ url }, { status: 201 }));
   } catch (err) {
     console.error("[chat-image-upload] R2 error:", err);
-    return NextResponse.json({ error: "Upload failed." }, { status: 500 });
+    return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));
   }
 }
