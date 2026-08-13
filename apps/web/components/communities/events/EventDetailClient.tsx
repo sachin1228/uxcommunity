@@ -335,8 +335,10 @@ export function EventDetailClient({
   const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
 
   // Comments (flat list, built into tree on render)
-  const [comments, setComments] = useState<EventComment[]>([]);
-  const [commentsLoading, setCommentsLoading] = useState(true);
+  const commentsUrl = `/api/communities/${communityId}/events/${initialEvent.id}/comments`;
+  const cachedComments = getCachedRequest<{ comments?: EventComment[] }>(commentsUrl, currentUserId);
+  const [comments, setComments] = useState<EventComment[]>(cachedComments?.comments ?? []);
+  const [commentsLoading, setCommentsLoading] = useState(!cachedComments);
 
   // Main composer state
   const [commentText, setCommentText] = useState("");
@@ -352,12 +354,19 @@ export function EventDetailClient({
 
   const fetchComments = useCallback(async () => {
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/comments`);
-      if (res.ok) { const d = await res.json(); setComments(d.comments ?? []); }
+      const data = await fetchJsonCached<{ comments?: EventComment[] }>(
+        commentsUrl,
+        { staleMs: 15_000 },
+        currentUserId,
+      );
+      setComments(data.comments ?? []);
     } finally { setCommentsLoading(false); }
-  }, [communityId, event.id]);
+  }, [commentsUrl, currentUserId]);
 
   useEffect(() => { void fetchComments(); }, [fetchComments]);
+  useEffect(() => {
+    setCachedRequest(commentsUrl, { comments }, currentUserId);
+  }, [comments, commentsUrl, currentUserId]);
 
   type SaveState = { saved: boolean; save_count: number };
 

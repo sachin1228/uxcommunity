@@ -11,6 +11,7 @@ import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { formatRelativeDate } from "./threadShared";
 import { communityFeedLayout } from "../feed-layout";
+import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -250,23 +251,32 @@ export function ThreadDetailClient({
   flushLayout = false,
 }: Props) {
   const router = useRouter();
+  const commentsUrl = `/api/communities/${communityId}/threads/${initialThread.id}/comments`;
+  const cachedComments = getCachedRequest<{ comments?: ThreadComment[] }>(commentsUrl, currentUserId);
   const [thread, setThread] = useState(initialThread);
-  const [comments, setComments] = useState(initialComments);
+  const [comments, setComments] = useState(cachedComments?.comments ?? initialComments);
 
-  // ── Realtime: refetch comments on any change ──────────────────────────────
+  useEffect(() => {
+    setCachedRequest(commentsUrl, { comments }, currentUserId);
+  }, [comments, commentsUrl, currentUserId]);
+
+  // ── Realtime: perform one authoritative, deduplicated refresh ─────────────
   const fetchComments = useCallback(async () => {
     try {
-      const res = await fetch(`/api/communities/${communityId}/threads/${thread.id}/comments`, { cache: "no-store" });
-      if (!res.ok) return;
-      const data = await res.json();
-      setComments(data.comments as ThreadComment[]);
-      const count = (data.comments as ThreadComment[]).reduce(
+      const data = await fetchJsonCached<{ comments?: ThreadComment[] }>(
+        commentsUrl,
+        { staleMs: 15_000, force: true },
+        currentUserId,
+      );
+      const nextComments = data.comments ?? [];
+      setComments(nextComments);
+      const count = nextComments.reduce(
         (acc: number, c: ThreadComment) => acc + 1 + c.replies.length,
         0,
       );
       setThread((t) => ({ ...t, comment_count: count }));
     } catch { /* silent */ }
-  }, [communityId, thread.id]);
+  }, [commentsUrl, currentUserId]);
 
   useEffect(() => {
     let supabase: ReturnType<typeof createBrowserClient>;

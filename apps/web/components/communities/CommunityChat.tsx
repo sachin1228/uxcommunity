@@ -39,6 +39,7 @@ import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { fetchJsonCached, initRequestCache } from "@/lib/request-cache";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -88,8 +89,14 @@ export function CommunityChat({
     setThreadEvents([]);
     setThreadsReady(false);
     let cancelled = false;
-    fetch(`/api/communities/${communityId}/threads`)
-      .then((r) => (r.ok ? r.json() : null))
+    initRequestCache(currentUserId);
+    void fetchJsonCached<{ threads: Array<{
+        id: string; community_id: string; user_id: string;
+        title: string; description: string; category: string;
+        attachments: Array<{ name: string; url: string; type: string; size: number }>;
+        created_at: string;
+        users: { name: string; avatar_url: string | null } | null;
+      }> }>(`/api/communities/${communityId}/threads`, { staleMs: 60_000 }, currentUserId)
       .then((data: { threads: Array<{
         id: string; community_id: string; user_id: string;
         title: string; description: string; category: string;
@@ -126,7 +133,7 @@ export function CommunityChat({
         if (!cancelled) setThreadsReady(true);
       });
     return () => { cancelled = true; };
-  }, [communityId]);
+  }, [communityId, currentUserId]);
 
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
