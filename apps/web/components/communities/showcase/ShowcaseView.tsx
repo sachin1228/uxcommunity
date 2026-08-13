@@ -277,47 +277,61 @@ export function ShowcaseView({
                     }`}
                   />
                   <div className="flex items-center gap-2">
-                    {post.user_id === currentUserId && (
-                      <div
-                        className="relative"
-                        ref={menu === post.id ? menuRef : undefined}
-                        onClick={(event) => event.stopPropagation()}
+                    <div
+                      className="relative"
+                      ref={menu === post.id ? menuRef : undefined}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        aria-label="Showcase options"
+                        onClick={() =>
+                          setMenu(menu === post.id ? null : post.id)
+                        }
+                        className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
                       >
-                        <button
-                          type="button"
-                          aria-label="Showcase options"
-                          onClick={() =>
-                            setMenu(menu === post.id ? null : post.id)
-                          }
-                          className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
-                        >
-                          <MoreHorizontal size={16} />
-                        </button>
-                        {menu === post.id && (
-                          <div className="absolute right-0 top-8 z-20 min-w-36 rounded-lg border border-border bg-surface py-1 shadow-lg">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditing(post);
-                                setMenu(null);
-                              }}
-                              className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
-                            >
-                              <Pencil size={12} />
-                              Edit showcase
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void remove(post)}
-                              className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
-                            >
-                              <Trash2 size={12} />
-                              Delete showcase
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                        <MoreHorizontal size={16} />
+                      </button>
+                      {menu === post.id && (
+                        <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenu(null);
+                              void toggle(post, "save");
+                            }}
+                            aria-pressed={post.user_saved}
+                            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+                          >
+                            <Bookmark size={12} fill={post.user_saved ? "currentColor" : "none"} />
+                            {post.user_saved ? "Unsave showcase" : "Save showcase"}
+                          </button>
+                          {post.user_id === currentUserId && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditing(post);
+                                  setMenu(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+                              >
+                                <Pencil size={12} />
+                                Edit showcase
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void remove(post)}
+                                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
+                              >
+                                <Trash2 size={12} />
+                                Delete showcase
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -381,19 +395,6 @@ export function ShowcaseView({
                       <ExternalLink size={14} />
                     </a>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => void toggle(post, "save")}
-                    aria-pressed={post.user_saved}
-                    aria-label={
-                      post.user_saved ? "Unsave showcase" : "Save showcase"
-                    }
-                  >
-                    <Bookmark
-                      size={20}
-                      fill={post.user_saved ? "currentColor" : "none"}
-                    />
-                  </button>
                 </div>
               </article>
             ))}

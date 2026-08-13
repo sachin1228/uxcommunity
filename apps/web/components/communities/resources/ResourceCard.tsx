@@ -90,7 +90,6 @@ export function ResourceCard({
   const optimisticBookmarkCountRef = useRef(resource.bookmark_count);
   const bookmarkRequestRunningRef = useRef(false);
   const displayedBookmarked = optimisticBookmark?.bookmarked ?? resource.user_bookmarked;
-  const displayedBookmarkCount = optimisticBookmark?.count ?? resource.bookmark_count;
 
   const [menuOpen, setMenuOpen]               = useState(false);
   const [showEditModal, setShowEditModal]     = useState(false);
@@ -249,6 +248,18 @@ export function ResourceCard({
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      handleBookmark(e);
+                      setMenuOpen(false);
+                    }}
+                    aria-pressed={displayedBookmarked}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                  >
+                    <Bookmark size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
+                    {displayedBookmarked ? "Unsave resource" : "Save resource"}
+                  </button>
                   {isOwner ? (
                     <>
                       <button
@@ -316,23 +327,15 @@ export function ResourceCard({
             </a>
           ) : null}
 
-          {communityName && (
-            <CommunityPostLabel
-              communityName={communityName}
-              communityImage={communityImage}
-              className="mt-3"
-            />
-          )}
-
-          {/* ── Footer: like · bookmark ── */}
-          <div className="mt-3 flex items-center gap-4">
+          {/* ── Footer: engagement · community ── */}
+          <div className="mt-3 flex items-center justify-between gap-4">
             {/* Heart / like */}
             <button
               type="button"
               onClick={handleSave}
               aria-label={displayedSaved ? "Unlike" : "Like"}
               aria-pressed={displayedSaved}
-              className="group/like flex items-center gap-2"
+              className="group/like flex shrink-0 items-center gap-2"
             >
               <Heart
                 size={20}
@@ -348,26 +351,13 @@ export function ResourceCard({
               </span>
             </button>
 
-            <div className="flex-1" />
-
-            {/* Bookmark / save */}
-            <button
-              type="button"
-              onClick={handleBookmark}
-              aria-label={displayedBookmarked ? "Remove bookmark" : "Bookmark"}
-              aria-pressed={displayedBookmarked}
-              className="group/save flex items-center gap-2 text-white"
-            >
-              <Bookmark
-                size={20}
-                strokeWidth={2}
-                fill={displayedBookmarked ? "currentColor" : "none"}
-                className="transition-transform duration-150 ease-out group-hover/save:scale-110"
+            {communityName && (
+              <CommunityPostLabel
+                communityName={communityName}
+                communityImage={communityImage}
+                className="min-w-0 justify-end text-right"
               />
-              <span className="font-body text-sm font-semibold tabular-nums">
-                {displayedBookmarkCount}
-              </span>
-            </button>
+            )}
           </div>
         </div>
       </article>

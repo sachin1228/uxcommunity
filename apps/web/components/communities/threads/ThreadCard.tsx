@@ -303,7 +303,19 @@ export function ThreadCard({
             <MoreHorizontal size={15} />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-8 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+            <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={(e) => {
+                  handleSave(e);
+                  setMenuOpen(false);
+                }}
+                aria-pressed={displayedSaved}
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+              >
+                <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
+                {displayedSaved ? "Unsave thread" : "Save thread"}
+              </button>
               {isOwner ? (
                 <>
                   <button
@@ -508,72 +520,54 @@ export function ThreadCard({
         return <>{imageGrid}{fileList}</>;
       })()}
 
-      {communityName && communityNamePlacement === "below" && (
-        <CommunityPostLabel
-          communityName={communityName}
-          communityImage={communityImage}
-          className="mt-3"
-        />
-      )}
-
       {interactionError && (
         <p role="status" className="mt-3 font-body text-xs text-red-400">
           {interactionError}
         </p>
       )}
 
-      {/* ── Footer: like · comments · bookmark ── */}
-      <div className="mt-3 flex items-center gap-4">
-        {/* Like (Instagram-style heart) */}
-        <button
-          type="button"
-          onClick={handleVote}
-          aria-label={optimisticVoted ? "Unlike" : "Like"}
-          aria-pressed={optimisticVoted}
-          className="group/like flex items-center gap-2"
-        >
-          <Heart
-            size={20}
-            strokeWidth={2}
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
-              optimisticVoted
-                ? "fill-red-500 text-red-500"
-                : "fill-none text-white"
-            }`}
-          />
-          <span
-            className={`font-body text-sm font-semibold tabular-nums ${
-              optimisticVoted ? "text-red-500" : "text-white"
-            }`}
-          >
-            {optimisticVoteCount}
-          </span>
-        </button>
-
-        {/* Comments */}
-        <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
-          <MessageSquare size={20} strokeWidth={2} />
-          {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
-        </span>
-
-        <div className="flex-1" />
-
-        {/* Bookmark */}
-        {!isDetail && (
+      {/* ── Footer: engagement · community ── */}
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <div className="flex shrink-0 items-center gap-4">
+          {/* Like (Instagram-style heart) */}
           <button
             type="button"
-            aria-label={displayedSaved ? "Unsave thread" : "Save thread"}
-            aria-pressed={displayedSaved}
-            onClick={handleSave}
-            className="group/save flex h-7 w-7 items-center justify-center rounded-md text-white"
+            onClick={handleVote}
+            aria-label={optimisticVoted ? "Unlike" : "Like"}
+            aria-pressed={optimisticVoted}
+            className="group/like flex items-center gap-2"
           >
-            <Bookmark
+            <Heart
               size={20}
               strokeWidth={2}
-              fill={displayedSaved ? "currentColor" : "none"}
-              className="transition-transform duration-150 ease-out group-hover/save:scale-110"
+              className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+                optimisticVoted
+                  ? "fill-red-500 text-red-500"
+                  : "fill-none text-white"
+              }`}
             />
+            <span
+              className={`font-body text-sm font-semibold tabular-nums ${
+                optimisticVoted ? "text-red-500" : "text-white"
+              }`}
+            >
+              {optimisticVoteCount}
+            </span>
           </button>
+
+          {/* Comments */}
+          <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
+            <MessageSquare size={20} strokeWidth={2} />
+            {thread.comment_count} {thread.comment_count === 1 ? "comment" : "comments"}
+          </span>
+        </div>
+
+        {communityName && communityNamePlacement === "below" && (
+          <CommunityPostLabel
+            communityName={communityName}
+            communityImage={communityImage}
+            className="min-w-0 justify-end text-right"
+          />
         )}
       </div>
     </>
