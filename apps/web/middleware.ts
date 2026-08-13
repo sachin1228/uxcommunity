@@ -5,6 +5,7 @@ import {
   verifySession,
   clearSessionCookie,
 } from "@/lib/auth/session";
+import { getUserStatusCached } from "@/lib/auth/user-status-cache";
 
 /** Lightweight Supabase REST check — Edge-compatible, no SDK needed. */
 async function fetchUserStatus(
@@ -74,7 +75,10 @@ export async function middleware(request: NextRequest) {
     // Skip this check for admins (they manage other users; their own status
     // isn't affected by the user block/delete actions).
     if (session.role === "user" && session.userId) {
-      const { exists, is_blocked } = await fetchUserStatus(session.userId);
+      const { exists, is_blocked } = await getUserStatusCached(
+        session.userId,
+        () => fetchUserStatus(session.userId),
+      );
       if (!exists || is_blocked) {
         const url = request.nextUrl.clone();
         url.pathname = "/login";

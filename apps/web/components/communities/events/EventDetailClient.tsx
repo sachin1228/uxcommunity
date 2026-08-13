@@ -12,6 +12,13 @@ import { EditEventModal } from "./EditEventModal";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
+import {
+  fetchJsonCached,
+  getCachedRequest,
+  setCachedRequest,
+  subscribeToRequest,
+} from "@/lib/request-cache";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -311,7 +318,13 @@ export function EventDetailClient({
   backLabel = "Home",
 }: Props) {
   const router = useRouter();
-  const [event, setEvent] = useState(initialEvent);
+  const saveUrl = `/api/communities/${communityId}/events/${initialEvent.id}/save`;
+  const [event, setEvent] = useState(() => {
+    const cached = getCachedRequest<{ saved: boolean; save_count: number }>(saveUrl, currentUserId);
+    return cached
+      ? { ...initialEvent, user_saved: cached.saved, save_count: cached.save_count }
+      : initialEvent;
+  });
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -319,7 +332,6 @@ export function EventDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
-  const [savePending, setSavePending] = useState(false);
   const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
 
   // Comments (flat list, built into tree on render)
@@ -332,6 +344,7 @@ export function EventDetailClient({
   const [commentError, setCommentError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const saveCoordinatorRef = useRef<BooleanIntentCoalescer | null>(null);
 
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -346,19 +359,46 @@ export function EventDetailClient({
 
   useEffect(() => { void fetchComments(); }, [fetchComments]);
 
-  const fetchSaveState = useCallback(async () => {
-    const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
+  type SaveState = { saved: boolean; save_count: number };
+
+  const applySaveState = useCallback((data: SaveState) => {
     setEvent((current) => ({
       ...current,
       user_saved: data.saved,
       save_count: data.save_count,
     }));
-  }, [communityId, event.id]);
+    saveCoordinatorRef.current?.syncConfirmed(data.saved);
+  }, []);
+
+  const fetchSaveState = useCallback(async (force = false) => {
+    try {
+      const data = await fetchJsonCached<SaveState>(
+        saveUrl,
+        { force, staleMs: 60_000 },
+        currentUserId,
+      );
+      applySaveState(data);
+    } catch {
+      // Keep the server-rendered state when reconciliation is temporarily unavailable.
+    }
+  }, [applySaveState, currentUserId, saveUrl]);
 
   useEffect(() => {
-    void fetchSaveState();
+    if (!getCachedRequest<SaveState>(saveUrl, currentUserId)) {
+      setCachedRequest(saveUrl, {
+        saved: initialEvent.user_saved,
+        save_count: initialEvent.save_count,
+      }, currentUserId);
+    }
+
+    return subscribeToRequest(saveUrl, () => {
+      const next = getCachedRequest<SaveState>(saveUrl, currentUserId);
+      if (next) applySaveState(next);
+    }, currentUserId);
+  }, [applySaveState, currentUserId, initialEvent.save_count, initialEvent.user_saved, saveUrl]);
+
+  useEffect(() => {
+    queueMicrotask(() => void fetchSaveState());
     let supabase: ReturnType<typeof createBrowserClient>;
     try { supabase = createBrowserClient(); } catch { return; }
 
@@ -369,11 +409,11 @@ export function EventDetailClient({
         schema: "public",
         table: "event_saves",
         filter: `event_id=eq.${event.id}`,
-      }, () => void fetchSaveState())
+      }, () => void fetchSaveState(true))
       .subscribe();
 
     const refreshOnFocus = () => {
-      if (document.visibilityState === "visible") void fetchSaveState();
+      if (document.visibilityState === "visible") void fetchSaveState(true);
     };
     document.addEventListener("visibilitychange", refreshOnFocus);
     window.addEventListener("focus", refreshOnFocus);
@@ -384,6 +424,32 @@ export function EventDetailClient({
       window.removeEventListener("focus", refreshOnFocus);
     };
   }, [event.id, fetchSaveState]);
+
+  useEffect(() => {
+    const coordinator = new BooleanIntentCoalescer({
+      initialValue: initialEvent.user_saved,
+      onOptimisticChange: (saved) => {
+        setEvent((current) => ({
+          ...current,
+          user_saved: saved,
+          save_count: Math.max(0, current.save_count + (saved === current.user_saved ? 0 : saved ? 1 : -1)),
+        }));
+      },
+      persist: async (desired) => {
+        const response = await fetch(saveUrl, { method: "POST" });
+        const data = await response.json().catch(() => null) as SaveState | null;
+        if (!response.ok || !data) throw new Error("Unable to update like");
+        setCachedRequest(saveUrl, data, currentUserId);
+        if (data.saved !== desired) throw new Error("Save state did not match the latest intent");
+        return data.saved;
+      },
+    });
+    saveCoordinatorRef.current = coordinator;
+    return () => {
+      coordinator.dispose();
+      saveCoordinatorRef.current = null;
+    };
+  }, [currentUserId, initialEvent.user_saved, saveUrl]);
 
   // Auto-grow textarea
   useEffect(() => {
@@ -429,26 +495,8 @@ export function EventDetailClient({
     }
   }
 
-  async function handleSave() {
-    if (savePending) return;
-    const previousSaved = event.user_saved;
-    const previousCount = event.save_count;
-    setEvent((current) => ({
-      ...current,
-      user_saved: !previousSaved,
-      save_count: previousCount + (previousSaved ? -1 : 1),
-    }));
-    setSavePending(true);
-    try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/save`, { method: "POST" });
-      if (!res.ok) throw new Error("Unable to update like");
-      const data = await res.json();
-      setEvent((current) => ({ ...current, user_saved: data.saved, save_count: data.save_count }));
-    } catch {
-      setEvent((current) => ({ ...current, user_saved: previousSaved, save_count: previousCount }));
-    } finally {
-      setSavePending(false);
-    }
+  function handleSave() {
+    saveCoordinatorRef.current?.toggle();
   }
 
   // ── Composer ──
@@ -661,11 +709,11 @@ export function EventDetailClient({
         <div className="mt-3 flex items-center justify-between gap-4">
           <button
             type="button"
-            onClick={handleSave}
-            disabled={savePending}
-            aria-label={event.user_saved ? "Unlike" : "Like"}
-            aria-pressed={event.user_saved}
-            className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleSave}
+              aria-label={event.user_saved ? "Unlike" : "Like"}
+              aria-pressed={event.user_saved}
+              className="group/like flex shrink-0 items-center gap-2"
+
           >
             <Heart
               size={20}
