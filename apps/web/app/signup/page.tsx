@@ -22,7 +22,6 @@ interface TokenState {
   error?: string;
   applicationId?: string;
   applicantEmail?: string;
-  resumeStep?: 2 | 3 | 4;
 }
 
 type Step = 1 | 2 | 3 | 4 | "done";
@@ -95,11 +94,9 @@ function SignupInner() {
       .then((r) => r.json())
       .then((d) => {
         if (d.valid) {
-          setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail, resumeStep: d.resumeStep });
+          setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail });
           setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", name: d.applicantName ?? "" }));
-          if (d.resumeStep === 2 || d.resumeStep === 3 || d.resumeStep === 4) {
-            setStep(d.resumeStep as 2 | 3 | 4);
-          }
+          setStep(1);
         } else {
           setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
         }
@@ -153,11 +150,7 @@ function SignupInner() {
         else setStep1Error(data.error ?? "Failed to create account.");
         return;
       }
-      if (data.resumed && data.resumeStep) {
-        setStep(data.resumeStep as 2 | 3 | 4);
-      } else {
-        setStep(2);
-      }
+      setStep(2);
     } catch {
       setStep1Error("Network error. Please try again.");
     } finally {
@@ -173,64 +166,24 @@ function SignupInner() {
     if (!step2.city_id)          { setStep2Error("Please select a city.");                setStep2Loading(false); return; }
     if (!step2.sector_id)        { setStep2Error("Please select an industry sector.");    setStep2Loading(false); return; }
     if (!step2.experience_level) { setStep2Error("Please select your experience level."); setStep2Loading(false); return; }
-    try {
-      const res = await fetch("/api/signup/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(step2),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 401) {
-          setStep1Error("Your session expired. Please re-enter your password to continue.");
-          setStep(1);
-          return;
-        }
-        setStep2Error(data.error ?? "Failed to save profile.");
-        return;
-      }
-      setStep3Error(null);
-      setSelectedInterestIds([]);
-      setStep(3);
-    } catch {
-      setStep2Error("Network error. Please try again.");
-    } finally {
-      setStep2Loading(false);
-    }
+    setStep3Error(null);
+    setSelectedInterestIds([]);
+    setStep(3);
+    setStep2Loading(false);
   }
 
   async function handleStep3() {
     setStep3Loading(true);
     setStep3Error(null);
-    try {
-      const res = await fetch("/api/signup/interests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interest_ids: selectedInterestIds }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 401) {
-          setStep1Error("Your session expired. Please re-enter your password to continue.");
-          setStep(1);
-          return;
-        }
-        setStep3Error(data.error ?? "Failed to save interests.");
-        return;
-      }
-      const options = getAvatarSourceOptions(step1.name);
-      setActiveAvatarTab("dicebear");
-      setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
-      setUploadedBlob(null);
-      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-      setUploadPreviewUrl(null);
-      setStep4Error(null);
-      setStep(4);
-    } catch {
-      setStep3Error("Network error. Please try again.");
-    } finally {
-      setStep3Loading(false);
-    }
+    const options = getAvatarSourceOptions(step1.name);
+    setActiveAvatarTab("dicebear");
+    setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
+    setUploadedBlob(null);
+    if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+    setUploadPreviewUrl(null);
+    setStep4Error(null);
+    setStep(4);
+    setStep3Loading(false);
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -257,28 +210,33 @@ function SignupInner() {
     setStep4Loading(true);
     setStep4Error(null);
     try {
+      const payload = {
+        identity: step1,
+        profile: step2,
+        interest_ids: selectedInterestIds,
+        ...(token ? { token } : {}),
+        avatar_source: uploadedBlob ? "upload" : selectedAvatar!.source,
+        ...(!uploadedBlob && selectedAvatar ? { avatar_url: selectedAvatar.dbUrl } : {}),
+      };
+
+      let res: Response;
       if (uploadedBlob) {
         const fd = new FormData();
+        fd.append("payload", JSON.stringify(payload));
         fd.append("file", uploadedBlob, "avatar.jpg");
-        const res  = await fetch("/api/signup/avatar", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 401) { setStep1Error("Your session expired. Please re-enter your password to continue."); setStep(1); return; }
-          setStep4Error(data.error ?? "Upload failed.");
-          return;
-        }
-      } else if (selectedAvatar) {
-        const res  = await fetch("/api/signup/avatar", {
+        res = await fetch("/api/signup/avatar", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/signup/avatar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ avatar_url: selectedAvatar.dbUrl, avatar_source: selectedAvatar.source }),
+          body: JSON.stringify(payload),
         });
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 401) { setStep1Error("Your session expired. Please re-enter your password to continue."); setStep(1); return; }
-          setStep4Error(data.error ?? "Failed to save avatar.");
-          return;
-        }
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        setStep4Error(data.error ?? "Failed to complete signup.");
+        return;
       }
       try {
         await Promise.race([

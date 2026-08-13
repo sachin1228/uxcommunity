@@ -57,6 +57,22 @@ export const signupStep2Schema = z.object({
   experience_level: z.string().min(1, "Please select an experience level"),
 });
 
+export const completeSignupSchema = z.object({
+  identity: directSignupStep1Schema,
+  profile: signupStep2Schema,
+  interest_ids: z.array(z.string().uuid()).max(100),
+  token: z.string().min(1).optional(),
+  avatar_url: z.string().min(1).optional(),
+  avatar_source: z.enum([
+    "dicebear",
+    "boring-avatars",
+    "robohash",
+    "avataaars",
+    "multiavatar",
+    "upload",
+  ]),
+});
+
 export const masterDataSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   image_url: z.string().url().optional().nullable(),
