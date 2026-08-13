@@ -5,7 +5,7 @@ import { createServerTimer } from "@/lib/server-timing";
 
 type InteractionCounts = {
   threads: Record<string, { comment_count: number; vote_count: number; user_voted: boolean; user_saved: boolean }>;
-  events: Record<string, { comment_count: number; rsvp_count: number; user_rsvped: boolean; save_count: number; user_saved: boolean }>;
+  events: Record<string, { comment_count: number; rsvp_count: number; user_rsvped: boolean; like_count: number; user_liked: boolean; save_count: number; user_saved: boolean }>;
   resources: Record<string, { comment_count: number; save_count: number; user_saved: boolean; bookmark_count: number; user_bookmarked: boolean }>;
 };
 
@@ -181,6 +181,8 @@ export async function GET(req: NextRequest) {
         comment_count: interactions.events[item.id]?.comment_count ?? 0,
         rsvp_count: interactions.events[item.id]?.rsvp_count ?? 0,
         user_rsvped: interactions.events[item.id]?.user_rsvped ?? false,
+        like_count: interactions.events[item.id]?.like_count ?? 0,
+        user_liked: interactions.events[item.id]?.user_liked ?? false,
         save_count: interactions.events[item.id]?.save_count ?? 0,
         user_saved: interactions.events[item.id]?.user_saved ?? false,
       };

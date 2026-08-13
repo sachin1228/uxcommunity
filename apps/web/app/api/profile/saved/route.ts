@@ -27,7 +27,7 @@ export async function GET() {
     { data: profile },
   ] = await Promise.all([
     db.from("thread_saves").select("thread_id").eq("user_id", userId),
-    db.from("event_rsvps").select("event_id").eq("user_id", userId),
+    db.from("event_saves").select("event_id").eq("user_id", userId),
     db.from("resource_bookmarks").select("resource_id").eq("user_id", userId),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
   ]);
@@ -111,17 +111,39 @@ export async function GET() {
   let enrichedEvents: unknown[] = events;
   if (events.length) {
     const ids = events.map((e) => e.id);
-    const [{ data: allRsvps }, { data: myRsvps }] = await Promise.all([
+    const [
+      { data: allRsvps },
+      { data: myRsvps },
+      { data: allLikes },
+      { data: myLikes },
+      { data: allSaves },
+      { data: mySaves },
+    ] = await Promise.all([
       db.from("event_rsvps").select("event_id").in("event_id", ids),
       db.from("event_rsvps").select("event_id").in("event_id", ids).eq("user_id", userId),
+      db.from("event_likes").select("event_id").in("event_id", ids),
+      db.from("event_likes").select("event_id").in("event_id", ids).eq("user_id", userId),
+      db.from("event_saves").select("event_id").in("event_id", ids),
+      db.from("event_saves").select("event_id").in("event_id", ids).eq("user_id", userId),
     ]);
-    const rsvpCounts: Record<string, number> = {};
-    for (const r of allRsvps ?? []) rsvpCounts[r.event_id] = (rsvpCounts[r.event_id] ?? 0) + 1;
+    const countByEvent = (rows: Array<{ event_id: string }> | null) => (rows ?? []).reduce<Record<string, number>>((counts, row) => {
+      counts[row.event_id] = (counts[row.event_id] ?? 0) + 1;
+      return counts;
+    }, {});
+    const rsvpCounts = countByEvent(allRsvps);
+    const likeCounts = countByEvent(allLikes);
+    const saveCounts = countByEvent(allSaves);
     const myRsvpSet = new Set((myRsvps ?? []).map((r) => r.event_id));
+    const myLikeSet = new Set((myLikes ?? []).map((r) => r.event_id));
+    const mySaveSet = new Set((mySaves ?? []).map((r) => r.event_id));
     enrichedEvents = events.map((e) => ({
       ...e,
       rsvp_count: rsvpCounts[e.id] ?? 0,
       user_rsvped: myRsvpSet.has(e.id),
+      like_count: likeCounts[e.id] ?? 0,
+      user_liked: myLikeSet.has(e.id),
+      save_count: saveCounts[e.id] ?? 0,
+      user_saved: mySaveSet.has(e.id),
     }));
   }
 

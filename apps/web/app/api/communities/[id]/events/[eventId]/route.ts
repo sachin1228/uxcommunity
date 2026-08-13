@@ -16,6 +16,8 @@ async function enrichOne(
     { data: profileRow },
     { data: allRsvps },
     { data: myRsvp },
+    { data: allLikes },
+    { data: myLike },
     { data: allSaves },
     { data: mySave },
   ] = await Promise.all([
@@ -23,6 +25,8 @@ async function enrichOne(
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
     db.from("event_rsvps").select("user_id").eq("event_id", eventId),
     db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
+    db.from("event_likes").select("event_id").eq("event_id", eventId),
+    db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
   ]);
@@ -32,6 +36,8 @@ async function enrichOne(
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     rsvp_count: (allRsvps ?? []).length,
     user_rsvped: Boolean(myRsvp),
+    like_count: (allLikes ?? []).length,
+    user_liked: Boolean(myLike),
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
   };

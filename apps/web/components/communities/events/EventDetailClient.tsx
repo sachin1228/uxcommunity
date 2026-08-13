@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Calendar, CornerDownRight, ExternalLink,
+  ArrowLeft, Bookmark, Calendar, CornerDownRight, ExternalLink,
   Heart, Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
   Send, Share2, Trash2, Users, Video,
 } from "lucide-react";
@@ -11,14 +11,8 @@ import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
-import { createBrowserClient } from "@/lib/supabase/browser";
-import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
-import {
-  fetchJsonCached,
-  getCachedRequest,
-  setCachedRequest,
-  subscribeToRequest,
-} from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { useEventInteractions } from "./useEventInteractions";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -318,13 +312,7 @@ export function EventDetailClient({
   backLabel = "Home",
 }: Props) {
   const router = useRouter();
-  const saveUrl = `/api/communities/${communityId}/events/${initialEvent.id}/save`;
-  const [event, setEvent] = useState(() => {
-    const cached = getCachedRequest<{ saved: boolean; save_count: number }>(saveUrl, currentUserId);
-    return cached
-      ? { ...initialEvent, user_saved: cached.saved, save_count: cached.save_count }
-      : initialEvent;
-  });
+  const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -346,7 +334,6 @@ export function EventDetailClient({
   const [commentError, setCommentError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const saveCoordinatorRef = useRef<BooleanIntentCoalescer | null>(null);
 
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
@@ -368,97 +355,28 @@ export function EventDetailClient({
     setCachedRequest(commentsUrl, { comments }, currentUserId);
   }, [comments, commentsUrl, currentUserId]);
 
-  type SaveState = { saved: boolean; save_count: number };
-
-  const applySaveState = useCallback((data: SaveState) => {
-    setEvent((current) => ({
-      ...current,
-      user_saved: data.saved,
-      save_count: data.save_count,
-    }));
-    saveCoordinatorRef.current?.syncConfirmed(data.saved);
+  const handleLikeChanged = useCallback((eventId: string, liked: boolean, count: number) => {
+    setEvent((current) => current.id === eventId
+      ? { ...current, user_liked: liked, like_count: count }
+      : current);
   }, []);
 
-  const fetchSaveState = useCallback(async (force = false) => {
-    try {
-      const data = await fetchJsonCached<SaveState>(
-        saveUrl,
-        { force, staleMs: 60_000 },
-        currentUserId,
-      );
-      applySaveState(data);
-    } catch {
-      // Keep the server-rendered state when reconciliation is temporarily unavailable.
-    }
-  }, [applySaveState, currentUserId, saveUrl]);
+  const handleSaveChanged = useCallback((eventId: string, saved: boolean, count: number) => {
+    setEvent((current) => current.id === eventId
+      ? { ...current, user_saved: saved, save_count: count }
+      : current);
+  }, []);
 
-  useEffect(() => {
-    if (!getCachedRequest<SaveState>(saveUrl, currentUserId)) {
-      setCachedRequest(saveUrl, {
-        saved: initialEvent.user_saved,
-        save_count: initialEvent.save_count,
-      }, currentUserId);
-    }
-
-    return subscribeToRequest(saveUrl, () => {
-      const next = getCachedRequest<SaveState>(saveUrl, currentUserId);
-      if (next) applySaveState(next);
-    }, currentUserId);
-  }, [applySaveState, currentUserId, initialEvent.save_count, initialEvent.user_saved, saveUrl]);
-
-  useEffect(() => {
-    queueMicrotask(() => void fetchSaveState());
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
-
-    const channel = supabase
-      .channel(`event-save-detail:${event.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_saves",
-        filter: `event_id=eq.${event.id}`,
-      }, () => void fetchSaveState(true))
-      .subscribe();
-
-    const refreshOnFocus = () => {
-      if (document.visibilityState === "visible") void fetchSaveState(true);
-    };
-    document.addEventListener("visibilitychange", refreshOnFocus);
-    window.addEventListener("focus", refreshOnFocus);
-
-    return () => {
-      supabase.removeChannel(channel);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-      window.removeEventListener("focus", refreshOnFocus);
-    };
-  }, [event.id, fetchSaveState]);
-
-  useEffect(() => {
-    const coordinator = new BooleanIntentCoalescer({
-      initialValue: initialEvent.user_saved,
-      onOptimisticChange: (saved) => {
-        setEvent((current) => ({
-          ...current,
-          user_saved: saved,
-          save_count: Math.max(0, current.save_count + (saved === current.user_saved ? 0 : saved ? 1 : -1)),
-        }));
-      },
-      persist: async (desired) => {
-        const response = await fetch(saveUrl, { method: "POST" });
-        const data = await response.json().catch(() => null) as SaveState | null;
-        if (!response.ok || !data) throw new Error("Unable to update like");
-        setCachedRequest(saveUrl, data, currentUserId);
-        if (data.saved !== desired) throw new Error("Save state did not match the latest intent");
-        return data.saved;
-      },
-    });
-    saveCoordinatorRef.current = coordinator;
-    return () => {
-      coordinator.dispose();
-      saveCoordinatorRef.current = null;
-    };
-  }, [currentUserId, initialEvent.user_saved, saveUrl]);
+  const { toggleLike, toggleSave } = useEventInteractions({
+    eventId: event.id,
+    communityId,
+    liked: event.user_liked,
+    likeCount: event.like_count,
+    saved: event.user_saved,
+    saveCount: event.save_count,
+    onLikeChanged: handleLikeChanged,
+    onSaveChanged: handleSaveChanged,
+  });
 
   // Auto-grow textarea
   useEffect(() => {
@@ -504,8 +422,12 @@ export function EventDetailClient({
     }
   }
 
+  function handleLike() {
+    toggleLike();
+  }
+
   function handleSave() {
-    saveCoordinatorRef.current?.toggle();
+    toggleSave();
   }
 
   // ── Composer ──
@@ -601,6 +523,15 @@ export function EventDetailClient({
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-9 z-20 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => { handleSave(); setMenuOpen(false); }}
+                  aria-pressed={event.user_saved}
+                  className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                >
+                  <Bookmark size={12} fill={event.user_saved ? "currentColor" : "none"} />
+                  {event.user_saved ? "Unsave event" : "Save event"}
+                </button>
                 <button
                   type="button"
                   onClick={() => { void handleShare(); setMenuOpen(false); }}
@@ -718,21 +649,20 @@ export function EventDetailClient({
         <div className="mt-3 flex items-center justify-between gap-4">
           <button
             type="button"
-              onClick={handleSave}
-              aria-label={event.user_saved ? "Unlike" : "Like"}
-              aria-pressed={event.user_saved}
+              onClick={handleLike}
+              aria-label={event.user_liked ? "Unlike event" : "Like event"}
+              aria-pressed={event.user_liked}
               className="group/like flex shrink-0 items-center gap-2"
-
           >
             <Heart
               size={20}
               strokeWidth={2}
               className={`transition-transform duration-150 group-hover/like:scale-110 ${
-                event.user_saved ? "fill-red-500 text-red-500" : "fill-none text-foreground"
+                event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"
               }`}
             />
-            <span className={`font-body text-sm font-semibold tabular-nums ${event.user_saved ? "text-red-500" : "text-foreground"}`}>
-              {event.save_count}
+            <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>
+              {event.like_count}
             </span>
           </button>
           {showCommunityAttribution && (
