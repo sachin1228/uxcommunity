@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { createNotification, getActorName, threadHref } from "@/lib/notifications";
+import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -64,21 +64,18 @@ export async function POST(
       return NextResponse.json({ error: "Failed to save thread." }, { status: 500 });
     }
 
-    let notificationWarning: string | undefined;
     if (!existing) {
-      const actorName = await getActorName(db, userId);
-      const notification = await createNotification(db, {
+      deferNotification({
         userId: thread.user_id,
         actorId: userId,
         communityId,
         type: "thread_save",
         entityType: "thread",
         entityId: threadId,
-        title: `${actorName} saved your thread`,
+        title: (actorName) => `${actorName} saved your thread`,
         body: thread.title,
         href: threadHref(communityId, threadId),
       });
-      if (!notification.ok) notificationWarning = "Thread saved, but notification delivery failed.";
     }
 
     const { data: persisted, error: confirmationError } = await db
@@ -93,7 +90,7 @@ export async function POST(
       return NextResponse.json({ error: "Save could not be confirmed." }, { status: 500 });
     }
 
-    return NextResponse.json({ saved: true, notificationWarning });
+    return NextResponse.json({ saved: true });
   }
 
   const { error } = await db

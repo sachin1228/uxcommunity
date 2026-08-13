@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { createNotification, eventHref, getActorName } from "@/lib/notifications";
+import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
@@ -110,29 +110,28 @@ export async function POST(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const actorName = await getActorName(db, userId);
   const href = eventHref(communityId, eventId);
-  await createNotification(db, {
+  deferNotification({
     userId: event.user_id,
     actorId: userId,
     communityId,
     type: "event_comment",
     entityType: "event",
     entityId: eventId,
-    title: `${actorName} commented on your event`,
+    title: (actorName) => `${actorName} commented on your event`,
     body: event.title,
     href,
   });
 
   if (parentAuthorId && parentAuthorId !== event.user_id) {
-    await createNotification(db, {
+    deferNotification({
       userId: parentAuthorId,
       actorId: userId,
       communityId,
       type: "event_reply",
       entityType: "event",
       entityId: eventId,
-      title: `${actorName} replied to your event comment`,
+      title: (actorName) => `${actorName} replied to your event comment`,
       body: event.title,
       href,
     });

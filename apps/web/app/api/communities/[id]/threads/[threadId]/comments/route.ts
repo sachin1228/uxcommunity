@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { createNotification, getActorName, threadHref } from "@/lib/notifications";
+import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 async function isMember(
@@ -165,29 +165,28 @@ export async function POST(
     return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
   }
 
-  const actorName = await getActorName(db, userId);
   const href = threadHref(communityId, threadId);
-  await createNotification(db, {
+  deferNotification({
     userId: thread.user_id,
     actorId: userId,
     communityId,
     type: "thread_comment",
     entityType: "thread",
     entityId: threadId,
-    title: `${actorName} commented on your thread`,
+    title: (actorName) => `${actorName} commented on your thread`,
     body: thread.title,
     href,
   });
 
   if (parentAuthorId && parentAuthorId !== thread.user_id) {
-    await createNotification(db, {
+    deferNotification({
       userId: parentAuthorId,
       actorId: userId,
       communityId,
       type: "thread_reply",
       entityType: "thread",
       entityId: threadId,
-      title: `${actorName} replied to your comment`,
+      title: (actorName) => `${actorName} replied to your comment`,
       body: thread.title,
       href,
     });

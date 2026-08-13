@@ -12,7 +12,6 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 // Feed item as returned by /api/home/feed — typed union
@@ -52,27 +51,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
   useEffect(() => {
     const initialFetch = window.setTimeout(() => void fetchFeed(true, refreshToken > 0), 0);
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
-
-    const likeChannel = supabase
-      .channel("home-event-likes")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_likes",
-      }, () => void fetchFeed(true, true))
-      .subscribe();
-
-    const saveChannel = supabase
-      .channel("home-event-saves")
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_saves",
-      }, () => void fetchFeed(true, true))
-      .subscribe();
-
     const refreshOnFocus = () => {
       if (document.visibilityState === "visible") void fetchFeed(true);
     };
@@ -81,8 +59,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
     return () => {
       window.clearTimeout(initialFetch);
-      supabase.removeChannel(likeChannel);
-      supabase.removeChannel(saveChannel);
       document.removeEventListener("visibilitychange", refreshOnFocus);
       window.removeEventListener("focus", refreshOnFocus);
     };

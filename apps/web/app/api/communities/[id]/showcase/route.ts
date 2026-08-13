@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
@@ -15,37 +16,65 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Record<s
   if (!rows.length) return [];
   const ids = rows.map((row) => row.id as string);
   const users = [...new Set(rows.map((row) => row.user_id as string))];
-  const [{ data: names }, { data: profiles }, { data: likes }, { data: saves }, { data: comments }] = await Promise.all([
+  const [{ data: names }, { data: profiles }, { data: interactions, error: interactionsError }] = await Promise.all([
     db.from("users").select("id, name").in("id", users),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", users),
-    db.from("showcase_likes").select("post_id, user_id").in("post_id", ids),
-    db.from("showcase_saves").select("post_id, user_id").in("post_id", ids),
-    db.from("showcase_comments").select("post_id").in("post_id", ids),
+    callPerformanceRpc(db, "get_showcase_interactions", { p_user_id: userId, p_post_ids: ids }),
   ]);
+  if (interactionsError) throw interactionsError;
+
   const nameMap = Object.fromEntries((names ?? []).map((item) => [item.id, item.name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((item) => [item.user_id, item.avatar_url]));
+  const interactionMap = (interactions ?? {}) as Record<string, {
+    like_count?: number;
+    comment_count?: number;
+    user_liked?: boolean;
+    user_saved?: boolean;
+  }>;
+
   return rows.map((row) => {
-    const postLikes = (likes ?? []).filter((item) => item.post_id === row.id);
-    const postSaves = (saves ?? []).filter((item) => item.post_id === row.id);
+    const interaction = interactionMap[row.id as string] ?? {};
     return {
       ...row,
       author: { name: nameMap[row.user_id as string] ?? "Community member", avatar_url: avatarMap[row.user_id as string] ?? null },
-      like_count: postLikes.length,
-      comment_count: (comments ?? []).filter((item) => item.post_id === row.id).length,
-      user_liked: postLikes.some((item) => item.user_id === userId),
-      user_saved: postSaves.some((item) => item.user_id === userId),
+      like_count: interaction.like_count ?? 0,
+      comment_count: interaction.comment_count ?? 0,
+      user_liked: interaction.user_liked ?? false,
+      user_saved: interaction.user_saved ?? false,
     };
   });
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+const SHOWCASE_PAGE_SIZE = 25;
+
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id } = await params;
   const db = createServiceClient();
   if (!(await member(db, id, session.userId!))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const { data, error } = await db.from("community_showcase_posts").select("*").eq("community_id", id).order("created_at", { ascending: false }).limit(100);
+  const cursor = request.nextUrl.searchParams.get("cursor");
+  let cursorCreatedAt: string | null = null;
+  let cursorId: string | null = null;
+  if (cursor) {
+    [cursorCreatedAt, cursorId] = cursor.split("|");
+    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+    }
+  }
+  const { data, error } = await callPerformanceRpc(db, "get_showcase_list_page", {
+    p_community_id: id,
+    p_user_id: session.userId!,
+    p_cursor_created_at: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_limit: SHOWCASE_PAGE_SIZE + 1,
+  });
   if (error) return NextResponse.json({ error: "Failed to load showcase posts." }, { status: 500 });
-  return NextResponse.json({ posts: await enrich(db, (data ?? []) as Record<string, unknown>[], session.userId!) });
+  const page = (data ?? []).slice(0, SHOWCASE_PAGE_SIZE) as Record<string, unknown>[];
+  const last = page.at(-1);
+  const nextCursor = (data?.length ?? 0) > SHOWCASE_PAGE_SIZE && last
+    ? `${last.created_at as string}|${last.id as string}`
+    : null;
+  return NextResponse.json({ posts: page, nextCursor });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

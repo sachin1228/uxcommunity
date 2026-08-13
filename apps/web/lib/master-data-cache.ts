@@ -64,3 +64,22 @@ export const getMasterNameMap = unstable_cache(
   ["master-name-map"],
   { revalidate: 3600, tags: ["master-images"] }
 );
+
+/**
+ * Returns experience-level display names keyed by slug. This removes a
+ * per-request lookup from community detail responses while keeping labels
+ * consistent with the values managed in the experience-level master table.
+ */
+export const getExperienceLevelNameMap = unstable_cache(
+  async (): Promise<Record<string, string>> => {
+    const db = createServiceClient();
+    const { data: rows } = await db
+      .from("experience_levels")
+      .select("slug, name");
+    return Object.fromEntries(
+      (rows ?? []).map((row) => [row.slug, row.name ?? ""])
+    );
+  },
+  ["experience-level-name-map"],
+  { revalidate: 3600, tags: ["master-images"] }
+);
