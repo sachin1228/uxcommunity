@@ -12,17 +12,19 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { FigmaEmbed } from "./FigmaEmbed";
+import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
 
-function useOgImage(url: string): string | null {
+function useOgImage(url: string, enabled: boolean): string | null {
   const [image, setImage] = useState<string | null>(() =>
-    ogImageCache.has(url) ? (ogImageCache.get(url) ?? null) : null,
+    enabled && ogImageCache.has(url) ? (ogImageCache.get(url) ?? null) : null,
   );
 
   useEffect(() => {
-    if (ogImageCache.has(url)) return;
+    if (!enabled || ogImageCache.has(url)) return;
     const ctrl = new AbortController();
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
@@ -35,13 +37,9 @@ function useOgImage(url: string): string | null {
         ogImageCache.set(url, null);
       });
     return () => ctrl.abort();
-  }, [url]);
+  }, [enabled, url]);
 
   return image;
-}
-
-function getDomain(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 }
 
 interface ResourceCardProps {
@@ -73,9 +71,10 @@ export function ResourceCard({
   communityName,
   communityImage,
 }: ResourceCardProps) {
-  const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
-  const isOwner    = resource.user_id === currentUserId;
-  const ogImage    = useOgImage(resource.url);
+  const typeInfo = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
+  const isOwner = resource.user_id === currentUserId;
+  const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
+  const ogImage = useOgImage(resource.url, !hasFigmaPrototype);
 
   const [optimisticSave, setOptimisticSave] = useState<{ saved: boolean; count: number } | null>(null);
   const confirmedSaveRef = useRef(resource.user_saved);
@@ -223,9 +222,7 @@ export function ResourceCard({
               : "border-b border-border"
         }`}
       >
-        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-        <a href={resource.url} target="_blank" rel="noopener noreferrer">
-
+        <div>
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
             <PostAuthorMeta
@@ -292,35 +289,32 @@ export function ResourceCard({
             </div>
           </div>
 
-          {/* ── Title ── */}
-          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-            {resource.title}
-          </h3>
-
           {/* ── Description ── */}
-          {resource.description && (
-            <p className="mt-1.5 line-clamp-2 font-body text-xs leading-relaxed text-foreground-muted">
-              {resource.description}
-            </p>
-          )}
+          <a href={resource.url} target="_blank" rel="noopener noreferrer" className="block">
+            <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-semibold leading-snug text-foreground">
+              {resource.description || resource.title}
+            </h3>
+          </a>
 
-          {/* ── Domain label ── */}
-          <p className="mt-2 font-body text-[11px] text-foreground-subtle">
-            {getDomain(resource.url)}
-          </p>
-
-          {/* ── OG image ── */}
-          {ogImage && (
-            <div className="mt-4 h-52 w-full overflow-hidden rounded-xl bg-surface">
+          {/* ── Interactive prototype / OG image ── */}
+          {hasFigmaPrototype ? (
+            <FigmaEmbed url={resource.url} compact className="mt-4" />
+          ) : ogImage ? (
+            <a
+              href={resource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 block w-fit max-w-full overflow-hidden rounded-xl bg-surface"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={ogImage}
                 alt=""
-                className="h-full w-full object-cover"
+                className="block h-auto max-h-96 max-w-full object-contain"
                 onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
               />
-            </div>
-          )}
+            </a>
+          ) : null}
 
           {communityName && (
             <CommunityPostLabel
@@ -375,7 +369,7 @@ export function ResourceCard({
               </span>
             </button>
           </div>
-        </a>
+        </div>
       </article>
 
       {showEditModal && (

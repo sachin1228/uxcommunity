@@ -12,6 +12,8 @@ import { RESOURCE_TYPES } from "./types";
 import { EditResourceModal } from "./EditResourceModal";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { FigmaEmbed } from "./FigmaEmbed";
+import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -251,6 +253,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwner = resource.user_id === currentUserId;
   const typeInfo = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
+  const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -464,6 +467,8 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                 {resource.description}
               </p>
             )}
+
+            {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
 
             {/* Tags */}
             {resource.tags.length > 0 && (
