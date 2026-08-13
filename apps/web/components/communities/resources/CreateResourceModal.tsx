@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Check, ChevronDown, Loader2, Globe, X } from "lucide-react";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
+import { parseFigmaUrl } from "@/lib/communities/figma";
 
 interface CreateResourceModalProps {
   communityId?: string;
@@ -38,6 +39,7 @@ export function CreateResourceModal({
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const figmaLink = useMemo(() => parseFigmaUrl(url), [url]);
 
   // Link preview state
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
@@ -167,7 +169,12 @@ export function CreateResourceModal({
             <div className="relative">
               <input
                 value={url}
-                onChange={(e) => { setUrl(e.target.value); setPreviewDismissed(false); }}
+                onChange={(e) => {
+                  const nextUrl = e.target.value;
+                  setUrl(nextUrl);
+                  setPreviewDismissed(false);
+                  if (parseFigmaUrl(nextUrl)) setResourceType("figma");
+                }}
                 placeholder="https://..."
                 type="url"
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
@@ -185,6 +192,15 @@ export function CreateResourceModal({
               </div>
             </div>
           </label>
+
+          {figmaLink && (
+            <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
+              <Check size={14} aria-hidden="true" />
+              <span className="font-body text-xs font-medium">
+                {figmaLink.kind === "prototype" ? "Figma prototype detected — interactive preview enabled" : "Figma file detected"}
+              </span>
+            </div>
+          )}
 
           {/* Link preview card */}
           {showPreview && (

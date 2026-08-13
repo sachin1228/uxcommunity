@@ -12,17 +12,19 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { FigmaEmbed } from "./FigmaEmbed";
+import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 // Module-level cache — shared across all cards, survives scroll / re-renders
 const ogImageCache = new Map<string, string | null>();
 
-function useOgImage(url: string): string | null {
+function useOgImage(url: string, enabled: boolean): string | null {
   const [image, setImage] = useState<string | null>(() =>
-    ogImageCache.has(url) ? (ogImageCache.get(url) ?? null) : null,
+    enabled && ogImageCache.has(url) ? (ogImageCache.get(url) ?? null) : null,
   );
 
   useEffect(() => {
-    if (ogImageCache.has(url)) return;
+    if (!enabled || ogImageCache.has(url)) return;
     const ctrl = new AbortController();
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : null))
@@ -35,7 +37,7 @@ function useOgImage(url: string): string | null {
         ogImageCache.set(url, null);
       });
     return () => ctrl.abort();
-  }, [url]);
+  }, [enabled, url]);
 
   return image;
 }
@@ -69,9 +71,10 @@ export function ResourceCard({
   communityName,
   communityImage,
 }: ResourceCardProps) {
-  const typeInfo   = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
-  const isOwner    = resource.user_id === currentUserId;
-  const ogImage    = useOgImage(resource.url);
+  const typeInfo = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
+  const isOwner = resource.user_id === currentUserId;
+  const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
+  const ogImage = useOgImage(resource.url, !hasFigmaPrototype);
 
   const [optimisticSave, setOptimisticSave] = useState<{ saved: boolean; count: number } | null>(null);
   const confirmedSaveRef = useRef(resource.user_saved);
@@ -219,8 +222,7 @@ export function ResourceCard({
               : "border-b border-border"
         }`}
       >
-        <a href={resource.url} target="_blank" rel="noopener noreferrer">
-
+        <div>
           {/* ── Top row: avatar · name · time · type pill · menu ── */}
           <div className="flex items-start justify-between gap-3">
             <PostAuthorMeta
@@ -288,13 +290,17 @@ export function ResourceCard({
           </div>
 
           {/* ── Description ── */}
-          <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-semibold leading-snug text-foreground">
-            {resource.description || resource.title}
-          </h3>
+          <a href={resource.url} target="_blank" rel="noopener noreferrer" className="block">
+            <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-semibold leading-snug text-foreground">
+              {resource.description || resource.title}
+            </h3>
+          </a>
 
-          {/* ── OG image ── */}
-          {ogImage && (
-            <div className="mt-4 h-52 w-full overflow-hidden rounded-xl bg-surface">
+          {/* ── Interactive prototype / OG image ── */}
+          {hasFigmaPrototype ? (
+            <FigmaEmbed url={resource.url} compact className="mt-4" />
+          ) : ogImage ? (
+            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-4 block h-52 w-full overflow-hidden rounded-xl bg-surface">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={ogImage}
@@ -302,8 +308,8 @@ export function ResourceCard({
                 className="h-full w-full object-cover"
                 onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
               />
-            </div>
-          )}
+            </a>
+          ) : null}
 
           {communityName && (
             <CommunityPostLabel
@@ -358,7 +364,7 @@ export function ResourceCard({
               </span>
             </button>
           </div>
-        </a>
+        </div>
       </article>
 
       {showEditModal && (
