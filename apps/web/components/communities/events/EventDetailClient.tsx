@@ -523,8 +523,9 @@ export function EventDetailClient({
         </div>
 
         {/* Main event card — matches the homepage card */}
-        <div className={`overflow-hidden rounded-xl border border-border bg-surface ${communityFeedLayout.detailSection}`}>
-          <div className="flex min-h-[190px] flex-col sm:flex-row">
+        <div className={communityFeedLayout.detailSection}>
+          <div className="overflow-hidden rounded-xl border border-border bg-surface">
+            <div className="flex min-h-[190px] flex-col sm:flex-row">
             <div className="relative aspect-video w-full shrink-0 overflow-hidden sm:aspect-auto sm:w-44">
               {event.cover_image_url
                 ? <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
@@ -605,6 +606,7 @@ export function EventDetailClient({
               )}
               {error && <p className="font-body text-xs text-red-400">{error}</p>}
             </div>
+          </div>
           </div>
         </div>
 
