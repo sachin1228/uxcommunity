@@ -248,7 +248,7 @@ export function EventCard({
                   {/* Options menu — visible to all users */}
                   <div
                     ref={menuRef}
-                    className={menuInPostHeader ? "absolute right-0 top-0 z-10" : "relative"}
+                    className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : "relative"}
                   >
                     <button
                       type="button"
