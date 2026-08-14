@@ -24,3 +24,35 @@ export function extractFirstUrl(text: string): string | null {
   if (!match) return null;
   return match[0].replace(/[.,;:!?)]+$/, "");
 }
+
+/**
+ * Normalize a URL for cache-keying so equivalent forms (case, trailing slash,
+ * fragment, default port, query-parameter order) share one cache entry.
+ * Used by both the client-side link-preview cache and the API route's
+ * in-process cache so the same page never triggers duplicate upstream fetches.
+ * Falls back to the trimmed input when it isn't a parseable URL.
+ */
+export function normalizePreviewUrl(raw: string): string {
+  const trimmed = raw.trim();
+  try {
+    const url = new URL(trimmed);
+    // Fragments aren't sent to the server and don't change the page metadata.
+    url.hash = "";
+    // Parameter order shouldn't cause separate requests.
+    url.searchParams.sort();
+    // Drop default ports.
+    if (
+      (url.protocol === "http:" && url.port === "80") ||
+      (url.protocol === "https:" && url.port === "443")
+    ) {
+      url.port = "";
+    }
+    // Trailing slash on the path is equivalent for metadata purposes.
+    if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
+      url.pathname = url.pathname.slice(0, -1);
+    }
+    return url.toString();
+  } catch {
+    return trimmed;
+  }
+}

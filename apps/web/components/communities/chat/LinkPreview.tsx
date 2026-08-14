@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
-
-// Module-level cache — persists across scroll/re-renders without refetching.
-const previewCache = new Map<string, LinkPreviewData | null>();
+import {
+  fetchLinkPreview,
+  getCachedLinkPreview,
+  hasFreshLinkPreview,
+  isLinkPreviewLoading,
+} from "@/lib/communities/linkPreviewCache";
 
 function ImagePreview({ src }: { src: string }) {
   const [failed, setFailed] = useState(false);
@@ -28,30 +31,30 @@ interface LinkPreviewProps {
 
 export function LinkPreview({ url, isMe }: LinkPreviewProps) {
   const [data, setData] = useState<LinkPreviewData | null | undefined>(
-    // Hydrate from module-level cache instantly if available
-    previewCache.has(url) ? previewCache.get(url) : undefined,
+    // Hydrate from the shared cache instantly if available
+    getCachedLinkPreview(url),
+  );
+  // True when the in-flight request was started by another component.
+  // Lazy init covers the "mounted while another component is already
+  // fetching" case without calling setState synchronously in the effect.
+  const [fromExistingRequest, setFromExistingRequest] = useState(() =>
+    isLinkPreviewLoading(url),
   );
 
   useEffect(() => {
-    if (previewCache.has(url)) return;
+    if (hasFreshLinkPreview(url)) return;
 
-    const controller = new AbortController();
+    let cancelled = false;
+    // The shared cache dedups: concurrent callers receive the same promise
+    // and only one network request is ever started per URL.
+    void fetchLinkPreview(url).then((result) => {
+      if (!cancelled) {
+        setFromExistingRequest(result.fromExistingRequest);
+        setData(result.data);
+      }
+    });
 
-    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, {
-      signal: controller.signal,
-    })
-      .then((r) => (r.ok ? (r.json() as Promise<LinkPreviewData>) : null))
-      .then((d) => {
-        previewCache.set(url, d);
-        setData(d);
-      })
-      .catch(() => {
-        // AbortError on unmount — no-op. Any real error → show nothing.
-        previewCache.set(url, null);
-        setData(null);
-      });
-
-    return () => controller.abort();
+    return () => { cancelled = true; };
   }, [url]);
 
   // ── Loading skeleton ────────────────────────────────────────────────────────
@@ -69,6 +72,11 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
           <div className="h-3 w-36 rounded bg-white/10" />
           <div className="h-2 w-28 rounded bg-white/10" />
         </div>
+        {fromExistingRequest && (
+          <p className="font-body text-[10px] text-foreground-muted/70">
+            Loading from existing request…
+          </p>
+        )}
       </div>
     );
   }

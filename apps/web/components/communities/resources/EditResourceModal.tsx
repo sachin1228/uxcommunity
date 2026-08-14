@@ -7,6 +7,10 @@ import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
+import {
+  fetchLinkPreview,
+  isLinkPreviewLoading,
+} from "@/lib/communities/linkPreviewCache";
 
 interface EditResourceModalProps {
   resource: CommunityResource;
@@ -36,6 +40,8 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewDismissed, setPreviewDismissed] = useState(false);
+  // True when the in-flight request was started by another component.
+  const [fromExistingRequest, setFromExistingRequest] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialFetchDoneRef = useRef(false);
@@ -50,15 +56,10 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
 
     setPreviewLoading(true);
     setPreview(null);
+    setFromExistingRequest(isLinkPreviewLoading(rawUrl.trim()));
     try {
-      const res = await fetch(`/api/link-preview?url=${encodeURIComponent(rawUrl)}`, {
-        signal: ctrl.signal,
-      });
-      if (!res.ok) throw new Error("fetch failed");
-      const data: LinkPreviewData = await res.json();
-      if (!ctrl.signal.aborted) setPreview(data);
-    } catch {
-      if (!ctrl.signal.aborted) setPreview(null);
+      const result = await fetchLinkPreview(rawUrl.trim());
+      if (!ctrl.signal.aborted) setPreview(result.data);
     } finally {
       if (!ctrl.signal.aborted) setPreviewLoading(false);
     }
@@ -192,7 +193,9 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
                   <Loader2 size={14} className="animate-spin text-foreground-subtle" />
-                  <span className="font-body text-sm text-foreground-subtle">Loading preview…</span>
+                  <span className="font-body text-sm text-foreground-subtle">
+                    {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
+                  </span>
                 </div>
               )}
               {preview && !previewLoading && (
