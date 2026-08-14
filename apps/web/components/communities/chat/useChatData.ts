@@ -245,59 +245,80 @@ export function useChatData({
     [communityId, currentUserId]
   );
 
-  // ── On communityId change: show cache instantly, then catch up ────────────
+  // ── On communityId change: show cache instantly, then hydrate once ────────
   useEffect(() => {
     communityIdRef.current = communityId;
     setInitialMessagesReady(false);
     setHasMoreAbove(true);
     isFetchingOlderRef.current = false;
     let cancelled = false;
-    const canonicalMessages = getCachedRequest<{ messages?: Message[] }>(
-      `/api/communities/${communityId}/messages`,
-      currentUserId,
-    )?.messages;
-    const canonicalMeta = getCachedRequest<{
-      community: Community;
-      members?: Member[];
-    }>(`/api/communities/${communityId}`, currentUserId);
-    const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
-    const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
-      ? {
-          community: canonicalMeta.community,
-          members: canonicalMeta.members ?? [],
-          fetchedAt: Date.now(),
-        }
-      : undefined);
-    setMessages(cachedMsgs ?? []);
-    if (cachedMeta) {
-      setCommunity(cachedMeta.community);
-      setMembers(cachedMeta.members);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-    const metaIsStale =
-      !cachedMeta || Date.now() - cachedMeta.fetchedAt > META_STALE_MS;
-    const msgPromise = cachedMsgs?.length
-      ? fetchMessages(
-          cachedMsgs.filter((m) => !m.id.startsWith("temp-")).at(-1)
-            ?.created_at
-        )
-      : fetchMessages();
+
+    const applyCanonicalCache = () => {
+      const canonicalMessages = getCachedRequest<{ messages?: Message[] }>(
+        `/api/communities/${communityId}/messages`,
+        currentUserId,
+      )?.messages;
+      const canonicalMeta = getCachedRequest<{
+        community: Community;
+        members?: Member[];
+      }>(`/api/communities/${communityId}`, currentUserId);
+      const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
+      const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
+        ? {
+            community: canonicalMeta.community,
+            members: canonicalMeta.members ?? [],
+            fetchedAt: Date.now(),
+          }
+        : undefined);
+
+      if (cachedMsgs) {
+        msgCache.set(communityId, cachedMsgs);
+        msgFetchedAt.set(communityId, Date.now());
+        setMessages(cachedMsgs);
+        setHasMoreAbove(cachedMsgs.length >= PAGE_SIZE);
+      } else {
+        setMessages([]);
+      }
+      if (cachedMeta) {
+        metaCache.set(communityId, cachedMeta);
+        setCommunity(cachedMeta.community);
+        setMembers(cachedMeta.members);
+        setLoading(false);
+      } else {
+        setLoading(true);
+      }
+      return { cachedMeta, cachedMsgs };
+    };
+
+    const initial = applyCanonicalCache();
 
     (async () => {
-      // Metadata and messages are independent. A transient metadata failure
-      // must not leave the chat loader visible forever; the header can still
-      // render from the sidebar cache while messages finish loading.
-      await Promise.allSettled([
-        msgPromise,
-        metaIsStale ? fetchMeta() : Promise.resolve(),
-      ]);
+      const bootstrapResult = await fetchAndHydrateCommunityBootstrap(
+        communityId,
+        currentUserId,
+      ).then(() => true).catch(() => false);
+      if (cancelled || communityIdRef.current !== communityId) return;
+
+      const hydrated = applyCanonicalCache();
+      if (!bootstrapResult) {
+        await Promise.allSettled([
+          hydrated.cachedMsgs ? Promise.resolve() : fetchMessages(),
+          hydrated.cachedMeta ? Promise.resolve() : fetchMeta(),
+        ]);
+      } else if (!hydrated.cachedMeta || !hydrated.cachedMsgs) {
+        await Promise.allSettled([
+          hydrated.cachedMsgs ? Promise.resolve() : fetchMessages(),
+          hydrated.cachedMeta ? Promise.resolve() : fetchMeta(),
+        ]);
+      }
+
       if (!cancelled) {
         setLoading(false);
         setInitialMessagesReady(true);
       }
     })();
+
+    if (!initial.cachedMeta) setLoading(true);
     return () => {
       cancelled = true;
     };
