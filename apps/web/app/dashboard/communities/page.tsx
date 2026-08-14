@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
 import { Check, Lock, ChevronRight } from "lucide-react";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import {
   exploreStore,
@@ -56,7 +57,7 @@ function CommunityCard({
   onJoin: (id: string) => void;
   joining: boolean;
 }) {
-  const router              = useRouter();
+  const router              = useGuardedRouter();
   const [imgErr, setImgErr] = useState(false);
   const locked              = !c.can_join && !c.joined;
   const lockBtnRef          = useRef<HTMLButtonElement>(null);
@@ -226,7 +227,7 @@ export default function CommunitiesIndexPage() {
     invalidateOnJoin(communityId);
 
     try {
-      const res = await fetch(`/api/communities/${communityId}/join`, { method: "POST" });
+      const res = await dedupeFetch(`/api/communities/${communityId}/join`, { method: "POST" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         // Roll back optimistic update on failure
