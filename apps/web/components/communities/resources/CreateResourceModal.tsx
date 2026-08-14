@@ -8,6 +8,10 @@ import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 import { parseFigmaUrl } from "@/lib/communities/figma";
+import {
+  fetchLinkPreview,
+  isLinkPreviewLoading,
+} from "@/lib/communities/linkPreviewCache";
 
 interface CreateResourceModalProps {
   communityId?: string;
@@ -45,6 +49,8 @@ export function CreateResourceModal({
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewDismissed, setPreviewDismissed] = useState(false);
+  // True when the in-flight request was started by another component.
+  const [fromExistingRequest, setFromExistingRequest] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fetchPreview = useCallback(async (rawUrl: string) => {
@@ -54,22 +60,17 @@ export function CreateResourceModal({
 
     setPreviewLoading(true);
     setPreview(null);
+    setFromExistingRequest(isLinkPreviewLoading(rawUrl.trim()));
     try {
-      const res = await fetch(`/api/link-preview?url=${encodeURIComponent(rawUrl)}`, {
-        signal: ctrl.signal,
-      });
-      if (!res.ok) throw new Error("fetch failed");
-      const data: LinkPreviewData = await res.json();
+      const result = await fetchLinkPreview(rawUrl.trim());
       if (!ctrl.signal.aborted) {
-        setPreview(data);
+        setPreview(result.data);
         // Auto-fill the single description field from the most useful preview copy.
-        if (!description.trim()) {
-          const previewDescription = data.description ?? data.title;
+        if (result.data && !description.trim()) {
+          const previewDescription = result.data.description ?? result.data.title;
           if (previewDescription) setDescription(previewDescription.slice(0, 2000));
         }
       }
-    } catch {
-      if (!ctrl.signal.aborted) setPreview(null);
     } finally {
       if (!ctrl.signal.aborted) setPreviewLoading(false);
     }
@@ -208,7 +209,9 @@ export function CreateResourceModal({
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
                   <Loader2 size={14} className="animate-spin text-foreground-subtle" />
-                  <span className="font-body text-sm text-foreground-subtle">Loading preview…</span>
+                  <span className="font-body text-sm text-foreground-subtle">
+                    {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
+                  </span>
                 </div>
               )}
               {preview && !previewLoading && (

@@ -13,26 +13,24 @@ import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { FigmaEmbed } from "./FigmaEmbed";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
-
-const ogImageCache = new Map<string, string | null>();
+import {
+  fetchLinkPreview,
+  getCachedLinkPreview,
+  hasFreshLinkPreview,
+} from "@/lib/communities/linkPreviewCache";
 
 function useOgImage(url: string, enabled: boolean): string | null {
   const [image, setImage] = useState<string | null>(() =>
-    enabled && ogImageCache.has(url) ? (ogImageCache.get(url) ?? null) : null,
+    enabled ? (getCachedLinkPreview(url)?.image ?? null) : null,
   );
 
   useEffect(() => {
-    if (!enabled || ogImageCache.has(url)) return;
-    const controller = new AbortController();
-    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, { signal: controller.signal })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { image?: string | null } | null) => {
-        const nextImage = data?.image ?? null;
-        ogImageCache.set(url, nextImage);
-        setImage(nextImage);
-      })
-      .catch(() => ogImageCache.set(url, null));
-    return () => controller.abort();
+    if (!enabled || hasFreshLinkPreview(url)) return;
+    let cancelled = false;
+    void fetchLinkPreview(url).then((result) => {
+      if (!cancelled) setImage(result.data?.image ?? null);
+    });
+    return () => { cancelled = true; };
   }, [enabled, url]);
 
   return image;
