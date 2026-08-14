@@ -17,7 +17,7 @@
  * applied after hydration).
  */
 
-import { useMemo, useSyncExternalStore } from "react";
+import { useMemo, useRef, useSyncExternalStore } from "react";
 import {
   metaCache,
   sidebarStore,
@@ -27,6 +27,7 @@ import {
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHeader";
 import { CommunityInfoPanel } from "@/components/communities/chat/CommunityInfoPanel";
+import { ChatInput } from "@/components/communities/chat/ChatInput";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 
 function communityIdFromPath(pathname: string): string | null {
@@ -55,6 +56,7 @@ function getServerPathname() {
 
 export default function CommunityPageLoading() {
   const router = useGuardedRouter();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const pathname = useSyncExternalStore(
     subscribeToLocation,
     getLocationPathname,
@@ -113,18 +115,58 @@ export default function CommunityPageLoading() {
           communityId={communityId ?? undefined}
         />
 
-        {/* Chat message area — the community's Lottie while it loads. */}
-        <div className="flex-1 flex items-center justify-center">
-          {communityId ? (
-            <LottieLoader
-              communityId={communityId}
-              communityType={community?.type ?? ""}
-              size={200}
-              spinnerClassName="h-5 w-5 text-foreground-muted"
-            />
-          ) : (
-            <div className="h-5 w-5 rounded-full border-2 border-border border-t-accent animate-spin" />
-          )}
+        {/* Chat message area — mirrors the real chat layout: dotted scroll
+            background with the community Lottie, and the input box pinned to
+            the bottom. Only the Lottie is "loading"; everything else looks
+            exactly like the committed page. */}
+        <div className="flex-1 overflow-hidden relative">
+          <div
+            className="absolute inset-0 overflow-y-auto pb-24"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          >
+            <div className="flex items-center justify-center h-full">
+              {communityId ? (
+                <LottieLoader
+                  communityId={communityId}
+                  communityType={community?.type ?? ""}
+                  size={200}
+                  spinnerClassName="h-5 w-5 text-foreground-muted"
+                />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-border border-t-accent animate-spin" />
+              )}
+            </div>
+          </div>
+
+          {/* Floating input — real ChatInput with inert handlers so it looks
+              identical to the page. Typing is a no-op during the brief
+              loading window (state would be lost when the page commits). */}
+          <div className="absolute bottom-0 left-0 right-0 z-10">
+            <div className="bg-black/40 backdrop-blur-sm">
+              <ChatInput
+                ref={inputRef}
+                input=""
+                sending={false}
+                error={null}
+                placeholder={`Message ${community?.name ?? ""}…`}
+                replyTo={null}
+                pendingImagePreview={null}
+                linkPreviewUrl={null}
+                onChange={() => {}}
+                onKeyDown={() => {}}
+                onSend={() => {}}
+                onCancelReply={() => {}}
+                onImageSelect={() => {}}
+                onImageRemove={() => {}}
+                onBlur={() => {}}
+                onEmojiSelect={() => {}}
+                onGifSelect={() => {}}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
