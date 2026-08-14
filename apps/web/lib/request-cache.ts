@@ -168,6 +168,13 @@ export type CommunityBootstrap = {
   messages: unknown
   permissions: unknown
   unreadCount: number
+  threads?: unknown
+  events?: unknown
+  resources?: unknown
+  showcase?: unknown
+  members?: unknown
+  rules?: unknown
+  stats?: unknown
   failures?: Array<{ section: string; message: string }>
 }
 
@@ -186,6 +193,13 @@ export async function fetchAndHydrateCommunityBootstrap(
     [`${base}/messages`, data.messages],
     [`${base}/permissions`, data.permissions],
     [`${base}/unread`, { unreadCount: data.unreadCount }],
+    [`${base}/threads`, data.threads],
+    [`${base}/events`, data.events],
+    [`${base}/resources`, data.resources],
+    [`${base}/showcase`, data.showcase],
+    [`${base}/members?page=0`, data.members],
+    [`${base}/rules`, data.rules],
+    [`${base}/stats`, data.stats],
   ]
   for (const [url, value] of sections) {
     if (value !== undefined) setCachedRequest(url, value, userId)
