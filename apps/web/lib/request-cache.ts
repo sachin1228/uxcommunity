@@ -16,6 +16,11 @@ type BootstrapBackedRequest = {
 }
 
 const DEFAULT_STALE_MS = 60_000
+export const DASHBOARD_STALE_MS = {
+  communities: 60_000,
+  homeFeed: 30_000,
+  notifications: 30_000,
+} as const
 const MAX_ENTRIES = 100
 const entries = new Map<string, CacheEntry<unknown>>()
 const inFlight = new Map<string, Promise<unknown>>()
@@ -65,6 +70,14 @@ export function canonicalRequestKey(url: string, userId = activeUserId ?? "anony
   return `${userId}:${parsed.pathname}${parsed.search}`
 }
 
+export function staleTimeForRequest(url: string) {
+  const pathname = new URL(url, "http://uxcommunity.local").pathname
+  if (pathname === "/api/communities") return DASHBOARD_STALE_MS.communities
+  if (pathname === "/api/home/feed") return DASHBOARD_STALE_MS.homeFeed
+  if (pathname === "/api/notifications") return DASHBOARD_STALE_MS.notifications
+  return DEFAULT_STALE_MS
+}
+
 export function initRequestCache(userId: string) {
   if (activeUserId && activeUserId !== userId) clearRequestCache()
   activeUserId = userId
@@ -108,7 +121,7 @@ export async function fetchJsonCached<T>(
   userId?: string,
 ): Promise<T> {
   const key = canonicalRequestKey(url, userId)
-  const staleMs = options.staleMs ?? DEFAULT_STALE_MS
+  const staleMs = options.staleMs ?? staleTimeForRequest(url)
   let cached = entries.get(key) as CacheEntry<T> | undefined
   let fresh = cached && Date.now() - cached.fetchedAt < staleMs
 

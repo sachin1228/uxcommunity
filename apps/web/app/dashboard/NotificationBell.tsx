@@ -131,6 +131,10 @@ export function NotificationBell({ userId }: Props) {
             const next = payload.new as NotificationItem;
             setNotifications((prev) => [next, ...prev.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS));
             if (!next.read_at) setUnreadCount((count) => count + 1);
+            patchNotificationCache((current) => ({
+              notifications: [next, ...current.notifications.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS),
+              unread_count: current.unread_count + (next.read_at ? 0 : 1),
+            }));
             return;
           }
 
@@ -141,12 +145,22 @@ export function NotificationBell({ userId }: Props) {
             if (!previous.read_at && next.read_at) {
               setUnreadCount((count) => Math.max(0, count - 1));
             }
+            patchNotificationCache((current) => ({
+              notifications: current.notifications.map((item) => item.id === next.id ? next : item),
+              unread_count: !previous.read_at && next.read_at
+                ? Math.max(0, current.unread_count - 1)
+                : current.unread_count,
+            }));
           }
 
           if (payload.eventType === "DELETE") {
             const previous = payload.old as NotificationItem;
             setNotifications((prev) => prev.filter((item) => item.id !== previous.id));
             if (!previous.read_at) setUnreadCount((count) => Math.max(0, count - 1));
+            patchNotificationCache((current) => ({
+              notifications: current.notifications.filter((item) => item.id !== previous.id),
+              unread_count: previous.read_at ? current.unread_count : Math.max(0, current.unread_count - 1),
+            }));
           }
         },
       )
@@ -155,7 +169,7 @@ export function NotificationBell({ userId }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [patchNotificationCache, userId]);
 
   async function markOneRead(id: string) {
     setNotifications((prev) =>
