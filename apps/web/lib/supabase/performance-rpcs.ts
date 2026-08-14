@@ -10,6 +10,20 @@ type PerformanceRpcMap = {
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null; deleted_at: string | null; users: Json; reactions: Json; reply_to: Json }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };
+  get_all_communities: {
+    args: { p_user_id: string };
+    returns: Array<{
+      id: string;
+      name: string;
+      type: string;
+      image_url: string | null;
+      description: string | null;
+      is_private: boolean;
+      member_count: number;
+      joined: boolean;
+      can_join: boolean;
+    }>;
+  };
   get_showcase_interactions: { args: { p_user_id: string; p_post_ids: string[] }; returns: Json };
   get_showcase_list_page: {
     args: { p_community_id: string; p_user_id: string; p_cursor_created_at: string | null; p_cursor_id: string | null; p_limit: number };

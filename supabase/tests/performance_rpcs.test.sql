@@ -1,9 +1,10 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(12);
 
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
+select has_function('public', 'get_all_communities', array['uuid']);
 select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_event_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_resource_list_aggregates', array['uuid','uuid[]']);
@@ -53,6 +54,16 @@ select is(
     lateral public.get_event_list_aggregates(context.user_id, '{}'::uuid[])),
   0,
   'event aggregate RPC handles an empty page'
+);
+
+select ok(
+  not exists(
+    select 1
+    from rpc_test_context context,
+      lateral public.get_all_communities(context.user_id) community
+    where community.member_count <= 0
+  ),
+  'community explore RPC excludes empty communities'
 );
 
 select * from finish();
