@@ -177,7 +177,7 @@ export function useSidebarCommunities(userId: string) {
           };
         }
       }
-      markReadOnServer(activeCommunityId);
+      void markReadOnServer(activeCommunityId);
     }
 
     setCommunities((prev) => {
