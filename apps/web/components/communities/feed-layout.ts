@@ -17,7 +17,4 @@ export const communityFeedLayout = {
   emptyIcon: "mb-4 text-foreground-subtle",
   emptyTitle: "font-display text-base font-semibold text-foreground",
   emptyDescription: "mt-1 max-w-md text-pretty font-body text-sm leading-6 text-foreground-muted",
-  skeletonList: "relative animate-pulse",
-  skeletonRow: "relative px-5 py-6 md:px-8",
-  skeletonLine: "rounded bg-surface-raised",
 } as const;

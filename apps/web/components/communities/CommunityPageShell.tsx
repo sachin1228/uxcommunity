@@ -139,6 +139,7 @@ export function CommunityPageShell({
           activeTab={activeTab}
           onTabChange={handleTabChange}
           onlineCount={onlineCount}
+          communityId={communityId}
         />
         {children}
       </div>

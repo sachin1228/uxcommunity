@@ -8,7 +8,7 @@ const TYPING_EXPIRY_MS = 3500;
 
 /**
  * Subscribes to the same `community-typing:<id>` broadcast channels used by
- * CommunityChat's useTypingPresence, but across ALL joined communities at once.
+ * CommunityChat's useTypingPresence, but across joined communities at once.
  *
  * Returns a Map<communityId, displayText> so the sidebar can show
  * "John is typing…" in place of the last-message preview for any community
@@ -16,13 +16,24 @@ const TYPING_EXPIRY_MS = 3500;
  *
  * Read-only — this hook never broadcasts (the active chat's useTypingPresence
  * handles broadcasting for the current user).
+ *
+ * Cost guard: the active community's typing channel is already subscribed by
+ * the chat page's useTypingPresence (subscribing it here too would deliver
+ * every broadcast twice), and a channel per community is expensive when the
+ * user is in many communities — so this subscribes at most
+ * TYPING_CHANNEL_LIMIT communities, skipping the active one.
  */
+const TYPING_CHANNEL_LIMIT = 8;
+
 export function useSidebarTyping({
   communities,
   userId,
+  activeCommunityIdRef,
 }: {
   communities: CachedSidebarCommunity[];
   userId: string;
+  /** Ref (not state) so channel setup doesn't re-run on every route change. */
+  activeCommunityIdRef: React.MutableRefObject<string | undefined>;
 }): Map<string, string> {
   const [typingMap, setTypingMap] = useState<Map<string, string>>(new Map());
 
@@ -44,6 +55,14 @@ export function useSidebarTyping({
     }
 
     stateRef.current.clear();
+
+    // Skip the community the user is currently viewing — the chat page's own
+    // useTypingPresence already subscribes to its channel, so subscribing here
+    // would process every typing broadcast twice.
+    const activeId = activeCommunityIdRef.current;
+    const subscribed = communities
+      .filter((comm) => comm.id !== activeId)
+      .slice(0, TYPING_CHANNEL_LIMIT);
 
     /** Expire stale entries and push the updated map into React state. */
     const flush = () => {
@@ -70,7 +89,7 @@ export function useSidebarTyping({
       setTypingMap(next);
     };
 
-    const channels = communities.map((comm) =>
+    const channels = subscribed.map((comm) =>
       supabase
         .channel(`community-typing:${comm.id}`, {
           config: { broadcast: { ack: false, self: false } },

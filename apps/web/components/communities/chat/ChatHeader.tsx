@@ -5,6 +5,8 @@ import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, Messag
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { LottieLoader } from "@/components/ui/LottieLoader";
+import { Spinner } from "@/components/ui/Spinner";
 import { TYPE_EMOJI } from "./chatUtils";
 
 interface Community {
@@ -25,6 +27,8 @@ interface ChatHeaderProps {
   onlineCount?: number;
   currentUserId?: string;
   onSettingsClick?: () => void;
+  /** Used to resolve the community Lottie while meta is still loading. */
+  communityId?: string;
 }
 
 export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members";
@@ -107,6 +111,7 @@ export function ChatHeader({
   onlineCount = 0,
   currentUserId,
   onSettingsClick,
+  communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
   const [openMenu, setOpenMenu] = useState<"joined" | "more" | null>(null);
@@ -299,8 +304,21 @@ export function ChatHeader({
             </nav>
           </>
         ) : (
-          /* Skeleton header while loading */
-          <div className="h-5 w-48 rounded bg-surface-raised animate-pulse" />
+          /* Chat chrome is still loading — show the community Lottie instead
+             of a skeleton bar. Resolves community-scoped or universal lottie
+             settings; falls back to a small spinner when none are configured. */
+          <div className="flex items-center justify-center py-2">
+            {communityId ? (
+              <LottieLoader
+                communityId={communityId}
+                communityType=""
+                size={44}
+                spinnerClassName="h-5 w-5 text-foreground-muted"
+              />
+            ) : (
+              <Spinner size={16} className="text-foreground-muted" />
+            )}
+          </div>
         )}
       </div>
     </>

@@ -108,9 +108,23 @@ export function NotificationBell({ userId }: Props) {
           if (!cancelled) setLoading(false);
         });
     }, 0);
+
+    // Catch up when the tab regains focus — the realtime channel may have
+    // missed events while the tab was hidden/disconnected. fetchJsonCached
+    // keeps this a no-op within the 30s freshness window, so it's cheap.
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") {
+        void fetchNotifications().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleFocus);
+    window.addEventListener("focus", handleFocus);
+
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", handleFocus);
+      window.removeEventListener("focus", handleFocus);
     };
   }, [fetchNotifications]);
 

@@ -208,9 +208,19 @@ export function useSidebarRealtime({
     }
 
     const joinedCommunityIds = new Set(communities.map((community) => community.id));
-    let subscribed = false;
-    const channel = supabase
-        .channel(`panel:${userId}`)
+
+    // One filtered channel per joined community. The old single `panel:<userId>`
+    // channel had no postgres_changes filter, so EVERY community_messages /
+    // message_reactions change across the whole database streamed to every
+    // online browser and was discarded client-side. A per-community
+    // `community_id=eq.<id>` filter keeps each client subscribed only to rows
+    // it actually needs.
+    let subscribedCount = 0;
+    const channels = communities.map((community) => {
+      const cid = community.id;
+      const filter = `community_id=eq.${cid}`;
+      return supabase
+        .channel(`panel:${userId}:${cid}`)
 
         // ── New message ────────────────────────────────────────────────────
         .on(
@@ -219,6 +229,7 @@ export function useSidebarRealtime({
             event: "INSERT",
             schema: "public",
             table: "community_messages",
+            filter,
           },
           (payload) => {
             const row = payload.new as {
@@ -332,6 +343,7 @@ export function useSidebarRealtime({
             event: "UPDATE",
             schema: "public",
             table: "community_messages",
+            filter,
           },
           (payload) => {
             const updated = payload.new as {
@@ -366,6 +378,7 @@ export function useSidebarRealtime({
             event: "INSERT",
             schema: "public",
             table: "message_reactions",
+            filter,
           },
           (payload) => {
             const r = payload.new as ReactionRow;
@@ -410,6 +423,7 @@ export function useSidebarRealtime({
             event: "UPDATE",
             schema: "public",
             table: "message_reactions",
+            filter,
           },
           (payload) => {
             const r = payload.new as ReactionRow;
@@ -429,6 +443,7 @@ export function useSidebarRealtime({
             event: "DELETE",
             schema: "public",
             table: "message_reactions",
+            filter,
           },
           (payload) => {
             const r = payload.old as {
@@ -465,21 +480,19 @@ export function useSidebarRealtime({
         )
 
         .subscribe((status) => {
-          if (status === "SUBSCRIBED" && !subscribed) {
-            subscribed = true;
-            activeRealtimeChannels += 1;
-          }
+          if (status === "SUBSCRIBED") subscribedCount += 1;
           reportRealtimeChannel(status, joinedCommunityIds.size);
         });
+    });
 
     let removed = false;
     return () => {
       if (!removed) {
         removed = true;
-        if (subscribed) activeRealtimeChannels = Math.max(0, activeRealtimeChannels - 1);
+        activeRealtimeChannels = Math.max(0, activeRealtimeChannels - subscribedCount);
         reportRealtimeChannel("REMOVED", joinedCommunityIds.size);
       }
-      supabase.removeChannel(channel);
+      channels.forEach((ch) => supabase.removeChannel(ch));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityIds, userId]);

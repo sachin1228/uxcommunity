@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
-  ArrowLeft, CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
+  CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
+import { BackLink } from "@/components/ui/BackLink";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
@@ -452,13 +452,11 @@ export function ThreadDetailClient({
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
           <div className={communityFeedLayout.detailSection}>
-            <Link
+            <BackLink
               href={backHref}
+              label={backLabel}
               className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
-            >
-              <ArrowLeft size={14} />
-              {backLabel}
-            </Link>
+            />
           </div>
         )}
 

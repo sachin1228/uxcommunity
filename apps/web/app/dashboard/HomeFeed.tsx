@@ -12,6 +12,7 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
+import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 // Feed item as returned by /api/home/feed — typed union
@@ -19,6 +20,9 @@ type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";  
 type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedItem = FeedThread | FeedEvent | FeedResource;
+
+/** Must match PAGE_SIZE in /api/home/feed. */
+const HOME_FEED_PAGE_SIZE = 30;
 
 interface HomeFeedProps {
   currentUserId: string;
@@ -31,6 +35,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= HOME_FEED_PAGE_SIZE);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -41,6 +47,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         currentUserId,
       );
       setItems(data.items ?? []);
+      setHasMore((data.items?.length ?? 0) >= HOME_FEED_PAGE_SIZE);
       setError(null);
     } catch (fetchError: unknown) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load the feed.");
@@ -162,49 +169,37 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     updateItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
   }, [updateItems]);
 
+  // ── Load older posts (keyset pagination via ?before=created_at) ──────────
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !items.length) return;
+    const last = items[items.length - 1];
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `/api/home/feed?before=${encodeURIComponent(last.created_at)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { items?: FeedItem[] };
+      const incoming = data.items ?? [];
+      updateItems((prev) => {
+        const ids = new Set(prev.map((item) => item.id));
+        return [...prev, ...incoming.filter((item) => !ids.has(item.id))];
+      });
+      setHasMore(incoming.length >= HOME_FEED_PAGE_SIZE);
+    } catch {
+      // Network error — leave the feed as-is.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [items, loadingMore, updateItems]);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <ul className="border-t border-border animate-pulse">
-        {[1, 2, 3].map((item) => (
-          <li key={item} className={`border-b border-border ${communityFeedLayout.row}`}>
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
-              <div className="flex items-center gap-2">
-                <div className="h-3 w-20 rounded bg-surface-raised" />
-                <div className="h-3 w-12 rounded bg-surface-raised" />
-                <div className="h-5 w-16 rounded-full bg-surface-raised" />
-              </div>
-            </div>
-            <div className="mt-4 h-4 w-3/4 rounded bg-surface-raised" />
-            <div className="mt-2.5 space-y-2">
-              <div className="h-3 w-full rounded bg-surface-raised" />
-              <div className="h-3 w-5/6 rounded bg-surface-raised" />
-              <div className="h-3 w-2/3 rounded bg-surface-raised" />
-            </div>
-            <div className="mt-4 flex items-center gap-4">
-              <div className="h-8 w-8 rounded-full bg-surface-raised" />
-              <div className="h-3 w-6 rounded bg-surface-raised" />
-              <div className="h-3 w-20 rounded bg-surface-raised" />
-            </div>
-          </li>
-        ))}
-        {/* Resource skeleton row */}
-        <li className={`border-b border-border ${communityFeedLayout.row}`}>
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
-            <div className="h-3 w-28 rounded bg-surface-raised" />
-          </div>
-          <div className="mt-4 h-4 w-3/4 rounded bg-surface-raised" />
-          <div className="mt-2 h-3 w-1/2 rounded bg-surface-raised" />
-          <div className="mt-4 h-52 w-full rounded-xl bg-surface-raised" />
-          <div className="mt-4 flex items-center gap-4">
-            <div className="h-5 w-12 rounded bg-surface-raised" />
-            <div className="h-5 w-12 rounded bg-surface-raised" />
-          </div>
-        </li>
-      </ul>
+      <div className="flex items-center justify-center py-24" role="status" aria-label="Loading feed">
+        <Spinner size={28} className="text-foreground-muted" />
+      </div>
     );
   }
 
@@ -253,6 +248,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }
 
   return (
+    <>
     <ul className="border-t border-border">
       {groups.map((group, gi) => {
         const isLastGroup = gi === groups.length - 1;
@@ -336,5 +332,19 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         });
       })}
     </ul>
+
+    {hasMore && (
+      <div className="flex justify-center border-t border-border py-6">
+        <button
+          type="button"
+          onClick={() => void loadMore()}
+          disabled={loadingMore}
+          className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+        >
+          {loadingMore ? "Loading…" : "Load older posts"}
+        </button>
+      </div>
+    )}
+    </>
   );
 }

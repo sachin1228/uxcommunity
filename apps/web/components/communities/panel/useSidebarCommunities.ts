@@ -147,7 +147,7 @@ export function useSidebarCommunities(userId: string) {
 
   // ── Realtime: message changes + typing indicators ────────────────────────
   useSidebarRealtime({ communities, userId, activeCommunityIdRef, setCommunities });
-  const typingMap = useSidebarTyping({ communities, userId });
+  const typingMap = useSidebarTyping({ communities, userId, activeCommunityIdRef });
 
   // ── Navigation handler ────────────────────────────────────────────────────
   function handleNavigate(id: string) {

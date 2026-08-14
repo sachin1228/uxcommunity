@@ -23,9 +23,12 @@ import { RESOURCE_TYPES } from "./types";
 import { CreateResourceModal } from "./CreateResourceModal";
 import { ResourceCard } from "./ResourceCard";
 import { communityFeedLayout } from "../feed-layout";
+import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const RESOURCES_STALE_MS = 60_000;
+/** Must match PAGE_SIZE in the resources list read model. */
+const RESOURCE_PAGE_SIZE = 100;
 
 type FilterType = "all" | CommunityResource["resource_type"];
 
@@ -38,9 +41,14 @@ export function ResourcesView({
 }) {
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/resources`;
-  const cached = getCachedRequest<{ resources?: CommunityResource[] }>(requestUrl, currentUserId);
+  const cached = getCachedRequest<{ resources?: CommunityResource[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [resources, setResources] = useState<CommunityResource[]>(() => cached?.resources ?? []);
   const [loading, setLoading] = useState(() => !cached);
+  const [hasMore, setHasMore] = useState(() => {
+    const nextCursor = cached?.nextCursor;
+    return nextCursor !== undefined ? nextCursor !== null : (cached?.resources?.length ?? 0) >= RESOURCE_PAGE_SIZE;
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -48,12 +56,17 @@ export function ResourcesView({
   const fetchResources = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ resources?: CommunityResource[] }>(
+      const data = await fetchJsonCached<{ resources?: CommunityResource[]; nextCursor?: string | null }>(
         requestUrl,
         { staleMs: RESOURCES_STALE_MS, force },
         currentUserId,
       );
       setResources(data.resources ?? []);
+      setHasMore(
+        data.nextCursor !== undefined
+          ? data.nextCursor !== null
+          : (data.resources?.length ?? 0) >= RESOURCE_PAGE_SIZE,
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load resources.");
@@ -144,6 +157,28 @@ export function ResourcesView({
     writeCache((prev) => prev.filter((r) => r.id !== resourceId));
   }
 
+  // ── Load older resources (keyset pagination via ?cursor=createdAt|id) ────
+  async function loadMore() {
+    if (loadingMore || !resources.length) return;
+    const last = resources[resources.length - 1];
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `${requestUrl}?cursor=${encodeURIComponent(`${last.created_at}|${last.id}`)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { resources?: CommunityResource[]; nextCursor?: string | null };
+      writeCache((current) => {
+        const byId = new Map(current.map((r) => [r.id, r]));
+        for (const resource of data.resources ?? []) byId.set(resource.id, resource);
+        return [...byId.values()];
+      });
+      setHasMore(data.nextCursor !== null && data.nextCursor !== undefined);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   // Derive which type filters have results
   const typesWithData = new Set(resources.map((r) => r.resource_type));
   const filtered = filter === "all" ? resources : resources.filter((r) => r.resource_type === filter);
@@ -218,25 +253,8 @@ export function ResourcesView({
 
       <div className={communityFeedLayout.content}>
         {loading ? (
-          <div className={communityFeedLayout.skeletonList}>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className={communityFeedLayout.skeletonRow}>
-                <div className="flex items-center justify-between">
-                  <div className="h-5 w-20 rounded-full bg-surface-raised" />
-                  <div className="h-5 w-5 rounded bg-surface-raised" />
-                </div>
-                <div className="mt-3 h-4 w-2/3 rounded bg-surface-raised" />
-                <div className="mt-2 space-y-1.5">
-                  <div className="h-3 w-full rounded bg-surface-raised" />
-                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="h-4 w-4 rounded-full bg-surface-raised" />
-                  <div className="h-2.5 w-16 rounded bg-surface-raised" />
-                  <div className="h-2.5 w-12 rounded bg-surface-raised" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-24" role="status" aria-label="Loading resources">
+            <Spinner size={28} className="text-foreground-muted" />
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
@@ -271,6 +289,18 @@ export function ResourcesView({
                 />
               </div>
             ))}
+            {hasMore && (
+              <div className="flex justify-center py-6">
+                <button
+                  type="button"
+                  onClick={() => void loadMore()}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+                >
+                  {loadingMore ? "Loading…" : "Load more"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

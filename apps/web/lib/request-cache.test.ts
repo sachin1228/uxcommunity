@@ -24,7 +24,7 @@ afterEach(() => {
 test("uses dashboard-specific stale windows", () => {
   assert.equal(staleTimeForRequest("/api/communities"), 60_000)
   assert.equal(staleTimeForRequest("/api/communities?archived=false"), 60_000)
-  assert.equal(staleTimeForRequest("/api/home/feed"), 30_000)
+  assert.equal(staleTimeForRequest("/api/home/feed"), 60_000)
   assert.equal(staleTimeForRequest("/api/notifications"), 30_000)
 })
 

@@ -127,8 +127,11 @@ export function LottieLoader({
   }, [communityId, communityType]);
 
   if (!resolved) {
-    // Brief moment while we check settings — show nothing to avoid flash
-    return null;
+    // Settings/animation JSON is still loading. Show the fallback spinner
+    // instead of nothing so loading surfaces (chat area, header) never sit
+    // blank — on a fresh session the /api/lottie-settings fetch can take a
+    // second, and after that it's a module-level cache hit.
+    return <Spinner className={spinnerClassName} />;
   }
 
   if (animationData) {

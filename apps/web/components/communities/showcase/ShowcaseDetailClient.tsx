@@ -1,16 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import {
-  ArrowLeft,
   CornerDownRight,
   Loader2,
   Send,
   Trash2,
 } from "lucide-react";
+import { BackLink } from "@/components/ui/BackLink";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ShowcaseCard } from "./ShowcaseCard";
@@ -306,13 +305,11 @@ export function ShowcaseDetailClient({
       <div
         className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}
       >
-        <Link
+        <BackLink
           href={`/dashboard/communities/${communityId}?tab=showcase`}
+          label="Showcase"
           className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
-        >
-          <ArrowLeft size={14} />
-          Showcase
-        </Link>
+        />
         <ShowcaseCard
           post={post}
           currentUserId={currentUserId}
