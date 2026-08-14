@@ -11,7 +11,14 @@ import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { formatRelativeDate } from "./threadShared";
 import { communityFeedLayout } from "../feed-layout";
-import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { patchCachedRequest } from "@/lib/request-cache";
+import {
+  fetchThreadResource,
+  getThreadResource,
+  invalidateThreadResources,
+  patchThreadResource,
+  seedThreadResource,
+} from "@/lib/thread-request-cache";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -251,32 +258,55 @@ export function ThreadDetailClient({
   flushLayout = false,
 }: Props) {
   const router = useRouter();
-  const commentsUrl = `/api/communities/${communityId}/threads/${initialThread.id}/comments`;
-  const cachedComments = getCachedRequest<{ comments?: ThreadComment[] }>(commentsUrl, currentUserId);
-  const [thread, setThread] = useState(initialThread);
+  const detailUrl = `/api/communities/${communityId}/threads/${initialThread.id}`;
+  const commentsUrl = `${detailUrl}/comments`;
+  seedThreadResource(detailUrl, { thread: initialThread }, currentUserId);
+  seedThreadResource(commentsUrl, { comments: initialComments }, currentUserId);
+  const cachedThread = getThreadResource<{ thread?: CommunityThread }>(detailUrl, currentUserId);
+  const cachedComments = getThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, currentUserId);
+  const [thread, setThread] = useState(cachedThread?.thread ?? initialThread);
   const [comments, setComments] = useState(cachedComments?.comments ?? initialComments);
+  const threadRef = useRef(thread);
+  const commentsRef = useRef(comments);
 
+  const applyComments = useCallback((nextComments: ThreadComment[]) => {
+    commentsRef.current = nextComments;
+    setComments(nextComments);
+    patchThreadResource<{ comments?: ThreadComment[] }>(
+      commentsUrl,
+      currentUserId,
+      (cached) => ({ ...cached, comments: nextComments }),
+    );
+    const count = nextComments.reduce((total, comment) => total + 1 + comment.replies.length, 0);
+    const nextThread = { ...threadRef.current, comment_count: count };
+    threadRef.current = nextThread;
+    setThread(nextThread);
+    patchThreadResource<{ thread?: CommunityThread }>(
+      detailUrl,
+      currentUserId,
+      (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, comment_count: count } : nextThread }),
+    );
+  }, [commentsUrl, currentUserId, detailUrl]);
+
+  // A remount reads SSR/cache first. Stale comments revalidate once in the background.
   useEffect(() => {
-    setCachedRequest(commentsUrl, { comments }, currentUserId);
-  }, [comments, commentsUrl, currentUserId]);
+    void fetchThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, {
+      kind: "comments",
+      userId: currentUserId,
+      onRevalidated: (data) => applyComments(data.comments ?? []),
+    }).then((data) => applyComments(data.comments ?? [])).catch(() => undefined);
+  }, [applyComments, commentsUrl, currentUserId]);
 
-  // ── Realtime: perform one authoritative, deduplicated refresh ─────────────
   const fetchComments = useCallback(async () => {
     try {
-      const data = await fetchJsonCached<{ comments?: ThreadComment[] }>(
-        commentsUrl,
-        { staleMs: 15_000, force: true },
-        currentUserId,
-      );
-      const nextComments = data.comments ?? [];
-      setComments(nextComments);
-      const count = nextComments.reduce(
-        (acc: number, c: ThreadComment) => acc + 1 + c.replies.length,
-        0,
-      );
-      setThread((t) => ({ ...t, comment_count: count }));
+      const data = await fetchThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, {
+        kind: "comments",
+        userId: currentUserId,
+        force: true,
+      });
+      applyComments(data.comments ?? []);
     } catch { /* silent */ }
-  }, [commentsUrl, currentUserId]);
+  }, [applyComments, commentsUrl, currentUserId]);
 
   useEffect(() => {
     let supabase: ReturnType<typeof createBrowserClient>;
@@ -285,7 +315,12 @@ export function ThreadDetailClient({
     const commentChannel = supabase
       .channel(`thread-comments:${thread.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "thread_comments", filter: `thread_id=eq.${thread.id}` },
-        () => void fetchComments(),
+        (payload) => {
+          const record = (payload.new ?? payload.old) as { user_id?: string } | null;
+          // Local mutations already patch state and cache synchronously.
+          if (record?.user_id === currentUserId) return;
+          void fetchComments();
+        },
       )
       .subscribe();
 
@@ -295,12 +330,20 @@ export function ThreadDetailClient({
         (payload) => {
           const record = (payload.new ?? payload.old) as { user_id?: string } | null;
           if (record?.user_id === currentUserId) return;
-          setThread((t) => ({
-            ...t,
+          const current = threadRef.current;
+          const next = {
+            ...current,
             vote_count: payload.eventType === "INSERT"
-              ? t.vote_count + 1
-              : Math.max(0, t.vote_count - 1),
-          }));
+              ? current.vote_count + 1
+              : Math.max(0, current.vote_count - 1),
+          };
+          threadRef.current = next;
+          setThread(next);
+          patchThreadResource<{ thread?: CommunityThread }>(
+            detailUrl,
+            currentUserId,
+            (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, vote_count: next.vote_count } : next }),
+          );
         },
       )
       .subscribe();
@@ -309,56 +352,89 @@ export function ThreadDetailClient({
       supabase.removeChannel(commentChannel);
       supabase.removeChannel(voteChannel);
     };
-  }, [thread.id, currentUserId, fetchComments]);
+  }, [thread.id, currentUserId, detailUrl, fetchComments]);
 
   // ── ThreadCard callbacks ──────────────────────────────────────────────────
 
+  function writeThread(update: (current: CommunityThread) => CommunityThread) {
+    const next = update(threadRef.current);
+    threadRef.current = next;
+    setThread(next);
+    patchThreadResource<{ thread?: CommunityThread }>(
+      detailUrl,
+      currentUserId,
+      (cached) => ({ ...cached, thread: cached.thread ? update(cached.thread) : next }),
+    );
+    patchCachedRequest<{ threads?: CommunityThread[] }>(
+      `/api/communities/${communityId}/threads`,
+      (cached) => ({
+        ...cached,
+        threads: cached.threads?.map((item) => item.id === next.id ? { ...item, ...next } : item),
+      }),
+      currentUserId,
+    );
+  }
+
   function handleVoteChanged(_threadId: string, voted: boolean, newCount: number) {
-    setThread((t) => ({ ...t, user_voted: voted, vote_count: newCount }));
+    writeThread((current) => ({ ...current, user_voted: voted, vote_count: newCount }));
   }
 
   function handleSaveChanged(_threadId: string, saved: boolean) {
-    setThread((t) => ({ ...t, user_saved: saved }));
+    writeThread((current) => ({ ...current, user_saved: saved }));
   }
 
   function handleUpdated(updated: CommunityThread) {
-    setThread((t) => ({ ...t, ...updated }));
+    writeThread((current) => ({ ...current, ...updated }));
   }
 
   function handleDeleted() {
+    invalidateThreadResources(initialThread.id, currentUserId);
+    patchCachedRequest<{ threads?: CommunityThread[] }>(
+      `/api/communities/${communityId}/threads`,
+      (cached) => ({ ...cached, threads: cached.threads?.filter((item) => item.id !== initialThread.id) }),
+      currentUserId,
+    );
     router.push(`/dashboard/communities/${communityId}`);
   }
 
   // ── Comment handlers ──────────────────────────────────────────────────────
 
+  function writeComments(update: (current: ThreadComment[]) => ThreadComment[]) {
+    const next = update(commentsRef.current);
+    commentsRef.current = next;
+    setComments(next);
+    patchThreadResource<{ comments?: ThreadComment[] }>(
+      commentsUrl,
+      currentUserId,
+      (cached) => ({ ...cached, comments: update(cached.comments ?? []) }),
+    );
+  }
+
+  function changeCommentCount(delta: number) {
+    writeThread((current) => ({
+      ...current,
+      comment_count: Math.max(0, current.comment_count + delta),
+    }));
+  }
+
   function handleCommentPosted(comment: ThreadComment) {
-    if (comment.parent_id) {
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === comment.parent_id ? { ...c, replies: [...c.replies, comment] } : c,
-        ),
-      );
-    } else {
-      setComments((prev) => [...prev, { ...comment, replies: [] }]);
-    }
-    setThread((t) => ({ ...t, comment_count: t.comment_count + 1 }));
+    writeComments((current) => comment.parent_id
+      ? current.map((item) => item.id === comment.parent_id
+        ? { ...item, replies: [...item.replies.filter((reply) => reply.id !== comment.id), comment] }
+        : item)
+      : [...current.filter((item) => item.id !== comment.id), { ...comment, replies: [] }]);
+    changeCommentCount(1);
   }
 
   function handleCommentDeleted(id: string, parentId: string | null) {
-    if (parentId) {
-      setComments((prev) =>
-        prev.map((c) =>
-          c.id === parentId ? { ...c, replies: c.replies.filter((r) => r.id !== id) } : c,
-        ),
-      );
-    } else {
-      const target = comments.find((c) => c.id === id);
-      const removed = 1 + (target?.replies.length ?? 0);
-      setComments((prev) => prev.filter((c) => c.id !== id));
-      setThread((t) => ({ ...t, comment_count: Math.max(0, t.comment_count - removed) }));
-      return;
-    }
-    setThread((t) => ({ ...t, comment_count: Math.max(0, t.comment_count - 1) }));
+    const target = parentId ? null : commentsRef.current.find((comment) => comment.id === id);
+    const removed = parentId ? 1 : 1 + (target?.replies.length ?? 0);
+    writeComments((current) => parentId
+      ? current.map((comment) => comment.id === parentId
+        ? { ...comment, replies: comment.replies.filter((reply) => reply.id !== id) }
+        : comment)
+      : current.filter((comment) => comment.id !== id));
+    changeCommentCount(-removed);
   }
 
   const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
