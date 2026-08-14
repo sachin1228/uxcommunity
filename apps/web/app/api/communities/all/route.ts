@@ -23,12 +23,28 @@ export async function GET() {
   );
 
   if (error) {
+    const databaseError = {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    };
+
+    console.error("[GET /api/communities/all] Supabase RPC failed", {
+      rpc: "get_all_communities",
+      parameters: { p_user_id: session.userId! },
+      error: databaseError,
+    });
+
     timer.finish({
       database_queries: 1,
       status: 500,
     });
     return NextResponse.json(
-      { error: "Failed to fetch communities." },
+      {
+        error: "Failed to fetch communities.",
+        database: databaseError,
+      },
       { status: 500 },
     );
   }
