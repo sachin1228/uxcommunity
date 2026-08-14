@@ -337,7 +337,7 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
             title="Upcoming Events"
             action={
               <Link
-                href={`/dashboard/communities/${communityId}/events`}
+                href={`/dashboard/communities/${communityId}?tab=events`}
                 className="font-body text-xs text-accent hover:underline"
               >
                 See all

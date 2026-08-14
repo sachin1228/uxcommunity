@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  ArrowLeft, CornerDownRight, Loader2, MessageSquare, MoreHorizontal,
+  CornerDownRight, Loader2, MessageSquare, MoreHorizontal,
   Send, Trash2, Users,
 } from "lucide-react";
+import { BackLink } from "@/components/ui/BackLink";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
@@ -369,13 +370,11 @@ export function EventDetailClient({
       <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
-          <a
+          <BackLink
             href={backHref}
+            label={backLabel}
             className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
-          >
-            <ArrowLeft size={14} />
-            {backLabel}
-          </a>
+          />
         )}
         {/* Event post */}
         <section className={`${communityFeedLayout.dividerY} py-6`}>

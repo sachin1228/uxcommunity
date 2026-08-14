@@ -32,8 +32,8 @@ type PerformanceRpcMap = {
   get_thread_list_aggregates: { args: { p_user_id: string; p_thread_ids: string[] }; returns: Array<AggregateBase & { vote_count: number; comment_count: number; user_voted: boolean; user_saved: boolean }> };
   get_event_list_aggregates: { args: { p_user_id: string; p_event_ids: string[] }; returns: Array<AggregateBase & { rsvp_count: number; like_count: number; save_count: number; user_rsvped: boolean; user_liked: boolean; user_saved: boolean }> };
   get_resource_list_aggregates: { args: { p_user_id: string; p_resource_ids: string[] }; returns: Array<AggregateBase & { save_count: number; comment_count: number; bookmark_count: number; user_saved: boolean; user_bookmarked: boolean }> };
-  get_thread_list_page: { args: { p_community_id: string; p_user_id: string; p_limit: number }; returns: Array<{ item: Json }> };
-  get_resource_list_page: { args: { p_community_id: string; p_user_id: string; p_limit: number }; returns: Array<{ item: Json }> };
+  get_thread_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
+  get_resource_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_event_list_page: { args: { p_community_id: string; p_user_id: string; p_phase: "upcoming" | "past"; p_cursor_event_date: string | null; p_cursor_id: string | null; p_now: string; p_limit: number }; returns: Array<{ item: Json }> };
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
 };

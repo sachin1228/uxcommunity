@@ -42,7 +42,12 @@ import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import { fetchAndHydrateCommunityBootstrap, initRequestCache, setCachedRequest } from "@/lib/request-cache";
+import {
+  fetchAndHydrateCommunityBootstrap,
+  initRequestCache,
+  setCachedRequest,
+  type CommunityBootstrap,
+} from "@/lib/request-cache";
 import type { SSRCommunitySections } from "@/lib/communities/server";
 
 const useIsomorphicLayoutEffect =
@@ -98,7 +103,26 @@ export function CommunityChat({
     for (const [url, value] of urls) {
       if (value !== undefined) setCachedRequest(url, value, currentUserId);
     }
-  }, [communityId, currentUserId, initialSections]);
+
+    // When the SSR snapshot already carries the community read model and first
+    // message page, mirror it into the bootstrap cache entry as well. Otherwise
+    // every downstream bootstrap-backed read (chat data, info panel, tab views)
+    // fires a fresh network GET /bootstrap even though the page already seeded
+    // everything it needs.
+    if (initialMeta && initialMessages) {
+      const bootstrap: CommunityBootstrap = {
+        community: {
+          community: initialMeta.community,
+          members: initialMeta.members,
+        },
+        messages: { messages: initialMessages },
+        permissions: undefined,
+        unreadCount: 0,
+        failures: [],
+      };
+      setCachedRequest(`${base}/bootstrap`, bootstrap, currentUserId);
+    }
+  }, [communityId, currentUserId, initialSections, initialMeta, initialMessages]);
 
   const handleTabChange = useCallback((tab: ChatTab) => {
     setActiveTab(tab);

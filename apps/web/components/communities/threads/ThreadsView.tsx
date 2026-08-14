@@ -20,6 +20,8 @@ import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const THREADS_STALE_MS = 60_000;
+/** Must match PAGE_SIZE in the threads list read model. */
+const THREAD_PAGE_SIZE = 50;
 
 export function ThreadsView({
   communityId,
@@ -30,9 +32,14 @@ export function ThreadsView({
 }) {
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/threads`;
-  const cached = getCachedRequest<{ threads?: CommunityThread[] }>(requestUrl, currentUserId);
+  const cached = getCachedRequest<{ threads?: CommunityThread[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.threads ?? []);
   const [loading, setLoading] = useState(() => !cached);
+  const [hasMore, setHasMore] = useState(() => {
+    const nextCursor = cached?.nextCursor;
+    return nextCursor !== undefined ? nextCursor !== null : (cached?.threads?.length ?? 0) >= THREAD_PAGE_SIZE;
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +48,17 @@ export function ThreadsView({
   const fetchThreads = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ threads?: CommunityThread[] }>(
+      const data = await fetchJsonCached<{ threads?: CommunityThread[]; nextCursor?: string | null }>(
         requestUrl,
         { staleMs: THREADS_STALE_MS, force },
         currentUserId,
       );
       setThreads(data.threads ?? []);
+      setHasMore(
+        data.nextCursor !== undefined
+          ? data.nextCursor !== null
+          : (data.threads?.length ?? 0) >= THREAD_PAGE_SIZE,
+      );
       setError(null);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load threads.");
@@ -159,6 +171,28 @@ export function ThreadsView({
 
   function handleDeleted(threadId: string) {
     writeCache((cur) => cur.filter((t) => t.id !== threadId));
+  }
+
+  // ── Load older threads (keyset pagination via ?cursor=createdAt|id) ──────
+  async function loadMore() {
+    if (loadingMore || !threads.length) return;
+    const last = threads[threads.length - 1];
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `${requestUrl}?cursor=${encodeURIComponent(`${last.created_at}|${last.id}`)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { threads?: CommunityThread[]; nextCursor?: string | null };
+      writeCache((current) => {
+        const byId = new Map(current.map((t) => [t.id, t]));
+        for (const thread of data.threads ?? []) byId.set(thread.id, thread);
+        return [...byId.values()];
+      });
+      setHasMore(data.nextCursor !== null && data.nextCursor !== undefined);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   const filteredThreads = filter === "all" ? threads : threads.filter((thread) => thread.category === filter);
@@ -297,6 +331,18 @@ export function ThreadsView({
               isLast={index === filteredThreads.length - 1}
             />
           ))}
+          {hasMore && (
+            <div className="flex justify-center py-6">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
