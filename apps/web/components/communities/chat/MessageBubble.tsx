@@ -721,11 +721,17 @@ export function MessageBubble({
             </p>
           )}
 
-          {isDeleted ? (
+          {imageStatus === "rejected" ? (
             <DeletedBubble
               isMe={isMe}
               createdAt={msg.created_at}
-              moderationViolation={imageStatus === "rejected"}
+              moderationViolation
+            />
+          ) : isDeleted ? (
+            <DeletedBubble
+              isMe={isMe}
+              createdAt={msg.created_at}
+              moderationViolation={false}
             />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
