@@ -196,7 +196,7 @@ test("reuses SSR-seeded community metadata and messages", async () => {
   assert.equal(calls, 0)
 })
 
-test("hydrates only critical community bootstrap keys", async () => {
+test("hydrates every supplied community bootstrap section into canonical user keys", async () => {
   const calls: string[] = []
   globalThis.fetch = (async (input) => {
     calls.push(String(input))
@@ -205,36 +205,69 @@ test("hydrates only critical community bootstrap keys", async () => {
       messages: { messages: [{ id: "message-a" }] },
       permissions: { role: "member", can_manage: false },
       unreadCount: 2,
+      threads: { threads: [{ id: "thread-a" }] },
+      events: { events: [{ id: "event-a" }] },
+      resources: { resources: [{ id: "resource-a" }] },
+      showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
+      members: { members: [{ user_id: "member-a" }], has_more: false },
+      rules: { rules: [{ id: "rule-a" }] },
+      stats: { posts_today: 3 },
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     })
   }) as typeof fetch
 
-  await Promise.all([
-    fetchAndHydrateCommunityBootstrap("community-a", "user-a"),
-    fetchJsonCached("/api/communities/community-a/messages", {}, "user-a"),
-  ])
+  await fetchAndHydrateCommunityBootstrap("community-a", "user-a")
+
+  const urls = [
+    "/api/communities/community-a",
+    "/api/communities/community-a/messages",
+    "/api/communities/community-a/permissions",
+    "/api/communities/community-a/unread",
+    "/api/communities/community-a/threads",
+    "/api/communities/community-a/events",
+    "/api/communities/community-a/resources",
+    "/api/communities/community-a/showcase",
+    "/api/communities/community-a/members?page=0",
+    "/api/communities/community-a/rules",
+    "/api/communities/community-a/stats",
+  ]
+  await Promise.all(urls.map((url) => fetchJsonCached(url, {}, "user-a")))
 
   assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
   assert.equal(
-    getCachedRequest<{ messages: Array<{ id: string }> }>(
-      "/api/communities/community-a/messages",
+    getCachedRequest<{ members: Array<{ user_id: string }> }>(
+      "/api/communities/community-a/members?page=0",
       "user-a",
-    )?.messages[0]?.id,
-    "message-a",
+    )?.members[0]?.user_id,
+    "member-a",
   )
   assert.equal(
-    getCachedRequest<{ unreadCount: number }>(
-      "/api/communities/community-a/unread",
+    getCachedRequest<{ posts_today: number }>(
+      "/api/communities/community-a/stats",
       "user-a",
-    )?.unreadCount,
-    2,
+    )?.posts_today,
+    3,
   )
-  assert.equal(
-    getCachedRequest("/api/communities/community-a/threads", "user-a"),
-    undefined,
-  )
+  assert.equal(getCachedRequest(urls[4], "user-b"), undefined)
+})
+
+test("leaves absent optional bootstrap sections uncached", async () => {
+  globalThis.fetch = (async () => new Response(JSON.stringify({
+    community: { community: { id: "community-a" }, members: [] },
+    messages: { messages: [] },
+    permissions: { role: "member", can_manage: false },
+    unreadCount: 0,
+  }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  })) as typeof fetch
+
+  await fetchAndHydrateCommunityBootstrap("community-a", "user-a")
+
+  assert.equal(getCachedRequest("/api/communities/community-a/threads", "user-a"), undefined)
+  assert.equal(getCachedRequest("/api/communities/community-a/members?page=0", "user-a"), undefined)
 })
 
 test("fetches secondary community collections independently", async () => {
