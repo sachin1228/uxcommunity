@@ -36,6 +36,20 @@ function communityIdFromPath(pathname: string): string | null {
   return match?.[1] ?? null;
 }
 
+/** Which header tab is active for the target route — mirrors the real pages. */
+function activeTabFromPath(pathname: string): ChatTab {
+  const match = pathname.match(
+    /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//,
+  );
+  switch (match?.[1]) {
+    case "threads":   return "threads";
+    case "events":    return "events";
+    case "resources": return "resources";
+    case "showcase":  return "showcase";
+    default:           return "chat";
+  }
+}
+
 function subscribeToLocation(callback: () => void) {
   window.addEventListener("popstate", callback);
   window.addEventListener("hashchange", callback);
@@ -104,6 +118,7 @@ export default function CommunityPageLoading() {
 
   const community = cached?.community ?? null;
   const members = cached?.members ?? [];
+  const activeTab: ChatTab = communityId ? activeTabFromPath(pathname) : "chat";
 
   function handleTabChange(tab: ChatTab) {
     if (!communityId) return;
@@ -120,7 +135,7 @@ export default function CommunityPageLoading() {
         {/* Real chat chrome — identical to the page, so committing is seamless. */}
         <ChatHeader
           community={community}
-          activeTab="chat"
+          activeTab={activeTab}
           onTabChange={handleTabChange}
           currentUserId={cachedUserId ?? undefined}
           communityId={communityId ?? undefined}
