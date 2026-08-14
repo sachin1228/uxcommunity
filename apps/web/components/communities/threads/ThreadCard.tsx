@@ -59,6 +59,7 @@ import { EditThreadModal } from "./EditThreadModal";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 
@@ -173,7 +174,7 @@ export function ThreadCard({
         initialValue: displayedVoteRef.current,
         onOptimisticChange: applyVoteState,
         persist: async (voted) => {
-          const response = await fetch(
+          const response = await dedupeFetch(
             `/api/communities/${communityId}/threads/${thread.id}/vote`,
             {
               method: "POST",
@@ -213,7 +214,7 @@ export function ThreadCard({
           onSaveChanged(thread.id, saved);
         },
         persist: async (saved) => {
-          const response = await fetch(
+          const response = await dedupeFetch(
             `/api/communities/${communityId}/threads/${thread.id}/save`,
             {
               method: "POST",

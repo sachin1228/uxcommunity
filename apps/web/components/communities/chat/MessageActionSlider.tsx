@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { Reply, Copy } from "lucide-react";
 import type { CachedMessage, MessageReaction } from "@/lib/communities/cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 interface MessageActionSliderProps {
   message: CachedMessage | null;
@@ -88,7 +89,7 @@ export function MessageActionSlider({
 
       // Sync with server (realtime will propagate to other clients)
       try {
-        const res = await fetch(
+        const res = await dedupeFetch(
           `/api/communities/${communityId}/messages/${msgId}/reactions`,
           {
             method: "POST",

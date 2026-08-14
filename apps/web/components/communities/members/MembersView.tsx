@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Check, MoreHorizontal, Search, Users, X } from "lucide-react";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
 import { fetchJsonCached, getCachedRequest } from "@/lib/request-cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 interface CommunityMember {
   user_id:     string;
@@ -64,6 +65,9 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
 
   // Per-member remove dropdown
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null);
+  // Locks a specific pending request (accept/decline) so double-clicks cannot
+  // fire the same mutation twice. Cleared on success and on failure.
+  const [busyRequestId, setBusyRequestId] = useState<string | null>(null);
   const menuRef = useRef<HTMLUListElement>(null);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -185,36 +189,48 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
   }, [loadMore]);
 
   async function handleAccept(requestId: string) {
-    const res = await fetch(`/api/communities/${communityId}/requests/${requestId}/accept`, { method: "POST" });
-    if (res.ok) {
-      const accepted = requests.find((r) => r.id === requestId);
-      setRequests((prev) => prev.filter((r) => r.id !== requestId));
-      if (accepted) {
-        // Add them to the members list optimistically
-        setMembers((prev) => [
-          ...prev,
-          {
-            user_id:     accepted.user_id,
-            name:        accepted.name,
-            avatar_url:  accepted.avatar_url,
-            designation: null,
-            company:     null,
-            joined_at:   new Date().toISOString(),
-            role:        "member",
-          },
-        ]);
+    if (busyRequestId) return;
+    setBusyRequestId(requestId);
+    try {
+      const res = await dedupeFetch(`/api/communities/${communityId}/requests/${requestId}/accept`, { method: "POST" });
+      if (res.ok) {
+        const accepted = requests.find((r) => r.id === requestId);
+        setRequests((prev) => prev.filter((r) => r.id !== requestId));
+        if (accepted) {
+          // Add them to the members list optimistically
+          setMembers((prev) => [
+            ...prev,
+            {
+              user_id:     accepted.user_id,
+              name:        accepted.name,
+              avatar_url:  accepted.avatar_url,
+              designation: null,
+              company:     null,
+              joined_at:   new Date().toISOString(),
+              role:        "member",
+            },
+          ]);
+        }
       }
+    } finally {
+      setBusyRequestId(null);
     }
   }
 
   async function handleDecline(requestId: string) {
-    const res = await fetch(`/api/communities/${communityId}/requests/${requestId}/decline`, { method: "POST" });
-    if (res.ok) setRequests((prev) => prev.filter((r) => r.id !== requestId));
+    if (busyRequestId) return;
+    setBusyRequestId(requestId);
+    try {
+      const res = await dedupeFetch(`/api/communities/${communityId}/requests/${requestId}/decline`, { method: "POST" });
+      if (res.ok) setRequests((prev) => prev.filter((r) => r.id !== requestId));
+    } finally {
+      setBusyRequestId(null);
+    }
   }
 
   async function handleRemoveMember(userId: string) {
     setOpenMenuFor(null);
-    const res = await fetch(`/api/communities/${communityId}/members/${userId}`, { method: "DELETE" });
+    const res = await dedupeFetch(`/api/communities/${communityId}/members/${userId}`, { method: "DELETE" });
     if (res.ok) setMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
@@ -273,16 +289,18 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                       <button
                         type="button"
                         onClick={() => handleAccept(req.id)}
-                        className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors"
+                        disabled={busyRequestId === req.id}
+                        className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Check size={11} /> Accept
+                        <Check size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDecline(req.id)}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                        disabled={busyRequestId === req.id}
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <X size={11} /> Decline
+                        <X size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
                       </button>
                     </div>
                   </li>

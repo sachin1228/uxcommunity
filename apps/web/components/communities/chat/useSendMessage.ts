@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { msgCache } from "@/lib/communities/cache";
 import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 type Message = CachedMessage;
 
@@ -45,6 +46,12 @@ export function useSendMessage({
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Guards against double-sends: `sending` resets synchronously once the
+  // optimistic bubble is shown, so a second Enter while the network request is
+  // still in flight would otherwise fire a duplicate POST. This ref stays
+  // locked until the request fully settles (success or failure).
+  const sendLockRef = useRef(false);
 
   // Stores retry data (file + content + replyTo) keyed by tempId so failed
   // messages can be retried without losing the original payload.
@@ -231,7 +238,7 @@ export function useSendMessage({
       }
 
       const res = await measureClient("message_create_request", () =>
-        fetch(`/api/communities/${communityId}/messages`, {
+        dedupeFetch(`/api/communities/${communityId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -355,8 +362,9 @@ export function useSendMessage({
     // Capture blob URL BEFORE clearing so we can keep it alive during upload
     const imagePreviewUrl = pendingImagePreview;
 
-    if ((!content && !imageFile) || sending) return;
+    if ((!content && !imageFile) || sending || sendLockRef.current) return;
 
+    sendLockRef.current = true;
     setSending(true);
     setError(null);
 
@@ -374,13 +382,17 @@ export function useSendMessage({
     }
     inputRef.current?.focus();
 
-    await runSend({
-      content,
-      imageFile,
-      imagePreviewUrl,
-      replyTo: currentReplyTo,
-      tempId,
-    });
+    try {
+      await runSend({
+        content,
+        imageFile,
+        imagePreviewUrl,
+        replyTo: currentReplyTo,
+        tempId,
+      });
+    } finally {
+      sendLockRef.current = false;
+    }
   }
 
   /**
@@ -389,7 +401,9 @@ export function useSendMessage({
    */
   const handleRetrySend = useCallback(async (failedTempId: string) => {
     const retryData = failedRetryDataRef.current.get(failedTempId);
-    if (!retryData || sending) return;
+    if (!retryData || sending || sendLockRef.current) return;
+
+    sendLockRef.current = true;
 
     // Remove the failed message before re-queueing
     setMessages((prev) => {
@@ -408,13 +422,17 @@ export function useSendMessage({
       ? URL.createObjectURL(retryData.file)
       : null;
 
-    await runSend({
-      content: retryData.content,
-      imageFile: retryData.file,
-      imagePreviewUrl,
-      replyTo: retryData.replyTo,
-      tempId,
-    });
+    try {
+      await runSend({
+        content: retryData.content,
+        imageFile: retryData.file,
+        imagePreviewUrl,
+        replyTo: retryData.replyTo,
+        tempId,
+      });
+    } finally {
+      sendLockRef.current = false;
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, sending, setMessages]);
 
@@ -431,7 +449,8 @@ export function useSendMessage({
    * No file upload needed — the URL is stored as image_url directly.
    */
   const handleGifSend = useCallback(async (gifUrl: string) => {
-    if (sending) return;
+    if (sending || sendLockRef.current) return;
+    sendLockRef.current = true;
     setSending(true);
     setError(null);
 
@@ -463,7 +482,7 @@ export function useSendMessage({
     setSending(false);
 
     try {
-      const res = await fetch(`/api/communities/${communityId}/messages`, {
+      const res = await dedupeFetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: "", image_url: gifUrl }),
@@ -517,6 +536,8 @@ export function useSendMessage({
         return next;
       });
       setError("Network error.");
+    } finally {
+      sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, currentUserId, sending, setMessages]);

@@ -11,6 +11,7 @@ import {
 import { ChatAvatar } from "./ChatAvatar";
 import { createClient } from "@/lib/supabase/client";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 interface Member {
   user_id: string;
@@ -172,7 +173,7 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
     setLocalRsvpCount(newCount);
     setRsvpPending(true);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${upcomingEvent.id}/rsvp`, { method: "POST" });
+      const res = await dedupeFetch(`/api/communities/${communityId}/events/${upcomingEvent.id}/rsvp`, { method: "POST" });
       if (res.ok) {
         const data = await res.json();
         setLocalRsvped(data.rsvped);

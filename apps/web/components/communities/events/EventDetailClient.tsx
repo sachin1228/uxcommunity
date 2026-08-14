@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   ArrowLeft, CornerDownRight, Loader2, MessageSquare, MoreHorizontal,
   Send, Trash2, Users,
@@ -9,6 +8,8 @@ import {
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -87,7 +88,7 @@ function CommentNode({
     setMenuOpen(false);
     setDeleting(true);
     try {
-      const res = await fetch(
+      const res = await dedupeFetch(
         `/api/communities/${communityId}/events/${eventId}/comments/${comment.id}`,
         { method: "DELETE" },
       );
@@ -102,7 +103,7 @@ function CommentNode({
     setReplyPosting(true);
     setReplyError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${eventId}/comments`, {
+      const res = await dedupeFetch(`/api/communities/${communityId}/events/${eventId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: text, parent_id: comment.id }),
@@ -271,7 +272,7 @@ export function EventDetailClient({
   backHref,
   backLabel = "Home",
 }: Props) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
   const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
@@ -334,7 +335,7 @@ export function EventDetailClient({
     setPosting(true);
     setCommentError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/comments`, {
+      const res = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: text }),

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 export type EventLikeState = { liked: boolean; like_count: number };
 export type EventSaveState = { saved: boolean; save_count: number };
@@ -18,7 +19,7 @@ type Options = {
 };
 
 async function persistBoolean<T>(url: string, key: "liked" | "saved", desired: boolean) {
-  const response = await fetch(url, {
+  const response = await dedupeFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [key]: desired }),

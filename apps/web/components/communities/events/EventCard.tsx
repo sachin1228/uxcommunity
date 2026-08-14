@@ -6,6 +6,8 @@ import { Calendar, ExternalLink, Heart, MapPin, Video } from "lucide-react";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
@@ -125,7 +127,6 @@ export function EventCard({
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
@@ -141,15 +142,16 @@ export function EventCard({
     onSaveChanged,
   });
 
+  // Reusable mutation pattern: `pending` drives the disabled/spinner state and
+  // concurrent invocations share the same in-flight request.
+  const { run: runDelete, pending: deleting } = usePendingMutation(async () => {
+    const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
+    if (response.ok) onDeleted(event.id);
+  });
+
   async function handleDelete() {
     if (!confirm("Delete this event? This cannot be undone.")) return;
-    setDeleting(true);
-    try {
-      const response = await fetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
-      if (response.ok) onDeleted(event.id);
-    } finally {
-      setDeleting(false);
-    }
+    await runDelete();
   }
 
   async function handleJoin(e: React.MouseEvent) {
@@ -161,7 +163,7 @@ export function EventCard({
     setRsvpPending(true);
     setRsvpError(null);
     try {
-      const response = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+      const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
       if (response.ok) {
         const data = await response.json();
         onRsvpChanged(event.id, data.rsvped, data.rsvp_count);

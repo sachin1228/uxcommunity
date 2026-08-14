@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { TYPE_EMOJI } from "./chatUtils";
 
 interface Community {
@@ -107,7 +108,7 @@ export function ChatHeader({
   currentUserId,
   onSettingsClick,
 }: ChatHeaderProps) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const [openMenu, setOpenMenu] = useState<"joined" | "more" | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
@@ -134,11 +135,11 @@ export function ChatHeader({
     setBusy(true);
 
     if (confirmAction === "leave") {
-      const response = await fetch(`/api/communities/${community.id}/members`, { method: "DELETE" });
+      const response = await dedupeFetch(`/api/communities/${community.id}/members`, { method: "DELETE" });
       if (!response.ok) { setBusy(false); return; }
       invalidateOnLeave(community.id);
     } else {
-      const response = await fetch(`/api/communities/${community.id}/archive`, { method: "POST" });
+      const response = await dedupeFetch(`/api/communities/${community.id}/archive`, { method: "POST" });
       if (!response.ok) { setBusy(false); return; }
       invalidateOnArchive(community.id);
       msgCache.delete(community.id);
