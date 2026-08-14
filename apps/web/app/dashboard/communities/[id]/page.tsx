@@ -31,6 +31,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
       initialMeta={ssrData?.meta}
       initialMessages={ssrData?.messages}
       initialLastReadAt={ssrData?.lastReadAt}
+      initialSections={ssrData?.sections}
       initialTab={initialTab}
     />
   );

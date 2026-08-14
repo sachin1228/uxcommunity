@@ -51,7 +51,7 @@ test("deduplicates concurrent GET requests", async () => {
   assert.deepEqual(first, second)
 })
 
-test("deduplicates three concurrent GET requests", async () => {
+test("deduplicates concurrent optional-section fallback requests", async () => {
   let calls = 0
   globalThis.fetch = (async () => {
     calls += 1
@@ -68,7 +68,7 @@ test("deduplicates three concurrent GET requests", async () => {
     fetchJsonCached("/api/communities/community-a/events", {}, "user-a"),
   ])
 
-  assert.equal(calls, 1)
+  assert.equal(calls, 2)
 })
 
 test("deduplicates stale revalidation", async () => {
@@ -253,6 +253,83 @@ test("hydrates every supplied community bootstrap section into canonical user ke
   assert.equal(getCachedRequest(urls[4], "user-b"), undefined)
 })
 
+test("coordinates concurrent bootstrap-backed reads through one bootstrap request", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    calls.push(String(input))
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    return new Response(JSON.stringify({
+      community: { community: { id: "community-a" }, members: [] },
+      messages: { messages: [{ id: "message-a" }] },
+      permissions: { role: "member", can_manage: false },
+      unreadCount: 2,
+      threads: { threads: [{ id: "thread-a" }] },
+      events: { events: [{ id: "event-a" }] },
+      resources: { resources: [{ id: "resource-a" }] },
+      showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
+      members: { members: [{ user_id: "member-a" }], has_more: false },
+      rules: { rules: [{ id: "rule-a" }] },
+      stats: { posts_today: 3 },
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  const base = "/api/communities/community-a"
+  const urls = [
+    base,
+    `${base}/messages`,
+    `${base}/permissions`,
+    `${base}/unread`,
+    `${base}/showcase`,
+    `${base}/threads`,
+    `${base}/events`,
+    `${base}/resources`,
+    `${base}/members?page=0`,
+    `${base}/rules`,
+    `${base}/stats`,
+  ]
+  const values = await Promise.all(
+    urls.map((url) => fetchJsonCached<unknown>(url, {}, "user-a")),
+  )
+
+  assert.equal(values.length, urls.length)
+  assert.deepEqual(calls, [`${base}/bootstrap`])
+})
+
+test("falls back once when an optional bootstrap section is absent", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    const url = String(input)
+    calls.push(url)
+    const body = url.endsWith("/bootstrap")
+      ? {
+          community: { community: { id: "community-a" }, members: [] },
+          messages: { messages: [] },
+          permissions: { role: "member", can_manage: false },
+          unreadCount: 0,
+        }
+      : { threads: [{ id: "thread-fallback" }] }
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  const value = await fetchJsonCached<{ threads: Array<{ id: string }> }>(
+    "/api/communities/community-a/threads",
+    {},
+    "user-a",
+  )
+
+  assert.equal(value.threads[0]?.id, "thread-fallback")
+  assert.deepEqual(calls, [
+    "/api/communities/community-a/bootstrap",
+    "/api/communities/community-a/threads",
+  ])
+})
+
 test("leaves absent optional bootstrap sections uncached", async () => {
   globalThis.fetch = (async () => new Response(JSON.stringify({
     community: { community: { id: "community-a" }, members: [] },
@@ -270,7 +347,7 @@ test("leaves absent optional bootstrap sections uncached", async () => {
   assert.equal(getCachedRequest("/api/communities/community-a/members?page=0", "user-a"), undefined)
 })
 
-test("fetches secondary community collections independently", async () => {
+test("hydrates a secondary community collection from bootstrap", async () => {
   const calls: string[] = []
   globalThis.fetch = (async (input) => {
     calls.push(String(input))
@@ -285,7 +362,7 @@ test("fetches secondary community collections independently", async () => {
     fetchJsonCached("/api/communities/community-a/threads", {}, "user-a"),
   ])
 
-  assert.deepEqual(calls, ["/api/communities/community-a/threads"])
+  assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
 })
 
 test("patches and invalidates only the requested user key", async () => {
