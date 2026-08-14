@@ -30,8 +30,6 @@ export function GlobalSidebar({ userId }: Props) {
     activeCommunityId,
     typingMap,
     handleNavigate,
-    onEnter,
-    onLeave,
     router,
   } = useSidebarCommunities(userId);
 
@@ -157,8 +155,6 @@ export function GlobalSidebar({ userId }: Props) {
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
                   onClick={() => handleNavigate(c.id)}
-                  onMouseEnter={() => onEnter(c.id)}
-                  onMouseLeave={onLeave}
                 />
               ))}
             </ul>
