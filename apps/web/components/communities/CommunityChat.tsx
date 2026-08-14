@@ -667,6 +667,7 @@ export function CommunityChat({
           onlineCount={onlineCount}
           currentUserId={currentUserId}
           onSettingsClick={isOwner ? () => setShowSettings(true) : undefined}
+          communityId={communityId}
         />
 
         <Modal

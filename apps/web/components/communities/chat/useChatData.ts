@@ -111,7 +111,12 @@ export function useChatData({
       evictIfNeeded();
       setMessages(initialMessages);
     }
-    if (cachedMeta || initialMeta) setLoading(false);
+    // Keep the chat area in its loading state (Lottie) until the first message
+    // page is available — meta alone should not dismiss it, otherwise a fresh
+    // visit flashes an empty chat while messages hydrate.
+    if ((cachedMeta || initialMeta) && (cachedMsgs?.length || initialMessages?.length)) {
+      setLoading(false);
+    }
     // Notify parent of the SSR lastReadAt seed when no cache exists
     if (!cachedMsgs?.length) {
       onSeedLastReadAt?.(initialMessages?.length ? null : undefined as unknown as null);
@@ -283,7 +288,10 @@ export function useChatData({
         metaCache.set(communityId, cachedMeta);
         setCommunity(cachedMeta.community);
         setMembers(cachedMeta.members);
-        setLoading(false);
+        // Don't dismiss the chat Lottie on meta alone — wait for the message
+        // page too. On revisits msgCache provides it instantly; on a fresh
+        // visit the bootstrap hydration below clears it.
+        if (cachedMsgs) setLoading(false);
       } else {
         setLoading(true);
       }
