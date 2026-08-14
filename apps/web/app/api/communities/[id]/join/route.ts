@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 /**
  * POST /api/communities/[id]/join
@@ -91,5 +92,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }
 
+  invalidateMembership(communityId, userId);
   return NextResponse.json({ success: true });
 }

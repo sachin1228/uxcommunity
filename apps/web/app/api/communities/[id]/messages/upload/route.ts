@@ -6,6 +6,7 @@ import { deleteFromR2, uploadToR2 } from "@/lib/r2";
 import { detectImageMime, moderateImageBuffer } from "@/lib/moderation/image";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { createServerTimer } from "@/lib/server-timing";
+import { getMembershipCached } from "@/lib/communities/membership-cache";
 
 const MAX_INPUT_BYTES = 20 * 1024 * 1024;
 const MAX_CONTENT_LENGTH = 2000;
@@ -31,7 +32,14 @@ export async function POST(
 
   let session;
   try {
-    session = await timer.measure("auth", () => requireSession("user"));
+    session = await timer.measure("auth", () =>
+      requireSession("user", {
+        onLivenessCache: (state) => {
+          timer.record("auth_cache_hit", state === "hit" ? 1 : 0);
+          timer.record("auth_cache_dedup", state === "dedup" ? 1 : 0);
+        },
+      }),
+    );
   } catch (error) {
     return finish(error as Response);
   }
@@ -39,21 +47,27 @@ export async function POST(
   const userId = session.userId!;
   const { id: communityId } = await params;
   const db = createServiceClient();
-  const { data: membership, error: membershipError } = await timer.measure(
-    "membership_query",
-    async () =>
-      await db
-        .from("community_members")
-        .select("joined_at")
-        .eq("community_id", communityId)
-        .eq("user_id", userId)
-        .maybeSingle(),
-  );
-
-  if (membershipError) {
+  let membership;
+  try {
+    membership = await timer.measure("membership_query", () =>
+      getMembershipCached(communityId, userId, async () => {
+        const { data, error } = await db
+          .from("community_members")
+          .select("joined_at")
+          .eq("community_id", communityId)
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (error) throw error;
+        return Boolean(data);
+      }),
+    );
+  } catch {
     return finish(NextResponse.json({ error: "Failed to verify community membership." }, { status: 500 }));
   }
-  if (!membership) {
+
+  timer.record("membership_cache_hit", membership.status === "hit" ? 1 : 0);
+  timer.record("membership_cache_dedup", membership.status === "dedup" ? 1 : 0);
+  if (!membership.isMember) {
     return finish(NextResponse.json({ error: "Not a member of this community." }, { status: 403 }));
   }
 
@@ -88,6 +102,8 @@ export async function POST(
     return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
   }
 
+  timer.record("input_bytes", source.byteLength);
+
   if (detectImageMime(source) !== file.type) {
     return finish(NextResponse.json({ error: "Image bytes do not match the selected file type." }, { status: 422 }));
   }
@@ -106,6 +122,9 @@ export async function POST(
   if (!compression) {
     return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
   }
+
+  timer.record("compressed_bytes", compression.data.byteLength);
+  timer.record("r2_upload_bytes", compression.data.byteLength);
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
   let url: string;

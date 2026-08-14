@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 function cleanDesignation(name: string): string {
   const clean = name.split("(")[0].trim();
@@ -138,5 +139,6 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to leave community." }, { status: 500 });
   }
+  invalidateMembership(communityId, userId);
   return NextResponse.json({ success: true });
 }

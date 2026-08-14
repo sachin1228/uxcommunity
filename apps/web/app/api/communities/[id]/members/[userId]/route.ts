@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 /**
  * Strip year-range suffixes and singularize experience level names for display.
@@ -111,5 +112,6 @@ export async function DELETE(
     .eq("user_id", targetUserId);
 
   if (error) return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+  invalidateMembership(communityId, targetUserId);
   return NextResponse.json({ success: true });
 }

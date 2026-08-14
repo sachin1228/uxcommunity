@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/accept
@@ -51,5 +52,6 @@ export async function POST(
     .update({ status: "accepted", decided_at: new Date().toISOString(), decided_by: userId })
     .eq("id", requestId);
 
+  invalidateMembership(communityId, request.user_id);
   return NextResponse.json({ success: true });
 }

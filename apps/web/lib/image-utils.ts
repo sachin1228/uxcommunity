@@ -38,13 +38,13 @@ export async function compressAvatar(input: Buffer): Promise<CompressedImage> {
  * Settings:
  * - Shrinks to at most 1200 px on the longest edge, preserving aspect ratio.
  * - Never upscales.
- * - Quality 65 — visually acceptable at ≈ 80 % smaller than raw JPEG.
+ * - Quality 72 — balanced visual fidelity and transfer size.
  * - Strips all EXIF/metadata (sharp does this by default).
  */
 export async function compressChatImage(input: Buffer): Promise<CompressedImage> {
   const data = await sharp(input)
     .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-    .webp({ quality: 65 })
+    .webp({ quality: 72 })
     .toBuffer();
   return { data, contentType: "image/webp", ext: "webp" };
 }

@@ -8,6 +8,7 @@ import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -137,6 +138,8 @@ export async function POST(request: Request) {
     console.error("[community-create] owner membership failed:", memberError);
     return NextResponse.json({ error: "Failed to create community membership." }, { status: 500 });
   }
+
+  invalidateMembership(community.id, userId);
 
   const rulesToInsert = rules.length
     ? rules

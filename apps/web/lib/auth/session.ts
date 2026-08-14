@@ -1,13 +1,16 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
+import {
+  getUserStatusCachedWithState,
+  invalidateUserStatus,
+  type UserStatusCacheState,
+} from "@/lib/auth/user-status-cache";
 
 export const SESSION_COOKIE = "uxcommunity_session";
 export const LEGACY_SESSION_COOKIE = "draft_session";
 const EXPIRY_SECONDS = 60 * 60 * 24 * 7; // 7 days
-const USER_LIVENESS_TTL_MS = 15_000;
-const activeUserChecks = new Map<string, number>();
-const activeUserChecksInFlight = new Map<string, Promise<void>>();
+const USER_LIVENESS_TTL_MS = 30_000;
 
 export interface SessionPayload {
   userId?: string;
@@ -77,47 +80,46 @@ export function clearSessionCookie(res: NextResponse) {
  * Used in API routes to guard against deleted/blocked users who still hold
  * a valid JWT (sessions are stateless, so we must verify liveness explicitly).
  */
-async function assertUserActive(userId: string): Promise<void> {
-  const checkedAt = activeUserChecks.get(userId);
-  if (checkedAt && Date.now() - checkedAt < USER_LIVENESS_TTL_MS) return;
+async function assertUserActive(userId: string): Promise<UserStatusCacheState> {
+  const { value, state } = await getUserStatusCachedWithState(
+    userId,
+    async () => {
+      // Lazy import keeps JWT-only consumers edge-compatible.
+      const { createServiceClient } = await import("@/lib/supabase/service");
+      const db = createServiceClient();
+      const { data, error } = await db
+        .from("users")
+        .select("id, is_blocked")
+        .eq("id", userId)
+        .maybeSingle();
 
-  const pending = activeUserChecksInFlight.get(userId);
-  if (pending) return pending;
+      if (error) throw error;
+      const activeUser = data as { id: string; is_blocked: boolean } | null;
+      return { exists: Boolean(activeUser), is_blocked: activeUser?.is_blocked ?? false };
+    },
+    { ttlMs: USER_LIVENESS_TTL_MS },
+  );
 
-  const check = (async () => {
-    // Lazy import keeps JWT-only consumers edge-compatible.
-    const { createServiceClient } = await import("@/lib/supabase/service");
-    const db = createServiceClient();
-    const { data, error } = await db
-      .from("users")
-      .select("id, is_blocked")
-      .eq("id", userId)
-      .maybeSingle();
+  if (!value.exists || value.is_blocked) {
+    invalidateUserStatus(userId);
+    throw new Response(
+      JSON.stringify({ error: "Account has been deactivated or deleted." }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
-    const activeUser = data as { id: string; is_blocked: boolean } | null;
-    if (error || !activeUser || activeUser.is_blocked) {
-      activeUserChecks.delete(userId);
-      throw new Response(
-        JSON.stringify({ error: "Account has been deactivated or deleted." }),
-        { status: 401, headers: { "Content-Type": "application/json" } },
-      );
-    }
-    activeUserChecks.set(userId, Date.now());
-  })().finally(() => activeUserChecksInFlight.delete(userId));
-
-  activeUserChecksInFlight.set(userId, check);
-  return check;
+  return state;
 }
 
 /** Clear a cached liveness result immediately after blocking or deleting a user. */
 export function invalidateUserLiveness(userId: string): void {
-  activeUserChecks.delete(userId);
-  activeUserChecksInFlight.delete(userId);
+  invalidateUserStatus(userId);
 }
 
 /** Throws a Response if session is missing, role doesn't match, or user is blocked/deleted. */
 export async function requireSession(
-  role?: "user" | "admin"
+  role?: "user" | "admin",
+  options: { onLivenessCache?: (state: UserStatusCacheState) => void } = {},
 ): Promise<SessionPayload> {
   const session = await getSession();
   if (!session) {
@@ -137,7 +139,8 @@ export async function requireSession(
   // Admins are not subject to this check (they won't block themselves via the
   // admin panel, and admin account management is handled separately).
   if (session.role === "user" && session.userId) {
-    await assertUserActive(session.userId);
+    const state = await assertUserActive(session.userId);
+    options.onLivenessCache?.(state);
   }
 
   return session;

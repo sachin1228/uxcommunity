@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { invalidateMembership } from "@/lib/communities/membership-cache";
 
 export async function POST() {
   let session;
@@ -114,7 +115,10 @@ export async function POST() {
     joinedCommunities.push(generalCommunity.id);
   }
 
-  if (!specs.length) return NextResponse.json({ joined: joinedCommunities });
+  if (!specs.length) {
+    for (const communityId of joinedCommunities) invalidateMembership(communityId, userId);
+    return NextResponse.json({ joined: joinedCommunities });
+  }
 
   // ── 4. Upsert each profile-based community ───────────────────
   for (const spec of specs) {
@@ -144,5 +148,6 @@ export async function POST() {
     joinedCommunities.push(community.id);
   }
 
+  for (const communityId of joinedCommunities) invalidateMembership(communityId, userId);
   return NextResponse.json({ joined: joinedCommunities });
 }
