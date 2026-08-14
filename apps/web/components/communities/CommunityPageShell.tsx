@@ -20,9 +20,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   metaCache,
-  sidebarStore,
   inFlightMetaFetch,
   META_STALE_MS,
+  type CachedMeta,
 } from "@/lib/communities/cache";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
@@ -52,46 +52,32 @@ interface Props {
   activeTab: ChatTab;
   /** Needed for online presence subscription. */
   currentUserId: string;
+  /** Server-rendered metadata keeps the first browser render identical to SSR. */
+  initialMeta: Pick<CachedMeta, "community" | "members">;
   children: React.ReactNode;
 }
 
-function readCache(communityId: string): { community: Community | null; members: Member[] } {
-  if (typeof window === "undefined") return { community: null, members: [] };
-  const cached = metaCache.get(communityId);
-  if (cached) return { community: cached.community as Community, members: cached.members };
-  const entry = sidebarStore.data?.communities.find((c) => c.id === communityId);
-  if (entry) {
-    return {
-      community: {
-        id: communityId,
-        name: entry.name,
-        type: entry.type,
-        member_count: entry.member_count,
-        image_url: entry.image_url,
-        is_private: entry.is_private,
-        enabled_tabs: entry.enabled_tabs,
-      },
-      members: [],
-    };
-  }
-  return { community: null, members: [] };
-}
-
-export function CommunityPageShell({ communityId, activeTab, currentUserId, children }: Props) {
+export function CommunityPageShell({
+  communityId,
+  activeTab,
+  currentUserId,
+  initialMeta,
+  children,
+}: Props) {
   const router = useRouter();
 
-  const [community, setCommunity] = useState<Community | null>(
-    () => readCache(communityId).community
-  );
-  const [members, setMembers] = useState<Member[]>(
-    () => readCache(communityId).members
-  );
+  const [community, setCommunity] = useState<Community>(initialMeta.community);
+  const [members, setMembers] = useState<Member[]>(initialMeta.members);
 
   const { onlineCount } = useOnlinePresence({ communityId, currentUserId });
 
   useEffect(() => {
     const cached = metaCache.get(communityId);
-    if (cached && Date.now() - cached.fetchedAt < META_STALE_MS) {
+    if (!cached) {
+      metaCache.set(communityId, { ...initialMeta, fetchedAt: Date.now() });
+      return;
+    }
+    if (Date.now() - cached.fetchedAt < META_STALE_MS) {
       setCommunity(cached.community as Community);
       setMembers(cached.members);
       return;
@@ -129,7 +115,7 @@ export function CommunityPageShell({ communityId, activeTab, currentUserId, chil
       });
 
     inFlightMetaFetch.set(communityId, promise);
-  }, [communityId]);
+  }, [communityId, initialMeta]);
 
   function handleTabChange(tab: ChatTab) {
     if (tab === "chat") {

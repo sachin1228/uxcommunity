@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { CommunityPageShell } from "@/components/communities/CommunityPageShell";
+import { loadCommunityReadModel } from "@/lib/communities/read-models";
+import type { CachedMeta } from "@/lib/communities/cache";
 
 interface Props {
   children: React.ReactNode;
@@ -17,9 +19,16 @@ export default async function ResourcesLayout({ children, params }: Props) {
 
   const { id } = await params;
   const userId = (session as { userId: string }).userId;
+  const meta = await loadCommunityReadModel(id, userId);
+  if (!meta.ok) redirect("/dashboard");
 
   return (
-    <CommunityPageShell communityId={id} activeTab="resources" currentUserId={userId}>
+    <CommunityPageShell
+      communityId={id}
+      activeTab="resources"
+      currentUserId={userId}
+      initialMeta={meta.data as unknown as Pick<CachedMeta, "community" | "members">}
+    >
       {children}
     </CommunityPageShell>
   );
