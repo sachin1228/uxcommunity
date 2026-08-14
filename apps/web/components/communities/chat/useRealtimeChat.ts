@@ -273,7 +273,15 @@ export function useRealtimeChat({
             const next = prev.map((m) =>
               m.id === updated.id
                 ? updated.deleted_at
-                  ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
+                  ? {
+                      ...m,
+                      deleted_at: updated.deleted_at,
+                      content: "",
+                      image_url: null,
+                      image_status: updated.image_status ?? m.image_status,
+                      reply_to: null,
+                      reactions: [],
+                    }
                   : {
                       ...m,
                       image_status: updated.image_status,

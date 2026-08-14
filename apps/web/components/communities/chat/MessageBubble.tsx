@@ -581,7 +581,34 @@ function ImageModerationNotice({
 }
 
 /** Placeholder shown for soft-deleted messages. */
-function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
+function DeletedBubble({
+  isMe,
+  createdAt,
+  moderationViolation,
+}: {
+  isMe: boolean;
+  createdAt: string;
+  moderationViolation: boolean;
+}) {
+  if (moderationViolation) {
+    return (
+      <div
+        className="inline-flex items-center gap-2 rounded-2xl rounded-tl-sm border border-red-500/30 bg-red-500/15 px-3 py-2.5 text-red-300 select-none"
+        role="status"
+      >
+        <Ban size={14} className="shrink-0" />
+        <span className="font-body text-xs">
+          {isMe
+            ? "Your image was removed because it violated community guidelines."
+            : "This image was removed for violating community guidelines."}
+        </span>
+        <span className="ml-1 shrink-0 font-mono text-[10px] text-red-300/70">
+          {fmtTime(createdAt)}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 select-none
@@ -695,7 +722,11 @@ export function MessageBubble({
           )}
 
           {isDeleted ? (
-            <DeletedBubble isMe={isMe} createdAt={msg.created_at} />
+            <DeletedBubble
+              isMe={isMe}
+              createdAt={msg.created_at}
+              moderationViolation={imageStatus === "rejected"}
+            />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className="flex items-center gap-1">
