@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
@@ -234,7 +234,7 @@ interface Props {
 }
 
 export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId }: Props) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
 

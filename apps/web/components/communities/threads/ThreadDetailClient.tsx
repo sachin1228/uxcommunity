@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   ArrowLeft, CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
@@ -257,7 +257,7 @@ export function ThreadDetailClient({
   backLabel = "Home",
   flushLayout = false,
 }: Props) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const detailUrl = `/api/communities/${communityId}/threads/${initialThread.id}`;
   const commentsUrl = `${detailUrl}/comments`;
   seedThreadResource(detailUrl, { thread: initialThread }, currentUserId);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   sidebarStore,
   SIDEBAR_STALE_MS,
@@ -23,7 +24,7 @@ import { useSidebarTyping } from "./useSidebarTyping";
 type Community = CachedSidebarCommunity;
 
 export function useSidebarCommunities(userId: string) {
-  const router   = useRouter();
+  const router   = useGuardedRouter();
   const pathname = usePathname();
 
   const activeCommunityId = pathname.match(

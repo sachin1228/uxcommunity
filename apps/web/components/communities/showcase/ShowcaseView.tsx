@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   Box,
   CalendarClock,
@@ -34,7 +34,7 @@ export function ShowcaseView({
   communityId: string;
   currentUserId: string;
 }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/showcase`;
   const cached = getCachedRequest<{ posts?: ShowcasePost[]; nextCursor?: string | null }>(requestUrl, currentUserId);

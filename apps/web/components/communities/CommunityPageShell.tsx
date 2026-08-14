@@ -17,7 +17,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   metaCache,
   inFlightMetaFetch,
@@ -64,7 +64,7 @@ export function CommunityPageShell({
   initialMeta,
   children,
 }: Props) {
-  const router = useRouter();
+  const router = useGuardedRouter();
 
   const [community, setCommunity] = useState<Community>(initialMeta.community);
   const [members, setMembers] = useState<Member[]>(initialMeta.members);

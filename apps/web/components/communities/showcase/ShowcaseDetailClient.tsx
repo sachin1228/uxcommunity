@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   ArrowLeft,
   CornerDownRight,
@@ -192,7 +192,7 @@ export function ShowcaseDetailClient({
   currentUserId: string;
   communityId: string;
 }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);

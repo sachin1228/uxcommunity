@@ -5,6 +5,7 @@ import {
   allowBack,
   allowNavigation,
   createNavigationGuard,
+  installLinkClickGuard,
   resetNavigationGuard,
   type RouterLike,
   NAVIGATION_LOCK_MS,
@@ -115,4 +116,54 @@ test("double back is swallowed but a later back is allowed", () => {
 test("allowNavigation records the first navigation and blocks duplicates", () => {
   assert.equal(allowNavigation("/x"), true)
   assert.equal(allowNavigation("/x"), false)
+})
+
+test("link click guard swallows rapid duplicate clicks on the same internal link", () => {
+  // Minimal DOM stand-in so the guard's document listener can be exercised.
+  const listeners: Array<{ type: string; fn: (e: unknown) => void; capture: boolean }> = []
+  ;(globalThis as { document?: unknown }).document = {
+    addEventListener: (type: string, fn: (e: unknown) => void, capture: boolean) => {
+      listeners.push({ type, fn, capture })
+    },
+    removeEventListener: () => undefined,
+  }
+
+  const cleanup = installLinkClickGuard(800)
+  const handler = listeners.find((l) => l.type === "click")!.fn
+
+  const makeClick = () => {
+    const event: Record<string, unknown> = {
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      defaultPrevented: false,
+      target: {
+        closest: (selector: string) =>
+          selector === "a[href]"
+            ? { getAttribute: () => "/dashboard/communities/c1" }
+            : null,
+      },
+    }
+    event.preventDefault = () => { event.defaultPrevented = true }
+    event.stopImmediatePropagation = () => { event.stopped = true }
+    return event
+  }
+
+  const first = makeClick()
+  handler(first)
+  assert.equal(first.defaultPrevented, false, "first click starts navigation")
+
+  const duplicate = makeClick()
+  handler(duplicate)
+  assert.equal(duplicate.defaultPrevented, true, "duplicate click is swallowed")
+
+  const otherHref = makeClick()
+  otherHref.target = { closest: () => ({ getAttribute: () => "/dashboard/communities/c2" }) }
+  handler(otherHref)
+  assert.equal(otherHref.defaultPrevented, false, "different destination is allowed")
+
+  cleanup()
+  delete (globalThis as { document?: unknown }).document
 })

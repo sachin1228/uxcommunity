@@ -31,6 +31,7 @@ export const BACK_LOCK_MS = 300;
 
 const pendingNavigations = new Map<string, number>();
 let lastBackAt = 0;
+let installedClickGuard: (() => void) | null = null;
 
 /** True when a push/replace to `href` should proceed (not a duplicate). */
 export function allowNavigation(href: string, lockMs = NAVIGATION_LOCK_MS): boolean {
@@ -53,6 +54,59 @@ export function allowNavigation(href: string, lockMs = NAVIGATION_LOCK_MS): bool
 export function resetNavigationGuard() {
   pendingNavigations.clear();
   lastBackAt = 0;
+}
+
+function isInternalHref(href: string): boolean {
+  return (
+    !href.startsWith("http") &&
+    !href.startsWith("//") &&
+    !href.startsWith("mailto:") &&
+    !href.startsWith("tel:") &&
+    !href.startsWith("javascript:") &&
+    !href.startsWith("#")
+  );
+}
+
+/**
+ * Global protection for `<Link>` components.
+ *
+ * Next.js `<Link>` calls the router internally, so `useGuardedRouter()` does
+ * not cover it. This installs a capture-phase document click listener that
+ * swallows rapid repeated clicks on the same internal anchor — a burst of 10
+ * clicks on one link produces a single route transition (and therefore a
+ * single RSC request) instead of 10.
+ *
+ * Returns a cleanup function. Idempotent: installing twice is a no-op.
+ */
+export function installLinkClickGuard(lockMs = NAVIGATION_LOCK_MS): () => void {
+  if (installedClickGuard) return installedClickGuard;
+
+  const handler = (event: MouseEvent) => {
+    if (event.defaultPrevented) return;
+    // Only plain left-clicks without modifier keys.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    const target = (event.target as Element | null)?.closest?.("a[href]");
+    if (!target) return;
+    const href = target.getAttribute("href");
+    if (!href || !isInternalHref(href)) return;
+    if (target.getAttribute("target") === "_blank") return;
+
+    if (!allowNavigation(href, lockMs)) {
+      // A transition to this exact destination is already pending — swallow
+      // this click before Next.js' own handler can start another one.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  };
+
+  document.addEventListener("click", handler, true);
+  installedClickGuard = () => {
+    document.removeEventListener("click", handler, true);
+    installedClickGuard = null;
+  };
+  return installedClickGuard;
 }
 
 /** True when `router.back()` should proceed (not a double-back). */
