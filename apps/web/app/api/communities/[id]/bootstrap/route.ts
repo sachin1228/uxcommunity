@@ -2,28 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { estimateJsonBytes } from "@/lib/server-timing";
 import {
-  loadCommunityEvents,
-  loadCommunityMembersPage,
   loadCommunityMessagePage,
   loadCommunityReadModel,
-  loadCommunityResources,
-  loadCommunityRules,
-  loadCommunityShowcasePage,
-  loadCommunityStats,
-  loadCommunityThreads,
   type ReadResult,
 } from "@/lib/communities/read-models";
 type Params = { params: Promise<{ id: string }> };
-type Section =
-  | "community"
-  | "messages"
-  | "rules"
-  | "stats"
-  | "events"
-  | "threads"
-  | "resources"
-  | "members"
-  | "showcase";
+type Section = "community" | "messages";
 
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
@@ -56,13 +40,6 @@ export async function GET(_request: NextRequest, context: Params) {
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
-    ["rules", async () => unwrapReadResult(await loadCommunityRules(communityId))],
-    ["stats", async () => unwrapReadResult(await loadCommunityStats(communityId))],
-    ["events", async () => unwrapReadResult(await loadCommunityEvents(communityId, userId))],
-    ["threads", async () => unwrapReadResult(await loadCommunityThreads(communityId, userId))],
-    ["resources", async () => unwrapReadResult(await loadCommunityResources(communityId, userId))],
-    ["members", async () => unwrapReadResult(await loadCommunityMembersPage(communityId, userId))],
-    ["showcase", async () => unwrapReadResult(await loadCommunityShowcasePage(communityId, userId, null))],
   ];
 
   const settled = await Promise.allSettled(
@@ -110,11 +87,6 @@ export async function GET(_request: NextRequest, context: Params) {
     response_bytes: responseBytes,
     returned_counts: {
       messages: ((data.messages as { messages?: unknown[] } | undefined)?.messages ?? []).length,
-      events: ((data.events as { events?: unknown[] } | undefined)?.events ?? []).length,
-      threads: ((data.threads as { threads?: unknown[] } | undefined)?.threads ?? []).length,
-      resources: ((data.resources as { resources?: unknown[] } | undefined)?.resources ?? []).length,
-      members: ((data.members as { members?: unknown[] } | undefined)?.members ?? []).length,
-      showcase: ((data.showcase as { posts?: unknown[] } | undefined)?.posts ?? []).length,
     },
   }));
 

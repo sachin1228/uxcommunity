@@ -83,14 +83,12 @@ export async function fetchJsonCached<T>(
   const cached = entries.get(key) as CacheEntry<T> | undefined
   const fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
-  // A direct link may mount a secondary tab before CommunityChat's effect runs.
-  // Route every initial community read through the same bootstrap promise so the
-  // child endpoint never races the aggregate request.
+  // Critical first-render reads share the community bootstrap promise. Secondary
+  // tabs use their own endpoint cache so they never delay or inflate bootstrap.
   const parsed = new URL(url, "http://uxcommunity.local")
-  const communityMatch = parsed.pathname.match(/^\/api\/communities\/([^/]+)\/(messages|rules|stats|events|threads|resources|showcase|permissions|unread|members)$/)
-  const isInitialMembersPage = communityMatch?.[2] !== "members" || parsed.searchParams.get("page") === "0"
-  const isInitialCollection = communityMatch && isInitialMembersPage && !parsed.searchParams.has("cursor") && !parsed.searchParams.has("before") && !parsed.searchParams.has("after") && !parsed.searchParams.has("search")
-  if (!options.force && !fresh && isInitialCollection) {
+  const communityMatch = parsed.pathname.match(/^\/api\/communities\/([^/]+)\/(messages|permissions|unread)$/)
+  const isInitialCriticalRead = communityMatch && !parsed.searchParams.has("before") && !parsed.searchParams.has("after")
+  if (!options.force && !fresh && isInitialCriticalRead) {
     await fetchAndHydrateCommunityBootstrap(communityMatch[1], userId ?? activeUserId ?? "anonymous")
     return fetchJsonCached<T>(url, options, userId)
   }
@@ -168,13 +166,6 @@ export function invalidateRequestPrefix(prefix: string, userId = activeUserId ??
 export type CommunityBootstrap = {
   community: unknown
   messages: unknown
-  rules: unknown
-  stats: unknown
-  events: unknown
-  threads: unknown
-  resources: unknown
-  members: unknown
-  showcase: unknown
   permissions: unknown
   unreadCount: number
   failures?: Array<{ section: string; message: string }>
@@ -193,13 +184,6 @@ export async function fetchAndHydrateCommunityBootstrap(
   const sections: Array<[string, unknown]> = [
     [base, data.community],
     [`${base}/messages`, data.messages],
-    [`${base}/rules`, data.rules],
-    [`${base}/stats`, data.stats],
-    [`${base}/events`, data.events],
-    [`${base}/threads`, data.threads],
-    [`${base}/resources`, data.resources],
-    [`${base}/members?page=0`, data.members],
-    [`${base}/showcase`, data.showcase],
     [`${base}/permissions`, data.permissions],
     [`${base}/unread`, { unreadCount: data.unreadCount }],
   ]

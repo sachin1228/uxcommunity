@@ -84,7 +84,8 @@ export function CommunityChat({
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // One deduplicated bootstrap primes every collection used by the community UI.
+  // Prime only first-render data. Secondary tabs fetch from their own cached
+  // endpoints when mounted, so their work cannot delay the chat shell.
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -103,7 +104,6 @@ export function CommunityChat({
           members: CachedMeta["members"];
         };
         const messageData = data.messages as { messages: CachedMessage[] };
-        const threadData = data.threads as { threads?: CachedThreadEvent[] };
         const fetchedAt = Date.now();
 
         metaCache.set(communityId, {
@@ -113,12 +113,6 @@ export function CommunityChat({
         });
         msgCache.set(communityId, messageData.messages ?? []);
         msgFetchedAt.set(communityId, fetchedAt);
-        setThreadEvents((threadData.threads ?? []).map((thread) => ({
-          ...thread,
-          attachments: thread.attachments ?? [],
-        })).sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        ));
       })
       .catch(() => {})
       .finally(() => {
