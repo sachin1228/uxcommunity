@@ -83,6 +83,16 @@ export async function fetchJsonCached<T>(
   const cached = entries.get(key) as CacheEntry<T> | undefined
   const fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
+  // Critical first-render reads share the community bootstrap promise. Secondary
+  // tabs use their own endpoint cache so they never delay or inflate bootstrap.
+  const parsed = new URL(url, "http://uxcommunity.local")
+  const communityMatch = parsed.pathname.match(/^\/api\/communities\/([^/]+)\/(messages|permissions|unread)$/)
+  const isInitialCriticalRead = communityMatch && !parsed.searchParams.has("before") && !parsed.searchParams.has("after")
+  if (!options.force && !fresh && isInitialCriticalRead) {
+    await fetchAndHydrateCommunityBootstrap(communityMatch[1], userId ?? activeUserId ?? "anonymous")
+    return fetchJsonCached<T>(url, options, userId)
+  }
+
   if (!options.force && fresh) {
     log("hit", key)
     return cached.value
@@ -151,6 +161,36 @@ export function invalidateRequestPrefix(prefix: string, userId = activeUserId ??
       listeners.get(key)?.forEach((listener) => listener())
     }
   }
+}
+
+export type CommunityBootstrap = {
+  community: unknown
+  messages: unknown
+  permissions: unknown
+  unreadCount: number
+  failures?: Array<{ section: string; message: string }>
+}
+
+export async function fetchAndHydrateCommunityBootstrap(
+  communityId: string,
+  userId: string,
+): Promise<CommunityBootstrap> {
+  const base = `/api/communities/${communityId}`
+  const data = await fetchJsonCached<CommunityBootstrap>(
+    `${base}/bootstrap`,
+    { staleMs: DEFAULT_STALE_MS },
+    userId,
+  )
+  const sections: Array<[string, unknown]> = [
+    [base, data.community],
+    [`${base}/messages`, data.messages],
+    [`${base}/permissions`, data.permissions],
+    [`${base}/unread`, { unreadCount: data.unreadCount }],
+  ]
+  for (const [url, value] of sections) {
+    if (value !== undefined) setCachedRequest(url, value, userId)
+  }
+  return data
 }
 
 export function subscribeToRequest(url: string, listener: () => void, userId?: string) {

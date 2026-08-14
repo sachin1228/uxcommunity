@@ -4,6 +4,7 @@ import test, { afterEach } from "node:test"
 import {
   canonicalRequestKey,
   clearRequestCache,
+  fetchAndHydrateCommunityBootstrap,
   fetchJsonCached,
   getCachedRequest,
   initRequestCache,
@@ -193,6 +194,65 @@ test("reuses SSR-seeded community metadata and messages", async () => {
   assert.equal(metadata.community.id, "community-a")
   assert.equal(messages.messages[0]?.id, "message-a")
   assert.equal(calls, 0)
+})
+
+test("hydrates only critical community bootstrap keys", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    calls.push(String(input))
+    return new Response(JSON.stringify({
+      community: { community: { id: "community-a" }, members: [] },
+      messages: { messages: [{ id: "message-a" }] },
+      permissions: { role: "member", can_manage: false },
+      unreadCount: 2,
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await Promise.all([
+    fetchAndHydrateCommunityBootstrap("community-a", "user-a"),
+    fetchJsonCached("/api/communities/community-a/messages", {}, "user-a"),
+  ])
+
+  assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
+  assert.equal(
+    getCachedRequest<{ messages: Array<{ id: string }> }>(
+      "/api/communities/community-a/messages",
+      "user-a",
+    )?.messages[0]?.id,
+    "message-a",
+  )
+  assert.equal(
+    getCachedRequest<{ unreadCount: number }>(
+      "/api/communities/community-a/unread",
+      "user-a",
+    )?.unreadCount,
+    2,
+  )
+  assert.equal(
+    getCachedRequest("/api/communities/community-a/threads", "user-a"),
+    undefined,
+  )
+})
+
+test("fetches secondary community collections independently", async () => {
+  const calls: string[] = []
+  globalThis.fetch = (async (input) => {
+    calls.push(String(input))
+    return new Response(JSON.stringify({ threads: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await Promise.all([
+    fetchJsonCached("/api/communities/community-a/threads", {}, "user-a"),
+    fetchJsonCached("/api/communities/community-a/threads", {}, "user-a"),
+  ])
+
+  assert.deepEqual(calls, ["/api/communities/community-a/threads"])
 })
 
 test("patches and invalidates only the requested user key", async () => {
