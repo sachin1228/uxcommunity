@@ -8,6 +8,7 @@ import {
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
+import { noteCommunityActivity, scheduleMarkRead } from "@/lib/communities/read-manager";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -234,6 +235,29 @@ export function useSidebarRealtime({
             const isOwn    = row.user_id === userId;
             const isActive = row.community_id === activeCommunityIdRef.current;
             const knownName = resolvedNames.get(row.user_id) ?? null;
+
+            // Keep the read manager's unread state fresh. For the community the
+            // user is actively viewing, schedule a (rate-limited) mark-read so
+            // the server's last_read_at keeps up with messages the user is
+            // actually reading. For inactive communities, just record activity
+            // so the next open knows a PATCH is needed.
+            if (!isOwn) {
+              if (isActive) {
+                scheduleMarkRead(row.community_id, {
+                  unreadCount: 1,
+                  lastMessageTimestamp: row.created_at,
+                  reason: "realtime message",
+                });
+              } else {
+                const currentEntry = communities.find(
+                  (c) => c.id === row.community_id
+                );
+                noteCommunityActivity(row.community_id, {
+                  unreadCount: (currentEntry?.message_count ?? 0) + 1,
+                  lastMessageTimestamp: row.created_at,
+                });
+              }
+            }
 
             setCommunities((prev) =>
               applyUpdate(prev, row.community_id, (c) => ({

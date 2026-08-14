@@ -23,7 +23,9 @@ export async function markReadOnServer(communityId: string): Promise<void> {
         sidebarStore.data = {
           ...sidebarStore.data,
           communities: sidebarStore.data.communities.map((c) =>
-            c.id === communityId ? { ...c, last_read_at: newLastReadAt } : c
+            c.id === communityId
+              ? { ...c, last_read_at: newLastReadAt, message_count: 0 }
+              : c
           ),
         };
       }
