@@ -262,6 +262,7 @@ export function useRealtimeChat({
         (payload) => {
           const updated = payload.new as {
             id: string;
+            user_id: string;
             deleted_at: string | null;
             image_url: string | null;
             image_status: CachedMessage["image_status"];
@@ -277,7 +278,12 @@ export function useRealtimeChat({
                   : {
                       ...m,
                       image_status: updated.image_status,
-                      image_url: updated.image_status === "approved" ? updated.image_url : null,
+                      image_url:
+                        updated.image_status === "approved"
+                          ? updated.image_url
+                          : updated.image_status === "pending" && updated.user_id === currentUserId
+                            ? (m.image_url ?? updated.image_url)
+                            : null,
                     }
                 : m
             );
