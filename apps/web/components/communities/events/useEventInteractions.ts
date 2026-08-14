@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 export type EventLikeState = { liked: boolean; like_count: number };
 export type EventSaveState = { saved: boolean; save_count: number };
@@ -18,11 +19,13 @@ type Options = {
 };
 
 async function persistBoolean<T>(url: string, key: "liked" | "saved", desired: boolean) {
-  const response = await fetch(url, {
+  // url cooldown: a rapid click burst on the like/save toggle fires alternating
+  // bodies — they must all collapse onto the first network request.
+  const response = await dedupeFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [key]: desired }),
-  });
+  }, { cooldownMode: "url" });
   const data = (await response.json().catch(() => null)) as T | null;
   if (!response.ok || !data) throw new Error(`Unable to update event ${key}`);
   return data;

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
+import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import "./globals.css";
 
 const geist = Geist({
@@ -64,6 +65,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground antialiased">
+        <NavigationGuard />
         {children}
       </body>
     </html>

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 import {
   ArrowLeft,
   CornerDownRight,
@@ -192,7 +193,7 @@ export function ShowcaseDetailClient({
   currentUserId: string;
   communityId: string;
 }) {
-  const router = useRouter();
+  const router = useGuardedRouter();
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
@@ -248,13 +249,14 @@ export function ShowcaseDetailClient({
         ? { like_count: value.like_count + (active ? -1 : 1) }
         : {}),
     }));
-    const response = await fetch(
+    const response = await dedupeFetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       },
+      { cooldownMode: "url" },
     );
     if (!response.ok) setPost(initialPost);
   }

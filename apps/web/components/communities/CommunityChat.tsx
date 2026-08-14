@@ -2,6 +2,7 @@
 
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { ChevronDown } from "lucide-react";
 import {
   applyReactionDelete,
@@ -70,6 +71,7 @@ export function CommunityChat({
   initialTab?: ChatTab;
 }) {
   const pathname = usePathname();
+  const router = useGuardedRouter();
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [showSettings, setShowSettings] = useState(false);

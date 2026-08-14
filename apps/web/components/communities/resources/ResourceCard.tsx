@@ -18,6 +18,8 @@ import {
   getCachedLinkPreview,
   hasFreshLinkPreview,
 } from "@/lib/communities/linkPreviewCache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { usePendingMutation } from "@/lib/use-mutation";
 
 function useOgImage(url: string, enabled: boolean): string | null {
   const [image, setImage] = useState<string | null>(() =>
@@ -92,7 +94,6 @@ export function ResourceCard({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [reported, setReported] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -105,18 +106,19 @@ export function ResourceCard({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
+  // Reusable mutation pattern: `pending` drives the disabled/spinner state and
+  // concurrent invocations share the same in-flight request.
+  const { run: runDelete, pending: deleting } = usePendingMutation(async () => {
+    const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}`, { method: "DELETE" });
+    if (response.ok) onDeleted(resource.id);
+  });
+
   async function handleDelete(event?: React.MouseEvent) {
     event?.preventDefault();
     event?.stopPropagation();
     if (!confirm("Delete this resource? This cannot be undone.")) return;
-    setDeleting(true);
     setMenuOpen(false);
-    try {
-      const response = await fetch(`/api/communities/${communityId}/resources/${resource.id}`, { method: "DELETE" });
-      if (response.ok) onDeleted(resource.id);
-    } finally {
-      setDeleting(false);
-    }
+    await runDelete();
   }
 
   async function flushSaveIntent() {
@@ -124,7 +126,7 @@ export function ResourceCard({
     saveRequestRunningRef.current = true;
     try {
       while (confirmedSaveRef.current !== desiredSaveRef.current) {
-        const response = await fetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource like");
         const result = (await response.json()) as { saved: boolean };
         confirmedSaveRef.current = result.saved;
@@ -158,7 +160,7 @@ export function ResourceCard({
     bookmarkRequestRunningRef.current = true;
     try {
       while (confirmedBookmarkRef.current !== desiredBookmarkRef.current) {
-        const response = await fetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource bookmark");
         const result = (await response.json()) as { bookmarked: boolean; bookmark_count: number };
         confirmedBookmarkRef.current = result.bookmarked;
