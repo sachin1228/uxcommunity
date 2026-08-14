@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import {
@@ -22,7 +23,7 @@ function cleanDesignation(name: string): string {
   return clean;
 }
 
-export async function loadCommunityReadModel(
+export const loadCommunityReadModel = cache(async function loadCommunityReadModel(
   communityId: string,
   userId: string,
 ): Promise<ReadResult<Record<string, unknown>>> {
@@ -85,7 +86,7 @@ export async function loadCommunityReadModel(
       current_user_role: membership.role ?? "member",
     },
   };
-}
+});
 
 export async function isCommunityMember(
   communityId: string,

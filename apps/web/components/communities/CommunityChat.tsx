@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import {
   applyReactionDelete,
@@ -66,7 +66,6 @@ export function CommunityChat({
   initialLastReadAt?: string | null;
   initialTab?: ChatTab;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
@@ -81,8 +80,12 @@ export function CommunityChat({
     const params = new URLSearchParams();
     if (tab !== "chat") params.set("tab", tab);
     const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-  }, [router, pathname]);
+
+    // Tabs are local views of the same mounted community page. Updating the
+    // URL with the History API keeps links shareable without requesting a new
+    // RSC payload, rerunning the page, or resetting chat state.
+    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname]);
 
   // Prime only first-render data. Secondary tabs fetch from their own cached
   // endpoints when mounted, so their work cannot delay the chat shell.
@@ -95,6 +98,20 @@ export function CommunityChat({
       }
     });
     initRequestCache(currentUserId);
+
+    // A server-rendered snapshot is authoritative for this navigation. Seed
+    // the shared client caches and avoid immediately requesting the same page
+    // data again after hydration.
+    if (initialMeta && initialMessages) {
+      const fetchedAt = Date.now();
+      metaCache.set(communityId, { ...initialMeta, fetchedAt });
+      msgCache.set(communityId, initialMessages);
+      msgFetchedAt.set(communityId, fetchedAt);
+      queueMicrotask(() => {
+        if (!cancelled) setThreadsReady(true);
+      });
+      return () => { cancelled = true; };
+    }
 
     void fetchAndHydrateCommunityBootstrap(communityId, currentUserId)
       .then((data) => {
@@ -120,7 +137,7 @@ export function CommunityChat({
       });
 
     return () => { cancelled = true; };
-  }, [communityId, currentUserId]);
+  }, [communityId, currentUserId, initialMessages, initialMeta]);
 
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
@@ -416,7 +433,7 @@ export function CommunityChat({
     highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
   }, [scrollContainerRef]);
 
-  // ── Realtime subscription ──���──────────────────────────────────────────────
+  // ── Realtime subscription ──���──���───────────────────────────────────────────
   useRealtimeChat({
     communityId,
     currentUserId,
