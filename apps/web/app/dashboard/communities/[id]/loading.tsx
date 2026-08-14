@@ -4,35 +4,30 @@
  * Community chat loading boundary.
  *
  * Shown while the community page's RSC payload streams in (during navigation
- * or initial load). This is intentionally NOT a skeleton:
- *
- *  - If the community was visited before this session, its name/avatar render
- *    instantly from the module-level meta/sidebar caches (same placement as
- *    ChatHeader, so there's no layout shift when the real page commits).
- *  - The chat area shows the community's Lottie animation (community-scoped,
- *    type-scoped, or universal fallback) instead of a pulse placeholder, so a
- *    slow server never leaves the user staring at the previous page or a
- *    blank screen.
+ * or initial load). It renders the REAL page chrome — ChatHeader (avatar,
+ * name, member count, tabs) and the CommunityInfoPanel on the right — fed
+ * from the module-level meta/sidebar caches, so the loading state looks like
+ * the actual community page instead of a skeleton or a bare animation. Only
+ * the chat message area shows the Lottie while messages hydrate.
  *
  * loading.tsx receives no params, so the target community is read from
  * window.location.pathname — the URL bar updates synchronously when a Link is
- * clicked, before the new page's data even starts streaming.
+ * clicked, before the new page's data even starts streaming. useSyncExternalStore
+ * keeps this hydration-safe (server snapshot is empty; client snapshot is
+ * applied after hydration).
  */
 
 import { useMemo, useSyncExternalStore } from "react";
-import { Lock } from "lucide-react";
-import { metaCache, sidebarStore } from "@/lib/communities/cache";
+import {
+  metaCache,
+  sidebarStore,
+  cachedUserId,
+  type CachedMeta,
+} from "@/lib/communities/cache";
+import { useGuardedRouter } from "@/lib/navigation-guard";
+import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHeader";
+import { CommunityInfoPanel } from "@/components/communities/chat/CommunityInfoPanel";
 import { LottieLoader } from "@/components/ui/LottieLoader";
-import { TYPE_EMOJI } from "@/components/communities/chat/chatUtils";
-
-interface LoadingCommunity {
-  id: string;
-  name: string;
-  type: string;
-  member_count: number;
-  image_url: string | null;
-  is_private?: boolean;
-}
 
 function communityIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/dashboard\/communities\/([^/]+)/);
@@ -59,8 +54,7 @@ function getServerPathname() {
 }
 
 export default function CommunityPageLoading() {
-  // useSyncExternalStore keeps this hydration-safe: the server snapshot is
-  // empty, and the client snapshot (target pathname) is applied after hydration.
+  const router = useGuardedRouter();
   const pathname = useSyncExternalStore(
     subscribeToLocation,
     getLocationPathname,
@@ -69,64 +63,57 @@ export default function CommunityPageLoading() {
 
   const communityId = communityIdFromPath(pathname);
 
-  const community = useMemo<LoadingCommunity | null>(() => {
+  // Best-effort cached chrome: full meta cache first, then the sidebar entry.
+  const cached = useMemo<CachedMeta | null>(() => {
     if (!communityId) return null;
     const meta = metaCache.get(communityId);
-    if (meta) return meta.community as LoadingCommunity;
+    if (meta) return meta;
     const sidebar = sidebarStore.data?.communities.find((c) => c.id === communityId);
     if (sidebar) {
       return {
-        id: communityId,
-        name: sidebar.name,
-        type: sidebar.type,
-        member_count: sidebar.member_count,
-        image_url: sidebar.image_url,
-        is_private: sidebar.is_private,
+        community: {
+          id: communityId,
+          name: sidebar.name,
+          type: sidebar.type,
+          member_count: sidebar.member_count,
+          image_url: sidebar.image_url,
+          is_private: sidebar.is_private,
+          enabled_tabs: sidebar.enabled_tabs,
+          owner_id: sidebar.owner_id,
+        },
+        members: [],
+        // Loading-only placeholder; never read for staleness here.
+        fetchedAt: 0,
       };
     }
     return null;
   }, [communityId]);
 
+  const community = cached?.community ?? null;
+  const members = cached?.members ?? [];
+
+  function handleTabChange(tab: ChatTab) {
+    if (!communityId) return;
+    router.push(
+      tab === "chat"
+        ? `/dashboard/communities/${communityId}`
+        : `/dashboard/communities/${communityId}?tab=${tab}`,
+    );
+  }
+
   return (
     <div className="flex-1 flex overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Cached chat chrome — same placement/height as ChatHeader so the
-            layout doesn't shift when the real page commits. */}
-        {community && (
-          <div className="px-5 pt-4 border-b border-border shrink-0">
-            <div className="flex items-center justify-between pb-3">
-              <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-full bg-surface-raised flex items-center justify-center text-sm shrink-0 overflow-hidden">
-                  {community.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={community.image_url}
-                      alt={community.name}
-                      className="h-11 w-11 rounded-full object-cover"
-                    />
-                  ) : (
-                    TYPE_EMOJI[community.type] ?? "💬"
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-display text-base font-semibold text-foreground leading-none">
-                    <span className="inline-flex items-center gap-1.5">
-                      {community.name}
-                      {community.is_private && (
-                        <Lock size={13} className="text-foreground-muted" aria-label="Private community" />
-                      )}
-                    </span>
-                  </h3>
-                  <p className="font-body text-[11px] text-foreground-muted mt-0.5">
-                    {community.member_count} member{community.member_count !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Real chat chrome — identical to the page, so committing is seamless. */}
+        <ChatHeader
+          community={community}
+          activeTab="chat"
+          onTabChange={handleTabChange}
+          currentUserId={cachedUserId ?? undefined}
+          communityId={communityId ?? undefined}
+        />
 
-        {/* Chat area — the community's Lottie animation while it loads. */}
+        {/* Chat message area — the community's Lottie while it loads. */}
         <div className="flex-1 flex items-center justify-center">
           {communityId ? (
             <LottieLoader
@@ -141,9 +128,13 @@ export default function CommunityPageLoading() {
         </div>
       </div>
 
-      {/* Info panel placeholder — matches CommunityInfoPanel's width so the
-          layout doesn't shift when the page commits. */}
-      <div className="w-72 shrink-0" aria-hidden />
+      {/* Real info sidebar — renders from the cached members/community. */}
+      <CommunityInfoPanel
+        members={members}
+        community={community}
+        communityId={communityId ?? ""}
+        currentUserId={cachedUserId ?? undefined}
+      />
     </div>
   );
 }
