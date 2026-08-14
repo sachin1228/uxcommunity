@@ -16,7 +16,9 @@
  * server, so `data.url` in the response matches exactly what the user
  * provided, keeping existing UI behavior unchanged.
  */
-import type { LinkPreviewData } from "./linkPreview";
+import { normalizePreviewUrl, type LinkPreviewData } from "./linkPreview";
+
+export { normalizePreviewUrl };
 
 /** Fresh link-preview metadata is served from cache for 10 minutes. */
 export const LINK_PREVIEW_STALE_MS = 10 * 60 * 1000;
@@ -48,35 +50,6 @@ export interface LinkPreviewResult {
 const cache = new Map<string, LinkPreviewCacheEntry>();
 // url (normalized) → in-flight promise shared by all callers
 const inFlight = new Map<string, Promise<LinkPreviewData | null>>();
-
-/**
- * Normalize a URL for cache-keying so equivalent forms (case, trailing slash,
- * fragment, query-parameter order) share one request.
- */
-export function normalizePreviewUrl(raw: string): string {
-  const trimmed = raw.trim();
-  try {
-    const url = new URL(trimmed);
-    // Fragments aren't sent to the server and don't change the page metadata.
-    url.hash = "";
-    // Parameter order shouldn't cause separate requests.
-    url.searchParams.sort();
-    // Drop default ports.
-    if (
-      (url.protocol === "http:" && url.port === "80") ||
-      (url.protocol === "https:" && url.port === "443")
-    ) {
-      url.port = "";
-    }
-    // Trailing slash on the path is equivalent for metadata purposes.
-    if (url.pathname.length > 1 && url.pathname.endsWith("/")) {
-      url.pathname = url.pathname.slice(0, -1);
-    }
-    return url.toString();
-  } catch {
-    return trimmed;
-  }
-}
 
 /** Development-only logs in the requested `[LINK PREVIEW …]` format. */
 function devLog(tag: "LINK PREVIEW CACHE" | "LINK PREVIEW NETWORK", fields: Record<string, string>) {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
-import type { LinkPreviewData } from "@/lib/communities/linkPreview";
+import {
+  normalizePreviewUrl,
+  type LinkPreviewData,
+} from "@/lib/communities/linkPreview";
 
 // ── Module-level in-memory cache (survives across requests in the same process) ──
 const cache = new Map<string, { data: LinkPreviewData; fetchedAt: number }>();
@@ -106,14 +109,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
-  const cacheKey = rawUrl;
+  // Cache by normalized URL so equivalent spellings (case, trailing slash,
+  // hash, query order) share one entry instead of refetching upstream.
+  const cacheKey = normalizePreviewUrl(rawUrl);
 
-  // Return cached result if still fresh
+  // Return cached result if still fresh. Echo the requester's own URL in the
+  // response so data.url always matches what was asked for, even when the
+  // cache entry was populated by an equivalent spelling.
   const hit = cache.get(cacheKey);
   if (hit && Date.now() - hit.fetchedAt < CACHE_TTL_MS) {
-    return NextResponse.json(hit.data, {
-      headers: { "Cache-Control": "public, max-age=300" },
-    });
+    return NextResponse.json(
+      hit.data.url === rawUrl ? hit.data : { ...hit.data, url: rawUrl },
+      {
+        headers: { "Cache-Control": "public, max-age=300" },
+      },
+    );
   }
 
   try {
