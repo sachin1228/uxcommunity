@@ -89,6 +89,7 @@ export function useRealtimeChat({
             created_at: string;
             reply_to_id: string | null;
             image_url: string | null;
+            image_status: CachedMessage["image_status"];
           };
 
           // Capture scroll position before state update
@@ -154,7 +155,8 @@ export function useRealtimeChat({
               status: "sent",
               reactions: [],
               reply_to: replyTo,
-              image_url: newRow.image_url ?? null,
+              image_url: newRow.image_status === "approved" ? (newRow.image_url ?? null) : (matchedTemp?.image_url ?? null),
+              image_status: newRow.image_status ?? null,
             };
             const next = [...withoutTemp, incoming].sort(
               (a, b) =>
@@ -256,15 +258,22 @@ export function useRealtimeChat({
           const updated = payload.new as {
             id: string;
             deleted_at: string | null;
+            image_url: string | null;
+            image_status: CachedMessage["image_status"];
           };
-          // Only care about soft-deletes; ignore other updates.
-          if (!updated.deleted_at) return;
+          if (!updated.deleted_at && !updated.image_status) return;
 
           setMessages((prev) => {
             if (!prev.some((m) => m.id === updated.id)) return prev;
             const next = prev.map((m) =>
               m.id === updated.id
-                ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
+                ? updated.deleted_at
+                  ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
+                  : {
+                      ...m,
+                      image_status: updated.image_status,
+                      image_url: updated.image_status === "approved" ? updated.image_url : null,
+                    }
                 : m
             );
             msgCache.set(communityId, next);
