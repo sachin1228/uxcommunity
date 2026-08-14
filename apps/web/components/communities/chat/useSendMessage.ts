@@ -260,7 +260,9 @@ export function useSendMessage({
             ...message,
             users:     message.users    ?? optimistic?.users    ?? null,
             reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
-            image_url: optimistic?.image_url ?? message.image_url ?? null,
+            // Swap the temporary blob URL for the durable R2 URL before the
+            // blob is revoked in finally, preventing a broken-image frame.
+            image_url: message.image_url ?? optimistic?.image_url ?? null,
             image_status: message.image_status ?? optimistic?.image_status ?? null,
             status: "sent" as const,
           };

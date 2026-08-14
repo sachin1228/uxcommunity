@@ -155,7 +155,12 @@ export function useRealtimeChat({
               status: "sent",
               reactions: [],
               reply_to: replyTo,
-              image_url: newRow.image_status === "approved" ? (newRow.image_url ?? null) : (matchedTemp?.image_url ?? null),
+              // The sender may render their pending durable URL; other clients
+              // keep pending media hidden until moderation approves it.
+              image_url:
+                newRow.image_status === "approved" || newRow.user_id === currentUserId
+                  ? (newRow.image_url ?? null)
+                  : null,
               image_status: newRow.image_status ?? null,
             };
             const next = [...withoutTemp, incoming].sort(
