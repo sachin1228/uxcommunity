@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Calendar, Heart, MapPin, Video } from "lucide-react";
-import type { CommunityEvent } from "./types";
+import { Calendar, ExternalLink, Heart, MapPin, Video } from "lucide-react";
+import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
 
@@ -17,43 +18,66 @@ function fmtEventDateTime(iso: string) {
   const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
   return `${date} • ${time}`;
 }
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+}
+
 function isPast(iso: string) {
   return new Date(iso) < new Date();
 }
 
-function AvatarStack({ host, count }: { host: { name: string; avatar_url: string | null } | null; count: number }) {
+function AvatarStack({
+  host,
+  rsvps,
+  count,
+}: {
+  host: { name: string; avatar_url: string | null } | null;
+  rsvps?: EventRsvp[];
+  count: number;
+}) {
+  const visible = rsvps?.slice(0, 5);
   const name = host?.name ?? "M";
-  const initial = name.charAt(0).toUpperCase();
-  // Show host avatar + up to 4 placeholder rings to mimic stacked avatars
   const placeholders = Math.min(Math.max(count - 1, 0), 4);
   const shades = ["bg-accent/60", "bg-accent/45", "bg-accent/30", "bg-accent/20"];
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2.5">
       <div className="flex items-center">
-        {/* Host avatar — frontmost */}
-        <div className="relative z-10 h-7 w-7 shrink-0 overflow-hidden rounded-full border-2 border-surface bg-accent/15 flex items-center justify-center">
-          {host?.avatar_url
-            ? <img src={host.avatar_url} alt={name} className="h-full w-full object-cover" />
-            : <span className="font-display text-[10px] font-bold text-accent">{initial}</span>}
-        </div>
-        {/* Stacked placeholders */}
-        {Array.from({ length: placeholders }).map((_, i) => (
+        {visible ? visible.map((rsvp, index) => (
           <div
-            key={i}
-            style={{ marginLeft: "-8px", zIndex: 9 - i }}
-            className={`relative h-7 w-7 shrink-0 rounded-full border-2 border-surface ${shades[i]}`}
-          />
-        ))}
+            key={rsvp.user_id}
+            style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
+            className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
+          >
+            {rsvp.users?.avatar_url ? (
+              <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="h-full w-full object-cover" />
+            ) : (
+              <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
+            )}
+          </div>
+        )) : (
+          <>
+            <div className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15">
+              {host?.avatar_url ? (
+                <img src={host.avatar_url} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="font-display text-[10px] font-bold text-accent">{name.charAt(0).toUpperCase()}</span>
+              )}
+            </div>
+            {Array.from({ length: placeholders }).map((_, index) => (
+              <div
+                key={index}
+                style={{ marginLeft: "-8px", zIndex: 9 - index }}
+                className={`relative h-7 w-7 shrink-0 rounded-full border-2 border-surface ${shades[index]}`}
+              />
+            ))}
+          </>
+        )}
       </div>
-      {count > 0 && (
-        <span className="font-body text-xs text-foreground-muted">
-          {count > 1 ? `+${count - 1} going` : "1 going"}
-        </span>
-      )}
-      {count === 0 && (
-        <span className="font-body text-xs text-foreground-subtle">0 going</span>
-      )}
+      <span className={`font-body ${rsvps ? "text-sm" : "text-xs"} ${count > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
+        {count === 0 ? "0 going" : visible && count > visible.length ? `+${count - visible.length} going` : `${count} going`}
+      </span>
     </div>
   );
 }
@@ -67,11 +91,12 @@ interface EventCardProps {
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
   onLikeChanged: (eventId: string, liked: boolean, count: number) => void;
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
-  /** Override the link destination (e.g. public standalone detail page). */
+  variant?: "list" | "detail";
+  rsvps?: EventRsvp[];
+  error?: string | null;
+  onRsvpSettled?: () => void | Promise<void>;
   detailHref?: string;
-  /** Extends the row divider to the bounds of the scrollable center column. */
   edgeToEdgeDivider?: boolean;
-  /** Positions the options menu in the surrounding post-author header. */
   menuInPostHeader?: boolean;
   communityName?: string;
   communityImage?: string | null;
@@ -86,18 +111,23 @@ export function EventCard({
   onRsvpChanged,
   onLikeChanged,
   onSaveChanged,
+  variant = "list",
+  rsvps,
+  error,
+  onRsvpSettled,
   detailHref,
   edgeToEdgeDivider = false,
   menuInPostHeader = false,
   communityName,
   communityImage,
 }: EventCardProps) {
+  const isDetail = variant === "detail";
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
-
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const { toggleLike, toggleSave } = useEventInteractions({
@@ -115,8 +145,8 @@ export function EventCard({
     if (!confirm("Delete this event? This cannot be undone.")) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
-      if (res.ok) onDeleted(event.id);
+      const response = await fetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
+      if (response.ok) onDeleted(event.id);
     } finally {
       setDeleting(false);
     }
@@ -129,37 +159,31 @@ export function EventCard({
     const newCount = event.rsvp_count + (newRsvped ? 1 : -1);
     onRsvpChanged(event.id, newRsvped, newCount);
     setRsvpPending(true);
+    setRsvpError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
+      const response = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+      if (response.ok) {
+        const data = await response.json();
         onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
+        await onRsvpSettled?.();
       } else {
+        const data = await response.json().catch(() => null);
+        setRsvpError(data?.error ?? "Failed to RSVP.");
         onRsvpChanged(event.id, event.user_rsvped, event.rsvp_count);
       }
     } catch {
+      setRsvpError("Failed to RSVP.");
       onRsvpChanged(event.id, event.user_rsvped, event.rsvp_count);
     } finally {
       setRsvpPending(false);
     }
   }
 
-  function handleLike(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleLike();
-  }
-
-  function handleSave() {
-    toggleSave();
-  }
-
-  function handleReport() {
-    setReported(true);
-  }
-
   async function handleShare() {
-    const url = `${window.location.origin}${isPublicContentScope(communityId) ? publicContentHref("event", event.id) : `/dashboard/communities/${communityId}/events/${event.id}`}`;
+    const fallbackPath = isPublicContentScope(communityId)
+      ? publicContentHref("event", event.id)
+      : `/dashboard/communities/${communityId}/events/${event.id}`;
+    const url = isDetail ? window.location.href : `${window.location.origin}${fallbackPath}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.title, url }); } catch { /* dismissed */ }
     } else {
@@ -174,168 +198,149 @@ export function EventCard({
     ? publicContentHref("event", event.id)
     : `/dashboard/communities/${communityId}/events/${event.id}`);
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
-
-  // Gradient placeholder colors for events without a cover image
   const gradients = [
     "from-violet-500/80 to-pink-500/80",
     "from-blue-500/80 to-cyan-400/80",
     "from-orange-400/80 to-rose-500/80",
     "from-emerald-400/80 to-teal-500/80",
   ];
-  const gradientIndex = event.id.charCodeAt(0) % gradients.length;
+  const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
+
+  const eventBody = (
+    <div className={isDetail ? "overflow-hidden rounded-xl border border-border bg-surface" : ""}>
+      <div className={`flex ${isDetail ? "min-h-[190px] flex-col sm:flex-row" : "gap-4"}`}>
+        <div className={`relative shrink-0 overflow-hidden ${isDetail ? "aspect-video w-full sm:aspect-auto sm:w-44" : "w-36"}`}>
+          {event.cover_image_url ? (
+            <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
+          ) : (
+            <div className={`h-full w-full bg-gradient-to-br ${gradient} ${isDetail ? "" : "min-h-[130px]"}`} />
+          )}
+        </div>
+        <div className={`flex min-w-0 flex-1 flex-col ${isDetail ? "gap-2 p-4 sm:p-5" : "gap-1.5 py-5 pl-2 pr-4"}`}>
+          <div className="flex items-start justify-between gap-2">
+            <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"}`}>
+              {past ? "Past Event" : "Upcoming Event"}
+            </span>
+            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
+              {!past && (
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={rsvpPending || full}
+                  className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                >
+                  {rsvpPending ? (isDetail ? "Updating…" : "…") : event.user_rsvped ? "Going ✓" : full ? (isDetail ? "Event Full" : "Full") : "Join Event"}
+                </button>
+              )}
+              {!isDetail && (
+                <EventOptionsMenu
+                  saved={event.user_saved}
+                  shared={shared}
+                  reported={reported}
+                  isOwner={isOwner}
+                  deleting={deleting}
+                  className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
+                  onSave={toggleSave}
+                  onShare={() => void handleShare()}
+                  onEdit={() => setShowEditModal(true)}
+                  onDelete={() => void handleDelete()}
+                  onReport={() => setReported(true)}
+                />
+              )}
+            </div>
+          </div>
+          {isDetail ? (
+            <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
+          ) : (
+            <h3 className="line-clamp-2 font-display text-sm font-semibold leading-snug text-foreground">{event.title}</h3>
+          )}
+          {event.description && (
+            <p className={`font-body text-foreground-muted ${isDetail ? "text-xs leading-relaxed" : "line-clamp-2 text-xs leading-relaxed"}`}>{event.description}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
+              <Calendar size={isDetail ? 12 : 11} className="shrink-0 text-accent" />
+              {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+            </span>
+            {event.is_online ? (
+              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
+                <Video size={isDetail ? 12 : 11} className="shrink-0" />
+                {isDetail && event.meet_link ? (
+                  <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
+                    Online (Google Meet) <ExternalLink size={10} />
+                  </a>
+                ) : event.meet_link ? "Online (Google Meet)" : "Online"}
+              </span>
+            ) : event.location ? (
+              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
+                <MapPin size={isDetail ? 12 : 11} className="shrink-0" />{event.location}
+              </span>
+            ) : null}
+          </div>
+          <p className={`font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
+            Hosted by <span className="font-semibold text-foreground">{authorName}</span>
+          </p>
+          <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
+          {isDetail && event.max_attendees && (
+            <p className="font-body text-xs text-foreground-subtle">
+              {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
+            </p>
+          )}
+          {isDetail && (error || rsvpError) && <p className="font-body text-xs text-red-400">{error || rsvpError}</p>}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
-      <article className={`group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border border-border rounded-xl overflow-hidden"}`}>
-        <Link
-          href={eventHref}
-          prefetch={false}
-          className={`block ${edgeToEdgeDivider ? communityFeedLayout.gutters : ""}`}
-        >
-          <div className="flex gap-4">
-            {/* Cover image / gradient — left panel */}
-            <div className="relative w-36 shrink-0 overflow-hidden rounded-none">
-              {event.cover_image_url ? (
-                <img
-                  src={event.cover_image_url}
-                  alt={event.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className={`h-full w-full bg-gradient-to-br ${gradients[gradientIndex]} min-h-[130px]`} />
-              )}
-            </div>
-
-            {/* Content — right panel */}
-            <div className="flex min-w-0 py-5 pl-2 pr-4 flex-1 flex-col gap-1.5">
-              {/* Top row: badge + action buttons */}
-              <div className="flex items-start justify-between gap-2">
-                <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${
-                  past
-                    ? "border-border text-foreground-subtle"
-                    : "border-accent/50 text-accent"
-                }`}>
-                  {past ? "Past Event" : "Upcoming Event"}
-                </span>
-
-                {/* Action buttons */}
-                <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
-                  {!past && (
-                    <button
-                      type="button"
-                      onClick={handleJoin}
-                      disabled={rsvpPending || (full && !event.user_rsvped)}
-                      className={`rounded-md px-2.5 py-1 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                        event.user_rsvped
-                          ? "bg-accent/15 text-accent hover:bg-accent/25"
-                          : full
-                          ? "border border-border text-foreground-subtle"
-                          : "bg-accent text-accent-foreground hover:bg-accent-hover"
-                      }`}
-                    >
-                      {rsvpPending ? "…" : event.user_rsvped ? "Going ✓" : full ? "Full" : "Join Event"}
-                    </button>
-                  )}
-                  <EventOptionsMenu
-                    saved={event.user_saved}
-                    shared={shared}
-                    reported={reported}
-                    isOwner={isOwner}
-                    deleting={deleting}
-                    className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
-                    onSave={handleSave}
-                    onShare={() => void handleShare()}
-                    onEdit={() => setShowEditModal(true)}
-                    onDelete={() => void handleDelete()}
-                    onReport={handleReport}
-                  />
-                </div>
-              </div>
-
-              {/* Title */}
-              <h3 className="font-display text-sm font-semibold leading-snug text-foreground line-clamp-2">
-                {event.title}
-              </h3>
-
-              {/* Description */}
-              {event.description && (
-                <p className="font-body text-xs text-foreground-muted line-clamp-2 leading-relaxed">
-                  {event.description}
-                </p>
-              )}
-
-              {/* Date + Location */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                  <Calendar size={11} className="shrink-0 text-accent" />
-                  {fmtEventDateTime(event.event_date)}
-                </span>
-                {event.is_online ? (
-                  <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                    <Video size={11} className="shrink-0" />
-                    {event.meet_link ? "Online (Google Meet)" : "Online"}
-                  </span>
-                ) : event.location ? (
-                  <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                    <MapPin size={11} className="shrink-0" />
-                    {event.location}
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Host + Attendees */}
-              <div className="mt-auto flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="font-body text-[11px] text-foreground-muted">
-                    Hosted by <span className="font-medium text-foreground">{authorName}</span>
-                  </p>
-                  <AvatarStack host={event.users} count={event.rsvp_count} />
-                </div>
-              </div>
-            </div>
+      <article className={isDetail ? "" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border"}`}>
+        {isDetail && (
+          <div className="relative mb-4 flex items-center justify-between gap-3">
+            <PostAuthorMeta
+              name={event.users?.name}
+              avatarUrl={event.users?.avatar_url}
+              createdAt={event.created_at}
+              dateInline
+              secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? communityName}`}
+            />
+            <EventOptionsMenu
+              saved={event.user_saved}
+              shared={shared}
+              reported={reported}
+              isOwner={isOwner}
+              deleting={deleting}
+              onSave={toggleSave}
+              onShare={() => void handleShare()}
+              onEdit={() => setShowEditModal(true)}
+              onDelete={() => void handleDelete()}
+              onReport={() => setReported(true)}
+            />
           </div>
-        </Link>
+        )}
+        {isDetail ? eventBody : (
+          <Link href={eventHref} prefetch={false} className={`block ${edgeToEdgeDivider ? communityFeedLayout.gutters : ""}`}>
+            {eventBody}
+          </Link>
+        )}
       </article>
-
-      {/* Footer: engagement · community */}
       <div className="mt-3 flex items-center justify-between gap-4">
         <button
           type="button"
-          onClick={handleLike}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
           aria-label={event.user_liked ? "Unlike event" : "Like event"}
           aria-pressed={event.user_liked}
           className="group/like flex shrink-0 items-center gap-2"
         >
-          <Heart
-            size={20}
-            strokeWidth={2}
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
-              event.user_liked
-                ? "fill-red-500 text-red-500"
-                : "fill-none text-foreground"
-            }`}
-          />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>
-            {event.like_count}
-          </span>
+          <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
         </button>
-
         {communityName && (
-          <CommunityPostLabel
-            communityName={communityName}
-            communityImage={communityImage}
-            className="min-w-0 justify-end text-right"
-          />
+          <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
         )}
       </div>
-
       {showEditModal && (
-        <EditEventModal
-          event={event}
-          communityId={communityId}
-          onClose={() => setShowEditModal(false)}
-          onUpdated={onUpdated}
-        />
+        <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
       )}
     </>
   );

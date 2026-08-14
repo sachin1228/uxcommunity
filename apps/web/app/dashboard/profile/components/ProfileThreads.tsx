@@ -216,6 +216,14 @@ export function ProfileThreads({
     );
   }
 
+  function handleEventLikeChanged(eventId: string, liked: boolean, count: number) {
+    setEvents((current) =>
+      current.map((e) =>
+        e.id === eventId ? { ...e, user_liked: liked, like_count: count } : e,
+      ),
+    );
+  }
+
   function handleEventSaveChanged(eventId: string, saved: boolean, count: number) {
     setEvents((current) =>
       current.map((e) =>
@@ -336,6 +344,7 @@ export function ProfileThreads({
                       onUpdated={handleEventUpdated(event.id)}
                       onDeleted={handleEventDeleted}
                       onRsvpChanged={handleRsvpChanged}
+                      onLikeChanged={handleEventLikeChanged}
                       onSaveChanged={handleEventSaveChanged}
                     />
                   </div>
@@ -447,6 +456,15 @@ export function ProfileThreads({
                             current.map((i) =>
                               i.type === "event" && i.data.id === event.id
                                 ? { ...i, data: { ...i.data, user_rsvped: rsvped, rsvp_count: count } }
+                                : i,
+                            ),
+                          )
+                        }
+                        onLikeChanged={(eventId, liked, count) =>
+                          setSavedItems((current) =>
+                            current.map((i) =>
+                              i.type === "event" && i.data.id === eventId
+                                ? { ...i, data: { ...i.data, user_liked: liked, like_count: count } }
                                 : i,
                             ),
                           )

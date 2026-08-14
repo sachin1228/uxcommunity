@@ -3,17 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bookmark, BookmarkCheck, CornerDownRight, ExternalLink,
-  Loader2, MessageSquare, MoreHorizontal, Pencil, Send, Trash2,
+  CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import type { CommunityResource, ResourceComment } from "./types";
-import { RESOURCE_TYPES } from "./types";
-import { EditResourceModal } from "./EditResourceModal";
 import { communityFeedLayout } from "../feed-layout";
-import { PostAuthorMeta } from "../PostAuthorMeta";
-import { FigmaEmbed } from "./FigmaEmbed";
-import { getFigmaEmbedUrl } from "@/lib/communities/figma";
+import { ResourceCard } from "./ResourceCard";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -23,10 +18,6 @@ function formatRelativeDate(value: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-function getDomain(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
 }
 
 function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" }) {
@@ -246,23 +237,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   const router = useRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
-  const [savePending, setSavePending] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const isOwner = resource.user_id === currentUserId;
-  const typeInfo = RESOURCE_TYPES.find((t) => t.value === resource.resource_type);
-  const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -306,34 +280,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     };
   }, [resource.id, currentUserId, fetchComments]);
 
-  async function handleDelete() {
-    if (!confirm("Delete this resource? This cannot be undone.")) return;
-    setDeleting(true);
-    setMenuOpen(false);
-    try {
-      const res = await fetch(`/api/communities/${communityId}/resources/${resource.id}`, { method: "DELETE" });
-      if (res.ok) router.push(`/dashboard/communities/${communityId}?tab=resources`);
-    } finally {
-      setDeleting(false);
-    }
-  }
-
-  async function handleSave() {
-    if (savePending) return;
-    const newSaved = !resource.user_saved;
-    const newCount = resource.save_count + (newSaved ? 1 : -1);
-    setResource((r) => ({ ...r, user_saved: newSaved, save_count: newCount }));
-    setSavePending(true);
-    try {
-      const res = await fetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" });
-      if (!res.ok) setResource((r) => ({ ...r, user_saved: !newSaved, save_count: resource.save_count }));
-    } catch {
-      setResource((r) => ({ ...r, user_saved: !newSaved, save_count: resource.save_count }));
-    } finally {
-      setSavePending(false);
-    }
-  }
-
   function handleCommentPosted(comment: ResourceComment) {
     if (comment.parent_id) {
       setComments((prev) =>
@@ -360,7 +306,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     setResource((r) => ({ ...r, comment_count: Math.max(0, r.comment_count - 1) }));
   }
 
-  const authorName = resource.users?.name ?? "Member";
   const totalComments = comments.reduce((acc, c) => acc + 1 + (c.replies?.length ?? 0), 0);
 
   return (
@@ -371,116 +316,16 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
           {/* Resource card */}
           <div className={`${communityFeedLayout.dividerY} py-6`}>
             <div className={communityFeedLayout.detailSection}>
-            {/* Top row: author metadata + actions */}
-            <div className="flex items-start justify-between gap-3">
-              <PostAuthorMeta
-                name={authorName}
-                avatarUrl={resource.users?.avatar_url}
-                createdAt={resource.created_at}
-                dateInline
-                secondaryLabel={`Resources · ${typeInfo?.label ?? "Post"}`}
+              <ResourceCard
+                variant="detail"
+                resource={resource}
+                currentUserId={currentUserId}
+                communityId={communityId}
+                onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
+                onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
+                onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
+                onDeleted={() => router.push(`/dashboard/communities/${communityId}?tab=resources`)}
               />
-
-              <div className="flex items-center gap-2">
-                {/* Save / bookmark */}
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={savePending}
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:opacity-60 ${
-                    resource.user_saved
-                      ? "border-accent/40 bg-accent/10 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"
-                  }`}
-                >
-                  {resource.user_saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
-                  {resource.user_saved ? "Saved" : "Save"}
-                  <span className="font-mono text-[10px]">{resource.save_count}</span>
-                </button>
-
-                {/* Open link */}
-                <a
-                  href={resource.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-                >
-                  <ExternalLink size={13} />
-                  Open
-                </a>
-
-                {/* Owner menu */}
-                {isOwner && (
-                  <div className="relative" ref={menuRef}>
-                    <button
-                      type="button"
-                      onClick={() => setMenuOpen((p) => !p)}
-                      aria-label="Resource options"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                    >
-                      <MoreHorizontal size={15} />
-                    </button>
-                    {menuOpen && (
-                      <div className="absolute right-0 top-9 z-20 min-w-[130px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                        <button
-                          type="button"
-                          onClick={() => { setMenuOpen(false); setShowEdit(true); }}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                        >
-                          <Pencil size={11} /> Edit resource
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleDelete}
-                          disabled={deleting}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                        >
-                          <Trash2 size={11} />
-                          {deleting ? "Deleting…" : "Delete resource"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Title */}
-            <h1 className="mt-3 font-display text-lg font-semibold leading-snug text-foreground">
-              {resource.title}
-            </h1>
-
-            {/* URL display */}
-            <a
-              href={resource.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent transition-colors"
-            >
-              <ExternalLink size={11} />
-              {getDomain(resource.url)}
-            </a>
-
-            {/* Description */}
-            {resource.description && (
-              <p className="mt-4 font-body text-sm leading-relaxed text-foreground-muted whitespace-pre-wrap">
-                {resource.description}
-              </p>
-            )}
-
-            {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
-
-            {/* Tags */}
-            {resource.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {resource.tags.map((tag) => (
-                  <span key={tag} className="font-body text-[11px] text-foreground-subtle">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
-
             </div>
           </div>
 
@@ -538,14 +383,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
         </div>
       </div>
 
-      {showEdit && (
-        <EditResourceModal
-          resource={resource}
-          communityId={communityId}
-          onClose={() => setShowEdit(false)}
-          onUpdated={(updated) => setResource((r) => ({ ...r, ...updated }))}
-        />
-      )}
     </>
   );
 }
