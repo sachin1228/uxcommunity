@@ -29,6 +29,7 @@ import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHead
 import { CommunityInfoPanel } from "@/components/communities/chat/CommunityInfoPanel";
 import { ChatInput } from "@/components/communities/chat/ChatInput";
 import { LottieLoader } from "@/components/ui/LottieLoader";
+import { Spinner } from "@/components/ui/Spinner";
 
 function communityIdFromPath(pathname: string): string | null {
   const match = pathname.match(/^\/dashboard\/communities\/([^/]+)/);
@@ -64,6 +65,16 @@ export default function CommunityPageLoading() {
   );
 
   const communityId = communityIdFromPath(pathname);
+
+  // Detail view pages (threads/events/resources/showcase) live under /[id]/
+  // too. They share the community chrome, but their content is a detail feed,
+  // not a chat — so only the chat tab gets the Lottie + input loading; detail
+  // pages get a plain spinner in the middle content area.
+  const isDetailView =
+    communityId !== null &&
+    /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//.test(
+      pathname,
+    );
 
   // Best-effort cached chrome: full meta cache first, then the sidebar entry.
   const cached = useMemo<CachedMeta | null>(() => {
@@ -115,10 +126,17 @@ export default function CommunityPageLoading() {
           communityId={communityId ?? undefined}
         />
 
-        {/* Chat message area — mirrors the real chat layout: dotted scroll
+        {isDetailView ? (
+          /* Detail view page — spinner in the middle content area, matching
+             its real layout (thread/event/resource/showcase feed). */
+          <div className="flex-1 flex items-center justify-center">
+            <Spinner size={28} className="text-foreground-muted" />
+          </div>
+        ) : (
+        /* Chat message area — mirrors the real chat layout: dotted scroll
             background with the community Lottie, and the input box pinned to
             the bottom. Only the Lottie is "loading"; everything else looks
-            exactly like the committed page. */}
+            exactly like the committed page. */
         <div className="flex-1 overflow-hidden relative">
           <div
             className="absolute inset-0 overflow-y-auto pb-24"
@@ -168,6 +186,7 @@ export default function CommunityPageLoading() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Real info sidebar — renders from the cached members/community. */}
