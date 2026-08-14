@@ -88,69 +88,6 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   };
 });
 
-export type CommunityBootstrapMembership = {
-  joined_at: string;
-  history_cleared_at: string | null;
-  last_read_at: string | null;
-  role: string | null;
-};
-
-type DatabaseMeasure = <T>(name: string, operation: () => Promise<T>) => Promise<T>;
-
-const measureDirectly: DatabaseMeasure = async (_name, operation) => operation();
-
-/**
- * Critical first-render metadata only. Keep this path free of member lists,
- * counts, profile joins, master-data lookups, and secondary-section RPCs.
- */
-export async function loadCommunityBootstrapReadModel(
-  communityId: string,
-  userId: string,
-  measure: DatabaseMeasure = measureDirectly,
-): Promise<ReadResult<{
-  community: Record<string, unknown>;
-  members: [];
-  current_user_role: string;
-  membership: CommunityBootstrapMembership;
-}>> {
-  const db = createServiceClient();
-  const [membershipResult, communityResult] = await Promise.all([
-    measure("db_membership", async () => await db
-      .from("community_members")
-      .select("joined_at, history_cleared_at, last_read_at, role")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle()),
-    measure("db_community", async () => await db
-      .from("communities")
-      .select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token")
-      .eq("id", communityId)
-      .eq("is_active", true)
-      .maybeSingle()),
-  ]);
-
-  const { data: membership, error: membershipError } = membershipResult;
-  const { data: community, error: communityError } = communityResult;
-  if (membershipError) return { ok: false, status: 500, error: "Failed to verify community membership." };
-  if (!membership) return { ok: false, status: 403, error: "Not a member of this community." };
-  if (communityError || !community) return { ok: false, status: 404, error: "Community not found." };
-
-  return {
-    ok: true,
-    data: {
-      community: {
-        ...community,
-        member_count: 0,
-        invite_token: community.owner_id === userId ? community.invite_token : undefined,
-      },
-      // Retained for response compatibility; member data is loaded lazily.
-      members: [],
-      current_user_role: membership.role ?? "member",
-      membership: membership as CommunityBootstrapMembership,
-    },
-  };
-}
-
 export async function isCommunityMember(
   communityId: string,
   userId: string,
@@ -374,38 +311,29 @@ export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,
   cursors: { before?: string | null; after?: string | null } = {},
-  options: {
-    membership?: Pick<CommunityBootstrapMembership, "joined_at" | "history_cleared_at">;
-    measure?: DatabaseMeasure;
-  } = {},
 ): Promise<ReadResult<{ messages: unknown[] }>> {
   const db = createServiceClient();
-  const measure = options.measure ?? measureDirectly;
-  let membership = options.membership;
+  const { data: membership, error: membershipError } = await db
+    .from("community_members")
+    .select("joined_at, history_cleared_at")
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  if (!membership) {
-    const { data, error } = await measure("db_membership", async () => await db
-      .from("community_members")
-      .select("joined_at, history_cleared_at")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle());
-    if (error) return { ok: false, status: 500, error: "Failed to verify community membership." };
-    if (!data) return { ok: false, status: 403, error: "Not a member of this community." };
-    membership = data;
-  }
+  if (membershipError) return { ok: false, status: 500, error: "Failed to verify community membership." };
+  if (!membership) return { ok: false, status: 403, error: "Not a member of this community." };
 
   const historyStart = membership.history_cleared_at && membership.history_cleared_at > membership.joined_at
     ? membership.history_cleared_at
     : membership.joined_at;
-  const { data, error } = await measure("db_messages", () => callPerformanceRpc(db, "get_community_message_page", {
+  const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
     p_community_id: communityId,
     p_user_id: userId,
     p_history_start: historyStart,
     p_before: cursors.after ? null : (cursors.before ?? null),
     p_after: cursors.after ?? null,
     p_limit: MESSAGE_PAGE_SIZE,
-  }));
+  });
 
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
   return { ok: true, data: { messages: (data ?? []).reverse() } };
