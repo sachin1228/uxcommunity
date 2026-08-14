@@ -6,6 +6,7 @@ import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/l
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
+import { Spinner } from "@/components/ui/Spinner";
 import { TYPE_EMOJI } from "./chatUtils";
 
 interface Community {
@@ -315,7 +316,7 @@ export function ChatHeader({
                 spinnerClassName="h-5 w-5 text-foreground-muted"
               />
             ) : (
-              <div className="h-5 w-48 rounded bg-surface-raised animate-pulse" />
+              <Spinner size={16} className="text-foreground-muted" />
             )}
           </div>
         )}

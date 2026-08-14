@@ -6,6 +6,7 @@ import {
   Send, Trash2, Users,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
+import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
@@ -476,16 +477,8 @@ export function EventDetailClient({
 
               {/* Comments list */}
               {commentsLoading ? (
-                <div className="animate-pulse border-t border-border">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="flex gap-3 border-b border-border py-5">
-                      <div className="h-8 w-8 rounded-full bg-surface-raised shrink-0" />
-                      <div className="flex-1 space-y-2 pt-1">
-                        <div className="h-3 w-24 rounded bg-surface-raised" />
-                        <div className="h-4 w-full rounded bg-surface-raised" />
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-center border-t border-border py-12">
+                  <Spinner size={22} className="text-foreground-muted" />
                 </div>
               ) : rootComments.length === 0 ? (
                 <div className={`${communityFeedLayout.emptyState} min-h-40`}>

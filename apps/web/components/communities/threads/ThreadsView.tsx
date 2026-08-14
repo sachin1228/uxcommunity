@@ -17,6 +17,7 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
+import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const THREADS_STALE_MS = 60_000;
@@ -261,41 +262,8 @@ export function ThreadsView({
 
       {loading && (
         <div className={communityFeedLayout.content}>
-          <div className={communityFeedLayout.skeletonList}>
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={communityFeedLayout.skeletonRow}>
-                {/* Top row: avatar + name + category */}
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-20 rounded bg-surface-raised" />
-                    <div className="h-3 w-10 rounded bg-surface-raised" />
-                    <div className="h-5 w-16 rounded-full bg-surface-raised" />
-                  </div>
-                </div>
-                {/* Title */}
-                <div className="mt-4 h-5 w-3/4 rounded bg-surface-raised" />
-                {/* Description */}
-                <div className="mt-2 space-y-1.5">
-                  <div className="h-3 w-full rounded bg-surface-raised" />
-                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                  <div className="h-3 w-2/3 rounded bg-surface-raised" />
-                </div>
-                {/* Tags */}
-                <div className="mt-3 flex gap-2">
-                  <div className="h-6 w-16 rounded-lg bg-surface-raised" />
-                  <div className="h-6 w-20 rounded-lg bg-surface-raised" />
-                </div>
-                {/* Footer */}
-                <div className="mt-3 flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-surface-raised" />
-                    <div className="h-3 w-6 rounded bg-surface-raised" />
-                  </div>
-                  <div className="h-3 w-20 rounded bg-surface-raised" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-24" role="status" aria-label="Loading threads">
+            <Spinner size={28} className="text-foreground-muted" />
           </div>
         </div>
       )}
