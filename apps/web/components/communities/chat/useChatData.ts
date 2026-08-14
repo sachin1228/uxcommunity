@@ -281,7 +281,10 @@ export function useChatData({
       : fetchMessages();
 
     (async () => {
-      await Promise.all([
+      // Metadata and messages are independent. A transient metadata failure
+      // must not leave the chat loader visible forever; the header can still
+      // render from the sidebar cache while messages finish loading.
+      await Promise.allSettled([
         msgPromise,
         metaIsStale ? fetchMeta() : Promise.resolve(),
       ]);
