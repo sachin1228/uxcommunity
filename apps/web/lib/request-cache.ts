@@ -112,7 +112,7 @@ export async function fetchJsonCached<T>(
   let cached = entries.get(key) as CacheEntry<T> | undefined
   let fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
-  if (!options.force && fresh) {
+  if (!options.force && fresh && cached) {
     log("hit", key)
     return cached.value
   }
@@ -128,7 +128,7 @@ export async function fetchJsonCached<T>(
     )
     cached = entries.get(key) as CacheEntry<T> | undefined
     fresh = cached && Date.now() - cached.fetchedAt < staleMs
-    if (fresh) {
+    if (fresh && cached) {
       log("hit", key)
       return cached.value
     }
