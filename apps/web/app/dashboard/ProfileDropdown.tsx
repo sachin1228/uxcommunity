@@ -28,8 +28,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
       // tab never sees data belonging to the current user.
       const { clearAllUserCaches } = await import("@/lib/communities/cache");
       clearAllUserCaches();
-      router.push("/login");
-      router.refresh();
+      router.replace("/login");
     } finally {
       setLoading(false);
     }
