@@ -83,6 +83,18 @@ export async function fetchJsonCached<T>(
   const cached = entries.get(key) as CacheEntry<T> | undefined
   const fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
+  // A direct link may mount a secondary tab before CommunityChat's effect runs.
+  // Route every initial community read through the same bootstrap promise so the
+  // child endpoint never races the aggregate request.
+  const parsed = new URL(url, "http://uxcommunity.local")
+  const communityMatch = parsed.pathname.match(/^\/api\/communities\/([^/]+)\/(messages|rules|stats|events|threads|resources|showcase|permissions|unread|members)$/)
+  const isInitialMembersPage = communityMatch?.[2] !== "members" || parsed.searchParams.get("page") === "0"
+  const isInitialCollection = communityMatch && isInitialMembersPage && !parsed.searchParams.has("cursor") && !parsed.searchParams.has("before") && !parsed.searchParams.has("after") && !parsed.searchParams.has("search")
+  if (!options.force && !fresh && isInitialCollection) {
+    await fetchAndHydrateCommunityBootstrap(communityMatch[1], userId ?? activeUserId ?? "anonymous")
+    return fetchJsonCached<T>(url, options, userId)
+  }
+
   if (!options.force && fresh) {
     log("hit", key)
     return cached.value
@@ -151,6 +163,50 @@ export function invalidateRequestPrefix(prefix: string, userId = activeUserId ??
       listeners.get(key)?.forEach((listener) => listener())
     }
   }
+}
+
+export type CommunityBootstrap = {
+  community: unknown
+  messages: unknown
+  rules: unknown
+  stats: unknown
+  events: unknown
+  threads: unknown
+  resources: unknown
+  members: unknown
+  showcase: unknown
+  permissions: unknown
+  unreadCount: number
+  failures?: Array<{ section: string; message: string }>
+}
+
+export async function fetchAndHydrateCommunityBootstrap(
+  communityId: string,
+  userId: string,
+): Promise<CommunityBootstrap> {
+  const base = `/api/communities/${communityId}`
+  const data = await fetchJsonCached<CommunityBootstrap>(
+    `${base}/bootstrap`,
+    { staleMs: DEFAULT_STALE_MS },
+    userId,
+  )
+  const sections: Array<[string, unknown]> = [
+    [base, data.community],
+    [`${base}/messages`, data.messages],
+    [`${base}/rules`, data.rules],
+    [`${base}/stats`, data.stats],
+    [`${base}/events`, data.events],
+    [`${base}/threads`, data.threads],
+    [`${base}/resources`, data.resources],
+    [`${base}/members?page=0`, data.members],
+    [`${base}/showcase`, data.showcase],
+    [`${base}/permissions`, data.permissions],
+    [`${base}/unread`, { unreadCount: data.unreadCount }],
+  ]
+  for (const [url, value] of sections) {
+    if (value !== undefined) setCachedRequest(url, value, userId)
+  }
+  return data
 }
 
 export function subscribeToRequest(url: string, listener: () => void, userId?: string) {

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Check, MoreHorizontal, Search, Users, X } from "lucide-react";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
+import { fetchJsonCached, getCachedRequest } from "@/lib/request-cache";
 
 interface CommunityMember {
   user_id:     string;
@@ -24,6 +25,7 @@ interface PendingRequest {
 
 interface MembersViewProps {
   communityId: string;
+  currentUserId: string;
   isOwner?:    boolean;
   isPrivate?:  boolean;
 }
@@ -43,12 +45,14 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export function MembersView({ communityId, isOwner = false, isPrivate = false }: MembersViewProps) {
+export function MembersView({ communityId, currentUserId, isOwner = false, isPrivate = false }: MembersViewProps) {
+  const requestUrl = `/api/communities/${communityId}/members?page=0`;
+  const hydrated = getCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(requestUrl, currentUserId);
   const cachedMembers = membersCache.get(communityId);
-  const [members,      setMembers]      = useState<CommunityMember[]>(() => cachedMembers?.data ?? []);
+  const [members,      setMembers]      = useState<CommunityMember[]>(() => cachedMembers?.data ?? hydrated?.members ?? []);
   const [page,         setPage]         = useState(0);
-  const [hasMore,      setHasMore]      = useState(() => cachedMembers?.hasMore ?? false);
-  const [loading,      setLoading]      = useState(() => !cachedMembers);
+  const [hasMore,      setHasMore]      = useState(() => cachedMembers?.hasMore ?? hydrated?.has_more ?? false);
+  const [loading,      setLoading]      = useState(() => !cachedMembers && !hydrated);
   const [loadingMore,  setLoadingMore]  = useState(false);
   const [query,        setQuery]        = useState("");
   const [debouncedQ,   setDebouncedQ]   = useState("");
@@ -77,7 +81,12 @@ export function MembersView({ communityId, isOwner = false, isPrivate = false }:
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    // Use cache for the no-search initial load
+    // Bootstrap has already populated the first unfiltered page.
+    const hydratedPage = !debouncedQ
+      ? getCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(requestUrl, currentUserId)
+      : undefined;
+    if (hydratedPage && !membersCache.has(communityId)) return () => ctrl.abort();
+
     const hit = !debouncedQ ? membersCache.get(communityId) : undefined;
     const isStale = !hit || Date.now() - hit.fetchedAt > MEMBERS_STALE_MS;
 
@@ -92,12 +101,23 @@ export function MembersView({ communityId, isOwner = false, isPrivate = false }:
       setPage(0);
       setHasMore(false);
       setLoading(true);
+    } else if (!isStale && !debouncedQ) {
+      setMembers(hit.data);
+      setHasMore(hit.hasMore);
+      setPage(0);
+      setLoading(false);
+      return () => ctrl.abort();
     }
 
     const url = `/api/communities/${communityId}/members?page=0${debouncedQ ? `&search=${encodeURIComponent(debouncedQ)}` : ""}`;
-    fetch(url, { signal: ctrl.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: { members: CommunityMember[]; has_more: boolean } | null) => {
+    const request = debouncedQ
+      ? fetch(url, { signal: ctrl.signal }).then((response) => response.ok ? response.json() : null)
+      : fetchJsonCached<{ members: CommunityMember[]; has_more: boolean }>(
+          url,
+          { staleMs: MEMBERS_STALE_MS },
+          currentUserId,
+        );
+    void request.then((data: { members: CommunityMember[]; has_more: boolean } | null) => {
         const freshMembers = data?.members ?? [];
         const freshHasMore = data?.has_more ?? false;
         setMembers(freshMembers);
@@ -112,7 +132,7 @@ export function MembersView({ communityId, isOwner = false, isPrivate = false }:
       .catch((err) => { if (err.name !== "AbortError") setLoading(false); });
 
     return () => ctrl.abort();
-  }, [communityId, debouncedQ]);
+  }, [communityId, currentUserId, debouncedQ, requestUrl]);
 
   // Fetch pending requests (owner + private only)
   useEffect(() => {

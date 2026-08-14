@@ -11,6 +11,7 @@ import {
   type CachedMeta,
 } from "@/lib/communities/cache";
 import {
+  fetchAndHydrateCommunityBootstrap,
   fetchJsonCached,
   getCachedRequest,
   setCachedRequest,
@@ -121,6 +122,7 @@ export function useChatData({
   // ── Fetch community metadata ──────────────────────────────────────────────
   const fetchMeta = useCallback(async () => {
     const targetId = communityId;
+    await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
     const d = await fetchJsonCached<{
       community: Community;
       members?: Member[];
@@ -138,8 +140,11 @@ export function useChatData({
 
   // ── Fetch messages (full or incremental via ?after=ISO) ───────────────────
   const fetchMessages = useCallback(
-    (after?: string): Promise<void> => {
+    async (after?: string): Promise<void> => {
       const targetId = communityId;
+      if (!after) {
+        await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
+      }
       const url = after
         ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(after)}`
         : `/api/communities/${targetId}/messages`;

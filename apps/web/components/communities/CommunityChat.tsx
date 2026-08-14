@@ -41,7 +41,7 @@ import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import { fetchJsonCached, initRequestCache, setCachedRequest } from "@/lib/request-cache";
+import { fetchAndHydrateCommunityBootstrap, initRequestCache } from "@/lib/request-cache";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -84,77 +84,46 @@ export function CommunityChat({
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // Load only metadata and the first message page through the critical bootstrap.
-  // Secondary tabs retain their dedicated lazy endpoints and request-cache keys.
+  // One deduplicated bootstrap primes every collection used by the community UI.
   useEffect(() => {
-    setThreadEvents([]);
-    setThreadsReady(false);
     let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setThreadEvents([]);
+        setThreadsReady(false);
+      }
+    });
     initRequestCache(currentUserId);
 
-    type Thread = {
-      id: string; community_id: string; user_id: string;
-      title: string; description: string; category: string;
-      attachments: Array<{ name: string; url: string; type: string; size: number }>;
-      created_at: string;
-      users: { name: string; avatar_url: string | null } | null;
-    };
-    type Bootstrap = {
-      community: {
-        community: CachedMeta["community"];
-        members: CachedMeta["members"];
-        current_user_role: string;
-      };
-      messages: { messages: CachedMessage[] };
-    };
+    void fetchAndHydrateCommunityBootstrap(communityId, currentUserId)
+      .then((data) => {
+        if (cancelled) return;
+        const communityData = data.community as {
+          community: CachedMeta["community"];
+          members: CachedMeta["members"];
+        };
+        const messageData = data.messages as { messages: CachedMessage[] };
+        const threadData = data.threads as { threads?: CachedThreadEvent[] };
+        const fetchedAt = Date.now();
 
-    void fetchJsonCached<Bootstrap>(
-      `/api/communities/${communityId}/bootstrap`,
-      { staleMs: 60_000 },
-      currentUserId,
-    ).then((data) => {
-      if (cancelled) return;
-      const base = `/api/communities/${communityId}`;
-      const fetchedAt = Date.now();
-      const meta: CachedMeta = {
-        community: data.community.community,
-        members: data.community.members,
-        fetchedAt,
-      };
-
-      setCachedRequest(base, data.community, currentUserId);
-      setCachedRequest(`${base}/messages`, data.messages, currentUserId);
-      metaCache.set(communityId, meta);
-      msgCache.set(communityId, data.messages.messages);
-      msgFetchedAt.set(communityId, fetchedAt);
-    }).catch(() => {});
-
-    // Threads are part of the chat timeline, but they are not required for the
-    // first message paint. Fetch them independently so a slow thread query
-    // cannot hold the critical bootstrap response open.
-    void fetchJsonCached<{ threads: Thread[] }>(
-      `/api/communities/${communityId}/threads`,
-      { staleMs: 60_000 },
-      currentUserId,
-    ).then((data) => {
-      if (cancelled) return;
-      const events: CachedThreadEvent[] = (data.threads ?? []).map((thread) => ({
-        id: thread.id,
-        community_id: thread.community_id,
-        user_id: thread.user_id,
-        title: thread.title,
-        description: thread.description,
-        category: thread.category,
-        attachments: thread.attachments ?? [],
-        created_at: thread.created_at,
-        users: thread.users,
-      }));
-      setThreadEvents(events.sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-      ));
-    }).catch(() => {}).finally(() => {
-      if (!cancelled) setThreadsReady(true);
-    });
+        metaCache.set(communityId, {
+          community: communityData.community,
+          members: communityData.members,
+          fetchedAt,
+        });
+        msgCache.set(communityId, messageData.messages ?? []);
+        msgFetchedAt.set(communityId, fetchedAt);
+        setThreadEvents((threadData.threads ?? []).map((thread) => ({
+          ...thread,
+          attachments: thread.attachments ?? [],
+        })).sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        ));
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setThreadsReady(true);
+      });
 
     return () => { cancelled = true; };
   }, [communityId, currentUserId]);
@@ -686,6 +655,7 @@ export function CommunityChat({
         ) : renderedTab === "members" ? (
           <MembersView
             communityId={communityId}
+            currentUserId={currentUserId}
             isOwner={isOwner}
             isPrivate={displayCommunity?.is_private ?? false}
           />
