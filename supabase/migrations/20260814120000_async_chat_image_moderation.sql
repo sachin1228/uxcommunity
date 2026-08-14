@@ -14,7 +14,13 @@ create index if not exists community_messages_pending_image_moderation_idx
   on public.community_messages (created_at)
   where image_status = 'pending';
 
-create or replace function public.get_community_message_page(
+-- PostgreSQL cannot change a function's OUT row type with CREATE OR REPLACE.
+-- Drop this exact signature first, then recreate it with image_status included.
+drop function if exists public.get_community_message_page(
+  uuid, uuid, timestamptz, timestamptz, timestamptz, integer
+);
+
+create function public.get_community_message_page(
   p_community_id uuid,
   p_user_id uuid,
   p_history_start timestamptz,
