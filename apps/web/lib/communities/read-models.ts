@@ -196,6 +196,103 @@ export async function loadCommunityShowcasePage(
   };
 }
 
+export async function loadCommunityEvents(
+  communityId: string,
+  userId: string,
+): Promise<ReadResult<{ events: unknown[]; nextCursor: string | null }>> {
+  const now = new Date().toISOString();
+  const fetchPhase = (phase: "upcoming" | "past") =>
+    callPerformanceRpc(createServiceClient(), "get_event_list_page", {
+      p_community_id: communityId,
+      p_user_id: userId,
+      p_phase: phase,
+      p_cursor_event_date: null,
+      p_cursor_id: null,
+      p_now: now,
+      p_limit: 26,
+    });
+
+  let phase: "upcoming" | "past" = "upcoming";
+  let result = await fetchPhase(phase);
+  if (!result.error && (result.data?.length ?? 0) === 0) {
+    phase = "past";
+    result = await fetchPhase(phase);
+  }
+  if (result.error?.code === "42501") return { ok: false, status: 403, error: "Not a member." };
+  if (result.error) return { ok: false, status: 500, error: "Failed to fetch events." };
+
+  const events = (result.data ?? []).slice(0, 25).map(({ item }) => item);
+  const last = events.at(-1) as Record<string, unknown> | undefined;
+  const nextCursor = (result.data?.length ?? 0) > 25 && last
+    ? `${phase}|${last.event_date as string}|${last.id as string}`
+    : phase === "upcoming" ? "past" : null;
+  return { ok: true, data: { events, nextCursor } };
+}
+
+export async function loadCommunityMembersPage(
+  communityId: string,
+  userId: string,
+): Promise<ReadResult<{ members: unknown[]; has_more: boolean; total: number }>> {
+  const db = createServiceClient();
+  if (!(await isCommunityMember(communityId, userId))) {
+    return { ok: false, status: 403, error: "Not a member." };
+  }
+  const { data: rows, error } = await db
+    .from("community_members")
+    .select("user_id, joined_at, role")
+    .eq("community_id", communityId)
+    .order("joined_at", { ascending: true });
+  if (error) return { ok: false, status: 500, error: "Failed to load members." };
+
+  const allRows = (rows ?? []) as Array<{ user_id: string; joined_at: string; role: string | null }>;
+  const pageRows = allRows.slice(0, 30);
+  const ids = pageRows.map((row) => row.user_id);
+  const [{ data: users }, { data: profiles }, experienceLevelNameMap] = ids.length
+    ? await Promise.all([
+        db.from("users").select("id, name").in("id", ids),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", ids),
+        getExperienceLevelNameMap(),
+      ])
+    : [{ data: [] }, { data: [] }, {} as Record<string, string>];
+  const userRows = (users ?? []) as Array<{ id: string; name: string }>;
+  const profileRows = (profiles ?? []) as Array<{
+    user_id: string;
+    avatar_url: string | null;
+    experience_level: string | null;
+    companies: { name: string } | null;
+  }>;
+  const userMap = Object.fromEntries(userRows.map((user) => [user.id, user]));
+  const profileMap = Object.fromEntries(profileRows.map((profile) => [profile.user_id, profile]));
+  const members = pageRows.flatMap((row) => {
+    const user = userMap[row.user_id] as any;
+    const profile = profileMap[row.user_id] as any;
+    return user ? [{
+      user_id: row.user_id,
+      joined_at: row.joined_at,
+      role: row.role ?? "member",
+      name: user.name,
+      avatar_url: profile?.avatar_url ?? null,
+      designation: profile?.experience_level
+        ? cleanDesignation(experienceLevelNameMap[profile.experience_level] ?? profile.experience_level)
+        : null,
+      company: profile?.companies?.name ?? null,
+    }] : [];
+  });
+  return { ok: true, data: { members, has_more: allRows.length > 30, total: allRows.length } };
+}
+
+export async function loadCommunityRules(
+  communityId: string,
+): Promise<ReadResult<{ rules: unknown[] }>> {
+  const { data, error } = await createServiceClient()
+    .from("community_rules")
+    .select("id, rule_text, order_index")
+    .eq("community_id", communityId)
+    .order("order_index", { ascending: true });
+  if (error) return { ok: false, status: 500, error: "Failed to load rules." };
+  return { ok: true, data: { rules: data ?? [] } };
+}
+
 export async function loadCommunityStats(communityId: string): Promise<ReadResult<{ posts_today: number }>> {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);

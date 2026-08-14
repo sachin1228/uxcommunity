@@ -67,15 +67,34 @@ export async function GET(_request: NextRequest, context: Params) {
     );
   }
 
-  const body = { ...data, failures };
+  const community = data.community as { current_user_role?: string } | undefined;
+  const body = {
+    ...data,
+    permissions: {
+      role: community?.current_user_role ?? "member",
+      can_manage: community?.current_user_role === "owner" || community?.current_user_role === "admin",
+    },
+    unreadCount: 0,
+    failures,
+  };
   const totalDuration = performance.now() - startedAt;
+  const responseBytes = estimateJsonBytes(body);
   timings.push(`total;dur=${totalDuration.toFixed(1)}`);
+  console.info(JSON.stringify({
+    event: "performance.community_bootstrap",
+    community_id: communityId,
+    duration_ms: Math.round(totalDuration),
+    response_bytes: responseBytes,
+    returned_counts: {
+      messages: ((data.messages as { messages?: unknown[] } | undefined)?.messages ?? []).length,
+    },
+  }));
 
   return NextResponse.json(body, {
     headers: {
       "Cache-Control": "private, no-store",
       "Server-Timing": timings.join(", "),
-      "X-Response-Bytes": String(estimateJsonBytes(body)),
+      "X-Response-Bytes": String(responseBytes),
     },
   });
 }
