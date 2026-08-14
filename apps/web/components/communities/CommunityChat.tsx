@@ -84,8 +84,8 @@ export function CommunityChat({
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // Load all initial community sections through one browser request, then seed
-  // the exact legacy request-cache keys consumed by each tab.
+  // Load only metadata and the first message page through the critical bootstrap.
+  // Secondary tabs retain their dedicated lazy endpoints and request-cache keys.
   useEffect(() => {
     setThreadEvents([]);
     setThreadsReady(false);
@@ -106,13 +106,6 @@ export function CommunityChat({
         current_user_role: string;
       };
       messages: { messages: CachedMessage[] };
-      threads: { threads: Thread[] };
-      events: unknown;
-      showcase: unknown;
-      resources: unknown;
-      stats: unknown;
-      rules: unknown;
-      members: unknown;
     };
 
     void fetchJsonCached<Bootstrap>(
@@ -134,15 +127,18 @@ export function CommunityChat({
       metaCache.set(communityId, meta);
       msgCache.set(communityId, data.messages.messages);
       msgFetchedAt.set(communityId, fetchedAt);
-      setCachedRequest(`${base}/threads`, data.threads, currentUserId);
-      setCachedRequest(`${base}/events`, data.events, currentUserId);
-      setCachedRequest(`${base}/showcase`, data.showcase, currentUserId);
-      setCachedRequest(`${base}/resources`, data.resources, currentUserId);
-      setCachedRequest(`${base}/stats`, data.stats, currentUserId);
-      setCachedRequest(`${base}/rules`, data.rules, currentUserId);
-      setCachedRequest(`${base}/members`, data.members, currentUserId);
+    }).catch(() => {});
 
-      const events: CachedThreadEvent[] = (data.threads?.threads ?? []).map((thread) => ({
+    // Threads are part of the chat timeline, but they are not required for the
+    // first message paint. Fetch them independently so a slow thread query
+    // cannot hold the critical bootstrap response open.
+    void fetchJsonCached<{ threads: Thread[] }>(
+      `/api/communities/${communityId}/threads`,
+      { staleMs: 60_000 },
+      currentUserId,
+    ).then((data) => {
+      if (cancelled) return;
+      const events: CachedThreadEvent[] = (data.threads ?? []).map((thread) => ({
         id: thread.id,
         community_id: thread.community_id,
         user_id: thread.user_id,
@@ -156,8 +152,7 @@ export function CommunityChat({
       setThreadEvents(events.sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       ));
-      setThreadsReady(true);
-    }).catch(() => {
+    }).catch(() => {}).finally(() => {
       if (!cancelled) setThreadsReady(true);
     });
 

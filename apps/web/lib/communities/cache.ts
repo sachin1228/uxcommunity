@@ -161,7 +161,10 @@ export function clearAllUserCaches(): void {
   msgCache.clear();
   metaCache.clear();
   msgFetchedAt.clear();
+  lastReadAtOnOpen.clear();
+  removedSidebarReactions.clear();
   inFlightMsgFetch.clear();
+  inFlightMetaFetch.clear();
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
   exploreStore.data     = null;
@@ -208,10 +211,7 @@ export function invalidateOnLeave(communityId: string): void {
       communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
     };
   }
-  msgCache.delete(communityId);
-  metaCache.delete(communityId);
-  msgFetchedAt.delete(communityId);
-  lastReadAtOnOpen.delete(communityId);
+  evictCommunityState(communityId);
   notifySidebarChanged();
 }
 
@@ -247,10 +247,18 @@ export function markSidebarReactionRemoved(
   communityId: string,
   messageId: string,
 ): void {
-  removedSidebarReactions.set(
-    sidebarReactionKey(communityId, messageId),
-    Date.now(),
-  );
+  const now = Date.now();
+  for (const [key, removedAt] of removedSidebarReactions) {
+    if (now - removedAt > REACTION_TOMBSTONE_TTL_MS) {
+      removedSidebarReactions.delete(key);
+    }
+  }
+  while (removedSidebarReactions.size >= MAX_REACTION_TOMBSTONES) {
+    const oldest = removedSidebarReactions.keys().next().value;
+    if (!oldest) break;
+    removedSidebarReactions.delete(oldest);
+  }
+  removedSidebarReactions.set(sidebarReactionKey(communityId, messageId), now);
 }
 
 /** Returns true when a Realtime reaction predates the latest local removal. */
@@ -304,9 +312,7 @@ export function invalidateOnArchive(communityId: string): void {
       ),
     };
   }
-  msgCache.delete(communityId);
-  msgFetchedAt.delete(communityId);
-  lastReadAtOnOpen.delete(communityId);
+  evictCommunityState(communityId);
   notifySidebarChanged();
 }
 
@@ -355,27 +361,46 @@ export function applyReactionDelete(
 
 // ─── Chat caches ──────────────────────────────────────────────────────────────
 
+export const META_STALE_MS      = 5 * 60_000;
+export const MSG_STALE_MS       = 3 * 60_000;
+export const MAX_CACHE_ENTRIES  = 25;
+const REACTION_TOMBSTONE_TTL_MS = 5 * 60_000;
+const MAX_REACTION_TOMBSTONES   = 250;
+
+class BoundedCommunityMap<T> extends Map<string, T> {
+  override set(key: string, value: T): this {
+    // Refresh insertion order so the first key remains the least recently written.
+    super.delete(key);
+    super.set(key, value);
+    while (this.size > MAX_CACHE_ENTRIES) {
+      const oldest = this.keys().next().value;
+      if (!oldest) break;
+      evictCommunityState(oldest);
+    }
+    return this;
+  }
+}
+
 export const lastReadAtOnOpen = new Map<string, string | null>();
-export const msgCache         = new Map<string, CachedMessage[]>();
-export const metaCache        = new Map<string, CachedMeta>();
+export const msgCache         = new BoundedCommunityMap<CachedMessage[]>();
+export const metaCache        = new BoundedCommunityMap<CachedMeta>();
 export const msgFetchedAt     = new Map<string, number>();
 export const inFlightMsgFetch = new Map<string, Promise<void>>();
 export const inFlightMetaFetch = new Map<string, Promise<void>>();
 
-export const META_STALE_MS      = 5 * 60_000;
-export const MSG_STALE_MS       = 3 * 60_000;
-export const MAX_CACHE_ENTRIES  = 25;
+function evictCommunityState(communityId: string): void {
+  msgCache.delete(communityId);
+  metaCache.delete(communityId);
+  msgFetchedAt.delete(communityId);
+  lastReadAtOnOpen.delete(communityId);
+  inFlightMsgFetch.delete(communityId);
+  inFlightMetaFetch.delete(communityId);
+  for (const key of removedSidebarReactions.keys()) {
+    if (key.startsWith(`${communityId}:`)) removedSidebarReactions.delete(key);
+  }
+}
 
 export function evictIfNeeded(): void {
-  while (msgCache.size > MAX_CACHE_ENTRIES) {
-    const oldest = msgCache.keys().next().value;
-    if (!oldest) break;
-    msgCache.delete(oldest);
-    msgFetchedAt.delete(oldest);
-  }
-  while (metaCache.size > MAX_CACHE_ENTRIES) {
-    const oldest = metaCache.keys().next().value;
-    if (!oldest) break;
-    metaCache.delete(oldest);
-  }
+  // BoundedCommunityMap evicts synchronously on every write. Keep this export
+  // for callers compiled against the previous cache API.
 }
