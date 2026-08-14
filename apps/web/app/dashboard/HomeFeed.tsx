@@ -37,7 +37,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     try {
       const data = await fetchJsonCached<{ items?: FeedItem[] }>(
         "/api/home/feed",
-        { staleMs: 30_000, force },
+        {
+          staleMs: 30_000,
+          force,
+          source: "home-feed",
+          reason: force ? "explicit refresh" : background ? "background freshness check" : "initial load",
+        },
         currentUserId,
       );
       setItems(data.items ?? []);

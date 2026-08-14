@@ -31,6 +31,25 @@ test("canonicalizes query parameters and isolates users", () => {
   )
 })
 
+test("request diagnostics metadata does not fragment deduplication", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    return new Response(JSON.stringify({ value: 1 }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  await Promise.all([
+    fetchJsonCached("/api/feed", { source: "sidebar", reason: "initial load" }, "user-a"),
+    fetchJsonCached("/api/feed", { source: "home", reason: "remount" }, "user-a"),
+  ])
+
+  assert.equal(calls, 1)
+})
+
 test("deduplicates concurrent GET requests", async () => {
   let calls = 0
   globalThis.fetch = (async () => {

@@ -92,7 +92,11 @@ export function NotificationBell({ userId }: Props) {
   const fetchNotifications = useCallback(async () => {
     const data = await fetchJsonCached<{ notifications?: NotificationItem[]; unread_count?: number }>(
       "/api/notifications",
-      { staleMs: 30_000 },
+      {
+        staleMs: Number.POSITIVE_INFINITY,
+        source: "notification-bell",
+        reason: "initial session load",
+      },
       userId,
     );
     setNotifications(data.notifications ?? []);

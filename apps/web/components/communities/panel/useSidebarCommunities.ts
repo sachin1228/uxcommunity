@@ -10,7 +10,7 @@ import {
   SIDEBAR_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
-import { usePrefetch } from "./usePrefetch";
+import { fetchJsonCached } from "@/lib/request-cache";
 import { markReadOnServer } from "./markReadOnServer";
 import { useSidebarRealtime } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
@@ -20,7 +20,6 @@ type Community = CachedSidebarCommunity;
 export function useSidebarCommunities(userId: string) {
   const router   = useRouter();
   const pathname = usePathname();
-  const { onEnter, onLeave } = usePrefetch(userId);
 
   const activeCommunityId = pathname.match(
     /\/dashboard\/communities\/([^/]+)/
@@ -33,11 +32,11 @@ export function useSidebarCommunities(userId: string) {
   const [loading, setLoading] = useState(() => sidebarStore.data === null);
 
   const activeCommunityIdRef = useRef(activeCommunityId);
-  const revalidateInFlight   = useRef(false);
 
-  // ── Stale-while-revalidate load ──────────────────────────────────────────
-  const load = useCallback(() => {
+  // ── Shared, user-scoped communities load ──────────────────────────────────
+  const load = useCallback((force = false) => {
     if (
+      !force &&
       sidebarStore.data &&
       Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS
     ) {
@@ -52,11 +51,18 @@ export function useSidebarCommunities(userId: string) {
       if (sidebarStore.data) setLoading(false);
       return;
     }
-    const p: Promise<void> = fetch("/api/communities")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((d) => {
-        if (!d) return;
-        const fresh = d.communities ?? [];
+    const p: Promise<void> = fetchJsonCached<{ communities?: CachedSidebarCommunity[] }>(
+      "/api/communities",
+      {
+        staleMs: SIDEBAR_STALE_MS,
+        force,
+        source: "communities-sidebar",
+        reason: force ? "membership changed" : "initial sidebar load",
+      },
+      userId,
+    )
+      .then((data) => {
+        const fresh = data.communities ?? [];
         sidebarStore.data = { communities: fresh, fetchedAt: Date.now() };
         setCommunities(fresh);
       })
@@ -67,75 +73,18 @@ export function useSidebarCommunities(userId: string) {
       });
     sidebarStore.inflight = p;
     if (sidebarStore.data) setLoading(false);
-  }, []);
-
-  // ── Background unread-count reconciliation ───────────────────────────────
-  const revalidateUnreadCounts = useCallback(() => {
-    if (revalidateInFlight.current) return;
-    revalidateInFlight.current = true;
-    fetch("/api/communities")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((d) => {
-        if (!d?.communities) return;
-        const fresh: CachedSidebarCommunity[] = d.communities;
-        setCommunities((prev) => {
-          const prevMap   = new Map(prev.map((c) => [c.id, c]));
-          const storeById = new Map(
-            (sidebarStore.data?.communities ?? []).map((c) => [c.id, c])
-          );
-          const currentActiveId = activeCommunityIdRef.current;
-          const merged = fresh.map((server) => {
-            const local    = prevMap.get(server.id);
-            const stored   = storeById.get(server.id);
-            const serverMs = server.last_read_at
-              ? new Date(server.last_read_at).getTime()
-              : -Infinity;
-            const storedMs = stored?.last_read_at
-              ? new Date(stored.last_read_at).getTime()
-              : -Infinity;
-            const bestLastReadAt =
-              !stored?.last_read_at || serverMs >= storedMs
-                ? server.last_read_at
-                : stored.last_read_at;
-            return {
-              ...server,
-              last_read_at: bestLastReadAt,
-              message_count:
-                server.id === currentActiveId
-                  ? 0
-                  : Math.max(server.message_count, local?.message_count ?? 0),
-            };
-          });
-          if (sidebarStore.data) {
-            sidebarStore.data = {
-              ...sidebarStore.data,
-              communities: merged,
-              fetchedAt: Date.now(),
-            };
-          }
-          return merged;
-        });
-      })
-      .catch(() => {})
-      .finally(() => {
-        revalidateInFlight.current = false;
-      });
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
-    const cacheWasFresh =
-      !!sidebarStore.data &&
-      Date.now() - sidebarStore.data.fetchedAt < SIDEBAR_STALE_MS;
     load();
-    if (cacheWasFresh) revalidateUnreadCounts();
-  }, [load, revalidateUnreadCounts]);
+  }, [load]);
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
   useEffect(() => {
     const handler = () => {
       setCommunities(sidebarStore.data?.communities ?? []);
       setLoading(sidebarStore.data === null);
-      load();
+      load(true);
     };
     window.addEventListener(SIDEBAR_CHANGED_EVENT, handler);
     return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, handler);
@@ -149,7 +98,7 @@ export function useSidebarCommunities(userId: string) {
         setCommunities(sidebarStore.data.communities);
       } else {
         // Cache was invalidated (e.g. community created/joined/left) — re-fetch.
-        load();
+        load(true);
       }
     };
     window.addEventListener(SIDEBAR_CHANGED_EVENT, syncFromCache);
@@ -253,8 +202,6 @@ export function useSidebarCommunities(userId: string) {
     activeCommunityId,
     typingMap,
     handleNavigate,
-    onEnter,
-    onLeave,
     pathname,
     router,
   };

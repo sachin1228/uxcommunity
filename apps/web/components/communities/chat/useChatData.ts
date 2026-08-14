@@ -98,9 +98,9 @@ export function useChatData({
       setCommunity(initialMeta.community);
       setMembers(initialMeta.members);
     }
-    if (cachedMsgs?.length) {
+    if (cachedMsgs) {
       setMessages(cachedMsgs);
-    } else if (initialMessages?.length) {
+    } else if (initialMessages !== undefined) {
       msgCache.set(communityId, initialMessages);
       setCachedRequest(
         `/api/communities/${communityId}/messages`,
@@ -113,10 +113,9 @@ export function useChatData({
     }
     if (cachedMeta || initialMeta) setLoading(false);
     // Notify parent of the SSR lastReadAt seed when no cache exists
-    if (!cachedMsgs?.length) {
-      onSeedLastReadAt?.(initialMessages?.length ? null : undefined as unknown as null);
+    if (!cachedMsgs) {
+      onSeedLastReadAt?.(initialMessages !== undefined ? null : undefined as unknown as null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Fetch community metadata ──────────────────────────────────────────────
@@ -126,7 +125,11 @@ export function useChatData({
     const d = await fetchJsonCached<{
       community: Community;
       members?: Member[];
-    }>(`/api/communities/${targetId}`, { staleMs: META_STALE_MS }, currentUserId);
+    }>(
+      `/api/communities/${targetId}`,
+      { staleMs: META_STALE_MS, source: "community-chat", reason: "metadata recovery" },
+      currentUserId,
+    );
     if (communityIdRef.current !== targetId) return;
     const cached: CachedMeta = {
       community: d.community,
@@ -151,7 +154,11 @@ export function useChatData({
 
       return fetchJsonCached<{ messages?: Message[] }>(
         url,
-        { staleMs: after ? 30_000 : 3 * 60_000 },
+        {
+          staleMs: after ? 30_000 : 3 * 60_000,
+          source: "community-chat",
+          reason: after ? "realtime reconnect catch-up" : "explicit message recovery",
+        },
         currentUserId,
       )
         .then((d) => {
@@ -215,7 +222,7 @@ export function useChatData({
         const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(before)}`;
         const d = await fetchJsonCached<{ messages?: Message[] }>(
           url,
-          { staleMs: 30_000 },
+          { staleMs: 30_000, source: "community-chat", reason: "older message pagination" },
           currentUserId,
         );
         if (communityIdRef.current !== targetId) return;
@@ -262,14 +269,14 @@ export function useChatData({
         community: Community;
         members?: Member[];
       }>(`/api/communities/${communityId}`, currentUserId);
-      const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
+      const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages ?? initialMessages;
       const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
         ? {
             community: canonicalMeta.community,
             members: canonicalMeta.members ?? [],
             fetchedAt: Date.now(),
           }
-        : undefined);
+        : initialMeta);
 
       if (cachedMsgs) {
         msgCache.set(communityId, cachedMsgs);
@@ -293,21 +300,17 @@ export function useChatData({
     const initial = applyCanonicalCache();
 
     (async () => {
-      const bootstrapResult = await fetchAndHydrateCommunityBootstrap(
-        communityId,
-        currentUserId,
-      ).then(() => true).catch(() => false);
-      if (cancelled || communityIdRef.current !== communityId) return;
+      if (!initial.cachedMeta || initial.cachedMsgs === undefined) {
+        await fetchAndHydrateCommunityBootstrap(
+          communityId,
+          currentUserId,
+          { source: "community-chat", reason: "SSR data unavailable" },
+        ).catch(() => undefined);
+        if (cancelled || communityIdRef.current !== communityId) return;
 
-      const hydrated = applyCanonicalCache();
-      if (!bootstrapResult) {
+        const hydrated = applyCanonicalCache();
         await Promise.allSettled([
-          hydrated.cachedMsgs ? Promise.resolve() : fetchMessages(),
-          hydrated.cachedMeta ? Promise.resolve() : fetchMeta(),
-        ]);
-      } else if (!hydrated.cachedMeta || !hydrated.cachedMsgs) {
-        await Promise.allSettled([
-          hydrated.cachedMsgs ? Promise.resolve() : fetchMessages(),
+          hydrated.cachedMsgs === undefined ? fetchMessages() : Promise.resolve(),
           hydrated.cachedMeta ? Promise.resolve() : fetchMeta(),
         ]);
       }

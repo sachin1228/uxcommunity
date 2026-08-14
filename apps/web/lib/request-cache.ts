@@ -6,6 +6,8 @@ type CacheEntry<T> = {
 type CacheOptions = {
   staleMs?: number
   force?: boolean
+  source?: string
+  reason?: string
 }
 
 type CacheEvent = "hit" | "miss" | "dedup" | "revalidate" | "invalidate"
@@ -39,15 +41,25 @@ export function getRequestCacheTelemetry() {
   }
 }
 
-function log(event: CacheEvent, key: string) {
+function log(
+  event: CacheEvent,
+  key: string,
+  context: Pick<CacheOptions, "source" | "reason"> = {},
+  durationMs?: number,
+) {
   cacheTelemetry[event] += 1
   telemetryEvents += 1
 
   if (process.env.NODE_ENV === "development") {
     const endpoint = key.slice(key.indexOf(":") + 1)
-    if (event === "hit") console.debug(`CACHE HIT: ${endpoint}`)
-    else if (event === "miss" || event === "revalidate") console.debug(`CACHE MISS: ${endpoint}`)
-    else console.debug(`[request-cache] ${event}`, key)
+    console.debug("[request-cache]", {
+      endpoint,
+      source: context.source ?? "unknown",
+      reason: context.reason ?? "unspecified",
+      result: event,
+      duplicate: event === "dedup",
+      ...(durationMs === undefined ? {} : { durationMs }),
+    })
     return
   }
 
@@ -113,37 +125,36 @@ export async function fetchJsonCached<T>(
   let fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
   if (!options.force && fresh && cached) {
-    log("hit", key)
+    log("hit", key, options)
     return cached.value
   }
 
   const bootstrapBacked = getBootstrapBackedRequest(url)
   let loggedLookup = false
   if (!options.force && bootstrapBacked?.isInitialRead) {
-    log(cached ? "revalidate" : "miss", key)
+    log(cached ? "revalidate" : "miss", key, options)
     loggedLookup = true
     await fetchAndHydrateCommunityBootstrap(
       bootstrapBacked.communityId,
       userId ?? activeUserId ?? "anonymous",
+      { source: options.source, reason: options.reason ?? "bootstrap-backed read" },
     )
     cached = entries.get(key) as CacheEntry<T> | undefined
     fresh = cached && Date.now() - cached.fetchedAt < staleMs
     if (fresh && cached) {
-      log("hit", key)
+      log("hit", key, options)
       return cached.value
     }
   }
 
   const pending = inFlight.get(key) as Promise<T> | undefined
   if (pending) {
-    log("dedup", key)
+    log("dedup", key, options)
     return pending
   }
 
-  if (!loggedLookup) log(cached ? "revalidate" : "miss", key)
-  if (process.env.NODE_ENV === "development") {
-    console.debug(`NETWORK REQUEST: ${url}`)
-  }
+  if (!loggedLookup) log(cached ? "revalidate" : "miss", key, options)
+  const startedAt = Date.now()
   const request = fetch(url, { cache: "no-store" })
     .then(async (response) => {
       const body = await response.json().catch(() => null)
@@ -157,6 +168,14 @@ export async function fetchJsonCached<T>(
       entries.set(key, { value: body as T, fetchedAt: Date.now() })
       while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
       listeners.get(key)?.forEach((listener) => listener())
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[request-cache] network", {
+          endpoint: new URL(url, "http://uxcommunity.local").pathname,
+          source: options.source ?? "unknown",
+          reason: options.reason ?? "unspecified",
+          durationMs: Date.now() - startedAt,
+        })
+      }
       return body as T
     })
     .finally(() => inFlight.delete(key))
@@ -220,11 +239,16 @@ export type CommunityBootstrap = {
 export async function fetchAndHydrateCommunityBootstrap(
   communityId: string,
   userId: string,
+  context: Pick<CacheOptions, "source" | "reason"> = {},
 ): Promise<CommunityBootstrap> {
   const base = `/api/communities/${communityId}`
   const data = await fetchJsonCached<CommunityBootstrap>(
     `${base}/bootstrap`,
-    { staleMs: DEFAULT_STALE_MS },
+    {
+      staleMs: DEFAULT_STALE_MS,
+      source: context.source ?? "community-bootstrap",
+      reason: context.reason ?? "hydrate community sections",
+    },
     userId,
   )
   const sections: Array<[string, unknown]> = [
