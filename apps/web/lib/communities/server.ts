@@ -1,10 +1,29 @@
 import "server-only";
-
-import type { CachedMessage, CachedMeta } from "./cache";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import type { CachedMeta, CachedMessage, MessageReaction, ReplyPreview } from "./cache";
 import {
-  loadCommunityBootstrapReadModel,
-  loadCommunityMessagePage,
+  loadCommunityEvents,
+  loadCommunityMembersPage,
+  loadCommunityResources,
+  loadCommunityRules,
+  loadCommunityShowcasePage,
+  loadCommunityStats,
+  loadCommunityThreads,
+  type ReadResult,
 } from "./read-models";
+
+/**
+ * Strip year-range suffixes and singularize experience level names for display.
+ * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
+ *      "Heads of Design"                 → "Head of Design"
+ */
+function cleanDesignation(name: string): string {
+  const clean = name.split("(")[0].trim();
+  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
+  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
+  return clean;
+}
 
 export interface SSRCommunitySections {
   threads?: unknown;
@@ -23,32 +42,192 @@ export interface SSRCommunityData {
   sections: SSRCommunitySections;
 }
 
-/**
- * The server render uses the same critical-only read path as bootstrap.
- * Secondary sections intentionally remain absent and fetch from their lazy APIs
- * only when their tab or panel mounts.
- */
+function readData<T>(result: ReadResult<T>): T | undefined {
+  return result.ok ? result.data : undefined;
+}
+
 export async function fetchCommunitySSRData(
   communityId: string,
   userId: string,
 ): Promise<SSRCommunityData | null> {
-  const communityResult = await loadCommunityBootstrapReadModel(communityId, userId);
-  if (!communityResult.ok) return null;
+  const db = createServiceClient();
 
-  const messageResult = await loadCommunityMessagePage(communityId, userId, {}, {
-    membership: communityResult.data.membership,
+  const [
+    { data: membership },
+    { data: community },
+    { data: msgRows },
+  ] = await Promise.all([
+    db.from("community_members").select("joined_at, last_read_at, history_cleared_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
+    db.from("community_messages").select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+  ]);
+
+  if (!membership || !community) return null;
+
+  const historyStart = membership.history_cleared_at &&
+    membership.history_cleared_at > membership.joined_at
+    ? membership.history_cleared_at
+    : membership.joined_at;
+
+  const msgs = (msgRows ?? []).filter((m) => m.created_at >= historyStart) as {
+    id: string; content: string; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null; deleted_at: string | null;
+  }[];
+  const uniqueMsgUserIds = [...new Set(msgs.map((m) => m.user_id))];
+  const messageIds       = msgs.map((m) => m.id);
+  const replyToIds       = [...new Set(msgs.map((m) => m.reply_to_id).filter(Boolean) as string[])];
+
+  const [
+    masterImgMap,
+    { data: memberRows },
+    { count: memberCount },
+    { data: msgUsers },
+    { data: msgProfiles },
+    { data: reactionRows },
+    replyMsgsResult,
+  ] = await Promise.all([
+    TABLE_LOOKUP[community.type as string]
+      ? getMasterImageMap(community.type as string)
+      : Promise.resolve({} as Record<string, string | null>),
+    db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
+    db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
+    uniqueMsgUserIds.length
+      ? db.from("users").select("id, name").in("id", uniqueMsgUserIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    uniqueMsgUserIds.length
+      ? db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", uniqueMsgUserIds)
+      : Promise.resolve({ data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] }),
+    messageIds.length
+      ? db.from("message_reactions").select("message_id, user_id, emoji").in("message_id", messageIds)
+      : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string }[] }),
+    replyToIds.length
+      ? db.from("community_messages").select("id, content, user_id").in("id", replyToIds)
+      : Promise.resolve({ data: [] as { id: string; content: string; user_id: string }[] }),
+  ]);
+
+  // Reply sender names
+  const replyUserIds = [...new Set((replyMsgsResult.data ?? []).map((m) => m.user_id))];
+  const { data: replyUsers } = replyUserIds.length
+    ? await db.from("users").select("id, name").in("id", replyUserIds)
+    : { data: [] as { id: string; name: string }[] };
+  const replyUserMap = Object.fromEntries((replyUsers ?? []).map((u) => [u.id, u.name]));
+  const replyMap: Record<string, ReplyPreview> = {};
+  for (const m of replyMsgsResult.data ?? []) {
+    replyMap[m.id] = { id: m.id, content: (m as any).content ?? "", user_name: replyUserMap[m.user_id] ?? "Unknown" };
+  }
+
+  const resolvedImageUrl: string | null =
+    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ??
+    (community as any).image_url ?? null;
+
+  // Member user info
+  const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
+  const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
+    ? await Promise.all([
+        db.from("users").select("id, name").in("id", memberUserIds),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
+      ])
+    : [
+        { data: [] as { id: string; name: string }[] },
+        { data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] },
+      ];
+
+  // Resolve all experience level slugs (members + message senders) in one batch query.
+  const allSlugs = [...new Set([
+    ...(memberProfiles  ?? []).map((p: any) => p.experience_level),
+    ...(msgProfiles     ?? []).map((p: any) => p.experience_level),
+  ].filter(Boolean) as string[])];
+  const expLevelMap: Record<string, string> = {};
+  if (allSlugs.length) {
+    const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", allSlugs);
+    for (const l of levels ?? []) expLevelMap[l.slug] = cleanDesignation(l.name);
+  }
+
+  const memberUserMap    = Object.fromEntries((memberUsers ?? []).map((u) => [u.id, u.name]));
+  const memberProfileMap = Object.fromEntries((memberProfiles ?? []).map((p: any) => [p.user_id, p]));
+  const members: CachedMeta["members"] = (memberRows ?? []).map((m) => {
+    const p = memberProfileMap[m.user_id];
+    return {
+      user_id: m.user_id,
+      users: memberUserMap[m.user_id]
+        ? {
+            name:        memberUserMap[m.user_id],
+            avatar_url:  p?.avatar_url ?? null,
+            designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+            company:     (p?.companies as any)?.name ?? null,
+          }
+        : null,
+    };
   });
-  if (!messageResult.ok) return null;
 
-  const { membership, community } = communityResult.data;
-  return {
-    meta: {
-      community: community as CachedMeta["community"],
-      members: [],
-      fetchedAt: Date.now(),
+  // Reactions map
+  const reactionsMap: Record<string, MessageReaction[]> = {};
+  for (const r of reactionRows ?? []) {
+    if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
+    const group = reactionsMap[r.message_id].find((g) => g.emoji === r.emoji);
+    if (group) group.user_ids.push(r.user_id);
+    else reactionsMap[r.message_id].push({ emoji: r.emoji, user_ids: [r.user_id] });
+  }
+
+  // Sender map (messages)
+  const msgUserMap: Record<string, { name: string; avatar_url: string | null; designation: string | null; company: string | null }> = {};
+  const msgProfileMap = Object.fromEntries((msgProfiles ?? []).map((p: any) => [p.user_id, p]));
+  for (const u of msgUsers ?? []) {
+    const p = msgProfileMap[u.id];
+    msgUserMap[u.id] = {
+      name:        u.name,
+      avatar_url:  p?.avatar_url ?? null,
+      designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
+      company:     (p?.companies as any)?.name ?? null,
+    };
+  }
+
+  const messages: CachedMessage[] = msgs.slice().reverse().map((m) => ({
+    ...m,
+    users:     msgUserMap[m.user_id] ?? null,
+    reactions: reactionsMap[m.id] ?? [],
+    reply_to:  m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
+    image_url: m.image_url ?? null,
+  }));
+
+  const meta: CachedMeta = {
+    community: {
+      id: community.id, name: community.name, type: community.type,
+      member_count: memberCount ?? 0, image_url: resolvedImageUrl,
+      description: (community as any).description ?? null,
+      created_at: (community as any).created_at ?? undefined,
+      owner_id: (community as any).owner_id ?? null,
+      is_private: (community as any).is_private ?? false,
+      enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "events", "resources"],
     },
-    messages: messageResult.data.messages as CachedMessage[],
-    lastReadAt: membership.last_read_at,
-    sections: {},
+    members,
+    fetchedAt: Date.now(),
+  };
+
+  const lastReadAt: string | null =
+    (membership as unknown as { last_read_at: string | null }).last_read_at ?? null;
+
+  const [threads, events, resources, showcase, memberPage, rules, stats] = await Promise.all([
+    loadCommunityThreads(communityId, userId),
+    loadCommunityEvents(communityId, userId),
+    loadCommunityResources(communityId, userId),
+    loadCommunityShowcasePage(communityId, userId, null),
+    loadCommunityMembersPage(communityId, userId),
+    loadCommunityRules(communityId),
+    loadCommunityStats(communityId),
+  ]);
+
+  return {
+    meta,
+    messages,
+    lastReadAt,
+    sections: {
+      threads: readData(threads),
+      events: readData(events),
+      resources: readData(resources),
+      showcase: readData(showcase),
+      members: readData(memberPage),
+      rules: readData(rules),
+      stats: readData(stats),
+    },
   };
 }
