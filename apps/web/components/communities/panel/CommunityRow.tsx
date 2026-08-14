@@ -49,8 +49,6 @@ interface CommunityRowProps {
   /** If set, shown instead of the last-message preview. */
   typingText?: string;
   onClick: () => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
 }
 
 export function CommunityRow({
@@ -58,8 +56,6 @@ export function CommunityRow({
   active,
   typingText,
   onClick,
-  onMouseEnter,
-  onMouseLeave,
 }: CommunityRowProps) {
   const { lastReaction } = c;
   const preview = c.last_message ? formatPreview(c.last_message) : null;
@@ -68,8 +64,6 @@ export function CommunityRow({
     <li>
       <button
         onClick={onClick}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
         className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
           active
             ? "bg-surface-raised text-foreground"

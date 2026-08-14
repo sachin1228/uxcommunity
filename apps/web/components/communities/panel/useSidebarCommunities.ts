@@ -10,7 +10,6 @@ import {
   SIDEBAR_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
-import { usePrefetch } from "./usePrefetch";
 import { markReadOnServer } from "./markReadOnServer";
 import { useSidebarRealtime } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
@@ -20,13 +19,6 @@ type Community = CachedSidebarCommunity;
 export function useSidebarCommunities(userId: string) {
   const router   = useRouter();
   const pathname = usePathname();
-  const prefetchCommunity = useCallback(
-    (communityId: string) => {
-      router.prefetch(`/dashboard/communities/${communityId}`);
-    },
-    [router],
-  );
-  const { onEnter, onLeave } = usePrefetch(prefetchCommunity);
 
   const activeCommunityId = pathname.match(
     /\/dashboard\/communities\/([^/]+)/
@@ -259,8 +251,6 @@ export function useSidebarCommunities(userId: string) {
     activeCommunityId,
     typingMap,
     handleNavigate,
-    onEnter,
-    onLeave,
     pathname,
     router,
   };
