@@ -16,7 +16,7 @@ import {
   initRequestCache,
   setCachedRequest,
 } from "@/lib/request-cache";
-import { markReadOnServer } from "./markReadOnServer";
+import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manager";
 import { useSidebarRealtime } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
 
@@ -32,6 +32,7 @@ export function useSidebarCommunities(userId: string) {
 
   const [communities, setCommunities] = useState<Community[]>(() => {
     initUserCache(userId);
+    initReadManager(userId);
     initRequestCache(userId);
     if (
       sidebarStore.data &&
@@ -94,10 +95,13 @@ export function useSidebarCommunities(userId: string) {
     activeCommunityIdRef.current = activeCommunityId;
     if (!activeCommunityId) return;
 
+    // Capture the pre-zero unread snapshot BEFORE any optimistic updates so the
+    // read manager can decide whether a PATCH is actually needed.
+    const snapshot = sidebarStore.data?.communities.find(
+      (c) => c.id === activeCommunityId
+    );
+
     if (!lastReadAtOnOpen.has(activeCommunityId)) {
-      const snapshot = sidebarStore.data?.communities.find(
-        (c) => c.id === activeCommunityId
-      );
       if (snapshot) {
         lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
         const optimisticReadAt = new Date().toISOString();
@@ -112,8 +116,13 @@ export function useSidebarCommunities(userId: string) {
           };
         }
       }
-      void markReadOnServer(activeCommunityId);
     }
+
+    scheduleMarkRead(activeCommunityId, {
+      unreadCount: snapshot?.message_count ?? null,
+      lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
+      reason: "community opened",
+    });
 
     setCommunities((prev) => {
       const updated = prev.map((c) =>
@@ -141,8 +150,11 @@ export function useSidebarCommunities(userId: string) {
 
   // ── Navigation handler ────────────────────────────────────────────────────
   function handleNavigate(id: string) {
+    // Read the pre-zero snapshot first; the optimistic badge clearing below
+    // would otherwise make the manager think there is nothing to mark read.
+    const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
+
     if (!lastReadAtOnOpen.has(id)) {
-      const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
       if (snapshot) {
         lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
         const optimisticReadAt = new Date().toISOString();
@@ -156,6 +168,12 @@ export function useSidebarCommunities(userId: string) {
         }
       }
     }
+
+    scheduleMarkRead(id, {
+      unreadCount: snapshot?.message_count ?? null,
+      lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
+      reason: "sidebar navigation",
+    });
 
     setCommunities((prev) => {
       const updated = prev.map((c) =>
@@ -177,7 +195,6 @@ export function useSidebarCommunities(userId: string) {
     });
 
     router.push(`/dashboard/communities/${id}`);
-    void markReadOnServer(id);
   }
 
   return {
