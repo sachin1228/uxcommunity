@@ -162,6 +162,7 @@ export async function POST(
             image_url: null,
             image_moderated_at: moderatedAt,
             image_moderation_error: moderationError,
+            deleted_at: imageStatus === "rejected" ? moderatedAt : null,
           })
           .eq("id", messageId)
           .eq("user_id", userId);
