@@ -139,30 +139,28 @@ export async function loadCommunityThreads(
   communityId: string,
   userId: string,
 ): Promise<ReadResult<{ threads: unknown[] }>> {
-  if (!(await isCommunityMember(communityId, userId))) return { ok: false, status: 403, error: "Not a member of this community." };
-  const { data, error } = await createServiceClient()
-    .from("community_threads")
-    .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at")
-    .eq("community_id", communityId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  const { data, error } = await callPerformanceRpc(createServiceClient(), "get_thread_list_page", {
+    p_community_id: communityId,
+    p_user_id: userId,
+    p_limit: 50,
+  });
+  if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
   if (error) return { ok: false, status: 500, error: "Failed to fetch threads." };
-  return { ok: true, data: { threads: await enrichCommunityThreads((data ?? []) as Array<Record<string, unknown>>, userId) } };
+  return { ok: true, data: { threads: (data ?? []).map(({ item }) => item) } };
 }
 
 export async function loadCommunityResources(
   communityId: string,
   userId: string,
 ): Promise<ReadResult<{ resources: unknown[] }>> {
-  if (!(await isCommunityMember(communityId, userId))) return { ok: false, status: 403, error: "Not a member of this community." };
-  const { data, error } = await createServiceClient()
-    .from("community_resources")
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
-    .eq("community_id", communityId)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  const { data, error } = await callPerformanceRpc(createServiceClient(), "get_resource_list_page", {
+    p_community_id: communityId,
+    p_user_id: userId,
+    p_limit: 100,
+  });
+  if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
   if (error) return { ok: false, status: 500, error: "Failed to fetch resources." };
-  return { ok: true, data: { resources: await enrichCommunityResources((data ?? []) as Array<Record<string, unknown>>, userId) } };
+  return { ok: true, data: { resources: (data ?? []).map(({ item }) => item) } };
 }
 
 export async function loadCommunityShowcasePage(
