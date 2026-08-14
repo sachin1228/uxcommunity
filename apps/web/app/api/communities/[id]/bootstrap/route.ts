@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { estimateJsonBytes } from "@/lib/server-timing";
-import { GET as getCommunity } from "../route";
-import { GET as getMessages } from "../messages/route";
+import {
+  loadCommunityMessagePage,
+  loadCommunityReadModel,
+  type ReadResult,
+} from "@/lib/communities/read-models";
 import { GET as getStats } from "../stats/route";
 import { GET as getRules } from "../rules/route";
 import { GET as getThreads } from "../threads/route";
@@ -18,40 +21,53 @@ const CRITICAL = new Set<Section>(["community", "messages"]);
 
 async function readSection(
   name: Section,
-  operation: () => Promise<Response>,
+  operation: () => Promise<unknown>,
 ): Promise<{ name: Section; value: unknown; duration: number }> {
   const startedAt = performance.now();
-  const response = await operation();
+  const value = await operation();
+  return { name, value, duration: performance.now() - startedAt };
+}
+
+function unwrapReadResult<T>(result: ReadResult<T>): T {
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
+async function readRoute(responsePromise: Promise<Response>): Promise<unknown> {
+  const response = await responsePromise;
   const value = await response.json().catch(() => null);
   if (!response.ok) {
     const message = value && typeof value === "object" && "error" in value
       ? String((value as { error: unknown }).error)
       : `Request failed (${response.status})`;
-    throw new Error(`${name}: ${message}`);
+    throw new Error(message);
   }
-  return { name, value, duration: performance.now() - startedAt };
+  return value;
 }
 
 export async function GET(request: NextRequest, context: Params) {
   const startedAt = performance.now();
+  let session;
   try {
-    await requireSession("user");
+    session = await requireSession("user");
   } catch (error) {
     return error as Response;
   }
 
   const authDuration = performance.now() - startedAt;
+  const { id: communityId } = await context.params;
+  const userId = session.userId!;
   const sectionRequest = new NextRequest(request.url, { headers: request.headers });
-  const operations: Array<[Section, () => Promise<Response>]> = [
-    ["community", () => getCommunity(sectionRequest, context)],
-    ["messages", () => getMessages(sectionRequest, context)],
-    ["stats", () => getStats(sectionRequest, context)],
-    ["rules", () => getRules(sectionRequest, context)],
-    ["threads", () => getThreads(sectionRequest, context)],
-    ["events", () => getEvents(sectionRequest, context)],
-    ["showcase", () => getShowcase(sectionRequest, context)],
-    ["resources", () => getResources(sectionRequest, context)],
-    ["members", () => getMembers(sectionRequest, context)],
+  const operations: Array<[Section, () => Promise<unknown>]> = [
+    ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
+    ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
+    ["stats", () => readRoute(getStats(sectionRequest, context))],
+    ["rules", () => readRoute(getRules(sectionRequest, context))],
+    ["threads", () => readRoute(getThreads(sectionRequest, context))],
+    ["events", () => readRoute(getEvents(sectionRequest, context))],
+    ["showcase", () => readRoute(getShowcase(sectionRequest, context))],
+    ["resources", () => readRoute(getResources(sectionRequest, context))],
+    ["members", () => readRoute(getMembers(sectionRequest, context))],
   ];
 
   const settled = await Promise.allSettled(

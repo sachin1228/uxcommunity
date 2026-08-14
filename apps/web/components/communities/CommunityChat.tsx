@@ -9,7 +9,9 @@ import {
   markSidebarReactionRemoved,
   patchSidebarReaction,
   sidebarStore,
+  metaCache,
   msgCache,
+  msgFetchedAt,
 } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import {
@@ -98,6 +100,12 @@ export function CommunityChat({
       users: { name: string; avatar_url: string | null } | null;
     };
     type Bootstrap = {
+      community: {
+        community: CachedMeta["community"];
+        members: CachedMeta["members"];
+        current_user_role: string;
+      };
+      messages: { messages: CachedMessage[] };
       threads: { threads: Thread[] };
       events: unknown;
       showcase: unknown;
@@ -114,6 +122,18 @@ export function CommunityChat({
     ).then((data) => {
       if (cancelled) return;
       const base = `/api/communities/${communityId}`;
+      const fetchedAt = Date.now();
+      const meta: CachedMeta = {
+        community: data.community.community,
+        members: data.community.members,
+        fetchedAt,
+      };
+
+      setCachedRequest(base, data.community, currentUserId);
+      setCachedRequest(`${base}/messages`, data.messages, currentUserId);
+      metaCache.set(communityId, meta);
+      msgCache.set(communityId, data.messages.messages);
+      msgFetchedAt.set(communityId, fetchedAt);
       setCachedRequest(`${base}/threads`, data.threads, currentUserId);
       setCachedRequest(`${base}/events`, data.events, currentUserId);
       setCachedRequest(`${base}/showcase`, data.showcase, currentUserId);
