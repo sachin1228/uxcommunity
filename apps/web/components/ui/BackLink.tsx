@@ -3,15 +3,16 @@
 /**
  * BackLink
  *
- * Detail-page back links used to be plain `<Link href={backHref}>`, which made
- * every "back" click re-run the destination page's server render (and re-fetch
- * its data). When the user reached the detail page through the app, this
- * instead uses `router.back()` — Next.js restores the previous page from its
- * router cache with zero new requests.
+ * Deterministic "back to list" link for detail pages (threads, events,
+ * showcase, resources, home-feed cards). It always navigates to the explicit
+ * `href` — the list/tab page the label promises — instead of relying on
+ * `router.back()`.
  *
- * Falls back to navigating to `href` when there is no in-app history to go back
- * to (e.g. the detail page was opened directly / deep-linked), and lets
- * modifier-clicks (open in new tab) behave normally.
+ * History-based back navigation was unreliable here: `window.history.length > 1`
+ * is almost always true, and the community tabs update the URL with
+ * `history.replaceState` (no new history entry), so the previous history entry
+ * is frequently the chat view rather than the list this link points to.
+ * Navigating to `href` also handles deep links correctly.
  */
 
 import { useCallback } from "react";
@@ -19,7 +20,7 @@ import { ArrowLeft } from "lucide-react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 
 interface BackLinkProps {
-  /** Fallback destination when there is no in-app history to go back to. */
+  /** Destination — the list/tab page this link returns to. */
   href: string;
   label?: string;
   className?: string;
@@ -42,14 +43,7 @@ export function BackLink({ href, label = "Home", className }: BackLinkProps) {
         return;
       }
       event.preventDefault();
-
-      if (typeof window !== "undefined" && window.history.length > 1) {
-        // The previous entry is in this tab's session — restore it from the
-        // Next.js router cache instead of re-rendering the page.
-        router.back();
-      } else {
-        router.push(href);
-      }
+      router.push(href);
     },
     [router, href],
   );
