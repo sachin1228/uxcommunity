@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bookmark,
   Box,
   CalendarClock,
   ChevronDown,
@@ -14,13 +13,10 @@ import {
   LayoutGrid,
   MessageCircle,
   Monitor,
-  MoreHorizontal,
   PenTool,
-  Pencil,
   Play,
   Plus,
   Tag,
-  Trash2,
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import {
@@ -31,6 +27,7 @@ import {
 } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const STALE = 30_000;
@@ -55,8 +52,6 @@ export function ShowcaseView({
   const [sort, setSort] = useState<"newest" | "popular">("newest");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ShowcasePost | null>(null);
-  const [menu, setMenu] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,17 +70,6 @@ export function ShowcaseView({
       .finally(() => setLoading(false));
     return () => { cancelled = true; };
   }, [currentUserId, requestUrl]);
-
-  useEffect(() => {
-    if (!menu) return;
-    const close = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenu(null);
-      }
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [menu]);
 
   const visible = useMemo(
     () =>
@@ -307,63 +291,13 @@ export function ShowcaseView({
                       )?.label ?? "Post"
                     }`}
                   />
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="relative"
-                      ref={menu === post.id ? menuRef : undefined}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <button
-                        type="button"
-                        aria-label="Showcase options"
-                        onClick={() =>
-                          setMenu(menu === post.id ? null : post.id)
-                        }
-                        className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                      {menu === post.id && (
-                        <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMenu(null);
-                              void toggle(post, "save");
-                            }}
-                            aria-pressed={post.user_saved}
-                            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
-                          >
-                            <Bookmark size={12} fill={post.user_saved ? "currentColor" : "none"} />
-                            {post.user_saved ? "Unsave showcase" : "Save showcase"}
-                          </button>
-                          {post.user_id === currentUserId && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditing(post);
-                                  setMenu(null);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
-                              >
-                                <Pencil size={12} />
-                                Edit showcase
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void remove(post)}
-                                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
-                              >
-                                <Trash2 size={12} />
-                                Delete showcase
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <ShowcaseOptionsMenu
+                    saved={post.user_saved}
+                    canManage={post.user_id === currentUserId}
+                    onToggleSave={() => void toggle(post, "save")}
+                    onEdit={() => setEditing(post)}
+                    onDelete={() => void remove(post)}
+                  />
                 </div>
 
                 <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">
