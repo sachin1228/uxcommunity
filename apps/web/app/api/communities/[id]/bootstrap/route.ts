@@ -6,16 +6,8 @@ import {
   loadCommunityReadModel,
   type ReadResult,
 } from "@/lib/communities/read-models";
-import { GET as getStats } from "../stats/route";
-import { GET as getRules } from "../rules/route";
-import { GET as getThreads } from "../threads/route";
-import { GET as getEvents } from "../events/route";
-import { GET as getShowcase } from "../showcase/route";
-import { GET as getResources } from "../resources/route";
-import { GET as getMembers } from "../members/route";
-
 type Params = { params: Promise<{ id: string }> };
-type Section = "community" | "messages" | "stats" | "rules" | "threads" | "events" | "showcase" | "resources" | "members";
+type Section = "community" | "messages";
 
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
@@ -33,19 +25,7 @@ function unwrapReadResult<T>(result: ReadResult<T>): T {
   return result.data;
 }
 
-async function readRoute(responsePromise: Promise<Response>): Promise<unknown> {
-  const response = await responsePromise;
-  const value = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = value && typeof value === "object" && "error" in value
-      ? String((value as { error: unknown }).error)
-      : `Request failed (${response.status})`;
-    throw new Error(message);
-  }
-  return value;
-}
-
-export async function GET(request: NextRequest, context: Params) {
+export async function GET(_request: NextRequest, context: Params) {
   const startedAt = performance.now();
   let session;
   try {
@@ -57,17 +37,9 @@ export async function GET(request: NextRequest, context: Params) {
   const authDuration = performance.now() - startedAt;
   const { id: communityId } = await context.params;
   const userId = session.userId!;
-  const sectionRequest = new NextRequest(request.url, { headers: request.headers });
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
-    ["stats", () => readRoute(getStats(sectionRequest, context))],
-    ["rules", () => readRoute(getRules(sectionRequest, context))],
-    ["threads", () => readRoute(getThreads(sectionRequest, context))],
-    ["events", () => readRoute(getEvents(sectionRequest, context))],
-    ["showcase", () => readRoute(getShowcase(sectionRequest, context))],
-    ["resources", () => readRoute(getResources(sectionRequest, context))],
-    ["members", () => readRoute(getMembers(sectionRequest, context))],
   ];
 
   const settled = await Promise.allSettled(

@@ -51,6 +51,13 @@ export function useRealtimeChat({
     [fetchMessages],
   );
 
+  useEffect(() => () => {
+    if (catchUpTimerRef.current) {
+      clearTimeout(catchUpTimerRef.current);
+      catchUpTimerRef.current = null;
+    }
+  }, [communityId, debouncedCatchUp]);
+
   // ── Supabase Realtime ─────────────────────────────────────────────────────
   useEffect(() => {
     let supabase: ReturnType<typeof createBrowserClient>;
