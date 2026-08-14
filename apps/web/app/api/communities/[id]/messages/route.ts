@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityMessagePage } from "@/lib/communities/read-models";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { moderateText } from "@/lib/moderation/text";
 import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
@@ -9,8 +9,6 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { createServerTimer } from "@/lib/server-timing";
-
-const PAGE_SIZE = 50;
 
 export async function GET(
   req: NextRequest,
@@ -22,47 +20,16 @@ export async function GET(
   } catch (e) {
     return e as Response;
   }
-  const userId = session.userId!;
+
   const { id: communityId } = await params;
-
-  const db = createServiceClient();
-  const { searchParams } = req.nextUrl;
-  const before = searchParams.get("before");
-  const after  = searchParams.get("after");
-
-  // Fetch membership first so we can use joined_at as a lower bound on messages.
-  // Members only see chat messages sent after they joined — not historical ones.
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at, history_cleared_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
-
-  const historyStart = membership.history_cleared_at &&
-    membership.history_cleared_at > membership.joined_at
-    ? membership.history_cleared_at
-    : membership.joined_at;
-
-  const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
-    p_community_id: communityId,
-    p_user_id: userId,
-    p_history_start: historyStart,
-    p_before: after ? null : before,
-    p_after: after,
-    p_limit: PAGE_SIZE,
+  const result = await loadCommunityMessagePage(communityId, session.userId!, {
+    before: req.nextUrl.searchParams.get("before"),
+    after: req.nextUrl.searchParams.get("after"),
   });
 
-  if (error) {
-    console.error("[GET messages]", error);
-    return NextResponse.json({ error: "Failed to fetch messages." }, { status: 500 });
-  }
-
-  // The RPC reads newest-first for index-friendly pagination. Chat consumers
-  // expect chronological order, so reverse only the bounded result page.
-  return NextResponse.json({ messages: (data ?? []).reverse() });
+  return result.ok
+    ? NextResponse.json(result.data)
+    : NextResponse.json({ error: result.error }, { status: result.status });
 }
 
 export async function POST(

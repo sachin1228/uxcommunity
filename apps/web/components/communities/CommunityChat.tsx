@@ -9,7 +9,9 @@ import {
   markSidebarReactionRemoved,
   patchSidebarReaction,
   sidebarStore,
+  metaCache,
   msgCache,
+  msgFetchedAt,
 } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import {
@@ -39,7 +41,7 @@ import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import { fetchJsonCached, initRequestCache } from "@/lib/request-cache";
+import { fetchJsonCached, initRequestCache, setCachedRequest } from "@/lib/request-cache";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -82,56 +84,83 @@ export function CommunityChat({
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
   }, [router, pathname]);
 
-  // ── Load existing threads on mount so they persist across refreshes ───────
+  // Load all initial community sections through one browser request, then seed
+  // the exact legacy request-cache keys consumed by each tab.
   useEffect(() => {
-    // Reset thread state immediately when the community changes so the empty-state
-    // isn't shown prematurely while the fetch is still in flight.
     setThreadEvents([]);
     setThreadsReady(false);
     let cancelled = false;
     initRequestCache(currentUserId);
-    void fetchJsonCached<{ threads: Array<{
-        id: string; community_id: string; user_id: string;
-        title: string; description: string; category: string;
-        attachments: Array<{ name: string; url: string; type: string; size: number }>;
-        created_at: string;
-        users: { name: string; avatar_url: string | null } | null;
-      }> }>(`/api/communities/${communityId}/threads`, { staleMs: 60_000 }, currentUserId)
-      .then((data: { threads: Array<{
-        id: string; community_id: string; user_id: string;
-        title: string; description: string; category: string;
-        attachments: Array<{ name: string; url: string; type: string; size: number }>;
-        created_at: string;
-        users: { name: string; avatar_url: string | null } | null;
-      }> } | null) => {
-        if (cancelled) return;
-        if (data?.threads?.length) {
-          const events: CachedThreadEvent[] = data.threads.map((t) => ({
-            id:           t.id,
-            community_id: t.community_id,
-            user_id:      t.user_id,
-            title:        t.title,
-            description:  t.description,
-            category:     t.category,
-            attachments:  t.attachments ?? [],
-            created_at:   t.created_at,
-            users:        t.users,
-          }));
-          setThreadEvents((prev) => {
-            // Merge with any events already added by realtime (deduplicate).
-            const existingIds = new Set(prev.map((e) => e.id));
-            const merged = [
-              ...events.filter((e) => !existingIds.has(e.id)),
-              ...prev,
-            ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-            return merged;
-          });
-        }
-        setThreadsReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) setThreadsReady(true);
-      });
+
+    type Thread = {
+      id: string; community_id: string; user_id: string;
+      title: string; description: string; category: string;
+      attachments: Array<{ name: string; url: string; type: string; size: number }>;
+      created_at: string;
+      users: { name: string; avatar_url: string | null } | null;
+    };
+    type Bootstrap = {
+      community: {
+        community: CachedMeta["community"];
+        members: CachedMeta["members"];
+        current_user_role: string;
+      };
+      messages: { messages: CachedMessage[] };
+      threads: { threads: Thread[] };
+      events: unknown;
+      showcase: unknown;
+      resources: unknown;
+      stats: unknown;
+      rules: unknown;
+      members: unknown;
+    };
+
+    void fetchJsonCached<Bootstrap>(
+      `/api/communities/${communityId}/bootstrap`,
+      { staleMs: 60_000 },
+      currentUserId,
+    ).then((data) => {
+      if (cancelled) return;
+      const base = `/api/communities/${communityId}`;
+      const fetchedAt = Date.now();
+      const meta: CachedMeta = {
+        community: data.community.community,
+        members: data.community.members,
+        fetchedAt,
+      };
+
+      setCachedRequest(base, data.community, currentUserId);
+      setCachedRequest(`${base}/messages`, data.messages, currentUserId);
+      metaCache.set(communityId, meta);
+      msgCache.set(communityId, data.messages.messages);
+      msgFetchedAt.set(communityId, fetchedAt);
+      setCachedRequest(`${base}/threads`, data.threads, currentUserId);
+      setCachedRequest(`${base}/events`, data.events, currentUserId);
+      setCachedRequest(`${base}/showcase`, data.showcase, currentUserId);
+      setCachedRequest(`${base}/resources`, data.resources, currentUserId);
+      setCachedRequest(`${base}/stats`, data.stats, currentUserId);
+      setCachedRequest(`${base}/rules`, data.rules, currentUserId);
+      setCachedRequest(`${base}/members`, data.members, currentUserId);
+
+      const events: CachedThreadEvent[] = (data.threads?.threads ?? []).map((thread) => ({
+        id: thread.id,
+        community_id: thread.community_id,
+        user_id: thread.user_id,
+        title: thread.title,
+        description: thread.description,
+        category: thread.category,
+        attachments: thread.attachments ?? [],
+        created_at: thread.created_at,
+        users: thread.users,
+      }));
+      setThreadEvents(events.sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      ));
+      setThreadsReady(true);
+    }).catch(() => {
+      if (!cancelled) setThreadsReady(true);
+    });
+
     return () => { cancelled = true; };
   }, [communityId, currentUserId]);
 
