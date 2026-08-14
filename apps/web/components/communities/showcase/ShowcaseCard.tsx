@@ -1,0 +1,183 @@
+"use client";
+
+import {
+  Bookmark,
+  ExternalLink,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
+import { communityFeedLayout } from "../feed-layout";
+import { PostAuthorMeta } from "../PostAuthorMeta";
+import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
+import { SHOWCASE_TYPES, type ShowcasePost } from "./types";
+
+interface ShowcaseCardProps {
+  post: ShowcasePost;
+  currentUserId: string;
+  variant?: "list" | "detail";
+  isLast?: boolean;
+  onOpen?: () => void;
+  onToggleLike: () => void;
+  onToggleSave: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+export function ShowcaseCard({
+  post,
+  currentUserId,
+  variant = "list",
+  isLast = false,
+  onOpen,
+  onToggleLike,
+  onToggleSave,
+  onEdit,
+  onDelete,
+}: ShowcaseCardProps) {
+  const isDetail = variant === "detail";
+  const typeLabel =
+    SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label ??
+    "Post";
+
+  const card = (
+    <>
+      <div className="flex items-start justify-between gap-4">
+        <PostAuthorMeta
+          name={post.author.name}
+          avatarUrl={post.author.avatar_url}
+          createdAt={post.created_at}
+          dateInline
+          secondaryLabel={`Showcase · ${typeLabel}`}
+        />
+        <ShowcaseOptionsMenu
+          saved={post.user_saved}
+          canManage={post.user_id === currentUserId}
+          onToggleSave={onToggleSave}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
+      </div>
+
+      {isDetail ? (
+        <h1 className="mt-4 text-pretty font-display text-xl font-semibold text-foreground">
+          {post.title}
+        </h1>
+      ) : (
+        <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">
+          {post.title}
+        </h2>
+      )}
+
+      {post.description && (
+        <p
+          className={`font-body text-foreground-muted ${
+            isDetail
+              ? "mt-2 whitespace-pre-wrap text-sm leading-relaxed"
+              : "mt-1.5 line-clamp-3 text-xs leading-relaxed"
+          }`}
+        >
+          {post.description}
+        </p>
+      )}
+
+      <div
+        className={`overflow-hidden rounded-xl border border-border bg-surface-raised ${
+          isDetail ? "mt-4" : "mt-3 max-h-[480px]"
+        }`}
+      >
+        <img
+          src={post.image_url}
+          alt={`Preview of ${post.title}`}
+          className={`w-full object-cover ${
+            isDetail ? "max-h-[620px]" : "max-h-[480px]"
+          }`}
+        />
+      </div>
+
+      <div
+        className={`flex items-center gap-4 ${isDetail ? "mt-4" : "mt-3"}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onToggleLike}
+          aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
+          aria-pressed={post.user_liked}
+          className="inline-flex items-center gap-2"
+        >
+          <Heart
+            size={20}
+            fill={post.user_liked ? "currentColor" : "none"}
+            className={post.user_liked ? "text-red-500" : "text-foreground"}
+          />
+          <span className="font-body text-sm font-semibold text-foreground">
+            {post.like_count}
+          </span>
+        </button>
+
+        {isDetail ? (
+          <span className="inline-flex items-center gap-2 font-body text-sm text-foreground">
+            <MessageCircle size={20} />
+            {post.comment_count}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onOpen}
+            className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
+          >
+            <MessageCircle size={20} />
+            {post.comment_count} {post.comment_count === 1 ? "comment" : "comments"}
+          </button>
+        )}
+
+        <div className="flex-1" />
+        {post.project_url && (
+          <a
+            href={post.project_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent"
+          >
+            View project
+            <ExternalLink size={14} />
+          </a>
+        )}
+        {isDetail && (
+          <button
+            type="button"
+            onClick={onToggleSave}
+            aria-label={post.user_saved ? "Unsave showcase post" : "Save showcase post"}
+            aria-pressed={post.user_saved}
+          >
+            <Bookmark size={20} fill={post.user_saved ? "currentColor" : "none"} />
+          </button>
+        )}
+      </div>
+    </>
+  );
+
+  if (isDetail) {
+    return (
+      <article className="border-y border-border py-6">
+        <div className={communityFeedLayout.detailSection}>{card}</div>
+      </article>
+    );
+  }
+
+  return (
+    <article
+      tabIndex={0}
+      role="link"
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onOpen?.();
+      }}
+      className={`${communityFeedLayout.row} cursor-pointer ${
+        isLast ? "" : communityFeedLayout.dividerBottom
+      }`}
+    >
+      {card}
+    </article>
+  );
+}
