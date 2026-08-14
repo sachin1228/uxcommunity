@@ -18,122 +18,17 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 const VALID_TABS = new Set(["chat", "threads", "events", "resources"]);
 
-/**
- * Strip year-range suffixes and singularize experience level names for display.
- * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- *      "Heads of Design"                 → "Head of Design"
- */
-function cleanDesignation(name: string): string {
-  const clean = name.split("(")[0].trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
-  const userId = session.userId!;
   const { id } = await params;
-
-  const db = createServiceClient();
-
-  // Run membership check and community fetch in parallel
-  const [{ data: membership }, { data: community, error: commErr }] = await Promise.all([
-    db
-      .from("community_members")
-      .select("joined_at, role")
-      .eq("community_id", id)
-      .eq("user_id", userId)
-      .maybeSingle(),
-    db
-      .from("communities")
-      .select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token")
-      .eq("id", id)
-      .eq("is_active", true)
-      .maybeSingle(),
-  ]);
-
-  if (!membership) {
-    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
-  }
-  if (commErr || !community) {
-    return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  }
-
-  // Use cached master data and return the first member page + total count in one query.
-  const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [masterImageMap, masterNameMap, experienceLevelNameMap, { data: memberRows, count: member_count }] = await Promise.all([
-    hasMasterData
-      ? getMasterImageMap(community.type)
-      : Promise.resolve({} as Record<string, string | null>),
-    hasMasterData
-      ? getMasterNameMap(community.type)
-      : Promise.resolve({} as Record<string, string>),
-    getExperienceLevelNameMap(),
-    db
-      .from("community_members")
-      .select("user_id, joined_at, role", { count: "exact" })
-      .eq("community_id", id)
-      .order("joined_at", { ascending: false })
-      .limit(10),
-  ]);
-
-  const resolvedImageUrl: string | null =
-    (community.reference_id ? masterImageMap[community.reference_id] : undefined) ??
-    community.image_url ??
-    null;
-  const resolvedReferenceName: string | null =
-    (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null;
-
-  // Batch-fetch member user info (1 query instead of N)
-  const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
-  const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
-    ? await Promise.all([
-        db.from("users").select("id, name").in("id", memberUserIds),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
-      ])
-    : [{ data: [] }, { data: [] }];
-
-  const userMap     = Object.fromEntries((memberUsers    ?? []).map((u: any) => [u.id, u]));
-  const profileMap  = Object.fromEntries((memberProfiles ?? []).map((p: any) => [p.user_id, p]));
-
-  const members = (memberRows ?? []).map((m) => {
-    const p = profileMap[m.user_id];
-    return {
-      user_id:  m.user_id,
-      joined_at: m.joined_at,
-      role:     (m as any).role ?? "member",
-      users: userMap[m.user_id]
-        ? {
-            name:        userMap[m.user_id].name,
-            avatar_url:  p?.avatar_url  ?? null,
-            designation: p?.experience_level
-              ? cleanDesignation(experienceLevelNameMap[p.experience_level] ?? p.experience_level)
-              : null,
-            company:     (p?.companies as any)?.name ?? null,
-          }
-        : null,
-    };
-  });
-
-  // Only expose invite_token to the owner
-  const isOwner = community.owner_id === userId;
-
-  return NextResponse.json({
-    community: {
-      ...community,
-      image_url:      resolvedImageUrl,
-      reference_name: resolvedReferenceName,
-      member_count:   member_count ?? 0,
-      invite_token:   isOwner ? (community as any).invite_token : undefined,
-    },
-    members,
-    current_user_role: (membership as any).role ?? "member",
-  });
+  const result = await loadCommunityReadModel(id, session.userId!);
+  return result.ok
+    ? NextResponse.json(result.data)
+    : NextResponse.json({ error: result.error }, { status: result.status });
 }
 
 // ── PATCH /api/communities/[id] ─────────────────────────────────────────────
