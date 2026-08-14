@@ -30,7 +30,7 @@ as $$
       el.id as experience_level_id
     from public.designer_profiles as dp
     left join public.experience_levels as el
-      on el.slug = dp.experience_level
+      on el.slug = dp.experience_level::text
     where dp.user_id = p_user_id
     limit 1
   ),
