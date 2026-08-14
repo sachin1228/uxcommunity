@@ -7,11 +7,8 @@ import {
   CalendarClock,
   ChevronDown,
   CircleEllipsis,
-  ExternalLink,
-  Heart,
   Image,
   LayoutGrid,
-  MessageCircle,
   Monitor,
   PenTool,
   Play,
@@ -21,13 +18,11 @@ import {
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import {
   SHOWCASE_CATEGORIES,
-  SHOWCASE_TYPES,
   type ShowcaseCategory,
   type ShowcasePost,
 } from "./types";
 import { communityFeedLayout } from "../feed-layout";
-import { PostAuthorMeta } from "../PostAuthorMeta";
-import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
+import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const STALE = 30_000;
@@ -265,103 +260,17 @@ export function ShowcaseView({
         ) : (
           <div>
             {visible.map((post, index) => (
-              <article
+              <ShowcaseCard
                 key={post.id}
-                tabIndex={0}
-                role="link"
-                onClick={() => open(post)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") open(post);
-                }}
-                className={`${communityFeedLayout.row} cursor-pointer ${
-                  index === visible.length - 1
-                    ? ""
-                    : communityFeedLayout.dividerBottom
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <PostAuthorMeta
-                    name={post.author.name}
-                    avatarUrl={post.author.avatar_url}
-                    createdAt={post.created_at}
-                    dateInline
-                    secondaryLabel={`Showcase · ${
-                      SHOWCASE_TYPES.find(
-                        (item) => item.value === post.post_type,
-                      )?.label ?? "Post"
-                    }`}
-                  />
-                  <ShowcaseOptionsMenu
-                    saved={post.user_saved}
-                    canManage={post.user_id === currentUserId}
-                    onToggleSave={() => void toggle(post, "save")}
-                    onEdit={() => setEditing(post)}
-                    onDelete={() => void remove(post)}
-                  />
-                </div>
-
-                <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">
-                  {post.title}
-                </h2>
-                {post.description && (
-                  <p className="mt-1.5 line-clamp-3 font-body text-xs leading-relaxed text-foreground-muted">
-                    {post.description}
-                  </p>
-                )}
-                <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
-                  <img
-                    src={post.image_url}
-                    alt={`Preview of ${post.title}`}
-                    className="max-h-[480px] w-full object-cover"
-                  />
-                </div>
-
-                <div
-                  className="mt-3 flex items-center gap-4"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <button
-                    type="button"
-                    onClick={() => void toggle(post, "like")}
-                    aria-pressed={post.user_liked}
-                    className="inline-flex items-center gap-2"
-                  >
-                    <Heart
-                      size={20}
-                      fill={post.user_liked ? "currentColor" : "none"}
-                      className={
-                        post.user_liked
-                          ? "text-red-500"
-                          : "text-foreground"
-                      }
-                    />
-                    <span className="font-body text-sm font-semibold text-foreground">
-                      {post.like_count}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => open(post)}
-                    className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
-                  >
-                    <MessageCircle size={20} />
-                    {post.comment_count}{" "}
-                    {post.comment_count === 1 ? "comment" : "comments"}
-                  </button>
-                  <div className="flex-1" />
-                  {post.project_url && (
-                    <a
-                      href={post.project_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent"
-                    >
-                      View project
-                      <ExternalLink size={14} />
-                    </a>
-                  )}
-                </div>
-              </article>
+                post={post}
+                currentUserId={currentUserId}
+                isLast={index === visible.length - 1}
+                onOpen={() => open(post)}
+                onToggleLike={() => void toggle(post, "like")}
+                onToggleSave={() => void toggle(post, "save")}
+                onEdit={() => setEditing(post)}
+                onDelete={() => void remove(post)}
+              />
             ))}
             {nextCursor && (
               <div className="flex justify-center py-6">
