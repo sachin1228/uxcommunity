@@ -16,8 +16,6 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
     activeCommunityId,
     typingMap,
     handleNavigate,
-    onEnter,
-    onLeave,
     pathname,
     router,
   } = useSidebarCommunities(userId);
@@ -120,8 +118,6 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
                   onClick={() => handleNavigate(c.id)}
-                  onMouseEnter={() => onEnter(c.id)}
-                  onMouseLeave={onLeave}
                 />
               ))}
             </ul>
