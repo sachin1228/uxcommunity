@@ -4,6 +4,12 @@
  * React context, Redux, or external libraries.
  */
 
+import {
+  invalidateRequest,
+  patchCachedRequest,
+  setCachedRequest,
+} from "@/lib/request-cache";
+
 export interface MessageReaction {
   emoji: string;
   user_ids: string[];
@@ -185,6 +191,7 @@ export function invalidateOnJoin(communityId: string): void {
   }
   sidebarStore.data     = null;
   sidebarStore.inflight = null;
+  invalidateRequest("/api/communities");
   notifySidebarChanged();
 }
 
@@ -193,6 +200,7 @@ export function invalidateCommunitiesList(): void {
   sidebarStore.inflight = null;
   exploreStore.data     = null;
   exploreStore.inflight = null;
+  invalidateRequest("/api/communities");
   notifySidebarChanged();
 }
 
@@ -210,6 +218,11 @@ export function invalidateOnLeave(communityId: string): void {
       ...sidebarStore.data,
       communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
     };
+    setCachedRequest("/api/communities", {
+      communities: sidebarStore.data.communities,
+    });
+  } else {
+    invalidateRequest("/api/communities");
   }
   evictCommunityState(communityId);
   notifySidebarChanged();
@@ -232,6 +245,14 @@ export function patchSidebarCommunity(
         c.id === communityId ? { ...c, ...patch } : c
       ),
     };
+    patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+      "/api/communities",
+      (current) => ({
+        communities: current.communities.map((community) =>
+          community.id === communityId ? { ...community, ...patch } : community
+        ),
+      }),
+    );
   }
   notifySidebarChanged();
 }
