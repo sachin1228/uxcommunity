@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
@@ -40,15 +41,19 @@ export async function verifySession(
   }
 }
 
-/** Read the current session from server-side cookies (App Router). */
-export async function getSession(): Promise<SessionPayload | null> {
+/**
+ * Read the current session from server-side cookies (App Router).
+ * React cache deduplicates nested layout/page reads within one RSC request
+ * without sharing cookie-derived state between users or requests.
+ */
+export const getSession = cache(async (): Promise<SessionPayload | null> => {
   const store = await cookies();
   const token =
     store.get(SESSION_COOKIE)?.value ??
     store.get(LEGACY_SESSION_COOKIE)?.value;
   if (!token) return null;
   return verifySession(token);
-}
+});
 
 export function setSessionCookie(res: NextResponse, token: string) {
   res.cookies.set(SESSION_COOKIE, token, {
