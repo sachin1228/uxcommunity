@@ -94,7 +94,7 @@ select has_index(
 );
 
 create temporary table rpc_count_trigger_context as
-select community_id, member_count
+select id as community_id, member_count
 from public.communities
 order by member_count desc, id
 limit 1;
