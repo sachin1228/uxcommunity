@@ -6,6 +6,7 @@ import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
+import { loadCommunityReadModel } from "@/lib/communities/read-models";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
