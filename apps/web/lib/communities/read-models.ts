@@ -87,6 +87,130 @@ export async function loadCommunityReadModel(
   };
 }
 
+export async function isCommunityMember(
+  communityId: string,
+  userId: string,
+): Promise<boolean> {
+  const { data } = await createServiceClient()
+    .from("community_members")
+    .select("joined_at")
+    .eq("community_id", communityId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return Boolean(data);
+}
+
+async function enrichAuthoredRows(
+  rows: Array<Record<string, unknown>>,
+  currentUserId: string,
+  aggregateRpc: "get_event_list_aggregates" | "get_thread_list_aggregates" | "get_resource_list_aggregates",
+  idsArgument: "p_event_ids" | "p_thread_ids" | "p_resource_ids",
+) {
+  if (!rows.length) return [];
+  const db = createServiceClient();
+  const ids = rows.map((row) => row.id).filter((id): id is string => typeof id === "string");
+  const userIds = [...new Set(rows.map((row) => row.user_id).filter((id): id is string => typeof id === "string"))];
+  const [{ data: users }, { data: profiles }, aggregateResult] = await Promise.all([
+    db.from("users").select("id, name").in("id", userIds),
+    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
+    callPerformanceRpc(db, aggregateRpc, { p_user_id: currentUserId, [idsArgument]: ids }),
+  ]);
+  if (aggregateResult.error) throw new Error(`Failed to load ${aggregateRpc} read model.`);
+  const userMap = Object.fromEntries((users ?? []).map((user) => [user.id, user.name]));
+  const avatarMap = Object.fromEntries((profiles ?? []).map((profile) => [profile.user_id, profile.avatar_url]));
+  const aggregateMap = new Map((aggregateResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]));
+  return rows.map((row) => ({
+    ...row,
+    users: userMap[row.user_id as string]
+      ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
+      : null,
+    ...(aggregateMap.get(row.id as string) ?? {}),
+  }));
+}
+
+export const enrichCommunityEvents = (rows: Array<Record<string, unknown>>, userId: string) =>
+  enrichAuthoredRows(rows, userId, "get_event_list_aggregates", "p_event_ids");
+export const enrichCommunityThreads = (rows: Array<Record<string, unknown>>, userId: string) =>
+  enrichAuthoredRows(rows, userId, "get_thread_list_aggregates", "p_thread_ids");
+export const enrichCommunityResources = (rows: Array<Record<string, unknown>>, userId: string) =>
+  enrichAuthoredRows(rows, userId, "get_resource_list_aggregates", "p_resource_ids");
+
+export async function loadCommunityThreads(
+  communityId: string,
+  userId: string,
+): Promise<ReadResult<{ threads: unknown[] }>> {
+  if (!(await isCommunityMember(communityId, userId))) return { ok: false, status: 403, error: "Not a member of this community." };
+  const { data, error } = await createServiceClient()
+    .from("community_threads")
+    .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at")
+    .eq("community_id", communityId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return { ok: false, status: 500, error: "Failed to fetch threads." };
+  return { ok: true, data: { threads: await enrichCommunityThreads((data ?? []) as Array<Record<string, unknown>>, userId) } };
+}
+
+export async function loadCommunityResources(
+  communityId: string,
+  userId: string,
+): Promise<ReadResult<{ resources: unknown[] }>> {
+  if (!(await isCommunityMember(communityId, userId))) return { ok: false, status: 403, error: "Not a member of this community." };
+  const { data, error } = await createServiceClient()
+    .from("community_resources")
+    .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at")
+    .eq("community_id", communityId)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) return { ok: false, status: 500, error: "Failed to fetch resources." };
+  return { ok: true, data: { resources: await enrichCommunityResources((data ?? []) as Array<Record<string, unknown>>, userId) } };
+}
+
+export async function loadCommunityShowcasePage(
+  communityId: string,
+  userId: string,
+  cursor: string | null,
+): Promise<ReadResult<{ posts: unknown[]; nextCursor: string | null }>> {
+  if (!(await isCommunityMember(communityId, userId))) return { ok: false, status: 403, error: "Not a member." };
+  let cursorCreatedAt: string | null = null;
+  let cursorId: string | null = null;
+  if (cursor) {
+    [cursorCreatedAt, cursorId] = cursor.split("|");
+    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+  }
+  const { data, error } = await callPerformanceRpc(createServiceClient(), "get_showcase_list_page", {
+    p_community_id: communityId,
+    p_user_id: userId,
+    p_cursor_created_at: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_limit: 26,
+  });
+  if (error) return { ok: false, status: 500, error: "Failed to load showcase posts." };
+  const posts = (data ?? []).slice(0, 25) as Array<Record<string, unknown>>;
+  const last = posts.at(-1);
+  return {
+    ok: true,
+    data: {
+      posts,
+      nextCursor: (data?.length ?? 0) > 25 && last ? `${last.created_at as string}|${last.id as string}` : null,
+    },
+  };
+}
+
+export async function loadCommunityStats(communityId: string): Promise<ReadResult<{ posts_today: number }>> {
+  const todayStart = new Date();
+  todayStart.setUTCHours(0, 0, 0, 0);
+  const { count, error } = await createServiceClient()
+    .from("community_messages")
+    .select("*", { count: "exact", head: true })
+    .eq("community_id", communityId)
+    .is("deleted_at", null)
+    .gte("created_at", todayStart.toISOString());
+  if (error) return { ok: false, status: 500, error: "Failed to load community stats." };
+  return { ok: true, data: { posts_today: count ?? 0 } };
+}
+
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,

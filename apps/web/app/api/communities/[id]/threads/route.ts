@@ -10,6 +10,7 @@ import { contentHash } from "@/lib/moderation/normalize";
 import { deferCommunityNotification, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
+import { loadCommunityThreads } from "@/lib/communities/read-models";
 
 const PAGE_SIZE = 50;
 const CATEGORIES = new Set<ThreadCategory>([
@@ -144,45 +145,18 @@ export async function GET(
 ) {
   const timer = createServerTimer("GET /api/communities/[id]/threads");
   let session;
-  try {
-    session = await timer.measure("auth", () => requireSession("user"));
-  } catch (error) {
+  try { session = await timer.measure("auth", () => requireSession("user")); } catch (error) {
     timer.finish({ status: (error as Response).status ?? 401 });
     return error as Response;
   }
-
   const { id: communityId } = await params;
-  const userId = session.userId!;
-  const db = createServiceClient();
-  if (!(await timer.measure("membership_query", () => isMember(db, communityId, userId)))) {
-    timer.finish({ status: 403 });
-    return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  const result = await timer.measure("read_model", () => loadCommunityThreads(communityId, session.userId!));
+  if (!result.ok) {
+    timer.finish({ status: result.status });
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
-
-  const { data, error } = await timer.measure("threads_query", async () =>
-    await db
-      .from("community_threads")
-      .select(
-        "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at",
-      )
-      .eq("community_id", communityId)
-      .order("created_at", { ascending: false })
-      .limit(PAGE_SIZE),
-  );
-
-  if (error) {
-    console.error("[GET threads]", error);
-    timer.finish({ status: 500 });
-    return NextResponse.json({ error: "Failed to fetch threads." }, { status: 500 });
-  }
-
-  const body = {
-    threads: await timer.measure("enrichment_queries", () =>
-      withAuthorAndVotes(db, (data ?? []) as Array<Record<string, unknown>>, userId),
-    ),
-  };
-  timer.finish({ status: 200, response_bytes: estimateJsonBytes(body), returned_rows: body.threads.length });
-  return NextResponse.json(body);
+  timer.finish({ status: 200, response_bytes: estimateJsonBytes(result.data), returned_rows: result.data.threads.length });
+  return NextResponse.json(result.data);
 }
 
 export async function POST(

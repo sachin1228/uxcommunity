@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
+import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
@@ -50,31 +51,9 @@ const SHOWCASE_PAGE_SIZE = 25;
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id } = await params;
-  const db = createServiceClient();
-  if (!(await member(db, id, session.userId!))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const cursor = request.nextUrl.searchParams.get("cursor");
-  let cursorCreatedAt: string | null = null;
-  let cursorId: string | null = null;
-  if (cursor) {
-    [cursorCreatedAt, cursorId] = cursor.split("|");
-    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
-      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
-    }
-  }
-  const { data, error } = await callPerformanceRpc(db, "get_showcase_list_page", {
-    p_community_id: id,
-    p_user_id: session.userId!,
-    p_cursor_created_at: cursorCreatedAt,
-    p_cursor_id: cursorId,
-    p_limit: SHOWCASE_PAGE_SIZE + 1,
-  });
-  if (error) return NextResponse.json({ error: "Failed to load showcase posts." }, { status: 500 });
-  const page = (data ?? []).slice(0, SHOWCASE_PAGE_SIZE) as Record<string, unknown>[];
-  const last = page.at(-1);
-  const nextCursor = (data?.length ?? 0) > SHOWCASE_PAGE_SIZE && last
-    ? `${last.created_at as string}|${last.id as string}`
-    : null;
-  return NextResponse.json({ posts: page, nextCursor });
+  const result = await loadCommunityShowcasePage(id, session.userId!, request.nextUrl.searchParams.get("cursor"));
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json(result.data);
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
