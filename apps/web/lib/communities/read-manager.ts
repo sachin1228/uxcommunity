@@ -11,6 +11,11 @@
  *   - debounce so bursts of events combine into one request
  *   - deduplicate while a PATCH is already in flight
  *
+ * The in-memory cache is bounded: at most MAX_READ_STATE_ENTRIES communities
+ * are tracked, so it cannot grow without limit during long-running sessions.
+ * When the cap is exceeded, the oldest unused entry (no pending debounce
+ * timer, no in-flight PATCH) is evicted.
+ *
  * Realtime handlers feed `noteCommunityActivity` so the tracked unread count
  * stays fresh even before the user navigates back into a community.
  */
@@ -38,10 +43,20 @@ interface CommunityReadState {
   inFlight: boolean;
 }
 
+/**
+ * Hard cap on the in-memory read-state cache. The map grows by one entry per
+ * community the user interacts with, so without a bound it would grow
+ * indefinitely across a long-running session. When the cap is exceeded, the
+ * oldest unused entry is evicted (see `evictReadStatesIfNeeded`).
+ */
+export const MAX_READ_STATE_ENTRIES = 100;
+
 /** Tuneable for tests. */
 export const readManagerConfig = {
   cooldownMs: 30_000,
   debounceMs: 1_000,
+  /** Max communities kept in memory; oldest unused entries are evicted past this. */
+  maxEntries: MAX_READ_STATE_ENTRIES,
 };
 
 const readStates = new Map<string, CommunityReadState>();
@@ -68,8 +83,37 @@ function ensureState(communityId: string): CommunityReadState {
       inFlight: false,
     };
     readStates.set(communityId, state);
+    evictReadStatesIfNeeded();
+  } else {
+    // Bump recency so the LRU eviction keeps communities the user is actively
+    // interacting with (including realtime activity), not just the most
+    // recently inserted ones.
+    readStates.delete(communityId);
+    readStates.set(communityId, state);
   }
   return state;
+}
+
+/**
+ * Enforce the cache size cap. Iterates oldest → newest (Map insertion order is
+ * refreshed by `ensureState` on every touch) and drops fully unused entries.
+ * Communities with a pending debounce timer or an in-flight PATCH are
+ * protected — evicting them would break the debounce/dedup guarantees.
+ */
+function evictReadStatesIfNeeded(): void {
+  while (readStates.size > readManagerConfig.maxEntries) {
+    let evicted = false;
+    for (const [communityId, state] of readStates) {
+      if (debounceTimers.has(communityId) || state.inFlight) continue;
+      readStates.delete(communityId);
+      logReadCache(communityId, "evicted", "cache at max size");
+      evicted = true;
+      break;
+    }
+    // Every remaining entry is protected (pending timer or in-flight request);
+    // stop rather than evicting entries the debounce/dedup logic depends on.
+    if (!evicted) break;
+  }
 }
 
 /** Inspect the tracked state for a community (used by tests). */
