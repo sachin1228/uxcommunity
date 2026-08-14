@@ -561,21 +561,20 @@ function isEmojiOnly(text: string): boolean {
 
 function ImageModerationNotice({
   status,
-  isMe,
 }: {
-  status: NonNullable<CachedMessage["image_status"]>;
-  isMe: boolean;
+  status: "rejected" | "review_required";
 }) {
-  const copy = status === "pending"
-    ? "Moderating image…"
-    : status === "rejected"
-      ? (isMe ? "This image did not meet community guidelines." : "Image removed by moderation.")
-      : (isMe ? "This image needs moderator review." : "Image unavailable pending review.");
+  const copy = status === "rejected"
+    ? "Image removed — it may violate community guidelines."
+    : "Image hidden — it requires moderator review.";
 
   return (
-    <div className="flex items-center gap-2 px-1 py-1.5" role="status">
-      <Clock size={14} className={status === "pending" ? "animate-pulse" : ""} />
-      <span className="font-body text-xs">{copy}</span>
+    <div
+      className="inline-flex max-w-sm items-start gap-2 rounded-2xl rounded-tr-sm border border-red-400/30 bg-red-500/15 px-3 py-2 text-red-200"
+      role="alert"
+    >
+      <Ban size={14} className="mt-0.5 shrink-0" />
+      <span className="font-body text-sm leading-5">{copy}</span>
     </div>
   );
 }
