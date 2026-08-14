@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import {
@@ -41,7 +41,8 @@ import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
-import { fetchAndHydrateCommunityBootstrap, initRequestCache } from "@/lib/request-cache";
+import { fetchAndHydrateCommunityBootstrap, initRequestCache, setCachedRequest } from "@/lib/request-cache";
+import type { SSRCommunitySections } from "@/lib/communities/server";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -57,6 +58,7 @@ export function CommunityChat({
   initialMeta,
   initialMessages,
   initialLastReadAt,
+  initialSections,
   initialTab = "chat",
 }: {
   communityId: string;
@@ -64,6 +66,7 @@ export function CommunityChat({
   initialMeta?: CachedMeta;
   initialMessages?: CachedMessage[];
   initialLastReadAt?: string | null;
+  initialSections?: SSRCommunitySections;
   initialTab?: ChatTab;
 }) {
   const pathname = usePathname();
@@ -74,6 +77,26 @@ export function CommunityChat({
   /** True once the initial threads fetch for the current community has settled. */
   const [threadsReady, setThreadsReady] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
+
+  // Seed every first-page endpoint before child passive effects run. This keeps
+  // tab mounts cache-only while preserving API reads for pagination and realtime.
+  useInsertionEffect(() => {
+    initRequestCache(currentUserId);
+    if (!initialSections) return;
+    const base = `/api/communities/${communityId}`;
+    const urls: Array<[string, unknown]> = [
+      [`${base}/threads`, initialSections.threads],
+      [`${base}/events`, initialSections.events],
+      [`${base}/resources`, initialSections.resources],
+      [`${base}/showcase`, initialSections.showcase],
+      [`${base}/members?page=0`, initialSections.members],
+      [`${base}/rules`, initialSections.rules],
+      [`${base}/stats`, initialSections.stats],
+    ];
+    for (const [url, value] of urls) {
+      if (value !== undefined) setCachedRequest(url, value, currentUserId);
+    }
+  }, [communityId, currentUserId, initialSections]);
 
   const handleTabChange = useCallback((tab: ChatTab) => {
     setActiveTab(tab);

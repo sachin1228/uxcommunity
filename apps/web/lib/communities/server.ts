@@ -2,6 +2,16 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import type { CachedMeta, CachedMessage, MessageReaction, ReplyPreview } from "./cache";
+import {
+  loadCommunityEvents,
+  loadCommunityMembersPage,
+  loadCommunityResources,
+  loadCommunityRules,
+  loadCommunityShowcasePage,
+  loadCommunityStats,
+  loadCommunityThreads,
+  type ReadResult,
+} from "./read-models";
 
 /**
  * Strip year-range suffixes and singularize experience level names for display.
@@ -15,10 +25,25 @@ function cleanDesignation(name: string): string {
   return clean;
 }
 
+export interface SSRCommunitySections {
+  threads?: unknown;
+  events?: unknown;
+  resources?: unknown;
+  showcase?: unknown;
+  members?: unknown;
+  rules?: unknown;
+  stats?: unknown;
+}
+
 export interface SSRCommunityData {
   meta: CachedMeta;
   messages: CachedMessage[];
   lastReadAt: string | null;
+  sections: SSRCommunitySections;
+}
+
+function readData<T>(result: ReadResult<T>): T | undefined {
+  return result.ok ? result.data : undefined;
 }
 
 export async function fetchCommunitySSRData(
@@ -181,5 +206,28 @@ export async function fetchCommunitySSRData(
   const lastReadAt: string | null =
     (membership as unknown as { last_read_at: string | null }).last_read_at ?? null;
 
-  return { meta, messages, lastReadAt };
+  const [threads, events, resources, showcase, memberPage, rules, stats] = await Promise.all([
+    loadCommunityThreads(communityId, userId),
+    loadCommunityEvents(communityId, userId),
+    loadCommunityResources(communityId, userId),
+    loadCommunityShowcasePage(communityId, userId, null),
+    loadCommunityMembersPage(communityId, userId),
+    loadCommunityRules(communityId),
+    loadCommunityStats(communityId),
+  ]);
+
+  return {
+    meta,
+    messages,
+    lastReadAt,
+    sections: {
+      threads: readData(threads),
+      events: readData(events),
+      resources: readData(resources),
+      showcase: readData(showcase),
+      members: readData(memberPage),
+      rules: readData(rules),
+      stats: readData(stats),
+    },
+  };
 }

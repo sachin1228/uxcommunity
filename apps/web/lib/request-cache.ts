@@ -10,6 +10,11 @@ type CacheOptions = {
 
 type CacheEvent = "hit" | "miss" | "dedup" | "revalidate" | "invalidate"
 
+type BootstrapBackedRequest = {
+  communityId: string
+  isInitialRead: boolean
+}
+
 const DEFAULT_STALE_MS = 60_000
 const MAX_ENTRIES = 100
 const entries = new Map<string, CacheEntry<unknown>>()
@@ -39,7 +44,10 @@ function log(event: CacheEvent, key: string) {
   telemetryEvents += 1
 
   if (process.env.NODE_ENV === "development") {
-    console.debug(`[request-cache] ${event}`, key)
+    const endpoint = key.slice(key.indexOf(":") + 1)
+    if (event === "hit") console.debug(`CACHE HIT: ${endpoint}`)
+    else if (event === "miss" || event === "revalidate") console.debug(`CACHE MISS: ${endpoint}`)
+    else console.debug(`[request-cache] ${event}`, key)
     return
   }
 
@@ -73,6 +81,27 @@ export function getCachedRequest<T>(url: string, userId?: string): T | undefined
   return entries.get(canonicalRequestKey(url, userId))?.value as T | undefined
 }
 
+function getBootstrapBackedRequest(url: string): BootstrapBackedRequest | null {
+  const parsed = new URL(url, "http://uxcommunity.local")
+  const match = parsed.pathname.match(
+    /^\/api\/communities\/([^/]+)(?:\/(messages|permissions|unread|showcase|threads|events|resources|members|rules|stats))?$/,
+  )
+  if (!match) return null
+
+  const section = match[2]
+  const hasPaginationOrSearch = ["before", "after", "cursor", "search", "q"].some(
+    (parameter) => parsed.searchParams.has(parameter),
+  )
+  const isPageZeroMembers = section !== "members"
+    || parsed.searchParams.size === 0
+    || (parsed.searchParams.size === 1 && parsed.searchParams.get("page") === "0")
+
+  return {
+    communityId: match[1],
+    isInitialRead: !hasPaginationOrSearch && isPageZeroMembers,
+  }
+}
+
 export async function fetchJsonCached<T>(
   url: string,
   options: CacheOptions = {},
@@ -80,22 +109,29 @@ export async function fetchJsonCached<T>(
 ): Promise<T> {
   const key = canonicalRequestKey(url, userId)
   const staleMs = options.staleMs ?? DEFAULT_STALE_MS
-  const cached = entries.get(key) as CacheEntry<T> | undefined
-  const fresh = cached && Date.now() - cached.fetchedAt < staleMs
+  let cached = entries.get(key) as CacheEntry<T> | undefined
+  let fresh = cached && Date.now() - cached.fetchedAt < staleMs
 
-  // Critical first-render reads share the community bootstrap promise. Secondary
-  // tabs use their own endpoint cache so they never delay or inflate bootstrap.
-  const parsed = new URL(url, "http://uxcommunity.local")
-  const communityMatch = parsed.pathname.match(/^\/api\/communities\/([^/]+)\/(messages|permissions|unread)$/)
-  const isInitialCriticalRead = communityMatch && !parsed.searchParams.has("before") && !parsed.searchParams.has("after")
-  if (!options.force && !fresh && isInitialCriticalRead) {
-    await fetchAndHydrateCommunityBootstrap(communityMatch[1], userId ?? activeUserId ?? "anonymous")
-    return fetchJsonCached<T>(url, options, userId)
-  }
-
-  if (!options.force && fresh) {
+  if (!options.force && fresh && cached) {
     log("hit", key)
     return cached.value
+  }
+
+  const bootstrapBacked = getBootstrapBackedRequest(url)
+  let loggedLookup = false
+  if (!options.force && bootstrapBacked?.isInitialRead) {
+    log(cached ? "revalidate" : "miss", key)
+    loggedLookup = true
+    await fetchAndHydrateCommunityBootstrap(
+      bootstrapBacked.communityId,
+      userId ?? activeUserId ?? "anonymous",
+    )
+    cached = entries.get(key) as CacheEntry<T> | undefined
+    fresh = cached && Date.now() - cached.fetchedAt < staleMs
+    if (fresh && cached) {
+      log("hit", key)
+      return cached.value
+    }
   }
 
   const pending = inFlight.get(key) as Promise<T> | undefined
@@ -104,7 +140,10 @@ export async function fetchJsonCached<T>(
     return pending
   }
 
-  log(cached ? "revalidate" : "miss", key)
+  if (!loggedLookup) log(cached ? "revalidate" : "miss", key)
+  if (process.env.NODE_ENV === "development") {
+    console.debug(`NETWORK REQUEST: ${url}`)
+  }
   const request = fetch(url, { cache: "no-store" })
     .then(async (response) => {
       const body = await response.json().catch(() => null)
