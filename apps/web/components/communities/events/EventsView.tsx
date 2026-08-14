@@ -264,7 +264,7 @@ export function EventsView({
               return (
                 <article
                   key={event.id}
-                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} ${isPast ? "opacity-60" : ""}`}
+                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} relative ${isPast ? "opacity-60" : ""}`}
                 >
                   <PostAuthorMeta
                     name={event.users?.name}
@@ -283,6 +283,7 @@ export function EventsView({
                     onRsvpChanged={handleRsvpChanged}
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
+                    menuInPostHeader
                   />
                 </article>
               );

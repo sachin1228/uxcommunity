@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft, Bookmark, Calendar, CornerDownRight, ExternalLink,
-  Heart, Loader2, MapPin, MessageSquare, MoreHorizontal, Pencil,
-  Send, Share2, Trash2, Users, Video,
+  ArrowLeft, Calendar, CornerDownRight, ExternalLink,
+  Heart, Loader2, MapPin, MessageSquare, MoreHorizontal,
+  Send, Trash2, Users, Video,
 } from "lucide-react";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
@@ -13,6 +13,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
 import { useEventInteractions } from "./useEventInteractions";
+import { EventOptionsMenu } from "./EventOptionsMenu";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -315,7 +316,6 @@ export function EventDetailClient({
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
   const [rsvpPending, setRsvpPending] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -512,49 +512,16 @@ export function EventDetailClient({
               Event · {event.is_online ? "Online" : event.location ?? communityName}
             </p>
           </div>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label="Event options"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
-            >
-              <MoreHorizontal size={16} />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => { handleSave(); setMenuOpen(false); }}
-                  aria-pressed={event.user_saved}
-                  className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                >
-                  <Bookmark size={12} fill={event.user_saved ? "currentColor" : "none"} />
-                  {event.user_saved ? "Unsave event" : "Save event"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { void handleShare(); setMenuOpen(false); }}
-                  className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                >
-                  <Share2 size={12} /> {shared ? "Copied!" : "Share event"}
-                </button>
-                {isOwner && (
-                  <>
-                    <button type="button" onClick={() => { setMenuOpen(false); setShowEditModal(true); }}
-                      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                      <Pencil size={12} /> Edit event
-                    </button>
-                    <button type="button" onClick={handleDeleteEvent} disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                      {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                      {deleting ? "Deleting…" : "Delete event"}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+          <EventOptionsMenu
+            saved={event.user_saved}
+            shared={shared}
+            isOwner={isOwner}
+            deleting={deleting}
+            onSave={handleSave}
+            onShare={() => void handleShare()}
+            onEdit={() => setShowEditModal(true)}
+            onDelete={() => void handleDeleteEvent()}
+          />
         </div>
 
         {/* Main event card — matches the homepage card */}
