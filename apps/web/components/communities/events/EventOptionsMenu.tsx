@@ -50,7 +50,7 @@ export function EventOptionsMenu({
   return (
     <div
       ref={menuRef}
-      className={`relative ${className}`}
+      className={className || "relative"}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
