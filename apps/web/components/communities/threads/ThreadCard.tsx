@@ -181,6 +181,7 @@ export function ThreadCard({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ voted }),
             },
+            { cooldownMode: "url" },
           );
           const result = (await response.json().catch(() => null)) as {
             voted?: boolean;
@@ -221,6 +222,7 @@ export function ThreadCard({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ saved }),
             },
+            { cooldownMode: "url" },
           );
           const result = (await response.json().catch(() => null)) as {
             saved?: boolean;

@@ -129,6 +129,98 @@ test("does not dedupe requests with different bodies", async () => {
   assert.equal(calls, 2)
 })
 
+test("10 concurrent identical saves produce one fetch and every caller can read the body", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    return jsonResponse({ saved: true, save_count: 3 })
+  }) as typeof fetch
+
+  const init = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ saved: true }),
+  }
+
+  const responses = await Promise.all(
+    Array.from({ length: 10 }, () =>
+      dedupeFetch("/api/communities/c1/events/e1/save", init),
+    ),
+  )
+
+  assert.equal(calls, 1)
+  const bodies = await Promise.all(responses.map((r) => r.json()))
+  assert.ok(bodies.every((b) => b.saved === true))
+})
+
+test("url-mode cooldown collapses alternating toggle bodies into one request", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return jsonResponse({ saved: calls === 1 })
+  }) as typeof fetch
+
+  // A rapid like/save toggle fires alternating bodies — with url-mode they
+  // must all resolve against the first network request.
+  await dedupeFetch("/api/communities/c1/events/e1/save", {
+    method: "POST",
+    body: JSON.stringify({ saved: true }),
+  }, { cooldownMode: "url" })
+  const replayed = await dedupeFetch("/api/communities/c1/events/e1/save", {
+    method: "POST",
+    body: JSON.stringify({ saved: false }),
+  }, { cooldownMode: "url" })
+
+  assert.equal(calls, 1)
+  const data = await replayed.json()
+  assert.equal(data.saved, true, "replay returns the first request's result")
+})
+
+test("different resources never collide even in url mode", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return jsonResponse({ ok: true })
+  }) as typeof fetch
+
+  await Promise.all([
+    dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: true }) }, { cooldownMode: "url" }),
+    dedupeFetch("/api/communities/c1/events/e2/save", { method: "POST", body: JSON.stringify({ saved: true }) }, { cooldownMode: "url" }),
+  ])
+
+  assert.equal(calls, 2)
+})
+
+test("url-mode does not collapse when the cooldown window has passed", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return jsonResponse({ saved: calls % 2 === 1 })
+  }) as typeof fetch
+
+  await dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: true }) }, { cooldownMode: "url", mutationCooldownMs: 100 })
+  await new Promise((resolve) => setTimeout(resolve, 150))
+  await dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: false }) }, { cooldownMode: "url", mutationCooldownMs: 100 })
+
+  assert.equal(calls, 2)
+})
+
+test("exact-mode keeps alternating toggle bodies as separate requests", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return jsonResponse({ saved: calls % 2 === 1 })
+  }) as typeof fetch
+
+  await Promise.all([
+    dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: true }) }),
+    dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: false }) }),
+  ])
+
+  assert.equal(calls, 2)
+})
+
 test("bypasses dedup for FormData bodies so uploads never collide", async () => {
   let calls = 0
   globalThis.fetch = (async () => {

@@ -19,11 +19,13 @@ type Options = {
 };
 
 async function persistBoolean<T>(url: string, key: "liked" | "saved", desired: boolean) {
+  // url cooldown: a rapid click burst on the like/save toggle fires alternating
+  // bodies — they must all collapse onto the first network request.
   const response = await dedupeFetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ [key]: desired }),
-  });
+  }, { cooldownMode: "url" });
   const data = (await response.json().catch(() => null)) as T | null;
   if (!response.ok || !data) throw new Error(`Unable to update event ${key}`);
   return data;

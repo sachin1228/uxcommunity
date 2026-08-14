@@ -24,6 +24,7 @@ import {
 import { communityFeedLayout } from "../feed-layout";
 import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 
 const STALE = 30_000;
 
@@ -122,13 +123,14 @@ export function ShowcaseView({
         : {}),
     });
 
-    const response = await fetch(
+    const response = await dedupeFetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       },
+      { cooldownMode: "url" },
     );
 
     if (!response.ok) {

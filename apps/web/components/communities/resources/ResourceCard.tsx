@@ -126,7 +126,7 @@ export function ResourceCard({
     saveRequestRunningRef.current = true;
     try {
       while (confirmedSaveRef.current !== desiredSaveRef.current) {
-        const response = await fetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource like");
         const result = (await response.json()) as { saved: boolean };
         confirmedSaveRef.current = result.saved;
@@ -160,7 +160,7 @@ export function ResourceCard({
     bookmarkRequestRunningRef.current = true;
     try {
       while (confirmedBookmarkRef.current !== desiredBookmarkRef.current) {
-        const response = await fetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource bookmark");
         const result = (await response.json()) as { bookmarked: boolean; bookmark_count: number };
         confirmedBookmarkRef.current = result.bookmarked;

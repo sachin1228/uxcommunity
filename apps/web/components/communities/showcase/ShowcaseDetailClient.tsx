@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
 import {
   ArrowLeft,
   CornerDownRight,
@@ -248,13 +249,14 @@ export function ShowcaseDetailClient({
         ? { like_count: value.like_count + (active ? -1 : 1) }
         : {}),
     }));
-    const response = await fetch(
+    const response = await dedupeFetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       },
+      { cooldownMode: "url" },
     );
     if (!response.ok) setPost(initialPost);
   }
