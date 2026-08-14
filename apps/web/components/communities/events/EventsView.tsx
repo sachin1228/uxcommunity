@@ -225,21 +225,47 @@ export function EventsView({
 
       <div className={communityFeedLayout.content}>
         {loading ? (
-          <div className={communityFeedLayout.skeletonList}>
+          <div className={communityFeedLayout.skeletonList} aria-label="Loading events" role="status">
             {[1, 2, 3].map((i) => (
-              <div key={i} className={communityFeedLayout.skeletonRow}>
-                <div className="h-3 w-28 rounded bg-surface-raised" />
-                <div className="mt-4 flex flex-col gap-2">
-                  <div className="h-4 w-2/3 rounded bg-surface-raised" />
-                  <div className="h-3 w-full rounded bg-surface-raised" />
-                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                  <div className="mt-1 flex justify-between">
+              <div
+                key={i}
+                className={`${communityFeedLayout.skeletonRow} ${communityFeedLayout.dividerBottom}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-surface-raised" />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3.5 w-20 rounded bg-surface-raised" />
+                      <div className="h-3 w-12 rounded bg-surface-raised" />
+                    </div>
                     <div className="h-3 w-24 rounded bg-surface-raised" />
-                    <div className="h-7 w-16 rounded-lg bg-surface-raised" />
                   </div>
+                </div>
+
+                <div className="mt-3 flex min-h-52 gap-5 rounded-xl border border-border p-4 md:min-h-56">
+                  <div className="aspect-square w-32 shrink-0 rounded-xl bg-surface-raised md:w-44" />
+                  <div className="flex min-w-0 flex-1 flex-col py-1">
+                    <div className="h-6 w-28 rounded-full bg-surface-raised" />
+                    <div className="mt-5 h-5 w-2/5 rounded bg-surface-raised" />
+                    <div className="mt-4 h-3.5 w-3/5 rounded bg-surface-raised" />
+                    <div className="mt-3 h-3.5 w-32 rounded bg-surface-raised" />
+                    <div className="mt-4 flex items-center gap-2">
+                      <div className="h-7 w-7 rounded-full bg-surface-raised" />
+                      <div className="h-3 w-16 rounded bg-surface-raised" />
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-4 py-1">
+                    <div className="h-10 w-24 rounded-lg bg-surface-raised" />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center gap-2">
+                  <div className="h-5 w-5 rounded bg-surface-raised" />
+                  <div className="h-3 w-3 rounded bg-surface-raised" />
                 </div>
               </div>
             ))}
+            <span className="sr-only">Loading events</span>
           </div>
         ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
@@ -264,7 +290,7 @@ export function EventsView({
               return (
                 <article
                   key={event.id}
-                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} ${isPast ? "opacity-60" : ""}`}
+                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} relative ${isPast ? "opacity-60" : ""}`}
                 >
                   <PostAuthorMeta
                     name={event.users?.name}
@@ -283,6 +309,7 @@ export function EventsView({
                     onRsvpChanged={handleRsvpChanged}
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
+                    menuInPostHeader
                   />
                 </article>
               );

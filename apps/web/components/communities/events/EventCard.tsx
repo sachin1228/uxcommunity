@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { Bookmark, Calendar, Flag, Heart, MapPin, MoreHorizontal, Pencil, Share2, Trash2, Video } from "lucide-react";
+import { Calendar, Heart, MapPin, Video } from "lucide-react";
 import type { CommunityEvent } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { useEventInteractions } from "./useEventInteractions";
+import { EventOptionsMenu } from "./EventOptionsMenu";
 
 function fmtEventDateTime(iso: string) {
   const d = new Date(iso);
@@ -94,13 +95,11 @@ export function EventCard({
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { toggleLike, toggleSave } = useEventInteractions({
     eventId: event.id,
     communityId,
@@ -112,20 +111,9 @@ export function EventCard({
     onSaveChanged,
   });
 
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
-
-  async function handleDelete(e: React.MouseEvent) {
-    e.preventDefault();
+  async function handleDelete() {
     if (!confirm("Delete this event? This cannot be undone.")) return;
     setDeleting(true);
-    setMenuOpen(false);
     try {
       const res = await fetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
       if (res.ok) onDeleted(event.id);
@@ -162,20 +150,15 @@ export function EventCard({
     toggleLike();
   }
 
-  function handleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  function handleSave() {
     toggleSave();
   }
 
-  function handleReport(e: React.MouseEvent) {
-    e.preventDefault();
-    setMenuOpen(false);
+  function handleReport() {
     setReported(true);
   }
 
-  async function handleShare(e: React.MouseEvent) {
-    e.preventDefault();
+  async function handleShare() {
     const url = `${window.location.origin}${isPublicContentScope(communityId) ? publicContentHref("event", event.id) : `/dashboard/communities/${communityId}/events/${event.id}`}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.title, url }); } catch { /* dismissed */ }
@@ -253,65 +236,19 @@ export function EventCard({
                       {rsvpPending ? "…" : event.user_rsvped ? "Going ✓" : full ? "Full" : "Join Event"}
                     </button>
                   )}
-                  {/* Options menu — visible to all users */}
-                  <div
-                    ref={menuRef}
-                    className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : "relative"}
-                  >
-                    <button
-                      type="button"
-                      onClick={(e) => { e.preventDefault(); setMenuOpen((p) => !p); }}
-                      aria-label="Event options"
-                      className={`flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground ${menuInPostHeader ? "" : "border border-border"}`}
-                    >
-                      <MoreHorizontal size={menuInPostHeader ? 15 : 13} />
-                    </button>
-                    {menuOpen && (
-                      <div className="absolute right-0 top-8 z-20 min-w-[140px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            void handleSave(e);
-                            setMenuOpen(false);
-                          }}
-                          aria-pressed={event.user_saved}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                        >
-                          <Bookmark size={11} fill={event.user_saved ? "currentColor" : "none"} />
-                          {event.user_saved ? "Unsave event" : "Save event"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            void handleShare(e);
-                            setMenuOpen(false);
-                          }}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-                        >
-                          <Share2 size={11} />
-                          {shared ? "Copied!" : "Share event"}
-                        </button>
-                        {isOwner && (
-                          <>
-                            <button type="button"
-                              onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                              <Pencil size={11} /> Edit event
-                            </button>
-                            <button type="button" onClick={handleDelete} disabled={deleting}
-                              className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                              <Trash2 size={11} /> {deleting ? "Deleting…" : "Delete event"}
-                            </button>
-                            <div className="my-1 border-t border-border" />
-                          </>
-                        )}
-                        <button type="button" onClick={handleReport} disabled={reported}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-                          <Flag size={11} /> {reported ? "Reported" : "Report post"}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <EventOptionsMenu
+                    saved={event.user_saved}
+                    shared={shared}
+                    reported={reported}
+                    isOwner={isOwner}
+                    deleting={deleting}
+                    className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
+                    onSave={handleSave}
+                    onShare={() => void handleShare()}
+                    onEdit={() => setShowEditModal(true)}
+                    onDelete={() => void handleDelete()}
+                    onReport={handleReport}
+                  />
                 </div>
               </div>
 
