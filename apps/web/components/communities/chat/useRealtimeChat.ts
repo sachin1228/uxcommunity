@@ -67,8 +67,6 @@ export function useRealtimeChat({
       return;
     }
 
-    const hasSubscribedRef = { current: false };
-
     const channel = supabase
       .channel(`community:${communityId}`)
       // ── New messages ────────────────────────────────────────────────────
@@ -500,18 +498,16 @@ export function useRealtimeChat({
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          if (!hasSubscribedRef.current) {
-            hasSubscribedRef.current = true;
-          } else {
-            // Reconnected — catch up on missed messages.
-            // Debounced so rapid reconnections (e.g. during a chat flood) collapse
-            // into a single incremental fetch instead of one per reconnect event.
-            const cached   = msgCache.get(communityId) ?? [];
-            const lastReal = cached
-              .filter((m) => !m.id.startsWith("temp-"))
-              .at(-1);
-            debouncedCatchUp(lastReal?.created_at ?? undefined);
-          }
+          // The client cache can be up to 5 minutes old when revisiting a
+          // community, so every fresh subscription (first mount, reconnect, or
+          // tab regain) runs an incremental ?after= catch-up. Messages sent
+          // while the user was away are never missed. Debounced so rapid
+          // reconnect events collapse into a single fetch.
+          const cached   = msgCache.get(communityId) ?? [];
+          const lastReal = cached
+            .filter((m) => !m.id.startsWith("temp-"))
+            .at(-1);
+          debouncedCatchUp(lastReal?.created_at ?? undefined);
         }
       });
 

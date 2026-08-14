@@ -1,73 +1,43 @@
+import { BookOpen, CalendarDays, Plus, User } from "lucide-react";
+import { DashboardContentLoader } from "./ContentLoader";
+import { communityFeedLayout } from "@/components/communities/feed-layout";
+
 /**
- * Shown immediately when navigating to /dashboard while the server component
- * resolves its session + DB fetch. Mirrors the homepage two-column layout.
+ * Dashboard home loading boundary.
+ *
+ * Mirrors the home page layout so navigation never looks broken: the composer
+ * header cards and column borders stay visible (static chrome), the feed area
+ * shows a single centered spinner, and the Discover sidebar keeps its own
+ * spinner. The topbar and left sidebar live in the dashboard layout and remain
+ * mounted throughout navigation.
  */
 export default function DashboardLoading() {
   return (
-    <div className="flex items-start h-full animate-pulse">
-      {/* ── Main feed column ── */}
-      <div className="flex-1 min-w-0 border-r border-border">
-        {/* Post composer */}
-        <div className="mx-16 my-1">
+    <DashboardContentLoader
+      header={
+        <section className={`${communityFeedLayout.gutters} my-1`}>
           <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
-            <div className="h-[38px] w-[38px] shrink-0 rounded-full bg-surface-raised" />
+            <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border border-border">
+              <User size={18} className="text-foreground-muted" />
+            </div>
             <div className="grid min-w-0 grid-cols-3 justify-items-center gap-0.5">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className="h-10 w-28 rounded-lg bg-surface-raised" />
+              {[
+                { label: "Create Thread", icon: Plus, color: "text-accent" },
+                { label: "Create Resource", icon: BookOpen, color: "text-emerald-600 dark:text-emerald-400" },
+                { label: "Create Event", icon: CalendarDays, color: "text-orange-600 dark:text-orange-400" },
+              ].map(({ label, icon: Icon, color }) => (
+                <div
+                  key={label}
+                  className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-3.5 py-2.5 font-body text-sm font-medium text-foreground-muted sm:gap-1.5"
+                >
+                  <Icon size={20} className={color} />
+                  <span className="truncate">{label}</span>
+                </div>
               ))}
             </div>
           </div>
-        </div>
-
-        <ul className="border-t border-border">
-          {/* Full-width thread/event skeleton rows */}
-          {[1, 2, 3].map((item) => (
-            <li key={item} className="border-b border-border px-16 py-6">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-20 rounded bg-surface-raised" />
-                  <div className="h-3 w-12 rounded bg-surface-raised" />
-                  <div className="h-5 w-16 rounded-full bg-surface-raised" />
-                </div>
-              </div>
-              <div className="mt-4 h-4 w-3/4 rounded bg-surface-raised" />
-              <div className="mt-2.5 space-y-2">
-                <div className="h-3 w-full rounded bg-surface-raised" />
-                <div className="h-3 w-5/6 rounded bg-surface-raised" />
-                <div className="h-3 w-2/3 rounded bg-surface-raised" />
-              </div>
-              <div className="mt-4 flex items-center gap-4">
-                <div className="h-8 w-8 rounded-full bg-surface-raised" />
-                <div className="h-3 w-6 rounded bg-surface-raised" />
-                <div className="h-3 w-20 rounded bg-surface-raised" />
-              </div>
-            </li>
-          ))}
-
-          {/* 2-col article grid skeleton row */}
-          <li className="border-b border-border">
-            <div className="grid grid-cols-2 gap-4 px-16 py-6">
-              {[1, 2].map((item) => (
-                <div key={item} className="rounded-2xl border border-border p-5">
-                  <div className="h-32 w-full rounded-xl bg-surface-raised mb-4" />
-                  <div className="h-3 w-20 rounded bg-surface-raised mb-3" />
-                  <div className="h-4 w-3/4 rounded bg-surface-raised" />
-                  <div className="mt-2 space-y-1.5">
-                    <div className="h-3 w-full rounded bg-surface-raised" />
-                    <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </li>
-        </ul>
-      </div>
-
-      {/* ── Discover sidebar ── */}
-      <aside className="hidden lg:block w-72 shrink-0 p-4">
-        <div className="h-5 w-24 rounded bg-surface-raised" />
-      </aside>
-    </div>
+        </section>
+      }
+    />
   );
 }

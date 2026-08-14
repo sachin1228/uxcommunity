@@ -86,7 +86,7 @@ async function withAuthorAndMeta(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const timer = createServerTimer("GET /api/communities/[id]/resources");
@@ -96,7 +96,9 @@ export async function GET(
     return error as Response;
   }
   const { id: communityId } = await params;
-  const result = await timer.measure("read_model", () => loadCommunityResources(communityId, session.userId!));
+  const result = await timer.measure("read_model", () =>
+    loadCommunityResources(communityId, session.userId!, req.nextUrl.searchParams.get("cursor")),
+  );
   if (!result.ok) {
     timer.finish({ status: result.status });
     return NextResponse.json({ error: result.error }, { status: result.status });

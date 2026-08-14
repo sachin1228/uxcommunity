@@ -1,17 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
-import type { CachedMeta, CachedMessage, MessageReaction, ReplyPreview } from "./cache";
-import {
-  loadCommunityEvents,
-  loadCommunityMembersPage,
-  loadCommunityResources,
-  loadCommunityRules,
-  loadCommunityShowcasePage,
-  loadCommunityStats,
-  loadCommunityThreads,
-  type ReadResult,
-} from "./read-models";
+import type { CachedMeta } from "./cache";
 
 /**
  * Strip year-range suffixes and singularize experience level names for display.
@@ -35,91 +25,48 @@ export interface SSRCommunitySections {
   stats?: unknown;
 }
 
-export interface SSRCommunityData {
+export interface SSRCommunityMeta {
   meta: CachedMeta;
-  messages: CachedMessage[];
   lastReadAt: string | null;
-  sections: SSRCommunitySections;
 }
 
-function readData<T>(result: ReadResult<T>): T | undefined {
-  return result.ok ? result.data : undefined;
-}
-
-export async function fetchCommunitySSRData(
+/**
+ * Lightweight server snapshot for the community chat page: just the community
+ * read model + top members — enough to paint the header and the info panel on
+ * the first server render. Messages and tab sections hydrate client-side from
+ * the request cache (revisits) or a fresh bootstrap fetch (with the Lottie
+ * loader in the chat while it loads), so navigation never blocks on the full
+ * read model.
+ */
+export async function fetchCommunityMetaSSR(
   communityId: string,
   userId: string,
-): Promise<SSRCommunityData | null> {
+): Promise<SSRCommunityMeta | null> {
   const db = createServiceClient();
 
   const [
     { data: membership },
     { data: community },
-    { data: msgRows },
+    { count: memberCount },
+    { data: memberRows },
   ] = await Promise.all([
-    db.from("community_members").select("joined_at, last_read_at, history_cleared_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
-    db.from("community_messages").select("id, content, created_at, user_id, reply_to_id, image_url, deleted_at").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+    db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
+    db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
   ]);
 
   if (!membership || !community) return null;
 
-  const historyStart = membership.history_cleared_at &&
-    membership.history_cleared_at > membership.joined_at
-    ? membership.history_cleared_at
-    : membership.joined_at;
-
-  const msgs = (msgRows ?? []).filter((m) => m.created_at >= historyStart) as {
-    id: string; content: string; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null; deleted_at: string | null;
-  }[];
-  const uniqueMsgUserIds = [...new Set(msgs.map((m) => m.user_id))];
-  const messageIds       = msgs.map((m) => m.id);
-  const replyToIds       = [...new Set(msgs.map((m) => m.reply_to_id).filter(Boolean) as string[])];
-
-  const [
-    masterImgMap,
-    { data: memberRows },
-    { count: memberCount },
-    { data: msgUsers },
-    { data: msgProfiles },
-    { data: reactionRows },
-    replyMsgsResult,
-  ] = await Promise.all([
-    TABLE_LOOKUP[community.type as string]
-      ? getMasterImageMap(community.type as string)
-      : Promise.resolve({} as Record<string, string | null>),
-    db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
-    db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
-    uniqueMsgUserIds.length
-      ? db.from("users").select("id, name").in("id", uniqueMsgUserIds)
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    uniqueMsgUserIds.length
-      ? db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", uniqueMsgUserIds)
-      : Promise.resolve({ data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] }),
-    messageIds.length
-      ? db.from("message_reactions").select("message_id, user_id, emoji").in("message_id", messageIds)
-      : Promise.resolve({ data: [] as { message_id: string; user_id: string; emoji: string }[] }),
-    replyToIds.length
-      ? db.from("community_messages").select("id, content, user_id").in("id", replyToIds)
-      : Promise.resolve({ data: [] as { id: string; content: string; user_id: string }[] }),
-  ]);
-
-  // Reply sender names
-  const replyUserIds = [...new Set((replyMsgsResult.data ?? []).map((m) => m.user_id))];
-  const { data: replyUsers } = replyUserIds.length
-    ? await db.from("users").select("id, name").in("id", replyUserIds)
-    : { data: [] as { id: string; name: string }[] };
-  const replyUserMap = Object.fromEntries((replyUsers ?? []).map((u) => [u.id, u.name]));
-  const replyMap: Record<string, ReplyPreview> = {};
-  for (const m of replyMsgsResult.data ?? []) {
-    replyMap[m.id] = { id: m.id, content: (m as any).content ?? "", user_name: replyUserMap[m.user_id] ?? "Unknown" };
-  }
+  const masterImgMap = TABLE_LOOKUP[community.type as string]
+    ? await getMasterImageMap(community.type as string)
+    : ({} as Record<string, string | null>);
 
   const resolvedImageUrl: string | null =
     (community.reference_id ? masterImgMap[community.reference_id] : undefined) ??
     (community as any).image_url ?? null;
 
-  // Member user info
+  // Top members for the info panel.
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
   const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
     ? await Promise.all([
@@ -131,11 +78,8 @@ export async function fetchCommunitySSRData(
         { data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null; companies: { name: string } | null }[] },
       ];
 
-  // Resolve all experience level slugs (members + message senders) in one batch query.
-  const allSlugs = [...new Set([
-    ...(memberProfiles  ?? []).map((p: any) => p.experience_level),
-    ...(msgProfiles     ?? []).map((p: any) => p.experience_level),
-  ].filter(Boolean) as string[])];
+  // Resolve experience level slugs in one batch query.
+  const allSlugs = [...new Set((memberProfiles ?? []).map((p: any) => p.experience_level).filter(Boolean) as string[])];
   const expLevelMap: Record<string, string> = {};
   if (allSlugs.length) {
     const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", allSlugs);
@@ -159,36 +103,6 @@ export async function fetchCommunitySSRData(
     };
   });
 
-  // Reactions map
-  const reactionsMap: Record<string, MessageReaction[]> = {};
-  for (const r of reactionRows ?? []) {
-    if (!reactionsMap[r.message_id]) reactionsMap[r.message_id] = [];
-    const group = reactionsMap[r.message_id].find((g) => g.emoji === r.emoji);
-    if (group) group.user_ids.push(r.user_id);
-    else reactionsMap[r.message_id].push({ emoji: r.emoji, user_ids: [r.user_id] });
-  }
-
-  // Sender map (messages)
-  const msgUserMap: Record<string, { name: string; avatar_url: string | null; designation: string | null; company: string | null }> = {};
-  const msgProfileMap = Object.fromEntries((msgProfiles ?? []).map((p: any) => [p.user_id, p]));
-  for (const u of msgUsers ?? []) {
-    const p = msgProfileMap[u.id];
-    msgUserMap[u.id] = {
-      name:        u.name,
-      avatar_url:  p?.avatar_url ?? null,
-      designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-      company:     (p?.companies as any)?.name ?? null,
-    };
-  }
-
-  const messages: CachedMessage[] = msgs.slice().reverse().map((m) => ({
-    ...m,
-    users:     msgUserMap[m.user_id] ?? null,
-    reactions: reactionsMap[m.id] ?? [],
-    reply_to:  m.reply_to_id ? (replyMap[m.reply_to_id] ?? null) : null,
-    image_url: m.image_url ?? null,
-  }));
-
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
@@ -203,31 +117,8 @@ export async function fetchCommunitySSRData(
     fetchedAt: Date.now(),
   };
 
-  const lastReadAt: string | null =
-    (membership as unknown as { last_read_at: string | null }).last_read_at ?? null;
-
-  const [threads, events, resources, showcase, memberPage, rules, stats] = await Promise.all([
-    loadCommunityThreads(communityId, userId),
-    loadCommunityEvents(communityId, userId),
-    loadCommunityResources(communityId, userId),
-    loadCommunityShowcasePage(communityId, userId, null),
-    loadCommunityMembersPage(communityId, userId),
-    loadCommunityRules(communityId),
-    loadCommunityStats(communityId),
-  ]);
-
   return {
     meta,
-    messages,
-    lastReadAt,
-    sections: {
-      threads: readData(threads),
-      events: readData(events),
-      resources: readData(resources),
-      showcase: readData(showcase),
-      members: readData(memberPage),
-      rules: readData(rules),
-      stats: readData(stats),
-    },
+    lastReadAt: (membership as unknown as { last_read_at: string | null }).last_read_at ?? null,
   };
 }

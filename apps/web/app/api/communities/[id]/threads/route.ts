@@ -140,7 +140,7 @@ async function withAuthorAndVotes(
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const timer = createServerTimer("GET /api/communities/[id]/threads");
@@ -150,7 +150,9 @@ export async function GET(
     return error as Response;
   }
   const { id: communityId } = await params;
-  const result = await timer.measure("read_model", () => loadCommunityThreads(communityId, session.userId!));
+  const result = await timer.measure("read_model", () =>
+    loadCommunityThreads(communityId, session.userId!, request.nextUrl.searchParams.get("cursor")),
+  );
   if (!result.ok) {
     timer.finish({ status: result.status });
     return NextResponse.json({ error: result.error }, { status: result.status });

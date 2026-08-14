@@ -1,171 +1,216 @@
+"use client";
+
 /**
- * Skeleton for the community page.
+ * Community chat loading boundary.
  *
- * Real layout (CommunityChat):
- *   flex-row
- *     flex-col (chat column, flex-1)
- *       ChatHeader   ← header is INSIDE the chat column, not full-width
- *       messages / tab content
- *     CommunityInfoPanel (w-72, full height, starts from top)
+ * Shown while the community page's RSC payload streams in (during navigation
+ * or initial load). It renders the REAL page chrome — ChatHeader (avatar,
+ * name, member count, tabs) and the CommunityInfoPanel on the right — fed
+ * from the module-level meta/sidebar caches, so the loading state looks like
+ * the actual community page instead of a skeleton or a bare animation. Only
+ * the chat message area shows the Lottie while messages hydrate.
+ *
+ * loading.tsx receives no params, so the target community is read from
+ * window.location.pathname — the URL bar updates synchronously when a Link is
+ * clicked, before the new page's data even starts streaming. useSyncExternalStore
+ * keeps this hydration-safe (server snapshot is empty; client snapshot is
+ * applied after hydration).
  */
-export default function CommunityLoading() {
+
+import { useMemo, useRef, useSyncExternalStore } from "react";
+import {
+  metaCache,
+  sidebarStore,
+  cachedUserId,
+  type CachedMeta,
+} from "@/lib/communities/cache";
+import { useGuardedRouter } from "@/lib/navigation-guard";
+import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHeader";
+import { CommunityInfoPanel } from "@/components/communities/chat/CommunityInfoPanel";
+import { ChatInput } from "@/components/communities/chat/ChatInput";
+import { LottieLoader } from "@/components/ui/LottieLoader";
+import { Spinner } from "@/components/ui/Spinner";
+
+function communityIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/dashboard\/communities\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
+/** Which header tab is active for the target route — mirrors the real pages. */
+function activeTabFromPath(pathname: string): ChatTab {
+  const match = pathname.match(
+    /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//,
+  );
+  switch (match?.[1]) {
+    case "threads":   return "threads";
+    case "events":    return "events";
+    case "resources": return "resources";
+    case "showcase":  return "showcase";
+    default:           return "chat";
+  }
+}
+
+function subscribeToLocation(callback: () => void) {
+  window.addEventListener("popstate", callback);
+  window.addEventListener("hashchange", callback);
+  return () => {
+    window.removeEventListener("popstate", callback);
+    window.removeEventListener("hashchange", callback);
+  };
+}
+
+function getLocationPathname() {
+  return window.location.pathname;
+}
+
+function getServerPathname() {
+  // During SSR/initial hydration there is no reliable client location — the
+  // boundary renders a neutral state and swaps in the real chrome post-hydration.
+  return "";
+}
+
+export default function CommunityPageLoading() {
+  const router = useGuardedRouter();
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const pathname = useSyncExternalStore(
+    subscribeToLocation,
+    getLocationPathname,
+    getServerPathname,
+  );
+
+  const communityId = communityIdFromPath(pathname);
+
+  // Detail view pages (threads/events/resources/showcase) live under /[id]/
+  // too. They share the community chrome, but their content is a detail feed,
+  // not a chat — so only the chat tab gets the Lottie + input loading; detail
+  // pages get a plain spinner in the middle content area.
+  const isDetailView =
+    communityId !== null &&
+    /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//.test(
+      pathname,
+    );
+
+  // Best-effort cached chrome: full meta cache first, then the sidebar entry.
+  const cached = useMemo<CachedMeta | null>(() => {
+    if (!communityId) return null;
+    const meta = metaCache.get(communityId);
+    if (meta) return meta;
+    const sidebar = sidebarStore.data?.communities.find((c) => c.id === communityId);
+    if (sidebar) {
+      return {
+        community: {
+          id: communityId,
+          name: sidebar.name,
+          type: sidebar.type,
+          member_count: sidebar.member_count,
+          image_url: sidebar.image_url,
+          is_private: sidebar.is_private,
+          enabled_tabs: sidebar.enabled_tabs,
+          owner_id: sidebar.owner_id,
+        },
+        members: [],
+        // Loading-only placeholder; never read for staleness here.
+        fetchedAt: 0,
+      };
+    }
+    return null;
+  }, [communityId]);
+
+  const community = cached?.community ?? null;
+  const members = cached?.members ?? [];
+  const activeTab: ChatTab = communityId ? activeTabFromPath(pathname) : "chat";
+
+  function handleTabChange(tab: ChatTab) {
+    if (!communityId) return;
+    router.push(
+      tab === "chat"
+        ? `/dashboard/communities/${communityId}`
+        : `/dashboard/communities/${communityId}?tab=${tab}`,
+    );
+  }
+
   return (
-    <div className="flex-1 flex overflow-hidden animate-pulse">
-
-      {/* ── Chat column ── */}
+    <div className="flex-1 flex overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Real chat chrome — identical to the page, so committing is seamless. */}
+        <ChatHeader
+          community={community}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          currentUserId={cachedUserId ?? undefined}
+          communityId={communityId ?? undefined}
+        />
 
-        {/* Header — same padding as ChatHeader */}
-        <div className="px-5 pt-4 border-b border-border shrink-0">
-
-          {/* Row 1: avatar + name | buttons */}
-          <div className="flex items-center justify-between pb-3">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-full bg-surface-raised shrink-0" />
-              <div className="space-y-1.5">
-                <div className="h-3 w-36 rounded bg-surface-raised" />
-                <div className="h-2.5 w-24 rounded bg-surface-raised" />
-              </div>
-            </div>
-            {/* Bell + Joined + ··· */}
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-surface-raised" />
-              <div className="h-8 w-20 rounded-lg bg-surface-raised" />
-              <div className="h-8 w-8 rounded-lg bg-surface-raised" />
-            </div>
+        {isDetailView ? (
+          /* Detail view page — spinner in the middle content area, matching
+             its real layout (thread/event/resource/showcase feed). */
+          <div className="flex-1 flex items-center justify-center">
+            <Spinner size={28} className="text-foreground-muted" />
           </div>
-
-          {/* Row 2: tabs */}
-          <div className="flex items-center gap-5">
-            <div className="py-2.5 px-3"><div className="h-3 w-8 rounded bg-surface-raised" /></div>
-            <div className="py-2.5 px-3"><div className="h-3 w-14 rounded bg-surface-raised" /></div>
-            <div className="py-2.5 px-3"><div className="h-3 w-12 rounded bg-surface-raised" /></div>
-            <div className="py-2.5 px-3"><div className="h-3 w-16 rounded bg-surface-raised" /></div>
-          </div>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 relative overflow-hidden">
-          <div className="absolute inset-0 overflow-y-auto px-5 py-4 flex flex-col justify-end gap-3 pb-24">
-
-            <div className="flex items-start gap-2.5">
-              <div className="h-7 w-7 rounded-full bg-surface-raised shrink-0 mt-0.5" />
-              <div className="space-y-1.5">
-                <div className="h-2.5 w-24 rounded bg-surface-raised" />
-                <div className="h-10 w-56 rounded-2xl rounded-tl-sm bg-surface-raised" />
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <div className="w-7 shrink-0" />
-              <div className="h-10 w-72 rounded-2xl rounded-tl-sm bg-surface-raised" />
-            </div>
-
-            <div className="flex justify-end">
-              <div className="h-10 w-44 rounded-2xl rounded-tr-sm bg-surface-raised" />
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <div className="h-7 w-7 rounded-full bg-surface-raised shrink-0 mt-0.5" />
-              <div className="space-y-1.5">
-                <div className="h-2.5 w-20 rounded bg-surface-raised" />
-                <div className="h-16 w-60 rounded-2xl rounded-tl-sm bg-surface-raised" />
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <div className="h-10 w-56 rounded-2xl rounded-tr-sm bg-surface-raised" />
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <div className="h-7 w-7 rounded-full bg-surface-raised shrink-0 mt-0.5" />
-              <div className="space-y-1.5">
-                <div className="h-2.5 w-28 rounded bg-surface-raised" />
-                <div className="h-10 w-48 rounded-2xl rounded-tl-sm bg-surface-raised" />
-              </div>
-            </div>
-
-          </div>
-
-          {/* Input */}
-          <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-2">
-            <div className="min-h-[52px] rounded-2xl bg-surface-raised" />
-          </div>
-        </div>
-
-      </div>{/* end chat column */}
-
-      {/* ── Info sidebar — full height, starts from top ── */}
-      <div className="w-72 shrink-0 flex flex-col gap-3 overflow-y-auto">
-
-        {/* Main info card */}
-        <div className="border border-border mr-4 mt-4 rounded-xl flex flex-col">
-
-          {/* Members */}
-          <div className="px-4 py-4 border-b border-border">
-            <div className="flex items-center justify-between mb-3">
-              <div className="h-3 w-24 rounded bg-surface-raised" />
-              <div className="h-2.5 w-14 rounded bg-surface-raised" />
-            </div>
-            <div className="flex items-center">
-              {[0,1,2,3,4].map((i) => (
-                <div
-                  key={i}
-                  className="h-7 w-7 rounded-full bg-surface-raised ring-2 ring-surface shrink-0"
-                  style={{ marginLeft: i === 0 ? 0 : -10 }}
+        ) : (
+        /* Chat message area — mirrors the real chat layout: dotted scroll
+            background with the community Lottie, and the input box pinned to
+            the bottom. Only the Lottie is "loading"; everything else looks
+            exactly like the committed page. */
+        <div className="flex-1 overflow-hidden relative">
+          <div
+            className="absolute inset-0 overflow-y-auto pb-24"
+            style={{
+              backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          >
+            <div className="flex items-center justify-center h-full">
+              {communityId ? (
+                <LottieLoader
+                  communityId={communityId}
+                  communityType={community?.type ?? ""}
+                  size={200}
+                  spinnerClassName="h-5 w-5 text-foreground-muted"
                 />
-              ))}
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-border border-t-accent animate-spin" />
+              )}
             </div>
           </div>
 
-          {/* About */}
-          <div className="px-4 py-4 border-b border-border">
-            <div className="h-3 w-10 rounded bg-surface-raised mb-3" />
-            <div className="space-y-2 mb-3">
-              <div className="h-2.5 w-full rounded bg-surface-raised" />
-              <div className="h-2.5 w-4/5 rounded bg-surface-raised" />
-              <div className="h-2.5 w-3/5 rounded bg-surface-raised" />
+          {/* Floating input — real ChatInput with inert handlers so it looks
+              identical to the page. Typing is a no-op during the brief
+              loading window (state would be lost when the page commits). */}
+          <div className="absolute bottom-0 left-0 right-0 z-10">
+            <div className="bg-black/40 backdrop-blur-sm">
+              <ChatInput
+                ref={inputRef}
+                input=""
+                sending={false}
+                error={null}
+                placeholder={`Message ${community?.name ?? ""}…`}
+                replyTo={null}
+                pendingImagePreview={null}
+                linkPreviewUrl={null}
+                onChange={() => {}}
+                onKeyDown={() => {}}
+                onSend={() => {}}
+                onCancelReply={() => {}}
+                onImageSelect={() => {}}
+                onImageRemove={() => {}}
+                onBlur={() => {}}
+                onEmojiSelect={() => {}}
+                onGifSelect={() => {}}
+              />
             </div>
-            <div className="flex items-center gap-1.5 mb-3">
-              <div className="h-3 w-3 rounded bg-surface-raised shrink-0" />
-              <div className="h-2.5 w-28 rounded bg-surface-raised" />
-            </div>
-            <div className="flex gap-1.5">
-              <div className="h-5 w-16 rounded-full bg-surface-raised" />
-              <div className="h-5 w-24 rounded-full bg-surface-raised" />
-            </div>
-          </div>
-
-          {/* Rules */}
-          <div className="px-4 py-4">
-            <div className="h-3 w-10 rounded bg-surface-raised mb-3" />
-            <div className="flex flex-col gap-2.5">
-              {[0,1,2].map((i) => (
-                <div key={i} className="flex items-start gap-2.5">
-                  <div className="h-4 w-4 rounded-full bg-surface-raised shrink-0" />
-                  <div className={`h-2.5 rounded bg-surface-raised ${i === 0 ? "w-full" : i === 1 ? "w-4/5" : "w-3/5"}`} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Stats card */}
-        <div className="border border-border mr-4 mb-4 rounded-xl px-4 py-4">
-          <div className="h-3 w-28 rounded bg-surface-raised mb-3" />
-          <div className="grid grid-cols-3 gap-2">
-            {[0,1,2].map((i) => (
-              <div key={i} className="bg-surface-raised rounded-xl px-3 py-3 flex flex-col gap-1.5 border border-border">
-                <div className="h-4 w-8 rounded bg-surface" />
-                <div className="h-2 w-10 rounded bg-surface" />
-              </div>
-            ))}
           </div>
         </div>
-
+        )}
       </div>
 
+      {/* Real info sidebar — renders from the cached members/community. */}
+      <CommunityInfoPanel
+        members={members}
+        community={community}
+        communityId={communityId ?? ""}
+        currentUserId={cachedUserId ?? undefined}
+      />
     </div>
   );
 }

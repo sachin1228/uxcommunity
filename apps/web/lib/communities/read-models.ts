@@ -139,29 +139,69 @@ export const enrichCommunityResources = (rows: Array<Record<string, unknown>>, u
 export async function loadCommunityThreads(
   communityId: string,
   userId: string,
-): Promise<ReadResult<{ threads: unknown[] }>> {
+  cursor: string | null = null,
+): Promise<ReadResult<{ threads: unknown[]; nextCursor: string | null }>> {
+  let cursorCreatedAt: string | null = null;
+  let cursorId: string | null = null;
+  if (cursor) {
+    [cursorCreatedAt, cursorId] = cursor.split("|");
+    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+  }
   const { data, error } = await callPerformanceRpc(createServiceClient(), "get_thread_list_page", {
     p_community_id: communityId,
     p_user_id: userId,
-    p_limit: 50,
+    p_before: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_limit: 51,
   });
   if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
   if (error) return { ok: false, status: 500, error: "Failed to fetch threads." };
-  return { ok: true, data: { threads: (data ?? []).map(({ item }) => item) } };
+  const rows = (data ?? []) as Array<{ item: Record<string, unknown> }>;
+  const threads = rows.slice(0, 50).map(({ item }) => item);
+  const last = threads.at(-1) as Record<string, unknown> | undefined;
+  return {
+    ok: true,
+    data: {
+      threads,
+      nextCursor: rows.length > 50 && last ? `${last.created_at as string}|${last.id as string}` : null,
+    },
+  };
 }
 
 export async function loadCommunityResources(
   communityId: string,
   userId: string,
-): Promise<ReadResult<{ resources: unknown[] }>> {
+  cursor: string | null = null,
+): Promise<ReadResult<{ resources: unknown[]; nextCursor: string | null }>> {
+  let cursorCreatedAt: string | null = null;
+  let cursorId: string | null = null;
+  if (cursor) {
+    [cursorCreatedAt, cursorId] = cursor.split("|");
+    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+  }
   const { data, error } = await callPerformanceRpc(createServiceClient(), "get_resource_list_page", {
     p_community_id: communityId,
     p_user_id: userId,
-    p_limit: 100,
+    p_before: cursorCreatedAt,
+    p_cursor_id: cursorId,
+    p_limit: 101,
   });
   if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
   if (error) return { ok: false, status: 500, error: "Failed to fetch resources." };
-  return { ok: true, data: { resources: (data ?? []).map(({ item }) => item) } };
+  const rows = (data ?? []) as Array<{ item: Record<string, unknown> }>;
+  const resources = rows.slice(0, 100).map(({ item }) => item);
+  const last = resources.at(-1) as Record<string, unknown> | undefined;
+  return {
+    ok: true,
+    data: {
+      resources,
+      nextCursor: rows.length > 100 && last ? `${last.created_at as string}|${last.id as string}` : null,
+    },
+  };
 }
 
 export async function loadCommunityShowcasePage(

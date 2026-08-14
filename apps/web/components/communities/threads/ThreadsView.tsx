@@ -17,9 +17,12 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
+import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const THREADS_STALE_MS = 60_000;
+/** Must match PAGE_SIZE in the threads list read model. */
+const THREAD_PAGE_SIZE = 50;
 
 export function ThreadsView({
   communityId,
@@ -30,9 +33,14 @@ export function ThreadsView({
 }) {
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/threads`;
-  const cached = getCachedRequest<{ threads?: CommunityThread[] }>(requestUrl, currentUserId);
+  const cached = getCachedRequest<{ threads?: CommunityThread[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.threads ?? []);
   const [loading, setLoading] = useState(() => !cached);
+  const [hasMore, setHasMore] = useState(() => {
+    const nextCursor = cached?.nextCursor;
+    return nextCursor !== undefined ? nextCursor !== null : (cached?.threads?.length ?? 0) >= THREAD_PAGE_SIZE;
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +49,17 @@ export function ThreadsView({
   const fetchThreads = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ threads?: CommunityThread[] }>(
+      const data = await fetchJsonCached<{ threads?: CommunityThread[]; nextCursor?: string | null }>(
         requestUrl,
         { staleMs: THREADS_STALE_MS, force },
         currentUserId,
       );
       setThreads(data.threads ?? []);
+      setHasMore(
+        data.nextCursor !== undefined
+          ? data.nextCursor !== null
+          : (data.threads?.length ?? 0) >= THREAD_PAGE_SIZE,
+      );
       setError(null);
     } catch (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : "Failed to load threads.");
@@ -161,6 +174,28 @@ export function ThreadsView({
     writeCache((cur) => cur.filter((t) => t.id !== threadId));
   }
 
+  // ── Load older threads (keyset pagination via ?cursor=createdAt|id) ──────
+  async function loadMore() {
+    if (loadingMore || !threads.length) return;
+    const last = threads[threads.length - 1];
+    setLoadingMore(true);
+    try {
+      const response = await fetch(
+        `${requestUrl}?cursor=${encodeURIComponent(`${last.created_at}|${last.id}`)}`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { threads?: CommunityThread[]; nextCursor?: string | null };
+      writeCache((current) => {
+        const byId = new Map(current.map((t) => [t.id, t]));
+        for (const thread of data.threads ?? []) byId.set(thread.id, thread);
+        return [...byId.values()];
+      });
+      setHasMore(data.nextCursor !== null && data.nextCursor !== undefined);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   const filteredThreads = filter === "all" ? threads : threads.filter((thread) => thread.category === filter);
 
   return (
@@ -227,41 +262,8 @@ export function ThreadsView({
 
       {loading && (
         <div className={communityFeedLayout.content}>
-          <div className={communityFeedLayout.skeletonList}>
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={communityFeedLayout.skeletonRow}>
-                {/* Top row: avatar + name + category */}
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 shrink-0 rounded-full bg-surface-raised" />
-                  <div className="flex items-center gap-2">
-                    <div className="h-3 w-20 rounded bg-surface-raised" />
-                    <div className="h-3 w-10 rounded bg-surface-raised" />
-                    <div className="h-5 w-16 rounded-full bg-surface-raised" />
-                  </div>
-                </div>
-                {/* Title */}
-                <div className="mt-4 h-5 w-3/4 rounded bg-surface-raised" />
-                {/* Description */}
-                <div className="mt-2 space-y-1.5">
-                  <div className="h-3 w-full rounded bg-surface-raised" />
-                  <div className="h-3 w-4/5 rounded bg-surface-raised" />
-                  <div className="h-3 w-2/3 rounded bg-surface-raised" />
-                </div>
-                {/* Tags */}
-                <div className="mt-3 flex gap-2">
-                  <div className="h-6 w-16 rounded-lg bg-surface-raised" />
-                  <div className="h-6 w-20 rounded-lg bg-surface-raised" />
-                </div>
-                {/* Footer */}
-                <div className="mt-3 flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-surface-raised" />
-                    <div className="h-3 w-6 rounded bg-surface-raised" />
-                  </div>
-                  <div className="h-3 w-20 rounded bg-surface-raised" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center py-24" role="status" aria-label="Loading threads">
+            <Spinner size={28} className="text-foreground-muted" />
           </div>
         </div>
       )}
@@ -297,6 +299,18 @@ export function ThreadsView({
               isLast={index === filteredThreads.length - 1}
             />
           ))}
+          {hasMore && (
+            <div className="flex justify-center py-6">
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

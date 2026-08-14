@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Check, MoreHorizontal, Search, Users, X } from "lucide-react";
 import { ChatAvatar } from "@/components/communities/chat/ChatAvatar";
+import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 
@@ -263,16 +264,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
               )}
             </p>
             {requestsLoading ? (
-              <div className="space-y-3 py-1">
-                {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-3 animate-pulse">
-                    <div className="h-9 w-9 rounded-full bg-surface-raised shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 w-28 rounded bg-surface-raised" />
-                      <div className="h-2.5 w-20 rounded bg-surface-raised" />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-center py-6">
+                <Spinner size={20} className="text-foreground-muted" />
               </div>
             ) : (
               <ul className="space-y-1">
@@ -313,16 +306,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
 
         {/* Members list */}
         {loading ? (
-          <div className="px-5 py-4 space-y-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="h-9 w-9 rounded-full bg-surface-raised shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 w-32 rounded bg-surface-raised" />
-                  <div className="h-2.5 w-48 rounded bg-surface-raised" />
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-center px-5 py-10">
+            <Spinner size={24} className="text-foreground-muted" />
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
@@ -398,16 +383,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
             <div ref={sentinelRef} className="h-4" />
 
             {loadingMore && (
-              <div className="px-5 pb-4 space-y-4">
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 animate-pulse">
-                    <div className="h-9 w-9 rounded-full bg-surface-raised shrink-0" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 w-32 rounded bg-surface-raised" />
-                      <div className="h-2.5 w-48 rounded bg-surface-raised" />
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-center px-5 py-6">
+                <Spinner size={18} className="text-foreground-muted" />
               </div>
             )}
 

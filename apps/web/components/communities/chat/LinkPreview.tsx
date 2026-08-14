@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Spinner } from "@/components/ui/Spinner";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 import {
   fetchLinkPreview,
   getCachedLinkPreview,
   hasFreshLinkPreview,
-  isLinkPreviewLoading,
 } from "@/lib/communities/linkPreviewCache";
 
 function ImagePreview({ src }: { src: string }) {
@@ -34,13 +34,6 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
     // Hydrate from the shared cache instantly if available
     getCachedLinkPreview(url),
   );
-  // True when the in-flight request was started by another component.
-  // Lazy init covers the "mounted while another component is already
-  // fetching" case without calling setState synchronously in the effect.
-  const [fromExistingRequest, setFromExistingRequest] = useState(() =>
-    isLinkPreviewLoading(url),
-  );
-
   useEffect(() => {
     if (hasFreshLinkPreview(url)) return;
 
@@ -49,7 +42,6 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
     // and only one network request is ever started per URL.
     void fetchLinkPreview(url).then((result) => {
       if (!cancelled) {
-        setFromExistingRequest(result.fromExistingRequest);
         setData(result.data);
       }
     });
@@ -57,26 +49,17 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
     return () => { cancelled = true; };
   }, [url]);
 
-  // ── Loading skeleton ────────────────────────────────────────────────────────
+  // ── Loading spinner ─────────────────────────────────────────────────────────
   if (data === undefined) {
     return (
       <div
-        className={`mt-1.5 rounded-xl overflow-hidden border animate-pulse
+        className={`mt-1.5 flex min-h-12 items-center justify-center rounded-xl overflow-hidden border
           ${isMe
             ? "border-white/10 bg-black/20"
             : "border-white/5 bg-black/10"
           }`}
       >
-        <div className="p-3 space-y-1.5">
-          <div className="h-2.5 w-20 rounded bg-white/10" />
-          <div className="h-3 w-36 rounded bg-white/10" />
-          <div className="h-2 w-28 rounded bg-white/10" />
-        </div>
-        {fromExistingRequest && (
-          <p className="font-body text-[10px] text-foreground-muted/70">
-            Loading from existing request…
-          </p>
-        )}
+        <Spinner size={16} className="text-foreground-muted" />
       </div>
     );
   }
