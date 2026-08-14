@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(12);
+select plan(17);
 
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
@@ -64,6 +64,69 @@ select ok(
     where community.member_count <= 0
   ),
   'community explore RPC excludes empty communities'
+);
+
+select ok(
+  not exists(
+    select 1
+    from public.communities community
+    where community.member_count <> (
+      select count(*)::bigint
+      from public.community_members member
+      where member.community_id = community.id
+    )
+  ),
+  'materialized community member counts match membership rows'
+);
+
+select has_index(
+  'public',
+  'community_members',
+  'idx_community_members_user_community',
+  'community membership lookup has a user-first covering index'
+);
+
+select has_index(
+  'public',
+  'communities',
+  'idx_communities_active_name',
+  'active communities have a partial ordering index'
+);
+
+create temporary table rpc_count_trigger_context as
+select community_id, member_count
+from public.communities
+order by member_count desc, id
+limit 1;
+
+create temporary table rpc_inserted_membership as
+with inserted as (
+  insert into public.community_members (community_id, user_id)
+  select context.community_id, gen_random_uuid()
+  from rpc_count_trigger_context context
+  returning community_id, user_id
+)
+select * from inserted;
+
+select is(
+  (select community.member_count
+   from public.communities community
+   join rpc_count_trigger_context context on context.community_id = community.id),
+  (select member_count + 1 from rpc_count_trigger_context),
+  'inserting a membership increments the materialized count'
+);
+
+delete from public.community_members member
+using rpc_inserted_membership inserted
+where member.community_id = inserted.community_id
+  and member.user_id = inserted.user_id;
+
+select is(
+  (select community.member_count
+   from public.communities community
+   join rpc_count_trigger_context context on context.community_id = community.id),
+  (select member_count from rpc_count_trigger_context),
+  'deleting a membership decrements the materialized count'
 );
 
 select * from finish();
