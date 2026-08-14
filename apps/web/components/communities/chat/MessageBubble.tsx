@@ -559,6 +559,27 @@ function isEmojiOnly(text: string): boolean {
   return remainder.length === 0;
 }
 
+function ImageModerationNotice({
+  status,
+  isMe,
+}: {
+  status: NonNullable<CachedMessage["image_status"]>;
+  isMe: boolean;
+}) {
+  const copy = status === "pending"
+    ? "Moderating image…"
+    : status === "rejected"
+      ? (isMe ? "This image did not meet community guidelines." : "Image removed by moderation.")
+      : (isMe ? "This image needs moderator review." : "Image unavailable pending review.");
+
+  return (
+    <div className="flex items-center gap-2 px-1 py-1.5" role="status">
+      <Clock size={14} className={status === "pending" ? "animate-pulse" : ""} />
+      <span className="font-body text-xs">{copy}</span>
+    </div>
+  );
+}
+
 /** Placeholder shown for soft-deleted messages. */
 function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
   return (
@@ -614,10 +635,12 @@ export function MessageBubble({
   const reactions = msg.reactions ?? [];
   const replyTo   = msg.reply_to ?? null;
   const imageUrl  = msg.image_url ?? null;
+  const imageStatus = msg.image_status ?? null;
   const uploading = msg.status === "sending" && !!imageUrl;
   const failed    = msg.status === "failed";
   const isDeleted = !!msg.deleted_at;
-  const imageOnly = !!imageUrl && !msg.content && !replyTo;
+  const moderationNotice = imageStatus && imageStatus !== "approved" ? imageStatus : null;
+  const imageOnly = (!!imageUrl || !!moderationNotice) && !msg.content && !replyTo;
 
   // Show as a large bubble-free emoji when the entire message is 1–3 emoji glyphs.
   const isEmojiMsg =
@@ -733,7 +756,7 @@ export function MessageBubble({
                   }`}
                 >
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
-                  {imageUrl && (
+                  {imageUrl && (imageStatus === "approved" || (imageStatus === "pending" && isMe)) && (
                     <BubbleImage
                       url={imageUrl}
                       isMe={isMe}
@@ -743,6 +766,9 @@ export function MessageBubble({
                       status={msg.status}
                       onCancel={() => onCancelSend(msg.id)}
                     />
+                  )}
+                  {moderationNotice && !(moderationNotice === "pending" && imageUrl && isMe) && (
+                    <ImageModerationNotice status={moderationNotice} isMe={isMe} />
                   )}
                   {msg.content && (
                     <MessageContent

@@ -2,23 +2,26 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compressChatImage } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
-import { moderateImageBuffer } from "@/lib/moderation/image";
-import { moderationFailureResponse } from "@/lib/moderation/http";
+import { deleteFromR2, uploadToR2 } from "@/lib/r2";
+import { detectImageMime, moderateImageBuffer } from "@/lib/moderation/image";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { createServerTimer } from "@/lib/server-timing";
 
-const MAX_INPUT_BYTES = 20 * 1024 * 1024; // 20 MB raw upload limit
+const MAX_INPUT_BYTES = 20 * 1024 * 1024;
+const MAX_CONTENT_LENGTH = 2000;
+const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
+type ImageStatus = "approved" | "rejected" | "review_required";
+
+function terminalStatus(status: "approved" | "review" | "rejected"): ImageStatus {
+  if (status === "approved") return "approved";
+  if (status === "rejected") return "rejected";
+  return "review_required";
+}
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const timer = createServerTimer("POST /api/communities/[id]/messages/upload");
   const finish = (response: Response) => {
@@ -29,22 +32,27 @@ export async function POST(
   let session;
   try {
     session = await timer.measure("auth", () => requireSession("user"));
-  } catch (e) {
-    return finish(e as Response);
+  } catch (error) {
+    return finish(error as Response);
   }
+
   const userId = session.userId!;
   const { id: communityId } = await params;
   const db = createServiceClient();
-
-  const { data: membership } = await timer.measure("membership_query", async () =>
-    await db
-      .from("community_members")
-      .select("joined_at")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle(),
+  const { data: membership, error: membershipError } = await timer.measure(
+    "membership_query",
+    async () =>
+      await db
+        .from("community_members")
+        .select("joined_at")
+        .eq("community_id", communityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
   );
 
+  if (membershipError) {
+    return finish(NextResponse.json({ error: "Failed to verify community membership." }, { status: 500 }));
+  }
   if (!membership) {
     return finish(NextResponse.json({ error: "Not a member of this community." }, { status: 403 }));
   }
@@ -57,8 +65,14 @@ export async function POST(
   }
 
   const file = formData.get("file");
+  const content = String(formData.get("content") ?? "").trim();
+  let replyToId = String(formData.get("reply_to_id") ?? "").trim() || null;
+
   if (!(file instanceof File)) {
     return finish(NextResponse.json({ error: "No file provided." }, { status: 400 }));
+  }
+  if (content.length > MAX_CONTENT_LENGTH) {
+    return finish(NextResponse.json({ error: "Message too long." }, { status: 422 }));
   }
   if (!ALLOWED_TYPES.has(file.type)) {
     return finish(NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed." }, { status: 422 }));
@@ -66,7 +80,6 @@ export async function POST(
   if (file.size > MAX_INPUT_BYTES) {
     return finish(NextResponse.json({ error: "Image must be under 20 MB." }, { status: 422 }));
   }
-  timer.record("input_bytes", file.size);
 
   let source: Buffer;
   try {
@@ -75,44 +88,119 @@ export async function POST(
     return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
   }
 
-  // Compression is CPU-bound while moderation is a remote request. Running
-  // them concurrently removes compression from the critical path, but storage
-  // remains strictly gated on an approved moderation decision.
-  const [moderation, compression] = await Promise.all([
-    timer.measure("moderation_request", () => moderateImageBuffer(source, file.type)),
-    timer.measure("compression", () => compressChatImage(source).catch(() => null)),
-  ]);
-
-  const moderationDecision = moderation.decision;
-  after(async () => {
-    try {
-      await logModerationDecision(createServiceClient(), {
-        userId,
-        contentType: "image_upload",
-        decision: moderationDecision,
-      });
-    } catch (error) {
-      console.error("[chat-image-upload] deferred moderation audit failed:", error);
-    }
-  });
-
-  if (!moderation.decision.allowed || !moderation.buffer) {
-    return finish(moderationFailureResponse(moderation.decision));
+  if (detectImageMime(source) !== file.type) {
+    return finish(NextResponse.json({ error: "Image bytes do not match the selected file type." }, { status: 422 }));
   }
+
+  if (replyToId) {
+    const { data: parent } = await db
+      .from("community_messages")
+      .select("id")
+      .eq("id", replyToId)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    if (!parent) replyToId = null;
+  }
+
+  const compression = await timer.measure("compression", () => compressChatImage(source).catch(() => null));
   if (!compression) {
     return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
   }
-  timer.record("output_bytes", compression.data.byteLength);
 
   const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
-
+  let url: string;
   try {
-    const url = await timer.measure("r2_upload", () =>
-      uploadToR2(key, compression.data, compression.contentType),
-    );
-    return finish(NextResponse.json({ url }, { status: 201 }));
-  } catch (err) {
-    console.error("[chat-image-upload] R2 error:", err);
+    url = await timer.measure("r2_upload", () => uploadToR2(key, compression.data, compression.contentType));
+  } catch (error) {
+    console.error("[chat-image-upload] R2 error:", error);
     return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));
   }
+
+  const { data: inserted, error: insertError } = await timer.measure("message_insert", async () =>
+    await db
+      .from("community_messages")
+      .insert({
+        community_id: communityId,
+        user_id: userId,
+        content: content || null,
+        reply_to_id: replyToId,
+        image_url: url,
+        image_status: "pending",
+      })
+      .select("id, content, created_at, user_id, reply_to_id, image_url, image_status")
+      .single(),
+  );
+
+  if (insertError || !inserted) {
+    await deleteFromR2(key).catch((cleanupError) =>
+      console.error("[chat-image-upload] insert cleanup failed:", cleanupError),
+    );
+    console.error("[chat-image-upload] message insert failed:", insertError);
+    return finish(NextResponse.json({ error: "Failed to send message." }, { status: 500 }));
+  }
+
+  const messageId = inserted.id;
+  after(async () => {
+    const moderationDb = createServiceClient();
+    try {
+      const result = await moderateImageBuffer(source, file.type);
+      const imageStatus = terminalStatus(result.decision.status);
+      const moderatedAt = new Date().toISOString();
+      const moderationError = imageStatus === "review_required" ? result.decision.reason : null;
+
+      if (imageStatus === "approved") {
+        await moderationDb
+          .from("community_messages")
+          .update({ image_status: imageStatus, image_moderated_at: moderatedAt, image_moderation_error: null })
+          .eq("id", messageId)
+          .eq("user_id", userId);
+      } else {
+        const { error: updateError } = await moderationDb
+          .from("community_messages")
+          .update({
+            image_status: imageStatus,
+            image_url: null,
+            image_moderated_at: moderatedAt,
+            image_moderation_error: moderationError,
+          })
+          .eq("id", messageId)
+          .eq("user_id", userId);
+        if (!updateError) await deleteFromR2(key).catch(() => {});
+      }
+
+      await logModerationDecision(moderationDb, {
+        userId,
+        contentType: "image_upload",
+        contentRefId: messageId,
+        decision: result.decision,
+      });
+    } catch (error) {
+      console.error("[chat-image-upload] deferred moderation failed:", error);
+      await moderationDb
+        .from("community_messages")
+        .update({
+          image_status: "review_required",
+          image_url: null,
+          image_moderated_at: new Date().toISOString(),
+          image_moderation_error: "Image moderation failed.",
+        })
+        .eq("id", messageId)
+        .eq("user_id", userId);
+      await deleteFromR2(key).catch(() => {});
+    }
+  });
+
+  return finish(
+    NextResponse.json(
+      {
+        message: {
+          ...inserted,
+          users: null,
+          reactions: [],
+          reply_to: null,
+        },
+      },
+      { status: 201 },
+    ),
+  );
 }

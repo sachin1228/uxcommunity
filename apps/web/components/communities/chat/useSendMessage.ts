@@ -172,6 +172,7 @@ export function useSendMessage({
       reactions: [],
       reply_to: msgReplyTo ?? null,
       image_url: imagePreviewUrl,
+      image_status: imageFile ? "pending" : null,
     };
 
     setMessages((prev) => {
@@ -205,43 +206,36 @@ export function useSendMessage({
     };
 
     try {
-      let uploadedImageUrl: string | null = null;
+      let res: Response;
 
       if (imageFile) {
-        // The client currently sends the original File. Server-side Sharp
-        // compression is measured separately by the upload route.
         clientTimings.client_compression = 0;
         const fd = new FormData();
         fd.append("file", imageFile);
+        fd.append("content", content);
+        if (msgReplyTo?.id) fd.append("reply_to_id", msgReplyTo.id);
 
-        const uploadRes = await measureClient("image_upload_request", () =>
-          fetch(
-            `/api/communities/${communityId}/messages/upload`,
-            { method: "POST", body: fd, signal: abortController.signal },
-          ),
-        );
-
-        if (!uploadRes.ok) {
-          const d = await uploadRes.json().catch(() => ({}));
-          throw new Error((d as { error?: string }).error ?? "Image upload failed.");
-        }
-
-        const { url } = await uploadRes.json();
-        uploadedImageUrl = url;
-      }
-
-      const res = await measureClient("message_create_request", () =>
-        fetch(`/api/communities/${communityId}/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content,
-            reply_to_id: msgReplyTo?.id ?? null,
-            image_url: uploadedImageUrl,
+        res = await measureClient("image_message_request", () =>
+          fetch(`/api/communities/${communityId}/messages/upload`, {
+            method: "POST",
+            body: fd,
+            signal: abortController.signal,
           }),
-          signal: abortController.signal,
-        }),
-      );
+        );
+      } else {
+        res = await measureClient("message_create_request", () =>
+          fetch(`/api/communities/${communityId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content,
+              reply_to_id: msgReplyTo?.id ?? null,
+              image_url: null,
+            }),
+            signal: abortController.signal,
+          }),
+        );
+      }
 
       const data = await res.json().catch(() => ({}));
 
@@ -266,7 +260,8 @@ export function useSendMessage({
             ...message,
             users:     message.users    ?? optimistic?.users    ?? null,
             reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
-            image_url: message.image_url ?? optimistic?.image_url ?? null,
+            image_url: optimistic?.image_url ?? message.image_url ?? null,
+            image_status: message.image_status ?? optimistic?.image_status ?? null,
             status: "sent" as const,
           };
 
