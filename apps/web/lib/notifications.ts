@@ -68,6 +68,53 @@ export async function createNotification(
     input.communityId && !isPublicContentScope(input.communityId)
       ? input.communityId
       : null;
+
+  const title = input.title.slice(0, 160);
+  const body = input.body?.slice(0, 500) ?? null;
+  const href = input.href;
+
+  // Cap storage growth (500MB free tier): interactions on the same entity
+  // (e.g. "Sachin replied" then "Priya replied" to the same thread) reuse a
+  // single unread notification row instead of creating a new row per event.
+  // Bumping created_at keeps the notification at the top of the list, and
+  // metadata.count records how many events it aggregates.
+  const { data: existing, error: lookupError } = (await db
+    .from("notifications")
+    .select("id, metadata")
+    .eq("user_id", input.userId)
+    .eq("entity_type", input.entityType)
+    .eq("entity_id", input.entityId)
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()) as unknown as {
+    data: { id: string; metadata: Record<string, unknown> | null } | null;
+    error: unknown;
+  };
+
+  if (!lookupError && existing) {
+    const prevMetadata = existing.metadata ?? {};
+    const prevCount =
+      typeof prevMetadata.count === "number" ? prevMetadata.count : 1;
+    const { error } = (await db
+      .from("notifications")
+      .update({
+        actor_id: input.actorId ?? null,
+        type: input.type,
+        title,
+        body,
+        href,
+        metadata: { ...prevMetadata, count: prevCount + 1 },
+        created_at: new Date().toISOString(),
+      } as never)
+      .eq("id", existing.id)) as unknown as { error: unknown };
+    if (error) {
+      console.error("[notifications] dedupe update failed", error);
+      return { ok: false, error };
+    }
+    return { ok: true };
+  }
+
   const { error } = await db.from("notifications").insert({
     user_id: input.userId,
     actor_id: input.actorId ?? null,
@@ -75,9 +122,9 @@ export async function createNotification(
     type: input.type,
     entity_type: input.entityType,
     entity_id: input.entityId,
-    title: input.title.slice(0, 160),
-    body: input.body?.slice(0, 500) ?? null,
-    href: input.href,
+    title,
+    body,
+    href,
     metadata: input.metadata ?? {},
   });
 

@@ -49,7 +49,7 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Record<s
 const SHOWCASE_PAGE_SIZE = 25;
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
+  let session; try { session = await requireSession("user", { verifyActive: false }); } catch (error) { return error as Response; }
   const { id } = await params;
   const result = await loadCommunityShowcasePage(id, session.userId!, request.nextUrl.searchParams.get("cursor"));
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });

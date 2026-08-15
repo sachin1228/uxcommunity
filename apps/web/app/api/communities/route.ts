@@ -37,7 +37,7 @@ function slugify(value: string): string {
 
 export async function GET() {
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { verifyActive: false }); } catch (e) { return e as Response; }
   return getSidebarCommunities(session.userId!);
 }
 

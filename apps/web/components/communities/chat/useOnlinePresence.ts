@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 
 /**
  * Tracks how many members are currently online in a community using
@@ -16,8 +17,10 @@ export function useOnlinePresence({
   currentUserId: string;
 }) {
   const [onlineCount, setOnlineCount] = useState(0);
+  const isVisible = useDocumentVisible();
 
   useEffect(() => {
+    if (!isVisible) return;
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
       supabase = createBrowserClient();
@@ -45,7 +48,7 @@ export function useOnlinePresence({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [communityId, currentUserId]);
+  }, [communityId, currentUserId, isVisible]);
 
   return { onlineCount };
 }

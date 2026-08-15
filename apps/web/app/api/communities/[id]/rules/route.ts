@@ -9,7 +9,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try { await requireSession(); } catch (e) { return e as Response; }
+  try { await requireSession(undefined, { verifyActive: false }); } catch (e) { return e as Response; }
   const { id } = await params;
   const db = createServiceClient();
 

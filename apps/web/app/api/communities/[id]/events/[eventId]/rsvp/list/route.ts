@@ -6,7 +6,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string; eventId: string }> },
 ) {
-  try { await requireSession("user"); } catch (e) { return e as Response; }
+  try { await requireSession("user", { verifyActive: false }); } catch (e) { return e as Response; }
 
   const { eventId } = await params;
   const db = createServiceClient();
