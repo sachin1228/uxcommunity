@@ -14,28 +14,22 @@ const TYPING_EXPIRY_MS = 3500;
  *
  * Returns a Map<communityId, displayText> so the sidebar can show
  * "John is typing…" in place of the last-message preview for any community
- * where someone is actively typing.
+ * where someone is actively typing — including the currently open one, so
+ * the indicator stays visible consistently (the chat window shows it above
+ * the input, the sidebar shows it in the row).
  *
  * Read-only — this hook never broadcasts (the active chat's useTypingPresence
- * handles broadcasting for the current user).
- *
- * Cost guard: the active community's typing room is already subscribed by the
- * chat page's useTypingPresence (subscribing it here too would deliver every
- * broadcast twice), and a room per community means one WebSocket per community
- * — so this subscribes to at most TYPING_CHANNEL_LIMIT communities, skipping
- * the active one.
+ * handles broadcasting for the current user). One WebSocket per community, so
+ * this subscribes to at most TYPING_CHANNEL_LIMIT communities.
  */
 const TYPING_CHANNEL_LIMIT = 8;
 
 export function useSidebarTyping({
   communities,
   userId,
-  activeCommunityIdRef,
 }: {
   communities: CachedSidebarCommunity[];
   userId: string;
-  /** Ref (not state) so channel setup doesn't re-run on every route change. */
-  activeCommunityIdRef: React.MutableRefObject<string | undefined>;
 }): Map<string, string> {
   const [typingMap, setTypingMap] = useState<Map<string, string>>(new Map());
 
@@ -52,13 +46,7 @@ export function useSidebarTyping({
 
     stateRef.current.clear();
 
-    // Skip the community the user is currently viewing — the chat page's own
-    // useTypingPresence already subscribes to its room, so subscribing here
-    // would process every typing broadcast twice.
-    const activeId = activeCommunityIdRef.current;
-    const subscribed = communities
-      .filter((comm) => comm.id !== activeId)
-      .slice(0, TYPING_CHANNEL_LIMIT);
+    const subscribed = communities.slice(0, TYPING_CHANNEL_LIMIT);
 
     /** Expire stale entries and push the updated map into React state. */
     const flush = () => {
