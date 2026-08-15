@@ -15,6 +15,7 @@ import {
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
@@ -112,20 +113,16 @@ export function ThreadsView({
 
     client.connect();
 
-    const handleFocus = () => {
-      if (document.visibilityState === "visible") void fetchThreads(true);
-    };
-    document.addEventListener("visibilitychange", handleFocus);
-    window.addEventListener("focus", handleFocus);
-
     return () => {
       window.clearTimeout(initialFetch);
       unsubscribes.forEach((unsub) => unsub());
       client.close();
-      document.removeEventListener("visibilitychange", handleFocus);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [communityId, currentUserId, fetchThreads, isVisible]);
+
+  // Refetch on returning to the tab only after a real absence (missed realtime
+  // events aren't replayed); brief alt-tabs no longer fire a request each.
+  useHiddenCatchUp(() => void fetchThreads(true));
 
   function writeCache(updater: (prev: CommunityThread[]) => CommunityThread[]) {
     setThreads((prev) => {

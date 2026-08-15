@@ -5,6 +5,7 @@ import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "l
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
@@ -69,17 +70,15 @@ export function EventsView({
 
     client.connect();
 
-    const handleFocus = () => { if (document.visibilityState === "visible") void fetchEvents(true); };
-    document.addEventListener("visibilitychange", handleFocus);
-    window.addEventListener("focus", handleFocus);
-
     return () => {
       unsubscribes.forEach((unsub) => unsub());
       client.close();
-      document.removeEventListener("visibilitychange", handleFocus);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [communityId, currentUserId, fetchEvents, isVisible]);
+
+  // Refetch on returning to the tab only after a real absence (missed realtime
+  // events aren't replayed); brief alt-tabs no longer fire a request each.
+  useHiddenCatchUp(() => void fetchEvents(true));
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;

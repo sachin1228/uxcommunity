@@ -16,6 +16,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 type NotificationType =
@@ -112,25 +113,18 @@ export function NotificationBell({ userId }: Props) {
         });
     }, 0);
 
-    // Catch up when the tab regains focus — the realtime channel is suspended
-    // while hidden, so notifications created during the hidden period would
-    // otherwise be missed until the next 30s refetch. Force bypasses the stale
-    // window so the count is correct the moment the tab becomes visible again.
-    const handleFocus = () => {
-      if (document.visibilityState === "visible") {
-        void fetchNotifications(true).catch(() => {});
-      }
-    };
-    document.addEventListener("visibilitychange", handleFocus);
-    window.addEventListener("focus", handleFocus);
-
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
-      document.removeEventListener("visibilitychange", handleFocus);
-      window.removeEventListener("focus", handleFocus);
     };
   }, [fetchNotifications]);
+
+  // Catch up when the tab returns after a real absence — the realtime channel
+  // is suspended while hidden, so notifications created during that window
+  // would otherwise be missed until the next 30s refetch. Force bypasses the
+  // stale window so the count is correct on return. Brief alt-tabs no longer
+  // fire a request each.
+  useHiddenCatchUp(() => void fetchNotifications(true).catch(() => {}));
 
   useEffect(() => {
     if (!isVisible) return;
