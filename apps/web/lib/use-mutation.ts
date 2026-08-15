@@ -50,3 +50,40 @@ export function usePendingMutation<Args extends unknown[], Result>(
 
   return { pending, run };
 }
+
+/**
+ * Per-item mutation lock for optimistic toggle buttons (like/save/bookmark/rsvp).
+ *
+ * Solves the "mash the button 20 times" problem at the UI layer: while an
+ * action for a given `id` is running, further clicks for that `id` are dropped
+ * synchronously (a ref check, so even two clicks in the same frame can't
+ * double-fire), and `isPending` drives the button's `disabled` state.
+ *
+ *   const { run, isPending } = usePendingActions();
+ *   <button disabled={isPending(post.id)} onClick={() => void run(post.id, async () => {
+ *     await dedupeFetch(...);   // runs at most once until it settles
+ *   })} />
+ */
+export function usePendingActions() {
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const pendingRef = useRef(new Set<string>());
+
+  const run = useCallback(
+    async <T,>(id: string, action: () => Promise<T>): Promise<T | undefined> => {
+      if (pendingRef.current.has(id)) return undefined;
+      pendingRef.current.add(id);
+      setPending(new Set(pendingRef.current));
+      try {
+        return await action();
+      } finally {
+        pendingRef.current.delete(id);
+        setPending(new Set(pendingRef.current));
+      }
+    },
+    [],
+  );
+
+  const isPending = useCallback((id: string) => pending.has(id), [pending]);
+
+  return { run, isPending };
+}

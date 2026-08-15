@@ -6,12 +6,15 @@ import { Bookmark, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 export function ShowcaseOptionsMenu({
   saved,
   canManage,
+  busy = false,
   onToggleSave,
   onEdit,
   onDelete,
 }: {
   saved: boolean;
   canManage: boolean;
+  /** Disables the save item while a save mutation is in flight (spam guard). */
+  busy?: boolean;
   onToggleSave: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -56,7 +59,8 @@ export function ShowcaseOptionsMenu({
               onToggleSave();
             }}
             aria-pressed={saved}
-            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+            disabled={busy}
+            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised disabled:opacity-50"
           >
             <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave showcase" : "Save showcase"}

@@ -9,6 +9,7 @@ interface EventOptionsMenuProps {
   reported?: boolean;
   isOwner: boolean;
   deleting?: boolean;
+  saving?: boolean;
   className?: string;
   onSave: () => void;
   onShare: () => void;
@@ -23,6 +24,7 @@ export function EventOptionsMenu({
   reported = false,
   isOwner,
   deleting = false,
+  saving = false,
   className = "",
   onSave,
   onShare,
@@ -71,9 +73,9 @@ export function EventOptionsMenu({
       </button>
       {open && (
         <div className="absolute right-0 top-9 z-30 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-          <button type="button" onClick={() => run(onSave)} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+          <button type="button" onClick={() => run(onSave)} disabled={saving} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
             <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
-            {saved ? "Unsave event" : "Save event"}
+            {saving ? "Saving…" : saved ? "Unsave event" : "Save event"}
           </button>
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
             <Share2 size={12} /> {shared ? "Copied!" : "Share event"}

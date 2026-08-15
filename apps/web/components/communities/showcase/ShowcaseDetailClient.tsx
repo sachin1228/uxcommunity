@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { usePendingActions } from "@/lib/use-mutation";
 import { isPublicContentScope } from "@/lib/content-scope";
 import {
   CornerDownRight,
@@ -197,6 +198,7 @@ export function ShowcaseDetailClient({
 }) {
   const router = useGuardedRouter();
   const publicScope = isPublicContentScope(communityId);
+  const { run, isPending } = usePendingActions();
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
@@ -245,23 +247,27 @@ export function ShowcaseDetailClient({
   async function toggle(action: "like" | "save") {
     const key = action === "like" ? "user_liked" : "user_saved";
     const active = post[key];
-    setPost((value) => ({
-      ...value,
-      [key]: !active,
-      ...(action === "like"
-        ? { like_count: value.like_count + (active ? -1 : 1) }
-        : {}),
-    }));
-    const response = await dedupeFetch(
-      `/api/communities/${communityId}/showcase/${post.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      },
-      { cooldownMode: "url" },
-    );
-    if (!response.ok) setPost(initialPost);
+    // Drop every click while a like/save is still in flight — a spam burst
+    // optimistically updates and requests exactly once.
+    await run("post", async () => {
+      setPost((value) => ({
+        ...value,
+        [key]: !active,
+        ...(action === "like"
+          ? { like_count: value.like_count + (active ? -1 : 1) }
+          : {}),
+      }));
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/showcase/${post.id}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+        { cooldownMode: "url" },
+      );
+      if (!response.ok) setPost(initialPost);
+    });
   }
   async function removePost() {
     if (!confirm("Delete this showcase post? This cannot be undone.")) return;
@@ -318,6 +324,7 @@ export function ShowcaseDetailClient({
           post={post}
           currentUserId={currentUserId}
           variant="detail"
+          busy={isPending("post")}
           onToggleLike={() => void toggle("like")}
           onToggleSave={() => void toggle("save")}
           onEdit={() => setEditing(true)}

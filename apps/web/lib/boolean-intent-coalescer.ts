@@ -3,6 +3,12 @@ export interface BooleanIntentCoalescerOptions {
   persist: (desired: boolean) => Promise<boolean>;
   onOptimisticChange: (value: boolean) => void;
   onError?: (error: unknown) => void;
+  /**
+   * Called whenever the coalescer transitions into/out of a pending state.
+   * Lets a button disable itself (and drop spam clicks) while a write is
+   * in flight instead of toggling again.
+   */
+  onPendingChange?: (pending: boolean) => void;
   quietWindowMs?: number;
 }
 
@@ -35,6 +41,7 @@ export class BooleanIntentCoalescer {
     this.desired = value;
     this.version += 1;
     this.options.onOptimisticChange(value);
+    this.notifyPending();
 
     // Start the first write immediately. Deferring it to a quiet-window timer
     // allowed an optimistic parent update to replace this card and dispose the
@@ -51,6 +58,7 @@ export class BooleanIntentCoalescer {
   syncConfirmed(value: boolean) {
     this.confirmed = value;
     if (!this.isPending()) this.desired = value;
+    this.notifyPending();
   }
 
   isPending() {
@@ -61,6 +69,12 @@ export class BooleanIntentCoalescer {
     this.disposed = true;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.notifyPending();
+  }
+
+  private notifyPending() {
+    if (this.disposed) return;
+    this.options.onPendingChange?.(this.isPending());
   }
 
   private schedule(delay: number) {
@@ -95,6 +109,7 @@ export class BooleanIntentCoalescer {
     } finally {
       this.inFlight = false;
       if (!this.disposed && this.desired !== this.confirmed) this.schedule(0);
+      this.notifyPending();
     }
   }
 }
