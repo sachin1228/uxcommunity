@@ -1,15 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { Globe, ImagePlus, Loader2, X } from "lucide-react";
 import { SHOWCASE_CATEGORIES, SHOWCASE_TYPES, type ShowcaseCategory, type ShowcasePost, type ShowcasePostType } from "./types";
 
-interface Props { communityId?: string; publicOnly?: boolean; onClose: () => void; onCreated?: (post: ShowcasePost) => void; onUpdated?: (post: ShowcasePost) => void; post?: ShowcasePost; }
+interface Props { communityId?: string; publicOnly?: boolean; initialIsPublic?: boolean; onClose: () => void; onCreated?: (post: ShowcasePost) => void; onUpdated?: (post: ShowcasePost) => void; post?: ShowcasePost; }
 
-export function CreateShowcaseModal({ communityId, publicOnly = false, onClose, onCreated, onUpdated, post }: Props) {
+export function CreateShowcaseModal({ communityId, publicOnly = false, initialIsPublic = false, onClose, onCreated, onUpdated, post }: Props) {
   const fileRef = useRef<HTMLInputElement>(null); const editing = Boolean(post);
   const [title, setTitle] = useState(post?.title ?? ""); const [description, setDescription] = useState(post?.description ?? ""); const [projectUrl, setProjectUrl] = useState(post?.project_url ?? "");
   const [type, setType] = useState<ShowcasePostType>(post?.post_type ?? "finished"); const [category, setCategory] = useState<ShowcaseCategory>(post?.category ?? "ui_ux"); const [tags, setTags] = useState(post?.tags.join(", ") ?? "");
+  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [file, setFile] = useState<File | null>(null); const [preview, setPreview] = useState<string | null>(post?.image_url ?? null); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null);
   async function submit(event: React.FormEvent) {
     event.preventDefault(); if ((!file && !post?.image_url) || !title.trim()) { setError("Add a title and preview image."); return; }
@@ -17,7 +18,7 @@ export function CreateShowcaseModal({ communityId, publicOnly = false, onClose, 
     try {
       let imageUrl = post?.image_url ?? "";
       if (file) { const form = new FormData(); form.set("file", file); const upload = await fetch(publicOnly ? "/api/home/uploads/showcase" : `/api/communities/${communityId}/showcase/upload`, { method: "POST", body: form }); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error ?? "Upload failed."); imageUrl = uploaded.url; }
-      const response = await fetch(editing ? `/api/communities/${publicOnly ? "public" : communityId}/showcase/${post!.id}` : (publicOnly ? "/api/home/posts/showcase" : `/api/communities/${communityId}/showcase`), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), description: description.trim(), image_url: imageUrl, project_url: projectUrl.trim() || null, post_type: type, category, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5) }) });
+      const response = await fetch(editing ? `/api/communities/${publicOnly ? "public" : communityId}/showcase/${post!.id}` : (publicOnly ? "/api/home/posts/showcase" : `/api/communities/${communityId}/showcase`), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), description: description.trim(), image_url: imageUrl, project_url: projectUrl.trim() || null, post_type: type, category, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5), is_public: publicOnly ? true : isPublic }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? `Could not ${editing ? "update" : "share"} your work.`); if (editing) onUpdated?.(data.post); else onCreated?.(data.post); onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your work."); } finally { setSaving(false); }
   }
@@ -32,6 +33,6 @@ export function CreateShowcaseModal({ communityId, publicOnly = false, onClose, 
         <label className="md:col-span-2"><span className="mb-1.5 block font-body text-xs text-foreground-muted">Description</span><textarea className={field} rows={4} maxLength={1200} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Share the story, process, or feedback you need."/></label>
         <label><span className="mb-1.5 block font-body text-xs text-foreground-muted">Project URL</span><input className={field} type="url" value={projectUrl} onChange={(event) => setProjectUrl(event.target.value)} placeholder="https://..."/></label>
         <label><span className="mb-1.5 block font-body text-xs text-foreground-muted">Tags</span><input className={field} value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Mobile, Fintech, Research"/></label>
-      </div>{error && <p className="mt-4 font-body text-sm text-red-400">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2.5 font-body text-sm text-foreground-muted">Cancel</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground disabled:opacity-60">{saving && <Loader2 size={15} className="animate-spin"/>}{saving ? "Saving…" : editing ? "Save changes" : "Share work"}</button></div>
+      </div>{!publicOnly && <label className="mt-5 flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3"><span className="flex items-center gap-2.5"><Globe size={15} className="shrink-0 text-foreground-muted"/><span><span className="block font-body text-sm font-medium text-foreground">Share publicly</span><span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span></span></span><span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="sr-only"/><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`}/></span></label>}{error && <p className="mt-4 font-body text-sm text-red-400">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2.5 font-body text-sm text-foreground-muted">Cancel</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground disabled:opacity-60">{saving && <Loader2 size={15} className="animate-spin"/>}{saving ? "Saving…" : editing ? "Save changes" : "Share work"}</button></div>
     </form></div>;
 }

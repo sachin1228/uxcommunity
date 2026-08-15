@@ -370,6 +370,7 @@ export function ShowcaseDetailClient({
         <CreateShowcaseModal
           communityId={publicScope ? "public" : communityId}
           publicOnly={publicScope}
+          initialIsPublic={post.is_public}
           post={post}
           onClose={() => setEditing(false)}
           onUpdated={setPost}

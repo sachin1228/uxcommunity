@@ -177,8 +177,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     updateItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
   }, [updateItems]);
 
-  const openShowcase = useCallback((id: string) => {
-    router.push(`/dashboard/showcase/${id}`);
+  const openShowcase = useCallback((post: FeedShowcase) => {
+    router.push(post.community_id
+      ? `/dashboard/communities/${post.community_id}/showcase/${post.id}`
+      : `/dashboard/showcase/${post.id}`);
   }, [router]);
 
   const handleShowcaseUpdated = useCallback((updated: ShowcasePost) => {
@@ -205,8 +207,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
   const handleShowcaseLikeSave = useCallback(async (post: FeedShowcase, action: "like" | "save") => {
     handleShowcaseInteraction(post.id, action);
+    const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
     const response = await dedupeFetch(
-      `/api/communities/${PUBLIC_CONTENT_SCOPE}/showcase/${post.id}`,
+      `/api/communities/${scope}/showcase/${post.id}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -219,8 +222,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
   const handleShowcaseDeleted = useCallback(async (post: FeedShowcase) => {
     if (!confirm("Delete this showcase post? This cannot be undone.")) return;
+    const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
     const response = await fetch(
-      `/api/communities/${PUBLIC_CONTENT_SCOPE}/showcase/${post.id}`,
+      `/api/communities/${scope}/showcase/${post.id}`,
       { method: "DELETE" },
     );
     if (response.ok) updateItems((prev) => prev.filter((it) => !(it._type === "showcase" && it.id === post.id)));
@@ -370,10 +374,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           return (
             <li key={`showcase-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
               <ShowcaseCard
-                post={{ ...group.item, community_id: "public" }}
+                post={{ ...group.item, community_id: group.item.community_id ?? "public" }}
                 currentUserId={currentUserId}
                 isLast={isLastGroup}
-                onOpen={() => openShowcase(group.item.id)}
+                onOpen={() => openShowcase(group.item)}
                 onToggleLike={() => void handleShowcaseLikeSave(group.item, "like")}
                 onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
                 onEdit={() => setEditingShowcase(group.item)}
@@ -426,7 +430,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
     {editingShowcase && (
       <CreateShowcaseModal
-        publicOnly
+        communityId={editingShowcase.community_id ?? undefined}
+        publicOnly={!editingShowcase.community_id}
+        initialIsPublic={editingShowcase.is_public}
         post={editingShowcase as ShowcasePost}
         onClose={() => setEditingShowcase(null)}
         onUpdated={handleShowcaseUpdated}
