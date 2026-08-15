@@ -13,11 +13,19 @@
  * `history.replaceState` (no new history entry), so the previous history entry
  * is frequently the chat view rather than the list this link points to.
  * Navigating to `href` also handles deep links correctly.
+ *
+ * Uses the raw router on purpose: the global navigation click guard
+ * (`installLinkClickGuard`, mounted in the root layout) already dedupes rapid
+ * repeated clicks on internal anchors in the capture phase. Wrapping the push
+ * in `useGuardedRouter()` here would run `allowNavigation` twice for the same
+ * href in the same tick — the capture-phase guard sets the lock first, so the
+ * guarded push sees its own click as an in-flight duplicate and swallows the
+ * navigation entirely (back links would do nothing).
  */
 
 import { useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
-import { useGuardedRouter } from "@/lib/navigation-guard";
+import { useRouter } from "next/navigation";
 
 interface BackLinkProps {
   /** Destination — the list/tab page this link returns to. */
@@ -27,7 +35,7 @@ interface BackLinkProps {
 }
 
 export function BackLink({ href, label = "Home", className }: BackLinkProps) {
-  const router = useGuardedRouter();
+  const router = useRouter();
 
   const handleClick = useCallback(
     (event: React.MouseEvent<HTMLAnchorElement>) => {
