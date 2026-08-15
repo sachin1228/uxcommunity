@@ -321,7 +321,7 @@ export function patchSidebarReaction(
         : community
     ),
   };
-  notifySidebarChanged();
+  notifySidebarReactionChanged();
 }
 
 export function invalidateOnArchive(communityId: string): void {
@@ -338,10 +338,23 @@ export function invalidateOnArchive(communityId: string): void {
 }
 
 export const SIDEBAR_CHANGED_EVENT = "uxcommunity:sidebar-changed";
+/**
+ * Fired only for local reaction preview patches. Unlike SIDEBAR_CHANGED_EVENT
+ * this must NOT trigger a server refetch: the cached /api/communities snapshot
+ * predates the reaction, and reloading it would clobber the optimistic preview
+ * (and any newer last_message) with stale rows.
+ */
+export const SIDEBAR_REACTION_CHANGED_EVENT = "uxcommunity:sidebar-reaction-changed";
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SIDEBAR_CHANGED_EVENT));
+  }
+}
+
+function notifySidebarReactionChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SIDEBAR_REACTION_CHANGED_EVENT));
   }
 }
 
