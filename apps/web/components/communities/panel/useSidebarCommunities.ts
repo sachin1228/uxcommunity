@@ -9,6 +9,7 @@ import {
   initUserCache,
   lastReadAtOnOpen,
   SIDEBAR_CHANGED_EVENT,
+  SIDEBAR_REACTION_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 import {
@@ -107,6 +108,19 @@ export function useSidebarCommunities(userId: string) {
     window.addEventListener(SIDEBAR_CHANGED_EVENT, handler);
     return () => window.removeEventListener(SIDEBAR_CHANGED_EVENT, handler);
   }, [load]);
+
+  // Local reaction preview patches (from the chat window) must only sync the
+  // store into React state. Refetching here would replace the optimistic
+  // "You reacted …" preview with the stale /api/communities cache that
+  // predates the reaction — the exact bug where reacting to a message left
+  // the sidebar showing the old preview (or "No messages yet").
+  useEffect(() => {
+    const handler = () => {
+      setCommunities(sidebarStore.data?.communities ?? []);
+    };
+    window.addEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
+  }, []);
 
   // ── Active community change: clear badge + mark read ─────────────────────
   useEffect(() => {
