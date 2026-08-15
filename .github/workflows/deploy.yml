@@ -103,6 +103,28 @@ jobs:
           INVITATION_EXPIRY_DAYS=${{ secrets.INVITATION_EXPIRY_DAYS || '7' }}
           EOF
 
+      # Fail the build if any NEXT_PUBLIC_* var the client needs is missing
+      # from the build env — a missing var silently degrades realtime to
+      # polling (no WebSocket ever connects). Check the generated
+      # .env.production.local so the guard sits right before next build.
+      - name: Verify client build-time env vars
+        working-directory: apps/web
+        shell: bash
+        run: |
+          missing=0
+          for name in NEXT_PUBLIC_APP_URL NEXT_PUBLIC_SUPABASE_URL \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_REALTIME_URL; do
+            value=$(grep "^${name}=" .env.production.local | head -1 | cut -d= -f2-)
+            if [ -z "$value" ]; then
+              echo "::error::Missing client build-time var: ${name} (absent from .env.production.local)"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Client bundle would be built without required NEXT_PUBLIC_* vars, so realtime and other client features would silently degrade to polling. Fix wrangler.toml [vars] or the workflow, then re-run."
+            exit 1
+          fi
+
       - name: Build web worker (OpenNext)
         working-directory: apps/web
         run: npx opennextjs-cloudflare build
