@@ -34,6 +34,19 @@ const REALTIME_URL =
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
 
+/**
+ * Build a `ws:`/`wss:` URL for the realtime WebSocket. `NEXT_PUBLIC_REALTIME_URL`
+ * is an https:// origin (e.g. https://rt.uxcommunity.in), but the WebSocket
+ * constructor rejects non-ws schemes with a SyntaxError. When the var is empty
+ * (local dev), fall back to a same-origin relative path so the request goes to
+ * whatever serves the page.
+ */
+function buildWebSocketUrl(baseUrl: string, room: string): string {
+  if (!baseUrl) return `/ws?room=${encodeURIComponent(room)}`;
+  const wsBase = baseUrl.replace(/^http/, "ws");
+  return `${wsBase}/ws?room=${encodeURIComponent(room)}`;
+}
+
 interface RealtimeClientOptions {
   room: string;
   user: RealtimeUser;
@@ -58,7 +71,7 @@ export class RealtimeClient {
   private readonly statusHandlers = new Set<StatusHandler>();
 
   constructor(options: RealtimeClientOptions) {
-    this.url = `${REALTIME_URL}/ws?room=${encodeURIComponent(options.room)}`;
+    this.url = buildWebSocketUrl(REALTIME_URL, options.room);
     this.user = options.user;
     this.reconnectEnabled = options.reconnect ?? true;
   }
