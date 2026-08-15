@@ -175,9 +175,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }, [updateItems]);
 
   const openShowcase = useCallback((post: FeedShowcase) => {
-    router.push(post.community_id
-      ? `/dashboard/communities/${post.community_id}/showcase/${post.id}`
-      : `/dashboard/showcase/${post.id}`);
+    // Showcase cards on the home feed open their own detail page (like threads
+    // and events), instead of dropping the user into the community context.
+    router.push(`/dashboard/showcase/${post.id}`);
   }, [router]);
 
   const handleShowcaseUpdated = useCallback((updated: ShowcasePost) => {
