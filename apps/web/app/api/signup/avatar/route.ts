@@ -174,6 +174,6 @@ export async function POST(request: NextRequest) {
     role: "user",
   });
   const response = NextResponse.json({ success: true, userId, avatar_url: avatarUrl });
-  setSessionCookie(response, sessionToken);
+  setSessionCookie(response, sessionToken, request.nextUrl.hostname);
   return response;
 }

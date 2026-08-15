@@ -55,17 +55,60 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
   return verifySession(token);
 });
 
-export function setSessionCookie(res: NextResponse, token: string) {
+/**
+ * The session cookie must also reach the realtime service, which runs on a
+ * sibling subdomain (rt.uxcommunity.in), so the WebSocket handshake can carry
+ * the JWT cross-subdomain. Scope it to the registrable domain. Localhost (dev)
+ * and any other host stays host-only.
+ */
+function cookieDomain(host?: string): string | undefined {
+  const isAppHost = (h: string) =>
+    h === "uxcommunity.in" || h.endsWith(".uxcommunity.in");
+  const requestHost = host?.split(":")[0].toLowerCase();
+
+  if (requestHost && isAppHost(requestHost)) return ".uxcommunity.in";
+
+  // A localhost / loopback request must stay host-only — never let the
+  // production env domain override it during local preview.
+  if (
+    requestHost &&
+    (requestHost === "localhost" ||
+      requestHost.endsWith(".local") ||
+      /^\d{1,3}(\.\d{1,3}){3}$/.test(requestHost))
+  ) {
+    return undefined;
+  }
+
+  // OpenNext can present the worker's own hostname (e.g. *.workers.dev) to
+  // route handlers. Fall back to the env-derived app host when the request
+  // host doesn't already identify the app domain.
+  const envHost = appUrlHost();
+  return envHost && isAppHost(envHost) ? ".uxcommunity.in" : undefined;
+}
+
+/** Fallback host derived from NEXT_PUBLIC_APP_URL (set in the prod build). */
+function appUrlHost(): string | undefined {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl) return undefined;
+  try {
+    return new URL(appUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+export function setSessionCookie(res: NextResponse, token: string, host?: string) {
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: EXPIRY_SECONDS,
     path: "/",
+    ...(cookieDomain(host) ? { domain: cookieDomain(host)! } : {}),
   });
 }
 
-export function clearSessionCookie(res: NextResponse) {
+export function clearSessionCookie(res: NextResponse, host?: string) {
   for (const cookieName of [SESSION_COOKIE, LEGACY_SESSION_COOKIE]) {
     res.cookies.set(cookieName, "", {
       httpOnly: true,
@@ -73,6 +116,7 @@ export function clearSessionCookie(res: NextResponse) {
       sameSite: "lax",
       maxAge: 0,
       path: "/",
+      ...(cookieDomain(host) ? { domain: cookieDomain(host)! } : {}),
     });
   }
 }
