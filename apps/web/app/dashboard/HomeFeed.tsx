@@ -6,20 +6,26 @@ import { Globe } from "lucide-react";
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
+import { ShowcaseCard } from "@/components/communities/showcase/ShowcaseCard";
+import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
 import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
+import type { ShowcasePost } from "@/components/communities/showcase/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };
-type FeedItem = FeedThread | FeedEvent | FeedResource;
+type FeedShowcase = Omit<ShowcasePost, "community_id"> & { _type: "showcase"; community_id: string | null; community_name: string | null; community_image: string | null };
+type FeedItem = FeedThread | FeedEvent | FeedResource | FeedShowcase;
 
 /** Must match PAGE_SIZE in /api/home/feed. */
 const HOME_FEED_PAGE_SIZE = 30;
@@ -37,6 +43,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= HOME_FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);
+  const router = useGuardedRouter();
 
   const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -169,6 +177,59 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     updateItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
   }, [updateItems]);
 
+  const openShowcase = useCallback((post: FeedShowcase) => {
+    router.push(post.community_id
+      ? `/dashboard/communities/${post.community_id}/showcase/${post.id}`
+      : `/dashboard/showcase/${post.id}`);
+  }, [router]);
+
+  const handleShowcaseUpdated = useCallback((updated: ShowcasePost) => {
+    setEditingShowcase(null);
+    updateItems((prev) => prev.map((it) =>
+      it._type === "showcase" && it.id === updated.id
+        ? { ...it, ...updated, community_id: it.community_id, community_name: it.community_name, community_image: it.community_image }
+        : it
+    ));
+  }, [updateItems]);
+
+  const handleShowcaseInteraction = useCallback((id: string, action: "like" | "save") => {
+    updateItems((prev) => prev.map((it) => {
+      if (it._type !== "showcase" || it.id !== id) return it;
+      const key = action === "like" ? "user_liked" : "user_saved";
+      const active = it[key];
+      return {
+        ...it,
+        [key]: !active,
+        ...(action === "like" ? { like_count: it.like_count + (active ? -1 : 1) } : {}),
+      };
+    }));
+  }, [updateItems]);
+
+  const handleShowcaseLikeSave = useCallback(async (post: FeedShowcase, action: "like" | "save") => {
+    handleShowcaseInteraction(post.id, action);
+    const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
+    const response = await dedupeFetch(
+      `/api/communities/${scope}/showcase/${post.id}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      },
+      { cooldownMode: "url" },
+    );
+    if (!response.ok) handleShowcaseInteraction(post.id, action);
+  }, [handleShowcaseInteraction]);
+
+  const handleShowcaseDeleted = useCallback(async (post: FeedShowcase) => {
+    if (!confirm("Delete this showcase post? This cannot be undone.")) return;
+    const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
+    const response = await fetch(
+      `/api/communities/${scope}/showcase/${post.id}`,
+      { method: "DELETE" },
+    );
+    if (response.ok) updateItems((prev) => prev.filter((it) => !(it._type === "showcase" && it.id === post.id)));
+  }, [updateItems]);
+
   // ── Load older posts (keyset pagination via ?before=created_at) ──────────
   const loadMore = useCallback(async () => {
     if (loadingMore || !items.length) return;
@@ -218,17 +279,19 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         <Globe size={32} className="mb-3 text-foreground-subtle" />
         <p className="font-body text-sm font-medium text-foreground-muted">Nothing public yet</p>
         <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
-          When community members share threads, events, or resources publicly, they&apos;ll appear here.
+          When community members share threads, events, resources, or showcase
+          work publicly, they&apos;ll appear here.
         </p>
       </div>
     );
   }
 
   // Group items so consecutive resources are batched together into a
-  // 2-column grid, while threads and events stay full-width.
+  // 2-column grid, while threads, events, and showcase posts stay full-width.
   type Group =
     | { kind: "thread"; item: FeedThread }
     | { kind: "event";  item: FeedEvent }
+    | { kind: "showcase"; item: FeedShowcase }
     | { kind: "resources"; items: FeedResource[] };
 
   const groups: Group[] = [];
@@ -242,8 +305,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
       }
     } else if (item._type === "thread") {
       groups.push({ kind: "thread", item });
-    } else {
+    } else if (item._type === "event") {
       groups.push({ kind: "event", item });
+    } else {
+      groups.push({ kind: "showcase", item });
     }
   }
 
@@ -305,6 +370,23 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           );
         }
 
+        if (group.kind === "showcase") {
+          return (
+            <li key={`showcase-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
+              <ShowcaseCard
+                post={{ ...group.item, community_id: group.item.community_id ?? "public" }}
+                currentUserId={currentUserId}
+                isLast={isLastGroup}
+                onOpen={() => openShowcase(group.item)}
+                onToggleLike={() => void handleShowcaseLikeSave(group.item, "like")}
+                onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
+                onEdit={() => setEditingShowcase(group.item)}
+                onDelete={() => void handleShowcaseDeleted(group.item)}
+              />
+            </li>
+          );
+        }
+
         // ── Resource group — same full-width layout as community resources ──
         return group.items.map((res, resourceIndex) => {
           const isLastResource = resourceIndex === group.items.length - 1;
@@ -344,6 +426,17 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           {loadingMore ? "Loading…" : "Load older posts"}
         </button>
       </div>
+    )}
+
+    {editingShowcase && (
+      <CreateShowcaseModal
+        communityId={editingShowcase.community_id ?? undefined}
+        publicOnly={!editingShowcase.community_id}
+        initialIsPublic={editingShowcase.is_public}
+        post={editingShowcase as ShowcasePost}
+        onClose={() => setEditingShowcase(null)}
+        onUpdated={handleShowcaseUpdated}
+      />
     )}
     </>
   );

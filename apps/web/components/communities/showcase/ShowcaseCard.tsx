@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Bookmark,
   ExternalLink,
   Heart,
   MessageCircle,
@@ -142,16 +141,6 @@ export function ShowcaseCard({
             View project
             <ExternalLink size={14} />
           </a>
-        )}
-        {isDetail && (
-          <button
-            type="button"
-            onClick={onToggleSave}
-            aria-label={post.user_saved ? "Unsave showcase post" : "Save showcase post"}
-            aria-pressed={post.user_saved}
-          >
-            <Bookmark size={20} fill={post.user_saved ? "currentColor" : "none"} />
-          </button>
         )}
       </div>
     </>

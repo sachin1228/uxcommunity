@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string) {
-  const [{ data: membership }, { data: post }] = await Promise.all([
-    db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("community_showcase_posts").select("id").eq("community_id", communityId).eq("id", postId).maybeSingle(),
-  ]);
+  let postQuery = db.from("community_showcase_posts").select("id").eq("id", postId);
+  postQuery = isPublicContentScope(communityId)
+    ? postQuery.is("community_id", null).eq("is_public", true)
+    : postQuery.eq("community_id", communityId);
+  const postPromise = postQuery.maybeSingle();
+  const membershipPromise = isPublicContentScope(communityId)
+    ? Promise.resolve({ data: { joined_at: "" } })
+    : db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
+  const [{ data: membership }, { data: post }] = await Promise.all([membershipPromise, postPromise]);
   return Boolean(membership && post);
 }
 

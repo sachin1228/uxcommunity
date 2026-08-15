@@ -300,6 +300,7 @@ export function ShowcaseView({
       {editing && (
         <CreateShowcaseModal
           communityId={communityId}
+          initialIsPublic={editing.is_public}
           post={editing}
           onClose={() => setEditing(null)}
           onUpdated={(post) =>

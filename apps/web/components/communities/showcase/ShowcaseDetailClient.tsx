@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { isPublicContentScope } from "@/lib/content-scope";
 import {
   CornerDownRight,
   Loader2,
@@ -186,13 +187,16 @@ export function ShowcaseDetailClient({
   initialComments,
   currentUserId,
   communityId,
+  backHref,
 }: {
   initialPost: ShowcasePost;
   initialComments: ShowcaseComment[];
   currentUserId: string;
   communityId: string;
+  backHref?: string;
 }) {
   const router = useGuardedRouter();
+  const publicScope = isPublicContentScope(communityId);
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
@@ -266,7 +270,7 @@ export function ShowcaseDetailClient({
       { method: "DELETE" },
     );
     if (response.ok)
-      router.push(`/dashboard/communities/${communityId}?tab=showcase`);
+      router.push(publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`);
   }
   function posted(comment: ShowcaseComment) {
     if (comment.parent_id)
@@ -306,8 +310,8 @@ export function ShowcaseDetailClient({
         className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}
       >
         <BackLink
-          href={`/dashboard/communities/${communityId}?tab=showcase`}
-          label="Showcase"
+          href={backHref ?? (publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`)}
+          label={publicScope ? "Home" : "Showcase"}
           className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
         />
         <ShowcaseCard
@@ -364,7 +368,9 @@ export function ShowcaseDetailClient({
       </div>
       {editing && (
         <CreateShowcaseModal
-          communityId={communityId}
+          communityId={publicScope ? "public" : communityId}
+          publicOnly={publicScope}
+          initialIsPublic={post.is_public}
           post={post}
           onClose={() => setEditing(false)}
           onUpdated={setPost}
