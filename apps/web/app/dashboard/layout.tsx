@@ -5,6 +5,7 @@ import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { NotificationBell } from "@/app/dashboard/NotificationBell";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 
 
 export default async function DashboardLayout({
@@ -41,7 +42,8 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
       {/* Full-width topbar */}
-      <header className="sticky top-0 z-20 flex h-12 items-center border-b border-border px-5 shrink-0">
+      <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-5">
+        <MobileSidebar userId={userId} />
         <span className="text-lg font-medium leading-none tracking-tight text-foreground">
           <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-lg" />
         </span>
@@ -59,7 +61,9 @@ export default async function DashboardLayout({
 
       {/* Below topbar: sidebar + page content side by side */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        <GlobalSidebar userId={userId} />
+        <div className="hidden h-full lg:block">
+          <GlobalSidebar userId={userId} />
+        </div>
 
         {/* Page content — no global padding; each page owns its own spacing */}
         <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">
