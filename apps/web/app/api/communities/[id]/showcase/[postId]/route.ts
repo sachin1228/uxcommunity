@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
 
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
-  return db.from("community_showcase_posts").select("*").eq("id", postId).eq("community_id", communityId).maybeSingle();
+  const query = db.from("community_showcase_posts").select("*").eq("id", postId);
+  return (isPublicContentScope(communityId) ? query.is("community_id", null).eq("is_public", true) : query.eq("community_id", communityId)).maybeSingle();
 }
 
 async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<string, unknown>, userId: string) {
@@ -24,6 +26,7 @@ async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<st
 }
 
 async function requireMember(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
+  if (isPublicContentScope(communityId)) return true;
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
   return Boolean(data);
 }
@@ -63,9 +66,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : ""; const projectUrl = typeof body.project_url === "string" ? body.project_url.trim() || null : null;
   const postType = typeof body.post_type === "string" ? body.post_type : ""; const category = typeof body.category === "string" ? body.category : "";
   const tags = Array.isArray(body.tags) ? [...new Set(body.tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.trim()).filter(Boolean))] : [];
+  const isPublic = body.is_public === true;
   if (!title || title.length > 120 || description.length > 1200 || !imageUrl || imageUrl.length > 2048 || !TYPES.has(postType) || !CATEGORIES.has(category) || tags.length > 5 || tags.some((tag) => tag.length > 30)) return NextResponse.json({ error: "One or more showcase fields are invalid." }, { status: 422 });
   if (projectUrl) { try { const url = new URL(projectUrl); if (!["http:", "https:"].includes(url.protocol)) throw new Error(); } catch { return NextResponse.json({ error: "Project URL must be a valid web address." }, { status: 422 }); } }
-  const { data, error } = await db.from("community_showcase_posts").update({ title, description, image_url: imageUrl, project_url: projectUrl, post_type: postType, category, tags }).eq("id", postId).eq("user_id", userId).select("*").single();
+  const { data, error } = await db.from("community_showcase_posts").update({ title, description, image_url: imageUrl, project_url: projectUrl, post_type: postType, category, tags, is_public: isPublic }).eq("id", postId).eq("user_id", userId).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
   return NextResponse.json({ post: await enrich(db, data, userId) });
 }

@@ -4,15 +4,17 @@ import { useState } from "react";
 import {
   BookOpen,
   CalendarDays,
+  Palette,
   Plus,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CreateEventModal } from "@/components/communities/events/CreateEventModal";
 import { CreateResourceModal } from "@/components/communities/resources/CreateResourceModal";
+import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
 import { CreateThreadModal } from "@/components/communities/threads/CreateThreadModal";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 
-type PostType = "thread" | "resource" | "event";
+type PostType = "showcase" | "thread" | "resource" | "event";
 
 interface HomePostComposerProps {
   name: string;
@@ -27,6 +29,13 @@ const postTypes: Array<{
   icon: typeof Plus;
   color: string;
 }> = [
+  {
+    type: "showcase",
+    label: "Create Showcase",
+    description: "Share your work with the community",
+    icon: Palette,
+    color: "text-violet-600 dark:text-violet-400",
+  },
   {
     type: "thread",
     label: "Create Thread",
@@ -71,17 +80,17 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
   return (
     <>
       <section className={`${communityFeedLayout.gutters} my-1`}>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-5 py-3 sm:py-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
-          <div className="grid min-w-0 grid-cols-3 justify-items-center gap-0.5">
+          <div className="grid min-w-0 grid-cols-4 justify-items-center gap-1.5">
             {postTypes.map(({ type, label, icon: Icon, color }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => openEditor(type)}
-                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-3.5 py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5"
+                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-2 py-2 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
               >
-                <Icon size={20} className={color} />
+                <Icon size={16} className={color} />
                 <span className="truncate">{label}</span>
               </button>
             ))}
@@ -89,6 +98,13 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
         </div>
       </section>
 
+      {postType === "showcase" && editorOpen && (
+        <CreateShowcaseModal
+          publicOnly
+          onClose={closeEditor}
+          onCreated={handleCreated}
+        />
+      )}
       {postType === "thread" && editorOpen && (
         <CreateThreadModal
           publicOnly
