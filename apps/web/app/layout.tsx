@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
+import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
 import "./globals.css";
 
 const geist = Geist({
@@ -66,6 +67,7 @@ export default function RootLayout({
     >
       <body className="bg-background text-foreground antialiased">
         <NavigationGuard />
+        <GlobalFetchGuard />
         {children}
       </body>
     </html>
