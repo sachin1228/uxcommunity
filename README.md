@@ -9,7 +9,7 @@ A platform for UI/UX, product, and social media designers. Designers apply to jo
 | **Application / onboarding** | Public apply form → admin review → approval email with invite link → multi-step sign-up (profile, avatar upload, interests) |
 | **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
 | **Admin panel** | Review and approve/reject applications; manage users (block/unblock); CRUD for master data: cities, companies, sectors, experience levels, interests, communities, Lottie animations. |
-| **Communities / chat** | Real-time community chat (Supabase Realtime). Members are auto-joined to communities on sign-up. Admins can delete messages. |
+| **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
 | **Image uploads** | Avatar and community images uploaded via signed Supabase Storage URLs, compressed server-side with `sharp`. |
 | **Rate limiting** | Redis-backed sliding-window rate limiter (Upstash) on login (IP + email), application submission, and password-reset requests. |
 
@@ -77,11 +77,44 @@ cp apps/web/.env.example apps/web/.env.local
 # 3. Apply database migrations
 # Run each file in supabase/migrations/ in order via the Supabase SQL editor
 
-# 4. Start the dev server
+# 4. Start the web dev server (terminal 1)
 npm run dev
 ```
 
 Open **http://localhost:3000**.
+
+### Realtime locally (chat, typing indicator, reactions)
+
+Realtime runs on a separate Cloudflare worker in `apps/realtime` (Durable Objects). To have it work locally you need **two terminals** — one for the web app, one for the realtime worker:
+
+```bash
+# Terminal 1 — web app
+npm run dev
+
+# Terminal 2 — realtime worker
+cd apps/realtime && npx wrangler dev   # serves ws://localhost:8787
+```
+
+The web app's client connects to `ws://localhost:8787` and the server-side fan-out publishes to `http://localhost:8787/publish`. In addition to the vars from `.env.example`, `apps/web/.env.local` needs:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_REALTIME_URL` | `http://localhost:8787` |
+| `REALTIME_URL` | `http://localhost:8787` |
+| `REALTIME_PUBLISH_SECRET` | any value — must match the worker's |
+
+And `apps/realtime/.dev.vars` (gitignored, create by hand):
+
+```
+SESSION_SECRET=<SAME value as apps/web/.env.local>
+REALTIME_PUBLISH_SECRET=<SAME value as apps/web/.env.local>
+```
+
+> The worker verifies WebSocket handshakes with the same JWT the web app signs. If `SESSION_SECRET` differs between the two files, the worker rejects every connection with a silent 401 and all realtime features fall back to polling.
+
+**Troubleshooting:** if messages, typing, and reactions only update with a delay (polling), the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
+
+In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
 
 ## Environment variables
 
@@ -103,7 +136,7 @@ See `apps/web/.env.example` for the full list with comments. Summary:
 ## Known limitations
 
 - **No automated test suite.** There are no unit or integration tests in the repo yet.
-- **No CI/CD pipeline.** Deployments are manual.
+- **CI/CD is deploy-only.** GitHub Actions deploys both the web and realtime workers to Cloudflare on every push to `main` (see `.github/workflows/deploy.yml`); there are no automated tests or preview environments.
 - **Admin auth is a single env-var credential** (`ADMIN_EMAIL` + `ADMIN_PASSWORD`). There is no multi-admin system, no admin user records in the database, and no per-admin audit log.
 - **Rate limiter fails open.** If Upstash Redis is unreachable, the rate limiter allows requests through and logs an error. This keeps the app available during Redis outages but means rate limits won't be enforced in that window.
 
