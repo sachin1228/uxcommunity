@@ -9,7 +9,7 @@ export async function GET() {
 
   let session;
   try {
-    session = await timer.measure("auth", () => requireSession("user"));
+    session = await timer.measure("auth", () => requireSession("user", { verifyActive: false }));
   } catch (error) {
     timer.finish({ status: error instanceof Response ? error.status : 500 });
     return error as Response;

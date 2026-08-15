@@ -75,7 +75,7 @@ export async function GET(
 ) {
   const timer = createServerTimer("GET /api/communities/[id]/events");
   let session;
-  try { session = await timer.measure("auth", () => requireSession("user")); } catch (e) {
+  try { session = await timer.measure("auth", () => requireSession("user", { verifyActive: false })); } catch (e) {
     timer.finish({ status: (e as Response).status ?? 401 });
     return e as Response;
   }

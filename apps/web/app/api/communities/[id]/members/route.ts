@@ -22,7 +22,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   let session;
-  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  try { session = await requireSession("user", { verifyActive: false }); } catch (e) { return e as Response; }
   const callerId = session.userId!;
   const { id: communityId } = await params;
 

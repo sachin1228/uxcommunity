@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 const TYPING_EXPIRY_MS = 3500;
@@ -43,9 +44,10 @@ export function useSidebarTyping({
   );
 
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
+  const isVisible = useDocumentVisible();
 
   useEffect(() => {
-    if (!communityIds) return;
+    if (!communityIds || !isVisible) return;
 
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
@@ -138,7 +140,7 @@ export function useSidebarTyping({
       setTypingMap(new Map());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId]);
+  }, [communityIds, userId, isVisible]);
 
   return typingMap;
 }
