@@ -1,12 +1,17 @@
-import { sidebarStore, lastReadAtOnOpen } from "@/lib/communities/cache";
+import { sidebarStore } from "@/lib/communities/cache";
 
 /**
  * Mark a community as read on the server.
  *
- * The PATCH endpoint returns `previousLastReadAt` — the last_read_at value
- * BEFORE it was overwritten. We store it in `lastReadAtOnOpen` so that
- * CommunityChat can position the unread divider by timestamp comparison even
- * when sidebarStore.data was null and the synchronous snapshot couldn't be taken.
+ * Optimistically clears the sidebar badge and advances last_read_at locally;
+ * the PATCH persists the new last_read_at server-side so future sidebar
+ * fetches compute accurate unread counts.
+ *
+ * Deliberately does NOT hand the previous last_read_at back to the chat via
+ * `lastReadAtOnOpen`: the chat receives the authoritative boundary from SSR
+ * (`initialLastReadAt`) on every open, and re-writing the OLD value into the
+ * shared map after the PATCH would resurrect the stale unread boundary (and
+ * divider) the next time the user opens the community.
  */
 export async function markReadOnServer(communityId: string): Promise<void> {
   const newLastReadAt = new Date().toISOString();
@@ -15,10 +20,6 @@ export async function markReadOnServer(communityId: string): Promise<void> {
       method: "PATCH",
     });
     if (res.ok) {
-      const data = await res.json();
-      if (!lastReadAtOnOpen.has(communityId) && "previousLastReadAt" in data) {
-        lastReadAtOnOpen.set(communityId, data.previousLastReadAt ?? null);
-      }
       if (sidebarStore.data) {
         sidebarStore.data = {
           ...sidebarStore.data,

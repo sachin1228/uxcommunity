@@ -138,22 +138,23 @@ export function useSidebarCommunities(userId: string) {
       (c) => c.id === activeCommunityId
     );
 
-    if (!lastReadAtOnOpen.has(activeCommunityId)) {
-      if (snapshot) {
-        lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
-        const optimisticReadAt = new Date().toISOString();
-        if (sidebarStore.data) {
-          sidebarStore.data = {
-            ...sidebarStore.data,
-            communities: sidebarStore.data.communities.map((c) =>
-              c.id === activeCommunityId
-                ? { ...c, last_read_at: optimisticReadAt }
-                : c
+    // Hand the chat the freshest known read boundary for this open. Always
+    // overwrite any leftover entry — a stale boundary from a previous visit
+    // would resurrect the old unread divider on the next open.
+    if (snapshot) {
+      lastReadAtOnOpen.set(activeCommunityId, snapshot.last_read_at ?? null);
+      const optimisticReadAt = new Date().toISOString();
+      if (sidebarStore.data) {
+        sidebarStore.data = {
+          ...sidebarStore.data,
+          communities: sidebarStore.data.communities.map((c) =>
+            c.id === activeCommunityId
+              ? { ...c, last_read_at: optimisticReadAt }
+              : c
             ),
           };
         }
       }
-    }
 
     scheduleMarkRead(activeCommunityId, {
       unreadCount: snapshot?.message_count ?? null,
@@ -191,18 +192,19 @@ export function useSidebarCommunities(userId: string) {
     // would otherwise make the manager think there is nothing to mark read.
     const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
 
-    if (!lastReadAtOnOpen.has(id)) {
-      if (snapshot) {
-        lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
-        const optimisticReadAt = new Date().toISOString();
-        if (sidebarStore.data) {
-          sidebarStore.data = {
-            ...sidebarStore.data,
-            communities: sidebarStore.data.communities.map((c) =>
-              c.id === id ? { ...c, last_read_at: optimisticReadAt } : c
-            ),
-          };
-        }
+    // Always hand the chat the freshest known read boundary for this open —
+    // overwrite any leftover entry rather than skipping when present, so a
+    // stale boundary from a previous visit can't resurrect the unread divider.
+    if (snapshot) {
+      lastReadAtOnOpen.set(id, snapshot.last_read_at ?? null);
+      const optimisticReadAt = new Date().toISOString();
+      if (sidebarStore.data) {
+        sidebarStore.data = {
+          ...sidebarStore.data,
+          communities: sidebarStore.data.communities.map((c) =>
+            c.id === id ? { ...c, last_read_at: optimisticReadAt } : c
+          ),
+        };
       }
     }
 
