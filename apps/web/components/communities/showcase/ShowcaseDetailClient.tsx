@@ -191,12 +191,14 @@ export function ShowcaseDetailClient({
   currentUserId,
   communityId,
   backHref,
+  backLabel,
 }: {
   initialPost: ShowcasePost;
   initialComments: ShowcaseComment[];
   currentUserId: string;
   communityId: string;
   backHref?: string;
+  backLabel?: string;
 }) {
   const router = useGuardedRouter();
   const publicScope = isPublicContentScope(communityId);
@@ -268,7 +270,7 @@ export function ShowcaseDetailClient({
       { method: "DELETE" },
     );
     if (response.ok)
-      router.push(publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`);
+      router.push(backHref ?? (publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`));
   }
   function posted(comment: ShowcaseComment) {
     if (comment.parent_id)
@@ -309,7 +311,7 @@ export function ShowcaseDetailClient({
       >
         <BackLink
           href={backHref ?? (publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`)}
-          label={publicScope ? "Home" : "Showcase"}
+          label={backLabel ?? (publicScope ? "Home" : "Showcase")}
           className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
         />
         <ShowcaseCard

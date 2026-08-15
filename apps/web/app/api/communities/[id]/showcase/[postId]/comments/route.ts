@@ -6,7 +6,7 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string) {
-  let postQuery = db.from("community_showcase_posts").select("id").eq("id", postId);
+  let postQuery = db.from("community_showcase_posts").select("id, is_public").eq("id", postId);
   postQuery = isPublicContentScope(communityId)
     ? postQuery.is("community_id", null).eq("is_public", true)
     : postQuery.eq("community_id", communityId);
@@ -14,8 +14,13 @@ async function access(db: ReturnType<typeof createServiceClient>, communityId: s
   const membershipPromise = isPublicContentScope(communityId)
     ? Promise.resolve({ data: { joined_at: "" } })
     : db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
-  const [{ data: membership }, { data: post }] = await Promise.all([membershipPromise, postPromise]);
-  return Boolean(membership && post);
+  const [{ data: membership }, { data: postRaw }] = await Promise.all([membershipPromise, postPromise]);
+  const post = postRaw as { is_public: boolean } | null;
+  if (!post) return false;
+  if (isPublicContentScope(communityId)) return true;
+  // Non-members can still comment on a community post that was published
+  // publicly — the home feed surfaces these to everyone.
+  return Boolean(membership) || post.is_public === true;
 }
 
 async function enrich(db: ReturnType<typeof createServiceClient>, rows: Array<Record<string, unknown>>) {
