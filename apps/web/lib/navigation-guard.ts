@@ -9,15 +9,19 @@
  * can never permanently block navigation:
  *
  *   - A push/replace to a destination seen within the lock window is ignored.
- *   - The lock expires automatically (default 800 ms), after which the same
- *     destination can be navigated to again.
+ *   - Navigating to the route you're already on is always a no-op (this kills
+ *     the duplicate RSC GETs from re-clicking a sidebar link for the current
+ *     page).
+ *   - The lock expires automatically (default 800 ms) or as soon as the route
+ *     settles via `settleNavigation`, after which the same destination can be
+ *     navigated to again.
  *   - `back()` gets its own short lock to swallow double-back presses.
  *
  * Use `useGuardedRouter()` inside components, or `createNavigationGuard()` for
  * imperative use outside React.
  */
 import { useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 /** Structural subset of the App Router instance used by this guard. */
 export interface RouterLike {
@@ -33,8 +37,35 @@ const pendingNavigations = new Map<string, number>();
 let lastBackAt = 0;
 let installedClickGuard: (() => void) | null = null;
 
-/** True when a push/replace to `href` should proceed (not a duplicate). */
-export function allowNavigation(href: string, lockMs = NAVIGATION_LOCK_MS): boolean {
+function normalizePath(path: string): string {
+  const withoutQueryAndHash = path.split("?")[0].split("#")[0];
+  const stripped = withoutQueryAndHash.replace(/\/+$/, "");
+  return stripped || "/";
+}
+
+/** True when two route paths are the same route (query/hash/trailing slash ignored). */
+function samePath(a: string, b: string): boolean {
+  return normalizePath(a) === normalizePath(b);
+}
+
+/**
+ * True when a push/replace to `href` should proceed (not a duplicate).
+ *
+ * Two kinds of duplicates are rejected:
+ *   1. Already here — `currentPath` equals `href`. This is the biggest source
+ *      of duplicate GETs: re-clicking the sidebar link for the page you're on
+ *      fires another RSC request for no reason. It's always a no-op.
+ *   2. A transition to the same destination is already pending within the lock
+ *      window. The lock is released early by `settleNavigation` once the route
+ *      actually changes, so a legit re-click right after settling works.
+ */
+export function allowNavigation(
+  href: string,
+  lockMs = NAVIGATION_LOCK_MS,
+  currentPath?: string,
+): boolean {
+  if (currentPath && samePath(currentPath, href)) return false;
+
   const now = Date.now();
   const last = pendingNavigations.get(href);
   if (last !== undefined && now - last < lockMs) return false;
@@ -48,6 +79,20 @@ export function allowNavigation(href: string, lockMs = NAVIGATION_LOCK_MS): bool
 
   pendingNavigations.set(href, now);
   return true;
+}
+
+/**
+ * Releases any pending navigation lock whose destination matches `pathname`.
+ *
+ * Call when the router observes the route change (e.g. from a `usePathname`
+ * watcher). Navigation to a destination clears its own lock, so the user can
+ * immediately navigate there again if they truly want to — the lock only
+ * guards the in-flight transition, never permanently.
+ */
+export function settleNavigation(pathname: string): void {
+  for (const href of pendingNavigations.keys()) {
+    if (samePath(pathname, href)) pendingNavigations.delete(href);
+  }
 }
 
 /** Clears all recorded navigation locks (used by tests and HMR). */
@@ -93,9 +138,12 @@ export function installLinkClickGuard(lockMs = NAVIGATION_LOCK_MS): () => void {
     if (!href || !isInternalHref(href)) return;
     if (target.getAttribute("target") === "_blank") return;
 
-    if (!allowNavigation(href, lockMs)) {
-      // A transition to this exact destination is already pending — swallow
-      // this click before Next.js' own handler can start another one.
+    const currentPath =
+      typeof window === "undefined" ? undefined : window.location.pathname;
+    if (!allowNavigation(href, lockMs, currentPath)) {
+      // Already on this route, or a transition to this exact destination is
+      // already pending — swallow this click before Next.js' own handler can
+      // start another navigation (and another RSC request).
       event.preventDefault();
       event.stopImmediatePropagation();
     }
@@ -130,13 +178,14 @@ export interface NavigationGuard {
 export function createNavigationGuard(
   router: RouterLike,
   lockMs = NAVIGATION_LOCK_MS,
+  currentPath?: string,
 ): NavigationGuard {
   return {
     push(href: string) {
-      if (allowNavigation(href, lockMs)) router.push(href);
+      if (allowNavigation(href, lockMs, currentPath)) router.push(href);
     },
     replace(href: string) {
-      if (allowNavigation(href, lockMs)) router.replace(href);
+      if (allowNavigation(href, lockMs, currentPath)) router.replace(href);
     },
     back() {
       if (allowBack()) router.back();
@@ -144,8 +193,15 @@ export function createNavigationGuard(
   };
 }
 
-/** React hook — returns push/replace/back that deduplicate identical navigations. */
+/**
+ * React hook — returns push/replace/back that deduplicate identical
+ * navigations and no-op navigations to the route you're already on.
+ */
 export function useGuardedRouter(lockMs = NAVIGATION_LOCK_MS): NavigationGuard {
   const router = useRouter();
-  return useMemo(() => createNavigationGuard(router, lockMs), [router, lockMs]);
+  const pathname = usePathname();
+  return useMemo(
+    () => createNavigationGuard(router, lockMs, pathname),
+    [router, lockMs, pathname],
+  );
 }

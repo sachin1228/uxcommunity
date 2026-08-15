@@ -14,6 +14,7 @@
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
     "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts",
     "test:dedupe": "tsx --test apps/web/lib/dedupe-fetch.test.ts apps/web/lib/navigation-guard.test.ts",
+    "test:global-fetch": "tsx --test apps/web/lib/global-fetch.test.ts",
     "test:link-preview-cache": "tsx --test apps/web/lib/communities/linkPreviewCache.test.ts",
     "test:read-manager": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/read-manager.test.ts",
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"

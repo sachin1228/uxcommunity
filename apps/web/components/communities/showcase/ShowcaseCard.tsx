@@ -15,6 +15,8 @@ interface ShowcaseCardProps {
   currentUserId: string;
   variant?: "list" | "detail";
   isLast?: boolean;
+  /** Disables like/save while a like/save mutation is in flight (spam guard). */
+  busy?: boolean;
   onOpen?: () => void;
   onToggleLike: () => void;
   onToggleSave: () => void;
@@ -27,6 +29,7 @@ export function ShowcaseCard({
   currentUserId,
   variant = "list",
   isLast = false,
+  busy = false,
   onOpen,
   onToggleLike,
   onToggleSave,
@@ -51,6 +54,7 @@ export function ShowcaseCard({
         <ShowcaseOptionsMenu
           saved={post.user_saved}
           canManage={post.user_id === currentUserId}
+          busy={busy}
           onToggleSave={onToggleSave}
           onEdit={onEdit}
           onDelete={onDelete}
@@ -102,7 +106,8 @@ export function ShowcaseCard({
           onClick={onToggleLike}
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
           aria-pressed={post.user_liked}
-          className="inline-flex items-center gap-2"
+          disabled={busy}
+          className="inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Heart
             size={20}

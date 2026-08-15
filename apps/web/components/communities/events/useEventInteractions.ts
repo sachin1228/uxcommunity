@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 
@@ -33,9 +33,17 @@ async function persistBoolean<T>(url: string, key: "liked" | "saved", desired: b
 
 export function useEventInteractions(options: Options) {
   const latestRef = useRef(options);
-  latestRef.current = options;
+  // Keep the latest props visible to the coalescer callbacks (which run from
+  // event handlers / async settles, always after this effect has flushed).
+  useEffect(() => {
+    latestRef.current = options;
+  });
   const likeCoordinatorRef = useRef<BooleanIntentCoalescer | null>(null);
   const saveCoordinatorRef = useRef<BooleanIntentCoalescer | null>(null);
+  // A write is pending while desired !== confirmed (or a request is in flight).
+  // The button disables itself so rapid clicks can't toggle it repeatedly.
+  const [likePending, setLikePending] = useState(false);
+  const [savePending, setSavePending] = useState(false);
 
   useEffect(() => {
     const likeUrl = `/api/communities/${options.communityId}/events/${options.eventId}/like`;
@@ -48,6 +56,7 @@ export function useEventInteractions(options: Options) {
         const count = Math.max(0, current.likeCount + (liked === current.liked ? 0 : liked ? 1 : -1));
         current.onLikeChanged(current.eventId, liked, count);
       },
+      onPendingChange: (pending) => setLikePending(pending),
       persist: async (desired) => {
         const data = await persistBoolean<EventLikeState>(likeUrl, "liked", desired);
         latestRef.current.onLikeChanged(options.eventId, data.liked, data.like_count);
@@ -62,6 +71,7 @@ export function useEventInteractions(options: Options) {
         const count = Math.max(0, current.saveCount + (saved === current.saved ? 0 : saved ? 1 : -1));
         current.onSaveChanged(current.eventId, saved, count);
       },
+      onPendingChange: (pending) => setSavePending(pending),
       persist: async (desired) => {
         const data = await persistBoolean<EventSaveState>(saveUrl, "saved", desired);
         latestRef.current.onSaveChanged(options.eventId, data.saved, data.save_count);
@@ -84,5 +94,5 @@ export function useEventInteractions(options: Options) {
 
   const toggleLike = useCallback(() => likeCoordinatorRef.current?.toggle(), []);
   const toggleSave = useCallback(() => saveCoordinatorRef.current?.toggle(), []);
-  return { toggleLike, toggleSave };
+  return { toggleLike, toggleSave, likePending, savePending };
 }

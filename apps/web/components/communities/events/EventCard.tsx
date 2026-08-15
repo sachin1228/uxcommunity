@@ -131,7 +131,7 @@ export function EventCard({
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
-  const { toggleLike, toggleSave } = useEventInteractions({
+  const { toggleLike, toggleSave, likePending, savePending } = useEventInteractions({
     eventId: event.id,
     communityId,
     liked: event.user_liked,
@@ -241,6 +241,7 @@ export function EventCard({
                   reported={reported}
                   isOwner={isOwner}
                   deleting={deleting}
+                  saving={savePending}
                   className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
                   onSave={toggleSave}
                   onShare={() => void handleShare()}
@@ -312,6 +313,7 @@ export function EventCard({
               reported={reported}
               isOwner={isOwner}
               deleting={deleting}
+              saving={savePending}
               onSave={toggleSave}
               onShare={() => void handleShare()}
               onEdit={() => setShowEditModal(true)}
@@ -332,7 +334,8 @@ export function EventCard({
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
           aria-label={event.user_liked ? "Unlike event" : "Like event"}
           aria-pressed={event.user_liked}
-          className="group/like flex shrink-0 items-center gap-2"
+          disabled={likePending}
+          className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
           <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
