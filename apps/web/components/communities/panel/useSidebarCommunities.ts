@@ -11,6 +11,7 @@ import {
   SIDEBAR_CHANGED_EVENT,
   SIDEBAR_MESSAGE_CHANGED_EVENT,
   SIDEBAR_REACTION_CHANGED_EVENT,
+  SIDEBAR_RECONNECTED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 import {
@@ -90,6 +91,24 @@ export function useSidebarCommunities(userId: string) {
   // only after a real absence — rapid alt-tabbing no longer issues a refetch
   // per focus event.
   useHiddenCatchUp(() => void load(true));
+
+  // The panel room also doesn't replay events missed while the socket was down
+  // mid-session (network blip, DO eviction, redeploy) — those aren't covered
+  // by the hidden-tab catch-up above. useSidebarRealtime dispatches this event
+  // on every reconnect; force a refetch to recover previews, unread badges,
+  // and reorder. Throttled so a flapping socket can't storm the endpoint (the
+  // client's reconnect backoff already spaces these out exponentially).
+  const lastReconnectRefetchAtRef = useRef(0);
+  useEffect(() => {
+    const handler = () => {
+      const now = Date.now();
+      if (now - lastReconnectRefetchAtRef.current < 5_000) return;
+      lastReconnectRefetchAtRef.current = now;
+      void load(true);
+    };
+    window.addEventListener(SIDEBAR_RECONNECTED_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_RECONNECTED_EVENT, handler);
+  }, [load]);
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
   useEffect(() => {

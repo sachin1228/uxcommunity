@@ -351,6 +351,13 @@ export const SIDEBAR_REACTION_CHANGED_EVENT = "uxcommunity:sidebar-reaction-chan
  * refetch, because the cached /api/communities snapshot predates the send.
  */
 export const SIDEBAR_MESSAGE_CHANGED_EVENT = "uxcommunity:sidebar-message-changed";
+/**
+ * Fired when the sidebar's panel WebSocket reconnects after a drop. The
+ * Cloudflare rooms don't replay events missed while the socket was down, so
+ * the sidebar must refetch to recover previews/badges/reorder. Listeners
+ * throttle the refetch so a flapping socket can't storm the endpoint.
+ */
+export const SIDEBAR_RECONNECTED_EVENT = "uxcommunity:sidebar-reconnected";
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {

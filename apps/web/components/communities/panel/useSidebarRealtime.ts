@@ -7,6 +7,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import {
   isSidebarReactionStale,
   sidebarStore,
+  SIDEBAR_RECONNECTED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
@@ -435,9 +436,25 @@ export function useSidebarRealtime({
       );
     }
 
+    // The panel room doesn't replay events missed while the socket was down
+    // (network blip, Durable Object eviction, worker redeploy), so on every
+    // reconnect the sidebar must refetch to recover previews, unread badges,
+    // and reorder. The first connect after mount is skipped — the sidebar just
+    // loaded fresh data — and listeners throttle the refetch so a flapping
+    // socket can't storm the endpoint.
+    let hasConnectedOnce = false;
+    const unsubStatus = client.onStatus((connected) => {
+      if (!connected) return;
+      if (hasConnectedOnce) {
+        window.dispatchEvent(new Event(SIDEBAR_RECONNECTED_EVENT));
+      }
+      hasConnectedOnce = true;
+    });
+
     client.connect();
 
     return () => {
+      unsubStatus();
       unsubscribes.forEach((unsub) => unsub());
       client.close();
     };
