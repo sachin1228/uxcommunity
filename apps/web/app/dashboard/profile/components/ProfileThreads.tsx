@@ -7,7 +7,6 @@ import {
   BookMarked,
   Bookmark,
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";

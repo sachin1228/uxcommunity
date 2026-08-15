@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -80,7 +79,7 @@ export function EventsView({
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [communityId, fetchEvents, isVisible]);
+  }, [communityId, currentUserId, fetchEvents, isVisible]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
