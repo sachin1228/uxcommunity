@@ -3,7 +3,7 @@
 import { useEffect, MutableRefObject } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import {
   isSidebarReactionStale,
   sidebarStore,

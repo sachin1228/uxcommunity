@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ProfileThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";

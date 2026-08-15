@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 
 /**
  * Tracks how many members are currently online in a community using the

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";

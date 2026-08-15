@@ -6,7 +6,7 @@ import {
   CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";

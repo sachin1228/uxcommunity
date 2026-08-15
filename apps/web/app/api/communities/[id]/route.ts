@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { compressAvatar } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
@@ -111,9 +111,9 @@ export async function PATCH(
       return moderationFailureResponse(moderation.decision);
     }
     try {
-      const compressed = await compressAvatar(moderation.buffer);
-      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${compressed.ext}`;
-      imageUrlResult = await uploadToR2(key, compressed.data, compressed.contentType);
+      const storedMime = moderation.mime ?? file.type;
+      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
+      imageUrlResult = await uploadToR2(key, moderation.buffer, storedMime);
     } catch (err) {
       console.error("[community-settings] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });

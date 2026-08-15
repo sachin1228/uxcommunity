@@ -13,7 +13,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";

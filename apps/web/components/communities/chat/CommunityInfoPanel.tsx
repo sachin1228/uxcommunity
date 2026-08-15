@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";

@@ -9,6 +9,10 @@ import "server-only";
  * blocks the write path or fails a request.
  */
 
+// Re-exported for server-side callers; Client Components should import from
+// "@/lib/realtime/rooms" directly.
+export { realtimeRooms } from "@/lib/realtime/rooms";
+
 const REALTIME_URL = process.env.REALTIME_URL ?? "";
 const REALTIME_PUBLISH_SECRET = process.env.REALTIME_PUBLISH_SECRET ?? "";
 
@@ -70,19 +74,3 @@ export async function publishRealtimeBatch(events: PublishPayload[]): Promise<vo
     console.error("[realtime] batch publish failed", error);
   }
 }
-
-export const realtimeRooms = {
-  chat: (communityId: string) => `chat:${communityId}`,
-  presence: (communityId: string) => `presence:${communityId}`,
-  typing: (communityId: string) => `typing:${communityId}`,
-  panel: (userId: string) => `panel:${userId}`,
-  profile: (userId: string) => `profile:${userId}`,
-  notifications: (userId: string) => `notifications:${userId}`,
-  threads: (communityId: string) => `threads:${communityId}`,
-  threadComments: (threadId: string) => `thread-comments:${threadId}`,
-  events: (communityId: string) => `events:${communityId}`,
-  resources: (communityId: string) => `resources:${communityId}`,
-  resourceComments: (resourceId: string) => `resource-comments:${resourceId}`,
-  showcase: (postId: string) => `showcase:${postId}`,
-  rules: (communityId: string) => `rules:${communityId}`,
-} as const;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { uploadToR2 } from "@/lib/r2";
-import { compressChatImage } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -49,11 +49,11 @@ export async function POST(request: NextRequest) {
     let key: string;
 
     if (isImage) {
-      const compressed = await compressChatImage(Buffer.from(await file.arrayBuffer()));
-      body = compressed.data;
-      contentType = compressed.contentType;
+      // Images are compressed client-side; store the moderated bytes as-is.
+      body = Buffer.from(await file.arrayBuffer());
+      contentType = file.type;
       storedSize = body.length;
-      key = `threads/public/${session.userId}/${slug}.webp`;
+      key = `threads/public/${session.userId}/${slug}.${extensionForMime(file.type)}`;
     } else {
       body = Buffer.from(await file.arrayBuffer());
       contentType = file.type;

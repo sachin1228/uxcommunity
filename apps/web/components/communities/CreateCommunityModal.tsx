@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { compressAvatarClient, compressedFile } from "@/lib/image-client";
 
 type Privacy = "public" | "private";
 type CommunityTab = "chat" | "threads" | "events" | "resources";
@@ -146,7 +147,13 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
     formData.set("description", description.trim());
     formData.set("tabs", JSON.stringify(tabs));
     formData.set("rules", JSON.stringify(rules.map((rule) => rule.trim()).filter(Boolean)));
-    if (image) formData.set("image", image);
+    if (image) {
+      try {
+        formData.set("image", compressedFile(await compressAvatarClient(image), image));
+      } catch {
+        formData.set("image", image);
+      }
+    }
 
     try {
       const response = await fetch("/api/communities", {

@@ -18,7 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";

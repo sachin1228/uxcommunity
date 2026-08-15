@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 
 const TYPING_IDLE_MS = 1600;
 const TYPING_EXPIRY_MS = 3500;

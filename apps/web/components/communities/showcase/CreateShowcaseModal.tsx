@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Globe, ImagePlus, Loader2, X } from "lucide-react";
 import { SHOWCASE_CATEGORIES, SHOWCASE_TYPES, type ShowcaseCategory, type ShowcasePost, type ShowcasePostType } from "./types";
+import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
 interface Props { communityId?: string; publicOnly?: boolean; initialIsPublic?: boolean; onClose: () => void; onCreated?: (post: ShowcasePost) => void; onUpdated?: (post: ShowcasePost) => void; post?: ShowcasePost; }
 
@@ -17,7 +18,7 @@ export function CreateShowcaseModal({ communityId, publicOnly = false, initialIs
     setSaving(true); setError(null);
     try {
       let imageUrl = post?.image_url ?? "";
-      if (file) { const form = new FormData(); form.set("file", file); const upload = await fetch(publicOnly ? "/api/home/uploads/showcase" : `/api/communities/${communityId}/showcase/upload`, { method: "POST", body: form }); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error ?? "Upload failed."); imageUrl = uploaded.url; }
+      if (file) { const form = new FormData(); try { form.set("file", compressedFile(await compressChatImageClient(file), file)); } catch { form.set("file", file); } const upload = await fetch(publicOnly ? "/api/home/uploads/showcase" : `/api/communities/${communityId}/showcase/upload`, { method: "POST", body: form }); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error ?? "Upload failed."); imageUrl = uploaded.url; }
       const response = await fetch(editing ? `/api/communities/${publicOnly ? "public" : communityId}/showcase/${post!.id}` : (publicOnly ? "/api/home/posts/showcase" : `/api/communities/${communityId}/showcase`), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), description: description.trim(), image_url: imageUrl, project_url: projectUrl.trim() || null, post_type: type, category, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5), is_public: publicOnly ? true : isPublic }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? `Could not ${editing ? "update" : "share"} your work.`); if (editing) onUpdated?.(data.post); else onCreated?.(data.post); onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your work."); } finally { setSaving(false); }

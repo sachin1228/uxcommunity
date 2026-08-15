@@ -1,0 +1,30 @@
+# OpenNext-on-Cloudflare config for the web app.
+# `main`/`assets` are produced by `opennextjs-cloudflare build` (.open-next/).
+name = "uxcommunity-web"
+main = ".open-next/worker.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = true
+
+assets = { directory = ".open-next/assets", binding = "ASSETS" }
+
+# Lets the worker self-fetch for `next start` / SSR internals.
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "uxcommunity-web"
+
+# Enables next/image optimization via Cloudflare Images
+# (see https://opennext.js.org/cloudflare/howtos/image).
+[images]
+binding = "IMAGES"
+
+# Non-secret, public-by-design values used at runtime by server code.
+# Secrets (SESSION_SECRET, SUPABASE_SERVICE_ROLE_KEY, REALTIME_URL,
+# REALTIME_PUBLISH_SECRET, UPSTASH_REDIS_REST_URL/TOKEN, RESEND_API_KEY,
+# EMAIL_FROM, R2_* , ADMIN_EMAIL/PASSWORD, MODERATION_IMAGE_SERVICE_URL) are
+# injected via `wrangler secret put` in production.
+[vars]
+NEXT_PUBLIC_APP_URL = "https://app.uxcommunity.in"
+NEXT_PUBLIC_SUPABASE_URL = "https://eauupthwlnarkauwifmw.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+NEXT_PUBLIC_REALTIME_URL = "https://uxcommunity-realtime.patilsachin1228.workers.dev"

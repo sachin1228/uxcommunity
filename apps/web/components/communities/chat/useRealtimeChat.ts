@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";

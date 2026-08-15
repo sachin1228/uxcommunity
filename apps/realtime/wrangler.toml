@@ -7,9 +7,6 @@ workers_dev = true
 # Secrets are injected via `wrangler secret put` in production:
 #   SESSION_SECRET           — shared with the web app (JWT signing secret)
 #   REALTIME_PUBLISH_SECRET  — server-to-server secret for the /publish endpoint
-[vars]
-SESSION_SECRET = ""
-REALTIME_PUBLISH_SECRET = ""
 
 [durable_objects]
 bindings = [{ name = "ROOM", class_name = "Room" }]

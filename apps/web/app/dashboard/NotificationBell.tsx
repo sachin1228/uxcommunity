@@ -14,7 +14,7 @@ import {
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/publish";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
