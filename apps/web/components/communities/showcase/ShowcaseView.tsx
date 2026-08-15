@@ -25,6 +25,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { usePendingActions } from "@/lib/use-mutation";
 
 const STALE = 30_000;
 
@@ -37,6 +38,7 @@ export function ShowcaseView({
 }) {
   const router = useGuardedRouter();
   initRequestCache(currentUserId);
+  const { run, isPending } = usePendingActions();
   const requestUrl = `/api/communities/${communityId}/showcase`;
   const cached = getCachedRequest<{ posts?: ShowcasePost[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [posts, setPosts] = useState<ShowcasePost[]>(cached?.posts ?? []);
@@ -116,29 +118,33 @@ export function ShowcaseView({
   async function toggle(post: ShowcasePost, action: "like" | "save") {
     const key = action === "like" ? "user_liked" : "user_saved";
     const active = post[key];
-    patch(post.id, {
-      [key]: !active,
-      ...(action === "like"
-        ? { like_count: post.like_count + (active ? -1 : 1) }
-        : {}),
-    });
-
-    const response = await dedupeFetch(
-      `/api/communities/${communityId}/showcase/${post.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      },
-      { cooldownMode: "url" },
-    );
-
-    if (!response.ok) {
+    // Drop every click while a like/save for this post is still in flight, so
+    // a spam burst optimistically updates and requests exactly once.
+    await run(post.id, async () => {
       patch(post.id, {
-        [key]: active,
-        ...(action === "like" ? { like_count: post.like_count } : {}),
+        [key]: !active,
+        ...(action === "like"
+          ? { like_count: post.like_count + (active ? -1 : 1) }
+          : {}),
       });
-    }
+
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/showcase/${post.id}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        },
+        { cooldownMode: "url" },
+      );
+
+      if (!response.ok) {
+        patch(post.id, {
+          [key]: active,
+          ...(action === "like" ? { like_count: post.like_count } : {}),
+        });
+      }
+    });
   }
 
   async function remove(post: ShowcasePost) {
@@ -267,6 +273,7 @@ export function ShowcaseView({
                 post={post}
                 currentUserId={currentUserId}
                 isLast={index === visible.length - 1}
+                busy={isPending(post.id)}
                 onOpen={() => open(post)}
                 onToggleLike={() => void toggle(post, "like")}
                 onToggleSave={() => void toggle(post, "save")}

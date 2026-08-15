@@ -81,3 +81,30 @@ test("a terminal failure rolls back to the last confirmed state", async () => {
   assert.equal(rendered, false);
   coalescer.dispose();
 });
+
+test("onPendingChange reports pending while a write is in flight and clears on settle", async () => {
+  let pendingSeen: boolean[] = [];
+  let lastPending: boolean | null = null;
+  const coalescer = new BooleanIntentCoalescer({
+    initialValue: false,
+    quietWindowMs: 10,
+    onOptimisticChange: () => {},
+    onPendingChange: (pending) => {
+      lastPending = pending;
+      pendingSeen.push(pending);
+    },
+    persist: async (desired) => {
+      await delay(80);
+      return desired;
+    },
+  });
+
+  coalescer.toggle();
+  assert.equal(lastPending, true, "a toggle makes the coalescer pending immediately");
+
+  await waitFor(() => lastPending === false);
+  assert.ok(pendingSeen.includes(true), "pending true was reported");
+  assert.ok(pendingSeen.includes(false), "pending false was reported after settle");
+
+  coalescer.dispose();
+});

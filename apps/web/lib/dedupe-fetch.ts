@@ -58,6 +58,24 @@ export function getDedupeFetchTelemetry() {
   return { ...telemetry }
 }
 
+/**
+ * fetch() used for the actual network call.
+ *
+ * Defaults to a lazy read of the global fetch so tests can stub it. Once
+ * `installGlobalFetchGuard` patches `window.fetch`, it pins this to the
+ * pre-patch global fetch — otherwise a patched `window.fetch` would call back
+ * into `dedupeFetch` and recurse infinitely.
+ */
+let fetchImpl: typeof fetch = (input, init) => globalThis.fetch(input, init)
+
+export function setDedupeFetchImpl(impl: typeof fetch) {
+  fetchImpl = impl
+}
+
+export function resetDedupeFetchImpl() {
+  fetchImpl = (input, init) => globalThis.fetch(input, init)
+}
+
 function devLog(key: string, source: "new" | "dedup" | "replay" | "removed" | "bypass") {
   if (process.env.NODE_ENV !== "development") return
   console.debug(`[dedupe-fetch] ${source} ${key}`)
@@ -123,7 +141,7 @@ export function dedupeFetch(
   if (body === null) {
     telemetry.bypassed += 1
     devLog("", "bypass")
-    return fetch(input, init)
+    return fetchImpl(input, init)
   }
 
   const method = (init?.method ?? "GET").toUpperCase()
@@ -171,7 +189,7 @@ export function dedupeFetch(
   //    buffer, so response bodies are never shared between readers.
   telemetry.new += 1
   devLog(key, "new")
-  const raw = fetch(input, init)
+  const raw = fetchImpl(input, init)
   const request = raw.then(
     async (response) => {
       const bodyText = await response.text()
