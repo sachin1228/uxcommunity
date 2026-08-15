@@ -82,15 +82,15 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
       <section className={`${communityFeedLayout.gutters} my-1`}>
         <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
-          <div className="grid min-w-0 grid-cols-4 justify-items-center gap-0.5">
+          <div className="grid min-w-0 grid-cols-4 justify-items-center gap-1.5">
             {postTypes.map(({ type, label, icon: Icon, color }) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => openEditor(type)}
-                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-3.5 py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground sm:gap-1.5"
+                className="flex w-fit min-w-0 items-center justify-self-center gap-1 rounded-lg px-2 py-1.5 font-body text-xs font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
               >
-                <Icon size={20} className={color} />
+                <Icon size={16} className={color} />
                 <span className="truncate">{label}</span>
               </button>
             ))}
