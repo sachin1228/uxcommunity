@@ -30,7 +30,11 @@ function formatPreview(msg: NonNullable<Community["last_message"]>): {
   prefix?: string;
   text: string;
 } {
-  const sender = msg.is_own ? "You" : msg.user?.name.split(" ")[0];
+  const sender = msg.is_own
+    ? "You"
+    : msg.user?.name
+      ? msg.user.name.split(" ")[0]
+      : "Someone";
   if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
   if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
   if (msg.is_reply) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, MutableRefObject } from "react";
+import { useEffect, useRef, MutableRefObject } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -61,6 +61,14 @@ export function useSidebarRealtime({
 }: Options) {
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
   const isVisible = useDocumentVisible();
+
+  // The effect below only re-runs when the joined-id set or visibility
+  // changes, so handlers would otherwise close over a stale `communities`
+  // snapshot. Keep the latest snapshot in a ref for reads inside handlers.
+  const communitiesRef = useRef(communities);
+  useEffect(() => {
+    communitiesRef.current = communities;
+  }, [communities]);
 
   useEffect(() => {
     if (!communities.length || !isVisible) return;
@@ -229,7 +237,7 @@ export function useSidebarRealtime({
                 reason: "realtime message",
               });
             } else {
-              const currentEntry = communities.find(
+              const currentEntry = communitiesRef.current.find(
                 (c) => c.id === row.community_id
               );
               noteCommunityActivity(row.community_id, {

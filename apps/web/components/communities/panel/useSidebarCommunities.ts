@@ -9,6 +9,7 @@ import {
   initUserCache,
   lastReadAtOnOpen,
   SIDEBAR_CHANGED_EVENT,
+  SIDEBAR_MESSAGE_CHANGED_EVENT,
   SIDEBAR_REACTION_CHANGED_EVENT,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
@@ -120,6 +121,18 @@ export function useSidebarCommunities(userId: string) {
     };
     window.addEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
     return () => window.removeEventListener(SIDEBAR_REACTION_CHANGED_EVENT, handler);
+  }, []);
+
+  // Optimistic last-message patches (the sender's own chat sends) must also
+  // only sync the store into React state — refetching would clobber the
+  // optimistic "You: …" preview with the stale /api/communities cache that
+  // predates the send, sinking the community back down the list.
+  useEffect(() => {
+    const handler = () => {
+      setCommunities(sidebarStore.data?.communities ?? []);
+    };
+    window.addEventListener(SIDEBAR_MESSAGE_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(SIDEBAR_MESSAGE_CHANGED_EVENT, handler);
   }, []);
 
   // ── Active community change: clear badge + mark read ─────────────────────
