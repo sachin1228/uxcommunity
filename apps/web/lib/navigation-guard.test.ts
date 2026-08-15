@@ -7,6 +7,7 @@ import {
   createNavigationGuard,
   installLinkClickGuard,
   resetNavigationGuard,
+  settleNavigation,
   type RouterLike,
   NAVIGATION_LOCK_MS,
   BACK_LOCK_MS,
@@ -116,6 +117,94 @@ test("double back is swallowed but a later back is allowed", () => {
 test("allowNavigation records the first navigation and blocks duplicates", () => {
   assert.equal(allowNavigation("/x"), true)
   assert.equal(allowNavigation("/x"), false)
+})
+
+test("allowNavigation blocks navigating to the current route", () => {
+  assert.equal(
+    allowNavigation("/dashboard/communities", NAVIGATION_LOCK_MS, "/dashboard/communities"),
+    false,
+  )
+  // Trailing slash and query/hash are ignored when comparing routes.
+  assert.equal(
+    allowNavigation("/dashboard/communities", NAVIGATION_LOCK_MS, "/dashboard/communities/"),
+    false,
+  )
+  assert.equal(
+    allowNavigation("/dashboard/communities", NAVIGATION_LOCK_MS, "/dashboard/communities?tab=a"),
+    false,
+  )
+  // A sub-route is a different destination — navigating is allowed.
+  assert.equal(
+    allowNavigation("/dashboard/communities", NAVIGATION_LOCK_MS, "/dashboard/communities/c1"),
+    true,
+  )
+})
+
+test("guarded router no-ops a push to the current route", () => {
+  const pushed: string[] = []
+  const guard = createNavigationGuard(
+    routerWith(pushed),
+    NAVIGATION_LOCK_MS,
+    "/dashboard/communities",
+  )
+
+  guard.push("/dashboard/communities")
+  guard.push("/dashboard/communities/c1")
+
+  assert.deepEqual(pushed, ["/dashboard/communities/c1"])
+})
+
+test("settleNavigation releases the lock once the route settles", () => {
+  const clock = freezeTime(1_000_000)
+
+  assert.equal(allowNavigation("/a"), true)
+  assert.equal(allowNavigation("/a"), false, "lock is held while pending")
+  settleNavigation("/a")
+  assert.equal(allowNavigation("/a"), true, "settled route unlocks immediately")
+
+  clock.restore()
+})
+
+test("link click guard swallows clicks on the current-route link", () => {
+  const listeners: Array<{ type: string; fn: (e: unknown) => void; capture: boolean }> = []
+  ;(globalThis as { document?: unknown }).document = {
+    addEventListener: (type: string, fn: (e: unknown) => void, capture: boolean) => {
+      listeners.push({ type, fn, capture })
+    },
+    removeEventListener: () => undefined,
+  }
+  const windowLike = { location: { pathname: "/dashboard/communities" } }
+  ;(globalThis as unknown as { window?: unknown }).window = windowLike
+
+  const cleanup = installLinkClickGuard(800)
+  const handler = listeners.find((l) => l.type === "click")!.fn
+
+  const makeClick = (href: string) => {
+    const event: Record<string, unknown> = {
+      button: 0,
+      metaKey: false,
+      ctrlKey: false,
+      shiftKey: false,
+      altKey: false,
+      defaultPrevented: false,
+      target: { closest: () => ({ getAttribute: () => href }) },
+    }
+    event.preventDefault = () => { event.defaultPrevented = true }
+    event.stopImmediatePropagation = () => { event.stopped = true }
+    return event
+  }
+
+  const sameRoute = makeClick("/dashboard/communities")
+  handler(sameRoute)
+  assert.equal(sameRoute.defaultPrevented, true, "clicking the current route is a no-op")
+
+  const otherRoute = makeClick("/dashboard/communities/c1")
+  handler(otherRoute)
+  assert.equal(otherRoute.defaultPrevented, false, "different destination is allowed")
+
+  cleanup()
+  delete (globalThis as { document?: unknown }).document
+  delete (globalThis as unknown as { window?: unknown }).window
 })
 
 test("link click guard swallows rapid duplicate clicks on the same internal link", () => {
