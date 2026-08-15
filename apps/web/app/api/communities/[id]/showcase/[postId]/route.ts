@@ -25,8 +25,9 @@ async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<st
   return { ...row, author: { name: user?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: count ?? 0, user_liked: Boolean(myLike), user_saved: Boolean(mySave) };
 }
 
-async function requireMember(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
-  if (isPublicContentScope(communityId)) return true;
+async function canInteract(db: ReturnType<typeof createServiceClient>, communityId: string, isPublic: boolean, userId: string) {
+  if (isPublicContentScope(communityId) || isPublic) return true;
+  // Non-public community posts stay member-only.
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
   return Boolean(data);
 }
@@ -34,18 +35,19 @@ async function requireMember(db: ReturnType<typeof createServiceClient>, communi
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id, postId } = await params; const db = createServiceClient(); const userId = session.userId!;
-  if (!(await requireMember(db, id, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
   const { data, error } = await getPost(db, id, postId);
   if (error) return NextResponse.json({ error: "Failed to load showcase post." }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  if (!(await canInteract(db, id, (data as { is_public: boolean }).is_public, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
   return NextResponse.json({ post: await enrich(db, data, userId) });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
-  if (!(await requireMember(db, id, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
-  const { data: post } = await getPost(db, id, postId); if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  const { data: post } = await getPost(db, id, postId);
+  if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  if (!(await canInteract(db, id, (post as { is_public: boolean }).is_public, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   if (body.action !== "like" && body.action !== "save") return NextResponse.json({ error: "Invalid action." }, { status: 422 });
   const table = body.action === "like" ? "showcase_likes" : "showcase_saves";

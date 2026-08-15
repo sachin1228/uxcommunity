@@ -153,7 +153,7 @@ export function ShowcaseCard({
 
   if (isDetail) {
     return (
-      <article className="border-y border-border py-6">
+      <article className="border-b border-border py-6">
         <div className={communityFeedLayout.detailSection}>{card}</div>
       </article>
     );

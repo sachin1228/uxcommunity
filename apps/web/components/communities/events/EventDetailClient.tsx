@@ -378,7 +378,7 @@ export function EventDetailClient({
           />
         )}
         {/* Event post */}
-        <section className={`${communityFeedLayout.dividerY} py-6`}>
+        <section className={`${communityFeedLayout.dividerBottom} py-6`}>
           <div className={communityFeedLayout.detailSection}>
             <EventCard
               variant="detail"
