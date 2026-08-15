@@ -345,6 +345,12 @@ export const SIDEBAR_CHANGED_EVENT = "uxcommunity:sidebar-changed";
  * (and any newer last_message) with stale rows.
  */
 export const SIDEBAR_REACTION_CHANGED_EVENT = "uxcommunity:sidebar-reaction-changed";
+/**
+ * Fired only for local last-message patches (optimistic sends from the chat
+ * window). Same constraints as SIDEBAR_REACTION_CHANGED_EVENT: no server
+ * refetch, because the cached /api/communities snapshot predates the send.
+ */
+export const SIDEBAR_MESSAGE_CHANGED_EVENT = "uxcommunity:sidebar-message-changed";
 
 function notifySidebarChanged(): void {
   if (typeof window !== "undefined") {
@@ -356,6 +362,79 @@ function notifySidebarReactionChanged(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(SIDEBAR_REACTION_CHANGED_EVENT));
   }
+}
+
+function notifySidebarMessageChanged(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(SIDEBAR_MESSAGE_CHANGED_EVENT));
+  }
+}
+
+/**
+ * Optimistically updates a community's last-message preview in the shared
+ * sidebar cache when the current user sends a message, so the community jumps
+ * to the top of the list instantly instead of waiting for the Realtime echo
+ * (DB insert → fan-out → WebSocket round trip). The Realtime echo, when it
+ * arrives, replaces the optimistic preview with the authoritative row.
+ *
+ * Mirrors the change into the request cache so a sidebar refetch within the
+ * stale window can't clobber the optimistic preview with an older snapshot.
+ */
+export function patchSidebarLastMessage(
+  communityId: string,
+  lastMessage: CachedSidebarCommunity["last_message"],
+): void {
+  const patch = (c: CachedSidebarCommunity): CachedSidebarCommunity => ({
+    ...c,
+    is_archived: false,
+    lastReaction: null, // a new message supersedes any pending reaction preview
+    last_message: lastMessage,
+  });
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.map((c) =>
+        c.id === communityId ? patch(c) : c
+      ),
+    };
+  }
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (current) => ({
+      communities: current.communities.map((community) =>
+        community.id === communityId ? patch(community) : community
+      ),
+    }),
+  );
+  notifySidebarMessageChanged();
+}
+
+/**
+ * Restores a community's sidebar entry to a previous snapshot — used to roll
+ * back an optimistic last-message patch when a send fails (the message never
+ * landed, so the preview must not show it).
+ */
+export function restoreSidebarEntry(
+  communityId: string,
+  entry: CachedSidebarCommunity,
+): void {
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.map((c) =>
+        c.id === communityId ? entry : c
+      ),
+    };
+  }
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (current) => ({
+      communities: current.communities.map((community) =>
+        community.id === communityId ? entry : community
+      ),
+    }),
+  );
+  notifySidebarMessageChanged();
 }
 
 // ─── Reaction helpers ─────────────────────────────────────────────────────────

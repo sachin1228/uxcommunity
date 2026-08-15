@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { msgCache } from "@/lib/communities/cache";
+import {
+  msgCache,
+  patchSidebarLastMessage,
+  restoreSidebarEntry,
+  sidebarStore,
+} from "@/lib/communities/cache";
 import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressChatImageClient, compressedFile } from "@/lib/image-client";
@@ -187,6 +192,35 @@ export function useSendMessage({
       msgCache.set(communityId, next);
       return next;
     });
+    // Bump the community to the top of the sidebar instantly. The chat shows
+    // the optimistic bubble already, and the sidebar shouldn't wait for the
+    // Realtime echo (DB insert → fan-out → WebSocket round trip) to reflect
+    // the sender's own message. The echo replaces this preview when it lands;
+    // on failure rollbackSidebar() restores the previous entry.
+    const prevSidebarEntry =
+      sidebarStore.data?.communities.find((c) => c.id === communityId) ?? null;
+    patchSidebarLastMessage(communityId, {
+      id: tempId,
+      content,
+      created_at: optimistic.created_at,
+      user: { name: currentUserName },
+      is_own: true,
+      has_image: !!imagePreviewUrl && !content,
+      is_reply: !!msgReplyTo,
+      reply_to_user: msgReplyTo ? msgReplyTo.user_name.split(" ")[0] : null,
+      is_deleted: false,
+      reactions: [],
+    });
+    const rollbackSidebar = () => {
+      if (!prevSidebarEntry) return;
+      const current = sidebarStore.data?.communities.find(
+        (c) => c.id === communityId
+      );
+      // Only restore when our optimistic preview is still the newest entry —
+      // never clobber a message that arrived after the failed send.
+      if (!current || current.last_message?.id !== tempId) return;
+      restoreSidebarEntry(communityId, prevSidebarEntry);
+    };
     // Immediately jump to the bottom so the user sees their own message,
     // regardless of how far up they were scrolled when they sent it.
     requestAnimationFrame(() => {
@@ -306,6 +340,7 @@ export function useSendMessage({
           msgCache.set(communityId, next);
           return next;
         });
+        rollbackSidebar();
 
         setError(data.error ?? "Your message has been sent for moderator review.");
         failedRetryDataRef.current.delete(tempId);
@@ -317,6 +352,7 @@ export function useSendMessage({
           msgCache.set(communityId, next);
           return next;
         });
+        rollbackSidebar();
 
         setError(data.error ?? "Failed to send.");
       }
@@ -341,6 +377,7 @@ export function useSendMessage({
           });
           failedRetryDataRef.current.delete(tempId);
         }
+        rollbackSidebar();
         return;
       }
 
@@ -351,6 +388,7 @@ export function useSendMessage({
         msgCache.set(communityId, next);
         return next;
       });
+      rollbackSidebar();
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllerRef.current = null;
@@ -480,6 +518,29 @@ export function useSendMessage({
       msgCache.set(communityId, next);
       return next;
     });
+    // Same instant sidebar bump as text/image sends.
+    const prevSidebarEntry =
+      sidebarStore.data?.communities.find((c) => c.id === communityId) ?? null;
+    patchSidebarLastMessage(communityId, {
+      id: tempId,
+      content: "",
+      created_at: optimistic.created_at,
+      user: { name: currentUserName },
+      is_own: true,
+      has_image: true,
+      is_reply: false,
+      reply_to_user: null,
+      is_deleted: false,
+      reactions: [],
+    });
+    const rollbackSidebar = () => {
+      if (!prevSidebarEntry) return;
+      const current = sidebarStore.data?.communities.find(
+        (c) => c.id === communityId
+      );
+      if (!current || current.last_message?.id !== tempId) return;
+      restoreSidebarEntry(communityId, prevSidebarEntry);
+    };
     // Jump to bottom so the GIF/sticker is immediately visible.
     requestAnimationFrame(() => {
       scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
@@ -532,6 +593,7 @@ export function useSendMessage({
           msgCache.set(communityId, next);
           return next;
         });
+        rollbackSidebar();
         setError((data as { error?: string }).error ?? "Failed to send.");
       }
     } catch {
@@ -542,6 +604,7 @@ export function useSendMessage({
         msgCache.set(communityId, next);
         return next;
       });
+      rollbackSidebar();
       setError("Network error.");
     } finally {
       sendLockRef.current = false;
