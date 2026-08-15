@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { estimateJsonBytes } from "@/lib/server-timing";
+import { createServiceClient } from "@/lib/supabase/service";
 import {
   loadCommunityMessagePage,
   loadCommunityReadModel,
+  loadCommunityStats,
   type ReadResult,
 } from "@/lib/communities/read-models";
 type Params = { params: Promise<{ id: string }> };
-type Section = "community" | "messages";
+type Section = "community" | "messages" | "rules" | "stats";
 
+/**
+ * Sections that gate the whole response. The rest (rules, stats) are cheap
+ * extras bundled so the client's info panel reads them from the hydrated
+ * request cache instead of firing separate fetches; if one fails, the
+ * bootstrap still succeeds and the client falls back to the individual
+ * endpoint.
+ */
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
 async function readSection(
@@ -37,9 +46,24 @@ export async function GET(_request: NextRequest, context: Params) {
   const authDuration = performance.now() - startedAt;
   const { id: communityId } = await context.params;
   const userId = session.userId!;
+  const db = createServiceClient();
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
+    // Cheap sections bundled into the same request so the right-hand info
+    // panel (stats, rules) never needs its own network round trips. Shapes
+    // match the standalone /stats and /rules endpoints so the hydrated
+    // request-cache entries are interchangeable with them.
+    ["rules", async () => {
+      const { data, error } = await db
+        .from("community_rules")
+        .select("id, rule_text, order_index")
+        .eq("community_id", communityId)
+        .order("order_index", { ascending: true });
+      if (error) throw new Error("Failed to load rules.");
+      return { rules: data ?? [] };
+    }],
+    ["stats", async () => unwrapReadResult(await loadCommunityStats(communityId))],
   ];
 
   const settled = await Promise.allSettled(

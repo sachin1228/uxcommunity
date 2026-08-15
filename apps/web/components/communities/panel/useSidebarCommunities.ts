@@ -20,6 +20,7 @@ import {
   setCachedRequest,
 } from "@/lib/request-cache";
 import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manager";
+import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useSidebarRealtime } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
 
@@ -83,21 +84,12 @@ export function useSidebarCommunities(userId: string) {
   }, [load]);
 
   // Realtime channels are suspended while the tab is hidden (see
-  // useSidebarRealtime) to free free-tier Realtime connections/messages. On
-  // regain, force a refetch so unread counts and last-message previews missed
-  // during the hidden period are caught up — force bypasses the 60s stale
-  // window, otherwise the stale cache would mask new messages.
-  useEffect(() => {
-    const handleFocus = () => {
-      if (document.visibilityState === "visible") void load(true);
-    };
-    document.addEventListener("visibilitychange", handleFocus);
-    window.addEventListener("focus", handleFocus);
-    return () => {
-      document.removeEventListener("visibilitychange", handleFocus);
-      window.removeEventListener("focus", handleFocus);
-    };
-  }, [load]);
+  // useSidebarRealtime) and the panel room doesn't replay missed events, so a
+  // regain must refetch to catch up unread counts and previews missed while
+  // hidden (force bypasses the 60s stale window). useHiddenCatchUp fires this
+  // only after a real absence — rapid alt-tabbing no longer issues a refetch
+  // per focus event.
+  useHiddenCatchUp(() => void load(true));
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
   useEffect(() => {

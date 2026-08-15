@@ -50,14 +50,29 @@ export async function POST(
 
   const db = createServiceClient();
 
-  // Run both rate-limit checks in parallel — each is an independent Redis call.
-  const [burst, minute] = await timer.measure("rate_limits", () =>
-    Promise.all([
-      rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
-      rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
-    ]),
-  );
+  // Run the rate-limit checks (Redis) and the membership check (DB) in
+  // parallel — they're independent lookups, so running them sequentially adds
+  // a full network round trip to every message send. The rate limit is still
+  // enforced before any write happens; only the (cheap, PK-indexed) membership
+  // read is issued alongside it.
+  const [rateResult, membershipResult] = await Promise.all([
+    timer.measure("rate_limits", () =>
+      Promise.all([
+        rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
+        rateLimit(`moderation:chat:${userId}:60s`, 20, 60),
+      ]),
+    ),
+    timer.measure("membership_query", async () =>
+      await db
+        .from("community_members")
+        .select("community_id")
+        .eq("community_id", communityId)
+        .eq("user_id", userId)
+        .maybeSingle(),
+    ),
+  ]);
 
+  const [burst, minute] = rateResult;
   if (!burst.success) {
     return NextResponse.json(
       { error: "Too many messages. Please slow down." },
@@ -73,14 +88,7 @@ export async function POST(
 
   // This route uses the service-role client, which bypasses RLS. Authorize the
   // actor explicitly before allowing any community-scoped reads or writes.
-  const { data: membership, error: membershipError } = await timer.measure("membership_query", async () =>
-    await db
-      .from("community_members")
-      .select("community_id")
-      .eq("community_id", communityId)
-      .eq("user_id", userId)
-      .maybeSingle(),
-  );
+  const { data: membership, error: membershipError } = membershipResult;
   if (membershipError) {
     return NextResponse.json({ error: "Failed to verify community membership." }, { status: 500 });
   }
