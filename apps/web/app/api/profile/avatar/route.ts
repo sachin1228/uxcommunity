@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { compressAvatar } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
@@ -76,8 +76,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File exceeds 5 MB limit." }, { status: 413 });
     }
 
-    // Compress to WebP (max 400×400, quality 85) before storing — reduces
-    // storage size ~70-85% and cuts egress every time the avatar is served.
+    // The client compresses to WebP (max 400×400, quality 85) before upload;
+    // the server stores the moderated bytes as-is.
     const db = createServiceClient();
     const moderation = await validateAndModerateImage(file);
     await logModerationDecision(db, {
@@ -87,12 +87,12 @@ export async function POST(request: NextRequest) {
     });
     if (!moderation.decision.allowed || !moderation.buffer) return moderationFailureResponse(moderation.decision);
 
-    const compressed = await compressAvatar(moderation.buffer);
-    const key = `avatars/${session.userId}/${Date.now()}.${compressed.ext}`;
+    const storedMime = moderation.mime ?? file.type;
+    const key = `avatars/${session.userId}/${Date.now()}.${extensionForMime(storedMime)}`;
 
     let publicUrl: string;
     try {
-      publicUrl = await uploadToR2(key, compressed.data, compressed.contentType);
+      publicUrl = await uploadToR2(key, moderation.buffer, storedMime);
     } catch (err) {
       console.error("[profile/avatar] R2 upload error:", err);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });

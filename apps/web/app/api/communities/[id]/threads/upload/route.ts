@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { uploadToR2 } from "@/lib/r2";
-import { compressChatImage } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB limit
 
@@ -67,11 +67,10 @@ export async function POST(
     let storedSize: number;
 
     if (isImage) {
-      // Compress: resize to max 1200×1200, convert to WebP
-      const compressed = await compressChatImage(Buffer.from(await file.arrayBuffer()));
-      body = compressed.data;
-      contentType = compressed.contentType;
-      key = `threads/${communityId}/${session.userId}/${slug}.webp`;
+      // Images are compressed client-side; store the moderated bytes as-is.
+      body = Buffer.from(await file.arrayBuffer());
+      contentType = file.type;
+      key = `threads/${communityId}/${session.userId}/${slug}.${extensionForMime(file.type)}`;
       storedSize = body.length;
     } else {
       body = Buffer.from(await file.arrayBuffer());

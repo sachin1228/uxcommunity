@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { compressChatImage } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { moderateImageBuffer } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
@@ -75,13 +75,9 @@ export async function POST(
     return finish(NextResponse.json({ error: "Failed to read image." }, { status: 422 }));
   }
 
-  // Compression is CPU-bound while moderation is a remote request. Running
-  // them concurrently removes compression from the critical path, but storage
-  // remains strictly gated on an approved moderation decision.
-  const [moderation, compression] = await Promise.all([
-    timer.measure("moderation_request", () => moderateImageBuffer(source, file.type)),
-    timer.measure("compression", () => compressChatImage(source).catch(() => null)),
-  ]);
+  // The client compresses the image to WebP before upload; moderation is the
+  // only remaining server-side step and gates the R2 write.
+  const moderation = await timer.measure("moderation_request", () => moderateImageBuffer(source, file.type));
 
   const moderationDecision = moderation.decision;
   after(async () => {
@@ -99,16 +95,14 @@ export async function POST(
   if (!moderation.decision.allowed || !moderation.buffer) {
     return finish(moderationFailureResponse(moderation.decision));
   }
-  if (!compression) {
-    return finish(NextResponse.json({ error: "Failed to process image." }, { status: 422 }));
-  }
-  timer.record("output_bytes", compression.data.byteLength);
+  const storedMime = moderation.mime ?? file.type;
+  timer.record("output_bytes", moderation.buffer.byteLength);
 
-  const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.webp`;
+  const key = `chat/${communityId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
 
   try {
     const url = await timer.measure("r2_upload", () =>
-      uploadToR2(key, compression.data, compression.contentType),
+      uploadToR2(key, moderation.buffer!, storedMime),
     );
     return finish(NextResponse.json({ url }, { status: 201 }));
   } catch (err) {

@@ -13,7 +13,8 @@ import {
 } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Spinner } from "@/components/ui/Spinner";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
@@ -133,59 +134,61 @@ export function NotificationBell({ userId }: Props) {
 
   useEffect(() => {
     if (!isVisible) return;
-    const supabase = createBrowserClient();
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${userId}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const next = payload.new as NotificationItem;
-            setNotifications((prev) => [next, ...prev.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS));
-            if (!next.read_at) setUnreadCount((count) => count + 1);
-            patchNotificationCache((current) => ({
-              notifications: [next, ...current.notifications.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS),
-              unread_count: current.unread_count + (next.read_at ? 0 : 1),
-            }));
-            return;
-          }
+    const client = new RealtimeClient({
+      room: realtimeRooms.notifications(userId),
+      user: { id: userId, name: null, avatar: null },
+    });
 
-          if (payload.eventType === "UPDATE") {
-            const next = payload.new as NotificationItem;
-            const previous = payload.old as Partial<NotificationItem>;
-            setNotifications((prev) => prev.map((item) => (item.id === next.id ? next : item)));
-            if (!previous.read_at && next.read_at) {
-              setUnreadCount((count) => Math.max(0, count - 1));
-            }
-            patchNotificationCache((current) => ({
-              notifications: current.notifications.map((item) => item.id === next.id ? next : item),
-              unread_count: !previous.read_at && next.read_at
-                ? Math.max(0, current.unread_count - 1)
-                : current.unread_count,
-            }));
-          }
+    const unsubscribes: Array<() => void> = [];
 
-          if (payload.eventType === "DELETE") {
-            const previous = payload.old as NotificationItem;
-            setNotifications((prev) => prev.filter((item) => item.id !== previous.id));
-            if (!previous.read_at) setUnreadCount((count) => Math.max(0, count - 1));
-            patchNotificationCache((current) => ({
-              notifications: current.notifications.filter((item) => item.id !== previous.id),
-              unread_count: previous.read_at ? current.unread_count : Math.max(0, current.unread_count - 1),
-            }));
-          }
-        },
-      )
-      .subscribe();
+    unsubscribes.push(
+      client.on("insert", (data) => {
+        const next = data as NotificationItem;
+        setNotifications((prev) => [next, ...prev.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS));
+        if (!next.read_at) setUnreadCount((count) => count + 1);
+        patchNotificationCache((current) => ({
+          notifications: [next, ...current.notifications.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS),
+          unread_count: current.unread_count + (next.read_at ? 0 : 1),
+        }));
+      }),
+    );
+
+    unsubscribes.push(
+      client.on("update", (data) => {
+        const { next, old: previous } = data as {
+          next: NotificationItem;
+          old: Partial<NotificationItem>;
+        };
+        setNotifications((prev) => prev.map((item) => (item.id === next.id ? next : item)));
+        if (!previous.read_at && next.read_at) {
+          setUnreadCount((count) => Math.max(0, count - 1));
+        }
+        patchNotificationCache((current) => ({
+          notifications: current.notifications.map((item) => item.id === next.id ? next : item),
+          unread_count: !previous.read_at && next.read_at
+            ? Math.max(0, current.unread_count - 1)
+            : current.unread_count,
+        }));
+      }),
+    );
+
+    unsubscribes.push(
+      client.on("delete", (data) => {
+        const previous = data as NotificationItem;
+        setNotifications((prev) => prev.filter((item) => item.id !== previous.id));
+        if (!previous.read_at) setUnreadCount((count) => Math.max(0, count - 1));
+        patchNotificationCache((current) => ({
+          notifications: current.notifications.filter((item) => item.id !== previous.id),
+          unread_count: previous.read_at ? current.unread_count : Math.max(0, current.unread_count - 1),
+        }));
+      }),
+    );
+
+    client.connect();
 
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribes.forEach((unsub) => unsub());
+      client.close();
     };
   }, [patchNotificationCache, userId, isVisible]);
 

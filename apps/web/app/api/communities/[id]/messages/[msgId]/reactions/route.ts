@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { MessageReaction } from "@/lib/communities/cache";
+import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
 
 interface Params {
   params: Promise<{ id: string; msgId: string }>;
@@ -61,6 +62,20 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // Persist an explicit desired state. This contract is idempotent, so retries
   // and coalesced rapid clicks cannot accidentally invert the final reaction.
+  // Capture the previous row first so the realtime event can describe the
+  // INSERT / UPDATE / DELETE transition (matching the old postgres_changes feed).
+  const { data: existingRow } = (await db
+    .from("message_reactions")
+    .select("emoji, created_at")
+    .eq("message_id", messageId)
+    .eq("user_id", userId)
+    .maybeSingle()) as unknown as {
+    data: { emoji: string; created_at: string | null } | null;
+  };
+  const existingEmoji = existingRow?.emoji ?? null;
+
+  const now = new Date().toISOString();
+
   const mutation = desiredEmoji === null
     ? db
         .from("message_reactions")
@@ -75,7 +90,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             community_id: communityId,
             user_id: userId,
             emoji: desiredEmoji,
-            created_at: new Date().toISOString(),
+            created_at: now,
           },
           { onConflict: "message_id,user_id" },
         );
@@ -86,6 +101,70 @@ export async function POST(req: NextRequest, { params }: Params) {
       { error: "Unable to update reaction." },
       { status: 500 },
     );
+  }
+
+  // Broadcast the transition to the chat room + every member's sidebar panel.
+  // Skip when the upsert was a no-op (same emoji already set on this message).
+  if (!(desiredEmoji !== null && existingEmoji === desiredEmoji)) {
+    after(async () => {
+      try {
+        const publishDb = createServiceClient();
+        const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
+
+        if (desiredEmoji === null) {
+          if (!existingEmoji) return; // nothing was removed
+          await publishChatFanout({
+            communityId,
+            memberUserIds: memberIds,
+            chatTopic: "reaction-delete",
+            chatData: { message_id: messageId, user_id: userId, emoji: existingEmoji },
+            panelTopic: "reaction-delete",
+            panelData: {
+              community_id: communityId,
+              message_id: messageId,
+              user_id: userId,
+              emoji: existingEmoji,
+              created_at: existingRow?.created_at,
+            },
+          });
+        } else if (existingEmoji && existingEmoji !== desiredEmoji) {
+          await publishChatFanout({
+            communityId,
+            memberUserIds: memberIds,
+            chatTopic: "reaction-update",
+            chatData: {
+              old: { message_id: messageId, user_id: userId, emoji: existingEmoji },
+              new: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
+            },
+            panelTopic: "reaction-update",
+            panelData: {
+              community_id: communityId,
+              message_id: messageId,
+              user_id: userId,
+              emoji: desiredEmoji,
+              created_at: now,
+            },
+          });
+        } else {
+          await publishChatFanout({
+            communityId,
+            memberUserIds: memberIds,
+            chatTopic: "reaction-insert",
+            chatData: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
+            panelTopic: "reaction-insert",
+            panelData: {
+              community_id: communityId,
+              message_id: messageId,
+              user_id: userId,
+              emoji: desiredEmoji,
+              created_at: now,
+            },
+          });
+        }
+      } catch (err) {
+        console.error("[reactions] realtime fan-out error:", err);
+      }
+    });
   }
 
   // Return authoritative state for this user plus grouped message reactions.

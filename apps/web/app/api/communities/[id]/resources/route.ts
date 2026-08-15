@@ -7,6 +7,7 @@ import { deferCommunityNotification, resourceHref } from "@/lib/notifications";
 import type { ResourceType } from "@/components/communities/resources/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityResources } from "@/lib/communities/read-models";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 100;
 
@@ -181,6 +182,10 @@ export async function POST(
     href: resourceHref(communityId, inserted.id),
     metadata: { resource_type: resourceType },
   });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.resources(communityId), topic: "resource", data: inserted },
+  ]);
 
   const enriched = (await withAuthorAndMeta(db, [inserted as Record<string, unknown>], userId))[0];
   return NextResponse.json({ resource: enriched }, { status: 201 });

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { compressAvatar } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -92,9 +93,9 @@ export async function POST(request: Request) {
     }
 
     try {
-      const compressed = await compressAvatar(moderation.buffer);
-      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${compressed.ext}`;
-      imageUrl = await uploadToR2(key, compressed.data, compressed.contentType);
+      const storedMime = moderation.mime ?? file.type;
+      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
+      imageUrl = await uploadToR2(key, moderation.buffer, storedMime);
     } catch (err) {
       console.error("[community-create] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });
@@ -152,6 +153,23 @@ export async function POST(request: Request) {
       rule_text: rule,
       order_index: index,
     }))
+  );
+
+  const createdCommunityId = (community as { id: string }).id;
+  const { data: createdRules } = (await db
+    .from("community_rules")
+    .select("id, community_id, rule_text, order_index")
+    .eq("community_id", createdCommunityId)
+    .order("order_index", { ascending: true })) as unknown as {
+    data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+  };
+
+  void publishRealtimeBatch(
+    (createdRules ?? []).map((rule) => ({
+      room: realtimeRooms.rules(createdCommunityId),
+      topic: "rule",
+      data: { event: "INSERT", rule },
+    })),
   );
 
   const slug = slugify(name);

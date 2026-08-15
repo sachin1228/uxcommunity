@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export async function POST(
   request: NextRequest,
@@ -32,7 +33,10 @@ export async function POST(
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
     : threadQuery.eq("community_id", communityId);
-  const { data: thread, error: threadError } = await threadQuery.maybeSingle();
+  const { data: thread, error: threadError } = (await threadQuery.maybeSingle()) as unknown as {
+    data: { id: string; user_id: string; title: string } | null;
+    error: unknown;
+  };
   if (threadError) {
     console.error("[LOOKUP thread for vote]", threadError);
     return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
@@ -63,6 +67,19 @@ export async function POST(
       console.error("[UPSERT vote]", error);
       return NextResponse.json({ error: "Failed to add like." }, { status: 500 });
     }
+
+    void publishRealtimeBatch([
+      {
+        room: realtimeRooms.threads(communityId),
+        topic: "vote",
+        data: { event: "INSERT", thread_id: threadId, user_id: userId },
+      },
+      {
+        room: realtimeRooms.profile(thread.user_id),
+        topic: "vote",
+        data: { event: "INSERT", thread_id: threadId, user_id: userId },
+      },
+    ]);
 
     if (!existing) {
       deferNotification({
@@ -101,6 +118,19 @@ export async function POST(
     console.error("[DELETE vote]", error);
     return NextResponse.json({ error: "Failed to remove like." }, { status: 500 });
   }
+
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threads(communityId),
+      topic: "vote",
+      data: { event: "DELETE", thread_id: threadId, user_id: userId },
+    },
+    {
+      room: realtimeRooms.profile(thread.user_id),
+      topic: "vote",
+      data: { event: "DELETE", thread_id: threadId, user_id: userId },
+    },
+  ]);
 
   const { count, error: countError } = await db
     .from("thread_votes")

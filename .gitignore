@@ -52,6 +52,16 @@ yarn-error.log*
 .vercel/
 
 # =========================
+# Cloudflare / OpenNext
+# =========================
+.open-next/
+.wrangler/
+.dev.vars
+.dev.vars.local
+# Keep example env
+!.dev.vars.example
+
+# =========================
 # Supabase
 # =========================
 supabase/.temp/

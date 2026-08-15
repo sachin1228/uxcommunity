@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import type { RealtimeChannel } from "@supabase/supabase-js";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 
 const TYPING_IDLE_MS = 1600;
 const TYPING_EXPIRY_MS = 3500;
@@ -15,13 +15,11 @@ export interface TypingUser {
 }
 
 /**
- * Broadcasts ephemeral typing state over Supabase Broadcast.
+ * Broadcasts ephemeral typing state over the Cloudflare realtime service.
  *
- * Broadcast is used instead of Presence because Presence relies on a stateful
- * channel state machine that silently stops accepting `track()` calls after the
- * channel has been idle for a while (requires a full page refresh to recover).
- * Broadcast is a simple fire-and-forget event bus with no persistent state,
- * making it immune to that class of drift/reconnect bugs.
+ * Typing is a fire-and-forget event bus with no persistent state: the DO
+ * rebroadcasts each publish to the room's other members (the sender is
+ * excluded automatically, mirroring Supabase's `self: false`).
  *
  * Each typing user is tracked locally with a `lastSeen` timestamp; the expiry
  * timer removes anyone who hasn't sent a heartbeat in TYPING_EXPIRY_MS ms.
@@ -36,7 +34,7 @@ export function useTypingPresence({
   currentUserName: string;
 }) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const channelRef = useRef<RealtimeChannel | null>(null);
+  const clientRef = useRef<RealtimeClient | null>(null);
   const isVisible = useDocumentVisible();
   const typingRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -46,7 +44,7 @@ export function useTypingPresence({
   identityRef.current = { user_id: currentUserId, name: currentUserName };
 
   // Local map: user_id → { name, lastSeen }
-  // Managed entirely on the client — no dependency on Supabase's presence state.
+  // Managed entirely on the client — no dependency on server presence state.
   const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(
     new Map(),
   );
@@ -73,7 +71,7 @@ export function useTypingPresence({
   }, []);
 
   /**
-   * Send a broadcast typing event.
+   * Send a typing event.
    *
    * - State transitions (false→true, true→false) are always sent immediately.
    * - Repeated "still typing" heartbeats are throttled to once per TYPING_THROTTLE_MS.
@@ -82,8 +80,8 @@ export function useTypingPresence({
    */
   const broadcast = useCallback(
     (typing: boolean) => {
-      const channel = channelRef.current;
-      if (!channel) return;
+      const client = clientRef.current;
+      if (!client) return;
 
       const now = Date.now();
 
@@ -93,14 +91,10 @@ export function useTypingPresence({
       // Reset to 0 when stopped so the next "typing: true" is never throttled
       lastSentAtRef.current = typing ? now : 0;
 
-      void channel.send({
-        type: "broadcast",
-        event: "typing",
-        payload: {
-          ...identityRef.current,
-          typing,
-          ts: now,
-        },
+      client.publish("typing", {
+        ...identityRef.current,
+        typing,
+        ts: now,
       });
     },
     [],
@@ -125,48 +119,37 @@ export function useTypingPresence({
 
   useEffect(() => {
     if (!isVisible) return;
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
-
-    typingMapRef.current.clear();
-    setTypingUsers([]);
-
-    const channel = supabase.channel(`community-typing:${communityId}`, {
-      config: {
-        broadcast: { ack: false, self: false },
-      },
+    const client = new RealtimeClient({
+      room: realtimeRooms.typing(communityId),
+      user: { id: currentUserId, name: currentUserName, avatar: null },
     });
-    channelRef.current = channel;
+    clientRef.current = client;
     lastSentAtRef.current = 0;
 
-    channel
-      .on(
-        "broadcast",
-        { event: "typing" },
-        ({ payload }: { payload: Record<string, unknown> }) => {
-          const userId =
-            typeof payload?.user_id === "string" ? payload.user_id : "";
-          const name =
-            typeof payload?.name === "string" ? payload.name : "Someone";
-          const typing = payload?.typing === true;
-          const ts =
-            typeof payload?.ts === "number" ? payload.ts : Date.now();
+    const unsub = client.on(
+      "typing",
+      (data) => {
+        const payload = (data ?? {}) as Record<string, unknown>;
+        const userId =
+          typeof payload?.user_id === "string" ? payload.user_id : "";
+        const name =
+          typeof payload?.name === "string" ? payload.name : "Someone";
+        const typing = payload?.typing === true;
+        const ts =
+          typeof payload?.ts === "number" ? payload.ts : Date.now();
 
-          if (!userId || userId === currentUserId) return;
+        if (!userId || userId === currentUserId) return;
 
-          if (typing) {
-            typingMapRef.current.set(userId, { name, lastSeen: ts });
-          } else {
-            typingMapRef.current.delete(userId);
-          }
-          flushTypingUsers();
-        },
-      )
-      .subscribe();
+        if (typing) {
+          typingMapRef.current.set(userId, { name, lastSeen: ts });
+        } else {
+          typingMapRef.current.delete(userId);
+        }
+        flushTypingUsers();
+      },
+    );
+
+    client.connect();
 
     // Sweep the local map every second to expire anyone who went silent
     // without sending an explicit "typing: false" (e.g. closed the tab).
@@ -175,11 +158,12 @@ export function useTypingPresence({
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       typingRef.current = false;
-      channelRef.current = null;
+      clientRef.current = null;
       lastSentAtRef.current = 0;
       window.clearInterval(expiryTimer);
       typingMapRef.current.clear();
-      supabase.removeChannel(channel);
+      unsub();
+      client.close();
       setTypingUsers([]);
     };
   }, [communityId, currentUserId, flushTypingUsers, isVisible]);

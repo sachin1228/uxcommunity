@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { msgCache } from "@/lib/communities/cache";
 import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
 type Message = CachedMessage;
 
@@ -215,11 +216,17 @@ export function useSendMessage({
       let uploadedImageUrl: string | null = null;
 
       if (imageFile) {
-        // The client currently sends the original File. Server-side Sharp
-        // compression is measured separately by the upload route.
-        clientTimings.client_compression = 0;
+        // Compress on the client (canvas → WebP); the upload route stores the
+        // bytes as-is since server-side Sharp is unavailable on Workers.
+        const fileToSend = await measureClient("client_compression", async () => {
+          try {
+            return compressedFile(await compressChatImageClient(imageFile), imageFile);
+          } catch {
+            return imageFile;
+          }
+        });
         const fd = new FormData();
-        fd.append("file", imageFile);
+        fd.append("file", fileToSend);
 
         const uploadRes = await measureClient("image_upload_request", () =>
           fetch(

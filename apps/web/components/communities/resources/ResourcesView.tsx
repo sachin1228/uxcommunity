@@ -17,7 +17,9 @@ import {
   Type,
   Wrench,
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { CreateResourceModal } from "./CreateResourceModal";
@@ -52,6 +54,7 @@ export function ResourcesView({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
+  const isVisible = useDocumentVisible();
 
   const fetchResources = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -76,41 +79,34 @@ export function ResourcesView({
   }, [currentUserId, requestUrl]);
 
   useEffect(() => {
+    if (!isVisible) return;
     const initialFetch = window.setTimeout(() => void fetchResources(true), 0);
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
 
-    const channel = supabase
-      .channel(`community-resources:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "community_resources",
-        filter: `community_id=eq.${communityId}`,
-      }, () => void fetchResources(true, true))
-      .subscribe();
+    const client = new RealtimeClient({
+      room: realtimeRooms.resources(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubscribes: Array<() => void> = [];
 
-    const saveChannel = supabase
-      .channel(`resource-saves:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "resource_saves",
-      }, (payload) => {
-        const record = (payload.new ?? payload.old) as { resource_id?: string; user_id?: string } | null;
+    unsubscribes.push(client.on("resource", () => void fetchResources(true, true)));
+    unsubscribes.push(
+      client.on("save", (data) => {
+        const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; resource_id?: string; user_id?: string } | null;
         if (!record?.resource_id) return;
         if (record.user_id === currentUserId) return;
         const resourceId = record.resource_id;
         setResources((prev) =>
           prev.map((r) => {
             if (r.id !== resourceId) return r;
-            if (payload.eventType === "INSERT") return { ...r, save_count: r.save_count + 1 };
-            if (payload.eventType === "DELETE") return { ...r, save_count: Math.max(0, r.save_count - 1) };
+            if (record.event === "INSERT") return { ...r, save_count: r.save_count + 1 };
+            if (record.event === "DELETE") return { ...r, save_count: Math.max(0, r.save_count - 1) };
             return r;
           }),
         );
-      })
-      .subscribe();
+      }),
+    );
+
+    client.connect();
 
     const handleFocus = () => { if (document.visibilityState === "visible") void fetchResources(true); };
     document.addEventListener("visibilitychange", handleFocus);
@@ -118,12 +114,12 @@ export function ResourcesView({
 
     return () => {
       window.clearTimeout(initialFetch);
-      supabase.removeChannel(channel);
-      supabase.removeChannel(saveChannel);
+      unsubscribes.forEach((unsub) => unsub());
+      client.close();
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [communityId, currentUserId, fetchResources]);
+  }, [communityId, currentUserId, fetchResources, isVisible]);
 
   function writeCache(updater: (prev: CommunityResource[]) => CommunityResource[]) {
     setResources((prev) => {

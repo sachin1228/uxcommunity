@@ -1,0 +1,47 @@
+# Copy to `.dev.vars` (gitignored) and fill in real values for local
+# `wrangler dev` / `opennextjs-cloudflare preview`.
+#
+# NEXT_PUBLIC_* vars are inlined into the client at `next build` time, so they
+# must ALSO be present in the build environment (e.g. apps/web/.env.production.local).
+
+# --- Public / non-secret (also set in wrangler.toml [vars] for runtime) ---
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_REALTIME_URL=
+
+# --- Realtime (server -> Worker) ---
+REALTIME_URL=
+REALTIME_PUBLISH_SECRET=
+
+# --- Auth / secrets (prod: `wrangler secret put <NAME>`) ---
+SESSION_SECRET=
+
+# --- Supabase ---
+SUPABASE_SERVICE_ROLE_KEY=
+
+# --- Upstash rate limiting ---
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# --- Email (Resend) ---
+RESEND_API_KEY=
+EMAIL_FROM=
+
+# --- GIPHY ---
+GIPHY_API_KEY=
+
+# --- R2 (existing uploads bucket; keep values as-is) ---
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET_NAME=
+R2_PUBLIC_URL=
+
+# --- Moderation image service ---
+MODERATION_IMAGE_SERVICE_URL=
+
+# --- Admin bootstrap / misc ---
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+INVITATION_EXPIRY_DAYS=7

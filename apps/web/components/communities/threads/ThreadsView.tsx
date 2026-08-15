@@ -12,7 +12,9 @@ import {
   UserRoundPlus,
   UsersRound,
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
@@ -45,6 +47,7 @@ export function ThreadsView({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<ThreadCategory | "all">("all");
+  const isVisible = useDocumentVisible();
 
   const fetchThreads = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -69,61 +72,45 @@ export function ThreadsView({
   }, [currentUserId, requestUrl]);
 
   useEffect(() => {
+    if (!isVisible) return;
     const initialFetch = window.setTimeout(() => void fetchThreads(true), 0);
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
+
+    const client = new RealtimeClient({
+      room: realtimeRooms.threads(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubscribes: Array<() => void> = [];
 
     // Subscribe to thread changes
-    const threadChannel = supabase
-      .channel(`community-threads:${communityId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "community_threads",
-          filter: `community_id=eq.${communityId}`,
-        },
-        () => void fetchThreads(true, true),
-      )
-      .subscribe();
+    unsubscribes.push(
+      client.on("thread", () => void fetchThreads(true, true)),
+    );
 
     // Subscribe to vote changes for realtime vote counts
-    const voteChannel = supabase
-      .channel(`thread-votes:${communityId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "thread_votes",
-        },
-        (payload) => {
-          const record = (payload.new ?? payload.old) as { thread_id?: string; user_id?: string } | null;
-          if (!record?.thread_id) return;
-          // Skip own votes — already handled optimistically on click
-          if (record.user_id === currentUserId) return;
-          const threadId = record.thread_id;
+    unsubscribes.push(
+      client.on("vote", (data) => {
+        const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
+        if (!record?.thread_id) return;
+        // Skip own votes — already handled optimistically on click
+        if (record.user_id === currentUserId) return;
+        const threadId = record.thread_id;
 
-          setThreads((current) =>
-            current.map((thread) => {
-              if (thread.id !== threadId) return thread;
-              if (payload.eventType === "INSERT") {
-                return { ...thread, vote_count: thread.vote_count + 1 };
-              }
-              if (payload.eventType === "DELETE") {
-                return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
-              }
-              return thread;
-            }),
-          );
-        },
-      )
-      .subscribe();
+        setThreads((current) =>
+          current.map((thread) => {
+            if (thread.id !== threadId) return thread;
+            if (record.event === "INSERT") {
+              return { ...thread, vote_count: thread.vote_count + 1 };
+            }
+            if (record.event === "DELETE") {
+              return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
+            }
+            return thread;
+          }),
+        );
+      }),
+    );
+
+    client.connect();
 
     const handleFocus = () => {
       if (document.visibilityState === "visible") void fetchThreads(true);
@@ -133,12 +120,12 @@ export function ThreadsView({
 
     return () => {
       window.clearTimeout(initialFetch);
-      supabase.removeChannel(threadChannel);
-      supabase.removeChannel(voteChannel);
+      unsubscribes.forEach((unsub) => unsub());
+      client.close();
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [communityId, currentUserId, fetchThreads]);
+  }, [communityId, currentUserId, fetchThreads, isVisible]);
 
   function writeCache(updater: (prev: CommunityThread[]) => CommunityThread[]) {
     setThreads((prev) => {

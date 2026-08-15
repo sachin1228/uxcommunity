@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function enrichOne(
   db: ReturnType<typeof createServiceClient>,
@@ -151,6 +152,10 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  void publishRealtimeBatch([
+    { room: realtimeRooms.events(communityId), topic: "event", data },
+  ]);
+
   const enriched = await enrichOne(db, data as unknown as Record<string, unknown>, userId);
   return NextResponse.json({ event: enriched });
 }
@@ -181,6 +186,10 @@ export async function DELETE(
 
   const { error } = await db.from("community_events").delete().eq("id", eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },
+  ]);
 
   return NextResponse.json({ ok: true });
 }

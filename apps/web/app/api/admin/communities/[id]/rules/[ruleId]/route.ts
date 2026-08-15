@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 // ── PUT /api/admin/communities/[id]/rules/[ruleId] ───────────────────────────
 // Updates rule_text and/or order_index for a single rule.
@@ -34,10 +35,15 @@ export async function PUT(
     .update(update)
     .eq("id", ruleId)
     .eq("community_id", id)
-    .select("id, rule_text, order_index, created_at")
+    .select("id, community_id, rule_text, order_index, created_at")
     .single();
 
   if (error) return NextResponse.json({ error: "Failed to update rule." }, { status: 500 });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.rules(id), topic: "rule", data: { event: "UPDATE", rule: data } },
+  ]);
+
   return NextResponse.json({ rule: data });
 }
 
@@ -50,6 +56,15 @@ export async function DELETE(
   const { id, ruleId } = await params;
   const db = createServiceClient();
 
+  const { data: existing } = (await db
+    .from("community_rules")
+    .select("id, community_id, rule_text, order_index")
+    .eq("id", ruleId)
+    .eq("community_id", id)
+    .maybeSingle()) as unknown as {
+    data: { id: string; community_id: string; rule_text: string; order_index: number } | null;
+  };
+
   const { error } = await db
     .from("community_rules")
     .delete()
@@ -57,5 +72,12 @@ export async function DELETE(
     .eq("community_id", id);
 
   if (error) return NextResponse.json({ error: "Failed to delete rule." }, { status: 500 });
+
+  if (existing) {
+    void publishRealtimeBatch([
+      { room: realtimeRooms.rules(id), topic: "rule", data: { event: "DELETE", rule: existing } },
+    ]);
+  }
+
   return NextResponse.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 // ── GET /api/admin/communities/[id]/rules ────────────────────────────────────
 export async function GET(
@@ -52,9 +53,14 @@ export async function POST(
   const { data, error } = await db
     .from("community_rules")
     .insert({ community_id: id, rule_text, order_index: next_index })
-    .select("id, rule_text, order_index, created_at")
+    .select("id, community_id, rule_text, order_index, created_at")
     .single();
 
   if (error) return NextResponse.json({ error: "Failed to create rule." }, { status: 500 });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.rules(id), topic: "rule", data: { event: "INSERT", rule: data } },
+  ]);
+
   return NextResponse.json({ rule: data }, { status: 201 });
 }

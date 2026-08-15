@@ -7,7 +7,9 @@ import {
   BookMarked,
   Bookmark,
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ProfileThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
@@ -64,6 +66,7 @@ export function ProfileThreads({
   const [activeTab, setActiveTab] = useState<Tab>("threads");
   const [threads, setThreads]     = useState(initialThreads);
   const pendingVotes              = useRef<Set<string>>(new Set());
+  const isVisible = useDocumentVisible();
 
   // ── Events tab ────────────────────────────────────────────────────────────
   const [events, setEvents]           = useState<ProfileEvent[]>([]);
@@ -123,44 +126,43 @@ export function ProfileThreads({
 
   // ── Realtime subscriptions for threads ───────────────────────────────────
   useEffect(() => {
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
+    if (!isVisible) return;
+    const client = new RealtimeClient({
+      room: realtimeRooms.profile(currentUserId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
 
-    const threadChannel = supabase
-      .channel("profile-threads")
-      .on("postgres_changes", { event: "*", schema: "public", table: "community_threads" }, async () => {
-        try {
-          const response = await fetch("/api/profile/threads", { cache: "no-store" });
-          if (!response.ok) return;
-          const data = await response.json();
-          setThreads(data.threads as ProfileThread[]);
-        } catch { /* reconciled on next refresh */ }
-      })
-      .subscribe();
+    const unsubThread = client.on("thread", async () => {
+      try {
+        const response = await fetch("/api/profile/threads", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        setThreads(data.threads as ProfileThread[]);
+      } catch { /* reconciled on next refresh */ }
+    });
 
-    const voteChannel = supabase
-      .channel("profile-thread-votes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "thread_votes" }, (payload) => {
-        const record = (payload.new ?? payload.old) as { thread_id?: string; user_id?: string } | null;
-        if (!record?.thread_id) return;
-        const threadId = record.thread_id;
-        if (record.user_id === currentUserId && pendingVotes.current.has(threadId)) return;
-        setThreads((current) =>
-          current.map((thread) => {
-            if (thread.id !== threadId) return thread;
-            if (payload.eventType === "INSERT") return { ...thread, vote_count: thread.vote_count + 1 };
-            if (payload.eventType === "DELETE") return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
-            return thread;
-          }),
-        );
-      })
-      .subscribe();
+    const unsubVote = client.on("vote", (data) => {
+      const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
+      if (!record?.thread_id) return;
+      const threadId = record.thread_id;
+      if (record.user_id === currentUserId && pendingVotes.current.has(threadId)) return;
+      setThreads((current) =>
+        current.map((thread) => {
+          if (thread.id !== threadId) return thread;
+          if (record.event === "INSERT") return { ...thread, vote_count: thread.vote_count + 1 };
+          if (record.event === "DELETE") return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
+          return thread;
+        }),
+      );
+    });
 
+    client.connect();
     return () => {
-      supabase.removeChannel(threadChannel);
-      supabase.removeChannel(voteChannel);
+      unsubThread();
+      unsubVote();
+      client.close();
     };
-  }, [currentUserId]);
+  }, [currentUserId, isVisible]);
 
   // ── Thread handlers ───────────────────────────────────────────────────────
   function handleUpdated(

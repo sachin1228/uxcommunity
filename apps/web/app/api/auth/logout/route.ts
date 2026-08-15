@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSession, clearSessionCookie } from "@/lib/auth/session";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   // M-6: Only clear the cookie when a valid session actually exists.
   // Prevents a CSRF-forced logout from silently succeeding with no session.
   const session = await getSession();
@@ -10,6 +10,6 @@ export async function POST() {
   }
 
   const response = NextResponse.json({ success: true });
-  clearSessionCookie(response);
+  clearSessionCookie(response, request.nextUrl.hostname);
   return response;
 }
