@@ -42,7 +42,16 @@ const RECONNECT_MAX_MS = 15_000;
  * whatever serves the page.
  */
 function buildWebSocketUrl(baseUrl: string, room: string): string {
-  if (!baseUrl) return `/ws?room=${encodeURIComponent(room)}`;
+  if (!baseUrl) {
+    // NEXT_PUBLIC_REALTIME_URL is missing from this build. The same-origin
+    // fallback only works when something on this origin serves /ws (local
+    // dev); in production it 404s and every feature silently degrades to
+    // polling. Surface it instead of failing quietly.
+    console.warn(
+      "[realtime] NEXT_PUBLIC_REALTIME_URL is not set — realtime (typing, messages, reactions) will fall back to polling. Set it at build time (see wrangler.toml [vars])."
+    );
+    return `/ws?room=${encodeURIComponent(room)}`;
+  }
   const wsBase = baseUrl.replace(/^http/, "ws");
   return `${wsBase}/ws?room=${encodeURIComponent(room)}`;
 }
