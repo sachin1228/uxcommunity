@@ -27,9 +27,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # wrangler 4.x requires Node >= 22, so use 22 (LTS) even though the
+      # app itself builds fine on Node 20.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
