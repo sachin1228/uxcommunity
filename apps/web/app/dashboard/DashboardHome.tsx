@@ -24,7 +24,7 @@ export function DashboardHome({ name, avatarUrl, userId }: DashboardHomeProps) {
         <HomeFeed currentUserId={userId} refreshToken={refreshToken} />
       </div>
 
-      <aside className="sticky top-6 hidden w-72 shrink-0 p-4 lg:block">
+      <aside className="sticky top-6 hidden w-72 shrink-0 p-4 xl:block">
         <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
       </aside>
     </div>
