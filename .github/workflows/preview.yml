@@ -1,0 +1,135 @@
+name: Preview Deploy (PR)
+
+# Vercel-style previews: every PR gets its own worker
+# (uxcommunity-web-preview-pr<number>) and the URL is commented on the PR.
+# The worker is deleted when the PR closes.
+#
+# Notes:
+# - Realtime (chat/typing/presence) is intentionally disabled in previews:
+#   REALTIME_URL / REALTIME_PUBLISH_SECRET are NOT set on the preview worker,
+#   so it can never broadcast to the production realtime service, and the
+#   session cookie (scoped to .uxcommunity.in) isn't sent to workers.dev hosts.
+#   Chat still works via polling fallback.
+# - Secrets are only available for PRs from branches in this repo (not forks).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Write env files
+        working-directory: apps/web
+        run: |
+          cat > .env.production.local <<EOF
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          EOF
+
+          # No REALTIME_URL / REALTIME_PUBLISH_SECRET: the preview worker must
+          # not publish to the production realtime service.
+          cat > .dev.vars <<EOF
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          GIPHY_API_KEY=${{ secrets.GIPHY_API_KEY }}
+          R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+          MODERATION_IMAGE_SERVICE_URL=${{ secrets.MODERATION_IMAGE_SERVICE_URL }}
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          EOF
+
+      - name: Build + deploy preview worker
+        working-directory: apps/web
+        id: deploy
+        run: |
+          WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
+          npx opennextjs-cloudflare build
+          npx opennextjs-cloudflare deploy -- --name "$WORKER" 2>&1 | tee /tmp/deploy.log
+          URL=$(grep -oE "https://${WORKER}\.[a-z0-9-]+\.workers\.dev" /tmp/deploy.log | head -1)
+          echo "worker=$WORKER" >> "$GITHUB_OUTPUT"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Set preview worker secrets
+        working-directory: apps/web
+        run: |
+          WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              ''|\#*) continue ;;
+            esac
+            key="${line%%=*}"
+            value="${line#*=}"
+            echo "$value" | npx wrangler secret put "$key" --name "$WORKER"
+          done < .dev.vars
+
+      - name: Comment preview URL on PR
+        if: steps.deploy.outputs.url != ''
+        uses: actions/github-script@v7
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        with:
+          script: |
+            const marker = "<!-- uxcommunity-preview-deploy -->";
+            const { owner, repo } = context.repo;
+            const issue = context.issue.number;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: issue });
+            for (const c of comments) {
+              if (c.body && c.body.includes(marker)) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+              }
+            }
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: issue,
+              body: `${marker}\n🚀 **Preview deployed** — ${process.env.PREVIEW_URL}\n\nTest it at: ${process.env.PREVIEW_URL}\n\n> Realtime (chat/typing/presence) is disabled in previews — it uses the production DB, but realtime events are not broadcast. Use production for realtime testing.`,
+            });
+
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Delete preview worker
+        working-directory: apps/web
+        run: |
+          npx wrangler delete "uxcommunity-web-preview-pr${{ github.event.pull_request.number }}" --force
