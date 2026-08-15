@@ -183,7 +183,7 @@ export function useSidebarCommunities(userId: string) {
 
   // ── Realtime: message changes + typing indicators ────────────────────────
   useSidebarRealtime({ communities, userId, activeCommunityIdRef, setCommunities });
-  const typingMap = useSidebarTyping({ communities, userId, activeCommunityIdRef });
+  const typingMap = useSidebarTyping({ communities, userId });
 
   // ── Navigation handler ────────────────────────────────────────────────────
   function handleNavigate(id: string) {
