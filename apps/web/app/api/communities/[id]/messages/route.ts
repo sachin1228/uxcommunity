@@ -16,7 +16,7 @@ export async function GET(
 ) {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { verifyActive: false });
   } catch (e) {
     return e as Response;
   }

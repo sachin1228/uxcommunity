@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 
 const TYPING_IDLE_MS = 1600;
@@ -36,6 +37,7 @@ export function useTypingPresence({
 }) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const isVisible = useDocumentVisible();
   const typingRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks when we last broadcast a "typing: true" so we can throttle heartbeats
@@ -122,6 +124,7 @@ export function useTypingPresence({
   );
 
   useEffect(() => {
+    if (!isVisible) return;
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
       supabase = createBrowserClient();
@@ -179,7 +182,7 @@ export function useTypingPresence({
       supabase.removeChannel(channel);
       setTypingUsers([]);
     };
-  }, [communityId, currentUserId, flushTypingUsers]);
+  }, [communityId, currentUserId, flushTypingUsers, isVisible]);
 
   return { typingUsers, setTyping };
 }

@@ -29,7 +29,7 @@ export async function GET(_request: NextRequest, context: Params) {
   const startedAt = performance.now();
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { verifyActive: false });
   } catch (error) {
     return error as Response;
   }

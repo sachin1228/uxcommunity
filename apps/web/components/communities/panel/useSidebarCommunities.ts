@@ -58,12 +58,12 @@ export function useSidebarCommunities(userId: string) {
 
   // The request cache owns freshness and in-flight deduplication. sidebarStore is
   // retained as the realtime/optimistic projection consumed by existing hooks.
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     if (!sidebarStore.data) setLoading(true);
     try {
       const data = await fetchJsonCached<{ communities?: Community[] }>(
         "/api/communities",
-        { staleMs: SIDEBAR_STALE_MS },
+        { staleMs: SIDEBAR_STALE_MS, force },
         userId,
       );
       const fresh = data.communities ?? [];
@@ -78,6 +78,23 @@ export function useSidebarCommunities(userId: string) {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Realtime channels are suspended while the tab is hidden (see
+  // useSidebarRealtime) to free free-tier Realtime connections/messages. On
+  // regain, force a refetch so unread counts and last-message previews missed
+  // during the hidden period are caught up — force bypasses the 60s stale
+  // window, otherwise the stale cache would mask new messages.
+  useEffect(() => {
+    const handleFocus = () => {
+      if (document.visibilityState === "visible") void load(true);
+    };
+    document.addEventListener("visibilitychange", handleFocus);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleFocus);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [load]);
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event

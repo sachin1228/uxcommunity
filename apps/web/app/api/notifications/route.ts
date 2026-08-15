@@ -7,7 +7,7 @@ const PAGE_SIZE = 30;
 export async function GET() {
   let session;
   try {
-    session = await requireSession("user");
+    session = await requireSession("user", { verifyActive: false });
   } catch (error) {
     return error as Response;
   }

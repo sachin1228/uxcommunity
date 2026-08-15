@@ -2,6 +2,7 @@
 
 import { useEffect, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import {
   isSidebarReactionStale,
   sidebarStore,
@@ -73,9 +74,10 @@ export function useSidebarRealtime({
   setCommunities,
 }: Options) {
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
+  const isVisible = useDocumentVisible();
 
   useEffect(() => {
-    if (!communities.length) return;
+    if (!communities.length || !isVisible) return;
 
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
@@ -495,5 +497,5 @@ export function useSidebarRealtime({
       channels.forEach((ch) => supabase.removeChannel(ch));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId]);
+  }, [communityIds, userId, isVisible]);
 }

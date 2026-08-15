@@ -145,7 +145,7 @@ export async function GET(
 ) {
   const timer = createServerTimer("GET /api/communities/[id]/threads");
   let session;
-  try { session = await timer.measure("auth", () => requireSession("user")); } catch (error) {
+  try { session = await timer.measure("auth", () => requireSession("user", { verifyActive: false })); } catch (error) {
     timer.finish({ status: (error as Response).status ?? 401 });
     return error as Response;
   }

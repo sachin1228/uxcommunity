@@ -122,7 +122,8 @@ export function invalidateUserLiveness(userId: string): void {
 
 /** Throws a Response if session is missing, role doesn't match, or user is blocked/deleted. */
 export async function requireSession(
-  role?: "user" | "admin"
+  role?: "user" | "admin",
+  options?: { verifyActive?: boolean },
 ): Promise<SessionPayload> {
   const session = await getSession();
   if (!session) {
@@ -141,7 +142,17 @@ export async function requireSession(
   // For regular users, verify they still exist and aren't blocked in the DB.
   // Admins are not subject to this check (they won't block themselves via the
   // admin panel, and admin account management is handled separately).
-  if (session.role === "user" && session.userId) {
+  //
+  // Read-only routes may pass verifyActive:false to skip the per-request DB
+  // round-trip — the signed JWT already proves who they are, and the liveness
+  // check is still enforced on every write/mutation path. A blocked user keeps
+  // read access for at most their 7-day session, which is acceptable for
+  // cutting per-request DB load (a free-tier capacity win).
+  if (
+    session.role === "user" &&
+    session.userId &&
+    options?.verifyActive !== false
+  ) {
     await assertUserActive(session.userId);
   }
 

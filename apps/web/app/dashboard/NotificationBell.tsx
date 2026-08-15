@@ -14,6 +14,7 @@ import {
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Spinner } from "@/components/ui/Spinner";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 type NotificationType =
@@ -72,6 +73,7 @@ function formatRelativeTime(value: string) {
 
 export function NotificationBell({ userId }: Props) {
   initRequestCache(userId);
+  const isVisible = useDocumentVisible();
   const cached = getCachedRequest<{ notifications?: NotificationItem[]; unread_count?: number }>("/api/notifications", userId);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(() => !cached);
@@ -89,10 +91,10 @@ export function NotificationBell({ userId }: Props) {
       update({ notifications: current.notifications ?? [], unread_count: current.unread_count ?? 0 }), userId);
   }, [userId]);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (force = false) => {
     const data = await fetchJsonCached<{ notifications?: NotificationItem[]; unread_count?: number }>(
       "/api/notifications",
-      { staleMs: 30_000 },
+      { staleMs: 30_000, force },
       userId,
     );
     setNotifications(data.notifications ?? []);
@@ -109,12 +111,13 @@ export function NotificationBell({ userId }: Props) {
         });
     }, 0);
 
-    // Catch up when the tab regains focus — the realtime channel may have
-    // missed events while the tab was hidden/disconnected. fetchJsonCached
-    // keeps this a no-op within the 30s freshness window, so it's cheap.
+    // Catch up when the tab regains focus — the realtime channel is suspended
+    // while hidden, so notifications created during the hidden period would
+    // otherwise be missed until the next 30s refetch. Force bypasses the stale
+    // window so the count is correct the moment the tab becomes visible again.
     const handleFocus = () => {
       if (document.visibilityState === "visible") {
-        void fetchNotifications().catch(() => {});
+        void fetchNotifications(true).catch(() => {});
       }
     };
     document.addEventListener("visibilitychange", handleFocus);
@@ -129,6 +132,7 @@ export function NotificationBell({ userId }: Props) {
   }, [fetchNotifications]);
 
   useEffect(() => {
+    if (!isVisible) return;
     const supabase = createBrowserClient();
     const channel = supabase
       .channel(`notifications:${userId}`)
@@ -183,7 +187,7 @@ export function NotificationBell({ userId }: Props) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [patchNotificationCache, userId]);
+  }, [patchNotificationCache, userId, isVisible]);
 
   async function markOneRead(id: string) {
     setNotifications((prev) =>

@@ -1,18 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
+import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 
 const PAGE_SIZE = 30;
 
 export const dynamic = "force-dynamic";
 
+// The home feed is read by every user on every dashboard visit. Recomputing it
+// per request runs ~30 × ~6 correlated count subqueries in get_home_feed_page,
+// which is heavy for the free-tier micro compute and the 5GB egress budget.
+// unstable_cache dedupes identical (user, cursor) reads for 10s, collapsing N
+// concurrent page loads into a single DB round-trip. 10s is short enough that
+// new posts / own votes appear almost immediately.
+const loadFeedPage = unstable_cache(
+  async (userId: string, before: string | null) => {
+    const { data, error } = await callPerformanceRpc(
+      createServiceClient(),
+      "get_home_feed_page",
+      { p_user_id: userId, p_before: before, p_limit: PAGE_SIZE },
+    );
+    if (error) throw error;
+    return (data ?? []).map(({ item }) => item);
+  },
+  ["home-feed"],
+  { revalidate: 10 },
+);
+
 export async function GET(req: NextRequest) {
   const timer = createServerTimer("GET /api/home/feed");
   let session;
   try {
-    session = await timer.measure("auth", () => requireSession("user"));
+    session = await timer.measure("auth", () =>
+      requireSession("user", { verifyActive: false }),
+    );
   } catch (error) {
     timer.finish({ status: (error as Response).status ?? 401 });
     return error as Response;
@@ -27,15 +50,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const { data, error } = await timer.measure("feed_page_rpc", () =>
-    callPerformanceRpc(createServiceClient(), "get_home_feed_page", {
-      p_user_id: session.userId!,
-      p_before: before,
-      p_limit: PAGE_SIZE,
-    }),
-  );
-
-  if (error) {
+  let items: Json[];
+  try {
+    items = await timer.measure("feed_page_rpc", () =>
+      loadFeedPage(session.userId!, before),
+    );
+  } catch (error) {
     console.error("[GET home feed]", error);
     timer.finish({ status: 500 });
     return NextResponse.json(
@@ -44,7 +64,6 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const items = (data ?? []).map(({ item }) => item);
   const body = { items };
   timer.finish({
     status: 200,

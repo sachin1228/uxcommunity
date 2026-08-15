@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
@@ -59,7 +60,10 @@ export function useRealtimeChat({
   }, [communityId, debouncedCatchUp]);
 
   // ── Supabase Realtime ─────────────────────────────────────────────────────
+  const isVisible = useDocumentVisible();
+
   useEffect(() => {
+    if (!isVisible) return;
     let supabase: ReturnType<typeof createBrowserClient>;
     try {
       supabase = createBrowserClient();
@@ -515,7 +519,7 @@ export function useRealtimeChat({
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, fetchMessages]);
+  }, [communityId, fetchMessages, isVisible]);
 
   // ── Tab visibility / window focus catch-up ────────────────────────────────
   useEffect(() => {
