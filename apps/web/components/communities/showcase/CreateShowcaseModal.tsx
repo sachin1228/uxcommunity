@@ -4,9 +4,9 @@ import { useRef, useState } from "react";
 import { ImagePlus, Loader2, X } from "lucide-react";
 import { SHOWCASE_CATEGORIES, SHOWCASE_TYPES, type ShowcaseCategory, type ShowcasePost, type ShowcasePostType } from "./types";
 
-interface Props { communityId: string; onClose: () => void; onCreated?: (post: ShowcasePost) => void; onUpdated?: (post: ShowcasePost) => void; post?: ShowcasePost; }
+interface Props { communityId?: string; publicOnly?: boolean; onClose: () => void; onCreated?: (post: ShowcasePost) => void; onUpdated?: (post: ShowcasePost) => void; post?: ShowcasePost; }
 
-export function CreateShowcaseModal({ communityId, onClose, onCreated, onUpdated, post }: Props) {
+export function CreateShowcaseModal({ communityId, publicOnly = false, onClose, onCreated, onUpdated, post }: Props) {
   const fileRef = useRef<HTMLInputElement>(null); const editing = Boolean(post);
   const [title, setTitle] = useState(post?.title ?? ""); const [description, setDescription] = useState(post?.description ?? ""); const [projectUrl, setProjectUrl] = useState(post?.project_url ?? "");
   const [type, setType] = useState<ShowcasePostType>(post?.post_type ?? "finished"); const [category, setCategory] = useState<ShowcaseCategory>(post?.category ?? "ui_ux"); const [tags, setTags] = useState(post?.tags.join(", ") ?? "");
@@ -16,8 +16,8 @@ export function CreateShowcaseModal({ communityId, onClose, onCreated, onUpdated
     setSaving(true); setError(null);
     try {
       let imageUrl = post?.image_url ?? "";
-      if (file) { const form = new FormData(); form.set("file", file); const upload = await fetch(`/api/communities/${communityId}/showcase/upload`, { method: "POST", body: form }); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error ?? "Upload failed."); imageUrl = uploaded.url; }
-      const response = await fetch(editing ? `/api/communities/${communityId}/showcase/${post!.id}` : `/api/communities/${communityId}/showcase`, { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), description: description.trim(), image_url: imageUrl, project_url: projectUrl.trim() || null, post_type: type, category, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5) }) });
+      if (file) { const form = new FormData(); form.set("file", file); const upload = await fetch(publicOnly ? "/api/home/uploads/showcase" : `/api/communities/${communityId}/showcase/upload`, { method: "POST", body: form }); const uploaded = await upload.json(); if (!upload.ok) throw new Error(uploaded.error ?? "Upload failed."); imageUrl = uploaded.url; }
+      const response = await fetch(editing ? `/api/communities/${publicOnly ? "public" : communityId}/showcase/${post!.id}` : (publicOnly ? "/api/home/posts/showcase" : `/api/communities/${communityId}/showcase`), { method: editing ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.trim(), description: description.trim(), image_url: imageUrl, project_url: projectUrl.trim() || null, post_type: type, category, tags: tags.split(",").map((tag) => tag.trim()).filter(Boolean).slice(0, 5) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? `Could not ${editing ? "update" : "share"} your work.`); if (editing) onUpdated?.(data.post); else onCreated?.(data.post); onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your work."); } finally { setSaving(false); }
   }

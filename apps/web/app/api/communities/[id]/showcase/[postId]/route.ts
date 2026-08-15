@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isPublicContentScope } from "@/lib/content-scope";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
 
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
-  return db.from("community_showcase_posts").select("*").eq("id", postId).eq("community_id", communityId).maybeSingle();
+  const query = db.from("community_showcase_posts").select("*").eq("id", postId);
+  return (isPublicContentScope(communityId) ? query.is("community_id", null).eq("is_public", true) : query.eq("community_id", communityId)).maybeSingle();
 }
 
 async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<string, unknown>, userId: string) {
@@ -24,6 +26,7 @@ async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<st
 }
 
 async function requireMember(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
+  if (isPublicContentScope(communityId)) return true;
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
   return Boolean(data);
 }

@@ -5,8 +5,8 @@ export function isPublicContentScope(scope: string) {
 }
 
 export function publicContentHref(
-  type: "thread" | "event" | "resource",
+  type: "thread" | "event" | "resource" | "showcase",
   id: string,
 ) {
-  return `/dashboard/${type === "thread" ? "threads" : type === "event" ? "events" : "resources"}/${id}`;
+  return `/dashboard/${type === "thread" ? "threads" : type === "event" ? "events" : type === "resource" ? "resources" : "showcase"}/${id}`;
 }
