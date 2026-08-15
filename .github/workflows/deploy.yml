@@ -68,11 +68,17 @@ jobs:
       - name: Write build + runtime env files
         working-directory: apps/web
         run: |
-          # Build-time env: SESSION_SECRET only. NEXT_PUBLIC_* are already
-          # injected into the build from wrangler.toml [vars].
+          # Build-time env. NEXT_PUBLIC_* vars are INLINED into the client
+          # bundle by `next build`, so they must be present in the build
+          # environment — wrangler.toml [vars] only reach the worker at
+          # runtime (server-side), never the client JS. Mirror them from
+          # wrangler.toml into .env.production.local so the client bundle
+          # (realtime WebSocket URL, Supabase URL/anon key, app URL) is built
+          # with the same values the worker gets at runtime.
           cat > .env.production.local <<EOF
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
           EOF
+          awk '/^\[vars\]/{f=1;next}/^\[/{f=0}f && /^[A-Z_]+ = /{gsub(/^ +/,""); split($0,a," = "); gsub(/"/,"",a[2]); print a[1]"="a[2]}' wrangler.toml >> .env.production.local
 
           # Runtime secrets → uploaded as Worker secrets by the deploy step.
           # Same values as the local apps/web/.dev.vars.
