@@ -12,7 +12,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
@@ -202,6 +204,7 @@ export function ShowcaseDetailClient({
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
+  const isVisible = useDocumentVisible();
   const fetchComments = useCallback(async () => {
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}/comments`,
@@ -221,29 +224,18 @@ export function ShowcaseDetailClient({
     }
   }, [communityId, post.id]);
   useEffect(() => {
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
-    const channel = supabase
-      .channel(`showcase-comments:${post.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "showcase_comments",
-          filter: `post_id=eq.${post.id}`,
-        },
-        () => void fetchComments(),
-      )
-      .subscribe();
+    if (!isVisible) return;
+    const client = new RealtimeClient({
+      room: realtimeRooms.showcase(post.id),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsub = client.on("comment", () => void fetchComments());
+    client.connect();
     return () => {
-      void supabase.removeChannel(channel);
+      unsub();
+      client.close();
     };
-  }, [post.id, fetchComments]);
+  }, [post.id, currentUserId, fetchComments, isVisible]);
   async function toggle(action: "like" | "save") {
     const key = action === "like" ? "user_liked" : "user_saved";
     const active = post[key];

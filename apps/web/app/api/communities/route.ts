@@ -8,6 +8,7 @@ import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -152,6 +153,23 @@ export async function POST(request: Request) {
       rule_text: rule,
       order_index: index,
     }))
+  );
+
+  const createdCommunityId = (community as { id: string }).id;
+  const { data: createdRules } = (await db
+    .from("community_rules")
+    .select("id, community_id, rule_text, order_index")
+    .eq("community_id", createdCommunityId)
+    .order("order_index", { ascending: true })) as unknown as {
+    data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+  };
+
+  void publishRealtimeBatch(
+    (createdRules ?? []).map((rule) => ({
+      room: realtimeRooms.rules(createdCommunityId),
+      topic: "rule",
+      data: { event: "INSERT", rule },
+    })),
   );
 
   const slug = slugify(name);

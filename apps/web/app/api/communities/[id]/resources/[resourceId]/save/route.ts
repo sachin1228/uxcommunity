@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export async function POST(
   _req: NextRequest,
@@ -52,6 +53,9 @@ export async function POST(
       .eq("resource_id", resourceId)
       .eq("user_id", userId);
     if (error) { console.error("[DELETE save]", error); return NextResponse.json({ error: "Failed to unsave resource." }, { status: 500 }); }
+    void publishRealtimeBatch([
+      { room: realtimeRooms.resources(communityId), topic: "save", data: { event: "DELETE", resource_id: resourceId, user_id: userId } },
+    ]);
     return NextResponse.json({ saved: false });
   } else {
     // Save
@@ -59,6 +63,9 @@ export async function POST(
       .from("resource_saves")
       .insert({ resource_id: resourceId, user_id: userId });
     if (error) { console.error("[INSERT save]", error); return NextResponse.json({ error: "Failed to save resource." }, { status: 500 }); }
+    void publishRealtimeBatch([
+      { room: realtimeRooms.resources(communityId), topic: "save", data: { event: "INSERT", resource_id: resourceId, user_id: userId } },
+    ]);
 
     deferNotification({
       userId: resource.user_id,

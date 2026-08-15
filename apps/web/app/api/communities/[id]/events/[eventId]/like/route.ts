@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { createServiceClient } from "@/lib/supabase/service";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function eventExists(db: ReturnType<typeof createServiceClient>, communityId: string, eventId: string) {
   let query = db.from("community_events").select("id").eq("id", eventId);
@@ -39,6 +40,10 @@ export async function POST(
     : await db.from("event_likes").delete().eq("event_id", eventId).eq("user_id", userId);
 
   if (mutation.error) return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.events(communityId), topic: "like", data: { event_id: eventId, user_id: userId } },
+  ]);
 
   const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),

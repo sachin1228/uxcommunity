@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -163,6 +164,9 @@ export async function POST(
   }
 
   const href = resourceHref(communityId, resourceId);
+  void publishRealtimeBatch([
+    { room: realtimeRooms.resourceComments(resourceId), topic: "comment", data: { user_id: userId } },
+  ]);
   deferNotification({
     userId: resource.user_id,
     actorId: userId,

@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
 
 /**
  * DELETE /api/communities/[id]/messages/[msgId]
  *
  * Soft-deletes a message for everyone (owner only).
  * Sets deleted_at, clears content and image_url so data does not leak.
- * The Supabase Realtime UPDATE event propagates the change to all clients.
+ * The realtime event propagates the change to all clients.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -21,21 +22,25 @@ export async function DELETE(
   const db = createServiceClient();
 
   // Fetch message and verify ownership
-  const { data: msg } = await db
+  const { data: msg } = (await db
     .from("community_messages")
-    .select("id, user_id")
+    .select("id, user_id, created_at")
     .eq("id", msgId)
     .eq("community_id", communityId)
-    .maybeSingle();
+    .maybeSingle()) as unknown as {
+    data: { id: string; user_id: string; created_at: string } | null;
+  };
 
   if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
   if (msg.user_id !== userId) return NextResponse.json({ error: "You can only delete your own messages." }, { status: 403 });
+
+  const deletedAt = new Date().toISOString();
 
   // Soft delete: stamp deleted_at, wipe content and image so data doesn't linger
   const { error } = await db
     .from("community_messages")
     .update({
-      deleted_at: new Date().toISOString(),
+      deleted_at: deletedAt,
       content:    null,
       image_url:  null,
       reply_to_id: null,
@@ -47,6 +52,28 @@ export async function DELETE(
     console.error("[DELETE message]", error);
     return NextResponse.json({ error: "Failed to delete message." }, { status: 500 });
   }
+
+  // Broadcast the soft-delete to the chat room + every member's sidebar panel.
+  after(async () => {
+    try {
+      const publishDb = createServiceClient();
+      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
+      await publishChatFanout({
+        communityId,
+        memberUserIds: memberIds,
+        chatTopic: "message-delete",
+        chatData: { id: msgId, deleted_at: deletedAt },
+        panelTopic: "message-delete",
+        panelData: {
+          community_id: communityId,
+          created_at: msg.created_at,
+          deleted_at: deletedAt,
+        },
+      });
+    } catch (err) {
+      console.error("[DELETE message] realtime fan-out error:", err);
+    }
+  });
 
   return NextResponse.json({ success: true });
 }

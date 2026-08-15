@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string) {
   let postQuery = db.from("community_showcase_posts").select("id").eq("id", postId);
@@ -46,5 +47,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (parentId) { const { data: parent } = await db.from("showcase_comments").select("id, parent_id").eq("id", parentId).eq("post_id", postId).maybeSingle(); if (!parent) return NextResponse.json({ error: "Parent comment not found." }, { status: 404 }); if (parent.parent_id) return NextResponse.json({ error: "Cannot reply to a reply." }, { status: 422 }); }
   const { data, error } = await db.from("showcase_comments").insert({ post_id: postId, user_id: userId, parent_id: parentId, body }).select("id, post_id, user_id, parent_id, body, created_at, updated_at").single();
   if (error || !data) return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
+  after(() => {
+    void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: userId } }]);
+  });
   const [comment] = await enrich(db, [data]); return NextResponse.json({ comment }, { status: 201 });
 }

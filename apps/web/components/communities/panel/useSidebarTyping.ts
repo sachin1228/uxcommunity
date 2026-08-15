@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 const TYPING_EXPIRY_MS = 3500;
 
 /**
- * Subscribes to the same `community-typing:<id>` broadcast channels used by
- * CommunityChat's useTypingPresence, but across joined communities at once.
+ * Subscribes to the same `typing:<id>` rooms used by CommunityChat's
+ * useTypingPresence, but across joined communities at once.
  *
  * Returns a Map<communityId, displayText> so the sidebar can show
  * "John is typing…" in place of the last-message preview for any community
@@ -18,11 +19,11 @@ const TYPING_EXPIRY_MS = 3500;
  * Read-only — this hook never broadcasts (the active chat's useTypingPresence
  * handles broadcasting for the current user).
  *
- * Cost guard: the active community's typing channel is already subscribed by
- * the chat page's useTypingPresence (subscribing it here too would deliver
- * every broadcast twice), and a channel per community is expensive when the
- * user is in many communities — so this subscribes at most
- * TYPING_CHANNEL_LIMIT communities, skipping the active one.
+ * Cost guard: the active community's typing room is already subscribed by the
+ * chat page's useTypingPresence (subscribing it here too would deliver every
+ * broadcast twice), and a room per community means one WebSocket per community
+ * — so this subscribes to at most TYPING_CHANNEL_LIMIT communities, skipping
+ * the active one.
  */
 const TYPING_CHANNEL_LIMIT = 8;
 
@@ -49,17 +50,10 @@ export function useSidebarTyping({
   useEffect(() => {
     if (!communityIds || !isVisible) return;
 
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
-
     stateRef.current.clear();
 
     // Skip the community the user is currently viewing — the chat page's own
-    // useTypingPresence already subscribes to its channel, so subscribing here
+    // useTypingPresence already subscribes to its room, so subscribing here
     // would process every typing broadcast twice.
     const activeId = activeCommunityIdRef.current;
     const subscribed = communities
@@ -91,44 +85,46 @@ export function useSidebarTyping({
       setTypingMap(next);
     };
 
-    const channels = subscribed.map((comm) =>
-      supabase
-        .channel(`community-typing:${comm.id}`, {
-          config: { broadcast: { ack: false, self: false } },
-        })
-        .on(
-          "broadcast",
-          { event: "typing" },
-          ({ payload }: { payload: Record<string, unknown> }) => {
-            const senderId =
-              typeof payload?.user_id === "string" ? payload.user_id : "";
-            const name =
-              typeof payload?.name === "string" ? payload.name : "Someone";
-            const typing  = payload?.typing === true;
-            const ts      =
-              typeof payload?.ts === "number" ? payload.ts : Date.now();
+    const clients: RealtimeClient[] = [];
+    for (const comm of subscribed) {
+      const client = new RealtimeClient({
+        room: realtimeRooms.typing(comm.id),
+        user: { id: userId, name: null, avatar: null },
+      });
+      client.on(
+        "typing",
+        (data) => {
+          const payload = (data ?? {}) as Record<string, unknown>;
+          const senderId =
+            typeof payload?.user_id === "string" ? payload.user_id : "";
+          const name =
+            typeof payload?.name === "string" ? payload.name : "Someone";
+          const typing  = payload?.typing === true;
+          const ts      =
+            typeof payload?.ts === "number" ? payload.ts : Date.now();
 
-            // Ignore our own broadcasts and malformed payloads.
-            if (!senderId || senderId === userId) return;
+          // Ignore our own broadcasts and malformed payloads.
+          if (!senderId || senderId === userId) return;
 
-            let userMap = stateRef.current.get(comm.id);
-            if (!userMap) {
-              userMap = new Map();
-              stateRef.current.set(comm.id, userMap);
-            }
+          let userMap = stateRef.current.get(comm.id);
+          if (!userMap) {
+            userMap = new Map();
+            stateRef.current.set(comm.id, userMap);
+          }
 
-            if (typing) {
-              userMap.set(senderId, { name, lastSeen: ts });
-            } else {
-              userMap.delete(senderId);
-              if (userMap.size === 0) stateRef.current.delete(comm.id);
-            }
+          if (typing) {
+            userMap.set(senderId, { name, lastSeen: ts });
+          } else {
+            userMap.delete(senderId);
+            if (userMap.size === 0) stateRef.current.delete(comm.id);
+          }
 
-            flush();
-          },
-        )
-        .subscribe(),
-    );
+          flush();
+        },
+      );
+      client.connect();
+      clients.push(client);
+    }
 
     // Sweep every second to expire anyone who closed their tab silently.
     const timer = window.setInterval(flush, 1000);
@@ -136,7 +132,7 @@ export function useSidebarTyping({
     return () => {
       window.clearInterval(timer);
       stateRef.current.clear();
-      channels.forEach((ch) => supabase.removeChannel(ch));
+      clients.forEach((client) => client.close());
       setTypingMap(new Map());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

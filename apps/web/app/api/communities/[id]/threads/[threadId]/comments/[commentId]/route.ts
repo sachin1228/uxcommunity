@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export async function DELETE(
   _req: NextRequest,
@@ -24,7 +25,9 @@ export async function DELETE(
   } else {
     commentQuery = commentQuery.eq("thread_id", threadId);
   }
-  const { data: comment } = await commentQuery.maybeSingle();
+  const { data: comment } = (await commentQuery.maybeSingle()) as unknown as {
+    data: { id: string; user_id: string } | null;
+  };
 
   if (!comment) return NextResponse.json({ error: "Comment not found." }, { status: 404 });
   if (comment.user_id !== userId) {
@@ -36,6 +39,14 @@ export async function DELETE(
     console.error("[DELETE comment]", error);
     return NextResponse.json({ error: "Failed to delete comment." }, { status: 500 });
   }
+
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threadComments(threadId),
+      topic: "comment",
+      data: { user_id: comment.user_id },
+    },
+  ]);
 
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { ResourceType } from "@/components/communities/resources/types";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const RESOURCE_TYPES = new Set<ResourceType>([
   "figma", "article", "tool", "video", "book",
@@ -132,6 +133,10 @@ export async function PATCH(
 
   if (error || !updated) { console.error("[PATCH resource]", error); return NextResponse.json({ error: "Failed to update resource." }, { status: 500 }); }
 
+  void publishRealtimeBatch([
+    { room: realtimeRooms.resources(communityId), topic: "resource", data: updated },
+  ]);
+
   return NextResponse.json({ resource: await enrichResource(db, updated as Record<string, unknown>, userId) });
 }
 
@@ -157,6 +162,10 @@ export async function DELETE(
 
   const { error } = await db.from("community_resources").delete().eq("id", resourceId);
   if (error) { console.error("[DELETE resource]", error); return NextResponse.json({ error: "Failed to delete resource." }, { status: 500 }); }
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.resources(communityId), topic: "resource", data: { id: resourceId } },
+  ]);
 
   return new NextResponse(null, { status: 204 });
 }

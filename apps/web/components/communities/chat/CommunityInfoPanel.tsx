@@ -9,7 +9,9 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { createClient } from "@/lib/supabase/client";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 
@@ -160,6 +162,7 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
   const [rsvpPending, setRsvpPending] = useState(false);
   const [localRsvped, setLocalRsvped] = useState<boolean | null>(null);
   const [localRsvpCount, setLocalRsvpCount] = useState<number | null>(null);
+  const isVisible = useDocumentVisible();
 
   const userRsvped = localRsvped ?? upcomingEvent?.user_rsvped ?? false;
   const rsvpCount = localRsvpCount ?? upcomingEvent?.rsvp_count ?? 0;
@@ -233,81 +236,71 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
       .catch(() => {/* silent */});
 
     // ── Realtime subscriptions ─────────────────────────────────────────────
-    const supabase = createClient();
-
-    const rulesChannel = supabase
-      .channel(`community-rules:${communityId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "community_rules",
-          filter: `community_id=eq.${communityId}`,
-        },
-        (payload) => {
-          const updateRules = (prev: CommunityRule[]) => {
-            if (payload.eventType === "INSERT") {
-              const newRule = payload.new as CommunityRule;
-              if (prev.some((rule) => rule.id === newRule.id)) return prev;
-              return [...prev, newRule].sort((a, b) => a.order_index - b.order_index);
-            }
-            if (payload.eventType === "UPDATE") {
-              const updated = payload.new as CommunityRule;
-              return prev
-                .map((rule) => (rule.id === updated.id ? updated : rule))
-                .sort((a, b) => a.order_index - b.order_index);
-            }
-            const deletedId = (payload.old as { id: string }).id;
-            return prev.filter((rule) => rule.id !== deletedId);
-          };
-          setRules(updateRules);
-          patchCachedRequest<{ rules: CommunityRule[] }>(
-            `/api/communities/${communityId}/rules`,
-            (current) => ({ ...current, rules: updateRules(current.rules) }),
-            currentUserId,
-          );
+    if (!isVisible || !currentUserId) return;
+    const rulesClient = new RealtimeClient({
+      room: realtimeRooms.rules(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubRules = rulesClient.on("rule", (data) => {
+      const { event, rule } = data as { event?: string; rule: CommunityRule };
+      const updateRules = (prev: CommunityRule[]) => {
+        if (event === "INSERT") {
+          if (prev.some((item) => item.id === rule.id)) return prev;
+          return [...prev, rule].sort((a, b) => a.order_index - b.order_index);
         }
-      )
-      .subscribe();
+        if (event === "UPDATE") {
+          return prev
+            .map((item) => (item.id === rule.id ? rule : item))
+            .sort((a, b) => a.order_index - b.order_index);
+        }
+        return prev.filter((item) => item.id !== rule.id);
+      };
+      setRules(updateRules);
+      patchCachedRequest<{ rules: CommunityRule[] }>(
+        `/api/communities/${communityId}/rules`,
+        (current) => ({ ...current, rules: updateRules(current.rules) }),
+        currentUserId,
+      );
+    });
+    rulesClient.connect();
 
     // ── Realtime RSVP sync — keep sidebar count in sync with event_rsvps ──
-    const rsvpChannel = supabase
-      .channel(`sidebar-event-rsvps:${communityId}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "event_rsvps" },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as { event_id?: string; user_id?: string } | null;
-          if (!row?.event_id) return;
-          setUpcomingEvent((prev) => {
-            if (!prev || prev.id !== row.event_id) return prev;
-            const delta = payload.eventType === "INSERT" ? 1 : payload.eventType === "DELETE" ? -1 : 0;
-            const newCount = Math.max(0, prev.rsvp_count + delta);
-            // If the change is from the current user, sync user_rsvped too
-            const isMe = currentUserId && row.user_id === currentUserId;
-            return {
-              ...prev,
-              rsvp_count: newCount,
-              user_rsvped: isMe
-                ? payload.eventType === "INSERT"
-                : prev.user_rsvped,
-            };
-          });
-          // Keep local overrides in sync so the button reflects realtime state
-          if (currentUserId && row.user_id === currentUserId) {
-            setLocalRsvped(payload.eventType === "INSERT");
-          }
-          setLocalRsvpCount(null); // let upcomingEvent.rsvp_count drive the count
-        }
-      )
-      .subscribe();
+    const eventsClient = new RealtimeClient({
+      room: realtimeRooms.events(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubRsvp = eventsClient.on("rsvp", (data) => {
+      const row = data as { event?: "INSERT" | "UPDATE" | "DELETE"; event_id?: string; user_id?: string } | null;
+      if (!row?.event_id) return;
+      setUpcomingEvent((prev) => {
+        if (!prev || prev.id !== row.event_id) return prev;
+        const delta = row.event === "INSERT" ? 1 : row.event === "DELETE" ? -1 : 0;
+        const newCount = Math.max(0, prev.rsvp_count + delta);
+        // If the change is from the current user, sync user_rsvped too
+        const isMe = currentUserId && row.user_id === currentUserId;
+        return {
+          ...prev,
+          rsvp_count: newCount,
+          user_rsvped: isMe
+            ? row.event === "INSERT"
+            : prev.user_rsvped,
+        };
+      });
+      // Keep local overrides in sync so the button reflects realtime state
+      if (currentUserId && row.user_id === currentUserId) {
+        setLocalRsvped(row.event === "INSERT");
+      }
+      setLocalRsvpCount(null); // let upcomingEvent.rsvp_count drive the count
+    });
+    eventsClient.connect();
 
     return () => {
-      supabase.removeChannel(rulesChannel);
-      supabase.removeChannel(rsvpChannel);
+      unsubRules();
+      rulesClient.close();
+      unsubRsvp();
+      eventsClient.close();
     };
-  }, [communityId, currentUserId]);
+  }, [communityId, currentUserId, isVisible]);
 
   return (
     // Outer wrapper — sizing + scroll, holds both cards

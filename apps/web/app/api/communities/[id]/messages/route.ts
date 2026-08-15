@@ -8,6 +8,7 @@ import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
 import { createServerTimer } from "@/lib/server-timing";
 
 export async function GET(
@@ -130,13 +131,23 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
-  const { data: inserted, error: insertErr } = await timer.measure("message_insert", async () =>
+  const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
       .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
       .select("id, content, created_at, user_id, reply_to_id, image_url")
       .single(),
-  );
+  )) as unknown as {
+    data: {
+      id: string;
+      content: string | null;
+      created_at: string;
+      user_id: string;
+      reply_to_id: string | null;
+      image_url: string | null;
+    } | null;
+    error: unknown;
+  };
 
   if (insertErr || !inserted) {
     console.error("[POST message] insert error:", insertErr);
@@ -160,12 +171,13 @@ export async function POST(
           userId: capturedUserId,
         });
         if (!aiDecision.allowed) {
-          // Soft-delete triggers a Realtime UPDATE → client removes the bubble.
+          // Soft-delete triggers a Realtime message-delete → client removes the bubble.
           const moderationDb = createServiceClient();
+          const deletedAt = new Date().toISOString();
           await Promise.all([
             moderationDb
               .from("community_messages")
-              .update({ deleted_at: new Date().toISOString() })
+              .update({ deleted_at: deletedAt })
               .eq("id", capturedId),
             logModerationDecision(moderationDb, {
               userId: capturedUserId,
@@ -175,12 +187,54 @@ export async function POST(
               decision: aiDecision,
             }),
           ]);
+          // Propagate the soft-delete to the chat room + sidebar panels.
+          const memberIds = await loadCommunityMemberUserIds(moderationDb, communityId);
+          await publishChatFanout({
+            communityId,
+            memberUserIds: memberIds,
+            chatTopic: "message-delete",
+            chatData: { id: capturedId, deleted_at: deletedAt },
+            panelTopic: "message-delete",
+            panelData: {
+              community_id: communityId,
+              created_at: inserted.created_at,
+              deleted_at: deletedAt,
+            },
+          });
         }
       } catch (err) {
         console.error("[POST message] after() AI moderation error:", err);
       }
     });
   }
+
+  // ── Phase 3: realtime fan-out after the response is sent ─────────────────
+  // Broadcast the new message to the community chat room plus every member's
+  // sidebar panel room (one batched request). Fire-and-forget: missed events
+  // are corrected by the client's next poll/catch-up.
+  after(async () => {
+    try {
+      const publishDb = createServiceClient();
+      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
+      await publishChatFanout({
+        communityId,
+        memberUserIds: memberIds,
+        chatTopic: "message",
+        chatData: {
+          id: inserted.id,
+          community_id: communityId,
+          user_id: inserted.user_id,
+          content: inserted.content ?? "",
+          created_at: inserted.created_at,
+          reply_to_id: inserted.reply_to_id ?? null,
+          image_url: inserted.image_url ?? null,
+        },
+        panelTopic: "message",
+      });
+    } catch (err) {
+      console.error("[POST message] realtime fan-out error:", err);
+    }
+  });
 
   timer.finish({ query_count: reply_to_id ? 2 : 1 });
 

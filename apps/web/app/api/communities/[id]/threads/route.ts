@@ -11,6 +11,7 @@ import { deferCommunityNotification, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityThreads } from "@/lib/communities/read-models";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 50;
 const CATEGORIES = new Set<ThreadCategory>([
@@ -248,6 +249,19 @@ export async function POST(
     console.error("[POST thread]", error);
     return NextResponse.json({ error: "Failed to create thread." }, { status: 500 });
   }
+
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threads(communityId),
+      topic: "thread",
+      data: inserted,
+    },
+    {
+      room: realtimeRooms.profile(userId),
+      topic: "thread",
+      data: inserted,
+    },
+  ]);
 
   await logModerationDecision(db, {
     userId,

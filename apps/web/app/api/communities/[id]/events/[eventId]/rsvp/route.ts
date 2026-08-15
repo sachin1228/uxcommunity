@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export async function POST(
   _req: NextRequest,
@@ -38,6 +39,9 @@ export async function POST(
   if (existing) {
     // Toggle off — remove RSVP
     await db.from("event_rsvps").delete().eq("event_id", eventId).eq("user_id", userId);
+    void publishRealtimeBatch([
+      { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
+    ]);
     const { data: remaining } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
     return NextResponse.json({ rsvped: false, rsvp_count: (remaining ?? []).length });
   }
@@ -51,6 +55,9 @@ export async function POST(
   }
 
   await db.from("event_rsvps").insert({ event_id: eventId, user_id: userId });
+  void publishRealtimeBatch([
+    { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
+  ]);
   deferNotification({
     userId: event.user_id,
     actorId: userId,

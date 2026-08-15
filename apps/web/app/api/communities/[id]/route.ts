@@ -7,6 +7,7 @@ import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { loadCommunityReadModel } from "@/lib/communities/read-models";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
@@ -140,12 +141,41 @@ export async function PATCH(
           .filter(Boolean)
           .slice(0, 12);
 
+        const { data: previousRules } = (await db
+          .from("community_rules")
+          .select("id, community_id, rule_text, order_index")
+          .eq("community_id", id)
+          .order("order_index", { ascending: true })) as unknown as {
+          data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+        };
+
         await db.from("community_rules").delete().eq("community_id", id);
         if (rules.length) {
           await db.from("community_rules").insert(
             rules.map((rule_text, order_index) => ({ community_id: id, rule_text, order_index }))
           );
         }
+
+        const { data: newRules } = (await db
+          .from("community_rules")
+          .select("id, community_id, rule_text, order_index")
+          .eq("community_id", id)
+          .order("order_index", { ascending: true })) as unknown as {
+          data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+        };
+
+        void publishRealtimeBatch([
+          ...(previousRules ?? []).map((rule) => ({
+            room: realtimeRooms.rules(id),
+            topic: "rule",
+            data: { event: "DELETE", rule },
+          })),
+          ...(newRules ?? []).map((rule) => ({
+            room: realtimeRooms.rules(id),
+            topic: "rule",
+            data: { event: "INSERT", rule },
+          })),
+        ]);
       }
     } catch { /* ignore */ }
   }

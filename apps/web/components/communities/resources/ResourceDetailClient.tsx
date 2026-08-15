@@ -5,7 +5,9 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
@@ -237,6 +239,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
+  const isVisible = useDocumentVisible();
 
   const fetchComments = useCallback(async () => {
     try {
@@ -250,35 +253,37 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   }, [communityId, resource.id]);
 
   useEffect(() => {
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
+    if (!isVisible) return;
 
-    const commentChannel = supabase
-      .channel(`resource-comments:${resource.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "resource_comments", filter: `resource_id=eq.${resource.id}` },
-        () => void fetchComments(),
-      )
-      .subscribe();
+    const commentsClient = new RealtimeClient({
+      room: realtimeRooms.resourceComments(resource.id),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubComments = commentsClient.on("comment", () => void fetchComments());
+    commentsClient.connect();
 
-    const saveChannel = supabase
-      .channel(`resource-saves-detail:${resource.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "resource_saves", filter: `resource_id=eq.${resource.id}` },
-        (payload) => {
-          const record = (payload.new ?? payload.old) as { user_id?: string } | null;
-          if (record?.user_id === currentUserId) return;
-          setResource((r) => ({
-            ...r,
-            save_count: payload.eventType === "INSERT" ? r.save_count + 1 : Math.max(0, r.save_count - 1),
-          }));
-        },
-      )
-      .subscribe();
+    const resourcesClient = new RealtimeClient({
+      room: realtimeRooms.resources(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubSaves = resourcesClient.on("save", (data) => {
+      const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; resource_id?: string; user_id?: string } | null;
+      if (!record?.resource_id || record.resource_id !== resource.id) return;
+      if (record.user_id === currentUserId) return;
+      setResource((r) => ({
+        ...r,
+        save_count: record.event === "INSERT" ? r.save_count + 1 : Math.max(0, r.save_count - 1),
+      }));
+    });
+    resourcesClient.connect();
 
     return () => {
-      supabase.removeChannel(commentChannel);
-      supabase.removeChannel(saveChannel);
+      unsubComments();
+      commentsClient.close();
+      unsubSaves();
+      resourcesClient.close();
     };
-  }, [resource.id, currentUserId, fetchComments]);
+  }, [resource.id, communityId, currentUserId, fetchComments, isVisible]);
 
   function handleCommentPosted(comment: ResourceComment) {
     if (comment.parent_id) {

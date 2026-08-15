@@ -7,6 +7,7 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const CATEGORIES = new Set<ThreadCategory>([
   "question", "discussion",
@@ -161,6 +162,19 @@ export async function PATCH(
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }
 
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threads(communityId),
+      topic: "thread",
+      data: updated,
+    },
+    {
+      room: realtimeRooms.profile(userId),
+      topic: "thread",
+      data: updated,
+    },
+  ]);
+
   return NextResponse.json({ thread: await enrichThread(db, updated as Record<string, unknown>, userId) });
 }
 
@@ -183,13 +197,28 @@ export async function DELETE(
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
-  const { data: existing } = await existingQuery.maybeSingle();
+  const { data: existing } = (await existingQuery.maybeSingle()) as unknown as {
+    data: { id: string; user_id: string; community_id: string | null } | null;
+  };
 
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
 
   const { error } = await db.from("community_threads").delete().eq("id", threadId);
   if (error) { console.error("[DELETE thread]", error); return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 }); }
+
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threads(communityId),
+      topic: "thread",
+      data: { id: threadId },
+    },
+    {
+      room: realtimeRooms.profile(existing.user_id),
+      topic: "thread",
+      data: { id: threadId },
+    },
+  ]);
 
   return new NextResponse(null, { status: 204 });
 }

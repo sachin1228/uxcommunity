@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/browser";
 import { useDocumentVisible } from "@/lib/use-document-visible";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
 
 /**
- * Tracks how many members are currently online in a community using
- * Supabase Realtime Presence. Each tab tracks itself; the hook returns
- * the total number of distinct online users (including the current user).
+ * Tracks how many members are currently online in a community using the
+ * Cloudflare realtime presence snapshot. Each tab joins the room; the hook
+ * returns the number of distinct online users (including the current user).
  */
 export function useOnlinePresence({
   communityId,
@@ -21,32 +22,20 @@ export function useOnlinePresence({
 
   useEffect(() => {
     if (!isVisible) return;
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try {
-      supabase = createBrowserClient();
-    } catch {
-      return;
-    }
-
-    const channel = supabase.channel(`community-online:${communityId}`, {
-      config: { presence: { key: currentUserId } },
+    const client = new RealtimeClient({
+      room: realtimeRooms.presence(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
     });
 
-    channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState<{ user_id: string }>();
-        // Count distinct user IDs (each key in presenceState is a user slot)
-        const distinctUsers = new Set(Object.keys(state));
-        setOnlineCount(distinctUsers.size);
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({ user_id: currentUserId });
-        }
-      });
+    const unsubPresence = client.onPresence((users) => {
+      setOnlineCount(users.length);
+    });
+
+    client.connect();
 
     return () => {
-      void supabase.removeChannel(channel);
+      unsubPresence();
+      client.close();
     };
   }, [communityId, currentUserId, isVisible]);
 

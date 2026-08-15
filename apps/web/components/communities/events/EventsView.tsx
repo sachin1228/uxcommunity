@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/publish";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
@@ -30,6 +33,7 @@ export function EventsView({
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
+  const isVisible = useDocumentVisible();
 
   const fetchEvents = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -50,60 +54,33 @@ export function EventsView({
   }, [currentUserId, requestUrl]);
 
   useEffect(() => {
+    if (!isVisible) return;
     queueMicrotask(() => void fetchEvents(true));
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
 
-    const channel = supabase
-      .channel(`community-events:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "community_events",
-        filter: `community_id=eq.${communityId}`,
-      }, () => void fetchEvents(true, true))
-      .subscribe();
+    const client = new RealtimeClient({
+      room: realtimeRooms.events(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubscribes: Array<() => void> = [];
 
-    const rsvpChannel = supabase
-      .channel(`event-rsvps:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_rsvps",
-      }, () => void fetchEvents(true, true))
-      .subscribe();
+    unsubscribes.push(client.on("event", () => void fetchEvents(true, true)));
+    unsubscribes.push(client.on("rsvp", () => void fetchEvents(true, true)));
+    unsubscribes.push(client.on("like", () => void fetchEvents(true, true)));
+    unsubscribes.push(client.on("save", () => void fetchEvents(true, true)));
 
-    const likeChannel = supabase
-      .channel(`event-likes:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_likes",
-      }, () => void fetchEvents(true, true))
-      .subscribe();
-
-    const saveChannel = supabase
-      .channel(`event-saves:${communityId}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "event_saves",
-      }, () => void fetchEvents(true, true))
-      .subscribe();
+    client.connect();
 
     const handleFocus = () => { if (document.visibilityState === "visible") void fetchEvents(true); };
     document.addEventListener("visibilitychange", handleFocus);
     window.addEventListener("focus", handleFocus);
 
     return () => {
-      supabase.removeChannel(channel);
-      supabase.removeChannel(rsvpChannel);
-      supabase.removeChannel(likeChannel);
-      supabase.removeChannel(saveChannel);
+      unsubscribes.forEach((unsub) => unsub());
+      client.close();
       document.removeEventListener("visibilitychange", handleFocus);
       window.removeEventListener("focus", handleFocus);
     };
-  }, [communityId, fetchEvents]);
+  }, [communityId, fetchEvents, isVisible]);
 
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
