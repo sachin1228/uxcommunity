@@ -12,6 +12,7 @@ import { invalidateCommunitiesList } from "@/lib/communities/cache";
 
 interface Props {
   userId: string;
+  mobile?: boolean;
 }
 
 function isMatch(href: string, pathname: string) {
@@ -20,7 +21,7 @@ function isMatch(href: string, pathname: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function GlobalSidebar({ userId }: Props) {
+export function GlobalSidebar({ userId, mobile = false }: Props) {
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -49,7 +50,11 @@ export function GlobalSidebar({ userId }: Props) {
   const exploreActive = pathname === "/dashboard/communities";
 
   return (
-    <aside className="h-full w-72 shrink-0 border-r border-border bg-background overflow-y-auto">
+    <aside
+      className={`h-full shrink-0 overflow-y-auto bg-background ${
+        mobile ? "w-full" : "w-72 border-r border-border"
+      }`}
+    >
       {createOpen && (
         <CreateCommunityModal
           open
