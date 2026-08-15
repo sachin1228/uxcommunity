@@ -4,6 +4,7 @@ import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { deferCommunityNotification, eventHref } from "@/lib/notifications";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -229,6 +230,10 @@ export async function POST(
     href: eventHref(communityId, data.id),
     metadata: { event_date: eventDate },
   });
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.events(communityId), topic: "event", data },
+  ]);
 
   const [enriched] = await enrichEvents(db, [data as unknown as Record<string, unknown>], userId);
   return NextResponse.json({ event: enriched }, { status: 201 });

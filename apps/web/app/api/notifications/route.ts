@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 30;
 
@@ -62,15 +63,53 @@ export async function PATCH(request: NextRequest) {
   const now = new Date().toISOString();
 
   if (body.all === true) {
-    const { error } = await db
+    const { data: rows, error } = (await db
       .from("notifications")
-      .update({ read_at: now })
+      .select("id, user_id, type, title, body, href, read_at, created_at")
       .eq("user_id", userId)
-      .is("read_at", null);
+      .is("read_at", null)) as unknown as {
+      data: Array<{
+        id: string;
+        user_id: string;
+        type: string;
+        title: string;
+        body: string | null;
+        href: string;
+        read_at: string | null;
+        created_at: string;
+      }> | null;
+      error: unknown;
+    };
 
     if (error) {
       console.error("[PATCH notifications all]", error);
       return NextResponse.json({ error: "Failed to mark notifications read." }, { status: 500 });
+    }
+
+    if (rows?.length) {
+      const { error: updateError } = await db
+        .from("notifications")
+        .update({ read_at: now })
+        .eq("user_id", userId)
+        .is("read_at", null);
+      if (updateError) {
+        console.error("[PATCH notifications all]", updateError);
+        return NextResponse.json({ error: "Failed to mark notifications read." }, { status: 500 });
+      }
+
+      // Keep other open tabs' bell counts in sync.
+      after(() => {
+        void publishRealtimeBatch(
+          rows.map((row) => ({
+            room: realtimeRooms.notifications(userId),
+            topic: "update",
+            data: {
+              next: { ...row, read_at: now },
+              old: { id: row.id, read_at: null },
+            },
+          })),
+        );
+      });
     }
 
     return NextResponse.json({ ok: true });
@@ -81,6 +120,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Notification id is required." }, { status: 422 });
   }
 
+  const { data: row } = (await db
+    .from("notifications")
+    .select("id, user_id, type, title, body, href, read_at, created_at")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle()) as unknown as {
+    data: {
+      id: string;
+      user_id: string;
+      type: string;
+      title: string;
+      body: string | null;
+      href: string;
+      read_at: string | null;
+      created_at: string;
+    } | null;
+  };
+
   const { error } = await db
     .from("notifications")
     .update({ read_at: now })
@@ -90,6 +147,18 @@ export async function PATCH(request: NextRequest) {
   if (error) {
     console.error("[PATCH notification]", error);
     return NextResponse.json({ error: "Failed to mark notification read." }, { status: 500 });
+  }
+
+  if (row) {
+    after(() => {
+      void publishRealtimeBatch([
+        {
+          room: realtimeRooms.notifications(userId),
+          topic: "update",
+          data: { next: { ...row, read_at: now }, old: { id: row.id, read_at: row.read_at } },
+        },
+      ]);
+    });
   }
 
   return NextResponse.json({ ok: true });

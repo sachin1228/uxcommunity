@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { uploadToR2 } from "@/lib/r2";
-import { compressChatImage } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   try {
-    const compressed = await compressChatImage(Buffer.from(await file.arrayBuffer()));
+    const body = Buffer.from(await file.arrayBuffer());
     const url = await uploadToR2(
-      `events/public/${session.userId}/${slug}.webp`,
-      compressed.data,
-      compressed.contentType,
+      `events/public/${session.userId}/${slug}.${extensionForMime(file.type)}`,
+      body,
+      file.type,
     );
     return NextResponse.json({ url }, { status: 201 });
   } catch (error) {

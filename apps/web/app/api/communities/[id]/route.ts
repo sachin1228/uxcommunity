@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { compressAvatar } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { loadCommunityReadModel } from "@/lib/communities/read-models";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
@@ -110,9 +111,9 @@ export async function PATCH(
       return moderationFailureResponse(moderation.decision);
     }
     try {
-      const compressed = await compressAvatar(moderation.buffer);
-      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${compressed.ext}`;
-      imageUrlResult = await uploadToR2(key, compressed.data, compressed.contentType);
+      const storedMime = moderation.mime ?? file.type;
+      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
+      imageUrlResult = await uploadToR2(key, moderation.buffer, storedMime);
     } catch (err) {
       console.error("[community-settings] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });
@@ -140,12 +141,41 @@ export async function PATCH(
           .filter(Boolean)
           .slice(0, 12);
 
+        const { data: previousRules } = (await db
+          .from("community_rules")
+          .select("id, community_id, rule_text, order_index")
+          .eq("community_id", id)
+          .order("order_index", { ascending: true })) as unknown as {
+          data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+        };
+
         await db.from("community_rules").delete().eq("community_id", id);
         if (rules.length) {
           await db.from("community_rules").insert(
             rules.map((rule_text, order_index) => ({ community_id: id, rule_text, order_index }))
           );
         }
+
+        const { data: newRules } = (await db
+          .from("community_rules")
+          .select("id, community_id, rule_text, order_index")
+          .eq("community_id", id)
+          .order("order_index", { ascending: true })) as unknown as {
+          data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
+        };
+
+        void publishRealtimeBatch([
+          ...(previousRules ?? []).map((rule) => ({
+            room: realtimeRooms.rules(id),
+            topic: "rule",
+            data: { event: "DELETE", rule },
+          })),
+          ...(newRules ?? []).map((rule) => ({
+            room: realtimeRooms.rules(id),
+            topic: "rule",
+            data: { event: "INSERT", rule },
+          })),
+        ]);
       }
     } catch { /* ignore */ }
   }

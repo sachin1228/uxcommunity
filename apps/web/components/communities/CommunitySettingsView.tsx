@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchJsonCached, setCachedRequest } from "@/lib/request-cache";
+import { compressAvatarClient, compressedFile } from "@/lib/image-client";
 import {
   BookOpen,
   Calendar,
@@ -177,7 +178,13 @@ export function CommunitySettingsView({
       formData.set("is_private",  String(isPrivate));
       formData.set("tabs",        JSON.stringify(tabs));
       formData.set("rules",       JSON.stringify(rules));
-      if (image) formData.set("image", image);
+      if (image) {
+        try {
+          formData.set("image", compressedFile(await compressAvatarClient(image), image));
+        } catch {
+          formData.set("image", image);
+        }
+      }
       if (removeImage && !image) formData.set("remove_image", "true");
 
       const res = await fetch(`/api/communities/${communityId}`, {

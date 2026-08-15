@@ -6,7 +6,9 @@ import {
   CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
-import { createBrowserClient } from "@/lib/supabase/browser";
+import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
+import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { formatRelativeDate } from "./threadShared";
@@ -268,6 +270,7 @@ export function ThreadDetailClient({
   const [comments, setComments] = useState(cachedComments?.comments ?? initialComments);
   const threadRef = useRef(thread);
   const commentsRef = useRef(comments);
+  const isVisible = useDocumentVisible();
 
   const applyComments = useCallback((nextComments: ThreadComment[]) => {
     commentsRef.current = nextComments;
@@ -309,50 +312,52 @@ export function ThreadDetailClient({
   }, [applyComments, commentsUrl, currentUserId]);
 
   useEffect(() => {
-    let supabase: ReturnType<typeof createBrowserClient>;
-    try { supabase = createBrowserClient(); } catch { return; }
+    if (!isVisible) return;
 
-    const commentChannel = supabase
-      .channel(`thread-comments:${thread.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "thread_comments", filter: `thread_id=eq.${thread.id}` },
-        (payload) => {
-          const record = (payload.new ?? payload.old) as { user_id?: string } | null;
-          // Local mutations already patch state and cache synchronously.
-          if (record?.user_id === currentUserId) return;
-          void fetchComments();
-        },
-      )
-      .subscribe();
+    const commentsClient = new RealtimeClient({
+      room: realtimeRooms.threadComments(thread.id),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubComments = commentsClient.on("comment", (data) => {
+      const record = data as { user_id?: string } | null;
+      // Local mutations already patch state and cache synchronously.
+      if (record?.user_id === currentUserId) return;
+      void fetchComments();
+    });
+    commentsClient.connect();
 
-    const voteChannel = supabase
-      .channel(`thread-votes-detail:${thread.id}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "thread_votes", filter: `thread_id=eq.${thread.id}` },
-        (payload) => {
-          const record = (payload.new ?? payload.old) as { user_id?: string } | null;
-          if (record?.user_id === currentUserId) return;
-          const current = threadRef.current;
-          const next = {
-            ...current,
-            vote_count: payload.eventType === "INSERT"
-              ? current.vote_count + 1
-              : Math.max(0, current.vote_count - 1),
-          };
-          threadRef.current = next;
-          setThread(next);
-          patchThreadResource<{ thread?: CommunityThread }>(
-            detailUrl,
-            currentUserId,
-            (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, vote_count: next.vote_count } : next }),
-          );
-        },
-      )
-      .subscribe();
+    const votesClient = new RealtimeClient({
+      room: realtimeRooms.threads(communityId),
+      user: { id: currentUserId, name: null, avatar: null },
+    });
+    const unsubVotes = votesClient.on("vote", (data) => {
+      const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
+      if (!record?.thread_id || record.thread_id !== thread.id) return;
+      if (record.user_id === currentUserId) return;
+      const current = threadRef.current;
+      const next = {
+        ...current,
+        vote_count: record.event === "INSERT"
+          ? current.vote_count + 1
+          : Math.max(0, current.vote_count - 1),
+      };
+      threadRef.current = next;
+      setThread(next);
+      patchThreadResource<{ thread?: CommunityThread }>(
+        detailUrl,
+        currentUserId,
+        (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, vote_count: next.vote_count } : next }),
+      );
+    });
+    votesClient.connect();
 
     return () => {
-      supabase.removeChannel(commentChannel);
-      supabase.removeChannel(voteChannel);
+      unsubComments();
+      commentsClient.close();
+      unsubVotes();
+      votesClient.close();
     };
-  }, [thread.id, currentUserId, detailUrl, fetchComments]);
+  }, [communityId, thread.id, currentUserId, detailUrl, fetchComments, isVisible]);
 
   // ── ThreadCard callbacks ──────────────────────────────────────────────────
 

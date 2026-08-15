@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export type NotificationType =
   | "community_thread"
@@ -96,6 +97,7 @@ export async function createNotification(
     const prevMetadata = existing.metadata ?? {};
     const prevCount =
       typeof prevMetadata.count === "number" ? prevMetadata.count : 1;
+    const createdNow = new Date().toISOString();
     const { error } = (await db
       .from("notifications")
       .update({
@@ -105,32 +107,82 @@ export async function createNotification(
         body,
         href,
         metadata: { ...prevMetadata, count: prevCount + 1 },
-        created_at: new Date().toISOString(),
+        created_at: createdNow,
       } as never)
       .eq("id", existing.id)) as unknown as { error: unknown };
     if (error) {
       console.error("[notifications] dedupe update failed", error);
       return { ok: false, error };
     }
+    // Best-effort realtime: keep other open bell dropdowns in sync.
+    void publishRealtimeBatch([
+      {
+        room: realtimeRooms.notifications(input.userId),
+        topic: "update",
+        data: {
+          next: {
+            id: existing.id,
+            user_id: input.userId,
+            actor_id: input.actorId ?? null,
+            community_id: input.communityId ?? null,
+            type: input.type,
+            entity_type: input.entityType,
+            entity_id: input.entityId,
+            title,
+            body,
+            href,
+            read_at: null,
+            created_at: createdNow,
+          },
+          old: { id: existing.id, read_at: null },
+        },
+      },
+    ]);
     return { ok: true };
   }
 
-  const { error } = await db.from("notifications").insert({
-    user_id: input.userId,
-    actor_id: input.actorId ?? null,
-    community_id: communityId,
-    type: input.type,
-    entity_type: input.entityType,
-    entity_id: input.entityId,
-    title,
-    body,
-    href,
-    metadata: input.metadata ?? {},
-  });
+  const { data: insertedRow, error } = (await db
+    .from("notifications")
+    .insert({
+      user_id: input.userId,
+      actor_id: input.actorId ?? null,
+      community_id: communityId,
+      type: input.type,
+      entity_type: input.entityType,
+      entity_id: input.entityId,
+      title,
+      body,
+      href,
+      metadata: input.metadata ?? {},
+    })
+    .select("id, user_id, type, title, body, href, read_at, created_at")
+    .single()) as unknown as {
+    data: {
+      id: string;
+      user_id: string;
+      type: string;
+      title: string;
+      body: string | null;
+      href: string;
+      read_at: string | null;
+      created_at: string;
+    } | null;
+    error: unknown;
+  };
 
   if (error) {
     console.error("[notifications] insert failed", error);
     return { ok: false, error };
+  }
+
+  if (insertedRow) {
+    void publishRealtimeBatch([
+      {
+        room: realtimeRooms.notifications(input.userId),
+        topic: "insert",
+        data: insertedRow,
+      },
+    ]);
   }
 
   return { ok: true };
@@ -166,9 +218,35 @@ export async function notifyCommunityMembers(
 
   if (!rows.length) return;
 
-  const { error: insertError } = await db.from("notifications").insert(rows);
+  const { data: insertedRows, error: insertError } = (await db
+    .from("notifications")
+    .insert(rows)
+    .select("id, user_id, type, title, body, href, read_at, created_at")) as unknown as {
+    data: Array<{
+      id: string;
+      user_id: string;
+      type: string;
+      title: string;
+      body: string | null;
+      href: string;
+      read_at: string | null;
+      created_at: string;
+    }> | null;
+    error: unknown;
+  };
   if (insertError) {
     console.error("[notifications] bulk insert failed", insertError);
+  }
+
+  // Best-effort realtime fan-out to each recipient's bell dropdown.
+  if (insertedRows?.length) {
+    void publishRealtimeBatch(
+      insertedRows.map((row) => ({
+        room: realtimeRooms.notifications(row.user_id),
+        topic: "insert",
+        data: row,
+      })),
+    );
   }
 }
 

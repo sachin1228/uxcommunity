@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -164,6 +165,14 @@ export async function POST(
     console.error("[POST comment]", error);
     return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
   }
+
+  void publishRealtimeBatch([
+    {
+      room: realtimeRooms.threadComments(threadId),
+      topic: "comment",
+      data: { user_id: userId },
+    },
+  ]);
 
   const href = threadHref(communityId, threadId);
   deferNotification({

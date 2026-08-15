@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { uploadToR2 } from "@/lib/r2";
-import { compressChatImage } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -38,9 +38,9 @@ export async function POST(
   const slug = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   try {
-    const compressed = await compressChatImage(Buffer.from(await file.arrayBuffer()));
-    const key = `events/${communityId}/${session.userId}/${slug}.webp`;
-    const url = await uploadToR2(key, compressed.data, compressed.contentType);
+    const body = Buffer.from(await file.arrayBuffer());
+    const key = `events/${communityId}/${session.userId}/${slug}.${extensionForMime(file.type)}`;
+    const url = await uploadToR2(key, body, file.type);
     return NextResponse.json({ url }, { status: 201 });
   } catch (err) {
     console.error("[event image upload]", err);

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, ImagePlus, Loader2, MapPin, Users, Video, X } from "lucide-react";
 import type { CommunityEvent } from "./types";
+import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -44,7 +45,11 @@ export function CreateEventModal({
     setError(null);
     try {
       const form = new FormData();
-      form.append("file", file);
+      try {
+        form.append("file", compressedFile(await compressChatImageClient(file), file));
+      } catch {
+        form.append("file", file);
+      }
       const res = await fetch(
         publicOnly
           ? "/api/home/uploads/events"

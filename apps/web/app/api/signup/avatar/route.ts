@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
-import { compressAvatar } from "@/lib/image-utils";
+import { extensionForMime } from "@/lib/image-utils";
 import { deleteFromR2, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderateText } from "@/lib/moderation/text";
@@ -119,10 +119,10 @@ export async function POST(request: NextRequest) {
       return moderationFailureResponse(moderation.decision);
     }
 
-    const compressed = await compressAvatar(moderation.buffer);
-    uploadedKey = `avatars/pending/${randomUUID()}.${compressed.ext}`;
+    const storedMime = moderation.mime ?? file.type;
+    uploadedKey = `avatars/pending/${randomUUID()}.${extensionForMime(storedMime)}`;
     try {
-      avatarUrl = await uploadToR2(uploadedKey, compressed.data, compressed.contentType);
+      avatarUrl = await uploadToR2(uploadedKey, moderation.buffer, storedMime);
     } catch (error) {
       console.error("[signup/avatar] R2 upload error:", error);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
@@ -174,6 +174,6 @@ export async function POST(request: NextRequest) {
     role: "user",
   });
   const response = NextResponse.json({ success: true, userId, avatar_url: avatarUrl });
-  setSessionCookie(response, sessionToken);
+  setSessionCookie(response, sessionToken, request.nextUrl.hostname);
   return response;
 }

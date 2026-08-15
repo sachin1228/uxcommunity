@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // M-5: User row was deleted — clear the stale cookie so the client
     // doesn't stay stuck in a logged-in-but-no-user state.
     const response = NextResponse.json({ user: null });
-    clearSessionCookie(response);
+    clearSessionCookie(response, request.nextUrl.hostname);
     return response;
   }
 

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   ) {
     const token = await createSession({ email: adminEmail, role: "admin" });
     const response = NextResponse.json({ success: true, redirect: "/admin" });
-    setSessionCookie(response, token);
+    setSessionCookie(response, token, request.nextUrl.hostname);
     return response;
   }
 
@@ -120,6 +120,6 @@ export async function POST(request: NextRequest) {
   });
 
   const response = NextResponse.json({ success: true, name: user.name });
-  setSessionCookie(response, token);
+  setSessionCookie(response, token, request.nextUrl.hostname);
   return response;
 }
