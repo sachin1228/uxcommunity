@@ -18,6 +18,7 @@ import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 
 // Feed item as returned by /api/home/feed — typed union
@@ -66,18 +67,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
   useEffect(() => {
     const initialFetch = window.setTimeout(() => void fetchFeed(true, refreshToken > 0), 0);
-    const refreshOnFocus = () => {
-      if (document.visibilityState === "visible") void fetchFeed(true);
-    };
-    document.addEventListener("visibilitychange", refreshOnFocus);
-    window.addEventListener("focus", refreshOnFocus);
-
     return () => {
       window.clearTimeout(initialFetch);
-      document.removeEventListener("visibilitychange", refreshOnFocus);
-      window.removeEventListener("focus", refreshOnFocus);
     };
   }, [fetchFeed, refreshToken]);
+
+  // Refetch when returning after a real absence (no realtime channel keeps the
+  // feed current); brief alt-tabs no longer fire a request each.
+  useHiddenCatchUp(() => void fetchFeed(true));
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 
