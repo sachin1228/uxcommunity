@@ -1,0 +1,116 @@
+name: Deploy to Cloudflare
+
+# Deploys the web worker (uxcommunity-web) and realtime worker
+# (uxcommunity-realtime) on every push to main. Mirrors the manual flow:
+#
+#   cd apps/web && npm run deploy
+#   cd apps/realtime && npx wrangler deploy
+#
+# Secrets are read from GitHub Actions secrets (Settings → Secrets and
+# variables → Actions) and written into .dev.vars, which
+# `opennextjs-cloudflare deploy` uploads as Worker secrets.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify required secrets are set
+        shell: bash
+        run: |
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID \
+            SESSION_SECRET SUPABASE_SERVICE_ROLE_KEY \
+            REALTIME_URL REALTIME_PUBLISH_SECRET; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub secret: $name"
+              exit 1
+            fi
+          done
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALTIME_URL: ${{ secrets.REALTIME_URL }}
+          REALTIME_PUBLISH_SECRET: ${{ secrets.REALTIME_PUBLISH_SECRET }}
+
+      # ── Realtime worker (the web app publishes to it) ─────────────────────
+      - name: Deploy realtime worker
+        working-directory: apps/realtime
+        run: |
+          npx wrangler deploy
+          echo "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
+          echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
+
+      # ── Web worker ─────────────────────────────────────────────────────────
+      - name: Write build + runtime env files
+        working-directory: apps/web
+        run: |
+          # Build-time env: SESSION_SECRET only. NEXT_PUBLIC_* are already
+          # injected into the build from wrangler.toml [vars].
+          cat > .env.production.local <<EOF
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          EOF
+
+          # Runtime secrets → uploaded as Worker secrets by the deploy step.
+          # Same values as the local apps/web/.dev.vars.
+          cat > .dev.vars <<EOF
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          REALTIME_URL=${{ secrets.REALTIME_URL }}
+          REALTIME_PUBLISH_SECRET=${{ secrets.REALTIME_PUBLISH_SECRET }}
+          UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM=${{ secrets.EMAIL_FROM }}
+          GIPHY_API_KEY=${{ secrets.GIPHY_API_KEY }}
+          R2_ACCOUNT_ID=${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID=${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY=${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME=${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL=${{ secrets.R2_PUBLIC_URL }}
+          MODERATION_IMAGE_SERVICE_URL=${{ secrets.MODERATION_IMAGE_SERVICE_URL }}
+          ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+          INVITATION_EXPIRY_DAYS=${{ secrets.INVITATION_EXPIRY_DAYS || '7' }}
+          EOF
+
+      - name: Build web worker (OpenNext)
+        working-directory: apps/web
+        run: npx opennextjs-cloudflare build
+
+      # Sanity-check the existing unit tests. Non-blocking for now so a flaky
+      # test can't silently block deploys — remove continue-on-error once the
+      # suite is stable.
+      - name: Run unit tests
+        working-directory: apps/web
+        continue-on-error: true
+        run: |
+          npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
+          npx tsx --test lib/request-cache.test.ts
+
+      - name: Deploy web worker
+        working-directory: apps/web
+        # --keep-vars: preserve any vars/secrets set in the Cloudflare
+        # dashboard that aren't in .dev.vars (e.g. NEXT_PUBLIC_*).
+        run: npx opennextjs-cloudflare deploy -- --keep-vars
