@@ -80,7 +80,7 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
   return (
     <>
       <section className={`${communityFeedLayout.gutters} my-1`}>
-        <div className="grid grid-cols-[auto_1fr] items-center gap-2.5 py-3 sm:py-4">
+        <div className="grid grid-cols-[auto_1fr] items-center gap-5 py-3 sm:py-4">
           <AvatarImg url={avatarUrl} name={name} size={38} className="shrink-0 rounded-full" />
           <div className="grid min-w-0 grid-cols-4 justify-items-center gap-1.5">
             {postTypes.map(({ type, label, icon: Icon, color }) => (
