@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare, Plus, Users } from "lucide-react";
+import { Gamepad2, Home, MessageSquare, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -46,8 +46,11 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
   });
 
   const homeActive =
-    isMatch("/dashboard", pathname) && !isMatch("/dashboard/communities", pathname);
+    isMatch("/dashboard", pathname) &&
+    !isMatch("/dashboard/communities", pathname) &&
+    !isMatch("/dashboard/chat-with-designers", pathname);
   const exploreActive = pathname === "/dashboard/communities";
+  const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
   return (
     <aside
@@ -99,6 +102,22 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
               <Users size={17} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
               {exploreActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+              )}
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/dashboard/chat-with-designers"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
+                designersActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
+              <Gamepad2 size={17} className="shrink-0" />
+              <span className="flex-1 truncate">Chat with designers</span>
+              {designersActive && (
                 <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
               )}
             </Link>
