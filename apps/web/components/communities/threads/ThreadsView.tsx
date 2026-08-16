@@ -247,7 +247,7 @@ export function ThreadsView({
       {loading && (
         <div className={communityFeedLayout.content}>
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading threads">
-            <Spinner size={28} className="text-foreground-muted" />
+            <Spinner size={28} />
           </div>
         </div>
       )}

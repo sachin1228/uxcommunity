@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
-import { Lock, Globe2, Users, Loader2, Check, MessageSquare } from "lucide-react";
+import { Lock, Globe2, Users, Check, MessageSquare } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface Community {
   id: string;
@@ -133,7 +134,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {status === "loading" ? (
-                  <><Loader2 size={15} className="animate-spin" /> Joining…</>
+                  <><Spinner size={15} className="text-white" /> Joining…</>
                 ) : community.is_private ? (
                   <><Lock size={14} /> Request to join</>
                 ) : (

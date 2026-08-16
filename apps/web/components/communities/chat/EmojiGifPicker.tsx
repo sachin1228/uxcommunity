@@ -10,7 +10,7 @@ const EmojiPickerReact = dynamic(() => import("emoji-picker-react"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full">
-      <div className="w-4 h-4 border-2 border-border border-t-foreground-muted rounded-full animate-spin" />
+      <div className="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin" />
     </div>
   ),
 });
@@ -103,7 +103,7 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
       <div className="flex-1 overflow-y-auto px-2 pb-1">
         {loading && results.length === 0 ? (
           <div className="flex items-center justify-center h-24">
-            <div className="w-4 h-4 border-2 border-border border-t-foreground-muted rounded-full animate-spin" />
+            <div className="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin" />
           </div>
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 gap-1">

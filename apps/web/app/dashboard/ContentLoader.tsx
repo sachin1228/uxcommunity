@@ -16,14 +16,14 @@ export function DashboardContentLoader({ header }: { header?: ReactNode }) {
       <div className="min-h-full min-w-0 flex-1 border-r border-border">
         {header}
         <div className="flex min-h-[50vh] items-center justify-center">
-          <Spinner size={28} className="text-foreground-muted" />
+          <Spinner size={28} />
         </div>
       </div>
 
       <aside className="sticky top-6 hidden w-72 shrink-0 p-4 lg:block">
         <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
         <div className="flex items-center justify-center pt-28">
-          <Spinner size={24} className="text-foreground-muted" />
+          <Spinner size={24} />
         </div>
       </aside>
     </div>

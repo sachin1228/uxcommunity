@@ -150,7 +150,7 @@ export default function AdminApplicationsPage() {
       <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4 text-foreground-muted" />
+            <Spinner className="h-4 w-4" />
           </div>
         ) : applications.length === 0 ? (
           <p className="py-12 text-center font-body text-xs text-foreground-muted">

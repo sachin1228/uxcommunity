@@ -102,7 +102,7 @@ export default function CommunityDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5 text-foreground-muted" />
+        <Spinner className="h-5 w-5" />
       </div>
     );
   }

@@ -8,7 +8,7 @@
  * name, member count, tabs) and the CommunityInfoPanel on the right — fed
  * from the module-level meta/sidebar caches, so the loading state looks like
  * the actual community page instead of a skeleton or a bare animation. Only
- * the chat message area shows the Lottie while messages hydrate.
+ * the chat message area shows the community Lottie while messages hydrate.
  *
  * loading.tsx receives no params, so the target community is read from
  * window.location.pathname — the URL bar updates synchronously when a Link is
@@ -145,7 +145,7 @@ export default function CommunityPageLoading() {
           /* Detail view page — spinner in the middle content area, matching
              its real layout (thread/event/resource/showcase feed). */
           <div className="flex-1 flex items-center justify-center">
-            <Spinner size={28} className="text-foreground-muted" />
+            <Spinner size={28} />
           </div>
         ) : (
         /* Chat message area — mirrors the real chat layout: dotted scroll
@@ -161,15 +161,13 @@ export default function CommunityPageLoading() {
             }}
           >
             <div className="flex items-center justify-center h-full">
-              {communityId ? (
+              {communityId && (
                 <LottieLoader
                   communityId={communityId}
                   communityType={community?.type ?? ""}
                   size={200}
-                  spinnerClassName="h-5 w-5 text-foreground-muted"
+                  showFallback={false}
                 />
-              ) : (
-                <div className="h-5 w-5 rounded-full border-2 border-border border-t-accent animate-spin" />
               )}
             </div>
           </div>

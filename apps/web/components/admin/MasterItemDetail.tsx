@@ -200,7 +200,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
     }
   }
 
-  if (loading) return <div className="flex justify-center py-24"><Spinner className="h-5 w-5 text-foreground-muted" /></div>;
+  if (loading) return <div className="flex justify-center py-24"><Spinner className="h-5 w-5" /></div>;
   if (error || !item) return <div className="py-16 text-center font-body text-sm text-foreground-muted">{error ?? `${entity} not found.`}</div>;
 
   return (
@@ -304,7 +304,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {imageUploading ? (
-              <Spinner className="h-3.5 w-3.5 text-foreground-muted" />
+              <Spinner className="h-3.5 w-3.5" />
             ) : (
               <>
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={handleImageChange} className="hidden" />

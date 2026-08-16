@@ -1,7 +1,15 @@
+/**
+ * Plain loading spinner. Defaults to the accent blue so every loading state
+ * in the app shares one consistent look. Pass an explicit `text-*` class
+ * (e.g. `text-white` on accent buttons) to override the color.
+ */
 export function Spinner({ className = "", size }: { className?: string; size?: number }) {
+  // If the caller passes an explicit text color, respect it (e.g. white
+  // spinners on accent buttons). Otherwise default to the accent blue.
+  const hasColorClass = /(^|\s)text-/.test(className);
   return (
     <svg
-      className={`animate-spin ${className}`}
+      className={`animate-spin ${hasColorClass ? "" : "text-accent"} ${className}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"
@@ -14,7 +22,7 @@ export function Spinner({ className = "", size }: { className?: string; size?: n
         cy="12"
         r="10"
         stroke="currentColor"
-        strokeWidth="4"
+        strokeWidth="2"
       />
       <path
         className="opacity-75"

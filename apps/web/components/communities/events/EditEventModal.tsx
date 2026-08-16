@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, Globe, ImagePlus, Loader2, MapPin, Users, Video, X } from "lucide-react";
+import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent } from "./types";
 import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
@@ -160,7 +161,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 onClick={() => imageInputRef.current?.click()}
                 className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-raised text-foreground-muted hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {imageUploading ? <Loader2 size={20} className="animate-spin" /> : <ImagePlus size={20} />}
+                {imageUploading ? <Spinner size={20} /> : <ImagePlus size={20} />}
                 <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
                 <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
               </button>
@@ -297,7 +298,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">Cancel</button>
           <button type="submit" disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
