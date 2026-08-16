@@ -187,6 +187,15 @@ select id, 'mid_level' from public.users
 where email like '%@uxcommunity.in'
 on conflict (user_id) do nothing;
 
+-- Login requires a non-null avatar_url on the profile (see /api/auth/login),
+-- so give every seeded designer a deterministic boring:// avatar.
+update public.designer_profiles dp
+set avatar_url = 'boring://beam/' || replace(u.name, ' ', '%20')
+from public.users u
+where dp.user_id = u.id
+  and u.email like '%@uxcommunity.in'
+  and dp.avatar_url is null;
+
 -- ═══ Ratings & stats ═══════════════════════════════════════
 
 insert into public.user_design_ratings (user_id, rating, wins, losses, draws, duels_played, win_streak, best_streak, last_duel_at) values
