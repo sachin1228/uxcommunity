@@ -72,7 +72,9 @@ export function DesignPreview({
             style={{ width: frameW, height: frameH, background: "#fff", overflow: "hidden" }}
           >
             {design?.components.map((component) => (
-              <div key={component.id} style={componentStyle(component)} />
+              <div key={component.id} style={componentStyle(component)}>
+                {component.type !== "image" && component.text}
+              </div>
             ))}
           </div>
         )}

@@ -393,7 +393,9 @@ export function DuelEditor({
                       field?.focus();
                     }}
                   >
-                    <div style={componentBodyStyle(component)} />
+                    <div style={componentBodyStyle(component)}>
+                      {component.type !== "image" && component.text}
+                    </div>
                     {isSelected && (
                       <>
                         <div className="pointer-events-none absolute inset-0 rounded-md border-2 border-accent" />
