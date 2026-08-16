@@ -63,7 +63,7 @@ export function ShowcaseOptionsMenu({
             className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised disabled:opacity-50"
           >
             <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
-            {saved ? "Unsave showcase" : "Save showcase"}
+            {saved ? "Unsave" : "Save"}
           </button>
           {canManage && (
             <>
@@ -76,7 +76,7 @@ export function ShowcaseOptionsMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
               >
                 <Pencil size={12} />
-                Edit showcase
+                Edit
               </button>
               <button
                 type="button"
@@ -87,7 +87,7 @@ export function ShowcaseOptionsMenu({
                 className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
               >
                 <Trash2 size={12} />
-                Delete showcase
+                Delete
               </button>
             </>
           )}

@@ -211,21 +211,21 @@ export function ResourceCard({
           {!isDetail && (
             <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} disabled={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
               <Bookmark size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
-              {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave resource" : "Save resource"}
+              {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
             </button>
           )}
           {isOwner ? (
             <>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil size={11} /> Edit resource
+                <Pencil size={11} /> Edit
               </button>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                <Trash2 size={11} />{deleting ? "Deleting…" : "Delete resource"}
+                <Trash2 size={11} />{deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           ) : (
             <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag size={11} />{reported ? "Reported" : "Report resource"}
+              <Flag size={11} />{reported ? "Reported" : "Report"}
             </button>
           )}
         </div>

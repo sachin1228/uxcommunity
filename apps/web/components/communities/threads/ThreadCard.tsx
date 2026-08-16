@@ -317,7 +317,7 @@ export function ThreadCard({
                 className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               >
                 <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
-                {displayedSaved ? "Unsave thread" : "Save thread"}
+                {displayedSaved ? "Unsave" : "Save"}
               </button>
               {isOwner ? (
                 <>
@@ -326,7 +326,7 @@ export function ThreadCard({
                     onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                   >
-                    <Pencil size={11} /> Edit thread
+                    <Pencil size={11} /> Edit
                   </button>
                   <button
                     type="button"
@@ -335,7 +335,7 @@ export function ThreadCard({
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
                     <Trash2 size={11} />
-                    {deleting ? "Deleting…" : "Delete thread"}
+                    {deleting ? "Deleting…" : "Delete"}
                   </button>
                 </>
               ) : (
@@ -351,7 +351,7 @@ export function ThreadCard({
                   className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
                 >
                   <Flag size={11} />
-                  {reported ? "Reported" : "Report thread"}
+                  {reported ? "Reported" : "Report"}
                 </button>
               )}
             </div>
