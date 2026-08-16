@@ -304,7 +304,7 @@ export function ChatHeader({
           /* Chat chrome is still loading — show the community Lottie instead
              of a skeleton bar. The Lottie is the only loader in the chat
              window, so no spinner fallback is shown. */
-          {communityId && (
+          communityId ? (
             <div className="flex items-center justify-center py-2">
               <LottieLoader
                 communityId={communityId}
@@ -313,7 +313,7 @@ export function ChatHeader({
                 showFallback={false}
               />
             </div>
-          )}
+          ) : null
         )}
       </div>
     </>
