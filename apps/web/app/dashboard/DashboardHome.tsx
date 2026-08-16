@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { HomeFeed } from "./HomeFeed";
 import { HomePostComposer } from "./HomePostComposer";
+import { DesignDuelPromo } from "@/components/design-duel/DesignDuelPromo";
 
 interface DashboardHomeProps {
   name: string | null;
@@ -26,6 +27,7 @@ export function DashboardHome({ name, avatarUrl, userId }: DashboardHomeProps) {
 
       <aside className="sticky top-6 hidden w-72 shrink-0 p-4 lg:block">
         <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
+        <DesignDuelPromo />
       </aside>
     </div>
   );

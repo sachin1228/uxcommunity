@@ -36,6 +36,19 @@ type PerformanceRpcMap = {
   get_resource_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_event_list_page: { args: { p_community_id: string; p_user_id: string; p_phase: "upcoming" | "past"; p_cursor_event_date: string | null; p_cursor_id: string | null; p_now: string; p_limit: number }; returns: Array<{ item: Json }> };
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
+  get_design_duel_leaderboard: {
+    args: { p_user_id: string; p_period: "weekly" | "all"; p_limit: number };
+    returns: Array<{ item: Json }>;
+  };
+  submit_design: {
+    args: { p_submission_id: string; p_design_json: Json; p_preview_image: string | null };
+    returns: Json;
+  };
+  cast_vote: {
+    args: { p_duel_id: string; p_voter_id: string; p_selected_submission_id: string; p_reason: string | null };
+    returns: Json;
+  };
+  resolve_duel: { args: { p_duel_id: string }; returns: Json };
 };
 
 type RpcResult<T> = Promise<{ data: T | null; error: PostgrestError | null }>;

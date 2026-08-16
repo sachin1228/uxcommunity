@@ -8,6 +8,7 @@ import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import { ShowcaseCard } from "@/components/communities/showcase/ShowcaseCard";
 import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
+import { DuelFeedCard, type DuelFeedItem } from "@/components/design-duel/DuelFeedCard";
 import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
@@ -26,7 +27,7 @@ type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";  
 type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedShowcase = Omit<ShowcasePost, "community_id"> & { _type: "showcase"; community_id: string | null; community_name: string | null; community_image: string | null };
-type FeedItem = FeedThread | FeedEvent | FeedResource | FeedShowcase;
+type FeedItem = FeedThread | FeedEvent | FeedResource | FeedShowcase | DuelFeedItem;
 
 /** Must match PAGE_SIZE in /api/home/feed. */
 const HOME_FEED_PAGE_SIZE = 30;
@@ -276,8 +277,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         <Globe size={32} className="mb-3 text-foreground-subtle" />
         <p className="font-body text-sm font-medium text-foreground-muted">Nothing public yet</p>
         <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
-          When community members share threads, events, resources, or showcase
-          work publicly, they&apos;ll appear here.
+          When community members share threads, events, resources, showcase
+          work, or design duels publicly, they&apos;ll appear here.
         </p>
       </div>
     );
@@ -289,6 +290,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     | { kind: "thread"; item: FeedThread }
     | { kind: "event";  item: FeedEvent }
     | { kind: "showcase"; item: FeedShowcase }
+    | { kind: "duel"; item: DuelFeedItem }
     | { kind: "resources"; items: FeedResource[] };
 
   const groups: Group[] = [];
@@ -304,6 +306,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
       groups.push({ kind: "thread", item });
     } else if (item._type === "event") {
       groups.push({ kind: "event", item });
+    } else if (item._type === "duel") {
+      groups.push({ kind: "duel", item });
     } else {
       groups.push({ kind: "showcase", item });
     }
@@ -379,6 +383,20 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
                 onEdit={() => setEditingShowcase(group.item)}
                 onDelete={() => void handleShowcaseDeleted(group.item)}
+              />
+            </li>
+          );
+        }
+
+        if (group.kind === "duel") {
+          return (
+            <li key={`duel-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
+              <DuelFeedCard
+                item={group.item}
+                isLast={isLastGroup}
+                onOpen={() =>
+                  router.push(`/dashboard/design-duel/duels/${group.item.duel.duel_id}`)
+                }
               />
             </li>
           );
