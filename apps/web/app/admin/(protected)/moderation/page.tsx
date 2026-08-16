@@ -108,7 +108,7 @@ export default function ModerationPage() {
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5 text-foreground-muted" />
+            <Spinner className="h-5 w-5" />
           </div>
         ) : events.length === 0 ? (
           <div className="py-16 text-center">

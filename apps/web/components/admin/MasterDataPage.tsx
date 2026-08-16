@@ -196,7 +196,7 @@ export function MasterDataPage({
       <div className="rounded-xl border border-border bg-surface overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-10">
-            <Spinner className="h-4 w-4 text-foreground-muted" />
+            <Spinner className="h-4 w-4" />
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">

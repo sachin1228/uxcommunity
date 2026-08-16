@@ -84,7 +84,7 @@ function ResetPasswordInner() {
 
         {pageState === "loading" && (
           <div className="flex justify-center py-16">
-            <Spinner className="h-6 w-6 text-foreground-muted" />
+            <Spinner className="h-6 w-6" />
           </div>
         )}
 
@@ -203,7 +203,7 @@ export default function ResetPasswordPage() {
     <Suspense
       fallback={
         <main className="flex min-h-screen items-center justify-center bg-background">
-          <Spinner className="h-6 w-6 text-foreground-muted" />
+          <Spinner className="h-6 w-6" />
         </main>
       }
     >

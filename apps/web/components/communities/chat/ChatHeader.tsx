@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookMarked, Calendar, ChevronDown, Loader2, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -94,7 +94,7 @@ function ConfirmDialog({
             disabled={busy}
             className="flex-1 rounded-xl bg-red-500/10 border border-red-500/20 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
-            {busy ? <Loader2 size={12} className="animate-spin" /> : null}
+            {busy ? <Spinner size={12} className="text-red-400" /> : null}
             {copy.cta}
           </button>
         </div>
@@ -302,20 +302,18 @@ export function ChatHeader({
           </>
         ) : (
           /* Chat chrome is still loading — show the community Lottie instead
-             of a skeleton bar. Resolves community-scoped or universal lottie
-             settings; falls back to a small spinner when none are configured. */
-          <div className="flex items-center justify-center py-2">
-            {communityId ? (
+             of a skeleton bar. The Lottie is the only loader in the chat
+             window, so no spinner fallback is shown. */
+          communityId ? (
+            <div className="flex items-center justify-center py-2">
               <LottieLoader
                 communityId={communityId}
                 communityType=""
                 size={44}
-                spinnerClassName="h-5 w-5 text-foreground-muted"
+                showFallback={false}
               />
-            ) : (
-              <Spinner size={16} className="text-foreground-muted" />
-            )}
-          </div>
+            </div>
+          ) : null
         )}
       </div>
     </>

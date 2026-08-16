@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  CornerDownRight, Loader2, MessageSquare, MoreHorizontal,
+  CornerDownRight, MessageSquare, MoreHorizontal,
   Send, Trash2, Users,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
@@ -161,7 +161,7 @@ function CommentNode({
                       disabled={deleting}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
-                      {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                      {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 size={11} />}
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   </div>
@@ -231,7 +231,7 @@ function CommentNode({
                     disabled={!replyText.trim() || replyPosting}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {replyPosting ? <Loader2 size={11} className="animate-spin" /> : <Send size={11} />}
+                    {replyPosting ? <Spinner size={11} className="text-white" /> : <Send size={11} />}
                     {replyPosting ? "Posting…" : "Post"}
                   </button>
                 </div>
@@ -459,7 +459,7 @@ export function EventDetailClient({
                     disabled={!canPost}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {posting ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                    {posting ? <Spinner size={13} className="text-white" /> : <Send size={13} />}
                     {posting ? "Posting…" : "Post"}
                   </button>
                 </div>
@@ -478,7 +478,7 @@ export function EventDetailClient({
               {/* Comments list */}
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
-                  <Spinner size={22} className="text-foreground-muted" />
+                  <Spinner size={22} />
                 </div>
               ) : rootComments.length === 0 ? (
                 <div className={`${communityFeedLayout.emptyState} min-h-40`}>

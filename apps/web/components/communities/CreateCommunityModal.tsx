@@ -8,12 +8,12 @@ import {
   Globe2,
   Hash,
   ImagePlus,
-  Loader2,
   Lock,
   MessageSquare,
   Plus,
   X,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
@@ -402,7 +402,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 disabled={!canContinue || submitting}
                 className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting && <Loader2 size={14} className="animate-spin" />}
+                {submitting && <Spinner size={14} className="text-white" />}
                 {submitting ? "Creating..." : "Create Community"}
               </button>
             )}

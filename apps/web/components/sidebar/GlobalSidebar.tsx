@@ -110,7 +110,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
       <div>
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4 text-foreground-muted" />
+            <Spinner className="h-4 w-4" />
           </div>
         ) : communities.length === 0 ? (
           <div>

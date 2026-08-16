@@ -59,7 +59,7 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
             : "border-white/5 bg-black/10"
           }`}
       >
-        <Spinner size={16} className="text-foreground-muted" />
+        <Spinner size={16} />
       </div>
     );
   }

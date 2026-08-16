@@ -2,13 +2,13 @@
 
 import { RefObject, useMemo } from "react";
 import { LottieLoader } from "@/components/ui/LottieLoader";
+import { Spinner } from "@/components/ui/Spinner";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { fmtDate } from "./chatUtils";
 import { CommunityIcon } from "../CommunityIcon";
 import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
-import { Loader2 } from "lucide-react";
 
 type Message = CachedMessage;
 
@@ -132,7 +132,7 @@ export function MessageList({
           communityId={communityId}
           communityType={displayCommunity?.type ?? ""}
           size={200}
-          spinnerClassName="h-5 w-5 text-foreground-muted"
+          showFallback={false}
         />
       </div>
     );
@@ -153,7 +153,7 @@ export function MessageList({
       {/* Spinner shown while an older-page fetch is in flight */}
       {loadingOlder && (
         <div className="flex items-center justify-center py-3">
-          <Loader2 size={18} className="animate-spin text-foreground-muted" />
+          <Spinner size={18} />
         </div>
       )}
 

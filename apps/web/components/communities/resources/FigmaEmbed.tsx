@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Maximize2, Minimize2 } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
 
 interface FigmaEmbedProps {
@@ -44,7 +45,7 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
       <div className={`relative w-full ${compact ? "aspect-[4/3] sm:aspect-video" : "aspect-[4/3] md:aspect-video"}`}>
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center gap-2 text-foreground-muted">
-            <Loader2 size={16} className="animate-spin" />
+            <Spinner size={16} />
             <span className="font-body text-sm">Loading Figma prototype…</span>
           </div>
         )}
