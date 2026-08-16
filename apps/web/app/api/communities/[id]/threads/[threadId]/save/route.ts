@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -62,20 +61,6 @@ export async function POST(
     if (error) {
       console.error("[UPSERT save]", error);
       return NextResponse.json({ error: "Failed to save thread." }, { status: 500 });
-    }
-
-    if (!existing) {
-      deferNotification({
-        userId: thread.user_id,
-        actorId: userId,
-        communityId,
-        type: "thread_save",
-        entityType: "thread",
-        entityId: threadId,
-        title: (actorName) => `${actorName} saved your thread`,
-        body: thread.title,
-        href: threadHref(communityId, threadId),
-      });
     }
 
     const { data: persisted, error: confirmationError } = await db

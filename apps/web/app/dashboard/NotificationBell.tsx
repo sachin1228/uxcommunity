@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
-  Bookmark,
   CalendarDays,
   CheckCheck,
   FileText,
@@ -26,11 +25,8 @@ type NotificationType =
   | "thread_comment"
   | "thread_reply"
   | "thread_vote"
-  | "thread_save"
   | "resource_comment"
   | "resource_reply"
-  | "resource_save"
-  | "resource_bookmark"
   | "event_comment"
   | "event_reply"
   | "event_rsvp"
@@ -55,8 +51,8 @@ const MAX_ITEMS = 30;
 
 function iconFor(type: NotificationType) {
   if (type.includes("event")) return CalendarDays;
+  if (type.includes("thread")) return FileText;
   if (type.includes("resource")) return FileText;
-  if (type.includes("save") || type.includes("bookmark")) return Bookmark;
   if (type.includes("comment") || type.includes("reply")) return MessageCircle;
   return Users;
 }
