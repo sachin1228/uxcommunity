@@ -95,6 +95,9 @@ jobs:
       - name: Build + deploy preview worker
         working-directory: apps/web
         id: deploy
+        env:
+          # 2-core GitHub runners can OOM during next build + esbuild bundling.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
           npx opennextjs-cloudflare build

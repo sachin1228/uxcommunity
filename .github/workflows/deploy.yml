@@ -127,6 +127,9 @@ jobs:
 
       - name: Build web worker (OpenNext)
         working-directory: apps/web
+        env:
+          # 2-core GitHub runners can OOM during next build + esbuild bundling.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: npx opennextjs-cloudflare build
 
       # Sanity-check the existing unit tests. Non-blocking for now so a flaky
