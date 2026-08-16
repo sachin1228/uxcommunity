@@ -99,7 +99,9 @@ export class Room extends DurableObject<Env> {
         this.reject(ws, "message too large");
         return;
       }
-      this.broadcast(payload, userId);
+      // Exclude only the sending socket, so the same user's other tabs still
+      // receive the event (needed for presence/voice rooms and multi-tab sync).
+      this.broadcast(payload, { ws });
     }
   }
 
@@ -182,14 +184,20 @@ export class Room extends DurableObject<Env> {
     if (payload.length > MAX_MESSAGE_BYTES) {
       return new Response("Message too large", { status: 413 });
     }
-    this.broadcast(payload, body.exclude_user);
+    // Server-side publishes keep excluding by userId (the sender already has
+    // the row from the API response).
+    this.broadcast(payload, { userId: body.exclude_user });
     return new Response("ok");
   }
 
-  private broadcast(message: string, excludeUserId?: string): void {
+  private broadcast(
+    message: string,
+    exclude?: { ws?: WebSocket; userId?: string }
+  ): void {
     for (const ws of this.ctx.getWebSockets()) {
       const { userId } = ws.deserializeAttachment();
-      if (excludeUserId && userId === excludeUserId) continue;
+      if (exclude?.ws === ws) continue;
+      if (exclude?.userId && userId === exclude.userId) continue;
       this.sendTo(ws, message);
     }
   }

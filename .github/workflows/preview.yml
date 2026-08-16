@@ -47,6 +47,13 @@ jobs:
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
           EOF
 
+          # Mirror wrangler.toml [vars] into the build env so the client
+          # bundle (Supabase URL/anon key, app URL, realtime URL) is built
+          # with the same values the worker gets at runtime. Without these
+          # the preview's browser bundle cannot reach Supabase at all, so
+          # login and signup fail on the preview.
+          awk '/^\[vars\]/{f=1;next}/^\[/{f=0}f && /^[A-Z_]+ = /{gsub(/^ +/,""); split($0,a," = "); gsub(/"/,"",a[2]); print a[1]"="a[2]}' wrangler.toml >> .env.production.local
+
           # No REALTIME_URL / REALTIME_PUBLISH_SECRET: the preview worker must
           # not publish to the production realtime service.
           cat > .dev.vars <<EOF
@@ -66,6 +73,24 @@ jobs:
           ADMIN_EMAIL=${{ secrets.ADMIN_EMAIL }}
           ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
           EOF
+
+      - name: Verify client build-time env vars
+        working-directory: apps/web
+        shell: bash
+        run: |
+          missing=0
+          for name in NEXT_PUBLIC_APP_URL NEXT_PUBLIC_SUPABASE_URL \
+            NEXT_PUBLIC_SUPABASE_ANON_KEY NEXT_PUBLIC_REALTIME_URL; do
+            value=$(grep "^${name}=" .env.production.local | head -1 | cut -d= -f2-)
+            if [ -z "$value" ]; then
+              echo "::error::Missing client build-time var: ${name}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Preview client bundle would be built without required NEXT_PUBLIC_* vars."
+            exit 1
+          fi
 
       - name: Build + deploy preview worker
         working-directory: apps/web
