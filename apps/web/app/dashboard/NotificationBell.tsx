@@ -51,7 +51,6 @@ const MAX_ITEMS = 30;
 
 function iconFor(type: NotificationType) {
   if (type.includes("event")) return CalendarDays;
-  if (type.includes("thread")) return FileText;
   if (type.includes("resource")) return FileText;
   if (type.includes("comment") || type.includes("reply")) return MessageCircle;
   return Users;

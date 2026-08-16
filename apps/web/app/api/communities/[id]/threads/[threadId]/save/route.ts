@@ -38,18 +38,6 @@ export async function POST(
   }
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
-  const { data: existing, error: lookupError } = await db
-    .from("thread_saves")
-    .select("thread_id")
-    .eq("thread_id", threadId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("[LOOKUP save]", lookupError);
-    return NextResponse.json({ error: "Failed to update save." }, { status: 500 });
-  }
-
   if (body.saved) {
     const { error } = await db
       .from("thread_saves")
