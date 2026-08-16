@@ -14,11 +14,11 @@
 
 import type { RemoteUser, SignalPayload } from "./presence";
 
-// Whole-room hearing (meeting-style): you can always hear everyone; walking
-// right up to someone makes them a bit louder. Volume fades to silence only
-// beyond the room bounds.
-const VOICE_RADIUS = 20;
-const FADE_FROM = 3;
+// Proximity hearing: you only hear people close to you (walk up to someone
+// to talk). Everyone in the room is connected, so a listener never needs
+// their mic on to hear — the mic only controls whether they transmit.
+const VOICE_RADIUS = 7;
+const FADE_FROM = 1.5;
 const VOLUME_MS = 150;
 
 const ICE_SERVERS: RTCIceServer[] = [
@@ -76,10 +76,11 @@ export class ProximityVoice {
   /**
    * Reconcile peer connections with everyone in the room.
    *
-   * Connections form between ALL users, so anybody can always hear anybody
-   * (no mic permission needed to listen). Your own mic only controls whether
-   * your audio track is attached — turn it on when it's your turn to talk.
-   * Call whenever presence changes (someone joins/leaves).
+   * Connections form between ALL users, so a nearby listener can always
+   * hear you without turning their mic on (no mic permission needed to
+   * listen). Your own mic only controls whether your audio track is
+   * attached — turn it on when you want to speak. Call whenever presence
+   * changes (someone joins/leaves).
    */
   syncTargets(users: RemoteUser[]) {
     const targets = new Set(
