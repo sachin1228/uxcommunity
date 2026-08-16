@@ -74,11 +74,6 @@ interface Props {
   size?: number;
   /** Tailwind class for fallback spinner (default "h-5 w-5 text-foreground-muted"). */
   spinnerClassName?: string;
-  /**
-   * Whether to render a fallback spinner when no Lottie is configured or still
-   * loading. Off in the chat window so the Lottie is the only loader there.
-   */
-  showFallback?: boolean;
 }
 
 export function LottieLoader({
@@ -86,7 +81,6 @@ export function LottieLoader({
   communityType,
   size = 120,
   spinnerClassName = "h-5 w-5 text-foreground-muted",
-  showFallback = true,
 }: Props) {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [resolved, setResolved] = useState(false);
@@ -134,10 +128,9 @@ export function LottieLoader({
 
   if (!resolved) {
     // Settings/animation JSON is still loading. Show the fallback spinner
-    // (unless disabled) so loading surfaces never sit blank — on a fresh
-    // session the /api/lottie-settings fetch can take a second, and after
-    // that it's a module-level cache hit.
-    if (!showFallback) return null;
+    // so loading surfaces never sit blank — on a fresh session the
+    // /api/lottie-settings fetch can take a second, and after that it's a
+    // module-level cache hit.
     return <Spinner className={spinnerClassName} />;
   }
 
@@ -154,7 +147,6 @@ export function LottieLoader({
     );
   }
 
-  // No lottie configured — fall back to the spinner unless disabled
-  if (!showFallback) return null;
+  // No lottie configured — fall back to the spinner ring
   return <Spinner className={spinnerClassName} />;
 }
