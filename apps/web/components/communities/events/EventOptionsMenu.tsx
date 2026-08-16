@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bookmark, Flag, Loader2, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { Bookmark, Flag, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface EventOptionsMenuProps {
   saved: boolean;
@@ -86,7 +87,7 @@ export function EventOptionsMenu({
                 <Pencil size={12} /> Edit
               </button>
               <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                {deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                {deleting ? <Spinner size={12} className="text-red-400" /> : <Trash2 size={12} />}
                 {deleting ? "Deleting…" : "Delete"}
               </button>
             </>

@@ -7,10 +7,10 @@ import { usePendingActions } from "@/lib/use-mutation";
 import { isPublicContentScope } from "@/lib/content-scope";
 import {
   CornerDownRight,
-  Loader2,
   Send,
   Trash2,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { BackLink } from "@/components/ui/BackLink";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RealtimeClient } from "@/lib/realtime/client";
@@ -87,7 +87,7 @@ function Composer({
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-sm text-accent-foreground disabled:opacity-50"
         >
           {saving ? (
-            <Loader2 size={13} className="animate-spin" />
+            <Spinner size={13} className="text-white" />
           ) : (
             <Send size={13} />
           )}

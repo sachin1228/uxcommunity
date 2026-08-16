@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Check, ChevronDown, Loader2, Globe, X } from "lucide-react";
+import { Check, ChevronDown, Globe, X } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
@@ -179,7 +180,7 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
               />
               {previewLoading && (
-                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-foreground-subtle" />
+                <Spinner size={14} className="absolute right-3 top-1/2 -translate-y-1/2" />
               )}
               {!previewLoading && isValidHttpUrl(url) && !preview && (
                 <Globe size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle" />
@@ -192,7 +193,7 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
             <div className="relative">
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
-                  <Loader2 size={14} className="animate-spin text-foreground-subtle" />
+                  <Spinner size={14} />
                   <span className="font-body text-sm text-foreground-subtle">
                     {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
                   </span>
@@ -335,7 +336,7 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>

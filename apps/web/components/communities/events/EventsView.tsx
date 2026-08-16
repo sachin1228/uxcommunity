@@ -202,7 +202,7 @@ export function EventsView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" aria-label="Loading events" role="status">
-            <Spinner size={28} className="text-foreground-muted" />
+            <Spinner size={28} />
           </div>
         ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>

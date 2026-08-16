@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Check, ChevronDown, Loader2, Globe, X } from "lucide-react";
+import { Check, ChevronDown, Globe, X } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
@@ -182,9 +183,9 @@ export function CreateResourceModal({
               />
               {/* Always-mounted icon slot — avoids animation restart jitter on mount/unmount */}
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                <Loader2
+                <Spinner
                   size={14}
-                  className={`animate-spin text-foreground-subtle transition-opacity duration-150 ${previewLoading ? "opacity-100" : "opacity-0"}`}
+                  className={`transition-opacity duration-150 ${previewLoading ? "opacity-100" : "opacity-0"}`}
                 />
                 <Globe
                   size={14}
@@ -208,7 +209,7 @@ export function CreateResourceModal({
             <div className="relative">
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
-                  <Loader2 size={14} className="animate-spin text-foreground-subtle" />
+                  <Spinner size={14} />
                   <span className="font-body text-sm text-foreground-subtle">
                     {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
                   </span>
@@ -356,7 +357,7 @@ export function CreateResourceModal({
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
             {saving ? "Sharing…" : "Share Resource"}
           </button>
         </div>

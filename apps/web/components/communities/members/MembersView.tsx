@@ -265,7 +265,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
             </p>
             {requestsLoading ? (
               <div className="flex items-center justify-center py-6">
-                <Spinner size={20} className="text-foreground-muted" />
+                <Spinner size={20} />
               </div>
             ) : (
               <ul className="space-y-1">
@@ -307,7 +307,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
         {/* Members list */}
         {loading ? (
           <div className="flex items-center justify-center px-5 py-10">
-            <Spinner size={24} className="text-foreground-muted" />
+            <Spinner size={24} />
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
@@ -384,7 +384,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
 
             {loadingMore && (
               <div className="flex items-center justify-center px-5 py-6">
-                <Spinner size={18} className="text-foreground-muted" />
+                <Spinner size={18} />
               </div>
             )}
 

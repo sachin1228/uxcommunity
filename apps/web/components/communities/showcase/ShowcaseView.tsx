@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Spinner } from "@/components/ui/Spinner";
 import {
   SHOWCASE_CATEGORIES,
   type ShowcaseCategory,
@@ -249,9 +250,9 @@ export function ShowcaseView({
 
       <div className={communityFeedLayout.content}>
         {loading ? (
-          <p className="py-24 text-center font-body text-sm text-foreground-muted">
-            Loading showcase…
-          </p>
+          <div className="flex items-center justify-center py-24" role="status" aria-label="Loading showcase">
+            <Spinner size={28} />
+          </div>
         ) : error ? (
           <p className="py-24 text-center font-body text-sm text-foreground-muted">
             {error}

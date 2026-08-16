@@ -323,7 +323,7 @@ export default function CommunitiesIndexPage() {
       <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
         {loading ? (
           <div className="flex justify-center py-16">
-            <Spinner className="h-5 w-5 text-foreground-muted" />
+            <Spinner className="h-5 w-5" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">

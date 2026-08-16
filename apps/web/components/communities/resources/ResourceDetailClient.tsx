@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
-  CornerDownRight, Loader2, MessageSquare, MoreHorizontal, Send, Trash2,
+  CornerDownRight, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -110,7 +111,7 @@ function CommentBox({
           disabled={saving || !body.trim()}
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+          {saving ? <Spinner size={12} className="text-white" /> : <Send size={12} />}
           {saving ? "Posting…" : "Post"}
         </button>
       </div>

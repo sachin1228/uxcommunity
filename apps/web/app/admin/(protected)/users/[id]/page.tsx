@@ -87,7 +87,7 @@ export default function UserDetailPage() {
   if (loading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner className="h-5 w-5 text-foreground-muted" />
+        <Spinner className="h-5 w-5" />
       </div>
     );
   }
@@ -209,7 +209,7 @@ export default function UserDetailPage() {
         >
           {allCommunitiesLoading ? (
             <span className="absolute inset-0 flex items-center justify-center">
-              <Spinner className="h-3.5 w-3.5 text-foreground-muted" />
+              <Spinner className="h-3.5 w-3.5" />
             </span>
           ) : (
             <span

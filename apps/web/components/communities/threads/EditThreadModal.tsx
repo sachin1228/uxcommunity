@@ -3,8 +3,9 @@
 import { useRef, useState, useEffect } from "react";
 import {
   Check, ChevronDown, Globe, Image as ImageIcon,
-  Link as LinkIcon, Loader2, Paperclip, X,
+  Link as LinkIcon, Paperclip, X,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -289,7 +290,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               onClick={() => fileInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {uploading ? <Loader2 size={14} className="animate-spin" /> : <ImageIcon size={14} />}
+              {uploading ? <Spinner size={14} /> : <ImageIcon size={14} />}
               {uploading ? "Uploading…" : "Photo"}
             </button>
             <button
@@ -500,7 +501,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             disabled={saving || uploading}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Loader2 size={15} className="animate-spin" />}
+            {saving && <Spinner size={15} className="text-white" />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>

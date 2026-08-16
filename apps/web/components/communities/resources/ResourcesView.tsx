@@ -249,7 +249,7 @@ export function ResourcesView({
       <div className={communityFeedLayout.content}>
         {loading ? (
           <div className="flex items-center justify-center py-24" role="status" aria-label="Loading resources">
-            <Spinner size={28} className="text-foreground-muted" />
+            <Spinner size={28} />
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>

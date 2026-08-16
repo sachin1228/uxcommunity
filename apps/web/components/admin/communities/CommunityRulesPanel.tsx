@@ -141,7 +141,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
 
       {loading && (
         <div className="flex justify-center py-4">
-          <Spinner className="h-4 w-4 text-foreground-muted" />
+          <Spinner className="h-4 w-4" />
         </div>
       )}
 

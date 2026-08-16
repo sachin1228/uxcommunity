@@ -11,7 +11,6 @@ import {
   Globe2,
   Hash,
   ImagePlus,
-  Loader2,
   Lock,
   MessageSquare,
   Plus,
@@ -20,6 +19,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { Spinner } from "@/components/ui/Spinner";
 
 interface Community {
   id: string;
@@ -253,7 +253,7 @@ export function CommunitySettingsView({
               disabled={saving || !name.trim()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+              {saving ? <Spinner size={12} className="text-white" /> : <Save size={12} />}
               Save changes
             </button>
             <button
@@ -552,7 +552,7 @@ export function CommunitySettingsView({
                   disabled={regenerating}
                   className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
                 >
-                  {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                  {regenerating ? <Spinner size={11} /> : <RefreshCw size={11} />}
                   Regenerate link
                 </button>
                 {regenMsg && (
@@ -599,7 +599,7 @@ export function CommunitySettingsView({
                       disabled={deleting}
                       className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
                     >
-                      {deleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                      {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 size={11} />}
                       Delete
                     </button>
                   </div>
