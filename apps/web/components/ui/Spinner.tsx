@@ -22,7 +22,7 @@ export function Spinner({ className = "", size }: { className?: string; size?: n
         cy="12"
         r="10"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="3"
       />
       {/* Spinning material — a stroked arc whose thickness matches the track's
           stroke width, so it never looks thicker than the circle. */}
@@ -30,7 +30,7 @@ export function Spinner({ className = "", size }: { className?: string; size?: n
         className="opacity-75"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="3"
         strokeLinecap="round"
         d="M12 2a10 10 0 0 1 10 10"
       />
