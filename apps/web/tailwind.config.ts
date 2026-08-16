@@ -49,10 +49,12 @@ const config: Config = {
         "overlay-foreground":  "var(--color-overlay-foreground)",
         "overlay-muted":       "var(--color-overlay-muted)",
       },
+      // Geist is self-hosted via the `geist` package (next/font/local) — no
+      // Google Fonts download at build time, which was breaking CI builds.
       fontFamily: {
-        display: ["var(--font-display)", "Geist", "sans-serif"],
-        body:    ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono:    ["var(--font-mono)", "Geist Mono", "ui-monospace", "monospace"],
+        display: ["var(--font-geist-sans)", "sans-serif"],
+        body:    ["var(--font-geist-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono:    ["var(--font-geist-mono)", "ui-monospace", "monospace"],
       },
       boxShadow: {
         xs:   "var(--shadow-xs)",
