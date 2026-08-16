@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -48,18 +47,6 @@ export async function POST(
     await db.from("resource_bookmarks").delete().eq("resource_id", resourceId).eq("user_id", userId);
   } else {
     await db.from("resource_bookmarks").insert({ resource_id: resourceId, user_id: userId });
-
-    deferNotification({
-      userId: resource.user_id,
-      actorId: userId,
-      communityId,
-      type: "resource_bookmark",
-      entityType: "resource",
-      entityId: resourceId,
-      title: (actorName) => `${actorName} bookmarked your resource`,
-      body: resource.title,
-      href: resourceHref(communityId, resourceId),
-    });
   }
 
   const { data: allBookmarks } = await db

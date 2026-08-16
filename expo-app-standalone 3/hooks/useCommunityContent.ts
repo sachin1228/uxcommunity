@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { ContentByKind, ContentKind, getCommunityContent } from '@/lib/communityContent';
 
 const TABLES: Record<ContentKind, string[]> = {
-  threads: ['community_threads', 'thread_votes', 'thread_saves', 'thread_comments'],
+  threads: ['community_threads', 'thread_likes', 'thread_saves', 'thread_comments'],
   events: ['community_events', 'event_rsvps', 'event_saves'],
   resources: ['community_resources', 'resource_saves', 'resource_bookmarks', 'resource_comments'],
 };

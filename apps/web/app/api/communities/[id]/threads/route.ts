@@ -95,7 +95,7 @@ async function isMember(
   return Boolean(data);
 }
 
-async function withAuthorAndVotes(
+async function withAuthorAndLikes(
   db: ReturnType<typeof createServiceClient>,
   rows: Array<Record<string, unknown>>,
   currentUserId: string,
@@ -132,8 +132,8 @@ async function withAuthorAndVotes(
       users: userMap[row.user_id as string]
         ? { name: userMap[row.user_id as string], avatar_url: avatarMap[row.user_id as string] ?? null }
         : null,
-      vote_count: Number(aggregate?.vote_count ?? 0),
-      user_voted: aggregate?.user_voted === true,
+      like_count: Number(aggregate?.like_count ?? 0),
+      user_liked: aggregate?.user_liked === true,
       user_saved: aggregate?.user_saved === true,
       comment_count: Number(aggregate?.comment_count ?? 0),
     };
@@ -283,6 +283,6 @@ export async function POST(
     metadata: { category },
   });
 
-  const enriched = (await withAuthorAndVotes(db, [inserted as Record<string, unknown>], userId))[0];
+  const enriched = (await withAuthorAndLikes(db, [inserted as Record<string, unknown>], userId))[0];
   return NextResponse.json({ thread: enriched }, { status: 201 });
 }

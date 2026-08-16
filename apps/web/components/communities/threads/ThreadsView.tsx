@@ -87,12 +87,12 @@ export function ThreadsView({
       client.on("thread", () => void fetchThreads(true, true)),
     );
 
-    // Subscribe to vote changes for realtime vote counts
+    // Subscribe to like changes for realtime like counts
     unsubscribes.push(
-      client.on("vote", (data) => {
+      client.on("like", (data) => {
         const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
         if (!record?.thread_id) return;
-        // Skip own votes — already handled optimistically on click
+        // Skip own likes — already handled optimistically on click
         if (record.user_id === currentUserId) return;
         const threadId = record.thread_id;
 
@@ -100,10 +100,10 @@ export function ThreadsView({
           current.map((thread) => {
             if (thread.id !== threadId) return thread;
             if (record.event === "INSERT") {
-              return { ...thread, vote_count: thread.vote_count + 1 };
+              return { ...thread, like_count: thread.like_count + 1 };
             }
             if (record.event === "DELETE") {
-              return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
+              return { ...thread, like_count: Math.max(0, thread.like_count - 1) };
             }
             return thread;
           }),
@@ -144,9 +144,9 @@ export function ThreadsView({
     writeCache((cur) => cur.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
   }
 
-  function handleVoteChanged(threadId: string, voted: boolean, newCount: number) {
+  function handleLikeChanged(threadId: string, liked: boolean, newCount: number) {
     writeCache((cur) =>
-      cur.map((t) => t.id === threadId ? { ...t, user_voted: voted, vote_count: newCount } : t),
+      cur.map((t) => t.id === threadId ? { ...t, user_liked: liked, like_count: newCount } : t),
     );
   }
 
@@ -277,7 +277,7 @@ export function ThreadsView({
               currentUserId={currentUserId}
               communityId={communityId}
               onUpdated={handleUpdated}
-              onVoteChanged={handleVoteChanged}
+              onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
               onDeleted={handleDeleted}
               isLast={index === filteredThreads.length - 1}

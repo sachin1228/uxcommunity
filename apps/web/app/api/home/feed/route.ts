@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // which is heavy for the free-tier micro compute and the 5GB egress budget.
 // unstable_cache dedupes identical (user, cursor) reads for 10s, collapsing N
 // concurrent page loads into a single DB round-trip. 10s is short enough that
-// new posts / own votes appear almost immediately.
+// new posts / own likes appear almost immediately.
 const loadFeedPage = unstable_cache(
   async (userId: string, before: string | null) => {
     const { data, error } = await callPerformanceRpc(

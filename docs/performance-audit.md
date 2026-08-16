@@ -11,7 +11,7 @@ This is a read-only, evidence-based audit of the existing Next.js and Supabase a
 3. Trace authentication work, database query count and ordering, payload selection, joins and aggregations, cache behavior, and likely index usage.
 4. Audit frontend consumers for duplicate fetches, cache bypasses, broad invalidations, navigation waterfalls, remounts, and `router.refresh()` use.
 5. Trace Realtime channels and cleanup to identify duplicate subscriptions, leaks, and event-driven refetch amplification.
-6. Trace likes, saves, votes, comments, messages, and event mutations for optimistic updates, races, duplicate calls, and overly broad invalidation.
+6. Trace likes, saves, comments, messages, and event mutations for optimistic updates, races, duplicate calls, and overly broad invalidation.
 7. Trace image uploads through preprocessing, validation, moderation, storage, and database writes.
 8. Run available read-only tests, lint, and production build checks, distinguishing measured results from code-derived estimates.
 
@@ -73,7 +73,7 @@ The home feed subscribes without a row-level filter to global `event_likes` and 
 - `apps/web/app/api/communities/[id]/resources/route.ts` — approximately 9 queries
 - `apps/web/app/api/communities/[id]/showcase/route.ts` — approximately 7 queries
 
-These routes fetch one row per vote, RSVP, like, save, comment, or bookmark and aggregate the results in JavaScript. Query count is bounded, but transferred row count is not.
+These routes fetch one row per RSVP, like, save, comment, or bookmark and aggregate the results in JavaScript. Query count is bounded, but transferred row count is not.
 
 **Recommendation:** Add grouped aggregate RPCs or security-invoker views following the existing home-feed aggregate pattern. Include only current-user interaction rows separately.
 

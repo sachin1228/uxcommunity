@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
@@ -39,18 +38,6 @@ export async function POST(
   }
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
-  const { data: existing, error: lookupError } = await db
-    .from("thread_saves")
-    .select("thread_id")
-    .eq("thread_id", threadId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (lookupError) {
-    console.error("[LOOKUP save]", lookupError);
-    return NextResponse.json({ error: "Failed to update save." }, { status: 500 });
-  }
-
   if (body.saved) {
     const { error } = await db
       .from("thread_saves")
@@ -62,20 +49,6 @@ export async function POST(
     if (error) {
       console.error("[UPSERT save]", error);
       return NextResponse.json({ error: "Failed to save thread." }, { status: 500 });
-    }
-
-    if (!existing) {
-      deferNotification({
-        userId: thread.user_id,
-        actorId: userId,
-        communityId,
-        type: "thread_save",
-        entityType: "thread",
-        entityId: threadId,
-        title: (actorName) => `${actorName} saved your thread`,
-        body: thread.title,
-        href: threadHref(communityId, threadId),
-      });
     }
 
     const { data: persisted, error: confirmationError } = await db

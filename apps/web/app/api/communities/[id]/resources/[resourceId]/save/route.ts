@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
@@ -66,18 +65,6 @@ export async function POST(
     void publishRealtimeBatch([
       { room: realtimeRooms.resources(communityId), topic: "save", data: { event: "INSERT", resource_id: resourceId, user_id: userId } },
     ]);
-
-    deferNotification({
-      userId: resource.user_id,
-      actorId: userId,
-      communityId,
-      type: "resource_save",
-      entityType: "resource",
-      entityId: resourceId,
-      title: (actorName) => `${actorName} saved your resource`,
-      body: resource.title,
-      href: resourceHref(communityId, resourceId),
-    });
 
     return NextResponse.json({ saved: true }, { status: 201 });
   }

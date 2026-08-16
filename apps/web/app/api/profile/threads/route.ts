@@ -37,27 +37,27 @@ export async function GET() {
   if (!threads.length) return NextResponse.json({ threads: [] });
 
   const threadIds = threads.map((t) => t.id);
-  const [{ data: allVotes }, { data: myVotes }, { data: mySaves }, { data: allComments }] = await Promise.all([
-    db.from("thread_votes").select("thread_id").in("thread_id", threadIds),
-    db.from("thread_votes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
+  const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] = await Promise.all([
+    db.from("thread_likes").select("thread_id").in("thread_id", threadIds),
+    db.from("thread_likes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
     db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
     db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
   ]);
 
-  const voteCountMap: Record<string, number> = {};
-  for (const v of allVotes ?? []) voteCountMap[v.thread_id] = (voteCountMap[v.thread_id] ?? 0) + 1;
+  const likeCountMap: Record<string, number> = {};
+  for (const l of allLikes ?? []) likeCountMap[l.thread_id] = (likeCountMap[l.thread_id] ?? 0) + 1;
 
   const commentCountMap: Record<string, number> = {};
   for (const c of allComments ?? []) commentCountMap[c.thread_id] = (commentCountMap[c.thread_id] ?? 0) + 1;
 
-  const myVoteSet = new Set((myVotes ?? []).map((v) => v.thread_id));
+  const myLikeSet = new Set((myLikes ?? []).map((l) => l.thread_id));
   const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
   return NextResponse.json({
     threads: threads.map((thread) => ({
       ...thread,
-      vote_count: voteCountMap[thread.id] ?? 0,
-      user_voted: myVoteSet.has(thread.id),
+      like_count: likeCountMap[thread.id] ?? 0,
+      user_liked: myLikeSet.has(thread.id),
       user_saved: mySaveSet.has(thread.id),
       comment_count: commentCountMap[thread.id] ?? 0,
     })),

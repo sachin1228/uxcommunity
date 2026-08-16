@@ -29,7 +29,7 @@ type PerformanceRpcMap = {
     args: { p_community_id: string; p_user_id: string; p_cursor_created_at: string | null; p_cursor_id: string | null; p_limit: number };
     returns: Array<AggregateBase & { community_id: string; user_id: string; title: string; description: string; image_url: string; project_url: string | null; post_type: string; category: string; tags: string[]; created_at: string; updated_at: string; author: Json; like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean }>;
   };
-  get_thread_list_aggregates: { args: { p_user_id: string; p_thread_ids: string[] }; returns: Array<AggregateBase & { vote_count: number; comment_count: number; user_voted: boolean; user_saved: boolean }> };
+  get_thread_list_aggregates: { args: { p_user_id: string; p_thread_ids: string[] }; returns: Array<AggregateBase & { like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean }> };
   get_event_list_aggregates: { args: { p_user_id: string; p_event_ids: string[] }; returns: Array<AggregateBase & { rsvp_count: number; like_count: number; save_count: number; user_rsvped: boolean; user_liked: boolean; user_saved: boolean }> };
   get_resource_list_aggregates: { args: { p_user_id: string; p_resource_ids: string[] }; returns: Array<AggregateBase & { save_count: number; comment_count: number; bookmark_count: number; user_saved: boolean; user_bookmarked: boolean }> };
   get_thread_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };

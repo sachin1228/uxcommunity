@@ -96,10 +96,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     ));
   }, [updateItems]);
 
-  const handleThreadVoteChanged = useCallback((id: string, voted: boolean, count: number) => {
+  const handleThreadLikeChanged = useCallback((id: string, liked: boolean, count: number) => {
     updateItems((prev) => prev.map((it) =>
       it._type === "thread" && it.id === id
-        ? { ...it, user_voted: voted, vote_count: count }
+        ? { ...it, user_liked: liked, like_count: count }
         : it
     ));
   }, [updateItems]);
@@ -327,7 +327,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 communityNamePlacement="below"
                 detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
-                onVoteChanged={handleThreadVoteChanged}
+                onLikeChanged={handleThreadLikeChanged}
                 onSaveChanged={handleThreadSaveChanged}
                 onDeleted={handleThreadDeleted}
                 isLast={isLastGroup}

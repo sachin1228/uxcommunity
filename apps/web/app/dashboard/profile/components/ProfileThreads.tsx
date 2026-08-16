@@ -65,7 +65,7 @@ export function ProfileThreads({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("threads");
   const [threads, setThreads]     = useState(initialThreads);
-  const pendingVotes              = useRef<Set<string>>(new Set());
+  const pendingLikes              = useRef<Set<string>>(new Set());
   const isVisible = useDocumentVisible();
 
   // ── Events tab ────────────────────────────────────────────────────────────
@@ -141,16 +141,16 @@ export function ProfileThreads({
       } catch { /* reconciled on next refresh */ }
     });
 
-    const unsubVote = client.on("vote", (data) => {
+    const unsubLike = client.on("like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id) return;
       const threadId = record.thread_id;
-      if (record.user_id === currentUserId && pendingVotes.current.has(threadId)) return;
+      if (record.user_id === currentUserId && pendingLikes.current.has(threadId)) return;
       setThreads((current) =>
         current.map((thread) => {
           if (thread.id !== threadId) return thread;
-          if (record.event === "INSERT") return { ...thread, vote_count: thread.vote_count + 1 };
-          if (record.event === "DELETE") return { ...thread, vote_count: Math.max(0, thread.vote_count - 1) };
+          if (record.event === "INSERT") return { ...thread, like_count: thread.like_count + 1 };
+          if (record.event === "DELETE") return { ...thread, like_count: Math.max(0, thread.like_count - 1) };
           return thread;
         }),
       );
@@ -159,7 +159,7 @@ export function ProfileThreads({
     client.connect();
     return () => {
       unsubThread();
-      unsubVote();
+      unsubLike();
       client.close();
     };
   }, [currentUserId, isVisible]);
@@ -178,12 +178,12 @@ export function ProfileThreads({
     };
   }
 
-  function handleVoteChanged(threadId: string, voted: boolean, newCount: number) {
-    pendingVotes.current.add(threadId);
-    setTimeout(() => pendingVotes.current.delete(threadId), 5000);
+  function handleLikeChanged(threadId: string, liked: boolean, newCount: number) {
+    pendingLikes.current.add(threadId);
+    setTimeout(() => pendingLikes.current.delete(threadId), 5000);
     setThreads((current) =>
       current.map((t) =>
-        t.id === threadId ? { ...t, user_voted: voted, vote_count: newCount } : t,
+        t.id === threadId ? { ...t, user_liked: liked, like_count: newCount } : t,
       ),
     );
   }
@@ -309,7 +309,7 @@ export function ProfileThreads({
                   communityId={thread.community_id}
                   communityName={thread.community?.name}
                   onUpdated={handleUpdated(thread.id, thread.community)}
-                  onVoteChanged={handleVoteChanged}
+                  onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}
                   onDeleted={handleDeleted}
                 />
@@ -404,7 +404,7 @@ export function ProfileThreads({
                       communityId={thread.community_id}
                       communityName={thread.community?.name}
                       onUpdated={handleUpdated(thread.id, thread.community)}
-                      onVoteChanged={handleVoteChanged}
+                      onLikeChanged={handleLikeChanged}
                       onSaveChanged={(threadId, saved) => {
                         if (!saved) {
                           setSavedItems((current) =>

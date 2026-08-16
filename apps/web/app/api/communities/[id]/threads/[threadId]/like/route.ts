@@ -16,9 +16,9 @@ export async function POST(
     return error as Response;
   }
 
-  const body = (await request.json().catch(() => null)) as { voted?: unknown } | null;
-  if (typeof body?.voted !== "boolean") {
-    return NextResponse.json({ error: "A boolean voted state is required." }, { status: 400 });
+  const body = (await request.json().catch(() => null)) as { liked?: unknown } | null;
+  if (typeof body?.liked !== "boolean") {
+    return NextResponse.json({ error: "A boolean liked state is required." }, { status: 400 });
   }
 
   const { id: communityId, threadId } = await params;
@@ -38,45 +38,45 @@ export async function POST(
     error: unknown;
   };
   if (threadError) {
-    console.error("[LOOKUP thread for vote]", threadError);
+    console.error("[LOOKUP thread for like]", threadError);
     return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
   }
   if (!thread) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
 
   const { data: existing, error: lookupError } = await db
-    .from("thread_votes")
+    .from("thread_likes")
     .select("thread_id")
     .eq("thread_id", threadId)
     .eq("user_id", userId)
     .maybeSingle();
 
   if (lookupError) {
-    console.error("[LOOKUP vote]", lookupError);
+    console.error("[LOOKUP like]", lookupError);
     return NextResponse.json({ error: "Failed to update like." }, { status: 500 });
   }
 
-  if (body.voted) {
+  if (body.liked) {
     const { error } = await db
-      .from("thread_votes")
+      .from("thread_likes")
       .upsert(
         { thread_id: threadId, user_id: userId },
         { onConflict: "thread_id,user_id", ignoreDuplicates: true },
       );
 
     if (error) {
-      console.error("[UPSERT vote]", error);
+      console.error("[UPSERT like]", error);
       return NextResponse.json({ error: "Failed to add like." }, { status: 500 });
     }
 
     void publishRealtimeBatch([
       {
         room: realtimeRooms.threads(communityId),
-        topic: "vote",
+        topic: "like",
         data: { event: "INSERT", thread_id: threadId, user_id: userId },
       },
       {
         room: realtimeRooms.profile(thread.user_id),
-        topic: "vote",
+        topic: "like",
         data: { event: "INSERT", thread_id: threadId, user_id: userId },
       },
     ]);
@@ -86,7 +86,7 @@ export async function POST(
         userId: thread.user_id,
         actorId: userId,
         communityId,
-        type: "thread_vote",
+        type: "thread_like",
         entityType: "thread",
         entityId: threadId,
         title: (actorName) => `${actorName} liked your thread`,
@@ -96,51 +96,51 @@ export async function POST(
     }
 
     const { count, error: countError } = await db
-      .from("thread_votes")
+      .from("thread_likes")
       .select("thread_id", { count: "exact", head: true })
       .eq("thread_id", threadId);
 
     if (countError) {
-      console.error("[COUNT votes]", countError);
+      console.error("[COUNT likes]", countError);
       return NextResponse.json({ error: "Like saved, but its count could not be confirmed." }, { status: 500 });
     }
 
-    return NextResponse.json({ voted: true, count: count ?? 0 });
+    return NextResponse.json({ liked: true, count: count ?? 0 });
   }
 
   const { error } = await db
-    .from("thread_votes")
+    .from("thread_likes")
     .delete()
     .eq("thread_id", threadId)
     .eq("user_id", userId);
 
   if (error) {
-    console.error("[DELETE vote]", error);
+    console.error("[DELETE like]", error);
     return NextResponse.json({ error: "Failed to remove like." }, { status: 500 });
   }
 
   void publishRealtimeBatch([
     {
       room: realtimeRooms.threads(communityId),
-      topic: "vote",
+      topic: "like",
       data: { event: "DELETE", thread_id: threadId, user_id: userId },
     },
     {
       room: realtimeRooms.profile(thread.user_id),
-      topic: "vote",
+      topic: "like",
       data: { event: "DELETE", thread_id: threadId, user_id: userId },
     },
   ]);
 
   const { count, error: countError } = await db
-    .from("thread_votes")
+    .from("thread_likes")
     .select("thread_id", { count: "exact", head: true })
     .eq("thread_id", threadId);
 
   if (countError) {
-    console.error("[COUNT votes]", countError);
+    console.error("[COUNT likes]", countError);
     return NextResponse.json({ error: "Like removed, but its count could not be confirmed." }, { status: 500 });
   }
 
-  return NextResponse.json({ voted: false, count: count ?? 0 });
+  return NextResponse.json({ liked: false, count: count ?? 0 });
 }

@@ -116,13 +116,13 @@ test("does not dedupe requests with different bodies", async () => {
   }) as typeof fetch
 
   await Promise.all([
-    dedupeFetch("/api/communities/c1/threads/t1/vote", {
+    dedupeFetch("/api/communities/c1/threads/t1/like", {
       method: "POST",
-      body: JSON.stringify({ voted: true }),
+      body: JSON.stringify({ liked: true }),
     }),
-    dedupeFetch("/api/communities/c1/threads/t1/vote", {
+    dedupeFetch("/api/communities/c1/threads/t1/like", {
       method: "POST",
-      body: JSON.stringify({ voted: false }),
+      body: JSON.stringify({ liked: false }),
     }),
   ])
 
