@@ -29,9 +29,9 @@ export interface CommunityThread extends BaseContent {
   links: string[];
   attachments: ThreadAttachment[];
   allow_replies: boolean;
-  vote_count: number;
+  like_count: number;
   comment_count: number;
-  user_voted: boolean;
+  user_liked: boolean;
   user_saved: boolean;
 }
 
@@ -93,10 +93,10 @@ export async function setContentAction(
   communityId: string,
   kind: ContentKind,
   itemId: string,
-  action: 'vote' | 'save',
+  action: 'like' | 'save',
   desired: boolean,
 ): Promise<boolean> {
-  const stateKey = action === 'vote' ? 'voted' : 'saved';
+  const stateKey = action === 'like' ? 'liked' : 'saved';
   const { data } = await apiFetch<Record<string, boolean>>(
     `/api/communities/${communityId}/${kind}/${itemId}/${action}`,
     { method: 'POST', body: { [stateKey]: desired } },
@@ -104,7 +104,7 @@ export async function setContentAction(
   return data[stateKey];
 }
 
-export async function toggleContentAction(communityId: string, kind: ContentKind, itemId: string, action: 'vote' | 'save' | 'rsvp' | 'bookmark'): Promise<void> {
+export async function toggleContentAction(communityId: string, kind: ContentKind, itemId: string, action: 'like' | 'save' | 'rsvp' | 'bookmark'): Promise<void> {
   await apiFetch(`/api/communities/${communityId}/${kind}/${itemId}/${action}`, { method: 'POST' });
 }
 

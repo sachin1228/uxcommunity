@@ -326,36 +326,36 @@ export function ThreadDetailClient({
     });
     commentsClient.connect();
 
-    const votesClient = new RealtimeClient({
+    const likesClient = new RealtimeClient({
       room: realtimeRooms.threads(communityId),
       user: { id: currentUserId, name: null, avatar: null },
     });
-    const unsubVotes = votesClient.on("vote", (data) => {
+    const unsubLikes = likesClient.on("like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id || record.thread_id !== thread.id) return;
       if (record.user_id === currentUserId) return;
       const current = threadRef.current;
       const next = {
         ...current,
-        vote_count: record.event === "INSERT"
-          ? current.vote_count + 1
-          : Math.max(0, current.vote_count - 1),
+        like_count: record.event === "INSERT"
+          ? current.like_count + 1
+          : Math.max(0, current.like_count - 1),
       };
       threadRef.current = next;
       setThread(next);
       patchThreadResource<{ thread?: CommunityThread }>(
         detailUrl,
         currentUserId,
-        (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, vote_count: next.vote_count } : next }),
+        (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, like_count: next.like_count } : next }),
       );
     });
-    votesClient.connect();
+    likesClient.connect();
 
     return () => {
       unsubComments();
       commentsClient.close();
-      unsubVotes();
-      votesClient.close();
+      unsubLikes();
+      likesClient.close();
     };
   }, [communityId, thread.id, currentUserId, detailUrl, fetchComments, isVisible]);
 
@@ -380,8 +380,8 @@ export function ThreadDetailClient({
     );
   }
 
-  function handleVoteChanged(_threadId: string, voted: boolean, newCount: number) {
-    writeThread((current) => ({ ...current, user_voted: voted, vote_count: newCount }));
+  function handleLikeChanged(_threadId: string, liked: boolean, newCount: number) {
+    writeThread((current) => ({ ...current, user_liked: liked, like_count: newCount }));
   }
 
   function handleSaveChanged(_threadId: string, saved: boolean) {
@@ -473,7 +473,7 @@ export function ThreadDetailClient({
               currentUserId={currentUserId}
               communityId={communityId}
               variant="detail"
-              onVoteChanged={handleVoteChanged}
+              onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
               onUpdated={handleUpdated}
               onDeleted={handleDeleted}

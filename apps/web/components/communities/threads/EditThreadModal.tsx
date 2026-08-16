@@ -239,8 +239,8 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         ...thread,
         ...(data.thread as CommunityThread),
         users: thread.users,
-        vote_count: thread.vote_count,
-        user_voted: thread.user_voted,
+        like_count: thread.like_count,
+        user_liked: thread.user_liked,
       });
       onClose();
     } catch (err) {

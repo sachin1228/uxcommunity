@@ -68,7 +68,7 @@ interface ThreadCardProps {
   currentUserId: string;
   communityId: string;
   onUpdated: (thread: CommunityThread) => void;
-  onVoteChanged: (threadId: string, voted: boolean, newCount: number) => void;
+  onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
   onDeleted: (threadId: string) => void;
   /** When set, shows a small "in CommunityName" badge — used on the profile page */
@@ -97,7 +97,7 @@ export function ThreadCard({
   currentUserId,
   communityId,
   onUpdated,
-  onVoteChanged,
+  onLikeChanged,
   onSaveChanged,
   onDeleted,
   communityName,
@@ -112,14 +112,14 @@ export function ThreadCard({
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const isOwner = thread.user_id === currentUserId;
 
-  const [optimisticVote, setOptimisticVote] = useState<{ voted: boolean; count: number } | null>(null);
-  const optimisticCountRef = useRef(thread.vote_count);
-  const displayedVoteRef = useRef(thread.user_voted);
-  const optimisticVoted = optimisticVote?.voted ?? thread.user_voted;
-  const optimisticVoteCount = optimisticVote?.count ?? thread.vote_count;
+  const [optimisticLike, setOptimisticLike] = useState<{ liked: boolean; count: number } | null>(null);
+  const optimisticCountRef = useRef(thread.like_count);
+  const displayedLikeRef = useRef(thread.user_liked);
+  const optimisticLiked = optimisticLike?.liked ?? thread.user_liked;
+  const optimisticLikeCount = optimisticLike?.count ?? thread.like_count;
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
   const displayedSaved = optimisticSaved ?? thread.user_saved;
-  const voteCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
+  const likeCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -159,51 +159,51 @@ export function ThreadCard({
     }
   }
 
-  function applyVoteState(voted: boolean) {
-    if (displayedVoteRef.current === voted) return;
-    const newCount = Math.max(0, optimisticCountRef.current + (voted ? 1 : -1));
-    displayedVoteRef.current = voted;
+  function applyLikeState(liked: boolean) {
+    if (displayedLikeRef.current === liked) return;
+    const newCount = Math.max(0, optimisticCountRef.current + (liked ? 1 : -1));
+    displayedLikeRef.current = liked;
     optimisticCountRef.current = newCount;
-    setOptimisticVote({ voted, count: newCount });
-    onVoteChanged(thread.id, voted, newCount);
+    setOptimisticLike({ liked, count: newCount });
+    onLikeChanged(thread.id, liked, newCount);
   }
 
-  function getVoteCoalescer() {
-    if (!voteCoalescerRef.current) {
-      voteCoalescerRef.current = new BooleanIntentCoalescer({
-        initialValue: displayedVoteRef.current,
-        onOptimisticChange: applyVoteState,
-        persist: async (voted) => {
+  function getLikeCoalescer() {
+    if (!likeCoalescerRef.current) {
+      likeCoalescerRef.current = new BooleanIntentCoalescer({
+        initialValue: displayedLikeRef.current,
+        onOptimisticChange: applyLikeState,
+        persist: async (liked) => {
           const response = await dedupeFetch(
-            `/api/communities/${communityId}/threads/${thread.id}/vote`,
+            `/api/communities/${communityId}/threads/${thread.id}/like`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ voted }),
+              body: JSON.stringify({ liked }),
             },
             { cooldownMode: "url" },
           );
           const result = (await response.json().catch(() => null)) as {
-            voted?: boolean;
+            liked?: boolean;
             count?: number;
             error?: string;
           } | null;
-          if (!response.ok || typeof result?.voted !== "boolean") {
+          if (!response.ok || typeof result?.liked !== "boolean") {
             throw new Error(result?.error ?? "Failed to update like.");
           }
           if (typeof result.count === "number") {
             optimisticCountRef.current = result.count;
-            setOptimisticVote({ voted: result.voted, count: result.count });
-            onVoteChanged(thread.id, result.voted, result.count);
+            setOptimisticLike({ liked: result.liked, count: result.count });
+            onLikeChanged(thread.id, result.liked, result.count);
           }
-          return result.voted;
+          return result.liked;
         },
         onError: (error) => {
           showInteractionError(error instanceof Error ? error.message : "Failed to update like.");
         },
       });
     }
-    return voteCoalescerRef.current;
+    return likeCoalescerRef.current;
   }
 
   function getSaveCoalescer() {
@@ -242,18 +242,18 @@ export function ThreadCard({
   }
 
   useEffect(() => () => {
-    voteCoalescerRef.current?.dispose();
+    likeCoalescerRef.current?.dispose();
     saveCoalescerRef.current?.dispose();
     if (interactionErrorTimerRef.current) clearTimeout(interactionErrorTimerRef.current);
   }, []);
 
   useEffect(() => {
-    voteCoalescerRef.current?.syncConfirmed(thread.user_voted);
-    if (!voteCoalescerRef.current?.isPending()) {
-      displayedVoteRef.current = thread.user_voted;
-      optimisticCountRef.current = thread.vote_count;
+    likeCoalescerRef.current?.syncConfirmed(thread.user_liked);
+    if (!likeCoalescerRef.current?.isPending()) {
+      displayedLikeRef.current = thread.user_liked;
+      optimisticCountRef.current = thread.like_count;
     }
-  }, [thread.user_voted, thread.vote_count]);
+  }, [thread.user_liked, thread.like_count]);
 
   useEffect(() => {
     saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
@@ -264,9 +264,9 @@ export function ThreadCard({
     getSaveCoalescer().toggle();
   }
 
-  function handleVote(e: React.MouseEvent) {
+  function handleLike(e: React.MouseEvent) {
     e.preventDefault();
-    getVoteCoalescer().toggle();
+    getLikeCoalescer().toggle();
   }
 
   const authorName    = thread.users?.name ?? "Member";
@@ -535,26 +535,26 @@ export function ThreadCard({
           {/* Like (Instagram-style heart) */}
           <button
             type="button"
-            onClick={handleVote}
-            aria-label={optimisticVoted ? "Unlike" : "Like"}
-            aria-pressed={optimisticVoted}
+            onClick={handleLike}
+            aria-label={optimisticLiked ? "Unlike" : "Like"}
+            aria-pressed={optimisticLiked}
             className="group/like flex items-center gap-2"
           >
             <Heart
               size={20}
               strokeWidth={2}
               className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
-                optimisticVoted
+                optimisticLiked
                   ? "fill-red-500 text-red-500"
                   : "fill-none text-white"
               }`}
             />
             <span
               className={`font-body text-sm font-semibold tabular-nums ${
-                optimisticVoted ? "text-red-500" : "text-white"
+                optimisticLiked ? "text-red-500" : "text-white"
               }`}
             >
-              {optimisticVoteCount}
+              {optimisticLikeCount}
             </span>
           </button>
 

@@ -53,7 +53,7 @@ export default function () {
   authTests();       // /me, invalid login, reset-request (session stays active)
   communityTests();   // communities, messages, reactions
   chatMessageTests(); // deep chat: pagination, replies, reactions, rate-limit, read, stats
-  threadTests();      // threads, votes, comments
+  threadTests();      // threads, likes, comments
   eventTests();       // events, rsvp, event comments
   profileTests();     // profile get/patch, interests, lottie-settings
 
