@@ -404,9 +404,10 @@ export function DesignersRoomView({ userId, userName }: Props) {
             <span className="text-2xl">🎮</span>
             <p className="mt-1 font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
             <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">
-              This is a live room — real people are here right now. Walk up to someone, press{" "}
-              <span className="font-semibold text-foreground">M</span> to turn on your mic and talk.
-              Hold your mouse (or finger) and drag to look around.
+              This is a live room — real people are here right now. You can always hear everyone;
+              press{" "}
+              <span className="font-semibold text-foreground">M</span> to turn on your mic when it&apos;s
+              your turn to talk, like a meeting. Hold your mouse (or finger) and drag to look around.
             </p>
             <button
               type="button"
@@ -444,6 +445,14 @@ export function DesignersRoomView({ userId, userName }: Props) {
           <span className="absolute bottom-1 font-body text-[9px] uppercase tracking-widest text-foreground-muted">
             radar
           </span>
+        </div>
+      )}
+
+      {/* On-air indicator when transmitting */}
+      {ready && !error && micState === "on" && (
+        <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 shadow-lg backdrop-blur">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+          <span className="font-body text-xs font-medium text-foreground">You&apos;re on air — everyone can hear you</span>
         </div>
       )}
 
