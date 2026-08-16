@@ -221,6 +221,30 @@ test("exact-mode keeps alternating toggle bodies as separate requests", async ()
   assert.equal(calls, 2)
 })
 
+test("reconstructs bodyless 204 responses without a body (DELETE showcase bug)", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return new Response(null, { status: 204 })
+  }) as typeof fetch
+
+  // Fresh request path: status 204 forbids a body, so buffering "" and
+  // rebuilding the Response with it must not throw.
+  const response = await dedupeFetch("/api/communities/c1/showcase/p1", {
+    method: "DELETE",
+  })
+  assert.equal(response.status, 204)
+  assert.equal(await response.text(), "")
+
+  // Settle-window replay path: the reconstructed Response must also be valid.
+  const replayed = await dedupeFetch("/api/communities/c1/showcase/p1", {
+    method: "DELETE",
+  })
+  assert.equal(replayed.status, 204)
+  assert.equal(await replayed.text(), "")
+  assert.equal(calls, 1)
+})
+
 test("bypasses dedup for FormData bodies so uploads never collide", async () => {
   let calls = 0
   globalThis.fetch = (async () => {
