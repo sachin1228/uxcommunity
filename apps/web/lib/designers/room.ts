@@ -348,7 +348,6 @@ export class DesignersRoom {
 
   private remotes = new Map<string, RemoteAvatar>();
   private colliders: Collider[] = [];
-  private locked = false;
 
   private resizeObserver: ResizeObserver;
 
@@ -392,9 +391,6 @@ export class DesignersRoom {
 
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
-    document.addEventListener("mousemove", this.onMouseMove);
-    document.addEventListener("pointerlockchange", this.onLockChange);
-    renderer.domElement.addEventListener("click", this.onCanvasClick);
     renderer.domElement.addEventListener("contextmenu", this.onContextMenu);
   }
 
@@ -428,45 +424,22 @@ export class DesignersRoom {
     cancelAnimationFrame(this.raf);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
-    document.removeEventListener("mousemove", this.onMouseMove);
-    document.removeEventListener("pointerlockchange", this.onLockChange);
-    this.renderer.domElement.removeEventListener("click", this.onCanvasClick);
     this.renderer.domElement.removeEventListener("contextmenu", this.onContextMenu);
     this.resizeObserver.disconnect();
-    if (document.pointerLockElement === this.renderer.domElement) {
-      document.exitPointerLock();
-    }
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement === this.container) {
       this.container.removeChild(this.renderer.domElement);
     }
   }
 
-  requestLock() {
-    if (this.locked) return;
-    const el = this.renderer.domElement;
-    const req =
-      el.requestPointerLock ||
-      (el as unknown as { webkitRequestPointerLock?: () => void }).webkitRequestPointerLock;
-    req?.call(el);
-  }
-
-  exitLock() {
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-
-  isLocked() {
-    return this.locked;
-  }
-
-  /** Mobile: directional vector in local space, both in [-1, 1]. */
+  /** Touch/drag: directional vector in local space, both in [-1, 1]. */
   setTouchMove(fx: number, fz: number) {
     this.touchMoveX = Math.max(-1, Math.min(1, fx));
     this.touchMoveZ = Math.max(-1, Math.min(1, fz));
   }
 
-  /** Mobile: incremental look delta in pixels. */
-  addTouchLook(dx: number, dy: number) {
+  /** Incremental look delta in pixels (drag to look — desktop and touch). */
+  addLook(dx: number, dy: number) {
     this.yaw -= dx * 0.0032;
     this.pitch -= dy * 0.0032;
     this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
@@ -506,27 +479,7 @@ export class DesignersRoom {
     this.keys.delete(e.key.toLowerCase());
   };
 
-  private onMouseMove = (e: MouseEvent) => {
-    if (!this.locked) return;
-    this.yaw -= e.movementX * 0.0022;
-    this.pitch -= e.movementY * 0.0022;
-    this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
-  };
-
-  private onLockChange = () => {
-    const el = this.renderer.domElement;
-    this.locked = document.pointerLockElement === el;
-  };
-
-  private onCanvasClick = () => {
-    if (!this.locked && this.pointerCapable()) this.requestLock();
-  };
-
   private onContextMenu = (e: Event) => e.preventDefault();
-
-  private pointerCapable() {
-    return !window.matchMedia("(pointer: coarse)").matches;
-  }
 
   // ── Movement + collision ─────────────────────────────────────────────────────
   private updatePlayer(dt: number) {

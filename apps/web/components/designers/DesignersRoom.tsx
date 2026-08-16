@@ -32,7 +32,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [locked, setLocked] = useState(false);
+  const [intro, setIntro] = useState(true);
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
   const [micState, setMicState] = useState<MicState>("off");
@@ -106,11 +106,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
     roomRef.current = room;
     room.start();
 
-    const onLock = () => setLocked(room.isLocked());
-    document.addEventListener("pointerlockchange", onLock);
-
     return () => {
-      document.removeEventListener("pointerlockchange", onLock);
       room.dispose();
       roomRef.current = null;
     };
@@ -179,6 +175,11 @@ export function DesignersRoomView({ userId, userName }: Props) {
     return () => window.clearTimeout(t);
   }, []);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setIntro(false), 7000);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const toggleMic = useCallback(async () => {
     if (micState === "on") {
       voiceRef.current?.disableMic();
@@ -208,8 +209,8 @@ export function DesignersRoomView({ userId, userName }: Props) {
     });
   }, []);
 
-  // Keyboard shortcuts work even while the pointer is locked to the game:
-  // M = mic, V = voice/speaker mute, Esc = release cursor (browser default).
+  // Keyboard shortcuts: M = mic, V = voice/speaker mute. The cursor is never
+  // captured, so every HUD button is always clickable too.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -235,7 +236,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
   };
 
   const leave = () => {
-    document.exitPointerLock?.();
     router.push("/dashboard");
   };
 
@@ -279,7 +279,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
     const dx = e.clientX - last.x;
     const dy = e.clientY - last.y;
     lookPos.current = { x: e.clientX, y: e.clientY };
-    roomRef.current?.addTouchLook(dx, dy);
+    roomRef.current?.addLook(dx, dy);
   };
   const onLookUp = () => {
     lookPos.current = null;
@@ -289,8 +289,15 @@ export function DesignersRoomView({ userId, userName }: Props) {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#f2e7d3] text-foreground">
-      {/* 3D canvas */}
-      <div ref={containerRef} className="absolute inset-0" />
+      {/* 3D canvas — drag anywhere (not on the HUD) to look around */}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 touch-none"
+        onPointerDown={onLookDown}
+        onPointerMove={onLookMove}
+        onPointerUp={onLookUp}
+        onPointerCancel={onLookUp}
+      />
 
       {/* Loading */}
       {!ready && !error && (
@@ -327,7 +334,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </button>
       )}
 
-      {/* Top-right: room name + online + mic + mute (z-30, clickable while unlocked) */}
+      {/* Top-right: room name + online + mic + mute */}
       {ready && (
         <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
@@ -379,33 +386,34 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {/* Controls hint */}
       {ready && hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Mouse to look · Shift to sprint · M mic · V voice
+          WASD to move · Hold &amp; drag to look · Shift to sprint · M mic · V voice
         </div>
       )}
 
-      {/* Persistent shortcut chip — visible while locked in the game */}
+      {/* Persistent shortcut chip */}
       {ready && !hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
-          M mic · V voice · Esc cursor
+          M mic · V voice · drag to look
         </div>
       )}
 
-      {/* Pointer-lock overlay (desktop) */}
-      {ready && !error && !locked && !isTouch && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/30 backdrop-blur-[2px]">
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-background/80 px-8 py-6 text-center shadow-xl backdrop-blur">
-            <span className="text-3xl">🎮</span>
-            <p className="font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
-            <p className="max-w-xs font-body text-xs text-foreground-muted">
-              This is a live room — real people are here right now. Walk around, walk up to
-              someone, turn on your mic and talk.
+      {/* Non-blocking intro card — the cursor is always free, so this never traps you */}
+      {ready && !error && intro && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <div className="pointer-events-auto mx-4 max-w-sm rounded-2xl border border-border bg-background/90 px-6 py-5 text-center shadow-xl backdrop-blur">
+            <span className="text-2xl">🎮</span>
+            <p className="mt-1 font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
+            <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">
+              This is a live room — real people are here right now. Walk up to someone, press{" "}
+              <span className="font-semibold text-foreground">M</span> to turn on your mic and talk.
+              Hold your mouse (or finger) and drag to look around.
             </p>
             <button
               type="button"
-              onClick={() => roomRef.current?.requestLock()}
-              className="mt-1 rounded-lg bg-accent px-5 py-2 font-body text-sm font-medium text-white transition-opacity hover:opacity-90"
+              onClick={() => setIntro(false)}
+              className="mt-3 rounded-lg bg-accent px-4 py-1.5 font-body text-xs font-medium text-white transition-opacity hover:opacity-90"
             >
-              Click to look around
+              Got it
             </button>
           </div>
         </div>
@@ -490,17 +498,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
                   : undefined
               }
             />
-          </div>
-          <div
-            className="absolute bottom-0 right-0 top-0 z-20 w-1/2 touch-none"
-            onPointerDown={onLookDown}
-            onPointerMove={onLookMove}
-            onPointerUp={onLookUp}
-            onPointerCancel={onLookUp}
-          >
-            <span className="pointer-events-none absolute right-6 top-16 rounded-full bg-background/60 px-3 py-1 font-body text-[10px] text-foreground-muted backdrop-blur">
-              drag to look
-            </span>
           </div>
         </>
       )}
