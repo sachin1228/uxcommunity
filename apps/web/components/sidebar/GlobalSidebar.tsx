@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare, Plus, Users } from "lucide-react";
+import { Home, MessageSquare, PenLine, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -48,6 +48,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
   const homeActive =
     isMatch("/dashboard", pathname) && !isMatch("/dashboard/communities", pathname);
   const exploreActive = pathname === "/dashboard/communities";
+  const diaryActive = pathname === "/dashboard/diary";
 
   return (
     <aside
@@ -99,6 +100,22 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
               <Users size={17} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
               {exploreActive && (
+                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+              )}
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/dashboard/diary"
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
+                diaryActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
+              <PenLine size={17} className="shrink-0" />
+              <span className="flex-1 truncate">Diary</span>
+              {diaryActive && (
                 <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
               )}
             </Link>

@@ -123,6 +123,50 @@ body {
   color: var(--color-foreground);
 }
 
+/* ─── Diary notebook paper ────────────────────────────────────────────── */
+/* Cream page with light-blue ruled lines every 34px and a red margin line.
+   Text blocks must use leading-[34px] so handwriting sits on the rules. */
+.diary-paper {
+  background-color: #FDFCF6;
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent 64px,
+      #FB8B8B 64px,
+      #FB8B8B 66px,
+      transparent 66px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 33px,
+      #C7DCF7 33px,
+      #C7DCF7 34px
+    );
+  background-origin: padding-box;
+  background-clip: padding-box;
+  border-radius: 10px;
+  box-shadow:
+    0 1px 2px rgba(30, 64, 175, 0.10),
+    0 18px 50px -12px rgba(30, 64, 175, 0.35);
+  color: #1D4ED8;
+}
+
+/* Yellow marker-style highlight used behind diary titles. */
+.diary-highlight {
+  background-image: linear-gradient(
+    104deg,
+    transparent 0.9%,
+    rgba(255, 238, 130, 0.95) 2.4%,
+    rgba(255, 238, 130, 0.95) 97.6%,
+    transparent 98.9%
+  );
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  border-radius: 6px;
+  padding: 0 0.5em;
+}
+
 /* ─── Grid theme utilities ───────────────────────────────────────────── */
 @layer utilities {
   .grid-dots {
