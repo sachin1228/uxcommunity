@@ -13,17 +13,19 @@
 delete from notifications
 where type in ('thread_save', 'resource_save', 'resource_bookmark');
 
--- 2. Rename existing thread_vote notifications to thread_like so the
+-- 2. Drop the old type CHECK constraint before renaming rows, otherwise
+--    the rename to thread_like violates the still-active constraint.
+alter table notifications
+  drop constraint notifications_type_check;
+
+-- 3. Rename existing thread_vote notifications to thread_like so the
 --    notification type matches the "like" branding everywhere.
 update notifications
 set type = 'thread_like'
 where type = 'thread_vote';
 
--- 3. Rebuild the type CHECK constraint without the removed types and
+-- 4. Rebuild the type CHECK constraint without the removed types and
 --    with the renamed thread_like type.
-alter table notifications
-  drop constraint notifications_type_check;
-
 alter table notifications
   add constraint notifications_type_check check (
     type in (
