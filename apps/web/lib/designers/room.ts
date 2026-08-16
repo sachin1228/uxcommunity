@@ -1,9 +1,9 @@
 /**
  * 3D designer-studio room engine (plain three.js — no extra addons).
  *
- * Handles: scene + furniture building, first-person pointer-lock camera,
- * WASD / touch movement with collision, and network-driven avatars for
- * other real users in the room.
+ * Handles: scene + furniture building, third-person follow camera with
+ * damping + collision, WASD / touch movement, and network-driven avatars
+ * for other real users in the room.
  *
  * Rendering is tuned for a "stylized multiplayer game + premium designer
  * studio" look: ACES tone mapping, PMREM environment lighting, layered
@@ -26,9 +26,12 @@ import type { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBl
 const HALF_W = 12; // room half-width  (x: ±12)
 const HALF_D = 9; // room half-depth   (z: ±9)
 const WALL_H = 4.6;
-const EYE = 1.62; // player eye height
 const BASE_FOV = 72;
 const SPRINT_FOV = 79;
+// third-person follow camera rig
+const CAM_DIST = 3.4; // orbit distance behind the player
+const CAM_HEIGHT = 1.95; // camera height above the floor
+const LOOK_Y = 1.45; // the point the camera frames (player torso)
 
 /** Static furniture colliders (x, z, radius). Mirrors the GLB placement below. */
 const COLLIDERS: ReadonlyArray<readonly [number, number, number]> = [
@@ -110,7 +113,7 @@ interface WoodTextures {
 /** Wood-plank texture set (albedo + normal + roughness) for the floor. */
 function makeWoodTextures(): WoodTextures {
   const S = 512;
-  const rows = 6;
+  const rows = 5;
   const plankH = S / rows;
 
   const mapC = document.createElement("canvas");
@@ -126,51 +129,59 @@ function makeWoodTextures(): WoodTextures {
   const roughC = document.createElement("canvas");
   roughC.width = roughC.height = S;
   const rctx = roughC.getContext("2d")!;
-  rctx.fillStyle = "#8f8f8f";
-  rctx.fillRect(0, 0, S, S);
 
   for (let r = 0; r < rows; r++) {
-    const light = Math.random() > 0.5;
-    const tone = 52 + Math.random() * 12 - (light ? 0 : 6);
-    const hue = 30 + Math.random() * 8;
-    mctx.fillStyle = `hsl(${hue}, 42%, ${tone}%)`;
+    const tone = 44 + Math.random() * 8;
+    const hue = 26 + Math.random() * 8;
+    mctx.fillStyle = `hsl(${hue}, 38%, ${tone}%)`;
     mctx.fillRect(0, r * plankH, S, plankH);
-    rctx.fillStyle = light ? "#a0a0a0" : "#828282";
-    rctx.fillRect(0, r * plankH, S, plankH);
-    // grain streaks
-    for (let i = 0; i < 140; i++) {
+    // per-board long-direction shading (each plank is individually toned)
+    const grad = mctx.createLinearGradient(0, r * plankH, 0, r * plankH + plankH);
+    grad.addColorStop(0, `hsla(${hue}, 38%, ${tone + 4}%, 0.45)`);
+    grad.addColorStop(1, `hsla(${hue}, 38%, ${tone - 5}%, 0.45)`);
+    mctx.fillStyle = grad;
+    mctx.fillRect(0, r * plankH, S, plankH);
+
+    // long wavy grain streaks (subtle — wood reads as satin, not zebra)
+    for (let i = 0; i < 60; i++) {
       const x = Math.random() * S;
       const y = r * plankH + Math.random() * plankH;
-      const len = 12 + Math.random() * 40;
-      mctx.strokeStyle = `hsla(${hue + 4}, 38%, ${tone - 12}%, ${0.06 + Math.random() * 0.1})`;
-      mctx.lineWidth = 1;
+      const len = 30 + Math.random() * 70;
+      mctx.strokeStyle = `hsla(${hue + 5}, 34%, ${tone - 10}%, ${0.05 + Math.random() * 0.08})`;
+      mctx.lineWidth = 1.4;
       mctx.beginPath();
       mctx.moveTo(x, y);
-      mctx.quadraticCurveTo(x + len / 2, y + (Math.random() - 0.5) * 5, x + len, y);
+      mctx.quadraticCurveTo(x + len / 2, y + (Math.random() - 0.5) * 8, x + len, y + (Math.random() - 0.5) * 6);
       mctx.stroke();
     }
     // occasional knot
-    if (Math.random() > 0.6) {
-      const kx = 40 + Math.random() * (S - 80);
-      const ky = r * plankH + Math.random() * plankH * 0.6;
-      mctx.fillStyle = `hsla(${hue}, 45%, ${tone - 20}%, 0.8)`;
+    if (Math.random() > 0.55) {
+      const kx = 50 + Math.random() * (S - 100);
+      const ky = r * plankH + Math.random() * plankH * 0.5;
+      mctx.fillStyle = `hsla(${hue}, 42%, ${tone - 16}%, 0.75)`;
       mctx.beginPath();
-      mctx.ellipse(kx, ky, 4, 7, 0, 0, Math.PI * 2);
+      mctx.ellipse(kx, ky, 3.5, 6, 0, 0, Math.PI * 2);
       mctx.fill();
-      mctx.fillStyle = `hsla(${hue}, 45%, ${tone - 26}%, 0.9)`;
+      mctx.fillStyle = `hsla(${hue}, 42%, ${tone - 22}%, 0.85)`;
       mctx.beginPath();
-      mctx.ellipse(kx, ky, 2, 4, 0, 0, Math.PI * 2);
+      mctx.ellipse(kx, ky, 1.6, 3.5, 0, 0, Math.PI * 2);
       mctx.fill();
     }
-    // seam groove (dark line in albedo + recess in normal map)
+
+    // seams: recessed groove at the top of each board + a staggered butt
+    // joint mid-board so planks read as individual boards, not a grid
     const seamY = r * plankH;
-    mctx.fillStyle = `hsla(${hue}, 40%, 22%, 0.85)`;
-    mctx.fillRect(0, seamY, S, 3);
-    mctx.fillRect(0, seamY + plankH - 1, S, 2);
-    nctx.fillStyle = "#5f5f5f";
-    nctx.fillRect(0, seamY + 1, S, 1.5);
-    nctx.fillStyle = "#9a9a9a";
-    nctx.fillRect(0, seamY + plankH - 1, S, 1.2);
+    mctx.fillStyle = `hsla(${hue}, 30%, 16%, 0.5)`;
+    mctx.fillRect(0, seamY, S, 2.5);
+    nctx.fillStyle = "#5a5a5a";
+    nctx.fillRect(0, seamY + 1, S, 1.2);
+    const joint = Math.random() * (S * 0.6) + S * 0.2;
+    mctx.fillRect(joint - 1, seamY, 2.5, plankH);
+    nctx.fillRect(joint, seamY + 1, 1.2, plankH);
+
+    // per-board roughness variation (satin finish)
+    rctx.fillStyle = Math.random() > 0.5 ? "#b4b4b4" : "#9e9e9e";
+    rctx.fillRect(0, seamY, S, plankH);
   }
 
   const map = new THREE.CanvasTexture(mapC);
@@ -179,30 +190,44 @@ function makeWoodTextures(): WoodTextures {
   map.colorSpace = THREE.SRGBColorSpace;
   for (const t of [map, normal, rough]) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2.6, 3.2);
+    t.repeat.set(2.4, 2.8);
   }
   return { map, normal, rough };
 }
 
-/** Subtle plaster noise for the walls/ceiling. */
-function makePlasterTexture(): THREE.CanvasTexture {
+/** Subtle plaster noise + bump for the walls. */
+function makePlasterTextures(): { map: THREE.CanvasTexture; normal: THREE.CanvasTexture } {
   const c = document.createElement("canvas");
   c.width = c.height = 256;
   const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#f4ead9";
+  ctx.fillStyle = "#f0e5d2";
   ctx.fillRect(0, 0, 256, 256);
   for (let i = 0; i < 2600; i++) {
     const v = Math.random();
     ctx.fillStyle = v > 0.5 ? "rgba(255,252,245,0.05)" : "rgba(120,100,80,0.04)";
     ctx.fillRect(Math.random() * 256, Math.random() * 256, 2.5, 2.5);
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const n = document.createElement("canvas");
+  n.width = n.height = 256;
+  const nctx = n.getContext("2d")!;
+  nctx.fillStyle = "#808080";
+  nctx.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 1500; i++) {
+    nctx.fillStyle = Math.random() > 0.5 ? "#7c7c7c" : "#858585";
+    nctx.fillRect(Math.random() * 256, Math.random() * 256, 2.2, 2.2);
+  }
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normal = new THREE.CanvasTexture(n);
+  for (const t of [map, normal]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(3, 3);
+  }
+  return { map, normal };
 }
 
-/** Circular rug with concentric bands + medallion. */
-function makeRugTexture(): THREE.CanvasTexture {
+/** Circular rug: concentric bands + medallion + fiber normal. */
+function makeRugTextures(): { map: THREE.CanvasTexture; normal: THREE.CanvasTexture } {
   const c = document.createElement("canvas");
   c.width = c.height = 512;
   const ctx = c.getContext("2d")!;
@@ -231,14 +256,24 @@ function makeRugTexture(): THREE.CanvasTexture {
   ctx.beginPath();
   ctx.arc(256, 256, 34, 0, Math.PI * 2);
   ctx.fill();
-  // subtle fiber noise
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.06})`;
-    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1.5, 1.5);
+  // subtle fiber noise (loose weave — not flat plastic)
+  for (let i = 0; i < 2600; i++) {
+    ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${Math.random() * 0.05})` : `rgba(0,0,20,${Math.random() * 0.04})`;
+    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1.4, 1.4);
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const n = document.createElement("canvas");
+  n.width = n.height = 512;
+  const nctx = n.getContext("2d")!;
+  nctx.fillStyle = "#808080";
+  nctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 2400; i++) {
+    nctx.fillStyle = Math.random() > 0.5 ? "#7c7c7c" : "#858585";
+    nctx.fillRect(Math.random() * 512, Math.random() * 512, 1.6, 1.6);
+  }
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normal = new THREE.CanvasTexture(n);
+  return { map, normal };
 }
 
 /** Soft radial gradient used for fake contact shadows under avatars. */
@@ -374,6 +409,262 @@ function makeSkyTexture(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+// ─── Procedural material detail (the GLB assets ship with flat color-only
+// materials — no textures at all — so we enrich them per material name with
+// albedo / normal / roughness detail derived from each material's base color.
+// This keeps the palette coherent while adding surface richness.) ──────────────
+type DetailKind = "wood" | "fabric" | "metal" | "leaf" | "felt" | "plastic";
+
+function hexToHsl(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace("#", ""), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  switch (max) {
+    case r:
+      h = (g - b) / d + (g < b ? 6 : 0);
+      break;
+    case g:
+      h = (b - r) / d + 2;
+      break;
+    default:
+      h = (r - g) / d + 4;
+  }
+  return [((h / 6) % 1) * 360, s, l];
+}
+
+function hsla(h: number, s: number, l: number, a = 1): string {
+  return `hsla(${h.toFixed(1)}, ${(s * 100).toFixed(1)}%, ${(l * 100).toFixed(1)}%, ${a})`;
+}
+
+/** Maps a GLB material name → the detail texture recipe to enrich it with. */
+function materialKind(name: string): DetailKind | null {
+  const n = name.toLowerCase();
+  if (n.includes("wood") || n.includes("book") || n.includes("drawer")) return "wood";
+  if (n.includes("fabric") || n.includes("pillow") || n.includes("seat") || n.includes("shade")) return "fabric";
+  if (n.includes("metal")) return "metal";
+  if (n.includes("leaf") || n.includes("stem")) return "leaf";
+  if (n.includes("deskmat")) return "felt";
+  if (n.includes("plastic") || n.includes("keyboard") || n.includes("caster") || n.includes("cam")) return "plastic";
+  return null;
+}
+
+interface DetailTextures {
+  map: THREE.CanvasTexture;
+  normal: THREE.CanvasTexture;
+  rough: THREE.CanvasTexture;
+}
+
+function makeDetailTextures(kind: DetailKind, base: string): DetailTextures {
+  const [h, s, l] = hexToHsl(base);
+  const S = 256;
+  const mapC = document.createElement("canvas");
+  mapC.width = mapC.height = S;
+  const mctx = mapC.getContext("2d")!;
+  const normalC = document.createElement("canvas");
+  normalC.width = normalC.height = S;
+  const nctx = normalC.getContext("2d")!;
+  nctx.fillStyle = "#808080";
+  nctx.fillRect(0, 0, S, S);
+  const roughC = document.createElement("canvas");
+  roughC.width = roughC.height = S;
+  const rctx = roughC.getContext("2d")!;
+
+  const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+  if (kind === "wood") {
+    const sat = Math.max(0, s * 0.85);
+    const light = Math.max(0.28, l - 0.03);
+    mctx.fillStyle = hsla(h, sat, light);
+    mctx.fillRect(0, 0, S, S);
+    // vertical grain streaks
+    for (let i = 0; i < 46; i++) {
+      const x = Math.random() * S;
+      const w = rand(1, 4);
+      const g = mctx.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, hsla(h, sat, light - rand(0.04, 0.12), 0.55));
+      g.addColorStop(0.5, hsla(h, sat, light + rand(0.02, 0.06), 0.35));
+      g.addColorStop(1, hsla(h, sat, light - rand(0.04, 0.1), 0.55));
+      mctx.fillStyle = g;
+      mctx.beginPath();
+      mctx.moveTo(x, 0);
+      mctx.quadraticCurveTo(x + w / 2, S / 2, x, S);
+      mctx.lineTo(x + w, S);
+      mctx.quadraticCurveTo(x + w / 2, S / 2, x + w, 0);
+      mctx.closePath();
+      mctx.fill();
+    }
+    // knots
+    for (let i = 0; i < 3; i++) {
+      const kx = Math.random() * S;
+      const ky = Math.random() * S;
+      for (let r = 6; r > 0; r -= 2) {
+        mctx.fillStyle = hsla(h, sat, light - r * 0.014);
+        mctx.beginPath();
+        mctx.ellipse(kx, ky, r * 0.7, r, 0, 0, Math.PI * 2);
+        mctx.fill();
+      }
+      nctx.fillStyle = "#5e5e5e";
+      nctx.beginPath();
+      nctx.ellipse(kx, ky, 6, 9, 0, 0, Math.PI * 2);
+      nctx.fill();
+    }
+    // subtle long streaks on normal
+    for (let i = 0; i < 60; i++) {
+      const x = Math.random() * S;
+      nctx.strokeStyle = Math.random() > 0.5 ? "rgba(120,120,120,0.25)" : "rgba(95,95,95,0.25)";
+      nctx.lineWidth = 1;
+      nctx.beginPath();
+      nctx.moveTo(x, 0);
+      nctx.quadraticCurveTo(x + rand(-2, 2), S / 2, x, S);
+      nctx.stroke();
+    }
+    rctx.fillStyle = "#b0b0b0";
+    rctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 30; i++) {
+      rctx.fillStyle = "rgba(180,180,180,0.35)";
+      rctx.fillRect(Math.random() * S, 0, 1.5, S);
+    }
+  } else if (kind === "fabric") {
+    const sat = Math.max(0, s * 0.9);
+    const light = Math.max(0.2, l - 0.02);
+    mctx.fillStyle = hsla(h, sat, light);
+    mctx.fillRect(0, 0, S, S);
+    // woven dots
+    for (let i = 0; i < 5200; i++) {
+      const d = Math.random() > 0.5 ? 0.06 : -0.06;
+      mctx.fillStyle = hsla(h, sat, light + d, 0.55);
+      mctx.fillRect(Math.random() * S, Math.random() * S, 1.6, 1.6);
+    }
+    // diagonal weave
+    for (let i = -S; i < S * 2; i += 4) {
+      mctx.strokeStyle = "rgba(255,255,255,0.04)";
+      mctx.lineWidth = 2;
+      mctx.beginPath();
+      mctx.moveTo(i, 0);
+      mctx.lineTo(i + S, S);
+      mctx.stroke();
+    }
+    nctx.fillStyle = "#808080";
+    nctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 2600; i++) {
+      const v = Math.random() > 0.5 ? "#7a7a7a" : "#868686";
+      nctx.fillStyle = v;
+      nctx.fillRect(Math.random() * S, Math.random() * S, 1.5, 1.5);
+    }
+    rctx.fillStyle = "#d8d8d8";
+    rctx.fillRect(0, 0, S, S);
+  } else if (kind === "metal") {
+    const sat = Math.min(s, 0.25);
+    const light = Math.max(0.12, Math.min(0.55, l));
+    mctx.fillStyle = hsla(h, sat, light);
+    mctx.fillRect(0, 0, S, S);
+    // brushed horizontal streaks
+    for (let i = 0; i < 90; i++) {
+      const y = Math.random() * S;
+      const g = mctx.createLinearGradient(0, y, S, y + 1);
+      g.addColorStop(0, hsla(h, sat, light + rand(-0.08, -0.03), 0.4));
+      g.addColorStop(0.5, hsla(h, sat, light + rand(0.03, 0.1), 0.5));
+      g.addColorStop(1, hsla(h, sat, light + rand(-0.07, -0.02), 0.4));
+      mctx.fillStyle = g;
+      mctx.fillRect(0, y, S, 1);
+    }
+    nctx.fillStyle = "#808080";
+    nctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 60; i++) {
+      const y = Math.random() * S;
+      nctx.fillStyle = Math.random() > 0.5 ? "#7d7d7d" : "#838383";
+      nctx.fillRect(0, y, S, 1);
+    }
+    rctx.fillStyle = "#8f8f8f";
+    rctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 50; i++) {
+      rctx.fillStyle = "rgba(160,160,160,0.3)";
+      rctx.fillRect(0, Math.random() * S, S, 1);
+    }
+  } else if (kind === "leaf") {
+    const light = Math.max(0.24, Math.min(0.5, l));
+    mctx.fillStyle = hsla(h, Math.max(0.35, s), light);
+    mctx.fillRect(0, 0, S, S);
+    // vein network
+    for (let i = 0; i < 7; i++) {
+      const cx = Math.random() * S;
+      const cy = Math.random() * S;
+      mctx.strokeStyle = hsla(h, Math.max(0.3, s), light - 0.08, 0.4);
+      mctx.lineWidth = 1.2;
+      for (let a = 0; a < 4; a++) {
+        const ang = Math.random() * Math.PI * 2;
+        mctx.beginPath();
+        mctx.moveTo(cx, cy);
+        mctx.lineTo(cx + Math.cos(ang) * rand(30, 60), cy + Math.sin(ang) * rand(30, 60));
+        mctx.stroke();
+      }
+    }
+    for (let i = 0; i < 1500; i++) {
+      mctx.fillStyle = Math.random() > 0.5 ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.05)";
+      mctx.fillRect(Math.random() * S, Math.random() * S, 2, 2);
+    }
+    nctx.fillStyle = "#808080";
+    nctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 40; i++) {
+      const x = Math.random() * S;
+      const y = Math.random() * S;
+      nctx.strokeStyle = "#6e6e6e";
+      nctx.lineWidth = 1;
+      nctx.beginPath();
+      nctx.moveTo(x, y);
+      nctx.lineTo(x + rand(-30, 30), y + rand(-30, 30));
+      nctx.stroke();
+    }
+    rctx.fillStyle = "#d5d5d5";
+    rctx.fillRect(0, 0, S, S);
+  } else if (kind === "felt") {
+    mctx.fillStyle = hsla(h, s, l);
+    mctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 4200; i++) {
+      mctx.fillStyle = Math.random() > 0.5 ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.07)";
+      mctx.fillRect(Math.random() * S, Math.random() * S, 1.4, 1.4);
+    }
+    nctx.fillStyle = "#7e7e7e";
+    nctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 2000; i++) {
+      nctx.fillStyle = "#7a7a7a";
+      nctx.fillRect(Math.random() * S, Math.random() * S, 1.4, 1.4);
+    }
+    rctx.fillStyle = "#dcdcdc";
+    rctx.fillRect(0, 0, S, S);
+  } else {
+    // plastic — very subtle
+    mctx.fillStyle = hsla(h, s, l);
+    mctx.fillRect(0, 0, S, S);
+    for (let i = 0; i < 900; i++) {
+      mctx.fillStyle = Math.random() > 0.5 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.04)";
+      mctx.fillRect(Math.random() * S, Math.random() * S, 2, 2);
+    }
+    nctx.fillStyle = "#808080";
+    nctx.fillRect(0, 0, S, S);
+    rctx.fillStyle = "#b8b8b8";
+    rctx.fillRect(0, 0, S, S);
+  }
+
+  const map = new THREE.CanvasTexture(mapC);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normal = new THREE.CanvasTexture(normalC);
+  const rough = new THREE.CanvasTexture(roughC);
+  for (const t of [map, normal, rough]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2, 2);
+  }
+  return { map, normal, rough };
 }
 
 function colorFromName(name: string): string {
@@ -533,6 +824,11 @@ export class DesignersRoom {
   private remotes = new Map<string, RemoteAvatar>();
   private colliders: Collider[] = [];
 
+  // third-person rig state
+  private camPos = new THREE.Vector3();
+  private camInit = false;
+  private playerBody: THREE.Group | null = null;
+
   private post: { composer: EffectComposer; ssao: SSAOPass | null; bloom: UnrealBloomPass | null } | null = null;
 
   private resizeObserver: ResizeObserver;
@@ -559,7 +855,7 @@ export class DesignersRoom {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.0;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
@@ -567,8 +863,8 @@ export class DesignersRoom {
     container.appendChild(renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#f2e7d3");
-    this.scene.fog = new THREE.Fog("#f2e7d3", 26, 54);
+    this.scene.background = new THREE.Color("#eadfc6");
+    this.scene.fog = new THREE.Fog("#eadfc6", 24, 50);
 
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.08, 120);
     this.camera.rotation.order = "YXZ";
@@ -577,8 +873,12 @@ export class DesignersRoom {
     this.buildLights();
     this.buildRoomShell();
     this.buildDecor();
+    this.buildPlayerBody();
 
     for (const [x, z, r] of COLLIDERS) this.addCollider(x, z, r);
+
+    // start the follow rig parked behind the player
+    this.camPos.set(this.px + Math.sin(this.yaw) * CAM_DIST, CAM_HEIGHT, this.pz + Math.cos(this.yaw) * CAM_DIST);
 
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -690,35 +990,39 @@ export class DesignersRoom {
     const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
     this.scene.environment = env;
-    this.scene.environmentIntensity = 0.6;
+    this.scene.environmentIntensity = 0.3;
   }
 
-  /** Layered lighting: sky fill + sun + ceiling + local warm/cool accents. */
+  /** Layered lighting: sky fill + sun through the window + warm interior bounce. */
   private buildLights() {
-    const hemi = new THREE.HemisphereLight(0xfff2e0, 0x8f8170, 0.5);
+    // indirect base: cool sky above, warm floor bounce below
+    const hemi = new THREE.HemisphereLight(0xdbe7ff, 0x8f8170, 0.4);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffe3c2, 2.4);
-    sun.position.set(8, 11, -7);
+    // warm key sun streaming through the back window — the main shadow caster
+    const sun = new THREE.DirectionalLight(0xffd9a6, 2.6);
+    sun.position.set(-3, 9, -17);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -13;
-    sun.shadow.camera.right = 13;
-    sun.shadow.camera.top = 13;
-    sun.shadow.camera.bottom = -13;
+    sun.shadow.camera.left = -14;
+    sun.shadow.camera.right = 14;
+    sun.shadow.camera.top = 14;
+    sun.shadow.camera.bottom = -14;
     sun.shadow.camera.near = 2;
-    sun.shadow.camera.far = 36;
-    sun.shadow.bias = -0.0003;
-    sun.shadow.normalBias = 0.025;
+    sun.shadow.camera.far = 42;
+    sun.shadow.bias = -0.00035;
+    sun.shadow.normalBias = 0.02;
     this.scene.add(sun);
 
-    // cool window light — gives the back wall believable depth
-    const windowFill = new THREE.PointLight(0xcfe4ff, 7, 14, 2);
-    windowFill.position.set(0, 3.0, -7.4);
-    this.scene.add(windowFill);
+    // cool sky fill from the window side — believable back-wall depth
+    const skyFill = new THREE.DirectionalLight(0xbcd8ff, 0.55);
+    skyFill.position.set(0, 6, -8);
+    this.scene.add(skyFill);
 
-    const amb = new THREE.AmbientLight(0xffffff, 0.14);
-    this.scene.add(amb);
+    // faint warm bounce from the room's opposite corner so shadows don't crush
+    const fill = new THREE.DirectionalLight(0xffe9d0, 0.16);
+    fill.position.set(6, 4, 8);
+    this.scene.add(fill);
   }
 
   private addCollider(x: number, z: number, r: number) {
@@ -735,8 +1039,12 @@ export class DesignersRoom {
       roughness: 1,
       metalness: 0,
     });
-    const plaster = makePlasterTexture();
-    const wallMat = new THREE.MeshStandardMaterial({ map: plaster, roughness: 0.96 });
+    const plaster = makePlasterTextures();
+    const wallMat = new THREE.MeshStandardMaterial({
+      map: plaster.map,
+      normalMap: plaster.normal,
+      roughness: 0.96,
+    });
     const trimMat = new THREE.MeshStandardMaterial({ color: "#f0e4cf", roughness: 0.9 });
 
     // floor
@@ -877,9 +1185,14 @@ export class DesignersRoom {
     this.scene.add(knob);
 
     // rug
+    const rugTex = makeRugTextures();
     const rug = new THREE.Mesh(
       new THREE.CylinderGeometry(3.3, 3.3, 0.03, 48),
-      new THREE.MeshStandardMaterial({ map: makeRugTexture(), roughness: 1 })
+      new THREE.MeshStandardMaterial({
+        map: rugTex.map,
+        normalMap: rugTex.normal,
+        roughness: 1,
+      })
     );
     rug.position.y = 0.02;
     rug.receiveShadow = true;
@@ -1041,8 +1354,8 @@ export class DesignersRoom {
       light.position.set(x, WALL_H - 0.84, z);
       this.scene.add(light);
     };
-    mkPendant(0, 0, 40);
-    mkPendant(-6, 2.5, 26);
+    mkPendant(0, 0, 26);
+    mkPendant(-6, 2.5, 16);
 
     // ── posters (framed design work) ──
     const mkPoster = (
@@ -1170,11 +1483,96 @@ export class DesignersRoom {
     });
   }
 
+  /**
+   * Enrich flat color-only GLB materials with procedural surface detail
+   * derived from each material's base color (the assets ship texture-free,
+   * so per-name detail makes them read as designed, not plain).
+   */
+  private enhanceMaterials(group: THREE.Group) {
+    group.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.material) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const sm = m as THREE.MeshStandardMaterial;
+        if (!sm.isMeshStandardMaterial || sm.map) continue;
+        const kind = materialKind(sm.name);
+        if (!kind) continue;
+        const { map, normal, rough } = makeDetailTextures(kind, sm.color.getStyle());
+        sm.map = map;
+        sm.normalMap = normal;
+        sm.roughnessMap = rough;
+        if (kind === "metal") {
+          sm.envMapIntensity = 1.25;
+          sm.roughness = Math.min(sm.roughness ?? 0.5, 0.5);
+        } else if (kind === "wood") {
+          sm.envMapIntensity = 0.7;
+        } else if (kind === "leaf") {
+          sm.side = THREE.DoubleSide;
+          sm.envMapIntensity = 0.5;
+          sm.emissive = new THREE.Color(sm.color).multiplyScalar(0.08);
+        } else if (kind === "fabric" || kind === "felt") {
+          sm.envMapIntensity = 0.35;
+        }
+        sm.needsUpdate = true;
+      }
+    });
+  }
+
+  /** Soft fake contact shadow that grounds furniture on the floor. */
+  private addContactShadow(x: number, z: number, w: number, d: number) {
+    const blob = new THREE.Mesh(
+      new THREE.PlaneGeometry(w, d),
+      new THREE.MeshBasicMaterial({
+        map: makeBlobTexture(),
+        transparent: true,
+        depthWrite: false,
+        opacity: 0.5,
+      })
+    );
+    blob.rotation.x = -Math.PI / 2;
+    blob.position.set(x, 0.014, z);
+    blob.renderOrder = 1;
+    this.scene.add(blob);
+  }
+
+  /** Minimal player avatar body that the follow camera frames. */
+  private buildPlayerBody() {
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: "#5b6b8c", roughness: 0.75 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: "#e6b98f", roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.5, 8, 16), bodyMat);
+    body.position.y = 0.6;
+    body.castShadow = true;
+    g.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 20), skinMat);
+    head.position.y = 1.34;
+    head.castShadow = true;
+    g.add(head);
+    // subtle ring so "you" are distinguishable from remote avatars
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.3, 0.42, 24),
+      new THREE.MeshBasicMaterial({
+        color: "#ffffff",
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    g.add(ring);
+    this.playerBody = g;
+    this.scene.add(g);
+  }
+
   private placeAssets(assets: Map<string, THREE.Group>) {
     const place = (name: string, x: number, z: number, ry = 0, scale = 1, y = 0) => {
       const src = assets.get(name);
       if (!src) return;
       const g = this.cloneAsset(src);
+      this.enhanceMaterials(g);
       g.position.set(x, y, z);
       g.rotation.y = ry;
       g.scale.setScalar(scale);
@@ -1185,7 +1583,6 @@ export class DesignersRoom {
     place("coffee-table", 4.3, -2.3);
 
     place("desk", -6.4, -2.4);
-    place("monitor", -6.3, -2.4, -Math.PI / 2, 1, 0.945); // faces +X (room center)
     place("chair", -4.4, -2.2, Math.PI / 2); // faces -X (toward desk)
 
     // desk B — mirrored layout, purple tint
@@ -1195,14 +1592,14 @@ export class DesignersRoom {
       this.tint(clone, "wood", "#6e5a86");
       this.tint(clone, "woodDark", "#4c3d60");
       this.tint(clone, "drawer", "#7a658f");
+      this.enhanceMaterials(clone);
       clone.position.set(7.4, 0, 3.6);
       this.scene.add(clone);
     }
-    place("monitor", 7.3, 3.6, Math.PI / 2, 1, 0.945); // faces -X (room center)
     place("chair", 5.4, 3.8, -Math.PI / 2); // faces +X (toward desk)
 
     place("floor-lamp", 2.6, 5.9);
-    const lampLight = new THREE.PointLight(0xffc98f, 20, 11, 2);
+    const lampLight = new THREE.PointLight(0xffc98f, 13, 11, 2);
     lampLight.position.set(2.6, 1.88, 5.9);
     this.scene.add(lampLight);
 
@@ -1210,20 +1607,34 @@ export class DesignersRoom {
     place("plant", -10.8, 6.6, 0, 0.95);
     place("plant", 3.45, -1.8, 0.6, 0.22, 0.95); // tiny plant on the coffee table
 
-    // screen glow
+    // monitors — placed once each, with an emissive screen glow
     const monitorA = assets.get("monitor");
     if (monitorA) {
       const a = this.cloneAsset(monitorA);
       a.position.set(-6.3, 0.945, -2.4);
       a.rotation.y = -Math.PI / 2;
+      this.enhanceMaterials(a);
       this.makeScreenGlow(a, "#7fb5ff");
       this.scene.add(a);
       const b = this.cloneAsset(monitorA);
       b.position.set(7.3, 0.945, 3.6);
       b.rotation.y = Math.PI / 2;
+      this.enhanceMaterials(b);
       this.makeScreenGlow(b, "#ffb37f");
       this.scene.add(b);
     }
+
+    // fake contact shadows ground every piece of furniture
+    this.addContactShadow(5.6, -4.4, 3.3, 1.5); // sofa
+    this.addContactShadow(4.3, -2.3, 1.7, 1.05); // coffee table
+    this.addContactShadow(-6.4, -2.4, 2.3, 1.15); // desk A
+    this.addContactShadow(-4.4, -2.2, 0.85, 0.85); // chair A
+    this.addContactShadow(7.4, 3.6, 2.3, 1.15); // desk B
+    this.addContactShadow(5.4, 3.8, 0.85, 0.85); // chair B
+    this.addContactShadow(2.6, 5.9, 0.7, 0.7); // floor lamp
+    this.addContactShadow(10.6, -7.2, 1.3, 1.3); // plant (big)
+    this.addContactShadow(-10.8, 6.6, 1.1, 1.1); // plant (small)
+    this.addContactShadow(-11.2, 2.0, 1.1, 1.9); // bookshelf
   }
 
   /** Procedural fallback used when GLB loading fails (keeps the room furnished). */
@@ -1420,12 +1831,12 @@ export class DesignersRoom {
         ]);
         if (this.disposed) return;
         ssao = new SSAOPass(this.scene, this.camera, w, h);
-        ssao.kernelRadius = 0.7;
+        ssao.kernelRadius = 0.5;
         ssao.minDistance = 0.003;
-        ssao.maxDistance = 0.09;
+        ssao.maxDistance = 0.1;
         composer.addPass(ssao);
 
-        bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.28, 0.45, 0.75);
+        bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.16, 0.4, 0.68);
         composer.addPass(bloom);
 
         composer.addPass(new OutputPass());
@@ -1519,9 +1930,46 @@ export class DesignersRoom {
     const targetFov = sprint && moving ? SPRINT_FOV : BASE_FOV;
     this.fov += (targetFov - this.fov) * (1 - Math.exp(-dt * 5));
 
-    this.camera.position.set(this.px, EYE + bob, this.pz);
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch;
+    // ── third-person follow camera ──
+    // desired orbit position sits behind the player on the movement heading
+    const camX = this.px + Math.sin(this.yaw) * CAM_DIST;
+    const camZ = this.pz + Math.cos(this.yaw) * CAM_DIST;
+    const camK = 1 - Math.exp(-dt * 8);
+    if (!this.camInit) {
+      this.camPos.set(camX, CAM_HEIGHT, camZ);
+      this.camInit = true;
+    } else {
+      this.camPos.x += (camX - this.camPos.x) * camK;
+      this.camPos.z += (camZ - this.camPos.z) * camK;
+      this.camPos.y += (CAM_HEIGHT - this.camPos.y) * camK;
+    }
+    // keep the camera inside the room
+    const cxm = Math.max(-HALF_W + 0.4, Math.min(HALF_W - 0.4, this.camPos.x));
+    if (cxm !== this.camPos.x) this.camPos.x = cxm;
+    const czm = Math.max(-HALF_D + 0.4, Math.min(HALF_D - 0.4, this.camPos.z));
+    if (czm !== this.camPos.z) this.camPos.z = czm;
+    // push out of furniture colliders so the camera never clips through
+    for (const c of this.colliders) {
+      const dx = this.camPos.x - c.x;
+      const dz = this.camPos.z - c.z;
+      const d = Math.hypot(dx, dz);
+      const min = c.r + 0.35;
+      if (d < min && d > 0.0001) {
+        this.camPos.x = c.x + (dx / d) * min;
+        this.camPos.z = c.z + (dz / d) * min;
+      }
+    }
+    // vertical look: drag-pitch raises/lowers the framed point on the player
+    const lookY = Math.max(0.35, Math.min(2.3, LOOK_Y - this.pitch * 1.4));
+    this.camera.position.set(this.camPos.x, this.camPos.y + bob, this.camPos.z);
+    this.camera.lookAt(this.px, lookY, this.pz);
+
+    // player avatar body follows position/heading (remotes see your back)
+    if (this.playerBody) {
+      this.playerBody.position.set(this.px, moving ? Math.sin(this.bobPhase) * 0.015 : 0, this.pz);
+      this.playerBody.rotation.set(0, this.yaw, 0);
+    }
+
     if (Math.abs(this.camera.fov - this.fov) > 0.01) {
       this.camera.fov = this.fov;
       this.camera.updateProjectionMatrix();
