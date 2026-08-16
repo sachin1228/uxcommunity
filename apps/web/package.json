@@ -23,7 +23,6 @@
     "bcryptjs": "^2.4.3",
     "boring-avatars": "^2.0.4",
     "emoji-picker-react": "^4.19.1",
-    "geist": "^1.7.2",
     "jose": "^5.9.6",
     "lottie-react": "^2.4.0",
     "lucide-react": "^0.400.0",
