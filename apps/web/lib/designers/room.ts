@@ -2,36 +2,19 @@
  * 3D designer-studio room engine (plain three.js — no extra addons).
  *
  * Handles: scene + furniture building, first-person pointer-lock camera,
- * WASD / touch movement with collision, wandering designer avatars,
- * proximity detection and scripted-but-live-sounding conversation scheduling,
- * plus network-driven avatars for other real users in the room.
- * React (`DesignersRoom.tsx`) is only responsible for the HUD, voice (TTS/WebRTC)
+ * WASD / touch movement with collision, and network-driven avatars for
+ * other real users in the room.
+ * React (`DesignersRoom.tsx`) is only responsible for the HUD, voice (WebRTC)
  * and input plumbing — all three.js state lives here.
  */
 
 import * as THREE from "three";
-import { PERSONAS, Persona, pickReply, pickGreeting, pickIdle } from "./personas";
 
 // ─── Room constants ───────────────────────────────────────────────────────────
 const HALF_W = 12; // room half-width  (x: ±12)
 const HALF_D = 9; // room half-depth   (z: ±9)
 const WALL_H = 4.6;
 const EYE = 1.62; // player eye height
-const TALK_R = 3.6; // radius where a designer starts talking to you
-const LEAVE_R = 4.4; // radius where the conversation drops
-
-export interface RoomDesigner {
-  id: string;
-  name: string;
-  role: string;
-  color: string;
-  accent: string;
-  x: number;
-  z: number;
-  heading: number;
-  nearby: boolean;
-  typing: boolean;
-}
 
 export interface RemoteUserState {
   id: string;
@@ -53,14 +36,10 @@ export interface FrameState {
   playerX: number;
   playerZ: number;
   playerHeading: number;
-  designers: RoomDesigner[];
   remotes: FrameRemote[];
 }
 
 export interface RoomOptions {
-  onNearby: (d: RoomDesigner | null) => void;
-  onSpeak: (d: RoomDesigner, text: string) => void;
-  onTyping: (d: RoomDesigner, typing: boolean) => void;
   onFrame: (state: FrameState) => void;
   onReady: () => void;
   onError: (message: string) => void;
@@ -240,161 +219,6 @@ function makeSkyTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-// ─── Designer avatar ───────────────────────────────────────────────────────────
-interface Avatar {
-  persona: Persona;
-  group: THREE.Group;
-  headGroup: THREE.Group;
-  leftArm: THREE.Mesh;
-  rightArm: THREE.Mesh;
-  leftLeg: THREE.Mesh;
-  rightLeg: THREE.Mesh;
-  x: number;
-  z: number;
-  heading: number;
-  speed: number;
-  targetX: number;
-  targetZ: number;
-  paused: number;
-  wanderDelay: number;
-  walkPhase: number;
-  idleCountdown: number;
-  typingCountdown: number;
-  pendingSpeak: string | null;
-  nearby: boolean;
-}
-
-function buildAvatar(p: Persona): Avatar {
-  const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.75 });
-  const skinMat = new THREE.MeshStandardMaterial({ color: p.skin, roughness: 0.6 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: "#1a1a24", roughness: 0.8 });
-  const accentMat = new THREE.MeshStandardMaterial({ color: p.accent, roughness: 0.8 });
-
-  // body
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.5, 8, 16), mat);
-  body.position.y = 0.62;
-  body.castShadow = true;
-  group.add(body);
-
-  // legs
-  const legGeo = new THREE.CapsuleGeometry(0.09, 0.42, 6, 12);
-  const leftLeg = new THREE.Mesh(legGeo, mat);
-  leftLeg.position.set(-0.14, 0.3, 0);
-  leftLeg.castShadow = true;
-  const rightLeg = new THREE.Mesh(legGeo, mat);
-  rightLeg.position.set(0.14, 0.3, 0);
-  rightLeg.castShadow = true;
-  group.add(leftLeg, rightLeg);
-
-  // arms
-  const armGeo = new THREE.CapsuleGeometry(0.07, 0.36, 6, 12);
-  const leftArm = new THREE.Mesh(armGeo, mat);
-  leftArm.position.set(-0.42, 1.02, 0);
-  leftArm.castShadow = true;
-  const rightArm = new THREE.Mesh(armGeo, mat);
-  rightArm.position.set(0.42, 1.02, 0);
-  rightArm.castShadow = true;
-  group.add(leftArm, rightArm);
-
-  // head + face (face points +z, group yaw = heading)
-  const headGroup = new THREE.Group();
-  headGroup.position.y = 1.36;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 20), skinMat);
-  head.castShadow = true;
-  headGroup.add(head);
-  const eyeGeo = new THREE.SphereGeometry(0.028, 8, 8);
-  const leftEye = new THREE.Mesh(eyeGeo, darkMat);
-  leftEye.position.set(-0.09, 0.02, 0.21);
-  const rightEye = new THREE.Mesh(eyeGeo, darkMat);
-  rightEye.position.set(0.09, 0.02, 0.21);
-  headGroup.add(leftEye, rightEye);
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.02), darkMat);
-  mouth.position.set(0, -0.09, 0.22);
-  headGroup.add(mouth);
-
-  // hair styles
-  switch (p.hair) {
-    case "bob": {
-      const h = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), accentMat);
-      h.scale.set(1, 0.78, 1.02);
-      h.position.y = 0.12;
-      h.castShadow = true;
-      headGroup.add(h);
-      break;
-    }
-    case "bun": {
-      const h = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 16), accentMat);
-      h.scale.set(1, 0.8, 1.02);
-      h.position.y = 0.1;
-      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), accentMat);
-      bun.position.y = 0.32;
-      headGroup.add(h, bun);
-      break;
-    }
-    case "flat": {
-      const h = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.52), accentMat);
-      h.position.y = 0.22;
-      h.castShadow = true;
-      headGroup.add(h);
-      break;
-    }
-    case "fro": {
-      const h = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 16), accentMat);
-      h.scale.set(1, 0.92, 1);
-      h.position.y = 0.16;
-      h.castShadow = true;
-      headGroup.add(h);
-      break;
-    }
-    case "beanie": {
-      const h = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.3, 14), accentMat);
-      h.position.y = 0.28;
-      h.castShadow = true;
-      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.06, 14), mat);
-      band.position.y = 0.14;
-      headGroup.add(h, band);
-      break;
-    }
-  }
-  group.add(headGroup);
-
-  // name label
-  const label = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: makeLabelTexture(p.name, p.role, p.accent),
-      transparent: true,
-      depthWrite: false,
-    })
-  );
-  label.scale.set(1.9, 0.475, 1);
-  label.position.y = 2.12;
-  group.add(label);
-
-  return {
-    persona: p,
-    group,
-    headGroup,
-    leftArm,
-    rightArm,
-    leftLeg,
-    rightLeg,
-    x: p.spawn[0],
-    z: p.spawn[1],
-    heading: Math.atan2(-p.spawn[0], -p.spawn[1]),
-    speed: 0.55 + Math.random() * 0.25,
-    targetX: p.spawn[0],
-    targetZ: p.spawn[1],
-    paused: 1 + Math.random() * 2,
-    wanderDelay: 3 + Math.random() * 4,
-    walkPhase: Math.random() * Math.PI * 2,
-    idleCountdown: 12 + Math.random() * 6,
-    typingCountdown: 0,
-    pendingSpeak: null,
-    nearby: false,
-  };
-}
-
 // ─── Remote (real user) avatar ──────────────────────────────────────────────────
 interface RemoteAvatar {
   id: string;
@@ -522,10 +346,8 @@ export class DesignersRoom {
   private touchMoveZ = 0;
   private touchSprint = false;
 
-  private designers: Avatar[] = [];
   private remotes = new Map<string, RemoteAvatar>();
   private colliders: Collider[] = [];
-  private nearbyId: string | null = null;
   private locked = false;
 
   private resizeObserver: ResizeObserver;
@@ -563,8 +385,6 @@ export class DesignersRoom {
 
     this.buildLights();
     this.buildRoom();
-    this.designers = PERSONAS.map(buildAvatar);
-    for (const a of this.designers) this.scene.add(a.group);
 
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -588,9 +408,7 @@ export class DesignersRoom {
       const dt = Math.min(this.clock.getDelta(), 0.05);
       const t = this.clock.elapsedTime;
       this.updatePlayer(dt);
-      this.updateDesigners(dt, t);
       this.updateRemotes(dt, t);
-      this.updateProximity();
       this.camera.position.set(this.px, EYE, this.pz);
       this.camera.rotation.order = "YXZ";
       this.camera.rotation.y = this.yaw;
@@ -641,10 +459,6 @@ export class DesignersRoom {
     return this.locked;
   }
 
-  getDesigners(): RoomDesigner[] {
-    return this.designers.map((a) => this.snapshot(a));
-  }
-
   /** Mobile: directional vector in local space, both in [-1, 1]. */
   setTouchMove(fx: number, fz: number) {
     this.touchMoveX = Math.max(-1, Math.min(1, fx));
@@ -658,37 +472,14 @@ export class DesignersRoom {
     this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
   }
 
-  /** Player says something to a nearby designer. */
-  say(designerId: string, text: string) {
-    const avatar = this.designers.find((a) => a.persona.id === designerId);
-    if (!avatar || !avatar.nearby) return;
-    this.queueSpeech(avatar, pickReply(avatar.persona, text));
-  }
-
   // ── Internals ────────────────────────────────────────────────────────────────
   private readyEmitted = false;
-
-  private snapshot(a: Avatar): RoomDesigner {
-    return {
-      id: a.persona.id,
-      name: a.persona.name,
-      role: a.persona.role,
-      color: a.persona.color,
-      accent: a.persona.accent,
-      x: a.x,
-      z: a.z,
-      heading: a.heading,
-      nearby: a.nearby,
-      typing: a.typingCountdown > 0,
-    };
-  }
 
   private emitFrame() {
     this.opts.onFrame({
       playerX: this.px,
       playerZ: this.pz,
       playerHeading: this.yaw,
-      designers: this.designers.map((a) => this.snapshot(a)),
       remotes: [...this.remotes.values()].map((r) => ({
         id: r.id,
         x: r.x,
@@ -775,17 +566,6 @@ export class DesignersRoom {
         this.pz = c.z + (dz / d) * min;
       }
     }
-    // designers (don't walk through people)
-    for (const a of this.designers) {
-      const dx = this.px - a.x;
-      const dz = this.pz - a.z;
-      const d = Math.hypot(dx, dz);
-      const min = 0.62;
-      if (d < min && d > 0.0001) {
-        this.px = a.x + (dx / d) * min;
-        this.pz = a.z + (dz / d) * min;
-      }
-    }
   }
 
   /** Reconcile the network-driven avatars with the current presence snapshot. */
@@ -836,133 +616,6 @@ export class DesignersRoom {
       r.heading += dh * Math.min(1, dt * 8);
       r.group.position.set(r.x, Math.sin(t * 2.1 + r.phase) * 0.02, r.z);
       r.group.rotation.y = r.heading;
-    }
-  }
-
-  private pickWanderTarget(a: Avatar) {
-    for (let i = 0; i < 12; i++) {
-      const x = (Math.random() * 2 - 1) * (HALF_W - 1.6);
-      const z = (Math.random() * 2 - 1) * (HALF_D - 1.5);
-      // keep some distance from the player and from furniture
-      const dPlayer = Math.hypot(x - this.px, z - this.pz);
-      const dFurn = Math.min(
-        ...this.colliders.map((c) => Math.hypot(x - c.x, z - c.z) - c.r),
-        Infinity
-      );
-      if (dPlayer > 3 && dFurn > 1.2) {
-        a.targetX = x;
-        a.targetZ = z;
-        return;
-      }
-    }
-    a.targetX = a.x;
-    a.targetZ = a.z;
-  }
-
-  private updateDesigners(dt: number, t: number) {
-    for (const a of this.designers) {
-      const p = a.persona;
-
-      // typing / speech scheduling
-      if (a.typingCountdown > 0) {
-        a.typingCountdown -= dt;
-        if (a.typingCountdown <= 0 && a.pendingSpeak) {
-          const text = a.pendingSpeak;
-          a.pendingSpeak = null;
-          this.opts.onTyping(this.snapshot(a), false);
-          this.opts.onSpeak(this.snapshot(a), text);
-        }
-      }
-
-      // wandering
-      let walking = false;
-      if (a.paused > 0) {
-        a.paused -= dt;
-        if (a.paused <= 0) this.pickWanderTarget(a);
-      } else {
-        const dx = a.targetX - a.x;
-        const dz = a.targetZ - a.z;
-        const d = Math.hypot(dx, dz);
-        if (d < 0.35) {
-          a.paused = 2 + Math.random() * 3.5;
-          a.wanderDelay = 4 + Math.random() * 5;
-        } else {
-          walking = true;
-          a.x += (dx / d) * a.speed * dt;
-          a.z += (dz / d) * a.speed * dt;
-          a.x = Math.max(-HALF_W + 1.1, Math.min(HALF_W - 1.1, a.x));
-          a.z = Math.max(-HALF_D + 1.0, Math.min(HALF_D - 1.0, a.z));
-          const target = Math.atan2(dx, dz);
-          let dh = target - a.heading;
-          while (dh > Math.PI) dh -= Math.PI * 2;
-          while (dh < -Math.PI) dh += Math.PI * 2;
-          a.heading += dh * Math.min(1, dt * 6);
-        }
-      }
-
-      // idle animation
-      a.group.position.set(a.x, Math.sin(t * 2.1 + a.walkPhase) * 0.022, a.z);
-      a.group.rotation.y = a.heading;
-      const swing = walking ? Math.sin(t * 7 + a.walkPhase) * 0.42 : 0;
-      a.leftArm.rotation.x = swing;
-      a.rightArm.rotation.x = -swing;
-      a.leftLeg.rotation.x = -swing * 0.9;
-      a.rightLeg.rotation.x = swing * 0.9;
-
-      // head follows the player when they're near
-      const dPlayer = Math.hypot(this.px - a.x, this.pz - a.z);
-      if (dPlayer < 6 && !walking) {
-        const target = Math.atan2(this.px - a.x, this.pz - a.z);
-        let dh = target - a.heading;
-        while (dh > Math.PI) dh -= Math.PI * 2;
-        while (dh < -Math.PI) dh += Math.PI * 2;
-        a.headGroup.rotation.y = Math.max(-0.6, Math.min(0.6, dh * 0.5));
-      } else {
-        a.headGroup.rotation.y = 0;
-      }
-
-      // idle chatter while the player is nearby
-      if (a.nearby) {
-        a.idleCountdown -= dt;
-        if (a.idleCountdown <= 0) {
-          a.idleCountdown = 10 + Math.random() * 7;
-          this.queueSpeech(a, pickIdle(p));
-        }
-      }
-    }
-  }
-
-  private queueSpeech(a: Avatar, text: string) {
-    if (a.typingCountdown > 0) return; // busy talking already
-    a.pendingSpeak = text;
-    a.typingCountdown = 0.55 + Math.random() * 0.5;
-    this.opts.onTyping(this.snapshot(a), true);
-  }
-
-  private updateProximity() {
-    let nearest: Avatar | null = null;
-    let nearestD = TALK_R;
-    for (const a of this.designers) {
-      const d = Math.hypot(this.px - a.x, this.pz - a.z);
-      if (d < nearestD) {
-        nearest = a;
-        nearestD = d;
-      }
-      a.nearby = false;
-    }
-    if (nearest) {
-      nearest.nearby = true;
-      if (this.nearbyId !== nearest.persona.id) {
-        this.nearbyId = nearest.persona.id;
-        this.opts.onNearby(this.snapshot(nearest));
-        // greet on arrival
-        if (!nearest.pendingSpeak && nearest.typingCountdown <= 0) {
-          this.queueSpeech(nearest, pickGreeting(nearest.persona));
-        }
-      }
-    } else if (this.nearbyId) {
-      this.nearbyId = null;
-      this.opts.onNearby(null);
     }
   }
 

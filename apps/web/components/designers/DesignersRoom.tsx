@@ -2,22 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mic, MicOff, Send, Volume2, VolumeX } from "lucide-react";
-import { DesignersRoom, FrameState, RoomDesigner } from "@/lib/designers/room";
-import { PERSONAS } from "@/lib/designers/personas";
+import { ArrowLeft, Copy, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { DesignersRoom, FrameState } from "@/lib/designers/room";
 import { StudioPresence, RemoteUser } from "@/lib/designers/presence";
 import { ProximityVoice } from "@/lib/designers/voice";
 import { Spinner } from "@/components/ui/Spinner";
-
-interface Bubble {
-  id: string;
-  name: string;
-  role: string;
-  color: string;
-  text: string;
-}
-
-const RADAR_SCALE = 56 / 15; // px per world unit
 
 interface Props {
   userId: string;
@@ -25,6 +14,13 @@ interface Props {
 }
 
 type MicState = "off" | "on" | "denied" | "unsupported";
+
+interface Toast {
+  id: number;
+  text: string;
+}
+
+const RADAR_SCALE = 56 / 15; // px per world unit
 
 export function DesignersRoomView({ userId, userName }: Props) {
   const router = useRouter();
@@ -39,47 +35,29 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [locked, setLocked] = useState(false);
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(false);
-  const [nearby, setNearby] = useState<RoomDesigner | null>(null);
-  const nearbyRef = useRef<RoomDesigner | null>(null);
-  const [bubble, setBubble] = useState<Bubble | null>(null);
-  const [typing, setTyping] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [hint, setHint] = useState(true);
-  const [message, setMessage] = useState("");
   const [micState, setMicState] = useState<MicState>("off");
   const [online, setOnline] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
   const [remoteIds, setRemoteIds] = useState<string[]>([]);
+  const [hint, setHint] = useState(true);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
   const playerDot = useRef<HTMLDivElement>(null);
-  const bubbleTimer = useRef<number | null>(null);
+  const prevOnlineIds = useRef<Set<string>>(new Set());
+  const prevOnlineNames = useRef<Map<string, string>>(new Map());
+  const toastId = useRef(0);
 
-  // ── Voice (browser TTS) ──────────────────────────────────────────────────────
-  const speakLine = useCallback((text: string) => {
-    if (mutedRef.current) return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      const en = voices.find((v) => v.lang.toLowerCase().startsWith("en"));
-      if (en) u.voice = en;
-      u.rate = 1.03;
-      u.pitch = 1.02;
-      u.volume = 1;
-      u.onstart = () => setSpeaking(true);
-      u.onend = () => setSpeaking(false);
-      u.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(u);
-    } catch {
-      setSpeaking(false);
-    }
+  const addToast = useCallback((text: string) => {
+    const id = ++toastId.current;
+    setToasts((prev) => [...prev.slice(-2), { id, text }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
   }, []);
 
-  // ── Radar + per-frame plumbing ───────────────────────────────────────────────
+  // ── Per-frame plumbing (radar, presence broadcast, voice volumes) ────────────
   const updateRadar = useCallback((s: FrameState) => {
-    // presence position broadcast + proximity voice volumes (both throttled inside)
     presenceRef.current?.updatePosition(s.playerX, s.playerZ, s.playerHeading);
     voiceRef.current?.updateVolumes(
       { x: s.playerX, z: s.playerZ },
@@ -87,22 +65,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
       mutedRef.current
     );
 
-    for (const d of s.designers) {
-      const el = radarDots.current[d.id];
-      if (!el) continue;
-      let sx = (d.x - s.playerX) * RADAR_SCALE;
-      let sy = -(d.z - s.playerZ) * RADAR_SCALE;
-      const dist = Math.hypot(sx, sy);
-      const max = 52;
-      if (dist > max) {
-        sx = (sx / dist) * max;
-        sy = (sy / dist) * max;
-      }
-      el.style.transform = `translate(${sx}px, ${sy}px)`;
-      el.style.opacity = d.nearby ? "1" : "0.8";
-      el.style.boxShadow = d.nearby ? "0 0 0 3px rgba(0,112,243,0.55)" : "none";
-    }
-    // real users
     for (const r of s.remotes) {
       const el = radarDots.current[r.id];
       if (!el) continue;
@@ -131,17 +93,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
       room = new DesignersRoom(el, {
         onReady: () => setReady(true),
         onError: (m) => setError(m),
-        onNearby: (d) => {
-          nearbyRef.current = d;
-          setNearby(d);
-        },
-        onSpeak: (d, text) => {
-          setBubble({ id: d.id, name: d.name, role: d.role, color: d.color, text });
-          if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current);
-          bubbleTimer.current = window.setTimeout(() => setBubble(null), 8000);
-          speakLine(text);
-        },
-        onTyping: (_d, t) => setTyping(t),
         onFrame: updateRadar,
       });
     } catch {
@@ -155,22 +106,15 @@ export function DesignersRoomView({ userId, userName }: Props) {
     roomRef.current = room;
     room.start();
 
-    // warm up voices
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.getVoices();
-      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
-
     const onLock = () => setLocked(room.isLocked());
     document.addEventListener("pointerlockchange", onLock);
 
     return () => {
       document.removeEventListener("pointerlockchange", onLock);
-      if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current);
       room.dispose();
       roomRef.current = null;
     };
-  }, [updateRadar, speakLine]);
+  }, [updateRadar]);
 
   // ── Presence (who is in the room) + WebRTC voice ─────────────────────────────
   useEffect(() => {
@@ -178,6 +122,22 @@ export function DesignersRoomView({ userId, userName }: Props) {
       userId,
       name: userName,
       avatar: null,
+      onPresenceUsers: (users) => {
+        const now = new Set(users.map((u) => u.id));
+        for (const u of users) {
+          if (u.id === userId) continue;
+          if (!prevOnlineIds.current.has(u.id)) {
+            addToast(`${u.name ?? "Someone"} joined the studio`);
+          }
+          prevOnlineNames.current.set(u.id, u.name ?? "Someone");
+        }
+        for (const id of prevOnlineIds.current) {
+          if (!now.has(id)) {
+            addToast(`${prevOnlineNames.current.get(id) ?? "Someone"} left the studio`);
+          }
+        }
+        prevOnlineIds.current = now;
+      },
       onRemoteUsers: (users) => {
         remoteUsersRef.current = users;
         roomRef.current?.setRemoteUsers(users);
@@ -200,6 +160,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       voice.dispose();
       presence.close();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, userName]);
 
   // coarse-pointer detection without a hydration mismatch or setState-in-effect
@@ -243,27 +204,17 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const toggleMute = () => {
     setMuted((m) => {
       mutedRef.current = !m;
-      if (!mutedRef.current && "speechSynthesis" in window) {
-        // unmuting: nothing queued — voices resume on next speech
-      }
       return !m;
     });
   };
 
-  const send = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = message.trim();
-    if (!text || !nearbyRef.current) return;
-    setBubble({
-      id: nearbyRef.current.id,
-      name: nearbyRef.current.name,
-      role: nearbyRef.current.role,
-      color: nearbyRef.current.color,
-      text: `You: ${text}`,
-    });
-    setTyping(true);
-    roomRef.current?.say(nearbyRef.current.id, text);
-    setMessage("");
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      addToast("Studio link copied — share it to bring people in");
+    } catch {
+      addToast("Couldn't copy the link");
+    }
   };
 
   const leave = () => {
@@ -317,7 +268,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
     lookPos.current = null;
   };
 
-  const nearbyColor = nearby?.color ?? "#0070F3";
+  const alone = realtimeConnected && online <= 1;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#f2e7d3] text-foreground">
@@ -411,7 +362,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {/* Controls hint */}
       {ready && hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Mouse to look · Shift to sprint · Walk up to a designer to talk
+          WASD to move · Mouse to look · Shift to sprint · Mic on, walk up to someone, talk
         </div>
       )}
 
@@ -422,7 +373,8 @@ export function DesignersRoomView({ userId, userName }: Props) {
             <span className="text-3xl">🎮</span>
             <p className="font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
             <p className="max-w-xs font-body text-xs text-foreground-muted">
-              Walk around with WASD, look around with your mouse, and walk up to a designer to have a chat.
+              This is a live room — real people are here right now. Walk around, walk up to
+              someone, turn on your mic and talk.
             </p>
             <button
               type="button"
@@ -435,93 +387,12 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* Chat panel (near a designer) */}
-      {ready && nearby && !error && (
-        <div className="absolute bottom-4 left-1/2 z-20 w-[min(30rem,calc(100%-2rem))] -translate-x-1/2">
-          <div className="overflow-hidden rounded-2xl border border-border bg-background/85 shadow-xl backdrop-blur">
-            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-              <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-body text-sm font-bold text-white"
-                style={{ background: nearbyColor }}
-              >
-                {nearby.name.charAt(0)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-body text-sm font-semibold text-foreground">
-                  {nearby.name}
-                  <span className="ml-2 font-body text-[11px] font-normal text-foreground-muted">{nearby.role}</span>
-                </p>
-                <p className="flex items-center gap-1 font-body text-[11px] text-accent">
-                  <Mic size={11} className={speaking ? "animate-pulse" : "opacity-60"} />
-                  {speaking ? "speaking…" : "in the room"}
-                </p>
-              </div>
-            </div>
-            <div className="min-h-[3.5rem] px-4 py-3">
-              {bubble && bubble.id === nearby.id ? (
-                <p className="font-body text-sm leading-relaxed text-foreground">
-                  {bubble.text.startsWith("You:") ? (
-                    <>
-                      <span className="font-semibold text-accent">{bubble.text.slice(0, 4)}</span>
-                      {bubble.text.slice(4)}
-                    </>
-                  ) : (
-                    bubble.text
-                  )}
-                </p>
-              ) : typing ? (
-                <span className="inline-flex items-center gap-1">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-foreground-muted"
-                      style={{ animationDelay: `${i * 0.15}s` }}
-                    />
-                  ))}
-                </span>
-              ) : (
-                <p className="font-body text-xs italic text-foreground-muted">
-                  Walk away to leave the conversation.
-                </p>
-              )}
-            </div>
-            <form onSubmit={send} className="flex items-center gap-2 border-t border-border px-3 py-2.5">
-              <input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder={`Say something to ${nearby.name}…`}
-                className="h-9 min-w-0 flex-1 rounded-lg border border-border bg-surface-raised px-3 font-body text-sm text-foreground outline-none placeholder:text-foreground-muted focus:border-accent"
-                aria-label="Type a message"
-              />
-              <button
-                type="submit"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-                disabled={!message.trim()}
-                aria-label="Send message"
-              >
-                <Send size={16} />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Radar */}
       {ready && !error && (
         <div className="pointer-events-none absolute bottom-5 right-5 z-20 hidden h-32 w-32 items-center justify-center sm:flex">
           <div className="absolute inset-0 rounded-full border border-border bg-background/50 backdrop-blur" />
           <div className="absolute inset-4 rounded-full border border-border/70" />
           <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,transparent_58%,rgba(0,112,243,0.08))]" />
-          {PERSONAS.map((p) => (
-            <div
-              key={p.id}
-              ref={(el) => {
-                radarDots.current[p.id] = el;
-              }}
-              className="absolute left-1/2 top-1/2 -ml-[5px] -mt-[5px] h-2.5 w-2.5 rounded-full border border-white/70"
-              style={{ background: p.color }}
-            />
-          ))}
           {remoteIds.map((id) => (
             <div
               key={id}
@@ -541,6 +412,38 @@ export function DesignersRoomView({ userId, userName }: Props) {
           <span className="absolute bottom-1 font-body text-[9px] uppercase tracking-widest text-foreground-muted">
             radar
           </span>
+        </div>
+      )}
+
+      {/* Alone hint + invite */}
+      {ready && !error && alone && (
+        <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur">
+          <p className="font-body text-xs text-foreground-muted">
+            You&apos;re the only one here right now
+          </p>
+          <button
+            type="button"
+            onClick={copyInvite}
+            className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 font-body text-xs font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <Copy size={12} />
+            Copy invite link
+          </button>
+        </div>
+      )}
+
+      {/* Join / leave toasts */}
+      {ready && toasts.length > 0 && (
+        <div className="pointer-events-none absolute bottom-4 left-4 z-20 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="flex items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 shadow-lg backdrop-blur"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="font-body text-xs text-foreground">{t.text}</span>
+            </div>
+          ))}
         </div>
       )}
 

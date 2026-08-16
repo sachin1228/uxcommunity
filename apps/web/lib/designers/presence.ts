@@ -11,7 +11,7 @@
  * - WebRTC signaling rides on the `signal` topic, targeted by userId.
  */
 
-import { RealtimeClient } from "@/lib/realtime/client";
+import { RealtimeClient, RealtimePresenceUser } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 
 export interface RemoteUser {
@@ -33,6 +33,7 @@ interface PresenceOptions {
   name: string;
   avatar: string | null;
   onRemoteUsers: (users: RemoteUser[]) => void;
+  onPresenceUsers: (users: RealtimePresenceUser[]) => void;
   onOnlineCount: (count: number) => void;
   onConnected: (connected: boolean) => void;
   onSignal: (from: string, data: SignalPayload) => void;
@@ -67,6 +68,7 @@ export class StudioPresence {
     this.client.on(SIGNAL_TOPIC, (data, sender) => this.onSignal(data, sender));
     this.client.onPresence((users) => {
       this.opts.onOnlineCount(users.length);
+      this.opts.onPresenceUsers(users);
     });
     this.client.onStatus((connected) => {
       this.opts.onConnected(connected);
