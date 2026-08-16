@@ -179,7 +179,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
     return () => window.clearTimeout(t);
   }, []);
 
-  const toggleMic = async () => {
+  const toggleMic = useCallback(async () => {
     if (micState === "on") {
       voiceRef.current?.disableMic();
       presenceRef.current?.setMic(false);
@@ -199,14 +199,31 @@ export function DesignersRoomView({ userId, userName }: Props) {
     // peers closed by enableMic() — re-form them now that we have a track
     voiceRef.current?.syncTargets(remoteUsersRef.current);
     setMicState("on");
-  };
+  }, [micState]);
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     setMuted((m) => {
       mutedRef.current = !m;
       return !m;
     });
-  };
+  }, []);
+
+  // Keyboard shortcuts work even while the pointer is locked to the game:
+  // M = mic, V = voice/speaker mute, Esc = release cursor (browser default).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === "m") {
+        e.preventDefault();
+        void toggleMic();
+      } else if (k === "v") {
+        e.preventDefault();
+        toggleMute();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleMic, toggleMute]);
 
   const copyInvite = async () => {
     try {
@@ -297,12 +314,12 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* Top-left: leave */}
+      {/* Top-left: leave (z-30 so it stays clickable above the unlock overlay) */}
       {ready && (
         <button
           type="button"
           onClick={leave}
-          className="absolute left-4 top-4 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/70 text-foreground-muted backdrop-blur transition-colors hover:text-foreground"
+          className="absolute left-4 top-4 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/70 text-foreground-muted backdrop-blur transition-colors hover:text-foreground"
           aria-label="Leave the room"
           title="Leave the room"
         >
@@ -310,9 +327,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </button>
       )}
 
-      {/* Top-right: room name + online + mic + mute */}
+      {/* Top-right: room name + online + mic + mute (z-30, clickable while unlocked) */}
       {ready && (
-        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
@@ -361,8 +378,15 @@ export function DesignersRoomView({ userId, userName }: Props) {
 
       {/* Controls hint */}
       {ready && hint && !isTouch && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Mouse to look · Shift to sprint · Mic on, walk up to someone, talk
+        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
+          WASD to move · Mouse to look · Shift to sprint · M mic · V voice
+        </div>
+      )}
+
+      {/* Persistent shortcut chip — visible while locked in the game */}
+      {ready && !hint && !isTouch && (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
+          M mic · V voice · Esc cursor
         </div>
       )}
 
