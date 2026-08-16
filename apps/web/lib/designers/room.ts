@@ -339,8 +339,9 @@ export class DesignersRoom {
   private keys = new Set<string>();
   private yaw = 0;
   private pitch = 0;
-  private px = 0;
-  private pz = 6.6;
+  // spawn near the door, scattered so people don't start inside each other
+  private px = (Math.random() * 2 - 1) * 2.5;
+  private pz = 4.6 + Math.random() * 2;
 
   private touchMoveX = 0;
   private touchMoveZ = 0;

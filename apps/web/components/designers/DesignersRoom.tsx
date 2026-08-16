@@ -145,7 +145,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       onSignal: (from, data) => voiceRef.current?.handleSignal(from, data),
     });
     presenceRef.current = presence;
-    const voice = new ProximityVoice(userId, (to, data) =>
+    const voice = new ProximityVoice(presence.getSelfId(), (to, data) =>
       presence.sendSignal(to, data)
     );
     voiceRef.current = voice;
