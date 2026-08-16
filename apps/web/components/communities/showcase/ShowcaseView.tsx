@@ -16,6 +16,7 @@ import {
   Tag,
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   SHOWCASE_CATEGORIES,
   type ShowcaseCategory,
@@ -50,6 +51,7 @@ export function ShowcaseView({
   const [sort, setSort] = useState<"newest" | "popular">("newest");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ShowcasePost | null>(null);
+  const [deletingPost, setDeletingPost] = useState<ShowcasePost | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -148,7 +150,6 @@ export function ShowcaseView({
   }
 
   async function remove(post: ShowcasePost) {
-    if (!confirm("Delete this showcase post? This cannot be undone.")) return;
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       { method: "DELETE" },
@@ -278,7 +279,7 @@ export function ShowcaseView({
                 onToggleLike={() => void toggle(post, "like")}
                 onToggleSave={() => void toggle(post, "save")}
                 onEdit={() => setEditing(post)}
-                onDelete={() => void remove(post)}
+                onDelete={() => setDeletingPost(post)}
               />
             ))}
             {nextCursor && (
@@ -317,6 +318,15 @@ export function ShowcaseView({
           }
         />
       )}
+      <ConfirmDialog
+        open={!!deletingPost}
+        title="Delete showcase post?"
+        message="This will permanently remove this showcase post. This cannot be undone."
+        onClose={() => setDeletingPost(null)}
+        onConfirm={() => {
+          if (deletingPost) return remove(deletingPost);
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -123,6 +124,7 @@ export function ThreadCard({
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
@@ -146,9 +148,7 @@ export function ThreadCard({
     interactionErrorTimerRef.current = setTimeout(() => setInteractionError(null), 4000);
   }
 
-  async function handleDelete(e: React.MouseEvent) {
-    e.preventDefault();
-    if (!confirm("Delete this thread? This cannot be undone.")) return;
+  async function handleDelete() {
     setDeleting(true);
     setMenuOpen(false);
     try {
@@ -317,7 +317,7 @@ export function ThreadCard({
                 className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               >
                 <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
-                {displayedSaved ? "Unsave thread" : "Save thread"}
+                {displayedSaved ? "Unsave" : "Save"}
               </button>
               {isOwner ? (
                 <>
@@ -326,16 +326,16 @@ export function ThreadCard({
                     onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                   >
-                    <Pencil size={11} /> Edit thread
+                    <Pencil size={11} /> Edit
                   </button>
                   <button
                     type="button"
-                    onClick={handleDelete}
+                    onClick={(e) => { e.preventDefault(); setMenuOpen(false); setConfirmDelete(true); }}
                     disabled={deleting}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
                     <Trash2 size={11} />
-                    {deleting ? "Deleting…" : "Delete thread"}
+                    {deleting ? "Deleting…" : "Delete"}
                   </button>
                 </>
               ) : (
@@ -351,7 +351,7 @@ export function ThreadCard({
                   className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
                 >
                   <Flag size={11} />
-                  {reported ? "Reported" : "Report thread"}
+                  {reported ? "Reported" : "Report"}
                 </button>
               )}
             </div>
@@ -607,6 +607,14 @@ export function ThreadCard({
           onUpdated={onUpdated}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete thread?"
+        message="This will permanently remove this thread. This cannot be undone."
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

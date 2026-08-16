@@ -11,6 +11,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -139,6 +140,7 @@ function CommentRow({
   const [replying, setReplying] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isOwner = comment.user_id === currentUserId;
 
@@ -152,7 +154,6 @@ function CommentRow({
   }, [menuOpen]);
 
   async function handleDelete() {
-    if (!confirm("Delete this comment?")) return;
     setDeleting(true);
     try {
       await fetch(`/api/communities/${communityId}/resources/${resourceId}/comments/${comment.id}`, { method: "DELETE" });
@@ -166,6 +167,7 @@ function CommentRow({
   const name = comment.users?.name ?? "Member";
 
   return (
+    <>
     <div className={`flex gap-2.5 ${isReply ? "pl-8" : ""}`}>
       <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "sm" : "md"} />
       <div className="min-w-0 flex-1">
@@ -186,7 +188,7 @@ function CommentRow({
                 <div className="absolute right-0 top-6 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
                   <button
                     type="button"
-                    onClick={handleDelete}
+                    onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
                     disabled={deleting}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
@@ -222,6 +224,14 @@ function CommentRow({
         )}
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmDelete}
+      title="Delete comment?"
+      message="This will permanently remove this comment. This cannot be undone."
+      onClose={() => setConfirmDelete(false)}
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }
 
