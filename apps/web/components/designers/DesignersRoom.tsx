@@ -41,6 +41,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [remoteIds, setRemoteIds] = useState<string[]>([]);
   const [hint, setHint] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [hudVisible, setHudVisible] = useState(true);
 
   const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
   const playerDot = useRef<HTMLDivElement>(null);
@@ -209,8 +210,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
     });
   }, []);
 
-  // Keyboard shortcuts: M = mic, V = voice/speaker mute. The cursor is never
-  // captured, so every HUD button is always clickable too.
+  // Keyboard shortcuts: M = mic, V = voice/speaker mute, H = hide/show the HUD
+  // for a clean view of the room. The cursor is never captured, so every HUD
+  // button is always clickable too.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -220,6 +222,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
       } else if (k === "v") {
         e.preventDefault();
         toggleMute();
+      } else if (k === "h") {
+        e.preventDefault();
+        setHudVisible((v) => !v);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -322,7 +327,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Top-left: leave (z-30 so it stays clickable above the unlock overlay) */}
-      {ready && (
+      {ready && hudVisible && (
         <button
           type="button"
           onClick={leave}
@@ -335,7 +340,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Top-right: room name + online + mic + mute */}
-      {ready && (
+      {ready && hudVisible && (
         <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
             <span
@@ -384,21 +389,21 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Controls hint */}
-      {ready && hint && !isTouch && (
+      {ready && hudVisible && hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Hold &amp; drag to look · Shift to sprint · M mic · V voice
+          WASD to move · Hold &amp; drag to look · Shift to sprint · M mic · V voice · H hide HUD
         </div>
       )}
 
       {/* Persistent shortcut chip */}
-      {ready && !hint && !isTouch && (
+      {ready && hudVisible && !hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
-          M mic · V voice · drag to look
+          M mic · V voice · H HUD · drag to look
         </div>
       )}
 
       {/* Non-blocking intro card — the cursor is always free, so this never traps you */}
-      {ready && !error && intro && (
+      {ready && hudVisible && !error && intro && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <div className="pointer-events-auto mx-4 max-w-sm rounded-2xl border border-border bg-background/90 px-6 py-5 text-center shadow-xl backdrop-blur">
             <span className="text-2xl">🎮</span>
@@ -421,7 +426,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Radar */}
-      {ready && !error && (
+      {ready && hudVisible && !error && (
         <div className="pointer-events-none absolute bottom-5 right-5 z-20 hidden h-32 w-32 items-center justify-center sm:flex">
           <div className="absolute inset-0 rounded-full border border-border bg-background/50 backdrop-blur" />
           <div className="absolute inset-4 rounded-full border border-border/70" />
@@ -449,7 +454,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* On-air indicator when transmitting */}
-      {ready && !error && micState === "on" && (
+      {ready && hudVisible && !error && micState === "on" && (
         <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 shadow-lg backdrop-blur">
           <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
           <span className="font-body text-xs font-medium text-foreground">You&apos;re on air — people near you can hear you</span>
@@ -457,7 +462,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Alone hint + invite */}
-      {ready && !error && alone && (
+      {ready && hudVisible && !error && alone && (
         <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur">
           <p className="font-body text-xs text-foreground-muted">
             You&apos;re the only one here right now
@@ -474,7 +479,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Join / leave toasts */}
-      {ready && toasts.length > 0 && (
+      {ready && hudVisible && toasts.length > 0 && (
         <div className="pointer-events-none absolute bottom-4 left-4 z-20 flex flex-col gap-2">
           {toasts.map((t) => (
             <div
@@ -489,7 +494,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Touch controls */}
-      {ready && !error && isTouch && (
+      {ready && hudVisible && !error && isTouch && (
         <>
           <div
             className="absolute bottom-6 left-6 z-20 h-32 w-32 touch-none"
