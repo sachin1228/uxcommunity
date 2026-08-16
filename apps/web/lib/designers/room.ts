@@ -3,8 +3,9 @@
  *
  * Handles: scene + furniture building, first-person pointer-lock camera,
  * WASD / touch movement with collision, wandering designer avatars,
- * proximity detection and scripted-but-live-sounding conversation scheduling.
- * React (`DesignersRoom.tsx`) is only responsible for the HUD, voice (TTS)
+ * proximity detection and scripted-but-live-sounding conversation scheduling,
+ * plus network-driven avatars for other real users in the room.
+ * React (`DesignersRoom.tsx`) is only responsible for the HUD, voice (TTS/WebRTC)
  * and input plumbing — all three.js state lives here.
  */
 
@@ -32,11 +33,28 @@ export interface RoomDesigner {
   typing: boolean;
 }
 
+export interface RemoteUserState {
+  id: string;
+  name: string;
+  x: number;
+  z: number;
+  heading: number;
+  mic: boolean;
+}
+
+export interface FrameRemote {
+  id: string;
+  x: number;
+  z: number;
+  mic: boolean;
+}
+
 export interface FrameState {
   playerX: number;
   playerZ: number;
   playerHeading: number;
   designers: RoomDesigner[];
+  remotes: FrameRemote[];
 }
 
 export interface RoomOptions {
@@ -161,6 +179,33 @@ function makePosterTexture(palette: [string, string, string]): THREE.CanvasTextu
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+function makeMicTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 64;
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, 128, 64);
+  ctx.beginPath();
+  ctx.roundRect(14, 10, 100, 44, 22);
+  ctx.fillStyle = "rgba(24,138,74,0.92)";
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 28px Inter, system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("MIC", 64, 33);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function colorFromName(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue}, 55%, 52%)`;
 }
 
 function makeSkyTexture(): THREE.CanvasTexture {
@@ -350,6 +395,112 @@ function buildAvatar(p: Persona): Avatar {
   };
 }
 
+// ─── Remote (real user) avatar ──────────────────────────────────────────────────
+interface RemoteAvatar {
+  id: string;
+  name: string;
+  color: string;
+  group: THREE.Group;
+  label: THREE.Sprite;
+  micBadge: THREE.Sprite;
+  targetX: number;
+  targetZ: number;
+  targetHeading: number;
+  x: number;
+  z: number;
+  heading: number;
+  mic: boolean;
+  phase: number;
+}
+
+function buildRemoteAvatar(id: string, name: string): RemoteAvatar {
+  const group = new THREE.Group();
+  const color = colorFromName(name);
+  const bodyMat = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: "#e6b98f", roughness: 0.6 });
+  const darkMat = new THREE.MeshStandardMaterial({ color: "#20222e", roughness: 0.8 });
+
+  // body (slightly slimmer than NPCs so remote users read as "players")
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.27, 0.5, 8, 16), bodyMat);
+  body.position.y = 0.6;
+  body.castShadow = true;
+  group.add(body);
+
+  const legGeo = new THREE.CapsuleGeometry(0.085, 0.4, 6, 12);
+  const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+  leftLeg.position.set(-0.13, 0.28, 0);
+  leftLeg.castShadow = true;
+  const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+  rightLeg.position.set(0.13, 0.28, 0);
+  rightLeg.castShadow = true;
+  group.add(leftLeg, rightLeg);
+
+  const armGeo = new THREE.CapsuleGeometry(0.065, 0.34, 6, 12);
+  const leftArm = new THREE.Mesh(armGeo, bodyMat);
+  leftArm.position.set(-0.38, 1.0, 0);
+  leftArm.castShadow = true;
+  const rightArm = new THREE.Mesh(armGeo, bodyMat);
+  rightArm.position.set(0.38, 1.0, 0);
+  rightArm.castShadow = true;
+  group.add(leftArm, rightArm);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.23, 20, 20), skinMat);
+  head.position.y = 1.34;
+  head.castShadow = true;
+  group.add(head);
+
+  // simple cap so remote users are instantly recognisable as players
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.24, 0.25, 0.12, 16),
+    darkMat
+  );
+  cap.position.y = 1.5;
+  cap.castShadow = true;
+  group.add(cap);
+
+  // name label
+  const label = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: makeLabelTexture(name, "In the studio", color),
+      transparent: true,
+      depthWrite: false,
+    })
+  );
+  label.scale.set(1.9, 0.475, 1);
+  label.position.y = 2.12;
+  group.add(label);
+
+  // mic badge (visible when the user is transmitting)
+  const micBadge = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: makeMicTexture(),
+      transparent: true,
+      depthWrite: false,
+    })
+  );
+  micBadge.scale.set(0.62, 0.31, 1);
+  micBadge.position.y = 1.8;
+  micBadge.visible = false;
+  group.add(micBadge);
+
+  return {
+    id,
+    name,
+    color,
+    group,
+    label,
+    micBadge,
+    targetX: 0,
+    targetZ: 0,
+    targetHeading: 0,
+    x: 0,
+    z: 0,
+    heading: 0,
+    mic: false,
+    phase: Math.random() * Math.PI * 2,
+  };
+}
+
 // ─── Room ──────────────────────────────────────────────────────────────────────
 export class DesignersRoom {
   private container: HTMLElement;
@@ -372,6 +523,7 @@ export class DesignersRoom {
   private touchSprint = false;
 
   private designers: Avatar[] = [];
+  private remotes = new Map<string, RemoteAvatar>();
   private colliders: Collider[] = [];
   private nearbyId: string | null = null;
   private locked = false;
@@ -437,6 +589,7 @@ export class DesignersRoom {
       const t = this.clock.elapsedTime;
       this.updatePlayer(dt);
       this.updateDesigners(dt, t);
+      this.updateRemotes(dt, t);
       this.updateProximity();
       this.camera.position.set(this.px, EYE, this.pz);
       this.camera.rotation.order = "YXZ";
@@ -536,6 +689,12 @@ export class DesignersRoom {
       playerZ: this.pz,
       playerHeading: this.yaw,
       designers: this.designers.map((a) => this.snapshot(a)),
+      remotes: [...this.remotes.values()].map((r) => ({
+        id: r.id,
+        x: r.x,
+        z: r.z,
+        mic: r.mic,
+      })),
     });
   }
 
@@ -626,6 +785,57 @@ export class DesignersRoom {
         this.px = a.x + (dx / d) * min;
         this.pz = a.z + (dz / d) * min;
       }
+    }
+  }
+
+  /** Reconcile the network-driven avatars with the current presence snapshot. */
+  setRemoteUsers(users: RemoteUserState[]) {
+    const seen = new Set<string>();
+    for (const u of users) {
+      seen.add(u.id);
+      let r = this.remotes.get(u.id);
+      if (!r) {
+        r = buildRemoteAvatar(u.id, u.name);
+        r.x = u.x;
+        r.z = u.z;
+        r.heading = u.heading;
+        this.scene.add(r.group);
+        this.remotes.set(u.id, r);
+      }
+      r.targetX = u.x;
+      r.targetZ = u.z;
+      r.targetHeading = u.heading;
+      r.mic = u.mic;
+      r.micBadge.visible = u.mic;
+      if (r.name !== u.name) {
+        r.name = u.name;
+        (r.label.material as THREE.SpriteMaterial).map = makeLabelTexture(
+          u.name,
+          "In the studio",
+          r.color
+        );
+        (r.label.material as THREE.SpriteMaterial).needsUpdate = true;
+      }
+    }
+    for (const [id, r] of this.remotes) {
+      if (!seen.has(id)) {
+        this.scene.remove(r.group);
+        this.remotes.delete(id);
+      }
+    }
+  }
+
+  private updateRemotes(dt: number, t: number) {
+    for (const r of this.remotes.values()) {
+      const k = Math.min(1, dt * 7);
+      r.x += (r.targetX - r.x) * k;
+      r.z += (r.targetZ - r.z) * k;
+      let dh = r.targetHeading - r.heading;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      r.heading += dh * Math.min(1, dt * 8);
+      r.group.position.set(r.x, Math.sin(t * 2.1 + r.phase) * 0.02, r.z);
+      r.group.rotation.y = r.heading;
     }
   }
 

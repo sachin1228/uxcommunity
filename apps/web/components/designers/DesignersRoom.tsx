@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Mic, Send, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Mic, MicOff, Send, Volume2, VolumeX } from "lucide-react";
 import { DesignersRoom, FrameState, RoomDesigner } from "@/lib/designers/room";
 import { PERSONAS } from "@/lib/designers/personas";
+import { StudioPresence, RemoteUser } from "@/lib/designers/presence";
+import { ProximityVoice } from "@/lib/designers/voice";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Bubble {
@@ -17,10 +19,20 @@ interface Bubble {
 
 const RADAR_SCALE = 56 / 15; // px per world unit
 
-export function DesignersRoomView() {
+interface Props {
+  userId: string;
+  userName: string;
+}
+
+type MicState = "off" | "on" | "denied" | "unsupported";
+
+export function DesignersRoomView({ userId, userName }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<DesignersRoom | null>(null);
+  const presenceRef = useRef<StudioPresence | null>(null);
+  const voiceRef = useRef<ProximityVoice | null>(null);
+  const remoteUsersRef = useRef<RemoteUser[]>([]);
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +46,10 @@ export function DesignersRoomView() {
   const [speaking, setSpeaking] = useState(false);
   const [hint, setHint] = useState(true);
   const [message, setMessage] = useState("");
+  const [micState, setMicState] = useState<MicState>("off");
+  const [online, setOnline] = useState(0);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [remoteIds, setRemoteIds] = useState<string[]>([]);
 
   const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
   const playerDot = useRef<HTMLDivElement>(null);
@@ -61,8 +77,16 @@ export function DesignersRoomView() {
     }
   }, []);
 
-  // ── Radar ────────────────────────────────────────────────────────────────────
+  // ── Radar + per-frame plumbing ───────────────────────────────────────────────
   const updateRadar = useCallback((s: FrameState) => {
+    // presence position broadcast + proximity voice volumes (both throttled inside)
+    presenceRef.current?.updatePosition(s.playerX, s.playerZ, s.playerHeading);
+    voiceRef.current?.updateVolumes(
+      { x: s.playerX, z: s.playerZ },
+      s.remotes,
+      mutedRef.current
+    );
+
     for (const d of s.designers) {
       const el = radarDots.current[d.id];
       if (!el) continue;
@@ -77,6 +101,21 @@ export function DesignersRoomView() {
       el.style.transform = `translate(${sx}px, ${sy}px)`;
       el.style.opacity = d.nearby ? "1" : "0.8";
       el.style.boxShadow = d.nearby ? "0 0 0 3px rgba(0,112,243,0.55)" : "none";
+    }
+    // real users
+    for (const r of s.remotes) {
+      const el = radarDots.current[r.id];
+      if (!el) continue;
+      let sx = (r.x - s.playerX) * RADAR_SCALE;
+      let sy = -(r.z - s.playerZ) * RADAR_SCALE;
+      const dist = Math.hypot(sx, sy);
+      const max = 52;
+      if (dist > max) {
+        sx = (sx / dist) * max;
+        sy = (sy / dist) * max;
+      }
+      el.style.transform = `translate(${sx}px, ${sy}px)`;
+      el.style.opacity = r.mic ? "1" : "0.7";
     }
     if (playerDot.current) {
       playerDot.current.style.transform = `rotate(${-s.playerHeading}rad)`;
@@ -133,6 +172,36 @@ export function DesignersRoomView() {
     };
   }, [updateRadar, speakLine]);
 
+  // ── Presence (who is in the room) + WebRTC voice ─────────────────────────────
+  useEffect(() => {
+    const presence = new StudioPresence({
+      userId,
+      name: userName,
+      avatar: null,
+      onRemoteUsers: (users) => {
+        remoteUsersRef.current = users;
+        roomRef.current?.setRemoteUsers(users);
+        voiceRef.current?.syncTargets(users);
+        setRemoteIds(users.map((u) => u.id));
+      },
+      onOnlineCount: setOnline,
+      onConnected: setRealtimeConnected,
+      onSignal: (from, data) => voiceRef.current?.handleSignal(from, data),
+    });
+    presenceRef.current = presence;
+    const voice = new ProximityVoice(userId, (to, data) =>
+      presence.sendSignal(to, data)
+    );
+    voiceRef.current = voice;
+    presence.connect();
+    return () => {
+      presenceRef.current = null;
+      voiceRef.current = null;
+      voice.dispose();
+      presence.close();
+    };
+  }, [userId, userName]);
+
   // coarse-pointer detection without a hydration mismatch or setState-in-effect
   const isTouch = useSyncExternalStore(
     useCallback((cb: () => void) => {
@@ -148,6 +217,28 @@ export function DesignersRoomView() {
     const t = window.setTimeout(() => setHint(false), 9000);
     return () => window.clearTimeout(t);
   }, []);
+
+  const toggleMic = async () => {
+    if (micState === "on") {
+      voiceRef.current?.disableMic();
+      presenceRef.current?.setMic(false);
+      setMicState("off");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicState("unsupported");
+      return;
+    }
+    const ok = await voiceRef.current?.enableMic();
+    if (!ok) {
+      setMicState("denied");
+      return;
+    }
+    presenceRef.current?.setMic(true);
+    // peers closed by enableMic() — re-form them now that we have a track
+    voiceRef.current?.syncTargets(remoteUsersRef.current);
+    setMicState("on");
+  };
 
   const toggleMute = () => {
     setMuted((m) => {
@@ -268,12 +359,41 @@ export function DesignersRoomView() {
         </button>
       )}
 
-      {/* Top-right: room name + mute */}
+      {/* Top-right: room name + online + mic + mute */}
       {ready && (
         <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-          <span className="hidden rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs font-medium text-foreground backdrop-blur sm:block">
+          <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                realtimeConnected ? "bg-emerald-500" : "bg-foreground-muted/40"
+              }`}
+            />
+            {realtimeConnected ? `${online} online` : "studio offline"}
+          </span>
+          <span className="hidden rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs font-medium text-foreground backdrop-blur md:block">
             Designer Studio
           </span>
+          <button
+            type="button"
+            onClick={toggleMic}
+            className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
+              micState === "on"
+                ? "bg-accent text-white"
+                : "bg-background/70 text-foreground-muted hover:text-foreground"
+            }`}
+            aria-label={micState === "on" ? "Turn off microphone" : "Turn on microphone"}
+            title={
+              micState === "on"
+                ? "Turn off microphone"
+                : micState === "denied"
+                  ? "Microphone permission was denied"
+                  : micState === "unsupported"
+                    ? "Microphone not available on this device"
+                    : "Turn on microphone to talk"
+            }
+          >
+            {micState === "on" ? <Mic size={17} /> : <MicOff size={17} />}
+          </button>
           <button
             type="button"
             onClick={toggleMute}
@@ -400,6 +520,15 @@ export function DesignersRoomView() {
               }}
               className="absolute left-1/2 top-1/2 -ml-[5px] -mt-[5px] h-2.5 w-2.5 rounded-full border border-white/70"
               style={{ background: p.color }}
+            />
+          ))}
+          {remoteIds.map((id) => (
+            <div
+              key={id}
+              ref={(el) => {
+                radarDots.current[id] = el;
+              }}
+              className="absolute left-1/2 top-1/2 -ml-[6px] -mt-[6px] h-3 w-3 rounded-full border-2 border-white bg-slate-500"
             />
           ))}
           <div
