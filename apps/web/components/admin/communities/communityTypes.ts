@@ -40,15 +40,6 @@ export const TYPE_LABELS: Record<string, string> = {
   general:          "General",
 };
 
-export const TYPE_EMOJI: Record<string, string> = {
-  city:             "📍",
-  sector:           "🏢",
-  interest:         "✦",
-  company:          "🏬",
-  experience_level: "🎯",
-  general:          "🌐",
-};
-
 /** Includes border colour — used in the detail page type badge. */
 export const TYPE_COLORS_WITH_BORDER: Record<string, string> = {
   city:             "bg-blue-500/10 text-blue-400 border-blue-500/20",

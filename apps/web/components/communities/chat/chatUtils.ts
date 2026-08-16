@@ -1,15 +1,5 @@
 // ─── Shared chat utilities ────────────────────────────────────────────────
 
-export const TYPE_EMOJI: Record<string, string> = {
-  city:     "📍",
-  sector:   "🏢",
-  interest: "✦",
-  company:  "🏬",
-  experience_level: "🎯",
-  general:  "💬",
-  user:     "◎",
-};
-
 export function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", {
     hour: "2-digit",

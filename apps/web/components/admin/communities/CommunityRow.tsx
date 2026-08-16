@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { ChevronRight, Users, MessageSquare } from "lucide-react";
-import { TYPE_EMOJI, TYPE_LABELS, TYPE_COLORS } from "./communityTypes";
+import { CommunityIcon } from "@/components/communities/CommunityIcon";
+import { TYPE_LABELS, TYPE_COLORS } from "./communityTypes";
 
 export interface CommunityListItem {
   id: string;
@@ -29,7 +30,6 @@ interface Props {
 
 export function CommunityRow({ community: c, isLast, onClick }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
-  const fallback = TYPE_EMOJI[c.type] ?? "💬";
 
   return (
     <tr
@@ -49,9 +49,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
               onError={() => setImgFailed(true)}
             />
           ) : (
-            <div className="h-8 w-8 rounded-full bg-surface-raised flex items-center justify-center shrink-0 text-sm select-none">
-              {fallback}
-            </div>
+            <CommunityIcon size={32} className="bg-surface-raised" />
           )}
           <div className="flex items-center gap-2">
             <span className="font-body text-sm text-foreground">{c.name}</span>

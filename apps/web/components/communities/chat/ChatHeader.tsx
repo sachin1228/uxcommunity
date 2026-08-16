@@ -7,7 +7,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
-import { TYPE_EMOJI } from "./chatUtils";
+import { CommunityIcon } from "../CommunityIcon";
 
 interface Community {
   id: string;
@@ -181,20 +181,17 @@ export function ChatHeader({
           <>
             <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-3">
-                <div className="h-11 w-11 rounded-full bg-surface-raised flex items-center justify-center text-sm shrink-0 overflow-hidden">
-                  {community.image_url ? (
+                <div className="relative h-11 w-11 rounded-full bg-surface-raised overflow-hidden shrink-0">
+                  <CommunityIcon size={44} className="bg-surface-raised" />
+                  {community.image_url && (
                     <img
                       src={community.image_url}
                       alt={community.name}
-                      className="h-11 w-11 rounded-full object-cover"
+                      className="absolute inset-0 h-11 w-11 rounded-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = "none";
-                        e.currentTarget.parentElement!.textContent =
-                          TYPE_EMOJI[community.type] ?? "💬";
                       }}
                     />
-                  ) : (
-                    TYPE_EMOJI[community.type] ?? "💬"
                   )}
                 </div>
                 <div>
