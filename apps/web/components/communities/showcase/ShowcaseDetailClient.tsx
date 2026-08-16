@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -115,8 +116,8 @@ function CommentRow({
   onDeleted: (comment: ShowcaseComment) => void;
 }) {
   const [replying, setReplying] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   async function remove() {
-    if (!confirm("Delete this comment?")) return;
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${postId}/comments/${comment.id}`,
       { method: "DELETE" },
@@ -125,6 +126,7 @@ function CommentRow({
   }
   const name = comment.users?.name ?? "Community member";
   return (
+    <>
     <div className={`flex gap-3 ${reply ? "pl-8" : ""}`}>
       {comment.users?.avatar_url ? (
         <img
@@ -145,7 +147,7 @@ function CommentRow({
           {comment.user_id === currentUserId && (
             <button
               type="button"
-              onClick={() => void remove()}
+              onClick={() => setConfirmDelete(true)}
               className="ml-auto text-foreground-subtle hover:text-red-400"
               aria-label="Delete comment"
             >
@@ -182,6 +184,14 @@ function CommentRow({
         )}
       </div>
     </div>
+    <ConfirmDialog
+      open={confirmDelete}
+      title="Delete comment?"
+      message="This will permanently remove this comment. This cannot be undone."
+      onClose={() => setConfirmDelete(false)}
+      onConfirm={remove}
+    />
+    </>
   );
 }
 
@@ -206,6 +216,7 @@ export function ShowcaseDetailClient({
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
+  const [confirmDeletePost, setConfirmDeletePost] = useState(false);
   const isVisible = useDocumentVisible();
   const fetchComments = useCallback(async () => {
     const response = await fetch(
@@ -264,7 +275,6 @@ export function ShowcaseDetailClient({
     });
   }
   async function removePost() {
-    if (!confirm("Delete this showcase post? This cannot be undone.")) return;
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       { method: "DELETE" },
@@ -322,7 +332,7 @@ export function ShowcaseDetailClient({
           onToggleLike={() => void toggle("like")}
           onToggleSave={() => void toggle("save")}
           onEdit={() => setEditing(true)}
-          onDelete={() => void removePost()}
+          onDelete={() => setConfirmDeletePost(true)}
         />
         <section className={`mt-6 ${communityFeedLayout.detailSection}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
@@ -377,6 +387,13 @@ export function ShowcaseDetailClient({
           onUpdated={setPost}
         />
       )}
+      <ConfirmDialog
+        open={confirmDeletePost}
+        title="Delete showcase post?"
+        message="This will permanently remove this showcase post. This cannot be undone."
+        onClose={() => setConfirmDeletePost(false)}
+        onConfirm={removePost}
+      />
     </div>
   );
 }

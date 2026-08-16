@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Calendar, ExternalLink, Heart, MapPin, Video } from "lucide-react";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { usePendingMutation } from "@/lib/use-mutation";
@@ -127,6 +128,7 @@ export function EventCard({
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
@@ -150,7 +152,6 @@ export function EventCard({
   });
 
   async function handleDelete() {
-    if (!confirm("Delete this event? This cannot be undone.")) return;
     await runDelete();
   }
 
@@ -246,7 +247,7 @@ export function EventCard({
                   onSave={toggleSave}
                   onShare={() => void handleShare()}
                   onEdit={() => setShowEditModal(true)}
-                  onDelete={() => void handleDelete()}
+                  onDelete={() => setConfirmDelete(true)}
                   onReport={() => setReported(true)}
                 />
               )}
@@ -347,6 +348,13 @@ export function EventCard({
       {showEditModal && (
         <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete event?"
+        message="This will permanently remove this event. This cannot be undone."
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

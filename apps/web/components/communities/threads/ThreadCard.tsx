@@ -10,6 +10,7 @@ import {
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -123,6 +124,7 @@ export function ThreadCard({
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
@@ -146,9 +148,7 @@ export function ThreadCard({
     interactionErrorTimerRef.current = setTimeout(() => setInteractionError(null), 4000);
   }
 
-  async function handleDelete(e: React.MouseEvent) {
-    e.preventDefault();
-    if (!confirm("Delete this thread? This cannot be undone.")) return;
+  async function handleDelete() {
     setDeleting(true);
     setMenuOpen(false);
     try {
@@ -330,7 +330,7 @@ export function ThreadCard({
                   </button>
                   <button
                     type="button"
-                    onClick={handleDelete}
+                    onClick={(e) => { e.preventDefault(); setMenuOpen(false); setConfirmDelete(true); }}
                     disabled={deleting}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
@@ -607,6 +607,14 @@ export function ThreadCard({
           onUpdated={onUpdated}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete thread?"
+        message="This will permanently remove this thread. This cannot be undone."
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

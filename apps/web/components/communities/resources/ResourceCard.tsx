@@ -8,6 +8,7 @@ import {
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { EditResourceModal } from "./EditResourceModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
@@ -96,6 +97,7 @@ export function ResourceCard({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [reported, setReported] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -115,11 +117,7 @@ export function ResourceCard({
     if (response.ok) onDeleted(resource.id);
   });
 
-  async function handleDelete(event?: React.MouseEvent) {
-    event?.preventDefault();
-    event?.stopPropagation();
-    if (!confirm("Delete this resource? This cannot be undone.")) return;
-    setMenuOpen(false);
+  async function handleDelete() {
     await runDelete();
   }
 
@@ -221,7 +219,7 @@ export function ResourceCard({
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
                 <Pencil size={11} /> Edit resource
               </button>
-              <button type="button" onClick={(event) => void handleDelete(event)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
                 <Trash2 size={11} />{deleting ? "Deleting…" : "Delete resource"}
               </button>
             </>
@@ -306,6 +304,13 @@ export function ResourceCard({
       {showEditModal && (
         <EditResourceModal resource={resource} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={(updated) => { onUpdated(updated); setShowEditModal(false); }} />
       )}
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete resource?"
+        message="This will permanently remove this resource. This cannot be undone."
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

@@ -16,6 +16,7 @@ import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
@@ -45,6 +46,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= HOME_FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);
+  const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
   const router = useGuardedRouter();
 
   const fetchFeed = useCallback(async (background = false, force = false) => {
@@ -218,7 +220,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }, [handleShowcaseInteraction]);
 
   const handleShowcaseDeleted = useCallback(async (post: FeedShowcase) => {
-    if (!confirm("Delete this showcase post? This cannot be undone.")) return;
     const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
     const response = await fetch(
       `/api/communities/${scope}/showcase/${post.id}`,
@@ -378,7 +379,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onToggleLike={() => void handleShowcaseLikeSave(group.item, "like")}
                 onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
                 onEdit={() => setEditingShowcase(group.item)}
-                onDelete={() => void handleShowcaseDeleted(group.item)}
+                onDelete={() => setDeletingShowcase(group.item)}
               />
             </li>
           );
@@ -435,6 +436,16 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         onUpdated={handleShowcaseUpdated}
       />
     )}
+
+    <ConfirmDialog
+      open={!!deletingShowcase}
+      title="Delete showcase post?"
+      message="This will permanently remove this showcase post. This cannot be undone."
+      onClose={() => setDeletingShowcase(null)}
+      onConfirm={() => {
+        if (deletingShowcase) return handleShowcaseDeleted(deletingShowcase);
+      }}
+    />
     </>
   );
 }
