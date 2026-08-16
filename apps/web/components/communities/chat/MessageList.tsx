@@ -132,7 +132,7 @@ export function MessageList({
           communityId={communityId}
           communityType={displayCommunity?.type ?? ""}
           size={200}
-          spinnerClassName="h-5 w-5"
+          showFallback={false}
         />
       </div>
     );

@@ -161,15 +161,13 @@ export default function CommunityPageLoading() {
             }}
           >
             <div className="flex items-center justify-center h-full">
-              {communityId ? (
+              {communityId && (
                 <LottieLoader
                   communityId={communityId}
                   communityType={community?.type ?? ""}
                   size={200}
-                  spinnerClassName="h-5 w-5"
+                  showFallback={false}
                 />
-              ) : (
-                <Spinner size={40} />
               )}
             </div>
           </div>

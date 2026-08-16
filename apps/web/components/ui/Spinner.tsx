@@ -24,10 +24,15 @@ export function Spinner({ className = "", size }: { className?: string; size?: n
         stroke="currentColor"
         strokeWidth="2"
       />
+      {/* Spinning material — a stroked arc whose thickness matches the track's
+          stroke width, so it never looks thicker than the circle. */}
       <path
         className="opacity-75"
-        fill="currentColor"
-        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        d="M12 2a10 10 0 0 1 10 10"
       />
     </svg>
   );
