@@ -104,7 +104,14 @@ function bodyKey(body: BodyInit | null | undefined): string | null {
 
 /** Fresh Response for a replay caller — each caller gets its own readable body. */
 function reconstructResponse(buffered: BufferedResponse): Response {
-  return new Response(buffered.bodyText, {
+  // 204 / 205 / 304 must not carry a body — passing the buffered "" would
+  // throw "Response with null body status cannot have body" when replaying
+  // bodyless responses (e.g. a 204 from a DELETE mutation).
+  const body =
+    buffered.status === 204 || buffered.status === 205 || buffered.status === 304
+      ? null
+      : buffered.bodyText
+  return new Response(body, {
     status: buffered.status,
     statusText: buffered.statusText,
     headers: buffered.headers,
