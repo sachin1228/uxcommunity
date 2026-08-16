@@ -5,7 +5,8 @@ import { LottieLoader } from "@/components/ui/LottieLoader";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
-import { TYPE_EMOJI, fmtDate } from "./chatUtils";
+import { fmtDate } from "./chatUtils";
+import { CommunityIcon } from "../CommunityIcon";
 import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
 import { Loader2 } from "lucide-react";
 
@@ -179,7 +180,7 @@ export function MessageList({
                 className="h-12 w-12 rounded-full object-cover"
               />
             ) : (
-              TYPE_EMOJI[displayCommunity?.type ?? ""] ?? "💬"
+              <CommunityIcon size={48} className="bg-surface-raised" />
             )}
           </div>
           <p className="font-body text-sm text-foreground-muted text-center">

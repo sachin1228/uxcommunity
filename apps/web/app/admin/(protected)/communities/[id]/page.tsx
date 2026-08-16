@@ -7,9 +7,9 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CommunityActionsPanel } from "@/components/admin/communities/CommunityActionsPanel";
 import { CommunityMembersList } from "@/components/admin/communities/CommunityMembersList";
 import { CommunityMessagesList } from "@/components/admin/communities/CommunityMessagesList";
+import { CommunityIcon } from "@/components/communities/CommunityIcon";
 import {
   TYPE_LABELS,
-  TYPE_EMOJI,
   TYPE_COLORS_WITH_BORDER,
   fmtDateTime,
   type Community,
@@ -121,8 +121,6 @@ export default function CommunityDetailPage() {
     );
   }
 
-  const fallback = TYPE_EMOJI[community.type] ?? "💬";
-
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
       {/* Back */}
@@ -143,9 +141,7 @@ export default function CommunityDetailPage() {
             onError={() => setImgFailed(true)}
           />
         ) : (
-          <div className="h-16 w-16 rounded-full bg-surface-raised flex items-center justify-center shrink-0 text-2xl select-none">
-            {fallback}
-          </div>
+          <CommunityIcon size={64} className="bg-surface-raised" />
         )}
         <div className="flex-1 min-w-0">
           {/* Name + inline edit */}
@@ -200,7 +196,7 @@ export default function CommunityDetailPage() {
                 "bg-surface-raised text-foreground-muted border-border"
               }`}
             >
-              {fallback} {TYPE_LABELS[community.type] ?? community.type}
+              <Users size={11} className="text-foreground-muted" /> {TYPE_LABELS[community.type] ?? community.type}
             </span>
             {!community.is_active && (
               <span className="px-2 py-0.5 rounded-full font-body text-[11px] font-medium bg-amber-500/10 text-amber-500 border border-amber-500/20">
