@@ -58,8 +58,8 @@ export interface CommunityThread {
   is_public?: boolean;
   created_at: string;
   updated_at: string;
-  vote_count: number;
-  user_voted: boolean;
+  like_count: number;
+  user_liked: boolean;
   user_saved: boolean;
   comment_count: number;
   users: {

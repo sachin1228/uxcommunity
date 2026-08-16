@@ -41,7 +41,7 @@ export const DEDUPE_BYPASS_HEADER = "x-ux-dedupe-bypass"
  * (`saved:true` → `saved:false`) or are safe to collapse by URL alone.
  */
 const TOGGLE_PATH =
-  /\/(like|unlike|save|unsave|bookmark|rsvp|join|leave|follow|unfollow|vote|accept|decline|archive|read|mark-read)(\/|$)/i
+  /\/(like|unlike|save|unsave|bookmark|rsvp|join|leave|follow|unfollow|accept|decline|archive|read|mark-read)(\/|$)/i
 
 let installed = false
 let cleanupFn: (() => void) | null = null

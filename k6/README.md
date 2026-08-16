@@ -15,7 +15,7 @@ k6/
 │   ├── 02_auth.js          # login, logout, me, reset-request
 │   ├── 03_applications.js  # POST /api/applications
 │   ├── 04_communities.js   # communities, messages, reactions
-│   ├── 05_threads.js       # threads, votes, comments
+│   ├── 05_threads.js       # threads, likes, comments
 │   ├── 06_events.js        # events, rsvp, event comments
 │   ├── 07_profile.js       # profile get/patch, interests, link-preview
 │   └── 08_admin.js         # admin panel read + light write smoke
@@ -190,7 +190,7 @@ The stress scenario relaxes the error-rate threshold to 15 % — the goal there 
 | Auth | `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`, `/api/auth/reset-request` |
 | Applications | `POST /api/applications` |
 | Communities | `/api/communities`, `/api/communities/all`, `/api/communities/:id`, `/api/communities/:id/stats`, `/api/communities/:id/messages`, `/api/communities/:id/messages/:id/reactions`, `/api/communities/:id/read` |
-| Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:id`, `/api/communities/:id/threads/:id/vote`, `/api/communities/:id/threads/:id/comments` |
+| Threads | `/api/communities/:id/threads`, `/api/communities/:id/threads/:id`, `/api/communities/:id/threads/:id/like`, `/api/communities/:id/threads/:id/comments` |
 | Events | `/api/communities/:id/events`, `/api/communities/:id/events/:id`, `/api/communities/:id/events/:id/rsvp`, `/api/communities/:id/events/:id/rsvp/list`, `/api/communities/:id/events/:id/comments` |
 | Profile | `/api/profile`, `/api/profile/interests`, `/api/profile/threads`, `/api/lottie-settings`, `/api/link-preview` |
 | Admin (read) | `/api/admin/applications`, `/api/admin/users`, `/api/admin/communities`, `/api/admin/cities`, `/api/admin/sectors`, `/api/admin/companies`, `/api/admin/interests`, `/api/admin/moderation`, `/api/admin/tags` |

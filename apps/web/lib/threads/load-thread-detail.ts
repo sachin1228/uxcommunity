@@ -24,12 +24,12 @@ async function loadThread(db: Database, options: LoadOptions): Promise<Community
   const { data } = await query.maybeSingle()
   if (!data) return null
 
-  const [{ data: user }, { data: profile }, { count: votes }, { data: myVote }, { data: mySave }, { count: comments }] =
+  const [{ data: user }, { data: profile }, { count: likes }, { data: myLike }, { data: mySave }, { count: comments }] =
     await Promise.all([
       db.from("users").select("id, name").eq("id", data.user_id).maybeSingle(),
       db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", data.user_id).maybeSingle(),
-      db.from("thread_votes").select("thread_id", { count: "exact", head: true }).eq("thread_id", data.id),
-      db.from("thread_votes").select("thread_id").eq("thread_id", data.id).eq("user_id", options.userId).maybeSingle(),
+      db.from("thread_likes").select("thread_id", { count: "exact", head: true }).eq("thread_id", data.id),
+      db.from("thread_likes").select("thread_id").eq("thread_id", data.id).eq("user_id", options.userId).maybeSingle(),
       db.from("thread_saves").select("thread_id").eq("thread_id", data.id).eq("user_id", options.userId).maybeSingle(),
       db.from("thread_comments").select("id", { count: "exact", head: true }).eq("thread_id", data.id),
     ])
@@ -37,8 +37,8 @@ async function loadThread(db: Database, options: LoadOptions): Promise<Community
   return {
     ...(data as unknown as CommunityThread),
     users: user ? { name: user.name, avatar_url: profile?.avatar_url ?? null } : null,
-    vote_count: votes ?? 0,
-    user_voted: Boolean(myVote),
+    like_count: likes ?? 0,
+    user_liked: Boolean(myLike),
     user_saved: Boolean(mySave),
     comment_count: comments ?? 0,
   }

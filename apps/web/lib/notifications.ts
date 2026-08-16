@@ -9,7 +9,7 @@ export type NotificationType =
   | "community_event"
   | "thread_comment"
   | "thread_reply"
-  | "thread_vote"
+  | "thread_like"
   | "resource_comment"
   | "resource_reply"
   | "event_comment"

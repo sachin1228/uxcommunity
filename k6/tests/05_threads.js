@@ -1,5 +1,5 @@
 /**
- * Threads, comments, and votes stress tests.
+ * Threads, comments, and likes stress tests.
  *
  * Endpoints covered:
  *   GET    /api/communities/:id/threads
@@ -7,7 +7,7 @@
  *   GET    /api/communities/:id/threads/:threadId
  *   PATCH  /api/communities/:id/threads/:threadId
  *   DELETE /api/communities/:id/threads/:threadId
- *   POST   /api/communities/:id/threads/:threadId/vote
+ *   POST   /api/communities/:id/threads/:threadId/like
  *   GET    /api/communities/:id/threads/:threadId/comments
  *   POST   /api/communities/:id/threads/:threadId/comments
  *   DELETE /api/communities/:id/threads/:threadId/comments/:commentId
@@ -77,14 +77,14 @@ export function threadTests() {
       sleep(0.1);
     });
 
-    group('threads — vote', () => {
+    group('threads — like', () => {
       const res = http.post(
-        `${BASE_URL}/api/communities/${COMMUNITY_ID}/threads/${threadId}/vote`,
+        `${BASE_URL}/api/communities/${COMMUNITY_ID}/threads/${threadId}/like`,
         null,
-        { headers: JSON_HEADERS, tags: { name: 'threads/vote' } },
+        { headers: JSON_HEADERS, tags: { name: 'threads/like' } },
       );
       check(res, {
-        'threads/vote: status 2xx or 404': (r) =>
+        'threads/like: status 2xx or 404': (r) =>
           (r.status >= 200 && r.status < 300) || r.status === 404,
       });
       sleep(0.1);

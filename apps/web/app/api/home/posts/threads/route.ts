@@ -140,8 +140,8 @@ export async function POST(request: NextRequest) {
     thread: {
       ...inserted,
       users: user ? { name: user.name, avatar_url: profile?.avatar_url ?? null } : null,
-      vote_count: 0,
-      user_voted: false,
+      like_count: 0,
+      user_liked: false,
       user_saved: false,
       comment_count: 0,
     },

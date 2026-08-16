@@ -90,15 +90,15 @@ test("returns stale data while one background revalidation updates consumers", a
 
 test("patches and invalidates all resources for a thread", () => {
   const commentsUrl = `${url}/comments`
-  seedThreadResource(url, { thread: { id: "thread-1", vote_count: 1 } }, "user-1")
+  seedThreadResource(url, { thread: { id: "thread-1", like_count: 1 } }, "user-1")
   seedThreadResource(commentsUrl, { comments: [] }, "user-1")
-  patchThreadResource<{ thread: { id: string; vote_count: number } }>(
+  patchThreadResource<{ thread: { id: string; like_count: number } }>(
     url,
     "user-1",
-    (current) => ({ ...current, thread: { ...current.thread, vote_count: 2 } }),
+    (current) => ({ ...current, thread: { ...current.thread, like_count: 2 } }),
   )
 
-  assert.equal(getThreadResource<{ thread: { vote_count: number } }>(url, "user-1")?.thread.vote_count, 2)
+  assert.equal(getThreadResource<{ thread: { like_count: number } }>(url, "user-1")?.thread.like_count, 2)
   invalidateThreadResources("thread-1", "user-1")
   assert.equal(getThreadResource(url, "user-1"), undefined)
   assert.equal(getThreadResource(commentsUrl, "user-1"), undefined)
