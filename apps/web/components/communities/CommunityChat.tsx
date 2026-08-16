@@ -774,7 +774,7 @@ export function CommunityChat({
               </button>
             )}
             <TypingIndicator users={typingUsers} />
-            <div className="bg-black/40 backdrop-blur-sm">
+            <div className="bg-[color-mix(in_srgb,var(--background)_90%,transparent)] backdrop-blur-sm">
               <ChatInput
                 ref={inputRef}
                 input={input}

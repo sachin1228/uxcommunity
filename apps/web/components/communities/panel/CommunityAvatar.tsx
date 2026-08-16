@@ -1,16 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const TYPE_EMOJI: Record<string, string> = {
-  city:             "📍",
-  sector:           "🏢",
-  interest:         "✦",
-  company:          "🏬",
-  experience_level: "🎯",
-  general:          "💬",
-  user:             "◎",
-};
+import { CommunityIcon } from "../CommunityIcon";
 
 interface CommunityAvatarProps {
   imageUrl: string | null;
@@ -21,7 +12,6 @@ interface CommunityAvatarProps {
 
 export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvatarProps) {
   const [failed, setFailed] = useState(false);
-  const fallback = TYPE_EMOJI[type] ?? "💬";
 
   if (imageUrl && !failed) {
     return (
@@ -40,12 +30,9 @@ export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvata
   }
 
   return (
-    <div
-      className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-lg font-medium select-none ${
-        active ? "bg-accent/20" : "bg-surface-raised"
-      }`}
-    >
-      {fallback}
-    </div>
+    <CommunityIcon
+      size={40}
+      className={active ? "bg-accent/20" : "bg-surface-raised"}
+    />
   );
 }

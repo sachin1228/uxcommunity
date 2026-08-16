@@ -78,10 +78,10 @@ export function LinkPreview({ url, isMe }: LinkPreviewProps) {
   const borderColor  = isMe ? "border-white/10"          : "border-white/[0.07]";
   const bgColor      = isMe ? "bg-black/20"               : "bg-black/10";
   const accentBar    = isMe ? "bg-white/20"               : "bg-accent/60";
-  const siteColor    = isMe ? "text-accent-foreground/50" : "text-accent/80";
+  const siteColor    = isMe ? "text-accent-foreground opacity-50" : "text-accent/80";
   const titleColor   = isMe ? "text-accent-foreground"    : "text-foreground";
-  const descColor    = isMe ? "text-accent-foreground/70" : "text-foreground-muted";
-  const domainColor  = isMe ? "text-accent-foreground/40" : "text-foreground-muted/60";
+  const descColor    = isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted";
+  const domainColor  = isMe ? "text-accent-foreground opacity-40" : "text-foreground-muted/60";
 
   return (
     <a

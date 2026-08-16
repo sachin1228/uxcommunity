@@ -56,10 +56,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-accent-foreground/80" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
         {reply.user_name}
       </p>
-      <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground/70" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
         {reply.content || "📷 Image"}
       </p>
     </div>
@@ -514,7 +514,7 @@ function MessageContent({
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className={`underline underline-offset-2 break-all ${
-          isMe ? "text-accent-foreground/90 hover:text-accent-foreground" : "text-foreground hover:opacity-80"
+          isMe ? "text-accent-foreground opacity-90 hover:opacity-100" : "text-foreground hover:opacity-80"
         }`}
       >
         {url}
@@ -569,11 +569,11 @@ function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }
           : "rounded-tl-sm bg-surface-raised/60 border border-white/5"
         }`}
     >
-      <Ban size={13} className={isMe ? "text-accent-foreground/40 shrink-0" : "text-foreground-muted/50 shrink-0"} />
-      <span className={`font-body text-xs  ${isMe ? "text-accent-foreground/50" : "text-foreground-muted/60"}`}>
+      <Ban size={13} className={isMe ? "text-accent-foreground opacity-40 shrink-0" : "text-foreground-muted/50 shrink-0"} />
+      <span className={`font-body text-xs  ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted/60"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-accent-foreground/40" : "text-foreground-muted/50"}`}>
+      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-accent-foreground opacity-40" : "text-foreground-muted/50"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>
@@ -754,15 +754,15 @@ export function MessageBubble({
                   {!imageOnly && (
                     <div className="flex items-center justify-end gap-1 mt-1">
                       <span className={`font-mono text-[10px] ${
-                        isMe ? "text-accent-foreground/60" : "text-foreground-muted"
+                        isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
                       }`}>
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock size={10} className="text-accent-foreground/60 animate-pulse" />
+                        <Clock size={10} className="text-accent-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck size={11} className="text-accent-foreground/70" />
+                        <CheckCheck size={11} className="text-accent-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>

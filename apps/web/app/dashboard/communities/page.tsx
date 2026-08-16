@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Check, Lock, ChevronRight } from "lucide-react";
+import { CommunityIcon } from "@/components/communities/CommunityIcon";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
@@ -16,16 +17,6 @@ import {
 type Community = CachedExploreCommunity;
 
 // ── Config ───────────────────────────────────────────────────────────────────
-
-const TYPE_EMOJI: Record<string, string> = {
-  city:             "📍",
-  sector:           "🏢",
-  interest:         "✦",
-  company:          "🏬",
-  experience_level: "🎯",
-  general:          "💬",
-  user:             "👥",
-};
 
 const LOCK_REASON: Record<string, string> = {
   company:          "Update your company in your profile to join",
@@ -99,7 +90,7 @@ function CommunityCard({
                 onError={() => setImgErr(true)}
               />
             ) : (
-              TYPE_EMOJI[c.type] ?? "💬"
+              <CommunityIcon size={36} className="bg-surface" />
             )}
           </div>
 
