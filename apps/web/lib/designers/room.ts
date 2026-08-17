@@ -28,9 +28,11 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { WebGPURenderer, PostProcessing } from "three/webgpu";
+import { WebGPURenderer, PostProcessing, RectAreaLightNode } from "three/webgpu";
 import { pass } from "three/tsl";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
+import { RectAreaLightTexturesLib } from "three/examples/jsm/lights/RectAreaLightTexturesLib.js";
 
 // ─── Alley constants ─────────────────────────────────────────────────────────
 const ALLEY_GLB = "/designers/hidden-alley/hidden-alley.glb";
@@ -45,6 +47,19 @@ const BLENDER_LENS = 24; // mm
 const BLENDER_SENSOR_W = 36; // mm
 const BLENDER_CAM_POS = new THREE.Vector3(-0.0722, 1.3, 4.4245);
 const BLENDER_CAM_DIR = new THREE.Vector3(0, 0, -1);
+
+// Blender source lighting rig (scene "Fog", EEVEE, world node group
+// "flower_hillside"). Blender Z-up → three.js Y-up: (x, y, z) → (x, z, −y).
+// Energies are the exact Blender values in EEVEE physical units; three.js
+// physical lighting shares the same SI units for directional irradiance and
+// rect-area radiance, so they carry over directly (nudged at the visual gate).
+const BLENDER_HDR_ROT_Y = -THREE.MathUtils.degToRad(17.7); // world Rotation Z 17.7° (CCW in Blender → −Y here)
+
+// Both suns share this orientation (Blender rot −0.379, −0.023, 7.911); the
+// vector is the world-space travel direction in three.js space.
+const BLENDER_SUN_DIR = new THREE.Vector3(0.3679, -0.9289, -0.0426);
+const BLENDER_SUN_AIM = new THREE.Vector3(0, 0, -2.5); // mid-alley, shadow frustum center
+const BLENDER_SUN_DIST = 40;
 
 // Walkable street footprint in three.js space (Blender z-up is converted to
 // glTF y-up by the exporter, so the alley's long axis runs along ±Z).
@@ -374,10 +389,8 @@ export class DesignersRoom {
     this.opts = opts;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog("#2e3340", 16, 55);
-    // the flower-hillside HDRI is a sunny daylight env; keep it as sky + IBL but
-    // scale its ambient contribution way down so the alley reads as warm dusk
-    this.scene.environmentIntensity = 0.35;
+    // no synthetic fog — the source scene's "Fog" is a misnomer (EEVEE renders
+    // the alley crisp and daylit, fog only ever greyed it out)
 
     this.camera = new THREE.PerspectiveCamera(66, 1, 0.1, 120);
 
@@ -518,8 +531,9 @@ export class DesignersRoom {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.7;
+    // Blender source: view transform AgX, exposure 0 → three.js AgX @ 1.0
+    renderer.toneMapping = THREE.AgXToneMapping;
+    renderer.toneMappingExposure = 1.0;
     const dom = renderer.domElement;
     dom.style.display = "block";
     dom.style.touchAction = "none";
@@ -791,6 +805,11 @@ export class DesignersRoom {
         pmrem.dispose();
         this.scene.environment = rt.texture;
         this.scene.background = tex;
+        // world Rotation Z 17.7° (Blender) → Y rotation (three.js). Rotating
+        // background and environment identically keeps sky + IBL consistent.
+        const rot = new THREE.Euler(0, BLENDER_HDR_ROT_Y, 0);
+        this.scene.backgroundRotation.copy(rot);
+        this.scene.environmentRotation.copy(rot);
       })
       .catch(() => this.buildProceduralEnvironment());
   }
@@ -817,46 +836,73 @@ export class DesignersRoom {
     pmrem.dispose();
   }
 
-  // ── Lighting (atmospheric urban dusk, inspired by the source scene) ────────
+  // ── Lighting (exact Blender source rig: 2 suns, 4 rect areas, 1 spot) ─────
   private buildLights() {
-    // key — warm late-day sun from the south-west (matches Sun.005)
-    const sun = new THREE.DirectionalLight(0xffc9a0, 1.8);
-    sun.position.set(-14.5, 9.0, -10.0);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.near = 2;
-    sun.shadow.camera.far = 50;
-    const s = 16;
-    sun.shadow.camera.left = -s;
-    sun.shadow.camera.right = s;
-    sun.shadow.camera.top = s;
-    sun.shadow.camera.bottom = -s;
-    sun.shadow.bias = -0.00025;
-    sun.shadow.normalBias = 0.05;
-    if (this.backend === "webgl2") sun.shadow.radius = 8;
-    this.scene.add(sun);
-    this.scene.add(sun.target);
+    if (this.backend === "webgl2") RectAreaLightUniformsLib.init();
+    else RectAreaLightNode.setLTC(RectAreaLightTexturesLib.init());
 
-    // cool sky fill + soft ground bounce
-    const hemi = new THREE.HemisphereLight(0x9fb4d8, 0x3a2f26, 0.35);
-    this.scene.add(hemi);
-    this.scene.add(new THREE.AmbientLight(0x6a7288, 0.14));
+    // Suns share one orientation in the source scene, so a single shadow map
+    // reproduces the exact same shadow shape (Sun.005 carries it — 15 W, wide).
+    const makeSun = (r: number, g: number, b: number, intensity: number, castShadow: boolean) => {
+      const sun = new THREE.DirectionalLight(new THREE.Color(r, g, b), intensity);
+      sun.position.copy(BLENDER_SUN_AIM).addScaledVector(BLENDER_SUN_DIR, -BLENDER_SUN_DIST);
+      sun.target.position.copy(BLENDER_SUN_AIM);
+      this.scene.add(sun);
+      this.scene.add(sun.target);
+      if (castShadow) {
+        sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048);
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = BLENDER_SUN_DIST + 40;
+        const e = 18; // covers the 9.2 × 22 alley footprint with margin
+        sun.shadow.camera.left = -e;
+        sun.shadow.camera.right = e;
+        sun.shadow.camera.top = e;
+        sun.shadow.camera.bottom = -e;
+        sun.shadow.bias = -0.00025;
+        sun.shadow.normalBias = 0.05;
+        if (this.backend === "webgl2") sun.shadow.radius = 8;
+      }
+      return sun;
+    };
+    makeSun(0.8899, 0.7988, 0.7242, 8, false); // Sun.001 — cool, 0.1° sharp
+    makeSun(0.8898, 0.6909, 0.5375, 15, true); // Sun.005 — warm, 3° broad
 
-    // warm practical lights (replicates the source Area/Spot rig, shadowless)
-    const warm = (x: number, y: number, z: number, intensity: number, distance: number, color = 0xffb26a) => {
-      const l = new THREE.PointLight(color, intensity, distance, 2);
-      l.position.set(x, y, z);
+    // Rect areas (Area.001/003/004/005 — 1×1 m squares). three.js RectAreaLight
+    // emits along local −Z; lookAt aligns that with the source emission dir.
+    // Blender up-axes are supplied explicitly so near-vertical emitters don't
+    // gimbal-lock lookAt.
+    const area = (
+      px: number, py: number, pz: number,
+      dx: number, dy: number, dz: number,
+      ux: number, uy: number, uz: number,
+      watts: number, r: number, g: number, b: number
+    ) => {
+      const l = new THREE.RectAreaLight(new THREE.Color(r, g, b), watts / Math.PI, 1, 1);
+      l.position.set(px, py, pz);
+      l.up.set(ux, uy, uz);
+      l.lookAt(px + dx, py + dy, pz + dz);
       this.scene.add(l);
     };
-    warm(0.02, 11.3, 2.8, 12, 30); // Area.001
-    warm(-2.14, 10.2, -9.8, 18, 34, 0xff9c6b); // Area.003
-    warm(1.42, 10.0, -19.4, 9, 26); // Area.004
-    warm(0.89, 10.2, 2.59, 14, 30); // Area.005
+    area(0.0191, 11.2967, 2.8, 0.0146, -0.9999, 0, 0, 0, -1, 35, 1.0, 0.8098, 0.5501); // Area.001
+    area(-2.1409, 10.1967, -9.8, 0.371, -0.929, 0, 0, 0, -1, 300, 1.0, 0.6495, 0.4973); // Area.003
+    area(1.4165, 10.0124, -19.4037, 0.577, -0.137, 0.805, -0.155, -0.986, -0.057, 39.27, 1.0, 0.7361, 0.6477); // Area.004
+    area(0.8925, 10.1967, 2.5866, -0.512, -0.859, 0, 0, 0, -1, 40, 1.0, 0.6495, 0.4973); // Area.005
 
-    // cool practical spot (Area.002)
-    const coolSpot = new THREE.SpotLight(0xcfe8ff, 14, 26, Math.PI / 4, 0.5, 1);
-    coolSpot.position.set(-1.98, 2.12, 0.1);
-    coolSpot.target.position.set(-1.98, 0, -2);
+    // Area.002 — cool wall lamp over the white door: spot, 135.9° cone, 0.26
+    // blend. Blender flux 15 W over Ω = 2π(1−cos 67.95°) → candela for the spot.
+    const spotAngle = THREE.MathUtils.degToRad(135.9 / 2);
+    const candela = 15 / (2 * Math.PI * (1 - Math.cos(spotAngle)));
+    const coolSpot = new THREE.SpotLight(
+      new THREE.Color(0.784, 0.9884, 1.0),
+      candela,
+      0,
+      spotAngle,
+      0.26,
+      2
+    );
+    coolSpot.position.set(-1.9809, 2.1223, 0.1);
+    coolSpot.target.position.set(-1.9809 + 0.0042, 2.1223 - 0.0999, 0.1);
     this.scene.add(coolSpot);
     this.scene.add(coolSpot.target);
   }
