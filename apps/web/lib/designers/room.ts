@@ -1,20 +1,26 @@
 /**
  * 3D designer-studio room engine (plain three.js — no extra addons).
  *
- * Handles: scene + furniture building, first-person pointer-lock camera,
- * WASD / touch movement with collision, and network-driven avatars for
- * other real users in the room.
+ * The environment is the "Pixellab abandoned house" GLB loaded at runtime
+ * with GLTFLoader. Its arbitrary authoring scale is normalised from the
+ * model's real bounding box, the player spawns standing in front of it, and
+ * the walkable area + house footprint are derived from the same bounds.
+ * Handles: scene + lighting, first-person drag-look camera, WASD / touch
+ * movement with collision, and network-driven avatars for other real users
+ * in the room.
  * React (`DesignersRoom.tsx`) is only responsible for the HUD, voice (WebRTC)
  * and input plumbing — all three.js state lives here.
  */
 
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
-// ─── Room constants ───────────────────────────────────────────────────────────
-const HALF_W = 12; // room half-width  (x: ±12)
-const HALF_D = 9; // room half-depth   (z: ±9)
-const WALL_H = 4.6;
+// ─── Environment constants ────────────────────────────────────────────────────
 const EYE = 1.62; // player eye height
+const HOUSE_URL = "/designers/pixellabs-abandoned-house-3642.glb";
+const HOUSE_TARGET_H = 6; // scale the (arbitrarily-sized) model to this height
+const WALK_MARGIN = 4.5; // how far the player may roam around the house
+const SPAWN_FRONT = 2.6; // spawn distance in front of the house footprint
 
 export interface RemoteUserState {
   id: string;
@@ -45,52 +51,7 @@ export interface RoomOptions {
   onError: (message: string) => void;
 }
 
-interface Collider {
-  x: number;
-  z: number;
-  r: number;
-}
-
 // ─── Small texture helpers ─────────────────────────────────────────────────────
-function makePlankTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 256;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#c99a68";
-  ctx.fillRect(0, 0, 256, 256);
-  // plank seams
-  for (let i = 0; i < 4; i++) {
-    ctx.strokeStyle = "rgba(90,58,28,0.35)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, i * 64);
-    ctx.lineTo(256, i * 64);
-    ctx.stroke();
-  }
-  // staggered vertical joints
-  ctx.strokeStyle = "rgba(90,58,28,0.25)";
-  for (let row = 0; row < 4; row++) {
-    const off = row % 2 === 0 ? 0 : 128;
-    for (let x = 0; x < 4; x++) {
-      ctx.beginPath();
-      ctx.moveTo((x * 64 + off) % 256, row * 64);
-      ctx.lineTo((x * 64 + off) % 256, row * 64 + 64);
-      ctx.stroke();
-    }
-  }
-  // grain noise
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = `rgba(80,50,22,${Math.random() * 0.08})`;
-    ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 2.2);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 function makeLabelTexture(name: string, role: string, accent: string): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = 512;
@@ -125,41 +86,6 @@ function makeLabelTexture(name: string, role: string, accent: string): THREE.Can
   return tex;
 }
 
-function makePosterTexture(palette: [string, string, string]): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 320;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, 0, 256, 320);
-  g.addColorStop(0, palette[0]);
-  g.addColorStop(1, palette[1]);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 320);
-  // abstract shapes
-  ctx.fillStyle = palette[2];
-  ctx.beginPath();
-  ctx.arc(128, 110, 56, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.beginPath();
-  ctx.arc(128, 110, 30, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = palette[2];
-  ctx.lineWidth = 10;
-  ctx.beginPath();
-  ctx.moveTo(40, 250);
-  ctx.lineTo(128, 200);
-  ctx.lineTo(216, 250);
-  ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.8)";
-  ctx.font = "700 22px Inter, system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("DESIGN", 128, 288);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 function makeMicTexture(): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = 128;
@@ -185,38 +111,6 @@ function colorFromName(name: string): string {
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   const hue = h % 360;
   return `hsl(${hue}, 55%, 52%)`;
-}
-
-function makeSkyTexture(): THREE.CanvasTexture {
-  const c = document.createElement("canvas");
-  c.width = 256;
-  c.height = 128;
-  const ctx = c.getContext("2d")!;
-  const g = ctx.createLinearGradient(0, 0, 0, 128);
-  g.addColorStop(0, "#6fb6ff");
-  g.addColorStop(0.7, "#bfe0ff");
-  g.addColorStop(1, "#e8f3ff");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 256, 128);
-  // sun
-  ctx.fillStyle = "#fff3c4";
-  ctx.beginPath();
-  ctx.arc(200, 34, 22, 0, Math.PI * 2);
-  ctx.fill();
-  // clouds
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
-  for (const [cx, cy, cr] of [
-    [60, 40, 14],
-    [86, 46, 11],
-    [160, 70, 12],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, cr, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }
 
 // ─── Remote (real user) avatar ──────────────────────────────────────────────────
@@ -339,16 +233,27 @@ export class DesignersRoom {
   private keys = new Set<string>();
   private yaw = 0;
   private pitch = 0;
-  // spawn near the door, scattered so people don't start inside each other
-  private px = (Math.random() * 2 - 1) * 2.5;
-  private pz = 4.6 + Math.random() * 2;
+  // spawn is chosen from the house bounding box once the GLB loads
+  private px = 0;
+  private pz = 4;
 
   private touchMoveX = 0;
   private touchMoveZ = 0;
   private touchSprint = false;
 
   private remotes = new Map<string, RemoteAvatar>();
-  private colliders: Collider[] = [];
+
+  // house (GLB) state — derived from its real bounding box at load time
+  private houseReady = false;
+  private houseBox: THREE.Box3 | null = null;
+  private minX = -20;
+  private maxX = 20;
+  private minZ = -20;
+  private maxZ = 20;
+  private houseCX = 0;
+  private houseCZ = 0;
+  private houseHX = 20;
+  private houseHZ = 20;
 
   private resizeObserver: ResizeObserver;
 
@@ -378,13 +283,14 @@ export class DesignersRoom {
     container.appendChild(renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#f2e7d3");
-    this.scene.fog = new THREE.Fog("#f2e7d3", 22, 46);
+    this.scene.background = new THREE.Color("#1b2129");
+    this.scene.fog = new THREE.Fog("#1b2129", 16, 40);
 
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 100);
 
     this.buildLights();
-    this.buildRoom();
+    this.buildGround();
+    this.loadHouse();
 
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -412,7 +318,8 @@ export class DesignersRoom {
       this.camera.rotation.x = this.pitch;
       this.renderer.render(this.scene, this.camera);
       this.emitFrame();
-      if (!this.readyEmitted) {
+      // hold the loading overlay until the environment is actually in the scene
+      if (!this.readyEmitted && this.houseReady) {
         this.readyEmitted = true;
         this.opts.onReady();
       }
@@ -505,20 +412,18 @@ export class DesignersRoom {
       this.px += (-Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr) * speed;
       this.pz += (-Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr) * speed;
     }
-    // walls
+    // walkable grounds around the house
     const m = 0.45;
-    this.px = Math.max(-HALF_W + m, Math.min(HALF_W - m, this.px));
-    this.pz = Math.max(-HALF_D + m, Math.min(HALF_D - m, this.pz));
-    // static furniture
-    for (const c of this.colliders) {
-      const dx = this.px - c.x;
-      const dz = this.pz - c.z;
-      const d = Math.hypot(dx, dz);
-      const min = c.r + 0.42;
-      if (d < min && d > 0.0001) {
-        this.px = c.x + (dx / d) * min;
-        this.pz = c.z + (dz / d) * min;
-      }
+    this.px = Math.max(this.minX + m, Math.min(this.maxX - m, this.px));
+    this.pz = Math.max(this.minZ + m, Math.min(this.maxZ - m, this.pz));
+    // keep the player out of the house footprint (solid model)
+    const dx = this.px - this.houseCX;
+    const dz = this.pz - this.houseCZ;
+    if (Math.abs(dx) < this.houseHX && Math.abs(dz) < this.houseHZ) {
+      const overX = this.houseHX - Math.abs(dx);
+      const overZ = this.houseHZ - Math.abs(dz);
+      if (overX < overZ) this.px = this.houseCX + Math.sign(dx || 1) * this.houseHX;
+      else this.pz = this.houseCZ + Math.sign(dz || 1) * this.houseHZ;
     }
   }
 
@@ -575,10 +480,11 @@ export class DesignersRoom {
 
   // ── Scene building ───────────────────────────────────────────────────────────
   private buildLights() {
-    const hemi = new THREE.HemisphereLight(0xfff1dc, 0x9a8f7c, 0.9);
+    // slightly boosted from the original bright studio so the dark house reads
+    const hemi = new THREE.HemisphereLight(0xfff1dc, 0x9a8f7c, 1.6);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffe1b3, 1.25);
+    const sun = new THREE.DirectionalLight(0xffe1b3, 1.5);
     sun.position.set(7, 10, -8);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -591,340 +497,77 @@ export class DesignersRoom {
     sun.shadow.bias = -0.0005;
     this.scene.add(sun);
 
-    const warm = new THREE.PointLight(0xff9d5c, 0.9, 16);
+    const warm = new THREE.PointLight(0xff9d5c, 1.2, 16);
     warm.position.set(0, 2.7, 5.5);
     this.scene.add(warm);
 
-    const cool = new THREE.PointLight(0x9cc4ff, 0.4, 14);
+    const cool = new THREE.PointLight(0x9cc4ff, 0.6, 14);
     cool.position.set(0, 3.2, -6);
     this.scene.add(cool);
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.16));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
   }
 
-  private addCollider(x: number, z: number, r: number) {
-    this.colliders.push({ x, z, r });
+  /** Dark yard floor so the house sits on something and casts a shadow. */
+  private buildGround() {
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(44, 44),
+      new THREE.MeshStandardMaterial({ color: "#262b33", roughness: 1 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    this.scene.add(ground);
   }
 
-  private buildRoom() {
-    const wallMat = new THREE.MeshStandardMaterial({ color: "#f4e9d6", roughness: 0.95 });
-    const floorMat = new THREE.MeshStandardMaterial({
-      map: makePlankTexture(),
-      roughness: 0.85,
-    });
+  // ── House (GLB) ──────────────────────────────────────────────────────────────
+  private loadHouse() {
+    const loader = new GLTFLoader();
+    loader.load(
+      HOUSE_URL,
+      (gltf) => {
+        if (this.disposed) return;
+        const root = gltf.scene;
+        root.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh) {
+            o.castShadow = true;
+            o.receiveShadow = true;
+          }
+        });
 
-    // floor
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, HALF_D * 2), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+        // The model is authored at an arbitrary scale and is not assumed to be
+        // centered at (0,0,0) — normalise from its real bounding box.
+        const rawBox = new THREE.Box3().setFromObject(root);
+        const rawSize = rawBox.getSize(new THREE.Vector3());
+        const scale = HOUSE_TARGET_H / rawSize.y;
+        root.scale.setScalar(scale);
+        this.scene.add(root);
 
-    // walls
-    const mkWall = (w: number, h: number, d: number, x: number, y: number, z: number) => {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-      wall.position.set(x, y, z);
-      wall.receiveShadow = true;
-      wall.castShadow = true;
-      this.scene.add(wall);
-    };
-    mkWall(HALF_W * 2, WALL_H, 0.3, 0, WALL_H / 2, -HALF_D); // back
-    mkWall(HALF_W * 2, WALL_H, 0.3, 0, WALL_H / 2, HALF_D); // front
-    mkWall(0.3, WALL_H, HALF_D * 2, -HALF_W, WALL_H / 2, 0); // left
-    mkWall(0.3, WALL_H, HALF_D * 2, HALF_W, WALL_H / 2, 0); // right
-    // ceiling
-    const ceil = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALF_W * 2, HALF_D * 2),
-      new THREE.MeshStandardMaterial({ color: "#fff8ec", roughness: 1 })
-    );
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.y = WALL_H;
-    this.scene.add(ceil);
+        const box = new THREE.Box3().setFromObject(root);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        this.houseBox = box;
+        this.houseReady = true;
 
-    // window on the back wall + sky outside
-    const winFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(9, 2.6, 0.24),
-      new THREE.MeshStandardMaterial({ color: "#e8d7b8", roughness: 0.9 })
-    );
-    winFrame.position.set(0, 2.35, -HALF_D + 0.18);
-    this.scene.add(winFrame);
+        // walkable bounds around the house
+        this.minX = center.x - size.x / 2 - WALK_MARGIN;
+        this.maxX = center.x + size.x / 2 + WALK_MARGIN;
+        this.minZ = center.z - size.z / 2 - WALK_MARGIN;
+        this.maxZ = center.z + size.z / 2 + WALK_MARGIN;
+        this.houseCX = center.x;
+        this.houseCZ = center.z;
+        this.houseHX = size.x / 2 - 0.5;
+        this.houseHZ = size.z / 2 - 0.5;
 
-    const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(8.2, 2.0),
-      new THREE.MeshStandardMaterial({
-        color: "#cfe8ff",
-        transparent: true,
-        opacity: 0.22,
-        roughness: 0.1,
-        metalness: 0.2,
-        side: THREE.DoubleSide,
-      })
-    );
-    glass.position.set(0, 2.35, -HALF_D + 0.32);
-    this.scene.add(glass);
-
-    const sky = new THREE.Mesh(
-      new THREE.PlaneGeometry(22, 11),
-      new THREE.MeshBasicMaterial({ map: makeSkyTexture() })
-    );
-    sky.position.set(0, 3.4, -HALF_D - 3.6);
-    this.scene.add(sky);
-
-    // door on the front wall
-    const doorMat = new THREE.MeshStandardMaterial({ color: "#b98a5a", roughness: 0.8 });
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.2, 0.34), doorMat);
-    door.position.set(-8.6, 1.6, HALF_D - 0.16);
-    this.scene.add(door);
-    const knob = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 10, 10),
-      new THREE.MeshStandardMaterial({ color: "#c9a24b", metalness: 0.7, roughness: 0.3 })
-    );
-    knob.position.set(-8.6 + 0.7, 1.55, HALF_D - 0.28);
-    this.scene.add(knob);
-
-    this.buildFurniture();
-  }
-
-  private std(color: string, rough = 0.8) {
-    return new THREE.MeshStandardMaterial({ color, roughness: rough });
-  }
-
-  private box(w: number, h: number, d: number, color: string, x: number, y: number, z: number, rough = 0.8, shadow = true) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.std(color, rough));
-    m.position.set(x, y, z);
-    m.castShadow = shadow;
-    m.receiveShadow = true;
-    this.scene.add(m);
-    return m;
-  }
-
-  private buildFurniture() {
-    // ── rug ──
-    const rug = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.3, 3.3, 0.03, 48),
-      this.std("#3e6fb0", 0.95)
-    );
-    rug.position.y = 0.02;
-    rug.receiveShadow = true;
-    this.scene.add(rug);
-    const rugInner = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.5, 2.5, 0.035, 48),
-      this.std("#527fc2", 0.95)
-    );
-    rugInner.position.y = 0.035;
-    rugInner.receiveShadow = true;
-    this.scene.add(rugInner);
-
-    // ── sofa ──
-    const sofaX = 5.6;
-    const sofaZ = -4.4;
-    this.box(3.0, 0.55, 1.15, "#4a7c8a", sofaX, 0.45, sofaZ, 0.9);
-    this.box(3.0, 0.75, 0.32, "#3f6b77", sofaX, 1.0, sofaZ + 0.42, 0.9);
-    this.box(0.42, 0.75, 1.15, "#3f6b77", sofaX - 1.35, 0.95, sofaZ, 0.9);
-    this.box(0.42, 0.75, 1.15, "#3f6b77", sofaX + 1.35, 0.95, sofaZ, 0.9);
-    // cushions
-    this.box(1.0, 0.24, 0.85, "#d8e4e6", sofaX - 0.72, 0.82, sofaZ - 0.05, 0.95);
-    this.box(1.0, 0.24, 0.85, "#c3d6d9", sofaX + 0.72, 0.82, sofaZ - 0.05, 0.95);
-    this.addCollider(sofaX, sofaZ, 1.85);
-
-    // ── coffee table ──
-    const tabX = 4.3;
-    const tabZ = -2.3;
-    this.box(1.5, 0.09, 0.9, "#8a5a33", tabX, 0.48, tabZ, 0.85);
-    for (const [lx, lz] of [
-      [-0.68, -0.38],
-      [0.68, -0.38],
-      [-0.68, 0.38],
-      [0.68, 0.38],
-    ] as const) {
-      this.box(0.09, 0.48, 0.09, "#6e4526", tabX + lx, 0.24, tabZ + lz, 0.85);
-    }
-    this.addCollider(tabX, tabZ, 0.95);
-
-    // ── desk A (left) with monitor + chair ──
-    const deskAX = -6.4;
-    const deskAZ = -2.4;
-    this.box(2.1, 0.09, 1.0, "#7c5330", deskAX, 0.86, deskAZ, 0.8);
-    for (const [lx, lz] of [
-      [-0.95, -0.42],
-      [0.95, -0.42],
-      [-0.95, 0.42],
-      [0.95, 0.42],
-    ] as const) {
-      this.box(0.1, 0.86, 0.1, "#5d3c20", deskAX + lx, 0.43, deskAZ + lz, 0.85);
-    }
-    this.box(1.15, 0.02, 0.42, "#2a2a35", deskAX - 0.05, 0.93, deskAZ, 0.6);
-    // monitor
-    this.box(0.02, 0.62, 0.95, "#14141c", deskAX + 0.05, 1.32, deskAZ, 0.4);
-    this.box(0.86, 0.55, 0.02, "#14141c", deskAX + 0.06, 1.3, deskAZ - 0.02, 0.4);
-    // screen glow
-    const screen = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.78, 0.46),
-      new THREE.MeshBasicMaterial({ color: "#7fb5ff" })
-    );
-    screen.position.set(deskAX + 0.07, 1.3, deskAZ - 0.04);
-    screen.rotation.y = Math.PI / 2;
-    this.scene.add(screen);
-    // chair behind
-    const chairX = deskAX + 2.0;
-    const chairZ = deskAZ + 0.2;
-    this.box(0.5, 0.12, 0.5, "#3d3d4d", chairX, 0.28, chairZ, 0.85);
-    this.box(0.5, 0.7, 0.12, "#3d3d4d", chairX, 0.6, chairZ - 0.25, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairX - 0.2, 0.6, chairZ, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairX + 0.2, 0.6, chairZ, 0.85);
-    this.addCollider(deskAX, deskAZ, 1.3);
-    this.addCollider(chairX, chairZ, 0.75);
-
-    // ── desk B (right) with monitor + chair ──
-    const deskBX = 7.4;
-    const deskBZ = 3.6;
-    this.box(2.1, 0.09, 1.0, "#6e5a86", deskBX, 0.86, deskBZ, 0.8);
-    for (const [lx, lz] of [
-      [-0.95, -0.42],
-      [0.95, -0.42],
-      [-0.95, 0.42],
-      [0.95, 0.42],
-    ] as const) {
-      this.box(0.1, 0.86, 0.1, "#4c3d60", deskBX + lx, 0.43, deskBZ + lz, 0.85);
-    }
-    this.box(1.15, 0.02, 0.42, "#2a2a35", deskBX + 0.05, 0.93, deskBZ, 0.6);
-    this.box(0.02, 0.62, 0.95, "#14141c", deskBX - 0.05, 1.32, deskBZ, 0.4);
-    this.box(0.86, 0.55, 0.02, "#14141c", deskBX - 0.06, 1.3, deskBZ - 0.02, 0.4);
-    const screenB = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.78, 0.46),
-      new THREE.MeshBasicMaterial({ color: "#ffb37f" })
-    );
-    screenB.position.set(deskBX - 0.07, 1.3, deskBZ - 0.04);
-    screenB.rotation.y = Math.PI / 2;
-    this.scene.add(screenB);
-    const chairBX = deskBX - 2.0;
-    this.box(0.5, 0.12, 0.5, "#3d3d4d", chairBX, 0.28, deskBZ + 0.2, 0.85);
-    this.box(0.5, 0.7, 0.12, "#3d3d4d", chairBX, 0.6, deskBZ - 0.05, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairBX - 0.2, 0.6, deskBZ + 0.2, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairBX + 0.2, 0.6, deskBZ + 0.2, 0.85);
-    this.addCollider(deskBX, deskBZ, 1.3);
-    this.addCollider(chairBX, deskBZ + 0.2, 0.75);
-
-    // ── bookshelf (left wall) ──
-    const shX = -11.2;
-    const shZ = 2.0;
-    this.box(0.7, 2.6, 1.6, "#7a5230", shX, 1.3, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 0.62, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 1.32, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 2.02, shZ, 0.85);
-    const bookColors = ["#c2574c", "#2f6fed", "#3fa06b", "#9a6ff0", "#f0a832", "#4a7c8a"];
-    for (let shelf = 0; shelf < 3; shelf++) {
-      for (let i = 0; i < 9; i++) {
-        const b = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, 0.34 + Math.random() * 0.2, 0.12),
-          this.std(bookColors[(i + shelf) % bookColors.length], 0.9)
-        );
-        b.position.set(shX + 0.01, 0.8 + shelf * 0.7, shZ - 0.55 + i * 0.14);
-        b.castShadow = true;
-        this.scene.add(b);
+        // spawn standing in front of the house (+z), scattered a little so
+        // people don't start inside each other
+        this.px = center.x + (Math.random() * 2 - 1) * 1.4;
+        this.pz = center.z + size.z / 2 + SPAWN_FRONT + Math.random() * 1.4;
+      },
+      undefined,
+      (err) => {
+        console.error("Failed to load " + HOUSE_URL, err);
+        this.opts.onError("Could not load the 3D environment.");
       }
-    }
-    this.addCollider(shX, shZ, 1.0);
-
-    // ── plants ──
-    const mkPlant = (x: number, z: number, scale: number, pot: string) => {
-      const g = new THREE.Group();
-      const potMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.34, 0.26, 0.5, 14),
-        this.std(pot, 0.9)
-      );
-      potMesh.position.y = 0.25;
-      potMesh.castShadow = true;
-      g.add(potMesh);
-      const foliageMat = this.std("#3e7d44", 0.9);
-      const f1 = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), foliageMat);
-      f1.position.y = 0.95;
-      const f2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), foliageMat);
-      f2.position.set(0.22, 1.15, 0.05);
-      const f3 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), foliageMat);
-      f3.position.set(-0.2, 1.2, -0.06);
-      f1.castShadow = f2.castShadow = f3.castShadow = true;
-      g.add(f1, f2, f3);
-      g.position.set(x, 0, z);
-      g.scale.setScalar(scale);
-      this.scene.add(g);
-      this.addCollider(x, z, 0.55 * scale);
-    };
-    mkPlant(10.6, -7.2, 1.15, "#b26a4a");
-    mkPlant(-10.8, 6.6, 0.95, "#8a9a5a");
-
-    // ── floor lamp ──
-    const lampX = 2.6;
-    const lampZ = 5.9;
-    const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.045, 1.9, 10),
-      this.std("#3a3a46", 0.6)
     );
-    pole.position.set(lampX, 0.95, lampZ);
-    pole.castShadow = true;
-    this.scene.add(pole);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.05, 14), this.std("#3a3a46", 0.6));
-    base.position.set(lampX, 0.03, lampZ);
-    this.scene.add(base);
-    const shade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.18, 0.34, 14, 1, true),
-      this.std("#e8d7b8", 0.9)
-    );
-    shade.position.set(lampX, 1.95, lampZ);
-    shade.castShadow = true;
-    this.scene.add(shade);
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 10, 10),
-      new THREE.MeshBasicMaterial({ color: "#ffd9a0" })
-    );
-    bulb.position.set(lampX, 1.82, lampZ);
-    this.scene.add(bulb);
-    const lampLight = new THREE.PointLight(0xffc98f, 0.7, 9);
-    lampLight.position.set(lampX, 1.85, lampZ);
-    this.scene.add(lampLight);
-    this.addCollider(lampX, lampZ, 0.4);
-
-    // ── ceiling lights ──
-    const ceilLight = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 14, 14),
-      new THREE.MeshBasicMaterial({ color: "#fff3d6" })
-    );
-    ceilLight.position.set(0, WALL_H - 0.05, 0);
-    this.scene.add(ceilLight);
-    const ceilLight2 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 14, 14),
-      new THREE.MeshBasicMaterial({ color: "#fff3d6" })
-    );
-    ceilLight2.position.set(-6, WALL_H - 0.05, 2.5);
-    this.scene.add(ceilLight2);
-
-    // ── posters ──
-    const mkPoster = (
-      w: number,
-      h: number,
-      palette: [string, string, string],
-      x: number,
-      y: number,
-      z: number,
-      ry: number
-    ) => {
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.06, h + 0.06, 0.03), this.std("#8a6a42", 0.8));
-      frame.position.set(x, y, z);
-      frame.rotation.y = ry;
-      frame.castShadow = true;
-      this.scene.add(frame);
-      // art sits just in front of the frame, facing into the room
-      const n = { x: Math.sin(ry), z: Math.cos(ry) };
-      const art = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ map: makePosterTexture(palette) })
-      );
-      art.position.set(x + n.x * 0.02, y, z + n.z * 0.02);
-      art.rotation.y = ry;
-      this.scene.add(art);
-    };
-    mkPoster(1.7, 2.1, ["#2f6fed", "#7fb5ff", "#ffd166"], -4, 2.4, -HALF_D + 0.2, 0);
-    mkPoster(1.4, 1.75, ["#e2574c", "#ff9d8a", "#ffe9e5"], 3.4, 2.3, HALF_D - 0.2, Math.PI);
-    mkPoster(1.4, 1.75, ["#3fa06b", "#8fd6a8", "#eafff1"], HALF_W - 0.2, 2.2, 4.2, -Math.PI / 2);
-    mkPoster(1.5, 1.9, ["#9a6ff0", "#c9a9ff", "#fff0b3"], -2.2, 2.35, HALF_D - 0.2, Math.PI);
   }
 }
