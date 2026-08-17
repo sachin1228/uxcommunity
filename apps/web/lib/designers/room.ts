@@ -37,6 +37,15 @@ const ALLEY_GLB = "/designers/hidden-alley/hidden-alley.glb";
 const HDR_URL = "/designers/hidden-alley/flower_hillside_1k.hdr";
 const DRACO_PATH = "/draco/";
 
+// Blender source camera "hidden_alley_camera": 24mm lens, 36mm sensor,
+// sensor_fit AUTO (horizontal fit at the 1920×1080 render). Converted to
+// three.js space (Blender Z-up → glTF Y-up): (x, y, z) → (x, z, −y). The
+// camera looks down the alley's long axis (three.js −Z).
+const BLENDER_LENS = 24; // mm
+const BLENDER_SENSOR_W = 36; // mm
+const BLENDER_CAM_POS = new THREE.Vector3(-0.0722, 1.3, 4.4245);
+const BLENDER_CAM_DIR = new THREE.Vector3(0, 0, -1);
+
 // Walkable street footprint in three.js space (Blender z-up is converted to
 // glTF y-up by the exporter, so the alley's long axis runs along ±Z).
 const ALLEY_MIN_X = -4.6;
@@ -354,6 +363,10 @@ export class DesignersRoom {
   private alleyReady = false;
   private alleyError: string | null = null;
 
+  // dev-only: reproduce the Blender source camera exactly for side-by-side
+  // comparison. Enabled via __UX_BLENDER_MATCH__ (mirrors __UX_FORCE_WEBGL2__).
+  private blenderMatch = false;
+
   private resizeObserver: ResizeObserver;
 
   constructor(container: HTMLElement, opts: RoomOptions) {
@@ -370,6 +383,14 @@ export class DesignersRoom {
 
     this.playerGroup = buildLocalAvatar();
     this.scene.add(this.playerGroup);
+
+    this.blenderMatch =
+      (globalThis as { __UX_BLENDER_MATCH__?: boolean }).__UX_BLENDER_MATCH__ === true;
+    if (this.blenderMatch) {
+      // Blender-match dev camera: fixed source pose, computed FOV, no follow.
+      this.playerGroup.visible = false;
+      this.applyBlenderCamera();
+    }
 
     this.resize();
     this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -566,7 +587,8 @@ export class DesignersRoom {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
     this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    if (this.blenderMatch) this.applyBlenderCamera();
+    else this.camera.updateProjectionMatrix();
     this.renderer?.setSize(w, h);
     this.composer?.setSize(w, h);
   }
@@ -645,7 +667,23 @@ export class DesignersRoom {
   }
 
   // ── Third-person follow camera ─────────────────────────────────────────────
+  private applyBlenderCamera() {
+    // vertical FOV from the 24mm lens / 36mm sensor, horizontal fit (AUTO at a
+    // 16:9 render). three.js fov is vertical, so derive it from the aspect.
+    const hFov = 2 * Math.atan(BLENDER_SENSOR_W / (2 * BLENDER_LENS));
+    this.camera.fov = (2 * Math.atan(Math.tan(hFov / 2) / this.camera.aspect)) * (180 / Math.PI);
+    this.camera.position.copy(BLENDER_CAM_POS);
+    this.camera.up.set(0, 1, 0);
+    this.camera.lookAt(BLENDER_CAM_POS.clone().add(BLENDER_CAM_DIR));
+    this.camera.updateProjectionMatrix();
+  }
+
   private updateCamera(dt: number, t: number) {
+    if (this.blenderMatch) {
+      // keep the fixed Blender pose even while the alley streams in
+      this.applyBlenderCamera();
+      return;
+    }
     let dy = this.yaw - this.camYaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;

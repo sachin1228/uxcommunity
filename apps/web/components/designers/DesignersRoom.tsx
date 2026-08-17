@@ -41,7 +41,10 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [remoteIds, setRemoteIds] = useState<string[]>([]);
   const [hint, setHint] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [hudVisible, setHudVisible] = useState(true);
+  const [hudVisible, setHudVisible] = useState(() => {
+    // dev Blender-match comparison mode: start with a clean view (H still toggles)
+    return (globalThis as { __UX_BLENDER_MATCH__?: boolean }).__UX_BLENDER_MATCH__ !== true;
+  });
 
   const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
   const playerDot = useRef<HTMLDivElement>(null);
