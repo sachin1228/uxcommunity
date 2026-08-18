@@ -1,10 +1,10 @@
 /**
  * 3D designer-studio room engine (plain three.js — no extra addons).
  *
- * The environment is the "Pixellab abandoned house" GLB loaded at runtime
+ * The environment is a PSX-style temple island GLB loaded at runtime
  * with GLTFLoader. Its arbitrary authoring scale is normalised from the
- * model's real bounding box, the player spawns standing in front of it, and
- * the walkable area + house footprint are derived from the same bounds.
+ * model's real bounding box, the player spawns at the centre of the island,
+ * and the walkable area is derived from the model's bounds.
  * Handles: scene + lighting, first-person drag-look camera, WASD / touch
  * movement with collision, and network-driven avatars for other real users
  * in the room.
@@ -17,10 +17,9 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 // ─── Environment constants ────────────────────────────────────────────────────
 const EYE = 1.62; // player eye height
-const HOUSE_URL = "/designers/pixellabs-abandoned-house-3642.glb";
+const HOUSE_URL = "/designers/psx_temple_island.glb";
 const HOUSE_TARGET_H = 6; // scale the (arbitrarily-sized) model to this height
-const WALK_MARGIN = 4.5; // how far the player may roam around the house
-const SPAWN_FRONT = 2.6; // spawn distance in front of the house footprint
+const WALK_MARGIN = 4.5; // how far the player may roam around the island
 
 export interface RemoteUserState {
   id: string;
@@ -233,8 +232,9 @@ export class DesignersRoom {
   private keys = new Set<string>();
   private yaw = 0;
   private pitch = 0;
-  // spawn is chosen from the house bounding box once the GLB loads
+  // spawn is chosen from the island bounding box once the GLB loads
   private px = 0;
+  private py = EYE;
   private pz = 4;
 
   private touchMoveX = 0;
@@ -243,17 +243,15 @@ export class DesignersRoom {
 
   private remotes = new Map<string, RemoteAvatar>();
 
-  // house (GLB) state — derived from its real bounding box at load time
+  // island (GLB) state — derived from its real bounding box at load time
   private houseReady = false;
-  private houseBox: THREE.Box3 | null = null;
   private minX = -20;
   private maxX = 20;
   private minZ = -20;
   private maxZ = 20;
-  private houseCX = 0;
-  private houseCZ = 0;
-  private houseHX = 20;
-  private houseHZ = 20;
+  private ground: THREE.Mesh | null = null;
+  private islandRoot: THREE.Object3D | null = null;
+  private terrainRaycaster = new THREE.Raycaster();
 
   private resizeObserver: ResizeObserver;
 
@@ -283,8 +281,8 @@ export class DesignersRoom {
     container.appendChild(renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#1b2129");
-    this.scene.fog = new THREE.Fog("#1b2129", 16, 40);
+    this.scene.background = new THREE.Color("#5a8faa");
+    this.scene.fog = new THREE.Fog("#5a8faa", 18, 50);
 
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 100);
 
@@ -312,7 +310,7 @@ export class DesignersRoom {
       const t = this.clock.elapsedTime;
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
-      this.camera.position.set(this.px, EYE, this.pz);
+      this.camera.position.set(this.px, this.py, this.pz);
       this.camera.rotation.order = "YXZ";
       this.camera.rotation.y = this.yaw;
       this.camera.rotation.x = this.pitch;
@@ -412,18 +410,22 @@ export class DesignersRoom {
       this.px += (-Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr) * speed;
       this.pz += (-Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr) * speed;
     }
-    // walkable grounds around the house
+    // walkable bounds around the island
     const m = 0.45;
     this.px = Math.max(this.minX + m, Math.min(this.maxX - m, this.px));
     this.pz = Math.max(this.minZ + m, Math.min(this.maxZ - m, this.pz));
-    // keep the player out of the house footprint (solid model)
-    const dx = this.px - this.houseCX;
-    const dz = this.pz - this.houseCZ;
-    if (Math.abs(dx) < this.houseHX && Math.abs(dz) < this.houseHZ) {
-      const overX = this.houseHX - Math.abs(dx);
-      const overZ = this.houseHZ - Math.abs(dz);
-      if (overX < overZ) this.px = this.houseCX + Math.sign(dx || 1) * this.houseHX;
-      else this.pz = this.houseCZ + Math.sign(dz || 1) * this.houseHZ;
+
+    // terrain follow — cast a ray downward to keep the player on the surface
+    if (this.islandRoot && this.houseReady) {
+      this.terrainRaycaster.set(
+        new THREE.Vector3(this.px, this.py + 20, this.pz),
+        new THREE.Vector3(0, -1, 0)
+      );
+      const hits = this.terrainRaycaster.intersectObject(this.islandRoot, true);
+      if (hits.length > 0) {
+        const target = hits[0].point.y + EYE;
+        this.py += (target - this.py) * Math.min(1, dt * 12);
+      }
     }
   }
 
@@ -481,11 +483,11 @@ export class DesignersRoom {
   // ── Scene building ───────────────────────────────────────────────────────────
   private buildLights() {
     // slightly boosted from the original bright studio so the dark house reads
-    const hemi = new THREE.HemisphereLight(0xfff1dc, 0x9a8f7c, 1.6);
+    const hemi = new THREE.HemisphereLight(0xb4d7e8, 0x6b8f5e, 1.4);
     this.scene.add(hemi);
 
-    const sun = new THREE.DirectionalLight(0xffe1b3, 1.5);
-    sun.position.set(7, 10, -8);
+    const sun = new THREE.DirectionalLight(0xfff4e0, 1.8);
+    sun.position.set(8, 14, -6);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     sun.shadow.camera.left = -14;
@@ -497,26 +499,20 @@ export class DesignersRoom {
     sun.shadow.bias = -0.0005;
     this.scene.add(sun);
 
-    const warm = new THREE.PointLight(0xff9d5c, 1.2, 16);
-    warm.position.set(0, 2.7, 5.5);
-    this.scene.add(warm);
-
-    const cool = new THREE.PointLight(0x9cc4ff, 0.6, 14);
-    cool.position.set(0, 3.2, -6);
-    this.scene.add(cool);
-
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   }
 
-  /** Dark yard floor so the house sits on something and casts a shadow. */
+  /** Water plane beneath the island. */
   private buildGround() {
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(44, 44),
-      new THREE.MeshStandardMaterial({ color: "#262b33", roughness: 1 })
+      new THREE.PlaneGeometry(80, 80),
+      new THREE.MeshStandardMaterial({ color: "#3a7ca5", roughness: 0.6, metalness: 0.15 })
     );
     ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.2;
     ground.receiveShadow = true;
     this.scene.add(ground);
+    this.ground = ground;
   }
 
   // ── House (GLB) ──────────────────────────────────────────────────────────────
@@ -541,27 +537,52 @@ export class DesignersRoom {
         const scale = HOUSE_TARGET_H / rawSize.y;
         root.scale.setScalar(scale);
         this.scene.add(root);
+        this.islandRoot = root;
 
         const box = new THREE.Box3().setFromObject(root);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
-        this.houseBox = box;
         this.houseReady = true;
 
-        // walkable bounds around the house
+        // walkable bounds around the island
         this.minX = center.x - size.x / 2 - WALK_MARGIN;
         this.maxX = center.x + size.x / 2 + WALK_MARGIN;
         this.minZ = center.z - size.z / 2 - WALK_MARGIN;
         this.maxZ = center.z + size.z / 2 + WALK_MARGIN;
-        this.houseCX = center.x;
-        this.houseCZ = center.z;
-        this.houseHX = size.x / 2 - 0.5;
-        this.houseHZ = size.z / 2 - 0.5;
 
-        // spawn standing in front of the house (+z), scattered a little so
-        // people don't start inside each other
+        // Cast a grid of rays downward to find the walkable ground surface.
+        // The first hit from directly above is always the visible top surface.
+        const raycaster = new THREE.Raycaster();
+        const down = new THREE.Vector3(0, -1, 0);
+        const groundYs: number[] = [];
+        const GRIDSZ = 6;
+        for (let ix = 0; ix < GRIDSZ; ix++) {
+          for (let iz = 0; iz < GRIDSZ; iz++) {
+            const rx = box.min.x + (size.x * (ix + 0.5)) / GRIDSZ;
+            const rz = box.min.z + (size.z * (iz + 0.5)) / GRIDSZ;
+            raycaster.set(
+              new THREE.Vector3(rx, box.max.y + 10, rz),
+              down
+            );
+            const hits = raycaster.intersectObject(root, true);
+            if (hits.length > 0) groundYs.push(hits[0].point.y);
+          }
+        }
+        // Use the 30th-percentile height — high enough to avoid underwater
+        // rock, low enough to skip tree-tops / temple-roof outliers.
+        groundYs.sort((a, b) => b - a);
+        const groundY =
+          groundYs.length > 0
+            ? groundYs[Math.floor(groundYs.length * 0.3)]
+            : box.max.y;
+
+        // spawn at the centre of the island, scattered slightly
         this.px = center.x + (Math.random() * 2 - 1) * 1.4;
-        this.pz = center.z + size.z / 2 + SPAWN_FRONT + Math.random() * 1.4;
+        this.pz = center.z + (Math.random() * 2 - 1) * 1.4;
+        this.py = groundY + EYE;
+
+        // drop the water plane below the model base
+        if (this.ground) this.ground.position.y = box.min.y - 0.3;
       },
       undefined,
       (err) => {
