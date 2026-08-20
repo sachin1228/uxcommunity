@@ -257,6 +257,11 @@ export async function POST(
       data: inserted,
     },
     {
+      room: realtimeRooms.chat(communityId),
+      topic: "thread-insert",
+      data: inserted,
+    },
+    {
       room: realtimeRooms.profile(userId),
       topic: "thread",
       data: inserted,
