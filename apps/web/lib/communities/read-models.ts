@@ -12,6 +12,26 @@ import {
 
 const MESSAGE_PAGE_SIZE = 50;
 
+/**
+ * Cloudflare's request pipeline decodes a literal `+` inside a query-string
+ * value as a space. A PostgREST UTC offset like "2026-08-15T10:00:00.123+00:00"
+ * therefore reaches route handlers as "2026-08-15T10:00:00.123 00:00" — a string
+ * Postgres cannot parse, which turned chat/thread/resource/showcase pagination
+ * into a permanent 500 (and an endless retry spinner in the chat). Normalize
+ * both the canonical ("+00:00" / "Z") and mangled (" 00:00") forms to a single
+ * "Z" suffix so the RPC always receives a parseable timestamptz.
+ */
+export function normalizeUtcCursor(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)(?:\+00:00| 00:00|Z)$/.exec(value.trim());
+  return match ? `${match[1]}Z` : null;
+}
+
+/** Serialize a PostgREST timestamptz ("…+00:00") as the "…Z" form used in cursors. */
+export function toUtcCursor(value: string): string {
+  return value.endsWith("+00:00") ? `${value.slice(0, -6)}Z` : value;
+}
+
 export type ReadResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; error: string };
@@ -145,7 +165,11 @@ export async function loadCommunityThreads(
   let cursorId: string | null = null;
   if (cursor) {
     [cursorCreatedAt, cursorId] = cursor.split("|");
-    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+    if (!cursorCreatedAt || !cursorId) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+    cursorCreatedAt = normalizeUtcCursor(cursorCreatedAt);
+    if (!cursorCreatedAt) {
       return { ok: false, status: 400, error: "Invalid cursor." };
     }
   }
@@ -165,7 +189,7 @@ export async function loadCommunityThreads(
     ok: true,
     data: {
       threads,
-      nextCursor: rows.length > 50 && last ? `${last.created_at as string}|${last.id as string}` : null,
+      nextCursor: rows.length > 50 && last ? `${toUtcCursor(last.created_at as string)}|${last.id as string}` : null,
     },
   };
 }
@@ -179,7 +203,11 @@ export async function loadCommunityResources(
   let cursorId: string | null = null;
   if (cursor) {
     [cursorCreatedAt, cursorId] = cursor.split("|");
-    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+    if (!cursorCreatedAt || !cursorId) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+    cursorCreatedAt = normalizeUtcCursor(cursorCreatedAt);
+    if (!cursorCreatedAt) {
       return { ok: false, status: 400, error: "Invalid cursor." };
     }
   }
@@ -199,7 +227,7 @@ export async function loadCommunityResources(
     ok: true,
     data: {
       resources,
-      nextCursor: rows.length > 100 && last ? `${last.created_at as string}|${last.id as string}` : null,
+      nextCursor: rows.length > 100 && last ? `${toUtcCursor(last.created_at as string)}|${last.id as string}` : null,
     },
   };
 }
@@ -214,7 +242,11 @@ export async function loadCommunityShowcasePage(
   let cursorId: string | null = null;
   if (cursor) {
     [cursorCreatedAt, cursorId] = cursor.split("|");
-    if (!cursorCreatedAt || !cursorId || Number.isNaN(Date.parse(cursorCreatedAt))) {
+    if (!cursorCreatedAt || !cursorId) {
+      return { ok: false, status: 400, error: "Invalid cursor." };
+    }
+    cursorCreatedAt = normalizeUtcCursor(cursorCreatedAt);
+    if (!cursorCreatedAt) {
       return { ok: false, status: 400, error: "Invalid cursor." };
     }
   }
@@ -232,7 +264,7 @@ export async function loadCommunityShowcasePage(
     ok: true,
     data: {
       posts,
-      nextCursor: (data?.length ?? 0) > 25 && last ? `${last.created_at as string}|${last.id as string}` : null,
+      nextCursor: (data?.length ?? 0) > 25 && last ? `${toUtcCursor(last.created_at as string)}|${last.id as string}` : null,
     },
   };
 }
@@ -366,12 +398,17 @@ export async function loadCommunityMessagePage(
   const historyStart = membership.history_cleared_at && membership.history_cleared_at > membership.joined_at
     ? membership.history_cleared_at
     : membership.joined_at;
+  const before = normalizeUtcCursor(cursors.before);
+  const after = normalizeUtcCursor(cursors.after);
+  if ((cursors.before && !before) || (cursors.after && !after)) {
+    return { ok: false, status: 400, error: "Invalid cursor." };
+  }
   const { data, error } = await callPerformanceRpc(db, "get_community_message_page", {
     p_community_id: communityId,
     p_user_id: userId,
     p_history_start: historyStart,
-    p_before: cursors.after ? null : (cursors.before ?? null),
-    p_after: cursors.after ?? null,
+    p_before: after ? null : before,
+    p_after: after,
     p_limit: MESSAGE_PAGE_SIZE,
   });
 

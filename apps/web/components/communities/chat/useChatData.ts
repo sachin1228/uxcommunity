@@ -20,6 +20,16 @@ import {
 /** Must match PAGE_SIZE in the messages API route. */
 const PAGE_SIZE = 50;
 
+/**
+ * PostgREST serializes UTC timestamptz values with a "+00:00" offset, but the
+ * Cloudflare runtime decodes a '+' inside a query value as a space — mangling
+ * the cursor ("…+00:00" → "… 00:00") before the API can read it. Send cursors
+ * in the "…Z" form so pagination survives the trip unchanged.
+ */
+function utcCursor(iso: string): string {
+  return iso.endsWith("+00:00") ? `${iso.slice(0, -6)}Z` : iso;
+}
+
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -151,7 +161,7 @@ export function useChatData({
         await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
       }
       const url = after
-        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(after)}`
+        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}`
         : `/api/communities/${targetId}/messages`;
 
       return fetchJsonCached<{ messages?: Message[] }>(
@@ -217,7 +227,7 @@ export function useChatData({
       setLoadingOlder(true);
       const targetId = communityId;
       try {
-        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(before)}`;
+        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(utcCursor(before))}`;
         const d = await fetchJsonCached<{ messages?: Message[] }>(
           url,
           { staleMs: 30_000 },

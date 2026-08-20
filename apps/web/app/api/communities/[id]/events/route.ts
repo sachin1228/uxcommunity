@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { deferCommunityNotification, eventHref } from "@/lib/notifications";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -87,14 +88,23 @@ export async function GET(
 
   const cursor = req.nextUrl.searchParams.get("cursor");
   const now = new Date().toISOString();
-  const [rawPhase = "upcoming", eventDate, cursorId] = cursor?.split("|") ?? [];
+  let [rawPhase = "upcoming", eventDate, cursorId] = cursor?.split("|") ?? [];
   if (rawPhase !== "upcoming" && rawPhase !== "past") {
     timer.finish({ status: 400 });
     return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
   }
-  if (eventDate && (!cursorId || Number.isNaN(Date.parse(eventDate)))) {
-    timer.finish({ status: 400 });
-    return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+  if (eventDate) {
+    if (!cursorId) {
+      timer.finish({ status: 400 });
+      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+    }
+    // Cloudflare decodes a '+' in a query value as a space, mangling UTC
+    // offsets ("…+00:00" → "… 00:00"). Normalize to "Z" before parsing.
+    eventDate = normalizeUtcCursor(eventDate) ?? eventDate;
+    if (Number.isNaN(Date.parse(eventDate))) {
+      timer.finish({ status: 400 });
+      return NextResponse.json({ error: "Invalid cursor." }, { status: 400 });
+    }
   }
 
   const fetchPhase = (phase: "upcoming" | "past", date: string | null, id: string | null) =>
@@ -129,7 +139,7 @@ export async function GET(
   const last = page.at(-1);
   const hasMoreInPhase = (data?.length ?? 0) > EVENT_PAGE_SIZE;
   const nextCursor = hasMoreInPhase && last
-    ? `${resultPhase}|${last.event_date as string}|${last.id as string}`
+    ? `${resultPhase}|${toUtcCursor(last.event_date as string)}|${last.id as string}`
     : resultPhase === "upcoming"
       ? "past"
       : null;
