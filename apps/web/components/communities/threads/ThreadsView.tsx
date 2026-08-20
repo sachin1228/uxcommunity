@@ -30,9 +30,11 @@ const THREAD_PAGE_SIZE = 50;
 export function ThreadsView({
   communityId,
   currentUserId,
+  onThreadCreated,
 }: {
   communityId: string;
   currentUserId: string;
+  onThreadCreated?: (thread: CommunityThread) => void;
 }) {
   initRequestCache(currentUserId);
   const requestUrl = `/api/communities/${communityId}/threads`;
@@ -138,6 +140,7 @@ export function ThreadsView({
 
   function handleCreated(thread: CommunityThread) {
     writeCache((cur) => [thread, ...cur.filter((item) => item.id !== thread.id)]);
+    onThreadCreated?.(thread);
   }
 
   function handleUpdated(updated: CommunityThread) {

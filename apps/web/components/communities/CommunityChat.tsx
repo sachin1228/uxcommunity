@@ -28,6 +28,7 @@ import { ChatInput } from "./chat/ChatInput";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
 import { ThreadsView } from "./threads/ThreadsView";
+import type { CommunityThread } from "./threads/types";
 import { EventsView } from "./events/EventsView";
 import { ResourcesView } from "./resources/ResourcesView";
 import { MembersView } from "./members/MembersView";
@@ -135,6 +136,26 @@ export function CommunityChat({
     // RSC payload, rerunning the page, or resetting chat state.
     window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
   }, [pathname]);
+
+  const handleThreadCreated = useCallback((thread: CommunityThread) => {
+    setThreadEvents((prev) => {
+      if (prev.some((event) => event.id === thread.id)) return prev;
+      const event: CachedThreadEvent = {
+        id: thread.id,
+        community_id: thread.community_id,
+        user_id: thread.user_id,
+        title: thread.title,
+        description: thread.description,
+        category: thread.category,
+        attachments: thread.attachments ?? [],
+        created_at: thread.created_at,
+        users: thread.users,
+      };
+      return [...prev, event].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+    });
+  }, []);
 
   // Prime only first-render data. Secondary tabs fetch from their own cached
   // endpoints when mounted, so their work cannot delay the chat shell.
@@ -708,7 +729,11 @@ export function CommunityChat({
         {renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "threads" ? (
-          <ThreadsView communityId={communityId} currentUserId={currentUserId} />
+          <ThreadsView
+            communityId={communityId}
+            currentUserId={currentUserId}
+            onThreadCreated={handleThreadCreated}
+          />
         ) : renderedTab === "events" ? (
           <EventsView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "resources" ? (
