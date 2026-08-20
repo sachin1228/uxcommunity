@@ -169,6 +169,11 @@ export async function PATCH(
       data: updated,
     },
     {
+      room: realtimeRooms.chat(communityId),
+      topic: "thread-update",
+      data: updated,
+    },
+    {
       room: realtimeRooms.profile(userId),
       topic: "thread",
       data: updated,
@@ -211,6 +216,11 @@ export async function DELETE(
     {
       room: realtimeRooms.threads(communityId),
       topic: "thread",
+      data: { id: threadId },
+    },
+    {
+      room: realtimeRooms.chat(communityId),
+      topic: "thread-delete",
       data: { id: threadId },
     },
     {
