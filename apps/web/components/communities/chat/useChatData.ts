@@ -5,6 +5,7 @@ import {
   msgCache,
   metaCache,
   msgFetchedAt,
+  msgCacheKey,
   evictIfNeeded,
   META_STALE_MS,
   type CachedMessage,
@@ -56,6 +57,8 @@ type Message = CachedMessage;
 
 interface UseChatDataOptions {
   communityId: string;
+  /** Active subchannel; null/undefined = the community's general chat. */
+  channelId?: string | null;
   currentUserId: string;
   initialMeta?: CachedMeta;
   initialMessages?: CachedMessage[];
@@ -67,6 +70,7 @@ interface UseChatDataOptions {
 
 export function useChatData({
   communityId,
+  channelId = null,
   currentUserId,
   initialMeta,
   initialMessages,
@@ -82,6 +86,7 @@ export function useChatData({
   const [loadingOlder,        setLoadingOlder]       = useState(false);
 
   const communityIdRef         = useRef(communityId);
+  const channelIdRef           = useRef(channelId);
   const membersRef             = useRef(members);
   const pendingProfileFetchRef = useRef<Map<string, Promise<void>>>(new Map());
   const isFetchingOlderRef     = useRef(false);
@@ -94,7 +99,8 @@ export function useChatData({
   useIsomorphicLayoutEffect(() => {
     onMounted?.();
     const cachedMeta = metaCache.get(communityId);
-    const cachedMsgs = msgCache.get(communityId);
+    const cacheKey = msgCacheKey(communityId, channelId);
+    const cachedMsgs = msgCache.get(cacheKey);
     if (cachedMeta) {
       setCommunity(cachedMeta.community);
       setMembers(cachedMeta.members);
@@ -110,21 +116,23 @@ export function useChatData({
     }
     if (cachedMsgs?.length) {
       setMessages(cachedMsgs);
-    } else if (initialMessages?.length) {
-      msgCache.set(communityId, initialMessages);
+    } else if (initialMessages?.length && !channelId) {
+      // SSR only ships the general channel's first page — never seed it into a
+      // subchannel view. Channel pages hydrate from the network below.
+      msgCache.set(cacheKey, initialMessages);
       setCachedRequest(
         `/api/communities/${communityId}/messages`,
         { messages: initialMessages },
         currentUserId,
       );
-      msgFetchedAt.set(communityId, Date.now());
+      msgFetchedAt.set(cacheKey, Date.now());
       evictIfNeeded();
       setMessages(initialMessages);
     }
     // Keep the chat area in its loading state (Lottie) until the first message
     // page is available — meta alone should not dismiss it, otherwise a fresh
     // visit flashes an empty chat while messages hydrate.
-    if ((cachedMeta || initialMeta) && (cachedMsgs?.length || initialMessages?.length)) {
+    if ((cachedMeta || initialMeta) && (cachedMsgs?.length || (initialMessages?.length && !channelId))) {
       setLoading(false);
     }
     // Notify parent of the SSR lastReadAt seed when no cache exists
@@ -157,12 +165,15 @@ export function useChatData({
   const fetchMessages = useCallback(
     async (after?: string): Promise<void> => {
       const targetId = communityId;
+      const cacheKey = msgCacheKey(targetId, channelId);
       if (!after) {
         await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
       }
-      const url = after
-        ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}`
-        : `/api/communities/${targetId}/messages`;
+      const params = new URLSearchParams();
+      if (channelId) params.set("channel_id", channelId);
+      if (after) params.set("after", utcCursor(after));
+      const qs = params.toString();
+      const url = `/api/communities/${targetId}/messages${qs ? `?${qs}` : ""}`;
 
       return fetchJsonCached<{ messages?: Message[] }>(
         url,
@@ -170,10 +181,11 @@ export function useChatData({
         currentUserId,
       )
         .then((d) => {
+          if (communityIdRef.current !== targetId || channelIdRef.current !== channelId) return;
           if (!d) return;
           const incoming: Message[] = d.messages ?? [];
           if (after) {
-            const existing   = msgCache.get(targetId) ?? [];
+            const existing   = msgCache.get(cacheKey) ?? [];
             const existingIds = new Set(existing.map((m) => m.id));
             const toAdd = incoming.filter((m) => !existingIds.has(m.id));
             if (toAdd.length > 0) {
@@ -185,10 +197,10 @@ export function useChatData({
                   new Date(a.created_at).getTime() -
                   new Date(b.created_at).getTime()
               );
-              msgCache.set(targetId, cacheSnapshot);
+              msgCache.set(cacheKey, cacheSnapshot);
             }
             setMessages((prev) => {
-              if (communityIdRef.current !== targetId) return prev;
+              if (communityIdRef.current !== targetId || channelIdRef.current !== channelId) return prev;
               const prevIds     = new Set(prev.map((m) => m.id));
               const toAddToPrev = incoming.filter((m) => !prevIds.has(m.id));
               if (toAddToPrev.length === 0) return prev;
@@ -200,14 +212,14 @@ export function useChatData({
                   new Date(a.created_at).getTime() -
                   new Date(b.created_at).getTime()
               );
-              msgCache.set(targetId, merged);
+              msgCache.set(cacheKey, merged);
               return merged;
             });
           } else {
-            msgCache.set(targetId, incoming);
-            msgFetchedAt.set(targetId, Date.now());
+            msgCache.set(cacheKey, incoming);
+            msgFetchedAt.set(cacheKey, Date.now());
             evictIfNeeded();
-            if (communityIdRef.current === targetId) {
+            if (communityIdRef.current === targetId && channelIdRef.current === channelId) {
               setMessages(incoming);
               // If we got fewer than a full page, there's nothing older to load.
               setHasMoreAbove(incoming.length >= PAGE_SIZE);
@@ -216,7 +228,7 @@ export function useChatData({
         })
         .catch(() => {});
     },
-    [communityId, currentUserId]
+    [communityId, channelId, currentUserId]
   );
 
   // ── Fetch older messages (upward pagination via ?before=ISO) ─────────────
@@ -226,18 +238,24 @@ export function useChatData({
       isFetchingOlderRef.current = true;
       setLoadingOlder(true);
       const targetId = communityId;
+      const cacheKey = msgCacheKey(targetId, channelId);
       try {
-        const url = `/api/communities/${targetId}/messages?before=${encodeURIComponent(utcCursor(before))}`;
+        const params = new URLSearchParams();
+        if (channelId) params.set("channel_id", channelId);
+        params.set("before", utcCursor(before));
+        const qs = params.toString();
+        const url = `/api/communities/${targetId}/messages?${qs}`;
         const d = await fetchJsonCached<{ messages?: Message[] }>(
           url,
           { staleMs: 30_000 },
           currentUserId,
         );
-        if (communityIdRef.current !== targetId) return;
+        if (communityIdRef.current !== targetId || channelIdRef.current !== channelId) return;
         const incoming: Message[] = d.messages ?? [];
         if (incoming.length < PAGE_SIZE) setHasMoreAbove(false);
         if (incoming.length === 0) return;
         setMessages((prev) => {
+          if (communityIdRef.current !== targetId || channelIdRef.current !== channelId) return prev;
           const prevIds = new Set(prev.map((m) => m.id));
           const toAdd   = incoming.filter((m) => !prevIds.has(m.id));
           if (toAdd.length === 0) return prev;
@@ -247,7 +265,7 @@ export function useChatData({
           ].sort(
             (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
           );
-          msgCache.set(targetId, merged);
+          msgCache.set(cacheKey, merged);
           return merged;
         });
       } catch {
@@ -257,27 +275,32 @@ export function useChatData({
         setLoadingOlder(false);
       }
     },
-    [communityId, currentUserId]
+    [communityId, channelId, currentUserId]
   );
 
-  // ── On communityId change: show cache instantly, then hydrate once ────────
+  // ── On communityId/channelId change: show cache instantly, then hydrate once ─
   useEffect(() => {
     communityIdRef.current = communityId;
+    channelIdRef.current = channelId;
     setInitialMessagesReady(false);
     setHasMoreAbove(true);
     isFetchingOlderRef.current = false;
     let cancelled = false;
 
     const applyCanonicalCache = () => {
+      const cacheKey = msgCacheKey(communityId, channelId);
+      const messagesUrl = channelId
+        ? `/api/communities/${communityId}/messages?channel_id=${channelId}`
+        : `/api/communities/${communityId}/messages`;
       const canonicalMessages = getCachedRequest<{ messages?: Message[] }>(
-        `/api/communities/${communityId}/messages`,
+        messagesUrl,
         currentUserId,
       )?.messages;
       const canonicalMeta = getCachedRequest<{
         community: Community;
         members?: Member[];
       }>(`/api/communities/${communityId}`, currentUserId);
-      const cachedMsgs = msgCache.get(communityId) ?? canonicalMessages;
+      const cachedMsgs = msgCache.get(cacheKey) ?? canonicalMessages;
       const cachedMeta = metaCache.get(communityId) ?? (canonicalMeta
         ? {
             community: canonicalMeta.community,
@@ -287,8 +310,8 @@ export function useChatData({
         : undefined);
 
       if (cachedMsgs) {
-        msgCache.set(communityId, cachedMsgs);
-        msgFetchedAt.set(communityId, Date.now());
+        msgCache.set(cacheKey, cachedMsgs);
+        msgFetchedAt.set(cacheKey, Date.now());
         setMessages(cachedMsgs);
         setHasMoreAbove(cachedMsgs.length >= PAGE_SIZE);
       } else {
@@ -315,7 +338,7 @@ export function useChatData({
         communityId,
         currentUserId,
       ).then(() => true).catch(() => false);
-      if (cancelled || communityIdRef.current !== communityId) return;
+      if (cancelled || communityIdRef.current !== communityId || channelIdRef.current !== channelId) return;
 
       const hydrated = applyCanonicalCache();
       if (!bootstrapResult) {
@@ -330,7 +353,7 @@ export function useChatData({
         ]);
       }
 
-      if (!cancelled) {
+      if (!cancelled && channelIdRef.current === channelId) {
         setLoading(false);
         setInitialMessagesReady(true);
       }
@@ -341,7 +364,7 @@ export function useChatData({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId]);
+  }, [communityId, channelId]);
 
   return {
     community,

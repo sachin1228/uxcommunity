@@ -6,7 +6,7 @@ type AggregateBase = { id: string };
 
 type PerformanceRpcMap = {
   get_community_message_page: {
-    args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number };
+    args: { p_community_id: string; p_user_id: string; p_history_start: string; p_before: string | null; p_after: string | null; p_limit: number; p_channel_id: string | null };
     returns: Array<{ id: string; content: string | null; created_at: string; user_id: string; reply_to_id: string | null; image_url: string | null; deleted_at: string | null; users: Json; reactions: Json; reply_to: Json }>;
   };
   get_sidebar_activity: { args: { p_user_id: string }; returns: Json };

@@ -12,6 +12,7 @@ import {
   sidebarStore,
   metaCache,
   msgCache,
+  msgCacheKey,
   msgFetchedAt,
 } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
@@ -34,6 +35,9 @@ import { MembersView } from "./members/MembersView";
 import { ShowcaseView } from "./showcase/ShowcaseView";
 import { CommunitySettingsView } from "./CommunitySettingsView";
 import { Modal } from "@/components/ui/Modal";
+import { ChannelBar } from "./channels/ChannelBar";
+import { ChannelManagerModal } from "./channels/ChannelManagerModal";
+import { useCommunityChannels } from "./channels/useCommunityChannels";
 import { useChatData } from "./chat/useChatData";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
@@ -66,6 +70,7 @@ export function CommunityChat({
   initialLastReadAt,
   initialSections,
   initialTab = "chat",
+  initialChannelId,
 }: {
   communityId: string;
   currentUserId: string;
@@ -74,12 +79,16 @@ export function CommunityChat({
   initialLastReadAt?: string | null;
   initialSections?: SSRCommunitySections;
   initialTab?: ChatTab;
+  /** Active subchannel from the URL; null = the community's general chat. */
+  initialChannelId?: string | null;
 }) {
   const pathname = usePathname();
   const router = useGuardedRouter();
   const [hasMounted, setHasMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [showSettings, setShowSettings] = useState(false);
+  const [showChannelManager, setShowChannelManager] = useState(false);
+  const [activeChannelId, setActiveChannelId] = useState<string | null>(initialChannelId ?? null);
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
   /** True once the initial threads fetch for the current community has settled. */
   const [threadsReady, setThreadsReady] = useState(false);
@@ -124,17 +133,54 @@ export function CommunityChat({
     }
   }, [communityId, currentUserId, initialSections, initialMeta, initialMessages]);
 
-  const handleTabChange = useCallback((tab: ChatTab) => {
-    setActiveTab(tab);
-    const params = new URLSearchParams();
-    if (tab !== "chat") params.set("tab", tab);
+  // ── Tab + channel switching (URL sync) ─────────────────────────────────────
+  /** Mirrors tab/channel state into the URL (History API) so views are shareable. */
+  const updateUrl = useCallback((patch: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value == null) params.delete(key);
+      else params.set(key, value);
+    }
     const qs = params.toString();
-
-    // Tabs are local views of the same mounted community page. Updating the
-    // URL with the History API keeps links shareable without requesting a new
-    // RSC payload, rerunning the page, or resetting chat state.
     window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
   }, [pathname]);
+
+  const handleTabChange = useCallback((tab: ChatTab) => {
+    setActiveTab(tab);
+    updateUrl({ tab: tab === "chat" ? null : tab });
+  }, [updateUrl]);
+
+  const handleChannelChange = useCallback((channelId: string | null) => {
+    setActiveChannelId(channelId);
+    updateUrl({ channel: channelId });
+  }, [updateUrl]);
+
+  // Sync channel when the sidebar drives navigation through the URL.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveChannelId(initialChannelId ?? null);
+  }, [initialChannelId]);
+
+  // ── Subchannels ────────────────────────────────────────────────────────────
+  const {
+    channels,
+    loading: channelsLoading,
+    createChannel,
+    renameChannel,
+    deleteChannel,
+  } = useCommunityChannels({ communityId, currentUserId });
+
+  // Per-channel message cache key (general = community id).
+  const cacheKey = msgCacheKey(communityId, activeChannelId);
+
+  // If the active channel was deleted, fall back to the general chat.
+  useEffect(() => {
+    if (activeChannelId && channels.length > 0 && !channels.some((ch) => ch.id === activeChannelId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleChannelChange(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChannelId, channels]);
 
   // Prime only first-render data. Secondary tabs fetch from their own cached
   // endpoints when mounted, so their work cannot delay the chat shell.
@@ -227,17 +273,17 @@ export function CommunityChat({
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,
-  } = useChatData({ communityId, currentUserId, initialMeta, initialMessages });
+  } = useChatData({ communityId, channelId: activeChannelId, currentUserId, initialMeta, initialMessages });
 
   const handleReactionToggled = useCallback(
     (msgId: string, reactions: MessageReaction[]) => {
       setMessages((prev) => {
         const next = prev.map((m) => m.id === msgId ? { ...m, reactions } : m);
-        msgCache.set(communityId, next);
+        msgCache.set(cacheKey, next);
         return next;
       });
     },
-    [communityId, setMessages]
+    [cacheKey, setMessages]
   );
 
   const reactionCoordinatorsRef = useRef(
@@ -271,7 +317,7 @@ export function CommunityChat({
   // ── Inline hover reaction handler ─────────────────────────────────────────
   const handleReaction = useCallback(
     (msgId: string, emoji: string) => {
-      const message = msgCache.get(communityId)?.find((item) => item.id === msgId);
+      const message = msgCache.get(cacheKey)?.find((item) => item.id === msgId);
       if (!message) return;
 
       let coordinator = reactionCoordinatorsRef.current.get(msgId);
@@ -286,7 +332,7 @@ export function CommunityChat({
             : "a message";
 
         const paintIntent = (desiredEmoji: ReactionIntent) => {
-          const latest = msgCache.get(communityId)?.find((item) => item.id === msgId);
+          const latest = msgCache.get(cacheKey)?.find((item) => item.id === msgId);
           if (latest) {
             handleReactionToggled(
               msgId,
@@ -341,7 +387,7 @@ export function CommunityChat({
 
       coordinator.toggle(emoji);
     },
-    [communityId, currentUserId, handleReactionToggled, projectOwnReaction],
+    [communityId, cacheKey, currentUserId, handleReactionToggled, projectOwnReaction],
   );
 
   // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
@@ -420,7 +466,7 @@ export function CommunityChat({
           ? { ...m, deleted_at: new Date().toISOString(), content: "", image_url: null, reply_to: null, reactions: [] }
           : m
       );
-      msgCache.set(communityId, next);
+      msgCache.set(cacheKey, next);
       return next;
     });
 
@@ -435,7 +481,7 @@ export function CommunityChat({
     } catch {
       fetchMessages();
     }
-  }, [communityId, fetchMessages, setMessages]);
+  }, [communityId, cacheKey, fetchMessages, setMessages]);
 
   const currentUserMember = members.find((member) => member.user_id === currentUserId);
   const currentUserName = currentUserMember?.users?.name ?? "Someone";
@@ -485,6 +531,7 @@ export function CommunityChat({
   // ── Realtime subscription ──���──���───────────────────────────────────────────
   useRealtimeChat({
     communityId,
+    channelId: activeChannelId,
     currentUserId,
     fetchMessages,
     setMessages,
@@ -514,6 +561,7 @@ export function CommunityChat({
     handleImageClear,
   } = useSendMessage({
     communityId,
+    channelId: activeChannelId,
     currentUserId,
     currentUserName,
     currentUserAvatar,
@@ -705,6 +753,28 @@ export function CommunityChat({
             />
           )}
         </Modal>
+        <ChannelManagerModal
+          open={showChannelManager}
+          onClose={() => setShowChannelManager(false)}
+          channels={channels}
+          loading={channelsLoading}
+          activeChannelId={activeChannelId}
+          createChannel={createChannel}
+          renameChannel={renameChannel}
+          deleteChannel={deleteChannel}
+          onDeleted={(deletedId) => {
+            if (activeChannelId === deletedId) handleChannelChange(null);
+          }}
+        />
+        {renderedTab === "chat" && (channels.length > 0 || isOwner) && (
+          <ChannelBar
+            channels={channels}
+            activeChannelId={activeChannelId}
+            onSelect={handleChannelChange}
+            canManage={isOwner}
+            onManage={() => setShowChannelManager(true)}
+          />
+        )}
         {renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "threads" ? (

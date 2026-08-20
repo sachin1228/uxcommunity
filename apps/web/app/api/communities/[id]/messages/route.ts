@@ -26,6 +26,7 @@ export async function GET(
   const result = await loadCommunityMessagePage(communityId, session.userId!, {
     before: req.nextUrl.searchParams.get("before"),
     after: req.nextUrl.searchParams.get("after"),
+    channelId: req.nextUrl.searchParams.get("channel_id"),
   });
 
   return result.ok
@@ -99,11 +100,13 @@ export async function POST(
   let content: string;
   let reply_to_id: string | null = null;
   let image_url: string | null = null;
+  let channel_id: string | null = null;
   try {
     const body  = await req.json();
     content     = (body.content ?? "").trim();
     reply_to_id = body.reply_to_id ?? null;
     image_url   = body.image_url   ?? null;
+    channel_id  = body.channel_id  ?? null;
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
@@ -139,11 +142,24 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
+  // Validate channel_id belongs to this community (if provided)
+  if (channel_id) {
+    const { data: channel } = await db
+      .from("community_channels")
+      .select("id")
+      .eq("id", channel_id)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    if (!channel) {
+      return NextResponse.json({ error: "Channel not found." }, { status: 404 });
+    }
+  }
+
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
-      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
-      .select("id, content, created_at, user_id, reply_to_id, image_url")
+      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url, channel_id })
+      .select("id, content, created_at, user_id, reply_to_id, image_url, channel_id")
       .single(),
   )) as unknown as {
     data: {
@@ -153,6 +169,7 @@ export async function POST(
       user_id: string;
       reply_to_id: string | null;
       image_url: string | null;
+      channel_id: string | null;
     } | null;
     error: unknown;
   };
@@ -236,6 +253,7 @@ export async function POST(
           created_at: inserted.created_at,
           reply_to_id: inserted.reply_to_id ?? null,
           image_url: inserted.image_url ?? null,
+          channel_id: inserted.channel_id ?? null,
         },
         panelTopic: "message",
       });
@@ -244,7 +262,7 @@ export async function POST(
     }
   });
 
-  timer.finish({ query_count: reply_to_id ? 2 : 1 });
+  timer.finish({ query_count: (reply_to_id ? 1 : 0) + (channel_id ? 1 : 0) + 1 });
 
   // Return only the inserted row. The client already has the sender's own
   // name/avatar (passed as props) and the reply preview (passed in the

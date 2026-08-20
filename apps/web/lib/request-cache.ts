@@ -110,7 +110,7 @@ function getBootstrapBackedRequest(url: string): BootstrapBackedRequest | null {
   if (!match) return null
 
   const section = match[2]
-  const hasPaginationOrSearch = ["before", "after", "cursor", "search", "q"].some(
+  const hasPaginationOrSearch = ["before", "after", "cursor", "search", "q", "channel_id"].some(
     (parameter) => parsed.searchParams.has(parameter),
   )
   const isPageZeroMembers = section !== "members"

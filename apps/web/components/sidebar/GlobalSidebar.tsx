@@ -1,24 +1,147 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { Gamepad2, Home, MessageSquare, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
+import { ChannelRow } from "@/components/sidebar/ChannelRow";
+import { ChannelManagerModal } from "@/components/communities/channels/ChannelManagerModal";
+import { useCommunityChannels } from "@/components/communities/channels/useCommunityChannels";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 interface Props {
   userId: string;
   mobile?: boolean;
 }
 
+type Community = CachedSidebarCommunity;
+
 function isMatch(href: string, pathname: string) {
   return href === "/dashboard"
     ? pathname === href
     : pathname === href || pathname.startsWith(href + "/");
+}
+
+/** The community list plus nested subchannel rows + channel manager modal.
+ *  Isolated so useSearchParams can live behind a Suspense boundary. */
+function CommunityListSection({
+  userId,
+  communities,
+  activeCommunityId,
+  typingMap,
+  handleNavigate,
+  router,
+}: {
+  userId: string;
+  communities: Community[];
+  activeCommunityId?: string;
+  typingMap: Map<string, string>;
+  handleNavigate: (id: string) => void;
+  router: ReturnType<typeof useSidebarCommunities>["router"];
+}) {
+  const searchParams = useSearchParams();
+  const activeChannelId = searchParams.get("channel");
+  const [manageCommunityId, setManageCommunityId] = useState<string | null>(null);
+
+  const manageCommunity = manageCommunityId
+    ? communities.find((c) => c.id === manageCommunityId) ?? null
+    : null;
+  const {
+    channels,
+    loading: channelsLoading,
+    createChannel,
+    renameChannel,
+    deleteChannel,
+  } = useCommunityChannels({
+    communityId: manageCommunity?.id ?? "",
+    currentUserId: userId,
+    enabled: !!manageCommunity,
+  });
+
+  const openCommunity = (id: string, channelId: string | null) => {
+    const base = `/dashboard/communities/${id}`;
+    router.push(channelId ? `${base}?channel=${encodeURIComponent(channelId)}` : base);
+  };
+
+  return (
+    <>
+      <ul className="space-y-0.5 px-3">
+        {communities.map((c) => {
+          const isOwner = c.owner_id === userId;
+          const communityChannels = c.channels ?? [];
+          const showChannels = communityChannels.length > 0 || isOwner;
+          return (
+            <Fragment key={c.id}>
+              <CommunityRow
+                c={c}
+                active={c.id === activeCommunityId}
+                typingText={typingMap.get(c.id)}
+                onClick={() => handleNavigate(c.id)}
+              />
+              {showChannels && (
+                <li className="mt-1 mb-1.5">
+                  <div className="flex items-center justify-between px-3 pb-0.5">
+                    <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted/70">
+                      Channels
+                    </span>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => setManageCommunityId(c.id)}
+                        className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                        aria-label={`Manage channels in ${c.name}`}
+                        title="Manage channels"
+                      >
+                        <Plus size={11} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-0.5">
+                    {communityChannels.map((ch) => (
+                      <ChannelRow
+                        key={ch.id}
+                        channel={ch}
+                        active={c.id === activeCommunityId && activeChannelId === ch.id}
+                        onClick={() => openCommunity(c.id, ch.id)}
+                      />
+                    ))}
+                    {isOwner && communityChannels.length === 0 && (
+                      <li className="px-3 pb-1 font-body text-[11px] text-foreground-muted/70">
+                        No channels yet
+                      </li>
+                    )}
+                  </ul>
+                </li>
+              )}
+            </Fragment>
+          );
+        })}
+      </ul>
+
+      {manageCommunity && (
+        <ChannelManagerModal
+          open
+          onClose={() => setManageCommunityId(null)}
+          channels={channels}
+          loading={channelsLoading}
+          activeChannelId={activeChannelId}
+          createChannel={createChannel}
+          renameChannel={renameChannel}
+          deleteChannel={deleteChannel}
+          onDeleted={(deletedId) => {
+            if (activeChannelId === deletedId) {
+              router.push(`/dashboard/communities/${manageCommunity.id}`);
+            }
+          }}
+        />
+      )}
+    </>
+  );
 }
 
 export function GlobalSidebar({ userId, mobile = false }: Props) {
@@ -171,17 +294,16 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                 <Plus size={11} strokeWidth={2.5} />
               </button>
             </div>
-            <ul className="space-y-0.5 px-3">
-              {sorted.map((c) => (
-                <CommunityRow
-                  key={c.id}
-                  c={c}
-                  active={c.id === activeCommunityId}
-                  typingText={typingMap.get(c.id)}
-                  onClick={() => handleNavigate(c.id)}
-                />
-              ))}
-            </ul>
+            <Suspense fallback={null}>
+              <CommunityListSection
+                userId={userId}
+                communities={sorted}
+                activeCommunityId={activeCommunityId}
+                typingMap={typingMap}
+                handleNavigate={handleNavigate}
+                router={router}
+              />
+            </Suspense>
           </div>
         )}
       </div>

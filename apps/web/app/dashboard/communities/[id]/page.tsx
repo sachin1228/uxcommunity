@@ -6,7 +6,7 @@ import type { ChatTab } from "@/components/communities/chat/ChatHeader";
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; channel?: string }>;
 }
 
 export default async function CommunityPage({ params, searchParams }: Props) {
@@ -14,7 +14,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   if (!session || session.role !== "user") redirect("/login");
 
   const { id } = await params;
-  const { tab } = await searchParams;
+  const { tab, channel } = await searchParams;
   const initialTab: ChatTab =
     tab === "showcase" || tab === "threads" || tab === "events" || tab === "resources" || tab === "members" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
@@ -32,6 +32,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
       initialMeta={ssrData?.meta}
       initialLastReadAt={ssrData?.lastReadAt}
       initialTab={initialTab}
+      initialChannelId={channel && channel.length > 0 ? channel : null}
     />
   );
 }
