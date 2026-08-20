@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Gamepad2, Home, MessageSquare, Plus, Users } from "lucide-react";
@@ -76,7 +76,7 @@ function CommunityListSection({
           const communityChannels = c.channels ?? [];
           const showChannels = communityChannels.length > 0 || isOwner;
           return (
-            <li key={c.id}>
+            <Fragment key={c.id}>
               <CommunityRow
                 c={c}
                 active={c.id === activeCommunityId}
@@ -84,7 +84,7 @@ function CommunityListSection({
                 onClick={() => handleNavigate(c.id)}
               />
               {showChannels && (
-                <div className="mt-1 mb-1.5">
+                <li className="mt-1 mb-1.5">
                   <div className="flex items-center justify-between px-3 pb-0.5">
                     <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted/70">
                       Channels
@@ -116,9 +116,9 @@ function CommunityListSection({
                       </li>
                     )}
                   </ul>
-                </div>
+                </li>
               )}
-            </li>
+            </Fragment>
           );
         })}
       </ul>
