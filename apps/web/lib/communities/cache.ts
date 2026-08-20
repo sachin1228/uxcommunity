@@ -85,6 +85,13 @@ export interface SidebarLastReaction {
   messagePreview: string;
 }
 
+/** A single chat subchannel within a user-created community. */
+export interface CachedCommunityChannel {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
 export interface CachedSidebarCommunity {
   id: string;
   name: string;
@@ -101,6 +108,8 @@ export interface CachedSidebarCommunity {
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
   last_read_at?: string | null;
+  /** Subchannels of a user-created community (empty/none for auto-created communities). */
+  channels?: CachedCommunityChannel[];
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;
   last_message: {
@@ -480,6 +489,16 @@ export const MAX_CACHE_ENTRIES  = 25;
 const REACTION_TOMBSTONE_TTL_MS = 5 * 60_000;
 const MAX_REACTION_TOMBSTONES   = 250;
 
+/**
+ * Composite key for per-message caches. Channels keep their own message
+ * history, so the message cache (and its fetched-at / in-flight maps) is
+ * keyed per channel. A null/undefined channel means the community's default
+ * "general" chat, which shares the community key for backward compatibility.
+ */
+export function msgCacheKey(communityId: string, channelId?: string | null): string {
+  return channelId ? `${communityId}:channel:${channelId}` : communityId;
+}
+
 class BoundedCommunityMap<T> extends Map<string, T> {
   override set(key: string, value: T): this {
     // Refresh insertion order so the first key remains the least recently written.
@@ -502,11 +521,17 @@ export const inFlightMsgFetch = new Map<string, Promise<void>>();
 export const inFlightMetaFetch = new Map<string, Promise<void>>();
 
 function evictCommunityState(communityId: string): void {
-  msgCache.delete(communityId);
+  for (const key of [...msgCache.keys()]) {
+    if (key === communityId || key.startsWith(`${communityId}:channel:`)) msgCache.delete(key);
+  }
   metaCache.delete(communityId);
-  msgFetchedAt.delete(communityId);
+  for (const key of [...msgFetchedAt.keys()]) {
+    if (key === communityId || key.startsWith(`${communityId}:channel:`)) msgFetchedAt.delete(key);
+  }
   lastReadAtOnOpen.delete(communityId);
-  inFlightMsgFetch.delete(communityId);
+  for (const key of [...inFlightMsgFetch.keys()]) {
+    if (key === communityId || key.startsWith(`${communityId}:channel:`)) inFlightMsgFetch.delete(key);
+  }
   inFlightMetaFetch.delete(communityId);
   for (const key of removedSidebarReactions.keys()) {
     if (key.startsWith(`${communityId}:`)) removedSidebarReactions.delete(key);

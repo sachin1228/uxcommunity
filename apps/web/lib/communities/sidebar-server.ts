@@ -74,10 +74,26 @@ export async function getSidebarCommunities(userId: string) {
     }
   }));
 
+  // Subchannels per community (sorted by creation for a stable nested list).
+  const { data: channelRows, error: channelError } = await db
+    .from("community_channels")
+    .select("id, community_id, name, created_at")
+    .in("community_id", rows.map((row) => row.community_id));
+  if (channelError) {
+    console.error("[GET communities projection] channels", channelError);
+  }
+  const channelsByCommunity = new Map<string, { id: string; name: string; created_at: string }[]>();
+  for (const ch of channelRows ?? []) {
+    const list = channelsByCommunity.get(ch.community_id) ?? [];
+    list.push({ id: ch.id, name: ch.name, created_at: ch.created_at });
+    channelsByCommunity.set(ch.community_id, list);
+  }
+
   const result = (communities ?? []).filter((community) => validIds.has(community.id)).map((community) => {
     const row = activityById.get(community.id)!;
     const message = row.last_message;
     const reaction = row.last_reaction;
+    const channelList = channelsByCommunity.get(community.id) ?? [];
     return {
       ...community,
       image_url: images[community.id] ?? community.image_url ?? null,
@@ -108,6 +124,7 @@ export async function getSidebarCommunities(userId: string) {
           ? `"${reaction.message_content.slice(0, 40)}${reaction.message_content.length > 40 ? "…" : ""}"`
           : reaction.has_image ? "Photo" : "a message",
       } : null,
+      ...(channelList.length > 0 ? { channels: channelList } : {}),
     };
   }).sort((a, b) => (b.last_message?.created_at ?? "").localeCompare(a.last_message?.created_at ?? ""));
 

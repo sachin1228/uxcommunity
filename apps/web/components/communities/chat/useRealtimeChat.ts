@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
-import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
+import { msgCache, msgCacheKey, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
@@ -13,6 +13,8 @@ type Message = CachedMessage;
 
 interface UseRealtimeChatOptions {
   communityId: string;
+  /** Active subchannel; null = general chat. Messages from other channels are ignored. */
+  channelId?: string | null;
   currentUserId: string;
   fetchMessages: (after?: string) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -27,6 +29,7 @@ interface UseRealtimeChatOptions {
 
 export function useRealtimeChat({
   communityId,
+  channelId = null,
   currentUserId,
   fetchMessages,
   setMessages,
@@ -38,6 +41,16 @@ export function useRealtimeChat({
   realtimeInsertPendingRef,
   realtimeWasNearBottomRef,
 }: UseRealtimeChatOptions) {
+  // Refs keep the active channel / cache key live inside the effect without
+  // forcing a reconnect (the room is community-wide; we filter client-side).
+  const channelIdRef = useRef(channelId);
+  const cacheKeyRef = useRef(msgCacheKey(communityId, channelId));
+
+  useEffect(() => {
+    channelIdRef.current = channelId;
+    cacheKeyRef.current = msgCacheKey(communityId, channelId);
+  }, [channelId, communityId]);
+
   // ── Debounced catch-up fetch ───────────────────────────────────────────────
   // Collapses rapid reconnect / visibility events into a single fetchMessages
   // call. Prevents a storm of incremental API requests during a chat flood.
@@ -83,7 +96,11 @@ export function useRealtimeChat({
           created_at: string;
           reply_to_id: string | null;
           image_url: string | null;
+          channel_id: string | null;
         };
+
+        // Ignore messages that belong to another subchannel.
+        if ((newRow.channel_id ?? null) !== (channelIdRef.current ?? null)) return;
 
         // Capture scroll position before state update
         if (initialScrollDoneRef.current) {
@@ -155,7 +172,7 @@ export function useRealtimeChat({
               new Date(a.created_at).getTime() -
               new Date(b.created_at).getTime()
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKeyRef.current, next);
 
           // Async fallback: only needed when reply_to_id is set but the
           // parent message is not in local state (e.g. very old message).
@@ -178,7 +195,7 @@ export function useRealtimeChat({
                       ? { ...m, reply_to: { id: preview.id, content: preview.content ?? "", user_name: preview.user_name } }
                       : m
                   );
-                  msgCache.set(targetCommunityId, next2);
+                  msgCache.set(cacheKeyRef.current, next2);
                   return next2;
                 });
               })
@@ -221,7 +238,7 @@ export function useRealtimeChat({
                         ? { ...m, users: resolvedUsers }
                         : m
                     );
-                    msgCache.set(targetCommunityId, next);
+                    msgCache.set(cacheKeyRef.current, next);
                     return next;
                   });
                 }
@@ -255,7 +272,7 @@ export function useRealtimeChat({
               ? { ...m, deleted_at: updated.deleted_at, content: "", image_url: null, reply_to: null, reactions: [] }
               : m
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKeyRef.current, next);
           return next;
         });
       }),
@@ -286,7 +303,7 @@ export function useRealtimeChat({
                 }
               : m
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKeyRef.current, next);
           return next;
         });
       }),
@@ -310,7 +327,7 @@ export function useRealtimeChat({
             const afterInsert = applyReactionInsert(afterDelete, newR.emoji, newR.user_id);
             return { ...m, reactions: afterInsert };
           });
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKeyRef.current, next);
           return next;
         });
       }),
@@ -342,7 +359,7 @@ export function useRealtimeChat({
                 }
               : m
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKeyRef.current, next);
           return next;
         });
       }),
@@ -457,7 +474,7 @@ export function useRealtimeChat({
     // single fetch.
     const unsubStatus = client.onStatus((connected) => {
       if (!connected) return;
-      const cached   = msgCache.get(communityId) ?? [];
+      const cached   = msgCache.get(cacheKeyRef.current) ?? [];
       const lastReal = cached
         .filter((m) => !m.id.startsWith("temp-"))
         .at(-1);
@@ -478,7 +495,7 @@ export function useRealtimeChat({
   useEffect(() => {
     const handleCatchUp = () => {
       if (document.visibilityState !== "visible") return;
-      const cached   = msgCache.get(communityId) ?? [];
+      const cached   = msgCache.get(cacheKeyRef.current) ?? [];
       const lastReal = cached
         .filter((m) => !m.id.startsWith("temp-"))
         .at(-1);

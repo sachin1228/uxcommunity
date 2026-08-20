@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   msgCache,
+  msgCacheKey,
   patchSidebarLastMessage,
   restoreSidebarEntry,
   sidebarStore,
@@ -15,6 +16,8 @@ type Message = CachedMessage;
 
 interface UseSendMessageOptions {
   communityId: string;
+  /** Active subchannel; null = general chat. Sent messages are scoped to it. */
+  channelId?: string | null;
   currentUserId: string;
   currentUserName: string;
   currentUserAvatar: string | null;
@@ -34,6 +37,7 @@ type RetryData = {
 
 export function useSendMessage({
   communityId,
+  channelId = null,
   currentUserId,
   currentUserName,
   currentUserAvatar,
@@ -43,6 +47,7 @@ export function useSendMessage({
   onClearReply,
   scrollToBottomRef,
 }: UseSendMessageOptions) {
+  const cacheKey = msgCacheKey(communityId, channelId);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,12 +149,12 @@ export function useSendMessage({
     if (!retryData?.file) {
       setMessages((prev) => {
         const next = prev.filter((m) => m.id !== tempId);
-        msgCache.set(communityId, next);
+        msgCache.set(cacheKey, next);
         return next;
       });
       failedRetryDataRef.current.delete(tempId);
     }
-  }, [communityId, setMessages]);
+  }, [cacheKey, setMessages]);
 
   /**
    * Core send logic, shared by handleSend and handleRetrySend.
@@ -189,7 +194,7 @@ export function useSendMessage({
 
     setMessages((prev) => {
       const next = [...prev, optimistic];
-      msgCache.set(communityId, next);
+      msgCache.set(cacheKey, next);
       return next;
     });
     // Bump the community to the top of the sidebar instantly. The chat shows
@@ -286,6 +291,7 @@ export function useSendMessage({
             content,
             reply_to_id: msgReplyTo?.id ?? null,
             image_url: uploadedImageUrl,
+            channel_id: channelId ?? null,
           }),
           signal: abortController.signal,
         }),
@@ -323,12 +329,12 @@ export function useSendMessage({
             const next = prev
               .filter((m) => m.id !== tempId)
               .map((m) => m.id === message.id ? merged : m);
-            msgCache.set(communityId, next);
+            msgCache.set(cacheKey, next);
             return next;
           }
 
           const next = prev.map((m) => m.id === tempId ? merged : m);
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKey, next);
           return next;
         });
 
@@ -337,7 +343,7 @@ export function useSendMessage({
       } else if (res.status === 202) {
         setMessages((prev) => {
           const next = prev.filter((m) => m.id !== tempId);
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKey, next);
           return next;
         });
         rollbackSidebar();
@@ -349,7 +355,7 @@ export function useSendMessage({
           const next = prev.map((m) =>
             m.id === tempId ? { ...m, status: "failed" as const } : m
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKey, next);
           return next;
         });
         rollbackSidebar();
@@ -365,14 +371,14 @@ export function useSendMessage({
             const next = prev.map((m) =>
               m.id === tempId ? { ...m, status: "failed" as const } : m
             );
-            msgCache.set(communityId, next);
+            msgCache.set(cacheKey, next);
             return next;
           });
         } else {
           // Text-only cancel — remove the optimistic message
           setMessages((prev) => {
             const next = prev.filter((m) => m.id !== tempId);
-            msgCache.set(communityId, next);
+            msgCache.set(cacheKey, next);
             return next;
           });
           failedRetryDataRef.current.delete(tempId);
@@ -385,7 +391,7 @@ export function useSendMessage({
         const next = prev.map((m) =>
           m.id === tempId ? { ...m, status: "failed" as const } : m
         );
-        msgCache.set(communityId, next);
+        msgCache.set(cacheKey, next);
         return next;
       });
       rollbackSidebar();
@@ -453,7 +459,7 @@ export function useSendMessage({
     // Remove the failed message before re-queueing
     setMessages((prev) => {
       const next = prev.filter((m) => m.id !== failedTempId);
-      msgCache.set(communityId, next);
+      msgCache.set(cacheKey, next);
       return next;
     });
     failedRetryDataRef.current.delete(failedTempId);
@@ -515,7 +521,7 @@ export function useSendMessage({
 
     setMessages((prev) => {
       const next = [...prev, optimistic];
-      msgCache.set(communityId, next);
+      msgCache.set(cacheKey, next);
       return next;
     });
     // Same instant sidebar bump as text/image sends.
@@ -553,7 +559,7 @@ export function useSendMessage({
       const res = await dedupeFetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "", image_url: gifUrl }),
+        body: JSON.stringify({ content: "", image_url: gifUrl, channel_id: channelId ?? null }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -578,11 +584,11 @@ export function useSendMessage({
             const next = prev
               .filter((m) => m.id !== tempId)
               .map((m) => (m.id === message.id ? merged : m));
-            msgCache.set(communityId, next);
+            msgCache.set(cacheKey, next);
             return next;
           }
           const next = prev.map((m) => m.id === tempId ? merged : m);
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKey, next);
           return next;
         });
       } else {
@@ -590,7 +596,7 @@ export function useSendMessage({
           const next = prev.map((m) =>
             m.id === tempId ? { ...m, status: "failed" as const } : m,
           );
-          msgCache.set(communityId, next);
+          msgCache.set(cacheKey, next);
           return next;
         });
         rollbackSidebar();
@@ -601,7 +607,7 @@ export function useSendMessage({
         const next = prev.map((m) =>
           m.id === tempId ? { ...m, status: "failed" as const } : m,
         );
-        msgCache.set(communityId, next);
+        msgCache.set(cacheKey, next);
         return next;
       });
       rollbackSidebar();
@@ -610,7 +616,7 @@ export function useSendMessage({
       sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, currentUserId, sending, setMessages]);
+  }, [communityId, channelId, currentUserId, sending, setMessages]);
 
   return {
     input,

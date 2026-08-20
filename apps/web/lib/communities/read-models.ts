@@ -382,7 +382,7 @@ export async function loadCommunityStats(communityId: string): Promise<ReadResul
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,
-  cursors: { before?: string | null; after?: string | null } = {},
+  cursors: { before?: string | null; after?: string | null; channelId?: string | null } = {},
 ): Promise<ReadResult<{ messages: unknown[] }>> {
   const db = createServiceClient();
   const { data: membership, error: membershipError } = await db
@@ -410,6 +410,7 @@ export async function loadCommunityMessagePage(
     p_before: after ? null : before,
     p_after: after,
     p_limit: MESSAGE_PAGE_SIZE,
+    p_channel_id: cursors.channelId ?? null,
   });
 
   if (error) return { ok: false, status: 500, error: "Failed to fetch messages." };
