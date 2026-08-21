@@ -47,6 +47,7 @@ interface MessageListProps {
   loading: boolean;
   /** True while an older-messages fetch is in flight. */
   loadingOlder: boolean;
+
   /** False once we know there are no more messages above the current window. */
   hasMoreAbove: boolean;
   /** True once the initial threads fetch for the current community has settled. */

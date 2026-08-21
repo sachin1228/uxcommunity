@@ -400,6 +400,23 @@ export function CommunityChat({
     if (delta > 0) container.scrollTop = anchor.scrollTop + delta;
   }, [messages]);
 
+  // Compensate for the loading spinner that appears while an older-messages
+  // fetch is in flight. The spinner is a flow element inside MessageList, so
+  // when loadingOlder becomes true it adds height above the visible content,
+  // pushing everything down. This layout effect fires synchronously before
+  // the browser paints and adjusts scrollTop so the user sees no shift.
+  // The [messages] effect above handles the final adjustment once messages
+  // are actually prepended.
+  useIsomorphicLayoutEffect(() => {
+    if (!loadingOlder) return;
+    const anchor = prependAnchorRef.current;
+    if (!anchor) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const delta = container.scrollHeight - anchor.scrollHeight;
+    if (delta > 0) container.scrollTop = anchor.scrollTop + delta;
+  }, [loadingOlder]);
+
   // IntersectionObserver-based trigger: starts loading older messages before
   // the user reaches the top by using a 300 px rootMargin.  Including
   // `loading` and `loadingOlder` in the deps ensures the observer is
