@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, MutableRefObject } from "react";
-import { useDocumentVisible } from "@/lib/use-document-visible";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/lib/communities/cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { noteCommunityActivity, scheduleMarkRead } from "@/lib/communities/read-manager";
+import { notifyIncomingCommunityMessage } from "@/lib/communities/message-notifications";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -60,18 +60,17 @@ export function useSidebarRealtime({
   setCommunities,
 }: Options) {
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
-  const isVisible = useDocumentVisible();
 
-  // The effect below only re-runs when the joined-id set or visibility
-  // changes, so handlers would otherwise close over a stale `communities`
-  // snapshot. Keep the latest snapshot in a ref for reads inside handlers.
+  // The effect below only re-runs when the joined-id set changes, so handlers
+  // would otherwise close over a stale `communities` snapshot. Keep the latest
+  // snapshot in a ref for reads inside handlers.
   const communitiesRef = useRef(communities);
   useEffect(() => {
     communitiesRef.current = communities;
   }, [communities]);
 
   useEffect(() => {
-    if (!communities.length || !isVisible) return;
+    if (!communities.length) return;
 
     const client = new RealtimeClient({
       room: realtimeRooms.panel(userId),
@@ -272,6 +271,28 @@ export function useSidebarRealtime({
             })),
           );
 
+          if (!isOwn) {
+            const communityName = communitiesRef.current.find(
+              (item) => item.id === row.community_id,
+            )?.name ?? "Community chat";
+            const senderNamePromise = knownName
+              ? Promise.resolve(knownName)
+              : resolveName(row.community_id, row.user_id);
+
+            void senderNamePromise.then((senderName) =>
+              notifyIncomingCommunityMessage(userId, {
+                id: row.id,
+                communityId: row.community_id,
+                communityName,
+                senderId: row.user_id,
+                senderName,
+                content: row.content,
+                hasImage: !!row.image_url,
+                isReply: !!row.reply_to_id,
+              }),
+            );
+          }
+
           // Async name resolution for unknown senders.
           if (!isOwn && !resolvedNames.has(row.user_id)) {
             const commId   = row.community_id;
@@ -442,5 +463,5 @@ export function useSidebarRealtime({
       client.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId, isVisible]);
+  }, [communityIds, userId]);
 }

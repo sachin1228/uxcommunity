@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { MessageNotificationSettings } from "@/app/dashboard/MessageNotificationSettings";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 
@@ -49,6 +50,7 @@ export default async function DashboardLayout({
         </span>
 
         <div className="ml-auto flex items-center gap-1">
+          <MessageNotificationSettings userId={userId} />
           <NotificationBell userId={userId} />
           <ProfileDropdown
             name={name}
