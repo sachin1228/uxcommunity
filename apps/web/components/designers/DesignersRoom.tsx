@@ -386,14 +386,14 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {/* Controls hint */}
       {ready && hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Drag to look · Space to jump · Shift to sprint · M mic · V voice
+          WASD to move · Drag to rotate view · Space to jump · Shift to sprint · M mic · V voice
         </div>
       )}
 
       {/* Persistent shortcut chip */}
       {ready && !hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
-          M mic · V voice · drag to look
+          M mic · V voice · drag to rotate
         </div>
       )}
 
@@ -407,7 +407,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
               This is a live room — real people are here right now. Walk up to someone to hear them
               (no mic needed to listen). Press{" "}
               <span className="font-semibold text-foreground">M</span> to turn on your mic when you
-              want to talk. Hold your mouse (or finger) and drag to look around.
+              want to talk. Hold your mouse (or finger) and drag to rotate the isometric view.
             </p>
             <button
               type="button"

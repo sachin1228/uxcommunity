@@ -332,14 +332,15 @@ export class DesignersRoom {
   private opts: RoomOptions;
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
 
   private keys = new Set<string>();
-  private yaw = 0;
-  private pitch = 0;
+  private yaw = -Math.PI / 4;
+  private pitch = -0.68;
+  private readonly viewSize = 24;
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
   private py = 0;
@@ -393,7 +394,7 @@ export class DesignersRoom {
     this.scene.background = new THREE.Color("#aec972");
     this.scene.fog = new THREE.Fog("#aec972", 55, 120);
 
-    this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 100);
+    this.camera = new THREE.OrthographicCamera(-12, 12, 12, -12, 0.1, 160);
 
     this.buildLights();
     this.buildRoom();
@@ -419,18 +420,18 @@ export class DesignersRoom {
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
 
-      // A spring-like chase camera gives the park a proper third-person feel.
-      const followDistance = 8.5;
-      const followHeight = 4.8;
-      const pitchLift = Math.sin(this.pitch) * 3.5;
+      // Elevated orthographic follow view, matching Bella Park's original
+      // clean isometric presentation while keeping the player centered.
+      const followDistance = 26;
+      const followHeight = 24;
       const desiredCamera = new THREE.Vector3(
         this.px + Math.sin(this.yaw) * followDistance,
-        this.py + followHeight + pitchLift,
+        this.py + followHeight,
         this.pz + Math.cos(this.yaw) * followDistance
       );
-      const desiredTarget = new THREE.Vector3(this.px, this.py + EYE + 0.35, this.pz);
-      const cameraEase = 1 - Math.exp(-dt * 8);
-      const targetEase = 1 - Math.exp(-dt * 12);
+      const desiredTarget = new THREE.Vector3(this.px, this.py + 0.8, this.pz);
+      const cameraEase = 1 - Math.exp(-dt * 5);
+      const targetEase = 1 - Math.exp(-dt * 8);
       this.cameraPosition.lerp(desiredCamera, cameraEase);
       this.cameraTarget.lerp(desiredTarget, targetEase);
       this.camera.position.copy(this.cameraPosition);
@@ -464,11 +465,9 @@ export class DesignersRoom {
     this.touchMoveZ = Math.max(-1, Math.min(1, fz));
   }
 
-  /** Incremental look delta in pixels (drag to look — desktop and touch). */
-  addLook(dx: number, dy: number) {
-    this.yaw -= dx * 0.0032;
-    this.pitch -= dy * 0.0032;
-    this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
+  /** Horizontal drag rotates the isometric view around the player. */
+  addLook(dx: number, _dy: number) {
+    this.yaw -= dx * 0.0022;
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────
@@ -492,7 +491,11 @@ export class DesignersRoom {
   private resize() {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
-    this.camera.aspect = w / h;
+    const aspect = w / h;
+    this.camera.left = (-this.viewSize * aspect) / 2;
+    this.camera.right = (this.viewSize * aspect) / 2;
+    this.camera.top = this.viewSize / 2;
+    this.camera.bottom = -this.viewSize / 2;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
   }
@@ -722,8 +725,12 @@ export class DesignersRoom {
           this.playerAvatar.position.set(this.px, this.py, this.pz);
           this.playerHeading = this.playerAvatar.rotation.y;
         }
-        this.cameraPosition.set(this.px, this.py + 4.8, this.pz + 8.5);
-        this.cameraTarget.set(this.px, this.py + EYE, this.pz);
+        this.cameraPosition.set(
+          this.px + Math.sin(this.yaw) * 26,
+          this.py + 24,
+          this.pz + Math.cos(this.yaw) * 26
+        );
+        this.cameraTarget.set(this.px, this.py + 0.8, this.pz);
         this.sceneReady = true;
       },
       undefined,
