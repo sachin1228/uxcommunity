@@ -343,8 +343,17 @@ export class DesignersRoom {
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
   private py = 0;
+  private groundY = 0;
   private pz = 4.6 + Math.random() * 2;
   private playerAvatar: THREE.Object3D | null = null;
+  private playerHeading = Math.PI;
+  private verticalVelocity = 0;
+  private grounded = true;
+  private moving = false;
+  private sprinting = false;
+  private moveTime = 0;
+  private cameraPosition = new THREE.Vector3();
+  private cameraTarget = new THREE.Vector3();
 
   private touchMoveX = 0;
   private touchMoveZ = 0;
@@ -377,7 +386,7 @@ export class DesignersRoom {
     renderer.toneMappingExposure = 1.05;
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
-    renderer.domElement.style.cursor = "crosshair";
+    renderer.domElement.style.cursor = "grab";
     container.appendChild(renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -410,16 +419,22 @@ export class DesignersRoom {
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
 
-      // Follow Bella from behind while keeping her and the garden in view.
-      const followDistance = 7;
-      const followHeight = 4.2;
-      const pitchLift = Math.sin(this.pitch) * 3;
-      this.camera.position.set(
+      // A spring-like chase camera gives the park a proper third-person feel.
+      const followDistance = 8.5;
+      const followHeight = 4.8;
+      const pitchLift = Math.sin(this.pitch) * 3.5;
+      const desiredCamera = new THREE.Vector3(
         this.px + Math.sin(this.yaw) * followDistance,
         this.py + followHeight + pitchLift,
         this.pz + Math.cos(this.yaw) * followDistance
       );
-      this.camera.lookAt(this.px, this.py + EYE, this.pz);
+      const desiredTarget = new THREE.Vector3(this.px, this.py + EYE + 0.35, this.pz);
+      const cameraEase = 1 - Math.exp(-dt * 8);
+      const targetEase = 1 - Math.exp(-dt * 12);
+      this.cameraPosition.lerp(desiredCamera, cameraEase);
+      this.cameraTarget.lerp(desiredTarget, targetEase);
+      this.camera.position.copy(this.cameraPosition);
+      this.camera.lookAt(this.cameraTarget);
       this.renderer.render(this.scene, this.camera);
       this.emitFrame();
       if (this.sceneReady && !this.readyEmitted) {
@@ -485,6 +500,10 @@ export class DesignersRoom {
   private onKeyDown = (e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
     if (["w", "a", "s", "d", "shift", " "].includes(k)) e.preventDefault();
+    if (k === " " && this.grounded && !e.repeat) {
+      this.verticalVelocity = 7.5;
+      this.grounded = false;
+    }
     this.keys.add(k);
   };
   private onKeyUp = (e: KeyboardEvent) => {
@@ -506,15 +525,35 @@ export class DesignersRoom {
       r = this.touchMoveX;
       f = this.touchMoveZ;
     }
-    const sprint =
-      this.keys.has("shift") || this.touchSprint;
-    const speed = (sprint ? 5.4 : 3.1) * dt;
+    const sprint = this.keys.has("shift") || this.touchSprint;
+    const speed = (sprint ? 7.2 : 4.2) * dt;
     const len = Math.hypot(f, r);
-    if (len > 0.01) {
+    this.moving = len > 0.01;
+    this.sprinting = sprint && this.moving;
+    if (this.moving) {
       const nf = f / len;
       const nr = r / len;
-      this.px += (-Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr) * speed;
-      this.pz += (-Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr) * speed;
+      const moveX = -Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr;
+      const moveZ = -Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr;
+      this.px += moveX * speed;
+      this.pz += moveZ * speed;
+
+      const desiredHeading = Math.atan2(moveX, moveZ);
+      let turn = desiredHeading - this.playerHeading;
+      while (turn > Math.PI) turn -= Math.PI * 2;
+      while (turn < -Math.PI) turn += Math.PI * 2;
+      this.playerHeading += turn * Math.min(1, dt * 12);
+      this.moveTime += dt * (sprint ? 13 : 9);
+    }
+
+    if (!this.grounded) {
+      this.verticalVelocity -= 20 * dt;
+      this.py += this.verticalVelocity * dt;
+      if (this.py <= this.groundY) {
+        this.py = this.groundY;
+        this.verticalVelocity = 0;
+        this.grounded = true;
+      }
     }
     // walls
     const m = 0.45;
@@ -533,8 +572,12 @@ export class DesignersRoom {
     }
 
     if (this.playerAvatar) {
-      this.playerAvatar.position.set(this.px, this.py, this.pz);
-      if (len > 0.01) this.playerAvatar.rotation.y = this.yaw + Math.PI;
+      const stride = this.moving && this.grounded ? Math.sin(this.moveTime) : 0;
+      const idle = this.grounded ? Math.sin(this.clock.elapsedTime * 2.2) * 0.025 : 0;
+      this.playerAvatar.position.set(this.px, this.py + Math.abs(stride) * 0.045 + idle, this.pz);
+      this.playerAvatar.rotation.y = this.playerHeading;
+      this.playerAvatar.rotation.z = stride * (this.sprinting ? 0.025 : 0.015);
+      this.playerAvatar.rotation.x = this.sprinting ? -0.08 : 0;
     }
   }
 
@@ -673,10 +716,14 @@ export class DesignersRoom {
           this.py = bounds.min.y;
           this.pz = center.z;
         }
+        this.groundY = this.py;
 
         if (this.playerAvatar) {
           this.playerAvatar.position.set(this.px, this.py, this.pz);
+          this.playerHeading = this.playerAvatar.rotation.y;
         }
+        this.cameraPosition.set(this.px, this.py + 4.8, this.pz + 8.5);
+        this.cameraTarget.set(this.px, this.py + EYE, this.pz);
         this.sceneReady = true;
       },
       undefined,
