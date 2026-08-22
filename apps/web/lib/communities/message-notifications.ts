@@ -23,7 +23,12 @@ const DEFAULT_PREFERENCES: MessageNotificationPreferences = {
   browser: false,
 };
 const PREFERENCES_EVENT = "uxcommunity:message-notification-preferences";
+const NOTIFICATION_BURST_MS = 8_000;
 const seenMessageIds = new Set<string>();
+const notificationBursts = new Map<string, {
+  timer: ReturnType<typeof setTimeout>;
+  messages: IncomingCommunityMessage[];
+}>();
 let audioContext: AudioContext | null = null;
 
 function storageKey(userId: string) {
@@ -114,14 +119,22 @@ export async function playMessageSound() {
   }
 }
 
-export async function notifyIncomingCommunityMessage(
+export function formatMessageBurstPreview(
+  messages: IncomingCommunityMessage[],
+) {
+  const senderCount = new Set(messages.map((message) => message.senderId)).size;
+  const senderLabel = senderCount === 1
+    ? messages[0]?.senderName ?? "Someone"
+    : `${senderCount} people`;
+  return `${messages.length} new messages from ${senderLabel}`;
+}
+
+function showBrowserNotification(
   userId: string,
   message: IncomingCommunityMessage,
+  body: string,
 ) {
-  if (message.senderId === userId || !markMessageNotificationSeen(message.id)) return;
   const preferences = readMessageNotificationPreferences(userId);
-  if (preferences.sound) void playMessageSound();
-
   const permission = typeof Notification === "undefined"
     ? "unsupported"
     : Notification.permission;
@@ -130,8 +143,8 @@ export async function notifyIncomingCommunityMessage(
 
   try {
     const notification = new Notification(message.communityName, {
-      body: `${message.senderName ?? "Someone"}: ${formatMessageNotificationPreview(message)}`,
-      tag: `community-message-${message.id}`,
+      body,
+      tag: `community-message-${message.communityId}`,
     });
     notification.onclick = () => {
       window.focus();
@@ -143,6 +156,49 @@ export async function notifyIncomingCommunityMessage(
   } catch {
     // Native notifications are best-effort and must not interrupt realtime chat.
   }
+}
+
+function flushMessageNotificationBurst(userId: string, burstKey: string) {
+  const burst = notificationBursts.get(burstKey);
+  notificationBursts.delete(burstKey);
+  if (!burst?.messages.length) return;
+
+  const latestMessage = burst.messages.at(-1)!;
+  showBrowserNotification(
+    userId,
+    latestMessage,
+    formatMessageBurstPreview(burst.messages),
+  );
+}
+
+export async function notifyIncomingCommunityMessage(
+  userId: string,
+  message: IncomingCommunityMessage,
+) {
+  if (message.senderId === userId || !markMessageNotificationSeen(message.id)) return;
+
+  const burstKey = `${userId}:${message.communityId}`;
+  const activeBurst = notificationBursts.get(burstKey);
+  if (activeBurst) {
+    activeBurst.messages.push(message);
+    return;
+  }
+
+  notificationBursts.set(burstKey, {
+    messages: [],
+    timer: setTimeout(
+      () => flushMessageNotificationBurst(userId, burstKey),
+      NOTIFICATION_BURST_MS,
+    ),
+  });
+
+  const preferences = readMessageNotificationPreferences(userId);
+  if (preferences.sound) void playMessageSound();
+  showBrowserNotification(
+    userId,
+    message,
+    `${message.senderName ?? "Someone"}: ${formatMessageNotificationPreview(message)}`,
+  );
 }
 
 export function useMessageNotificationPreferences(userId: string) {
