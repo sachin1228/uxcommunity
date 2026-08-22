@@ -342,7 +342,9 @@ export class DesignersRoom {
   private pitch = 0;
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
+  private py = 0;
   private pz = 4.6 + Math.random() * 2;
+  private playerAvatar: THREE.Object3D | null = null;
 
   private touchMoveX = 0;
   private touchMoveZ = 0;
@@ -407,10 +409,17 @@ export class DesignersRoom {
       const t = this.clock.elapsedTime;
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
-      this.camera.position.set(this.px, EYE, this.pz);
-      this.camera.rotation.order = "YXZ";
-      this.camera.rotation.y = this.yaw;
-      this.camera.rotation.x = this.pitch;
+
+      // Follow Bella from behind while keeping her and the garden in view.
+      const followDistance = 7;
+      const followHeight = 4.2;
+      const pitchLift = Math.sin(this.pitch) * 3;
+      this.camera.position.set(
+        this.px + Math.sin(this.yaw) * followDistance,
+        this.py + followHeight + pitchLift,
+        this.pz + Math.cos(this.yaw) * followDistance
+      );
+      this.camera.lookAt(this.px, this.py + EYE, this.pz);
       this.renderer.render(this.scene, this.camera);
       this.emitFrame();
       if (this.sceneReady && !this.readyEmitted) {
@@ -522,6 +531,11 @@ export class DesignersRoom {
         this.pz = c.z + (dz / d) * min;
       }
     }
+
+    if (this.playerAvatar) {
+      this.playerAvatar.position.set(this.px, this.py, this.pz);
+      if (len > 0.01) this.playerAvatar.rotation.y = this.yaw + Math.PI;
+    }
   }
 
   /** Reconcile the network-driven avatars with the current presence snapshot. */
@@ -617,11 +631,12 @@ export class DesignersRoom {
 
         const park = gltf.scene;
         let spawn: THREE.Vector3 | null = null;
+        let bella: THREE.Object3D | null = null;
 
         park.traverse((child) => {
           if (child.name === "Character") {
             spawn = child.getWorldPosition(new THREE.Vector3());
-            child.visible = false;
+            bella = child;
           }
           if (child instanceof THREE.Mesh) {
             child.castShadow = true;
@@ -634,6 +649,13 @@ export class DesignersRoom {
 
         this.scene.add(park);
 
+        // Keep Bella as the local player's visible avatar while preserving her
+        // world transform from the source scene.
+        if (bella) {
+          this.scene.attach(bella);
+          this.playerAvatar = bella;
+        }
+
         const bounds = new THREE.Box3().setFromObject(park);
         const size = bounds.getSize(new THREE.Vector3());
         const center = bounds.getCenter(new THREE.Vector3());
@@ -644,12 +666,17 @@ export class DesignersRoom {
 
         if (spawn) {
           this.px = spawn.x;
+          this.py = spawn.y;
           this.pz = spawn.z;
         } else {
           this.px = center.x;
+          this.py = bounds.min.y;
           this.pz = center.z;
         }
 
+        if (this.playerAvatar) {
+          this.playerAvatar.position.set(this.px, this.py, this.pz);
+        }
         this.sceneReady = true;
       },
       undefined,
