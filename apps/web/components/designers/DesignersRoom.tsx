@@ -123,13 +123,13 @@ export function DesignersRoomView({ userId, userName }: Props) {
         for (const u of users) {
           if (u.id === userId) continue;
           if (!prevOnlineIds.current.has(u.id)) {
-            addToast(`${u.name ?? "Someone"} joined the studio`);
+            addToast(`${u.name ?? "Someone"} joined the park`);
           }
           prevOnlineNames.current.set(u.id, u.name ?? "Someone");
         }
         for (const id of prevOnlineIds.current) {
           if (!now.has(id)) {
-            addToast(`${prevOnlineNames.current.get(id) ?? "Someone"} left the studio`);
+            addToast(`${prevOnlineNames.current.get(id) ?? "Someone"} left the park`);
           }
         }
         prevOnlineIds.current = now;
@@ -303,7 +303,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {!ready && !error && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-background">
           <Spinner className="h-9 w-9" />
-          <p className="font-body text-sm text-foreground-muted">Entering the studio…</p>
+          <p className="font-body text-sm text-foreground-muted">Entering the park…</p>
         </div>
       )}
 
@@ -343,10 +343,10 @@ export function DesignersRoomView({ userId, userName }: Props) {
                 realtimeConnected ? "bg-emerald-500" : "bg-foreground-muted/40"
               }`}
             />
-            {realtimeConnected ? `${online} online` : "studio offline"}
+            {realtimeConnected ? `${online} online` : "park offline"}
           </span>
           <span className="hidden rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs font-medium text-foreground backdrop-blur md:block">
-            Designer Studio
+            Bella Park
           </span>
           <button
             type="button"
@@ -402,7 +402,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
           <div className="pointer-events-auto mx-4 max-w-sm rounded-2xl border border-border bg-background/90 px-6 py-5 text-center shadow-xl backdrop-blur">
             <span className="text-2xl">🎮</span>
-            <p className="mt-1 font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
+            <p className="mt-1 font-body text-sm font-semibold text-foreground">You&apos;re in Bella Park</p>
             <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">
               This is a live room — real people are here right now. Walk up to someone to hear them
               (no mic needed to listen). Press{" "}
