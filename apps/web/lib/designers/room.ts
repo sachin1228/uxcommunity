@@ -340,7 +340,7 @@ export class DesignersRoom {
   private keys = new Set<string>();
   private yaw = -Math.PI / 4;
   private pitch = -0.68;
-  private readonly viewSize = 24;
+  private readonly viewSize = 46;
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
   private py = 0;
@@ -422,8 +422,8 @@ export class DesignersRoom {
 
       // Elevated orthographic follow view, matching Bella Park's original
       // clean isometric presentation while keeping the player centered.
-      const followDistance = 26;
-      const followHeight = 24;
+      const followDistance = 44;
+      const followHeight = 40;
       const desiredCamera = new THREE.Vector3(
         this.px + Math.sin(this.yaw) * followDistance,
         this.py + followHeight,
@@ -726,9 +726,9 @@ export class DesignersRoom {
           this.playerHeading = this.playerAvatar.rotation.y;
         }
         this.cameraPosition.set(
-          this.px + Math.sin(this.yaw) * 26,
-          this.py + 24,
-          this.pz + Math.cos(this.yaw) * 26
+          this.px + Math.sin(this.yaw) * 44,
+          this.py + 40,
+          this.pz + Math.cos(this.yaw) * 44
         );
         this.cameraTarget.set(this.px, this.py + 0.8, this.pz);
         this.sceneReady = true;
