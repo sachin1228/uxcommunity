@@ -530,7 +530,7 @@ export class DesignersRoom {
       f = this.touchMoveZ;
     }
     const sprint = this.keys.has("shift") || this.touchSprint;
-    const speed = (sprint ? 7.2 : 4.2) * dt;
+    const speed = (sprint ? 10.5 : 6.5) * dt;
     const len = Math.hypot(f, r);
     this.moving = len > 0.01;
     this.sprinting = sprint && this.moving;
