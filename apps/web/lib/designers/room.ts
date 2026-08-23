@@ -385,7 +385,7 @@ export class DesignersRoom {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.7;
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
     renderer.domElement.style.cursor = "grab";
@@ -393,7 +393,6 @@ export class DesignersRoom {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color("#aec972");
-    this.scene.fog = new THREE.Fog("#aec972", 55, 120);
 
     this.camera = new THREE.OrthographicCamera(-12, 12, 12, -12, 0.1, 160);
 
