@@ -386,7 +386,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {/* Controls hint */}
       {ready && hint && !isTouch && (
         <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Drag to rotate view · Space to jump · Shift to sprint · M mic · V voice
+          WASD to move · Drag in any direction to orbit · Space to jump · Shift to sprint · M mic · V voice
         </div>
       )}
 

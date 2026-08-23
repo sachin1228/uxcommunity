@@ -339,8 +339,9 @@ export class DesignersRoom {
 
   private keys = new Set<string>();
   private yaw = -Math.PI / 4;
-  private pitch = -0.68;
-  private readonly viewSize = 46;
+  private pitch = 0.68;
+  private readonly cameraDistance = 82;
+  private readonly viewSize = 72;
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
   private py = 0;
@@ -420,14 +421,13 @@ export class DesignersRoom {
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
 
-      // Elevated orthographic follow view, matching Bella Park's original
-      // clean isometric presentation while keeping the player centered.
-      const followDistance = 44;
-      const followHeight = 40;
+      // Wide, elevated orbit view matching Bella Park's original presentation.
+      // Yaw and pitch both orbit around the player while preserving distance.
+      const horizontalDistance = Math.cos(this.pitch) * this.cameraDistance;
       const desiredCamera = new THREE.Vector3(
-        this.px + Math.sin(this.yaw) * followDistance,
-        this.py + followHeight,
-        this.pz + Math.cos(this.yaw) * followDistance
+        this.px + Math.sin(this.yaw) * horizontalDistance,
+        this.py + Math.sin(this.pitch) * this.cameraDistance,
+        this.pz + Math.cos(this.yaw) * horizontalDistance
       );
       const desiredTarget = new THREE.Vector3(this.px, this.py + 0.8, this.pz);
       const cameraEase = 1 - Math.exp(-dt * 5);
@@ -465,9 +465,10 @@ export class DesignersRoom {
     this.touchMoveZ = Math.max(-1, Math.min(1, fz));
   }
 
-  /** Horizontal drag rotates the isometric view around the player. */
-  addLook(dx: number, _dy: number) {
+  /** Drag orbits the isometric camera horizontally and vertically around the player. */
+  addLook(dx: number, dy: number) {
     this.yaw -= dx * 0.0022;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.0022, 0.3, 1.25);
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────
@@ -725,10 +726,11 @@ export class DesignersRoom {
           this.playerAvatar.position.set(this.px, this.py, this.pz);
           this.playerHeading = this.playerAvatar.rotation.y;
         }
+        const horizontalDistance = Math.cos(this.pitch) * this.cameraDistance;
         this.cameraPosition.set(
-          this.px + Math.sin(this.yaw) * 44,
-          this.py + 40,
-          this.pz + Math.cos(this.yaw) * 44
+          this.px + Math.sin(this.yaw) * horizontalDistance,
+          this.py + Math.sin(this.pitch) * this.cameraDistance,
+          this.pz + Math.cos(this.yaw) * horizontalDistance
         );
         this.cameraTarget.set(this.px, this.py + 0.8, this.pz);
         this.sceneReady = true;
