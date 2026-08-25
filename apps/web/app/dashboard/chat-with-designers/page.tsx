@@ -24,7 +24,7 @@ export default async function ChatWithDesignersPage() {
 
   return (
     <div className="h-full p-[60px]">
-      <div className="h-full overflow-hidden rounded-xl">
+      <div className="h-full rounded-xl">
         <DesignersRoomView
           userId={session.userId!}
           userName={name ?? session.email ?? "Designer"}
