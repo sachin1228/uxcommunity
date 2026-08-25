@@ -210,9 +210,9 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-surface-raised">
-      <div className="flex min-h-64 flex-col md:flex-row">
-        <div className={`relative min-h-52 shrink-0 overflow-hidden md:min-h-64 ${isDetail ? "md:w-5/12" : "md:w-2/5"}`}>
+    <div className="relative overflow-hidden rounded-lg border border-border bg-surface-raised">
+      <div className="flex min-h-52 flex-col md:flex-row">
+        <div className={`relative min-h-44 shrink-0 overflow-hidden md:min-h-52 ${isDetail ? "md:w-[38%]" : "md:w-[36%]"}`}>
           {event.cover_image_url ? (
             <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 size-full object-cover" />
           ) : (
@@ -221,33 +221,33 @@ export function EventCard({
           <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" aria-hidden="true" />
         </div>
 
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-5 py-6 md:border-l md:border-t-0 md:px-7">
-          <span className="absolute -left-3 -top-3 hidden size-6 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -bottom-3 -left-3 hidden size-6 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -left-3 -top-3 size-6 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
-          <span className="absolute -right-3 -top-3 size-6 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-4 py-4 md:border-l md:border-t-0 md:px-5">
+          <span className="absolute -left-2 -top-2 hidden size-4 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -bottom-2 -left-2 hidden size-4 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -left-2 -top-2 size-4 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
+          <span className="absolute -right-2 -top-2 size-4 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
 
-          <div className="flex items-start justify-between gap-4 pr-16">
+          <div className="flex items-start justify-between gap-3 pr-12">
             <div className="min-w-0">
               {isDetail ? (
-                <h1 className="text-balance font-display text-2xl font-bold leading-tight text-foreground">{event.title}</h1>
+                <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
               ) : (
-                <h3 className="line-clamp-2 text-balance font-display text-xl font-bold leading-tight text-foreground">{event.title}</h3>
+                <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-foreground">{event.title}</h3>
               )}
               {event.description && (
-                <p className={`mt-2 font-body text-sm leading-6 text-foreground-muted ${isDetail ? "text-pretty" : "line-clamp-2"}`}>{event.description}</p>
+                <p className={`mt-1.5 font-body text-xs leading-5 text-foreground-muted ${isDetail ? "line-clamp-3 text-pretty" : "line-clamp-2"}`}>{event.description}</p>
               )}
             </div>
           </div>
 
-          <div className="mt-5 flex flex-col gap-2.5 border-b border-border pb-5">
-            <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
+          <div className="mt-3 flex flex-col gap-1.5 border-b border-border pb-3">
+            <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
               <Calendar size={16} className="shrink-0 text-accent" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {event.is_online ? (
-              <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
-                <Video size={16} className="shrink-0" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+                <Video size={14} className="shrink-0" aria-hidden="true" />
                 {isDetail && event.meet_link ? (
                   <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
                     Online (Google Meet) <ExternalLink size={12} />
@@ -255,17 +255,17 @@ export function EventCard({
                 ) : event.meet_link ? "Online (Google Meet)" : "Online"}
               </span>
             ) : event.location ? (
-              <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
-                <MapPin size={16} className="shrink-0" aria-hidden="true" />
+              <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+                <MapPin size={14} className="shrink-0" aria-hidden="true" />
                 <span className="truncate">{event.location}</span>
               </span>
             ) : null}
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-x-7 gap-y-4">
-            <div className="border-r border-border pr-7">
-              <p className="font-body text-xs text-foreground-subtle">Hosted by</p>
-              <p className="mt-1 font-display text-base font-semibold text-foreground">{authorName}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+            <div className="border-r border-border pr-5">
+              <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
+              <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
             </div>
             <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
           </div>
@@ -277,13 +277,13 @@ export function EventCard({
           )}
           {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-auto flex items-end justify-between gap-4 pt-6">
+          <div className="mt-auto flex items-end justify-between gap-3 pt-4">
             {!past ? (
               <button
                 type="button"
                 onClick={handleJoin}
                 disabled={rsvpPending || full}
-                className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-5 font-body text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
               >
                 <UserPlus size={17} aria-hidden="true" />
                 {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
@@ -313,9 +313,9 @@ export function EventCard({
         </div>
       </div>
 
-      <div className={`absolute right-5 top-0 flex w-20 flex-col items-center bg-accent px-2 pb-5 pt-4 text-center text-accent-foreground [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "opacity-70" : ""}`}>
-        <Calendar size={22} aria-hidden="true" />
-        <span className="mt-2 font-body text-[10px] font-semibold uppercase leading-4 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
+      <div className={`absolute right-4 top-0 flex w-16 flex-col items-center bg-accent px-1.5 pb-4 pt-3 text-center text-accent-foreground [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "opacity-70" : ""}`}>
+        <Calendar size={18} aria-hidden="true" />
+        <span className="mt-1.5 font-body text-[9px] font-semibold uppercase leading-3 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
       </div>
     </div>
   );
