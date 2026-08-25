@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { extensionForMime } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -45,13 +45,20 @@ export async function PATCH(
   const { id } = await params;
   const db = createServiceClient();
 
-  const { data: community } = await db
+  const { data: community, error: communityError } = (await db
     .from("communities")
-    .select("id, owner_id")
+    .select("id, owner_id, image_url")
     .eq("id", id)
     .eq("is_active", true)
-    .maybeSingle();
+    .maybeSingle()) as unknown as {
+      data: { id: string; owner_id: string | null; image_url: string | null } | null;
+      error: { message: string } | null;
+    };
 
+  if (communityError) {
+    console.error("[community-settings] failed to load community:", communityError);
+    return NextResponse.json({ error: "Failed to load community." }, { status: 500 });
+  }
   if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
   if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
 
@@ -95,6 +102,7 @@ export async function PATCH(
 
   // Handle image upload / removal
   let imageUrlResult: string | null | undefined; // undefined = no change
+  let uploadedImageKey: string | null = null;
   const file = formData.get("image");
   const removeImage = getString("remove_image") === "true";
 
@@ -112,8 +120,8 @@ export async function PATCH(
     }
     try {
       const storedMime = moderation.mime ?? file.type;
-      const key = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
-      imageUrlResult = await uploadToR2(key, moderation.buffer, storedMime);
+      uploadedImageKey = `communities/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
+      imageUrlResult = await uploadToR2(uploadedImageKey, moderation.buffer, storedMime);
     } catch (err) {
       console.error("[community-settings] image upload failed:", err);
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });
@@ -125,8 +133,60 @@ export async function PATCH(
   }
 
   if (Object.keys(updates).length > 0) {
-    const { error } = await db.from("communities").update(updates).eq("id", id);
-    if (error) return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+    const { data: updatedCommunity, error } = (await db
+      .from("communities")
+      .update(updates)
+      .eq("id", id)
+      .select("id, image_url")
+      .maybeSingle()) as unknown as {
+        data: { id: string; image_url: string | null } | null;
+        error: { message: string } | null;
+      };
+
+    if (error) {
+      console.error("[community-settings] community update failed:", error);
+      if (uploadedImageKey) {
+        await deleteFromR2(uploadedImageKey).catch((cleanupError) =>
+          console.error("[community-settings] failed to roll back R2 upload:", cleanupError)
+        );
+      }
+      return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+    }
+    if (!updatedCommunity) {
+      console.error("[community-settings] community update matched no row:", { id });
+      if (uploadedImageKey) {
+        await deleteFromR2(uploadedImageKey).catch((cleanupError) =>
+          console.error("[community-settings] failed to roll back R2 upload:", cleanupError)
+        );
+      }
+      return NextResponse.json({ error: "Community was not updated." }, { status: 409 });
+    }
+
+    if (imageUrlResult !== undefined) {
+      if (updatedCommunity.image_url !== imageUrlResult) {
+        console.error("[community-settings] image URL was not persisted:", {
+          id,
+          expected: imageUrlResult,
+          persisted: updatedCommunity.image_url,
+        });
+        if (uploadedImageKey) {
+          await deleteFromR2(uploadedImageKey).catch((cleanupError) =>
+            console.error("[community-settings] failed to roll back R2 upload:", cleanupError)
+          );
+        }
+        return NextResponse.json({ error: "Community picture was not saved." }, { status: 500 });
+      }
+      imageUrlResult = updatedCommunity.image_url;
+
+      if (community.image_url && community.image_url !== imageUrlResult) {
+        const previousImageKey = parseR2Key(community.image_url);
+        if (previousImageKey) {
+          await deleteFromR2(previousImageKey).catch((cleanupError) =>
+            console.error("[community-settings] failed to delete previous R2 image:", cleanupError)
+          );
+        }
+      }
+    }
   }
 
   // Update rules if provided
