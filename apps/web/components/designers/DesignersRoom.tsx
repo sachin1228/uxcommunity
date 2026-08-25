@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { DesignersRoom, FrameState } from "@/lib/designers/room";
 import { StudioPresence, RemoteUser } from "@/lib/designers/presence";
 import { ProximityVoice } from "@/lib/designers/voice";
@@ -36,7 +36,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [micState, setMicState] = useState<MicState>("off");
   const [online, setOnline] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [hint, setHint] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const prevOnlineIds = useRef<Set<string>>(new Set());
@@ -146,12 +145,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
     () => false
   );
 
-  useEffect(() => {
-    if (intro) return;
-    const t = window.setTimeout(() => setHint(false), 9000);
-    return () => window.clearTimeout(t);
-  }, [intro]);
-
   const enterPark = useCallback(() => {
     roomRef.current?.setInputEnabled(true);
     setIntro(false);
@@ -203,15 +196,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleMic, toggleMute]);
 
-  const copyInvite = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      addToast("Studio link copied — share it to bring people in");
-    } catch {
-      addToast("Couldn't copy the link");
-    }
-  };
-
   const leave = () => {
     router.push("/dashboard");
   };
@@ -262,8 +246,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
     lookPos.current = null;
   };
 
-  const alone = realtimeConnected && online <= 1;
-
   return (
     <div className="relative h-full w-full text-foreground">
       {/* 3D canvas — drag anywhere (not on the HUD) to look around */}
@@ -296,19 +278,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
             Back to dashboard
           </button>
         </div>
-      )}
-
-      {/* Top-left: leave */}
-      {ready && !intro && (
-        <button
-          type="button"
-          onClick={leave}
-          className="absolute left-4 top-4 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/70 text-foreground-muted backdrop-blur transition-colors hover:text-foreground"
-          aria-label="Leave the room"
-          title="Leave the room"
-        >
-          <ArrowLeft size={18} />
-        </button>
       )}
 
       {/* Top controls sit in the 60px margin, outside the game canvas. */}
@@ -360,20 +329,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* Controls hint */}
-      {ready && !intro && hint && !isTouch && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Drag in any direction to orbit · Space to jump · Shift to sprint · M mic · V voice
-        </div>
-      )}
-
-      {/* Persistent shortcut chip */}
-      {ready && !hint && !isTouch && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
-          M mic · V voice · drag to rotate
-        </div>
-      )}
-
       {/* Entry gate: game controls stay locked until the user enters. */}
       {ready && !error && intro && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/35 px-4">
@@ -392,7 +347,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
               className="mt-3 font-body text-sm leading-relaxed text-foreground-muted"
             >
               This is a live room with real people. Walk up to someone to hear them—no microphone is
-              needed to listen. Press M when you want to talk, and drag to rotate the view.
+              needed to listen.
             </p>
             <button
               type="button"
@@ -411,23 +366,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
         <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 shadow-lg backdrop-blur">
           <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
           <span className="font-body text-xs font-medium text-foreground">You&apos;re on air — people near you can hear you</span>
-        </div>
-      )}
-
-      {/* Alone hint + invite */}
-      {ready && !error && !intro && alone && (
-        <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur">
-          <p className="font-body text-xs text-foreground-muted">
-            You&apos;re the only one here right now
-          </p>
-          <button
-            type="button"
-            onClick={copyInvite}
-            className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 font-body text-xs font-medium text-white transition-opacity hover:opacity-90"
-          >
-            <Copy size={12} />
-            Copy invite link
-          </button>
         </div>
       )}
 
