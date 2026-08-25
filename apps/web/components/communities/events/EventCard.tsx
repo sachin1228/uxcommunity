@@ -106,6 +106,7 @@ export function EventCard({
   communityImage,
 }: EventCardProps) {
   const isDetail = variant === "detail";
+  const attendeePreviews = rsvps ?? event.rsvps;
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -247,7 +248,7 @@ export function EventCard({
               <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
               <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
             </div>
-            <AvatarStack rsvps={rsvps} count={event.rsvp_count} />
+            <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
           </div>
 
           {isDetail && event.max_attendees && (
