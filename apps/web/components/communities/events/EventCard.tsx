@@ -298,7 +298,7 @@ export function EventCard({
 
   return (
     <>
-      <article className={isDetail ? "" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border"}`}>
+      <article className={isDetail ? communityFeedLayout.detailCard : menuInPostHeader ? "group" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border bg-surface"}`}>
         {isDetail && (
           <div className="relative mb-4 flex items-center justify-between gap-3">
             <PostAuthorMeta

@@ -580,12 +580,12 @@ export function ThreadCard({
   return (
     <>
       {isDetail ? (
-        <div>
+        <article className={communityFeedLayout.detailCard}>
           {innerContent}
-        </div>
+        </article>
       ) : cardStyle === "card" ? (
         <article className="group mx-auto w-full max-w-4xl">
-          <Link href={threadHref} prefetch={false} className="block rounded-xl bg-surface px-6 py-5">
+          <Link href={threadHref} prefetch={false} className={`block ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}>
             {innerContent}
           </Link>
         </article>
