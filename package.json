@@ -12,6 +12,8 @@
     "start": "npm run start --workspace=apps/web",
     "preview": "npm run preview --workspace=apps/web",
     "cloudflare:build": "npm run cloudflare:build --workspace=apps/web",
+    "deploy:web": "npm run deploy --workspace=apps/web",
+    "deploy:realtime": "wrangler deploy --config apps/realtime/wrangler.toml",
     "lint": "npm run lint --workspace=apps/web",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
