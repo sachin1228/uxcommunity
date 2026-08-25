@@ -13,6 +13,8 @@ export const neutral = {
 } as const;
 
 export const accent = {
+  blue: "#0070f3",
+  blueHover: "#0064d9",
   lime: "#e4f222",
   limeHover: "#d5e31f",
   green: "#27a644",
@@ -24,19 +26,19 @@ export const accent = {
 
 /** Backward-compatible alias; new interfaces should consume semantic themes. */
 export const blue = {
-  100: neutral.void,
-  200: neutral.carbon,
-  300: neutral.obsidian,
-  400: accent.limeHover,
-  500: accent.lime,
-  600: accent.lime,
-  700: accent.lime,
-  800: neutral.mist,
-  900: neutral.bone,
-  1000: neutral.paper,
+  100: "#e8f2ff",
+  200: "#c9e0ff",
+  300: "#9bc5ff",
+  400: "#3d8df4",
+  500: accent.blue,
+  600: accent.blueHover,
+  700: "#0059bd",
+  800: "#004a9e",
+  900: "#003d82",
+  1000: "#002a5c",
 } as const;
 
 export const dark = neutral;
-export const signal = accent.lime;
+export const signal = accent.blue;
 export const colors = { neutral, accent, blue, dark, signal } as const;
 export type Colors = typeof colors;

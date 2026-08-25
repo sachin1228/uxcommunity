@@ -31,9 +31,9 @@ export function BrandLogo({
       >
         <defs>
           <linearGradient id="bg" x1="128" y1="0" x2="128" y2="256" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stopColor="#E4F222" />
-            <stop offset="0.5" stopColor="#E4F222" />
-            <stop offset="1" stopColor="#D5E31F" />
+            <stop offset="0" stopColor="#3D8DF4" />
+            <stop offset="0.5" stopColor="#0070F3" />
+            <stop offset="1" stopColor="#0064D9" />
           </linearGradient>
 
           <linearGradient id="bubble" x1="128" y1="45" x2="128" y2="180" gradientUnits="userSpaceOnUse">
@@ -51,14 +51,14 @@ export function BrandLogo({
         <path
           d="M128 4 C79 4 47 10 28 28 C10 47 4 79 4 128 C4 177 10 209 28 228 C47 246 79 252 128 252 C177 252 209 246 228 228 C246 209 252 177 252 128 C252 79 246 47 228 28 C209 10 177 4 128 4Z"
           fill="url(#bg)"
-          stroke="#C5D21D"
+          stroke="#0059BD"
           strokeWidth="2"
         />
 
         <path
           d="M128 6 C80 6 48 12 30 30 C12 48 7 80 7 128"
           fill="none"
-          stroke="#F1F79B"
+          stroke="#6FA9F5"
           strokeWidth="2"
           strokeLinecap="round"
           opacity="0.45"
