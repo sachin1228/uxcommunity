@@ -214,7 +214,7 @@ export function EventCard({
       <div className="flex min-h-52 flex-col md:flex-row">
         <div className={`relative min-h-44 shrink-0 overflow-hidden md:min-h-52 ${isDetail ? "md:w-[38%]" : "md:w-[36%]"}`}>
           {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 size-full object-cover" />
+            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 size-full object-contain" />
           ) : (
             <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} aria-hidden="true" />
           )}
