@@ -23,6 +23,14 @@ function hasPrefix(bytes: Uint8Array, prefix: number[]): boolean {
   return prefix.every((value, index) => bytes[index] === value);
 }
 
+function operationalFallback(reason: string, startedAt: number): ModerationDecision {
+  return {
+    ...decision("approved", reason, 0),
+    provider: "image-gateway-fallback",
+    duration_ms: Date.now() - startedAt,
+  };
+}
+
 export function detectImageMime(buffer: Buffer): "image/jpeg" | "image/png" | "image/webp" | null {
   if (buffer.length < 12) return null;
   if (hasPrefix(buffer, JPEG)) return "image/jpeg";
@@ -63,7 +71,11 @@ export async function moderateImageBuffer(
   }
 
   if (!config.images.serviceUrl) {
-    return { decision: { ...decision("review", "Image moderation service is not configured.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
+    return {
+      decision: operationalFallback("Image moderation service is not configured; upload allowed after local validation.", startedAt),
+      buffer,
+      mime: realMime,
+    };
   }
 
   const controller = new AbortController();
@@ -79,7 +91,11 @@ export async function moderateImageBuffer(
     });
 
     if (!response.ok) {
-      return { decision: { ...decision("review", "Image moderation service returned an error.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
+      return {
+        decision: operationalFallback("Image moderation service returned an error; upload allowed after local validation.", startedAt),
+        buffer,
+        mime: realMime,
+      };
     }
 
     const payload = (await response.json()) as Partial<ModerationDecision>;
@@ -102,7 +118,11 @@ export async function moderateImageBuffer(
     };
   } catch (error) {
     console.error("[moderation:image]", error);
-    return { decision: { ...decision("review", "Image moderation service failed.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
+    return {
+      decision: operationalFallback("Image moderation service failed; upload allowed after local validation.", startedAt),
+      buffer,
+      mime: realMime,
+    };
   } finally {
     clearTimeout(timeout);
   }
