@@ -81,10 +81,9 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       )}
       <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
         <ProfileDropdown {...user} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-body text-sm font-semibold text-foreground">{user.name}</p>
-          <p className="truncate font-body text-xs text-foreground-muted">{user.email}</p>
-        </div>
+        <p className="min-w-0 flex-1 truncate font-body text-base font-semibold text-foreground">
+          {user.name}
+        </p>
         <div className="flex items-center gap-1">
           <MessageNotificationSettings userId={userId} />
           <NotificationBell userId={userId} />
