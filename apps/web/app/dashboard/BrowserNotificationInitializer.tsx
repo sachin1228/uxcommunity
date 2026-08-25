@@ -11,7 +11,7 @@ function readPermission(): BrowserPermission {
 }
 
 export function BrowserNotificationInitializer() {
-  const [permission, setPermission] = useState<BrowserPermission>(readPermission);
+  const [permission, setPermission] = useState<BrowserPermission>("unsupported");
   const [dismissed, setDismissed] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
 
@@ -20,6 +20,7 @@ export function BrowserNotificationInitializer() {
   }, []);
 
   useEffect(() => {
+    queueMicrotask(refreshPermission);
     window.addEventListener("focus", refreshPermission);
     document.addEventListener("visibilitychange", refreshPermission);
 
