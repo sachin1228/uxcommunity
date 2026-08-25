@@ -100,7 +100,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-normal transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -108,15 +108,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Home size={15} className="shrink-0" />
               <span className="flex-1 truncate">Home</span>
-              {homeActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-normal transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -124,15 +121,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Users size={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
-              {exploreActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
           <li>
             <Link
               href="/dashboard/chat-with-designers"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-normal transition-colors ${
                 designersActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -140,9 +134,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Gamepad2 size={15} className="shrink-0" />
               <span className="flex-1 truncate">Chat with designers</span>
-              {designersActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
         </ul>
