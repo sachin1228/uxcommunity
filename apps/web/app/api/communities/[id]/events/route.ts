@@ -135,7 +135,18 @@ export async function GET(
 
   const data = (result.data ?? []).map(({ item }) => item as Record<string, unknown>);
   const page = data.slice(0, EVENT_PAGE_SIZE);
-  const enriched = page;
+  const previews = await timer.measure("attendee_previews_rpc", () =>
+    callPerformanceRpc(db, "get_event_attendee_previews", {
+      p_event_ids: page.map((event) => event.id as string),
+      p_limit: 5,
+    }),
+  );
+  if (previews.error) {
+    timer.finish({ status: 500 });
+    return NextResponse.json({ error: "Failed to fetch event attendees." }, { status: 500 });
+  }
+  const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
+  const enriched = page.map((event) => ({ ...event, rsvps: previewMap.get(event.id as string) ?? [] }));
   const last = page.at(-1);
   const hasMoreInPhase = (data?.length ?? 0) > EVENT_PAGE_SIZE;
   const nextCursor = hasMoreInPhase && last

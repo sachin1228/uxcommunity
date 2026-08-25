@@ -9,7 +9,7 @@ import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import { ShowcaseCard } from "@/components/communities/showcase/ShowcaseCard";
 import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
 import type { CommunityThread } from "@/components/communities/threads/types";
-import type { CommunityEvent } from "@/components/communities/events/types";
+import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
@@ -24,7 +24,7 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread   = Omit<CommunityThread, "community_id"> & { _type: "thread";   community_id: string | null; community_name: string | null; community_image: string | null };
-type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null };
+type FeedEvent    = Omit<CommunityEvent, "community_id"> & { _type: "event";    community_id: string | null; community_name: string | null; community_image: string | null; rsvps?: EventRsvp[] };
 type FeedResource = Omit<CommunityResource, "community_id"> & { _type: "resource"; community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedShowcase = Omit<ShowcasePost, "community_id"> & { _type: "showcase"; community_id: string | null; community_name: string | null; community_image: string | null };
 type FeedItem = FeedThread | FeedEvent | FeedResource | FeedShowcase;
@@ -351,8 +351,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   className="mb-3"
                 />
                 <EventCard
-                  event={{ ...group.item, community_id: group.item.community_id ?? "" }}
-                  currentUserId={currentUserId}
+                event={{ ...group.item, community_id: group.item.community_id ?? "" }}
+                rsvps={group.item.rsvps}
+                currentUserId={currentUserId}
                   communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                   detailHref={`/dashboard/events/${group.item.id}`}
                   menuInPostHeader

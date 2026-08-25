@@ -17,13 +17,34 @@ export const dynamic = "force-dynamic";
 // new posts / own likes appear almost immediately.
 const loadFeedPage = unstable_cache(
   async (userId: string, before: string | null) => {
+    const db = createServiceClient();
     const { data, error } = await callPerformanceRpc(
-      createServiceClient(),
+      db,
       "get_home_feed_page",
       { p_user_id: userId, p_before: before, p_limit: PAGE_SIZE },
     );
     if (error) throw error;
-    return (data ?? []).map(({ item }) => item);
+
+    const items = (data ?? []).map(({ item }) => item);
+    const eventIds = items.flatMap((item) =>
+      typeof item === "object" && item !== null && !Array.isArray(item) && item._type === "event" && typeof item.id === "string"
+        ? [item.id]
+        : [],
+    );
+    if (!eventIds.length) return items;
+
+    const previews = await callPerformanceRpc(db, "get_event_attendee_previews", {
+      p_event_ids: eventIds,
+      p_limit: 5,
+    });
+    if (previews.error) throw previews.error;
+    const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
+
+    return items.map((item) =>
+      typeof item === "object" && item !== null && !Array.isArray(item) && item._type === "event" && typeof item.id === "string"
+        ? { ...item, rsvps: previewMap.get(item.id) ?? [] }
+        : item,
+    );
   },
   ["home-feed"],
   { revalidate: 10 },
