@@ -21,7 +21,7 @@
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=10.0.0"
   },
   "dependencies": {

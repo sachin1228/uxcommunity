@@ -275,19 +275,21 @@ export function useSendMessage({
         }
 
         const uploadData: unknown = await uploadRes.json().catch(() => null);
-        const url =
+        const bodyUrl =
           uploadData &&
           typeof uploadData === "object" &&
           "url" in uploadData &&
           typeof uploadData.url === "string"
             ? uploadData.url.trim()
             : "";
+        const headerUrl = uploadRes.headers.get("X-Image-Url")?.trim() ?? "";
+        const uploadedUrl = bodyUrl || headerUrl;
 
-        if (!url) {
-          throw new Error("Image upload failed: the server did not return an image URL.");
+        if (!uploadedUrl) {
+          throw new Error("Image upload failed: the server returned an invalid response.");
         }
 
-        uploadedImageUrl = url;
+        uploadedImageUrl = uploadedUrl;
       }
 
       const res = await measureClient("message_create_request", () =>

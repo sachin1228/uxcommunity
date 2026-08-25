@@ -109,7 +109,17 @@ export async function POST(
       throw new Error("R2 upload completed without a public URL.");
     }
 
-    return finish(NextResponse.json({ url: url.trim() }, { status: 201 }));
+    const imageUrl = url.trim();
+    return finish(NextResponse.json(
+      { url: imageUrl },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control": "no-store",
+          "X-Image-Url": imageUrl,
+        },
+      },
+    ));
   } catch (err) {
     console.error("[chat-image-upload] R2 error:", err);
     return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));
