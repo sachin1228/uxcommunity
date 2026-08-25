@@ -827,7 +827,7 @@ export function CommunityChat({
         )}
       </div>
 
-      <CommunityInfoPanel members={members} community={displayCommunity} communityId={communityId} currentUserId={currentUserId} onlineCount={onlineCount} />
+      <CommunityInfoPanel community={displayCommunity} communityId={communityId} currentUserId={currentUserId} onlineCount={onlineCount} />
     </div>
   );
 }
