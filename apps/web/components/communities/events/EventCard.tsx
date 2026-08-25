@@ -31,55 +31,36 @@ function isPast(iso: string) {
 }
 
 function AvatarStack({
-  host,
   rsvps,
   count,
 }: {
-  host: { name: string; avatar_url: string | null } | null;
   rsvps?: EventRsvp[];
   count: number;
 }) {
-  const visible = rsvps?.slice(0, 5);
-  const name = host?.name ?? "M";
-  const placeholders = Math.min(Math.max(count - 1, 0), 4);
-  const shades = ["bg-accent/60", "bg-accent/45", "bg-accent/30", "bg-accent/20"];
+  const safeCount = Math.max(0, count);
+  const visible = rsvps?.slice(0, 5) ?? [];
 
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex items-center">
-        {visible ? visible.map((rsvp, index) => (
-          <div
-            key={rsvp.user_id}
-            style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-            className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
-          >
-            {rsvp.users?.avatar_url ? (
-              <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="h-full w-full object-cover" />
-            ) : (
-              <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
-            )}
-          </div>
-        )) : (
-          <>
-            <div className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15">
-              {host?.avatar_url ? (
-                <img src={host.avatar_url} alt={name} className="h-full w-full object-cover" />
+      {visible.length > 0 && (
+        <div className="flex items-center" aria-label={`${safeCount} attendees`}>
+          {visible.map((rsvp, index) => (
+            <div
+              key={rsvp.user_id}
+              style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
+              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
+            >
+              {rsvp.users?.avatar_url ? (
+                <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="font-display text-[10px] font-bold text-accent">{name.charAt(0).toUpperCase()}</span>
+                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
-            {Array.from({ length: placeholders }).map((_, index) => (
-              <div
-                key={index}
-                style={{ marginLeft: "-8px", zIndex: 9 - index }}
-                className={`relative h-7 w-7 shrink-0 rounded-full border-2 border-surface ${shades[index]}`}
-              />
-            ))}
-          </>
-        )}
-      </div>
-      <span className={`font-body ${rsvps ? "text-sm" : "text-xs"} ${count > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
-        {count === 0 ? "0 going" : visible && count > visible.length ? `+${count - visible.length} going` : `${count} going`}
+          ))}
+        </div>
+      )}
+      <span className={`font-body text-xs ${safeCount > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
+        {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
   );
@@ -159,7 +140,7 @@ export function EventCard({
     e.preventDefault();
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
-    const newCount = event.rsvp_count + (newRsvped ? 1 : -1);
+    const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
     onRsvpChanged(event.id, newRsvped, newCount);
     setRsvpPending(true);
     setRsvpError(null);
@@ -266,7 +247,7 @@ export function EventCard({
               <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
               <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
             </div>
-            <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
+            <AvatarStack rsvps={rsvps} count={event.rsvp_count} />
           </div>
 
           {isDetail && event.max_attendees && (
