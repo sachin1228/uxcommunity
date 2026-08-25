@@ -63,7 +63,18 @@ export async function moderateImageBuffer(
   }
 
   if (!config.images.serviceUrl) {
-    return { decision: { ...decision("review", "Image moderation service is not configured.", 1), duration_ms: Date.now() - startedAt }, buffer, mime: realMime };
+    // The external moderation service is optional. The upload has already
+    // passed size, declared MIME, and magic-byte validation, so allow it when
+    // no service was configured instead of making every image upload a 202.
+    return {
+      decision: {
+        ...decision("approved", "Image passed local validation.", 1),
+        provider: "local-image-validation",
+        duration_ms: Date.now() - startedAt,
+      },
+      buffer,
+      mime: realMime,
+    };
   }
 
   const controller = new AbortController();

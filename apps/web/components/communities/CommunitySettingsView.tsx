@@ -191,17 +191,18 @@ export function CommunitySettingsView({
         method: "PATCH",
         body: formData,
       });
-      if (res.ok) {
-        const data = await res.json().catch(() => null);
+      const data = await res.json().catch(() => null);
+      if (res.status === 200 && data?.success === true) {
         setCachedRequest(rulesUrl, {
           rules: rules.map((rule_text, index) => ({ id: `local-${index}`, rule_text })),
         });
         const newImageUrl = data?.image_url !== undefined ? data.image_url : (removeImage ? null : (community.image_url ?? null));
         onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs, image_url: newImageUrl });
+        setImage(null);
+        setRemoveImage(false);
         setSaveMsg("Settings saved.");
         setTimeout(() => { setSaveMsg(null); onClose(); }, 1200);
       } else {
-        const data = await res.json().catch(() => null);
         setSaveMsg(data?.error ?? "Failed to save.");
       }
     } finally {
