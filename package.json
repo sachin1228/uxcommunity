@@ -10,6 +10,8 @@
     "dev:realtime": "npm run dev --workspace=apps/realtime",
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
+    "preview": "npm run preview --workspace=apps/web",
+    "cloudflare:build": "npm run cloudflare:build --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
