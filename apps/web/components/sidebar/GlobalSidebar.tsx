@@ -9,9 +9,20 @@ import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { MessageNotificationSettings } from "@/app/dashboard/MessageNotificationSettings";
+import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
+
+interface SidebarUser {
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  initial: string;
+}
 
 interface Props {
   userId: string;
+  user: SidebarUser;
   mobile?: boolean;
 }
 
@@ -21,7 +32,7 @@ function isMatch(href: string, pathname: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function GlobalSidebar({ userId, mobile = false }: Props) {
+export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -54,7 +65,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
 
   return (
     <aside
-      className={`h-full shrink-0 overflow-y-auto bg-background ${
+      className={`flex h-full shrink-0 flex-col overflow-hidden bg-background-subtle ${
         mobile ? "w-full" : "w-72 border-r border-border"
       }`}
     >
@@ -68,8 +79,21 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           }}
         />
       )}
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-border px-4">
+        <ProfileDropdown {...user} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-body text-sm font-semibold text-foreground">{user.name}</p>
+          <p className="truncate font-body text-xs text-foreground-muted">{user.email}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <MessageNotificationSettings userId={userId} />
+          <NotificationBell userId={userId} />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {/* WORKSPACE nav */}
-      <div className="px-4 pt-5 pb-3">
+      <div className="px-4 pb-3 pt-5">
         <p className="px-1 mb-3 font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
           Workspace
         </p>
@@ -184,6 +208,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
             </ul>
           </div>
         )}
+      </div>
       </div>
     </aside>
   );

@@ -2,10 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
-import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
-import { NotificationBell } from "@/app/dashboard/NotificationBell";
-import { MessageNotificationSettings } from "@/app/dashboard/MessageNotificationSettings";
-import { BrandLogo } from "@/components/ui/BrandLogo";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 
 
@@ -40,39 +36,26 @@ export default async function DashboardLayout({
   const initial = name.charAt(0).toUpperCase();
   const userId = session.userId!;
 
+  const sidebarUser = { name, email, avatarUrl, initial };
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
-      {/* Full-width topbar */}
-      <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-5">
-        <MobileSidebar userId={userId} />
-        <span className="text-lg font-medium leading-none tracking-tight text-foreground">
-          <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-lg" />
-        </span>
+    <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">
+      <div className="hidden h-full lg:block">
+        <GlobalSidebar userId={userId} user={sidebarUser} />
+      </div>
 
-        <div className="ml-auto flex items-center gap-1">
-          <MessageNotificationSettings userId={userId} />
-          <NotificationBell userId={userId} />
-          <ProfileDropdown
-            name={name}
-            email={email}
-            avatarUrl={avatarUrl}
-            initial={initial}
-          />
-        </div>
-      </header>
+      <div className="flex min-w-0 flex-1 flex-col bg-surface">
+        <header className="flex h-12 shrink-0 items-center border-b border-border px-3 lg:hidden">
+          <MobileSidebar userId={userId} user={sidebarUser} />
+          <span className="ml-2 font-body text-sm font-medium text-foreground">
+            Menu
+          </span>
+        </header>
 
-      {/* Below topbar: sidebar + page content side by side */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        <div className="hidden h-full lg:block">
-          <GlobalSidebar userId={userId} />
-        </div>
-
-        {/* Page content — no global padding; each page owns its own spacing */}
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface">
           {children}
         </main>
       </div>
-
     </div>
   );
 }
