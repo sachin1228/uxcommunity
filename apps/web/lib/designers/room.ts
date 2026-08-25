@@ -9,11 +9,12 @@
  */
 
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-// ─── Room constants ───────────────────────────────────────────────────────────
-const HALF_W = 12; // room half-width  (x: ±12)
-const HALF_D = 9; // room half-depth   (z: ±9)
-const WALL_H = 4.6;
+// ─── Park constants ───────────────────────────────────────────────────────────
+// Bella's model uses a much larger outdoor coordinate system than the old room.
+let HALF_W = 48;
+let HALF_D = 48;
 const EYE = 1.62; // player eye height
 
 export interface RemoteUserState {
@@ -331,18 +332,32 @@ export class DesignersRoom {
   private opts: RoomOptions;
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
+  private camera: THREE.OrthographicCamera;
   private clock = new THREE.Clock();
   private raf = 0;
   private disposed = false;
 
   private keys = new Set<string>();
-  private yaw = 0;
-  private pitch = 0;
+  private yaw = -Math.PI / 4;
+  private pitch = 0.68;
+  private readonly cameraDistance = 82;
+  private readonly viewSize = 72;
   // spawn near the door, scattered so people don't start inside each other
   private px = (Math.random() * 2 - 1) * 2.5;
+  private py = 0;
+  private groundY = 0;
   private pz = 4.6 + Math.random() * 2;
+  private playerAvatar: THREE.Object3D | null = null;
+  private playerHeading = Math.PI;
+  private verticalVelocity = 0;
+  private grounded = true;
+  private moving = false;
+  private sprinting = false;
+  private moveTime = 0;
+  private cameraPosition = new THREE.Vector3();
+  private cameraTarget = new THREE.Vector3();
 
+  private inputEnabled = false;
   private touchMoveX = 0;
   private touchMoveZ = 0;
   private touchSprint = false;
@@ -371,17 +386,16 @@ export class DesignersRoom {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.7;
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
-    renderer.domElement.style.cursor = "crosshair";
+    renderer.domElement.style.cursor = "grab";
     container.appendChild(renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#f2e7d3");
-    this.scene.fog = new THREE.Fog("#f2e7d3", 22, 46);
+    this.scene.background = new THREE.Color("#aec972");
 
-    this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 100);
+    this.camera = new THREE.OrthographicCamera(-12, 12, 12, -12, 0.1, 160);
 
     this.buildLights();
     this.buildRoom();
@@ -406,13 +420,25 @@ export class DesignersRoom {
       const t = this.clock.elapsedTime;
       this.updatePlayer(dt);
       this.updateRemotes(dt, t);
-      this.camera.position.set(this.px, EYE, this.pz);
-      this.camera.rotation.order = "YXZ";
-      this.camera.rotation.y = this.yaw;
-      this.camera.rotation.x = this.pitch;
+
+      // Wide, elevated orbit view matching Bella Park's original presentation.
+      // Yaw and pitch both orbit around the player while preserving distance.
+      const horizontalDistance = Math.cos(this.pitch) * this.cameraDistance;
+      const desiredCamera = new THREE.Vector3(
+        this.px + Math.sin(this.yaw) * horizontalDistance,
+        this.py + Math.sin(this.pitch) * this.cameraDistance,
+        this.pz + Math.cos(this.yaw) * horizontalDistance
+      );
+      const desiredTarget = new THREE.Vector3(this.px, this.py + 0.8, this.pz);
+      const cameraEase = 1 - Math.exp(-dt * 5);
+      const targetEase = 1 - Math.exp(-dt * 8);
+      this.cameraPosition.lerp(desiredCamera, cameraEase);
+      this.cameraTarget.lerp(desiredTarget, targetEase);
+      this.camera.position.copy(this.cameraPosition);
+      this.camera.lookAt(this.cameraTarget);
       this.renderer.render(this.scene, this.camera);
       this.emitFrame();
-      if (!this.readyEmitted) {
+      if (this.sceneReady && !this.readyEmitted) {
         this.readyEmitted = true;
         this.opts.onReady();
       }
@@ -433,21 +459,33 @@ export class DesignersRoom {
     }
   }
 
+  setInputEnabled(enabled: boolean) {
+    this.inputEnabled = enabled;
+    if (!enabled) {
+      this.keys.clear();
+      this.touchMoveX = 0;
+      this.touchMoveZ = 0;
+      this.touchSprint = false;
+    }
+  }
+
   /** Touch/drag: directional vector in local space, both in [-1, 1]. */
   setTouchMove(fx: number, fz: number) {
+    if (!this.inputEnabled) return;
     this.touchMoveX = Math.max(-1, Math.min(1, fx));
     this.touchMoveZ = Math.max(-1, Math.min(1, fz));
   }
 
-  /** Incremental look delta in pixels (drag to look — desktop and touch). */
+  /** Drag orbits the isometric camera horizontally and vertically around the player. */
   addLook(dx: number, dy: number) {
-    this.yaw -= dx * 0.0032;
-    this.pitch -= dy * 0.0032;
-    this.pitch = Math.max(-1.35, Math.min(1.35, this.pitch));
+    if (!this.inputEnabled) return;
+    this.yaw -= dx * 0.0022;
+    this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.0022, 0.3, 1.25);
   }
 
   // ── Internals ────────────────────────────────────────────────────────────────
   private readyEmitted = false;
+  private sceneReady = false;
 
   private emitFrame() {
     this.opts.onFrame({
@@ -466,14 +504,23 @@ export class DesignersRoom {
   private resize() {
     const w = this.container.clientWidth || 1;
     const h = this.container.clientHeight || 1;
-    this.camera.aspect = w / h;
+    const aspect = w / h;
+    this.camera.left = (-this.viewSize * aspect) / 2;
+    this.camera.right = (this.viewSize * aspect) / 2;
+    this.camera.top = this.viewSize / 2;
+    this.camera.bottom = -this.viewSize / 2;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (!this.inputEnabled) return;
     const k = e.key.toLowerCase();
     if (["w", "a", "s", "d", "shift", " "].includes(k)) e.preventDefault();
+    if (k === " " && this.grounded && !e.repeat) {
+      this.verticalVelocity = 7.5;
+      this.grounded = false;
+    }
     this.keys.add(k);
   };
   private onKeyUp = (e: KeyboardEvent) => {
@@ -495,15 +542,35 @@ export class DesignersRoom {
       r = this.touchMoveX;
       f = this.touchMoveZ;
     }
-    const sprint =
-      this.keys.has("shift") || this.touchSprint;
-    const speed = (sprint ? 5.4 : 3.1) * dt;
+    const sprint = this.keys.has("shift") || this.touchSprint;
+    const speed = (sprint ? 15 : 10) * dt;
     const len = Math.hypot(f, r);
-    if (len > 0.01) {
+    this.moving = len > 0.01;
+    this.sprinting = sprint && this.moving;
+    if (this.moving) {
       const nf = f / len;
       const nr = r / len;
-      this.px += (-Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr) * speed;
-      this.pz += (-Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr) * speed;
+      const moveX = -Math.sin(this.yaw) * nf + Math.cos(this.yaw) * nr;
+      const moveZ = -Math.cos(this.yaw) * nf - Math.sin(this.yaw) * nr;
+      this.px += moveX * speed;
+      this.pz += moveZ * speed;
+
+      const desiredHeading = Math.atan2(moveX, moveZ);
+      let turn = desiredHeading - this.playerHeading;
+      while (turn > Math.PI) turn -= Math.PI * 2;
+      while (turn < -Math.PI) turn += Math.PI * 2;
+      this.playerHeading += turn * Math.min(1, dt * 12);
+      this.moveTime += dt * (sprint ? 13 : 9);
+    }
+
+    if (!this.grounded) {
+      this.verticalVelocity -= 20 * dt;
+      this.py += this.verticalVelocity * dt;
+      if (this.py <= this.groundY) {
+        this.py = this.groundY;
+        this.verticalVelocity = 0;
+        this.grounded = true;
+      }
     }
     // walls
     const m = 0.45;
@@ -519,6 +586,15 @@ export class DesignersRoom {
         this.px = c.x + (dx / d) * min;
         this.pz = c.z + (dz / d) * min;
       }
+    }
+
+    if (this.playerAvatar) {
+      const stride = this.moving && this.grounded ? Math.sin(this.moveTime) : 0;
+      const idle = this.grounded ? Math.sin(this.clock.elapsedTime * 2.2) * 0.025 : 0;
+      this.playerAvatar.position.set(this.px, this.py + Math.abs(stride) * 0.045 + idle, this.pz);
+      this.playerAvatar.rotation.y = this.playerHeading;
+      this.playerAvatar.rotation.z = stride * (this.sprinting ? 0.025 : 0.015);
+      this.playerAvatar.rotation.x = this.sprinting ? -0.08 : 0;
     }
   }
 
@@ -607,324 +683,77 @@ export class DesignersRoom {
   }
 
   private buildRoom() {
-    const wallMat = new THREE.MeshStandardMaterial({ color: "#f4e9d6", roughness: 0.95 });
-    const floorMat = new THREE.MeshStandardMaterial({
-      map: makePlankTexture(),
-      roughness: 0.85,
-    });
+    const loader = new GLTFLoader();
+    loader.load(
+      "/designers/bellas-park/Portfolio.glb",
+      (gltf) => {
+        if (this.disposed) return;
 
-    // floor
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(HALF_W * 2, HALF_D * 2), floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.receiveShadow = true;
-    this.scene.add(floor);
+        const park = gltf.scene;
+        let spawn: THREE.Vector3 | null = null;
+        let bella: THREE.Object3D | null = null;
 
-    // walls
-    const mkWall = (w: number, h: number, d: number, x: number, y: number, z: number) => {
-      const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
-      wall.position.set(x, y, z);
-      wall.receiveShadow = true;
-      wall.castShadow = true;
-      this.scene.add(wall);
-    };
-    mkWall(HALF_W * 2, WALL_H, 0.3, 0, WALL_H / 2, -HALF_D); // back
-    mkWall(HALF_W * 2, WALL_H, 0.3, 0, WALL_H / 2, HALF_D); // front
-    mkWall(0.3, WALL_H, HALF_D * 2, -HALF_W, WALL_H / 2, 0); // left
-    mkWall(0.3, WALL_H, HALF_D * 2, HALF_W, WALL_H / 2, 0); // right
-    // ceiling
-    const ceil = new THREE.Mesh(
-      new THREE.PlaneGeometry(HALF_W * 2, HALF_D * 2),
-      new THREE.MeshStandardMaterial({ color: "#fff8ec", roughness: 1 })
-    );
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.y = WALL_H;
-    this.scene.add(ceil);
+        park.traverse((child) => {
+          if (child.name === "Character") {
+            spawn = child.getWorldPosition(new THREE.Vector3());
+            bella = child;
+          }
+          if (child instanceof THREE.Mesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+          // The source model's collider is useful to Bella's original capsule
+          // controller, but should not appear in the shared room.
+          if (child.name === "Ground_Collider") child.visible = false;
+        });
 
-    // window on the back wall + sky outside
-    const winFrame = new THREE.Mesh(
-      new THREE.BoxGeometry(9, 2.6, 0.24),
-      new THREE.MeshStandardMaterial({ color: "#e8d7b8", roughness: 0.9 })
-    );
-    winFrame.position.set(0, 2.35, -HALF_D + 0.18);
-    this.scene.add(winFrame);
+        this.scene.add(park);
 
-    const glass = new THREE.Mesh(
-      new THREE.PlaneGeometry(8.2, 2.0),
-      new THREE.MeshStandardMaterial({
-        color: "#cfe8ff",
-        transparent: true,
-        opacity: 0.22,
-        roughness: 0.1,
-        metalness: 0.2,
-        side: THREE.DoubleSide,
-      })
-    );
-    glass.position.set(0, 2.35, -HALF_D + 0.32);
-    this.scene.add(glass);
+        // Keep Bella as the local player's visible avatar while preserving her
+        // world transform from the source scene.
+        if (bella) {
+          this.scene.attach(bella);
+          this.playerAvatar = bella;
+        }
 
-    const sky = new THREE.Mesh(
-      new THREE.PlaneGeometry(22, 11),
-      new THREE.MeshBasicMaterial({ map: makeSkyTexture() })
-    );
-    sky.position.set(0, 3.4, -HALF_D - 3.6);
-    this.scene.add(sky);
+        const bounds = new THREE.Box3().setFromObject(park);
+        const size = bounds.getSize(new THREE.Vector3());
+        const center = bounds.getCenter(new THREE.Vector3());
+        if (Number.isFinite(size.x) && Number.isFinite(size.z)) {
+          HALF_W = Math.max(12, size.x * 0.48);
+          HALF_D = Math.max(12, size.z * 0.48);
+        }
 
-    // door on the front wall
-    const doorMat = new THREE.MeshStandardMaterial({ color: "#b98a5a", roughness: 0.8 });
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.7, 3.2, 0.34), doorMat);
-    door.position.set(-8.6, 1.6, HALF_D - 0.16);
-    this.scene.add(door);
-    const knob = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 10, 10),
-      new THREE.MeshStandardMaterial({ color: "#c9a24b", metalness: 0.7, roughness: 0.3 })
-    );
-    knob.position.set(-8.6 + 0.7, 1.55, HALF_D - 0.28);
-    this.scene.add(knob);
+        if (spawn) {
+          this.px = spawn.x;
+          this.py = spawn.y;
+          this.pz = spawn.z;
+        } else {
+          this.px = center.x;
+          this.py = bounds.min.y;
+          this.pz = center.z;
+        }
+        this.groundY = this.py;
 
-    this.buildFurniture();
-  }
-
-  private std(color: string, rough = 0.8) {
-    return new THREE.MeshStandardMaterial({ color, roughness: rough });
-  }
-
-  private box(w: number, h: number, d: number, color: string, x: number, y: number, z: number, rough = 0.8, shadow = true) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this.std(color, rough));
-    m.position.set(x, y, z);
-    m.castShadow = shadow;
-    m.receiveShadow = true;
-    this.scene.add(m);
-    return m;
-  }
-
-  private buildFurniture() {
-    // ── rug ──
-    const rug = new THREE.Mesh(
-      new THREE.CylinderGeometry(3.3, 3.3, 0.03, 48),
-      this.std("#3e6fb0", 0.95)
-    );
-    rug.position.y = 0.02;
-    rug.receiveShadow = true;
-    this.scene.add(rug);
-    const rugInner = new THREE.Mesh(
-      new THREE.CylinderGeometry(2.5, 2.5, 0.035, 48),
-      this.std("#527fc2", 0.95)
-    );
-    rugInner.position.y = 0.035;
-    rugInner.receiveShadow = true;
-    this.scene.add(rugInner);
-
-    // ── sofa ──
-    const sofaX = 5.6;
-    const sofaZ = -4.4;
-    this.box(3.0, 0.55, 1.15, "#4a7c8a", sofaX, 0.45, sofaZ, 0.9);
-    this.box(3.0, 0.75, 0.32, "#3f6b77", sofaX, 1.0, sofaZ + 0.42, 0.9);
-    this.box(0.42, 0.75, 1.15, "#3f6b77", sofaX - 1.35, 0.95, sofaZ, 0.9);
-    this.box(0.42, 0.75, 1.15, "#3f6b77", sofaX + 1.35, 0.95, sofaZ, 0.9);
-    // cushions
-    this.box(1.0, 0.24, 0.85, "#d8e4e6", sofaX - 0.72, 0.82, sofaZ - 0.05, 0.95);
-    this.box(1.0, 0.24, 0.85, "#c3d6d9", sofaX + 0.72, 0.82, sofaZ - 0.05, 0.95);
-    this.addCollider(sofaX, sofaZ, 1.85);
-
-    // ── coffee table ──
-    const tabX = 4.3;
-    const tabZ = -2.3;
-    this.box(1.5, 0.09, 0.9, "#8a5a33", tabX, 0.48, tabZ, 0.85);
-    for (const [lx, lz] of [
-      [-0.68, -0.38],
-      [0.68, -0.38],
-      [-0.68, 0.38],
-      [0.68, 0.38],
-    ] as const) {
-      this.box(0.09, 0.48, 0.09, "#6e4526", tabX + lx, 0.24, tabZ + lz, 0.85);
-    }
-    this.addCollider(tabX, tabZ, 0.95);
-
-    // ── desk A (left) with monitor + chair ──
-    const deskAX = -6.4;
-    const deskAZ = -2.4;
-    this.box(2.1, 0.09, 1.0, "#7c5330", deskAX, 0.86, deskAZ, 0.8);
-    for (const [lx, lz] of [
-      [-0.95, -0.42],
-      [0.95, -0.42],
-      [-0.95, 0.42],
-      [0.95, 0.42],
-    ] as const) {
-      this.box(0.1, 0.86, 0.1, "#5d3c20", deskAX + lx, 0.43, deskAZ + lz, 0.85);
-    }
-    this.box(1.15, 0.02, 0.42, "#2a2a35", deskAX - 0.05, 0.93, deskAZ, 0.6);
-    // monitor
-    this.box(0.02, 0.62, 0.95, "#14141c", deskAX + 0.05, 1.32, deskAZ, 0.4);
-    this.box(0.86, 0.55, 0.02, "#14141c", deskAX + 0.06, 1.3, deskAZ - 0.02, 0.4);
-    // screen glow
-    const screen = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.78, 0.46),
-      new THREE.MeshBasicMaterial({ color: "#7fb5ff" })
-    );
-    screen.position.set(deskAX + 0.07, 1.3, deskAZ - 0.04);
-    screen.rotation.y = Math.PI / 2;
-    this.scene.add(screen);
-    // chair behind
-    const chairX = deskAX + 2.0;
-    const chairZ = deskAZ + 0.2;
-    this.box(0.5, 0.12, 0.5, "#3d3d4d", chairX, 0.28, chairZ, 0.85);
-    this.box(0.5, 0.7, 0.12, "#3d3d4d", chairX, 0.6, chairZ - 0.25, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairX - 0.2, 0.6, chairZ, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairX + 0.2, 0.6, chairZ, 0.85);
-    this.addCollider(deskAX, deskAZ, 1.3);
-    this.addCollider(chairX, chairZ, 0.75);
-
-    // ── desk B (right) with monitor + chair ──
-    const deskBX = 7.4;
-    const deskBZ = 3.6;
-    this.box(2.1, 0.09, 1.0, "#6e5a86", deskBX, 0.86, deskBZ, 0.8);
-    for (const [lx, lz] of [
-      [-0.95, -0.42],
-      [0.95, -0.42],
-      [-0.95, 0.42],
-      [0.95, 0.42],
-    ] as const) {
-      this.box(0.1, 0.86, 0.1, "#4c3d60", deskBX + lx, 0.43, deskBZ + lz, 0.85);
-    }
-    this.box(1.15, 0.02, 0.42, "#2a2a35", deskBX + 0.05, 0.93, deskBZ, 0.6);
-    this.box(0.02, 0.62, 0.95, "#14141c", deskBX - 0.05, 1.32, deskBZ, 0.4);
-    this.box(0.86, 0.55, 0.02, "#14141c", deskBX - 0.06, 1.3, deskBZ - 0.02, 0.4);
-    const screenB = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.78, 0.46),
-      new THREE.MeshBasicMaterial({ color: "#ffb37f" })
-    );
-    screenB.position.set(deskBX - 0.07, 1.3, deskBZ - 0.04);
-    screenB.rotation.y = Math.PI / 2;
-    this.scene.add(screenB);
-    const chairBX = deskBX - 2.0;
-    this.box(0.5, 0.12, 0.5, "#3d3d4d", chairBX, 0.28, deskBZ + 0.2, 0.85);
-    this.box(0.5, 0.7, 0.12, "#3d3d4d", chairBX, 0.6, deskBZ - 0.05, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairBX - 0.2, 0.6, deskBZ + 0.2, 0.85);
-    this.box(0.12, 0.4, 0.5, "#3d3d4d", chairBX + 0.2, 0.6, deskBZ + 0.2, 0.85);
-    this.addCollider(deskBX, deskBZ, 1.3);
-    this.addCollider(chairBX, deskBZ + 0.2, 0.75);
-
-    // ── bookshelf (left wall) ──
-    const shX = -11.2;
-    const shZ = 2.0;
-    this.box(0.7, 2.6, 1.6, "#7a5230", shX, 1.3, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 0.62, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 1.32, shZ, 0.85);
-    this.box(0.7, 0.12, 1.6, "#8f6a44", shX, 2.02, shZ, 0.85);
-    const bookColors = ["#c2574c", "#2f6fed", "#3fa06b", "#9a6ff0", "#f0a832", "#4a7c8a"];
-    for (let shelf = 0; shelf < 3; shelf++) {
-      for (let i = 0; i < 9; i++) {
-        const b = new THREE.Mesh(
-          new THREE.BoxGeometry(0.2, 0.34 + Math.random() * 0.2, 0.12),
-          this.std(bookColors[(i + shelf) % bookColors.length], 0.9)
+        if (this.playerAvatar) {
+          this.playerAvatar.position.set(this.px, this.py, this.pz);
+          this.playerHeading = this.playerAvatar.rotation.y;
+        }
+        const horizontalDistance = Math.cos(this.pitch) * this.cameraDistance;
+        this.cameraPosition.set(
+          this.px + Math.sin(this.yaw) * horizontalDistance,
+          this.py + Math.sin(this.pitch) * this.cameraDistance,
+          this.pz + Math.cos(this.yaw) * horizontalDistance
         );
-        b.position.set(shX + 0.01, 0.8 + shelf * 0.7, shZ - 0.55 + i * 0.14);
-        b.castShadow = true;
-        this.scene.add(b);
+        this.cameraTarget.set(this.px, this.py + 0.8, this.pz);
+        this.sceneReady = true;
+      },
+      undefined,
+      () => {
+        if (this.disposed) return;
+        this.opts.onError("Bella Park could not be loaded. Please refresh and try again.");
       }
-    }
-    this.addCollider(shX, shZ, 1.0);
-
-    // ── plants ──
-    const mkPlant = (x: number, z: number, scale: number, pot: string) => {
-      const g = new THREE.Group();
-      const potMesh = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.34, 0.26, 0.5, 14),
-        this.std(pot, 0.9)
-      );
-      potMesh.position.y = 0.25;
-      potMesh.castShadow = true;
-      g.add(potMesh);
-      const foliageMat = this.std("#3e7d44", 0.9);
-      const f1 = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), foliageMat);
-      f1.position.y = 0.95;
-      const f2 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), foliageMat);
-      f2.position.set(0.22, 1.15, 0.05);
-      const f3 = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 12), foliageMat);
-      f3.position.set(-0.2, 1.2, -0.06);
-      f1.castShadow = f2.castShadow = f3.castShadow = true;
-      g.add(f1, f2, f3);
-      g.position.set(x, 0, z);
-      g.scale.setScalar(scale);
-      this.scene.add(g);
-      this.addCollider(x, z, 0.55 * scale);
-    };
-    mkPlant(10.6, -7.2, 1.15, "#b26a4a");
-    mkPlant(-10.8, 6.6, 0.95, "#8a9a5a");
-
-    // ── floor lamp ──
-    const lampX = 2.6;
-    const lampZ = 5.9;
-    const pole = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035, 0.045, 1.9, 10),
-      this.std("#3a3a46", 0.6)
     );
-    pole.position.set(lampX, 0.95, lampZ);
-    pole.castShadow = true;
-    this.scene.add(pole);
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.05, 14), this.std("#3a3a46", 0.6));
-    base.position.set(lampX, 0.03, lampZ);
-    this.scene.add(base);
-    const shade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.28, 0.18, 0.34, 14, 1, true),
-      this.std("#e8d7b8", 0.9)
-    );
-    shade.position.set(lampX, 1.95, lampZ);
-    shade.castShadow = true;
-    this.scene.add(shade);
-    const bulb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 10, 10),
-      new THREE.MeshBasicMaterial({ color: "#ffd9a0" })
-    );
-    bulb.position.set(lampX, 1.82, lampZ);
-    this.scene.add(bulb);
-    const lampLight = new THREE.PointLight(0xffc98f, 0.7, 9);
-    lampLight.position.set(lampX, 1.85, lampZ);
-    this.scene.add(lampLight);
-    this.addCollider(lampX, lampZ, 0.4);
-
-    // ── ceiling lights ──
-    const ceilLight = new THREE.Mesh(
-      new THREE.SphereGeometry(0.24, 14, 14),
-      new THREE.MeshBasicMaterial({ color: "#fff3d6" })
-    );
-    ceilLight.position.set(0, WALL_H - 0.05, 0);
-    this.scene.add(ceilLight);
-    const ceilLight2 = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 14, 14),
-      new THREE.MeshBasicMaterial({ color: "#fff3d6" })
-    );
-    ceilLight2.position.set(-6, WALL_H - 0.05, 2.5);
-    this.scene.add(ceilLight2);
-
-    // ── posters ──
-    const mkPoster = (
-      w: number,
-      h: number,
-      palette: [string, string, string],
-      x: number,
-      y: number,
-      z: number,
-      ry: number
-    ) => {
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(w + 0.06, h + 0.06, 0.03), this.std("#8a6a42", 0.8));
-      frame.position.set(x, y, z);
-      frame.rotation.y = ry;
-      frame.castShadow = true;
-      this.scene.add(frame);
-      // art sits just in front of the frame, facing into the room
-      const n = { x: Math.sin(ry), z: Math.cos(ry) };
-      const art = new THREE.Mesh(
-        new THREE.PlaneGeometry(w, h),
-        new THREE.MeshBasicMaterial({ map: makePosterTexture(palette) })
-      );
-      art.position.set(x + n.x * 0.02, y, z + n.z * 0.02);
-      art.rotation.y = ry;
-      this.scene.add(art);
-    };
-    mkPoster(1.7, 2.1, ["#2f6fed", "#7fb5ff", "#ffd166"], -4, 2.4, -HALF_D + 0.2, 0);
-    mkPoster(1.4, 1.75, ["#e2574c", "#ff9d8a", "#ffe9e5"], 3.4, 2.3, HALF_D - 0.2, Math.PI);
-    mkPoster(1.4, 1.75, ["#3fa06b", "#8fd6a8", "#eafff1"], HALF_W - 0.2, 2.2, 4.2, -Math.PI / 2);
-    mkPoster(1.5, 1.9, ["#9a6ff0", "#c9a9ff", "#fff0b3"], -2.2, 2.35, HALF_D - 0.2, Math.PI);
   }
+
 }

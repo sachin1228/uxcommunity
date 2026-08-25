@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Copy, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { DesignersRoom, FrameState } from "@/lib/designers/room";
 import { StudioPresence, RemoteUser } from "@/lib/designers/presence";
 import { ProximityVoice } from "@/lib/designers/voice";
@@ -20,8 +20,6 @@ interface Toast {
   text: string;
 }
 
-const RADAR_SCALE = 56 / 15; // px per world unit
-
 export function DesignersRoomView({ userId, userName }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,12 +36,8 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [micState, setMicState] = useState<MicState>("off");
   const [online, setOnline] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [remoteIds, setRemoteIds] = useState<string[]>([]);
-  const [hint, setHint] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
-  const playerDot = useRef<HTMLDivElement>(null);
   const prevOnlineIds = useRef<Set<string>>(new Set());
   const prevOnlineNames = useRef<Map<string, string>>(new Map());
   const toastId = useRef(0);
@@ -56,32 +50,14 @@ export function DesignersRoomView({ userId, userName }: Props) {
     }, 4500);
   }, []);
 
-  // ── Per-frame plumbing (radar, presence broadcast, voice volumes) ────────────
-  const updateRadar = useCallback((s: FrameState) => {
+  // ── Per-frame presence broadcast and proximity voice volumes ────────────────
+  const updateFrame = useCallback((s: FrameState) => {
     presenceRef.current?.updatePosition(s.playerX, s.playerZ, s.playerHeading);
     voiceRef.current?.updateVolumes(
       { x: s.playerX, z: s.playerZ },
       s.remotes,
       mutedRef.current
     );
-
-    for (const r of s.remotes) {
-      const el = radarDots.current[r.id];
-      if (!el) continue;
-      let sx = (r.x - s.playerX) * RADAR_SCALE;
-      let sy = -(r.z - s.playerZ) * RADAR_SCALE;
-      const dist = Math.hypot(sx, sy);
-      const max = 52;
-      if (dist > max) {
-        sx = (sx / dist) * max;
-        sy = (sy / dist) * max;
-      }
-      el.style.transform = `translate(${sx}px, ${sy}px)`;
-      el.style.opacity = r.mic ? "1" : "0.7";
-    }
-    if (playerDot.current) {
-      playerDot.current.style.transform = `rotate(${-s.playerHeading}rad)`;
-    }
   }, []);
 
   // ── Room lifecycle ───────────────────────────────────────────────────────────
@@ -93,7 +69,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       room = new DesignersRoom(el, {
         onReady: () => setReady(true),
         onError: (m) => setError(m),
-        onFrame: updateRadar,
+        onFrame: updateFrame,
       });
     } catch {
       // construction failed (e.g. WebGL unavailable) — surface it after mount
@@ -110,7 +86,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       room.dispose();
       roomRef.current = null;
     };
-  }, [updateRadar]);
+  }, [updateFrame]);
 
   // ── Presence (who is in the room) + WebRTC voice ─────────────────────────────
   useEffect(() => {
@@ -123,13 +99,13 @@ export function DesignersRoomView({ userId, userName }: Props) {
         for (const u of users) {
           if (u.id === userId) continue;
           if (!prevOnlineIds.current.has(u.id)) {
-            addToast(`${u.name ?? "Someone"} joined the studio`);
+            addToast(`${u.name ?? "Someone"} joined the park`);
           }
           prevOnlineNames.current.set(u.id, u.name ?? "Someone");
         }
         for (const id of prevOnlineIds.current) {
           if (!now.has(id)) {
-            addToast(`${prevOnlineNames.current.get(id) ?? "Someone"} left the studio`);
+            addToast(`${prevOnlineNames.current.get(id) ?? "Someone"} left the park`);
           }
         }
         prevOnlineIds.current = now;
@@ -138,7 +114,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
         remoteUsersRef.current = users;
         roomRef.current?.setRemoteUsers(users);
         voiceRef.current?.syncTargets(users);
-        setRemoteIds(users.map((u) => u.id));
       },
       onOnlineCount: setOnline,
       onConnected: setRealtimeConnected,
@@ -170,14 +145,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
     () => false
   );
 
-  useEffect(() => {
-    const t = window.setTimeout(() => setHint(false), 9000);
-    return () => window.clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    const t = window.setTimeout(() => setIntro(false), 7000);
-    return () => window.clearTimeout(t);
+  const enterPark = useCallback(() => {
+    roomRef.current?.setInputEnabled(true);
+    setIntro(false);
   }, []);
 
   const toggleMic = useCallback(async () => {
@@ -225,15 +195,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [toggleMic, toggleMute]);
-
-  const copyInvite = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      addToast("Studio link copied — share it to bring people in");
-    } catch {
-      addToast("Couldn't copy the link");
-    }
-  };
 
   const leave = () => {
     router.push("/dashboard");
@@ -285,14 +246,12 @@ export function DesignersRoomView({ userId, userName }: Props) {
     lookPos.current = null;
   };
 
-  const alone = realtimeConnected && online <= 1;
-
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#f2e7d3] text-foreground">
+    <div className="relative h-full w-full text-foreground">
       {/* 3D canvas — drag anywhere (not on the HUD) to look around */}
       <div
         ref={containerRef}
-        className="absolute inset-0 touch-none"
+        className="absolute inset-0 overflow-hidden rounded-xl bg-[#f2e7d3] touch-none"
         onPointerDown={onLookDown}
         onPointerMove={onLookMove}
         onPointerUp={onLookUp}
@@ -303,7 +262,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {!ready && !error && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-background">
           <Spinner className="h-9 w-9" />
-          <p className="font-body text-sm text-foreground-muted">Entering the studio…</p>
+          <p className="font-body text-sm text-foreground-muted">Entering the park…</p>
         </div>
       )}
 
@@ -321,32 +280,19 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* Top-left: leave (z-30 so it stays clickable above the unlock overlay) */}
-      {ready && (
-        <button
-          type="button"
-          onClick={leave}
-          className="absolute left-4 top-4 z-30 flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-background/70 text-foreground-muted backdrop-blur transition-colors hover:text-foreground"
-          aria-label="Leave the room"
-          title="Leave the room"
-        >
-          <ArrowLeft size={18} />
-        </button>
-      )}
-
-      {/* Top-right: room name + online + mic + mute */}
-      {ready && (
-        <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+      {/* Top controls sit in the 60px margin, outside the game canvas. */}
+      {ready && !intro && (
+        <div className="absolute right-0 top-[-48px] z-30 flex h-9 items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
                 realtimeConnected ? "bg-emerald-500" : "bg-foreground-muted/40"
               }`}
             />
-            {realtimeConnected ? `${online} online` : "studio offline"}
+            {realtimeConnected ? `${online} online` : "park offline"}
           </span>
           <span className="hidden rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs font-medium text-foreground backdrop-blur md:block">
-            Designer Studio
+            Bella Park
           </span>
           <button
             type="button"
@@ -383,98 +329,48 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </div>
       )}
 
-      {/* Controls hint */}
-      {ready && hint && !isTouch && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full border border-border bg-background/70 px-4 py-1.5 font-body text-xs text-foreground-muted backdrop-blur">
-          WASD to move · Hold &amp; drag to look · Shift to sprint · M mic · V voice
-        </div>
-      )}
-
-      {/* Persistent shortcut chip */}
-      {ready && !hint && !isTouch && (
-        <div className="pointer-events-none absolute left-1/2 top-4 z-30 -translate-x-1/2 rounded-full bg-background/50 px-3 py-1 font-body text-[10px] tracking-wide text-foreground-muted backdrop-blur">
-          M mic · V voice · drag to look
-        </div>
-      )}
-
-      {/* Non-blocking intro card — the cursor is always free, so this never traps you */}
+      {/* Entry gate: game controls stay locked until the user enters. */}
       {ready && !error && intro && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <div className="pointer-events-auto mx-4 max-w-sm rounded-2xl border border-border bg-background/90 px-6 py-5 text-center shadow-xl backdrop-blur">
-            <span className="text-2xl">🎮</span>
-            <p className="mt-1 font-body text-sm font-semibold text-foreground">You&apos;re in the Designer Studio</p>
-            <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">
-              This is a live room — real people are here right now. Walk up to someone to hear them
-              (no mic needed to listen). Press{" "}
-              <span className="font-semibold text-foreground">M</span> to turn on your mic when you
-              want to talk. Hold your mouse (or finger) and drag to look around.
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/35 px-4">
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-background px-8 py-7 text-center shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="bella-welcome-title"
+            aria-describedby="bella-welcome-description"
+          >
+            <h2 id="bella-welcome-title" className="font-body text-xl font-semibold text-foreground">
+              You&apos;re in Bella Park
+            </h2>
+            <p
+              id="bella-welcome-description"
+              className="mt-3 font-body text-sm leading-relaxed text-foreground-muted"
+            >
+              This is a live room with real people. Walk up to someone to hear them—no microphone is
+              needed to listen.
             </p>
             <button
               type="button"
-              onClick={() => setIntro(false)}
-              className="mt-3 rounded-lg bg-accent px-4 py-1.5 font-body text-xs font-medium text-white transition-opacity hover:opacity-90"
+              onClick={enterPark}
+              className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              autoFocus
             >
-              Got it
+              Enter Bella Park
             </button>
           </div>
         </div>
       )}
 
-      {/* Radar */}
-      {ready && !error && (
-        <div className="pointer-events-none absolute bottom-5 right-5 z-20 hidden h-32 w-32 items-center justify-center sm:flex">
-          <div className="absolute inset-0 rounded-full border border-border bg-background/50 backdrop-blur" />
-          <div className="absolute inset-4 rounded-full border border-border/70" />
-          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,transparent_58%,rgba(0,112,243,0.08))]" />
-          {remoteIds.map((id) => (
-            <div
-              key={id}
-              ref={(el) => {
-                radarDots.current[id] = el;
-              }}
-              className="absolute left-1/2 top-1/2 -ml-[6px] -mt-[6px] h-3 w-3 rounded-full border-2 border-white bg-slate-500"
-            />
-          ))}
-          <div
-            ref={playerDot}
-            className="absolute left-1/2 top-1/2 -ml-[7px] -mt-[7px] h-3.5 w-3.5"
-            style={{ transform: "rotate(0rad)" }}
-          >
-            <div className="mx-auto h-0 w-0 border-x-[6px] border-b-[10px] border-x-transparent border-b-accent" />
-          </div>
-          <span className="absolute bottom-1 font-body text-[9px] uppercase tracking-widest text-foreground-muted">
-            radar
-          </span>
-        </div>
-      )}
-
       {/* On-air indicator when transmitting */}
-      {ready && !error && micState === "on" && (
+      {ready && !error && !intro && micState === "on" && (
         <div className="pointer-events-none absolute bottom-14 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 px-4 py-1.5 shadow-lg backdrop-blur">
           <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
           <span className="font-body text-xs font-medium text-foreground">You&apos;re on air — people near you can hear you</span>
         </div>
       )}
 
-      {/* Alone hint + invite */}
-      {ready && !error && alone && (
-        <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-border bg-background/80 py-1.5 pl-4 pr-1.5 shadow-lg backdrop-blur">
-          <p className="font-body text-xs text-foreground-muted">
-            You&apos;re the only one here right now
-          </p>
-          <button
-            type="button"
-            onClick={copyInvite}
-            className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 font-body text-xs font-medium text-white transition-opacity hover:opacity-90"
-          >
-            <Copy size={12} />
-            Copy invite link
-          </button>
-        </div>
-      )}
-
       {/* Join / leave toasts */}
-      {ready && toasts.length > 0 && (
+      {ready && !intro && toasts.length > 0 && (
         <div className="pointer-events-none absolute bottom-4 left-4 z-20 flex flex-col gap-2">
           {toasts.map((t) => (
             <div
@@ -489,7 +385,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       )}
 
       {/* Touch controls */}
-      {ready && !error && isTouch && (
+      {ready && !error && !intro && isTouch && (
         <>
           <div
             className="absolute bottom-6 left-6 z-20 h-32 w-32 touch-none"
