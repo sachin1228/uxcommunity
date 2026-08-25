@@ -65,7 +65,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
 
   return (
     <aside
-      className={`flex h-full shrink-0 flex-col overflow-hidden bg-background-subtle ${
+      className={`flex h-full shrink-0 flex-col overflow-hidden bg-background ${
         mobile ? "w-full" : "w-72 border-r border-border"
       }`}
     >
