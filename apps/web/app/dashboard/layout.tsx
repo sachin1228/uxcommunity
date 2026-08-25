@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
+import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
 
 export default async function DashboardLayout({
@@ -40,6 +41,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">
+      <BrowserNotificationInitializer />
       <div className="hidden h-full lg:block">
         <GlobalSidebar userId={userId} user={sidebarUser} />
       </div>
