@@ -1,17 +1,19 @@
 import type { ReactNode } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 
-/**
- * Loading shell for centered dashboard detail pages.
- * Pass `header` to preserve optional page-specific header content.
- */
+/** Single-column shell shared by the homepage and every public card detail route. */
+export function DashboardSingleColumn({ children }: { children: ReactNode }) {
+  return <div className="mx-auto min-h-full w-full max-w-3xl">{children}</div>;
+}
+
+/** Loading shell for dashboard pages without a secondary rail. */
 export function DashboardContentLoader({ header }: { header?: ReactNode }) {
   return (
-    <div className="mx-auto min-h-full w-full max-w-3xl">
+    <DashboardSingleColumn>
       {header}
       <div className="flex min-h-[50vh] items-center justify-center">
         <Spinner size={28} />
       </div>
-    </div>
+    </DashboardSingleColumn>
   );
 }

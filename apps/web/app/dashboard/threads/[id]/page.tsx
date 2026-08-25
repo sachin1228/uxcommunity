@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 import { ThreadDetailClient } from "@/components/communities/threads/ThreadDetailClient"
+import { DashboardSingleColumn } from "../../ContentLoader"
 import { getSession } from "@/lib/auth/session"
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope"
 import { loadThreadDetail } from "@/lib/threads/load-thread-detail"
@@ -23,7 +24,7 @@ export default async function PublicThreadDetailPage({ params }: Props) {
     : { data: null }
 
   return (
-    <div className="mx-auto min-h-full w-full max-w-3xl">
+    <DashboardSingleColumn>
       <ThreadDetailClient
         thread={thread}
         initialComments={comments}
@@ -33,6 +34,6 @@ export default async function PublicThreadDetailPage({ params }: Props) {
         backHref="/dashboard"
         flushLayout
       />
-    </div>
+    </DashboardSingleColumn>
   )
 }

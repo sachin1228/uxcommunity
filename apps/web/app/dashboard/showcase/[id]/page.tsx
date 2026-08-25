@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ShowcaseDetailClient } from "@/components/communities/showcase/ShowcaseDetailClient";
 import type { ShowcaseComment, ShowcasePost } from "@/components/communities/showcase/types";
+import { DashboardSingleColumn } from "../../ContentLoader";
 
 export default async function PublicShowcaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession(); if (!session || session.role !== "user") redirect("/login");
@@ -21,8 +22,8 @@ export default async function PublicShowcaseDetailPage({ params }: { params: Pro
   const communityId = (row as { community_id: string | null }).community_id ?? "public";
   const post = { ...row, community_id: communityId, author: { name: author?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: enriched.length, user_liked: Boolean(myLike), user_saved: Boolean(mySave) } as ShowcasePost;
   return (
-    <div className="mx-auto min-h-full w-full max-w-3xl">
+    <DashboardSingleColumn>
       <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} backHref="/dashboard" backLabel="Home" />
-    </div>
+    </DashboardSingleColumn>
   );
 }
