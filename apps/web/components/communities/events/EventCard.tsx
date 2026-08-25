@@ -243,12 +243,27 @@ export function EventCard({
             ) : null}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 md:flex-nowrap">
             <div className="border-r border-border pr-5">
               <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
               <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
             </div>
             <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
+            <div className="ml-auto hidden shrink-0 md:block">
+              {!past ? (
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={rsvpPending || full}
+                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                >
+                  <UserPlus size={17} aria-hidden="true" />
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                </button>
+              ) : (
+                <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
+              )}
+            </div>
           </div>
 
           {isDetail && event.max_attendees && (
@@ -258,20 +273,22 @@ export function EventCard({
           )}
           {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-auto flex items-end justify-between gap-3 pt-4">
-            {!past ? (
-              <button
-                type="button"
-                onClick={handleJoin}
-                disabled={rsvpPending || full}
-                className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
-              >
-                <UserPlus size={17} aria-hidden="true" />
-                {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
-              </button>
-            ) : (
-              <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
-            )}
+          <div className="mt-auto flex items-end justify-between gap-3 pt-4 md:pt-0">
+            <div className="md:hidden">
+              {!past ? (
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={rsvpPending || full}
+                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                >
+                  <UserPlus size={17} aria-hidden="true" />
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                </button>
+              ) : (
+                <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
+              )}
+            </div>
             {!isDetail && !menuInPostHeader && (
               <div onClick={(e) => e.preventDefault()}>
                 <EventOptionsMenu
