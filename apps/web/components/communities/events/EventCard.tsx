@@ -221,10 +221,10 @@ export function EventCard({
         </div>
 
         <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-4 py-4 md:border-l md:border-t-0 md:px-5">
-          <span className="absolute -left-2 -top-2 hidden size-4 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -bottom-2 -left-2 hidden size-4 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -left-2 -top-2 size-4 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
-          <span className="absolute -right-2 -top-2 size-4 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
+          <span className="absolute -left-2 -top-2 hidden size-4 rounded-full bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -bottom-2 -left-2 hidden size-4 rounded-full bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -left-2 -top-2 size-4 rounded-full bg-surface md:hidden" aria-hidden="true" />
+          <span className="absolute -right-2 -top-2 size-4 rounded-full bg-surface md:hidden" aria-hidden="true" />
 
           <div className="flex items-start justify-between gap-3 pr-12">
             <div className="min-w-0">
