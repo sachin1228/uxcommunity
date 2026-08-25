@@ -98,7 +98,7 @@ export async function PATCH(
   const file = formData.get("image");
   const removeImage = getString("remove_image") === "true";
 
-  if (file instanceof File && file.size > 0) {
+  if (file instanceof Blob && file.size > 0) {
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
       return NextResponse.json({ error: "Only JPEG, PNG and WebP images are allowed." }, { status: 422 });
     }

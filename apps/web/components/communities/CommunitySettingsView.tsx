@@ -42,6 +42,9 @@ interface CommunitySettingsViewProps {
 
 type Tab = "chat" | "threads" | "events" | "resources";
 
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
 const FEATURE_OPTIONS: Array<{
   id: Tab;
   label: string;
@@ -78,6 +81,7 @@ export function CommunitySettingsView({
   const [image,         setImage]         = useState<File | null>(null);
   const [imagePreview,  setImagePreview]  = useState<string | null>(community.image_url ?? null);
   const [removeImage,   setRemoveImage]   = useState(false);
+  const [imageError,    setImageError]    = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const previewUrlRef = useRef<string | null>(null);
 
@@ -123,6 +127,17 @@ export function CommunitySettingsView({
   const inviteUrl = buildInviteUrl(inviteToken);
 
   function handleImageChange(file: File | null) {
+    setImageError(null);
+
+    if (file && !ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setImageError("Choose a JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file && file.size > MAX_IMAGE_BYTES) {
+      setImageError("Community photo must be under 10 MB.");
+      return;
+    }
+
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (file) {
       previewUrlRef.current = URL.createObjectURL(file);
@@ -134,6 +149,7 @@ export function CommunitySettingsView({
       setImage(null);
       setImagePreview(null);
       setRemoveImage(true);
+      if (fileRef.current) fileRef.current.value = "";
     }
   }
 
@@ -198,12 +214,20 @@ export function CommunitySettingsView({
         });
         const newImageUrl = data?.image_url !== undefined ? data.image_url : (removeImage ? null : (community.image_url ?? null));
         onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs, image_url: newImageUrl });
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+        setImage(null);
+        setImagePreview(newImageUrl);
+        setRemoveImage(false);
+        if (fileRef.current) fileRef.current.value = "";
         setSaveMsg("Settings saved.");
         setTimeout(() => { setSaveMsg(null); onClose(); }, 1200);
       } else {
         const data = await res.json().catch(() => null);
         setSaveMsg(data?.error ?? "Failed to save.");
       }
+    } catch {
+      setSaveMsg("Could not save settings. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -319,13 +343,22 @@ export function CommunitySettingsView({
                       </button>
                     )}
                     <p className="font-body text-[11px] text-foreground-muted">JPEG, PNG, or WebP under 10 MB.</p>
+                    {imageError && (
+                      <p className="font-body text-[11px] text-red-400" role="alert">
+                        {imageError}
+                      </p>
+                    )}
                   </div>
                   <input
                     ref={fileRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     className="hidden"
-                    onChange={(e) => handleImageChange(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      const selectedFile = e.currentTarget.files?.[0] ?? null;
+                      e.currentTarget.value = "";
+                      if (selectedFile) handleImageChange(selectedFile);
+                    }}
                   />
                 </div>
               </div>
