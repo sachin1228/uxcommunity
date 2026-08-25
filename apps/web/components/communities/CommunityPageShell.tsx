@@ -144,7 +144,6 @@ export function CommunityPageShell({
         {children}
       </div>
       <CommunityInfoPanel
-        members={members}
         community={community}
         communityId={communityId}
         currentUserId={currentUserId}

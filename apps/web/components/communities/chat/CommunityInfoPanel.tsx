@@ -8,17 +8,11 @@ import {
   Users,
   ExternalLink,
 } from "lucide-react";
-import { ChatAvatar } from "./ChatAvatar";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
-
-interface Member {
-  user_id: string;
-  users: { name: string; avatar_url: string | null } | null;
-}
 
 interface UpcomingEvent {
   id: string;
@@ -40,7 +34,6 @@ interface CommunityData {
 }
 
 interface CommunityInfoPanelProps {
-  members: Member[];
   community: CommunityData | null;
   communityId: string;
   currentUserId?: string;
@@ -83,38 +76,6 @@ function fmtEventDate(iso: string) {
   return `${date} · ${time}`;
 }
 
-// ─── Avatar stack ─────────────────────────────────────────────────────────────
-function AvatarStack({ members, total }: { members: Member[]; total: number }) {
-  const shown = members.slice(0, 7);
-  const extra = total > shown.length ? total - shown.length : 0;
-
-  return (
-    <div className="flex items-center">
-      {shown.map((m, i) => (
-        <div
-          key={m.user_id}
-          className="ring-2 ring-surface rounded-full shrink-0 bg-surface-raised"
-          style={{ marginLeft: i === 0 ? 0 : -10, zIndex: shown.length - i }}
-        >
-          <ChatAvatar
-            name={m.users?.name ?? "?"}
-            url={m.users?.avatar_url ?? null}
-            size={7}
-          />
-        </div>
-      ))}
-      {extra > 0 && (
-        <div
-          className="h-7 min-w-[28px] px-1.5 shrink-0 rounded-full bg-surface-raised ring-2 ring-surface flex items-center justify-center font-body text-[10px] font-semibold text-foreground-muted"
-          style={{ marginLeft: -6 }}
-        >
-          {extra >= 1000 ? `+${Math.round(extra / 1000)}K` : `+${extra}`}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Section wrapper — plain divider, no individual card ─────────────────────
 function Section({
   title,
@@ -153,8 +114,8 @@ interface CommunityRule {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function CommunityInfoPanel({ members, community, communityId, currentUserId, onlineCount = 0 }: CommunityInfoPanelProps) {
-  const memberCount = community?.member_count ?? members.length;
+export function CommunityInfoPanel({ community, communityId, currentUserId, onlineCount = 0 }: CommunityInfoPanelProps) {
+  const memberCount = community?.member_count ?? 0;
 
   const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
   const [postsToday, setPostsToday] = useState<number | null>(null);
@@ -308,21 +269,6 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
 
       {/* Main info card */}
       <div className="border border-border mr-4 mt-4 rounded-xl flex flex-col">
-
-        {/* Members */}
-        <Section
-          title={`Members (${memberCount.toLocaleString()})`}
-          action={
-            onlineCount > 0 ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
-                {onlineCount} online
-              </span>
-            ) : undefined
-          }
-        >
-          <AvatarStack members={members} total={memberCount} />
-        </Section>
 
         {/* Upcoming Events — only shown when a real upcoming event exists */}
         {upcomingEvent && (

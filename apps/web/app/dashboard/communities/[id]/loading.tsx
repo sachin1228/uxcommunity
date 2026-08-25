@@ -202,9 +202,8 @@ export default function CommunityPageLoading() {
         )}
       </div>
 
-      {/* Real info sidebar — renders from the cached members/community. */}
+      {/* Real info sidebar — renders from the cached community. */}
       <CommunityInfoPanel
-        members={members}
         community={community}
         communityId={communityId ?? ""}
         currentUserId={cachedUserId ?? undefined}
