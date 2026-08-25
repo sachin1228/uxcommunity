@@ -68,7 +68,7 @@ export function CommunityRow({
     <li>
       <button
         onClick={onClick}
-        className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${
+        className={`flex w-full items-start gap-[11px] rounded-lg px-[9px] py-[9px] text-left transition-colors ${
           active
             ? "bg-surface-raised text-foreground"
             : "hover:bg-surface-raised"
