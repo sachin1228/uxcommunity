@@ -43,20 +43,41 @@ export function DropdownMenu({
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
-  /** Reposition the menu relative to the trigger. */
+  /** Reposition the menu relative to the trigger while keeping it in view. */
   const reposition = useCallback(() => {
     const menu = menuRef.current;
     const trigger = triggerRef.current;
     if (!menu || !trigger) return;
-    const r = trigger.getBoundingClientRect();
-    menu.style.top = `${r.bottom + gap}px`;
-    if (align === "right") {
-      menu.style.right = `${window.innerWidth - r.right}px`;
-      menu.style.left = "auto";
-    } else {
-      menu.style.left = `${r.left}px`;
-      menu.style.right = "auto";
-    }
+
+    const viewportPadding = 8;
+    const triggerRect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+
+    const preferredLeft =
+      align === "right"
+        ? triggerRect.right - menuRect.width
+        : triggerRect.left;
+    const maxLeft = Math.max(
+      viewportPadding,
+      window.innerWidth - menuRect.width - viewportPadding,
+    );
+    const left = Math.min(Math.max(preferredLeft, viewportPadding), maxLeft);
+
+    const spaceBelow = window.innerHeight - triggerRect.bottom - gap;
+    const canFitAbove = triggerRect.top - gap >= menuRect.height + viewportPadding;
+    const preferredTop =
+      spaceBelow < menuRect.height && canFitAbove
+        ? triggerRect.top - menuRect.height - gap
+        : triggerRect.bottom + gap;
+    const maxTop = Math.max(
+      viewportPadding,
+      window.innerHeight - menuRect.height - viewportPadding,
+    );
+    const top = Math.min(Math.max(preferredTop, viewportPadding), maxTop);
+
+    menu.style.left = `${left}px`;
+    menu.style.right = "auto";
+    menu.style.top = `${top}px`;
   }, [triggerRef, align, gap]);
 
   /* Reposition whenever the menu opens or the viewport scrolls/resizes. */
