@@ -39,16 +39,17 @@ export function SearchableSelect({
 
   const filtered = query.trim()
     ? options.filter((o) =>
-        o.label.toLowerCase().includes(query.trim().toLowerCase())
+        o.label.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : options;
 
-  const showOther = allowOther && query.trim().length > 0 && filtered.length === 0;
+  const showOther =
+    allowOther && query.trim().length > 0 && filtered.length === 0;
 
   const selectedOption =
     value === otherValue && allowOther
       ? { label: otherLabel, imageUrl: null }
-      : options.find((o) => o.value === value) ?? null;
+      : (options.find((o) => o.value === value) ?? null);
   const selectedLabel = selectedOption?.label;
 
   const handleSelect = useCallback(
@@ -57,14 +58,17 @@ export function SearchableSelect({
       setOpen(false);
       setQuery("");
     },
-    [onChange]
+    [onChange],
   );
 
   // Close on outside click
   useEffect(() => {
     if (!open) return;
     function handle(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
         setQuery("");
       }
@@ -89,12 +93,16 @@ export function SearchableSelect({
   }
 
   const triggerClass =
-    "relative flex w-full cursor-pointer items-center justify-between rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm outline-none transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50 disabled:cursor-not-allowed " +
-    (open ? "border-accent ring-2 ring-accent/20 " : "") +
-     (selectedLabel ? "text-foreground " : "text-foreground-muted ");
+    "linear-field relative flex w-full cursor-pointer items-center justify-between font-body outline-none disabled:cursor-not-allowed disabled:opacity-50 " +
+    (open ? "border-accent ring-1 ring-accent/30 " : "") +
+    (selectedLabel ? "text-foreground " : "text-foreground-muted ");
 
   return (
-    <div ref={containerRef} className="relative w-full" onKeyDown={handleKeyDown}>
+    <div
+      ref={containerRef}
+      className="relative w-full"
+      onKeyDown={handleKeyDown}
+    >
       {/* Trigger */}
       <button
         type="button"
@@ -115,7 +123,7 @@ export function SearchableSelect({
               className="h-5 w-5 shrink-0 rounded object-cover"
             />
           ) : selectedLabel ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface-raised font-body text-[10px] font-semibold text-foreground-muted uppercase select-none">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface-raised font-body text-[10px] font-semibold text-foreground-muted uppercase select-none">
               {selectedLabel[0]}
             </span>
           ) : null}
@@ -141,9 +149,9 @@ export function SearchableSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-surface-raised shadow-md overflow-hidden">
+        <div className="linear-menu absolute z-50 mt-1 w-full">
           {/* Search input */}
-            <div className="border-b border-border px-3 py-2">
+          <div className="border-b border-border-subtle px-2 py-1.5">
             <div className="flex items-center gap-2">
               <svg
                 className="h-3.5 w-3.5 flex-shrink-0 text-foreground-muted"
@@ -164,16 +172,13 @@ export function SearchableSelect({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
-                 className="w-full bg-transparent font-body text-sm text-foreground placeholder:text-foreground-subtle outline-none"
+                className="w-full bg-transparent font-body text-[13px] text-foreground placeholder:text-foreground-subtle outline-none"
               />
             </div>
           </div>
 
           {/* Options list */}
-          <ul
-            role="listbox"
-            className="max-h-52 overflow-y-auto py-1"
-          >
+          <ul role="listbox" className="max-h-52 overflow-y-auto py-1">
             {filtered.map((option) => {
               const isSelected = value === option.value;
               return (
@@ -183,10 +188,10 @@ export function SearchableSelect({
                   aria-selected={isSelected}
                   onClick={() => handleSelect(option.value)}
                   className={
-                    "flex cursor-pointer items-center gap-2.5 px-3.5 py-2 font-body text-sm transition-colors " +
+                    "linear-menu-item cursor-pointer " +
                     (isSelected
                       ? "bg-accent/10 text-accent"
-                       : "text-foreground hover:bg-background-subtle")
+                      : "text-foreground hover:bg-background-subtle")
                   }
                 >
                   {/* Image or letter avatar */}
@@ -198,7 +203,7 @@ export function SearchableSelect({
                       className="h-5 w-5 shrink-0 rounded object-cover"
                     />
                   ) : (
-                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface font-body text-[10px] font-semibold uppercase text-foreground-muted select-none">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface font-body text-[10px] font-semibold uppercase text-foreground-muted select-none">
                       {option.label[0]}
                     </span>
                   )}
@@ -230,10 +235,10 @@ export function SearchableSelect({
                 aria-selected={value === otherValue}
                 onClick={() => handleSelect(otherValue)}
                 className={
-                  "flex cursor-pointer items-center gap-2 px-3.5 py-2 font-body text-sm  transition-colors " +
+                  "linear-menu-item cursor-pointer " +
                   (value === otherValue
                     ? "bg-accent/10 text-accent"
-                     : "text-foreground-muted hover:bg-background-subtle")
+                    : "text-foreground-muted hover:bg-background-subtle")
                 }
               >
                 {value === otherValue ? (
@@ -251,12 +256,14 @@ export function SearchableSelect({
                     />
                   </svg>
                 ) : null}
-                <span className={value === otherValue ? "" : "ml-5.5"}>{otherLabel}</span>
+                <span className={value === otherValue ? "" : "ml-5.5"}>
+                  {otherLabel}
+                </span>
               </li>
             )}
 
             {filtered.length === 0 && !showOther && (
-               <li className="px-3.5 py-3 text-center font-body text-sm text-foreground-muted">
+              <li className="px-3 py-2.5 text-center font-body text-[13px] text-foreground-muted">
                 No results found
               </li>
             )}

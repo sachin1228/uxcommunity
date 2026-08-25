@@ -48,17 +48,19 @@ export function ConfirmDialog({
       maxWidth="max-w-sm"
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
-          <AlertTriangle size={18} />
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-red-500/10 text-red-500">
+          <AlertTriangle size={16} />
         </div>
-        <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
+        <p className="font-body text-[13px] leading-5 text-foreground-muted">
+          {message}
+        </p>
       </div>
-      <div className="mt-6 flex gap-3">
+      <div className="mt-5 flex justify-end gap-2">
         <button
           type="button"
           onClick={onClose}
           disabled={pending}
-          className="flex-1 rounded-lg border border-border py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+          className="linear-button disabled:opacity-50"
         >
           Cancel
         </button>
@@ -66,9 +68,13 @@ export function ConfirmDialog({
           type="button"
           onClick={() => void handleConfirm()}
           disabled={pending}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+          className="linear-button border-red-500/50 bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
         >
-          {pending ? <Spinner size={15} className="text-white" /> : <Trash2 size={14} />}
+          {pending ? (
+            <Spinner size={14} className="text-white" />
+          ) : (
+            <Trash2 size={14} />
+          )}
           {pending ? "Deleting…" : confirmLabel}
         </button>
       </div>

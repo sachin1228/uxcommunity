@@ -41,7 +41,9 @@ export function DropdownMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   // Only render on the client — prevents SSR/hydration mismatch.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /** Reposition the menu relative to the trigger. */
   const reposition = useCallback(() => {
@@ -102,9 +104,7 @@ export function DropdownMenu({
       ref={menuRef}
       role="menu"
       style={{ position: "fixed", zIndex: 9999 }}
-      className={`min-w-[8rem] overflow-hidden rounded-md border border-border bg-surface-raised shadow-xl
-        animate-in fade-in zoom-in-95 duration-100 origin-top-right
-        ${className}`}
+      className={`linear-menu min-w-32 animate-in fade-in zoom-in-95 duration-100 origin-top-right ${className}`}
     >
       {children}
     </div>,
