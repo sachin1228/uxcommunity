@@ -104,7 +104,12 @@ export async function POST(
     const url = await timer.measure("r2_upload", () =>
       uploadToR2(key, moderation.buffer!, storedMime),
     );
-    return finish(NextResponse.json({ url }, { status: 201 }));
+
+    if (typeof url !== "string" || !url.trim()) {
+      throw new Error("R2 upload completed without a public URL.");
+    }
+
+    return finish(NextResponse.json({ url: url.trim() }, { status: 201 }));
   } catch (err) {
     console.error("[chat-image-upload] R2 error:", err);
     return finish(NextResponse.json({ error: "Upload failed." }, { status: 500 }));

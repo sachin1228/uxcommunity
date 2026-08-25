@@ -274,7 +274,19 @@ export function useSendMessage({
           throw new Error((d as { error?: string }).error ?? "Image upload failed.");
         }
 
-        const { url } = await uploadRes.json();
+        const uploadData: unknown = await uploadRes.json().catch(() => null);
+        const url =
+          uploadData &&
+          typeof uploadData === "object" &&
+          "url" in uploadData &&
+          typeof uploadData.url === "string"
+            ? uploadData.url.trim()
+            : "";
+
+        if (!url) {
+          throw new Error("Image upload failed: the server did not return an image URL.");
+        }
+
         uploadedImageUrl = url;
       }
 
