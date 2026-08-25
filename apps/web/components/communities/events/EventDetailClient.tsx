@@ -378,8 +378,7 @@ export function EventDetailClient({
           />
         )}
         {/* Event post */}
-        <section className={`${communityFeedLayout.dividerBottom} py-6`}>
-          <div className={communityFeedLayout.detailSection}>
+        <section className={`mx-5 md:mx-8 ${communityFeedLayout.detailCard}`}>
             <EventCard
               variant="detail"
               event={event}
@@ -401,11 +400,10 @@ export function EventDetailClient({
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
             />
-          </div>
         </section>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
+        <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare size={14} />, count: topLevelCount },

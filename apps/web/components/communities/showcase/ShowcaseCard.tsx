@@ -28,7 +28,6 @@ export function ShowcaseCard({
   post,
   currentUserId,
   variant = "list",
-  isLast = false,
   busy = false,
   onOpen,
   onToggleLike,
@@ -152,11 +151,7 @@ export function ShowcaseCard({
   );
 
   if (isDetail) {
-    return (
-      <article className="border-b border-border py-6">
-        <div className={communityFeedLayout.detailSection}>{card}</div>
-      </article>
-    );
+    return <article className={`mx-5 md:mx-8 ${communityFeedLayout.detailCard}`}>{card}</article>;
   }
 
   return (
@@ -167,9 +162,7 @@ export function ShowcaseCard({
       onKeyDown={(event) => {
         if (event.key === "Enter") onOpen?.();
       }}
-      className={`${communityFeedLayout.row} cursor-pointer ${
-        isLast ? "" : communityFeedLayout.dividerBottom
-      }`}
+      className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive} cursor-pointer`}
     >
       {card}
     </article>

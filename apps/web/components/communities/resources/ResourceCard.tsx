@@ -235,7 +235,7 @@ export function ResourceCard({
 
   return (
     <>
-      <article className={isDetail ? "" : `group cursor-pointer py-6 ${hideDivider ? "" : edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "border-b border-border"}`}>
+      <article className={isDetail ? communityFeedLayout.detailCard : `group cursor-pointer ${hideDivider ? "py-0" : edgeToEdgeDivider ? communityFeedLayout.dividerBottom : `${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}`}>
         <div className="flex items-start justify-between gap-3">
           <PostAuthorMeta
             name={resource.users?.name}

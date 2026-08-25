@@ -1,4 +1,4 @@
-# uxcommunity/ — a home for designers.
+# uxcommunity/ — a home for designers
 
 A platform for UI/UX, product, and social media designers. Designers apply to join, admins review applications, approved members complete their profile and get access to a real-time community chat.
 
@@ -114,7 +114,11 @@ REALTIME_PUBLISH_SECRET=<SAME value as apps/web/.env.local>
 
 **Troubleshooting:** if messages, typing, and reactions only update with a delay (polling), the WebSocket isn't connected. Make sure terminal 2 is running, then check DevTools → Network → WS for a `ws://localhost:8787/ws?...` connection.
 
-In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
+In production the same flow runs against `rt.uxcommunity.in` — the CI deploy (`Deploy to Cloudflare`) mirrors `apps/web/wrangler.toml [vars]` into the client build automatically, so `NEXT_PUBLIC_REALTIME_URL` is only a local-dev concern.
+
+### Cloudflare deployment targets
+
+The root `wrangler.toml` intentionally targets `uxcommunity-realtime`, which owns the `Room` Durable Object. Run `npm run deploy:realtime` for that Worker and `npm run deploy:web` for the separate OpenNext web Worker; never deploy the web bundle with the root Wrangler configuration.
 
 ## Environment variables
 

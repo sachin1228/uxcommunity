@@ -273,29 +273,34 @@ export function ThreadsView({
               <h3 className={communityFeedLayout.emptyTitle}>No threads in this category</h3>
               <p className={communityFeedLayout.emptyDescription}>Try a different filter or start a new thread.</p>
             </div>
-          ) : filteredThreads.map((thread, index) => (
-            <ThreadCard
-              key={thread.id}
-              thread={thread}
-              currentUserId={currentUserId}
-              communityId={communityId}
-              onUpdated={handleUpdated}
-              onLikeChanged={handleLikeChanged}
-              onSaveChanged={handleSaveChanged}
-              onDeleted={handleDeleted}
-              isLast={index === filteredThreads.length - 1}
-            />
-          ))}
-          {hasMore && (
-            <div className="flex justify-center py-6">
-              <button
-                type="button"
-                onClick={() => void loadMore()}
-                disabled={loadingMore}
-                className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
-              >
-                {loadingMore ? "Loading…" : "Load more"}
-              </button>
+          ) : (
+            <div className={communityFeedLayout.cardList}>
+              {filteredThreads.map((thread, index) => (
+                <ThreadCard
+                  key={thread.id}
+                  thread={thread}
+                  currentUserId={currentUserId}
+                  communityId={communityId}
+                  onUpdated={handleUpdated}
+                  onLikeChanged={handleLikeChanged}
+                  onSaveChanged={handleSaveChanged}
+                  onDeleted={handleDeleted}
+                  isLast={index === filteredThreads.length - 1}
+                  cardStyle="card"
+                />
+              ))}
+              {hasMore && (
+                <div className="flex justify-center py-6">
+                  <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+                  >
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

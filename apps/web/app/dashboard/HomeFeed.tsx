@@ -310,15 +310,16 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     }
   }
 
+  const cardClassName =
+    "overflow-hidden rounded-xl border border-border [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+
   return (
     <>
-    <ul className="border-t border-border">
-      {groups.map((group, gi) => {
-        const isLastGroup = gi === groups.length - 1;
-
+    <ul className="flex flex-col gap-4">
+      {groups.map((group) => {
         if (group.kind === "thread") {
           return (
-            <li key={`thread-${group.item.id}`}>
+            <li key={`thread-${group.item.id}`} className={cardClassName}>
               <ThreadCard
                 thread={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
@@ -331,7 +332,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onLikeChanged={handleThreadLikeChanged}
                 onSaveChanged={handleThreadSaveChanged}
                 onDeleted={handleThreadDeleted}
-                isLast={isLastGroup}
+                isLast
               />
             </li>
           );
@@ -339,7 +340,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
         if (group.kind === "event") {
           return (
-            <li key={`event-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
+            <li key={`event-${group.item.id}`} className={cardClassName}>
               <div className={`${communityFeedLayout.row} relative`}>
                 <PostAuthorMeta
                   name={group.item.users?.name}
@@ -370,11 +371,11 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
         if (group.kind === "showcase") {
           return (
-            <li key={`showcase-${group.item.id}`} className={isLastGroup ? "" : "border-b border-border"}>
+            <li key={`showcase-${group.item.id}`} className={cardClassName}>
               <ShowcaseCard
                 post={{ ...group.item, community_id: group.item.community_id ?? "public" }}
                 currentUserId={currentUserId}
-                isLast={isLastGroup}
+                isLast
                 onOpen={() => openShowcase(group.item)}
                 onToggleLike={() => void handleShowcaseLikeSave(group.item, "like")}
                 onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
@@ -386,14 +387,11 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         }
 
         // ── Resource group — same full-width layout as community resources ──
-        return group.items.map((res, resourceIndex) => {
-          const isLastResource = resourceIndex === group.items.length - 1;
-          const showDivider = !isLastGroup || !isLastResource;
-
+        return group.items.map((res) => {
           return (
             <li
               key={`resource-${res.id}`}
-              className={`${communityFeedLayout.gutters} ${showDivider ? communityFeedLayout.dividerBottom : ""}`}
+              className={`${cardClassName} ${communityFeedLayout.gutters} py-6`}
             >
               <ResourceCard
                 resource={{ ...res, community_id: res.community_id ?? "" }}

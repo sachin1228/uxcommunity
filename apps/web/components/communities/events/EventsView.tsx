@@ -217,7 +217,7 @@ export function EventsView({
             <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
           </div>
         ) : (
-          <div>
+          <div className={communityFeedLayout.cardList}>
             {[
               ...(filter === "all" || filter === "upcoming" ? upcoming : []),
               ...(filter === "all" || filter === "past" ? past : []),
@@ -227,7 +227,7 @@ export function EventsView({
               return (
                 <article
                   key={event.id}
-                  className={`${communityFeedLayout.row} ${communityFeedLayout.dividerBottom} relative ${isPast ? "opacity-60" : ""}`}
+                  className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive} relative ${isPast ? "opacity-60" : ""}`}
                 >
                   <PostAuthorMeta
                     name={event.users?.name}
