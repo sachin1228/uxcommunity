@@ -291,7 +291,7 @@ export function EventCard({
             ) : (
               <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
             )}
-            {!isDetail && (
+            {!isDetail && !menuInPostHeader && (
               <div onClick={(e) => e.preventDefault()}>
                 <EventOptionsMenu
                   saved={event.user_saved}
@@ -300,7 +300,6 @@ export function EventCard({
                   isOwner={isOwner}
                   deleting={deleting}
                   saving={savePending}
-                  className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
                   onSave={toggleSave}
                   onShare={() => void handleShare()}
                   onEdit={() => setShowEditModal(true)}
@@ -323,6 +322,22 @@ export function EventCard({
   return (
     <>
       <article className={isDetail || menuInPostHeader ? "group" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border bg-surface"}`}>
+        {menuInPostHeader && !isDetail && (
+          <EventOptionsMenu
+            saved={event.user_saved}
+            shared={shared}
+            reported={reported}
+            isOwner={isOwner}
+            deleting={deleting}
+            saving={savePending}
+            className="absolute right-5 top-6 z-10 md:right-8"
+            onSave={toggleSave}
+            onShare={() => void handleShare()}
+            onEdit={() => setShowEditModal(true)}
+            onDelete={() => setConfirmDelete(true)}
+            onReport={() => setReported(true)}
+          />
+        )}
         {isDetail && (
           <div className="relative mb-4 flex items-center justify-between gap-3">
             <PostAuthorMeta
