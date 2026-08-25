@@ -210,7 +210,7 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className={isDetail ? "overflow-hidden rounded-xl border border-border bg-surface" : ""}>
+    <div className={isDetail ? "overflow-hidden rounded-lg bg-surface" : ""}>
       <div className={`flex ${isDetail ? "min-h-[190px] flex-col sm:flex-row" : "gap-4"}`}>
         <div className={`relative shrink-0 overflow-hidden ${isDetail ? "aspect-video w-full sm:aspect-auto sm:w-44" : "w-36"}`}>
           {event.cover_image_url ? (
