@@ -20,8 +20,6 @@ interface Toast {
   text: string;
 }
 
-const RADAR_SCALE = 56 / 15; // px per world unit
-
 export function DesignersRoomView({ userId, userName }: Props) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -38,12 +36,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const [micState, setMicState] = useState<MicState>("off");
   const [online, setOnline] = useState(0);
   const [realtimeConnected, setRealtimeConnected] = useState(false);
-  const [remoteIds, setRemoteIds] = useState<string[]>([]);
   const [hint, setHint] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const radarDots = useRef<Record<string, HTMLDivElement | null>>({});
-  const playerDot = useRef<HTMLDivElement>(null);
   const prevOnlineIds = useRef<Set<string>>(new Set());
   const prevOnlineNames = useRef<Map<string, string>>(new Map());
   const toastId = useRef(0);
@@ -56,32 +51,14 @@ export function DesignersRoomView({ userId, userName }: Props) {
     }, 4500);
   }, []);
 
-  // ── Per-frame plumbing (radar, presence broadcast, voice volumes) ────────────
-  const updateRadar = useCallback((s: FrameState) => {
+  // ── Per-frame presence broadcast and proximity voice volumes ────────────────
+  const updateFrame = useCallback((s: FrameState) => {
     presenceRef.current?.updatePosition(s.playerX, s.playerZ, s.playerHeading);
     voiceRef.current?.updateVolumes(
       { x: s.playerX, z: s.playerZ },
       s.remotes,
       mutedRef.current
     );
-
-    for (const r of s.remotes) {
-      const el = radarDots.current[r.id];
-      if (!el) continue;
-      let sx = (r.x - s.playerX) * RADAR_SCALE;
-      let sy = -(r.z - s.playerZ) * RADAR_SCALE;
-      const dist = Math.hypot(sx, sy);
-      const max = 52;
-      if (dist > max) {
-        sx = (sx / dist) * max;
-        sy = (sy / dist) * max;
-      }
-      el.style.transform = `translate(${sx}px, ${sy}px)`;
-      el.style.opacity = r.mic ? "1" : "0.7";
-    }
-    if (playerDot.current) {
-      playerDot.current.style.transform = `rotate(${-s.playerHeading}rad)`;
-    }
   }, []);
 
   // ── Room lifecycle ───────────────────────────────────────────────────────────
@@ -93,7 +70,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       room = new DesignersRoom(el, {
         onReady: () => setReady(true),
         onError: (m) => setError(m),
-        onFrame: updateRadar,
+        onFrame: updateFrame,
       });
     } catch {
       // construction failed (e.g. WebGL unavailable) — surface it after mount
@@ -110,7 +87,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       room.dispose();
       roomRef.current = null;
     };
-  }, [updateRadar]);
+  }, [updateFrame]);
 
   // ── Presence (who is in the room) + WebRTC voice ─────────────────────────────
   useEffect(() => {
@@ -138,7 +115,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
         remoteUsersRef.current = users;
         roomRef.current?.setRemoteUsers(users);
         voiceRef.current?.syncTargets(users);
-        setRemoteIds(users.map((u) => u.id));
       },
       onOnlineCount: setOnline,
       onConnected: setRealtimeConnected,
@@ -288,11 +264,11 @@ export function DesignersRoomView({ userId, userName }: Props) {
   const alone = realtimeConnected && online <= 1;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#f2e7d3] text-foreground">
+    <div className="relative h-full w-full text-foreground">
       {/* 3D canvas — drag anywhere (not on the HUD) to look around */}
       <div
         ref={containerRef}
-        className="absolute inset-0 touch-none"
+        className="absolute inset-0 overflow-hidden rounded-xl bg-[#f2e7d3] touch-none"
         onPointerDown={onLookDown}
         onPointerMove={onLookMove}
         onPointerUp={onLookUp}
@@ -334,9 +310,9 @@ export function DesignersRoomView({ userId, userName }: Props) {
         </button>
       )}
 
-      {/* Top-right: room name + online + mic + mute */}
+      {/* Top controls sit in the 60px margin, outside the game canvas. */}
       {ready && (
-        <div className="absolute right-4 top-4 z-30 flex items-center gap-2">
+        <div className="absolute right-0 top-[-48px] z-30 flex h-9 items-center gap-2">
           <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
@@ -417,34 +393,6 @@ export function DesignersRoomView({ userId, userName }: Props) {
               Got it
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Radar */}
-      {ready && !error && (
-        <div className="pointer-events-none absolute bottom-5 right-5 z-20 hidden h-32 w-32 items-center justify-center sm:flex">
-          <div className="absolute inset-0 rounded-full border border-border bg-background/50 backdrop-blur" />
-          <div className="absolute inset-4 rounded-full border border-border/70" />
-          <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_center,transparent_58%,rgba(0,112,243,0.08))]" />
-          {remoteIds.map((id) => (
-            <div
-              key={id}
-              ref={(el) => {
-                radarDots.current[id] = el;
-              }}
-              className="absolute left-1/2 top-1/2 -ml-[6px] -mt-[6px] h-3 w-3 rounded-full border-2 border-white bg-slate-500"
-            />
-          ))}
-          <div
-            ref={playerDot}
-            className="absolute left-1/2 top-1/2 -ml-[7px] -mt-[7px] h-3.5 w-3.5"
-            style={{ transform: "rotate(0rad)" }}
-          >
-            <div className="mx-auto h-0 w-0 border-x-[6px] border-b-[10px] border-x-transparent border-b-accent" />
-          </div>
-          <span className="absolute bottom-1 font-body text-[9px] uppercase tracking-widest text-foreground-muted">
-            radar
-          </span>
         </div>
       )}
 
