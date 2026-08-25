@@ -11,7 +11,7 @@ import { Spinner } from "@/components/ui/Spinner";
  */
 export default function DashboardLoading() {
   return (
-    <div className="mx-auto min-h-full w-full max-w-6xl">
+    <div className="mx-auto min-h-full w-full max-w-3xl">
       <section className={`${communityFeedLayout.gutters} my-1`}>
         <div className="grid grid-cols-[auto_1fr] items-center gap-5 py-3 sm:py-4">
           <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border border-border">
