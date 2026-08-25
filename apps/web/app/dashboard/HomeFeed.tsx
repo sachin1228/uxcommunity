@@ -391,7 +391,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
           return (
             <li
               key={`resource-${res.id}`}
-              className={`${cardClassName} ${communityFeedLayout.gutters}`}
+              className={`${cardClassName} ${communityFeedLayout.gutters} py-6`}
             >
               <ResourceCard
                 resource={{ ...res, community_id: res.community_id ?? "" }}
