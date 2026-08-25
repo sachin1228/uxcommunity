@@ -212,14 +212,11 @@ export function EventCard({
   const eventBody = (
     <div className="relative overflow-hidden rounded-lg border border-border bg-surface-raised">
       <div className="flex min-h-52 flex-col md:flex-row">
-        <div className={`relative min-h-44 shrink-0 overflow-hidden bg-background md:min-h-52 ${isDetail ? "md:w-[38%]" : "md:w-[36%]"}`}>
+        <div className="relative shrink-0 overflow-hidden bg-background md:h-64 md:w-auto">
           {event.cover_image_url ? (
-            <>
-              <img src={event.cover_image_url} alt="" className="absolute inset-0 size-full scale-110 object-cover opacity-30 blur-xl" aria-hidden="true" />
-              <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 size-full object-contain" />
-            </>
+            <img src={event.cover_image_url} alt={event.title} className="block h-auto w-full md:h-64 md:w-auto md:max-w-md" />
           ) : (
-            <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} aria-hidden="true" />
+            <div className={`h-44 w-full bg-gradient-to-br md:h-64 md:w-64 ${gradient}`} aria-hidden="true" />
           )}
         </div>
 
