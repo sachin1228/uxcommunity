@@ -23,11 +23,13 @@ export default async function ChatWithDesignersPage() {
   const name = (user as { name?: string | null } | null)?.name;
 
   return (
-    <div className="h-full">
-      <DesignersRoomView
-        userId={session.userId!}
-        userName={name ?? session.email ?? "Designer"}
-      />
+    <div className="h-full p-[60px]">
+      <div className="h-full overflow-hidden rounded-xl">
+        <DesignersRoomView
+          userId={session.userId!}
+          userName={name ?? session.email ?? "Designer"}
+        />
+      </div>
     </div>
   );
 }

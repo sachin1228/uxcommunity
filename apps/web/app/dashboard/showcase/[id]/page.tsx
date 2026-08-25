@@ -21,13 +21,8 @@ export default async function PublicShowcaseDetailPage({ params }: { params: Pro
   const communityId = (row as { community_id: string | null }).community_id ?? "public";
   const post = { ...row, community_id: communityId, author: { name: author?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: enriched.length, user_liked: Boolean(myLike), user_saved: Boolean(mySave) } as ShowcasePost;
   return (
-    <div className="flex h-full items-start">
-      <div className="min-w-0 flex-1 border-r border-border">
-        <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} backHref="/dashboard" backLabel="Home" />
-      </div>
-      <aside className="sticky top-6 hidden w-72 shrink-0 p-4 lg:block">
-        <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
-      </aside>
+    <div className="mx-auto min-h-full w-full max-w-3xl">
+      <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} backHref="/dashboard" backLabel="Home" />
     </div>
   );
 }

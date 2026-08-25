@@ -477,8 +477,7 @@ export function ThreadDetailClient({
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
-        <div className={`${communityFeedLayout.dividerBottom} py-6`}>
-          <div className={communityFeedLayout.detailSection}>
+        <div className={communityFeedLayout.detailSection}>
             <ThreadCard
               thread={thread}
               currentUserId={currentUserId}
@@ -489,11 +488,10 @@ export function ThreadDetailClient({
               onUpdated={handleUpdated}
               onDeleted={handleDeleted}
             />
-          </div>
         </div>
 
         {/* ── Comments section ── */}
-        <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
+        <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
           <div className="mb-4 flex items-center gap-2">
             <span className="font-display text-sm font-semibold text-foreground">
               {totalComments} {totalComments === 1 ? "Comment" : "Comments"}

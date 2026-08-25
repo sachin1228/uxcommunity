@@ -164,7 +164,7 @@ export function ShowcaseView({
     router.push(`/dashboard/communities/${communityId}/showcase/${post.id}`);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background">
+    <div className="flex-1 overflow-y-auto">
       <div
         className={`${communityFeedLayout.content} ${
           !loading && posts.length
@@ -268,7 +268,7 @@ export function ShowcaseView({
             </p>
           </div>
         ) : (
-          <div>
+          <div className={communityFeedLayout.cardList}>
             {visible.map((post, index) => (
               <ShowcaseCard
                 key={post.id}

@@ -9,9 +9,20 @@ import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { MessageNotificationSettings } from "@/app/dashboard/MessageNotificationSettings";
+import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
+
+interface SidebarUser {
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  initial: string;
+}
 
 interface Props {
   userId: string;
+  user: SidebarUser;
   mobile?: boolean;
 }
 
@@ -21,7 +32,7 @@ function isMatch(href: string, pathname: string) {
     : pathname === href || pathname.startsWith(href + "/");
 }
 
-export function GlobalSidebar({ userId, mobile = false }: Props) {
+export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -54,8 +65,8 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
 
   return (
     <aside
-      className={`h-full shrink-0 overflow-y-auto bg-background ${
-        mobile ? "w-full" : "w-72 border-r border-border"
+      className={`flex h-full shrink-0 flex-col overflow-hidden bg-background ${
+        mobile ? "w-full" : "w-64 border-r border-border"
       }`}
     >
       {createOpen && (
@@ -68,58 +79,61 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           }}
         />
       )}
+      <div className="flex h-[57px] shrink-0 items-center gap-[11px] px-[13px]">
+        <ProfileDropdown {...user} />
+        <p className="min-w-0 flex-1 truncate font-body text-base font-semibold text-foreground">
+          {user.name}
+        </p>
+        <div className="flex items-center">
+          <MessageNotificationSettings userId={userId} />
+          <NotificationBell userId={userId} />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {/* WORKSPACE nav */}
-      <div className="px-4 pt-5 pb-3">
-        <p className="px-1 mb-3 font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
+      <div className="px-[13px] pb-[9px] pt-[13px]">
+        <p className="mb-[9px] px-[5px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
           Workspace
         </p>
-        <ul className="space-y-1">
+        <ul className="flex flex-col gap-[3px]">
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Home size={17} className="shrink-0" />
+              <Home size={15} className="shrink-0" />
               <span className="flex-1 truncate">Home</span>
-              {homeActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Users size={17} className="shrink-0" />
+              <Users size={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
-              {exploreActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
           <li>
             <Link
               href="/dashboard/chat-with-designers"
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-body text-sm font-medium transition-colors ${
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 designersActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Gamepad2 size={17} className="shrink-0" />
+              <Gamepad2 size={15} className="shrink-0" />
               <span className="flex-1 truncate">Chat with designers</span>
-              {designersActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-              )}
             </Link>
           </li>
         </ul>
@@ -157,7 +171,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
           </div>
         ) : (
           <div>
-            <div className="flex items-center justify-between px-5 pt-3 pb-2">
+            <div className="flex items-center justify-between px-[17px] pb-[7px] pt-[9px]">
               <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
                 Your Community
               </span>
@@ -171,7 +185,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                 <Plus size={11} strokeWidth={2.5} />
               </button>
             </div>
-            <ul className="space-y-0.5 px-3">
+            <ul className="flex flex-col gap-[3px] px-[13px]">
               {sorted.map((c) => (
                 <CommunityRow
                   key={c.id}
@@ -184,6 +198,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
             </ul>
           </div>
         )}
+      </div>
       </div>
     </aside>
   );

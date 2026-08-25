@@ -107,27 +107,19 @@ export default async function PublicEventDetailPage({ params }: Props) {
   ]);
 
   return (
-    <div className="flex items-start h-full">
-      {/* Main content — mirrors homepage feed column */}
-      <div className="flex-1 min-w-0 border-r border-border">
-        <EventDetailClient
-          event={event}
-          initialRsvps={initialRsvps}
-          currentUserId={userId}
-          currentUserName={userRow.data?.name ?? ""}
-          currentUserAvatar={profileRow.data?.avatar_url ?? null}
-          communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
-          communityName={communityData.data?.name ?? (event.community_id ? "Community" : "Public event")}
-          communityImage={communityData.data?.image_url ?? null}
-          showCommunityAttribution
-          backHref="/dashboard"
-        />
-      </div>
-
-      {/* Right sidebar — mirrors homepage Discover column */}
-      <aside className="hidden lg:block w-72 shrink-0 sticky top-6 p-4">
-        <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
-      </aside>
+    <div className="mx-auto min-h-full w-full max-w-3xl">
+      <EventDetailClient
+        event={event}
+        initialRsvps={initialRsvps}
+        currentUserId={userId}
+        currentUserName={userRow.data?.name ?? ""}
+        currentUserAvatar={profileRow.data?.avatar_url ?? null}
+        communityId={event.community_id ?? PUBLIC_CONTENT_SCOPE}
+        communityName={communityData.data?.name ?? (event.community_id ? "Community" : "Public event")}
+        communityImage={communityData.data?.image_url ?? null}
+        showCommunityAttribution
+        backHref="/dashboard"
+      />
     </div>
   );
 }

@@ -330,8 +330,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
         <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
 
           {/* Resource card */}
-          <div className={`${communityFeedLayout.dividerY} py-6`}>
-            <div className={communityFeedLayout.detailSection}>
+          <div className={communityFeedLayout.detailSection}>
               <ResourceCard
                 variant="detail"
                 resource={resource}
@@ -342,11 +341,10 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                 onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
                 onDeleted={() => router.push(`/dashboard/communities/${communityId}?tab=resources`)}
               />
-            </div>
           </div>
 
           {/* Comments section */}
-          <div className={`mt-6 ${communityFeedLayout.detailSection}`}>
+          <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
             <div className="mb-4 flex items-center gap-2">
               <span className="font-display text-sm font-semibold text-foreground">
                 {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
