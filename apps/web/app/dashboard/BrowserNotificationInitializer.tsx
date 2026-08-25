@@ -47,10 +47,10 @@ export function BrowserNotificationInitializer() {
       {!dismissed && (
         <aside
           aria-label="Notification status"
-          className="fixed inset-x-4 top-4 z-40 mx-auto flex max-w-3xl items-center gap-3 rounded-2xl border border-accent/20 bg-accent-soft px-4 py-3 text-foreground shadow-xl shadow-background/20 sm:gap-4 sm:px-5"
+          className="mx-3 mb-2 flex shrink-0 items-center gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2.5 text-foreground"
         >
-          <BellOff className="size-6 shrink-0 text-accent sm:size-7" aria-hidden="true" />
-          <p className="min-w-0 flex-1 font-body text-sm leading-relaxed sm:text-base">
+          <BellOff className="size-5 shrink-0 text-accent" aria-hidden="true" />
+          <p className="min-w-0 flex-1 font-body text-xs leading-relaxed">
             Message notifications are off.{" "}
             <button
               type="button"
@@ -63,7 +63,7 @@ export function BrowserNotificationInitializer() {
           <button
             type="button"
             onClick={() => setDismissed(true)}
-            className="flex size-9 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-background/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex size-7 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-background/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Dismiss notification reminder"
           >
             <X className="size-5" aria-hidden="true" />
@@ -73,7 +73,7 @@ export function BrowserNotificationInitializer() {
 
       {showGuide && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 px-5 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 px-5 backdrop-blur-md"
           role="dialog"
           aria-modal="true"
           aria-labelledby="notification-guide-title"

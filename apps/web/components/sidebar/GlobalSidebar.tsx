@@ -10,6 +10,7 @@ import { useSidebarCommunities } from "@/components/communities/panel/useSidebar
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 
 interface SidebarUser {
@@ -85,6 +86,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
         </p>
         <NotificationBell userId={userId} />
       </div>
+
+      {!mobile && <BrowserNotificationInitializer />}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
       {/* WORKSPACE nav */}
