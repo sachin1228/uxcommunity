@@ -29,7 +29,7 @@ export function Modal({
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     },
-    [onClose],
+    [onClose]
   );
 
   useEffect(() => {
@@ -59,38 +59,34 @@ export function Modal({
 
       {/* Panel */}
       <div
-        className={`linear-modal relative z-10 max-h-[calc(100vh-2rem)] w-full overflow-y-auto ${maxWidth} ${panelClassName ?? ""}`}
+        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-border bg-surface shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto ${panelClassName ?? "p-8"}`}
       >
         {title && (
-          <div className="linear-modal-header justify-between">
-            <h2 className="font-display text-sm font-semibold text-foreground">
+          <div className="mb-6 flex items-start justify-between gap-4">
+            <h2 className="font-display text-xl font-semibold text-foreground">
               {title}
             </h2>
             {!hideCloseButton && (
               <button
-                type="button"
                 onClick={onClose}
-                className="linear-icon-button shrink-0"
+                className="flex-shrink-0 text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Close"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             )}
           </div>
         )}
         {!title && !hideCloseButton && (
           <button
-            type="button"
             onClick={onClose}
-            className="linear-icon-button absolute right-3 top-3"
+            className="absolute right-4 top-4 text-foreground-muted hover:text-foreground transition-colors"
             aria-label="Close"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         )}
-        <div className={panelClassName ? undefined : "linear-modal-body"}>
-          {children}
-        </div>
+        {children}
       </div>
     </div>
   );

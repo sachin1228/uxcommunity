@@ -55,10 +55,8 @@
   --color-overlay-foreground: var(--color-mist);
   --color-overlay-muted: var(--color-fog);
 
-  --font-inter-variable:
-    var(--font-display), Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-berkeley-mono:
-    var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
+  --font-inter-variable: var(--font-display), Inter, ui-sans-serif, system-ui, sans-serif;
+  --font-berkeley-mono: var(--font-mono), "JetBrains Mono", ui-monospace, monospace;
   --font-weight-light: 300;
   --font-weight-regular: 400;
   --font-weight-medium: 510;
@@ -88,20 +86,6 @@
   --radius-badges: 4px;
   --radius-inputs: 6px;
   --radius-buttons: 6px;
-
-  --control-height-sm: 28px;
-  --control-height-md: 32px;
-  --control-height-lg: 36px;
-  --control-font-size: 13px;
-  --control-line-height: 18px;
-  --control-padding-x: 12px;
-  --menu-item-height: 32px;
-  --modal-padding: 20px;
-  --color-control: #1b1c1f;
-  --color-control-hover: #232428;
-  --color-control-active: #2b2c31;
-  --color-menu: #1c1d20;
-  --color-modal: #151619;
 
   --shadow-xs: rgba(0, 0, 0, 0.2) 0 0 0 1px;
   --shadow-sm: rgba(0, 0, 0, 0.4) 0 2px 4px;

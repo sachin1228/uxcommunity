@@ -17,11 +17,8 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings:
-    "cv01" 1,
-    "ss03" 1,
-    "zero" 1;
-  font-size: 14px;
+  font-feature-settings: "cv01" 1, "ss03" 1, "zero" 1;
+  font-size: 16px;
   font-weight: 400;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
@@ -60,34 +57,13 @@ body {
   textarea,
   select {
     transition-duration: 160ms;
-    transition-property:
-      color, background-color, border-color, box-shadow, opacity;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
     transition-timing-function: ease-out;
   }
 
   button,
   [role="button"] {
-    font-size: var(--control-font-size);
     font-weight: 510;
-    line-height: var(--control-line-height);
-  }
-
-  button:not(:disabled),
-  [role="button"]:not([aria-disabled="true"]) {
-    cursor: pointer;
-  }
-
-  select {
-    min-height: var(--control-height-md);
-    padding-inline: var(--control-padding-x);
-    font-size: var(--control-font-size);
-  }
-
-  [role="menuitem"] {
-    min-height: var(--menu-item-height);
-    border-radius: var(--radius-buttons);
-    font-size: var(--control-font-size);
-    line-height: var(--control-line-height);
   }
 
   input,
@@ -124,157 +100,11 @@ body {
     font-size: 12px;
     letter-spacing: -0.013em;
   }
-
-  .linear-button {
-    display: inline-flex;
-    min-height: var(--control-height-md);
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    border: 1px solid var(--color-border-strong);
-    border-radius: var(--radius-buttons);
-    background: var(--color-control);
-    padding: 0 var(--control-padding-x);
-    color: var(--color-mist);
-    font-size: var(--control-font-size);
-    font-weight: 510;
-    line-height: var(--control-line-height);
-    box-shadow:
-      inset 0 1px rgb(255 255 255 / 0.035),
-      var(--shadow-xs);
-  }
-
-  .linear-button:hover {
-    background: var(--color-control-hover);
-    color: var(--color-paper);
-  }
-
-  .linear-button:active {
-    background: var(--color-control-active);
-    transform: translateY(1px);
-  }
-
-  .linear-button-primary {
-    border-color: var(--color-accent);
-    background: var(--color-accent);
-    color: var(--color-accent-foreground);
-  }
-
-  .linear-button-primary:hover {
-    border-color: var(--color-accent-hover);
-    background: var(--color-accent-hover);
-  }
-
-  .linear-button-ghost {
-    border-color: transparent;
-    background: transparent;
-    box-shadow: none;
-    color: var(--color-fog);
-  }
-
-  .linear-button-ghost:hover {
-    background: var(--color-control-hover);
-    color: var(--color-mist);
-  }
-
-  .linear-icon-button {
-    display: inline-flex;
-    min-height: var(--control-height-md);
-    min-width: var(--control-height-md);
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    border-radius: var(--radius-buttons);
-    color: var(--color-fog);
-  }
-
-  .linear-icon-button:hover {
-    border-color: var(--color-border);
-    background: var(--color-control-hover);
-    color: var(--color-paper);
-  }
-
-  .linear-field {
-    min-height: var(--control-height-lg);
-    border: 1px solid var(--color-input-border);
-    border-radius: var(--radius-inputs);
-    background: var(--color-input-background);
-    padding: 0 var(--control-padding-x);
-    color: var(--color-mist);
-    font-size: var(--control-font-size);
-    line-height: var(--control-line-height);
-  }
-
-  .linear-menu {
-    overflow: hidden;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 8px;
-    background: var(--color-menu);
-    padding: 4px;
-    box-shadow:
-      var(--shadow-xl),
-      inset 0 1px rgb(255 255 255 / 0.035);
-  }
-
-  .linear-menu-item {
-    display: flex;
-    min-height: var(--menu-item-height);
-    align-items: center;
-    gap: 8px;
-    border-radius: var(--radius-buttons);
-    padding: 6px 8px;
-    color: var(--color-mist);
-    font-size: var(--control-font-size);
-    font-weight: 400;
-    line-height: var(--control-line-height);
-  }
-
-  .linear-menu-item:hover,
-  .linear-menu-item[aria-selected="true"] {
-    background: var(--color-control-hover);
-    color: var(--color-paper);
-  }
-
-  .linear-modal {
-    overflow: hidden;
-    border: 1px solid var(--color-border-strong);
-    border-radius: 12px;
-    background: var(--color-modal);
-    box-shadow:
-      var(--shadow-xl),
-      inset 0 1px rgb(255 255 255 / 0.035);
-  }
-
-  .linear-modal-header,
-  .linear-modal-footer {
-    display: flex;
-    min-height: 52px;
-    align-items: center;
-    gap: 12px;
-    padding: 12px var(--modal-padding);
-  }
-
-  .linear-modal-header {
-    border-bottom: 1px solid var(--color-border-subtle);
-  }
-
-  .linear-modal-footer {
-    justify-content: flex-end;
-    border-top: 1px solid var(--color-border-subtle);
-  }
-
-  .linear-modal-body {
-    padding: var(--modal-padding);
-  }
 }
 
 @layer utilities {
   .grid-dots {
-    background-image: radial-gradient(
-      circle,
-      var(--grid-dot-color) 1px,
-      transparent 1px
-    );
+    background-image: radial-gradient(circle, var(--grid-dot-color) 1px, transparent 1px);
     background-size: var(--grid-size) var(--grid-size);
   }
 
@@ -287,55 +117,6 @@ body {
 }
 
 /* Compatibility layer: legacy utilities now resolve through the new system. */
-button.rounded-lg,
-button.rounded-xl,
-button.rounded-2xl {
-  border-radius: var(--radius-buttons);
-}
-
-button[class*="py-2.5"],
-button[class*="py-3"],
-button[class*="py-4"] {
-  min-height: var(--control-height-lg);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-}
-
-button.text-sm,
-button.text-base,
-button.text-lg {
-  font-size: var(--control-font-size);
-  line-height: var(--control-line-height);
-}
-
-[role="dialog"] > form,
-[role="dialog"] > div:not([aria-hidden="true"]),
-.fixed.inset-0 > form {
-  border-radius: 12px;
-}
-
-[role="dialog"] h2.text-xl,
-[role="dialog"] h2.text-2xl,
-[role="dialog"] h3.text-lg {
-  font-size: 0.9375rem;
-  line-height: 1.25rem;
-}
-
-[role="dialog"] input.text-sm,
-[role="dialog"] select.text-sm,
-[role="dialog"] textarea.text-sm,
-[role="menu"] .text-sm {
-  font-size: var(--control-font-size);
-  line-height: var(--control-line-height);
-}
-
-[role="menu"] > button,
-[role="menu"] [role="menuitem"] {
-  min-height: var(--menu-item-height);
-  padding: 6px 8px;
-  border-radius: var(--radius-buttons);
-}
-
 .font-bold,
 .font-extrabold,
 .font-black {
