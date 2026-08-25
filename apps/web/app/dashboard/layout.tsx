@@ -44,7 +44,7 @@ export default async function DashboardLayout({
         <GlobalSidebar userId={userId} user={sidebarUser} />
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col bg-surface">
+      <div className="flex min-w-0 flex-1 flex-col bg-background-subtle">
         <header className="flex h-12 shrink-0 items-center border-b border-border px-3 lg:hidden">
           <MobileSidebar userId={userId} user={sidebarUser} />
           <span className="ml-2 font-body text-sm font-medium text-foreground">
@@ -52,7 +52,7 @@ export default async function DashboardLayout({
           </span>
         </header>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-surface">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background-subtle">
           {children}
         </main>
       </div>
