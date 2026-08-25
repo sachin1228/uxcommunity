@@ -19,11 +19,11 @@ export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvata
       <img
         src={imageUrl}
         alt={name}
-        width={40}
-        height={40}
+        width={36}
+        height={36}
         loading="lazy"
         decoding="async"
-        className="h-11 w-11 rounded-full object-cover shrink-0"
+        className="size-9 shrink-0 rounded-full object-cover"
         onError={() => setFailed(true)}
       />
     );
@@ -31,7 +31,7 @@ export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvata
 
   return (
     <CommunityIcon
-      size={40}
+      size={36}
       className={active ? "bg-accent/20" : "bg-surface-raised"}
     />
   );
