@@ -203,10 +203,18 @@ export function ChatHeader({
                       )}
                     </span>
                   </h3>
-                  <p className="font-body text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1">
-                    <Users size={10} /> {community.member_count} member
-                    {community.member_count !== 1 ? "s" : ""}
-                  </p>
+                  <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <Users size={10} /> {community.member_count} member
+                      {community.member_count !== 1 ? "s" : ""}
+                    </span>
+                    {onlineCount > 0 && (
+                      <span className="inline-flex items-center gap-1" aria-label={`${onlineCount} online`}>
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
+                        {onlineCount} online
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div ref={menuRef} className="relative flex items-center gap-2">

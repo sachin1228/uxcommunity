@@ -310,19 +310,9 @@ export function CommunityInfoPanel({ members, community, communityId, currentUse
       <div className="border border-border mr-4 mt-4 rounded-xl flex flex-col">
 
         {/* Members */}
-        <Section
-          title={`Members (${memberCount.toLocaleString()})`}
-          action={
-            onlineCount > 0 ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0" />
-                {onlineCount} online
-              </span>
-            ) : undefined
-          }
-        >
-          <AvatarStack members={members} total={memberCount} />
-        </Section>
+      <Section title={`Members (${memberCount.toLocaleString()})`}>
+        <AvatarStack members={members} total={memberCount} />
+      </Section>
 
         {/* Upcoming Events — only shown when a real upcoming event exists */}
         {upcomingEvent && (
