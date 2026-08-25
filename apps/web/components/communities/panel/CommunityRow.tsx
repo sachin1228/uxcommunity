@@ -68,11 +68,7 @@ export function CommunityRow({
     <li>
       <button
         onClick={onClick}
-        className={`flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${
-          active
-            ? "bg-surface-raised text-foreground"
-            : "hover:bg-surface-raised"
-        }`}
+        className="flex w-full items-start gap-2.5 rounded-lg px-2 py-2 text-left text-foreground transition-colors hover:bg-surface-raised"
       >
         <CommunityAvatar
           imageUrl={c.image_url}
