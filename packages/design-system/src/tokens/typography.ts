@@ -1,7 +1,7 @@
 /** Typography tokens for compact, high-clarity product interfaces. */
 export const fontFamily = {
-  display: "var(--font-display), Inter, ui-sans-serif, system-ui, sans-serif",
-  body: "var(--font-display), Inter, ui-sans-serif, system-ui, sans-serif",
+  display: "var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif",
+  body: "var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif",
   mono: "var(--font-mono), 'JetBrains Mono', ui-monospace, monospace",
 } as const;
 

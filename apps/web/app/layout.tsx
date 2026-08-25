@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, JetBrains_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
 import "./globals.css";
 
-const inter = Inter({
+const geist = Geist({
   subsets: ["latin"],
   variable: "--font-display",
 });
@@ -61,7 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetBrainsMono.variable} bg-background`}
+      className={`${geist.variable} ${jetBrainsMono.variable} bg-background`}
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground antialiased">

@@ -16,7 +16,7 @@ html {
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);
-  font-family: var(--font-inter-variable);
+  font-family: var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif;
   font-feature-settings: "cv01" 1, "ss03" 1, "zero" 1;
   font-size: 16px;
   font-weight: 400;

@@ -50,9 +50,9 @@ const config: Config = {
         "overlay-muted":       "var(--color-overlay-muted)",
       },
       fontFamily: {
-        sans: ["var(--font-display)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        body: ["var(--font-display)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
+        body: ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "JetBrains Mono", "ui-monospace", "monospace"],
       },
       boxShadow: {
