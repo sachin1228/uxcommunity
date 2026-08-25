@@ -357,6 +357,7 @@ export class DesignersRoom {
   private cameraPosition = new THREE.Vector3();
   private cameraTarget = new THREE.Vector3();
 
+  private inputEnabled = false;
   private touchMoveX = 0;
   private touchMoveZ = 0;
   private touchSprint = false;
@@ -458,14 +459,26 @@ export class DesignersRoom {
     }
   }
 
+  setInputEnabled(enabled: boolean) {
+    this.inputEnabled = enabled;
+    if (!enabled) {
+      this.keys.clear();
+      this.touchMoveX = 0;
+      this.touchMoveZ = 0;
+      this.touchSprint = false;
+    }
+  }
+
   /** Touch/drag: directional vector in local space, both in [-1, 1]. */
   setTouchMove(fx: number, fz: number) {
+    if (!this.inputEnabled) return;
     this.touchMoveX = Math.max(-1, Math.min(1, fx));
     this.touchMoveZ = Math.max(-1, Math.min(1, fz));
   }
 
   /** Drag orbits the isometric camera horizontally and vertically around the player. */
   addLook(dx: number, dy: number) {
+    if (!this.inputEnabled) return;
     this.yaw -= dx * 0.0022;
     this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.0022, 0.3, 1.25);
   }
@@ -501,6 +514,7 @@ export class DesignersRoom {
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (!this.inputEnabled) return;
     const k = e.key.toLowerCase();
     if (["w", "a", "s", "d", "shift", " "].includes(k)) e.preventDefault();
     if (k === " " && this.grounded && !e.repeat) {
