@@ -20,7 +20,6 @@ export function BrowserNotificationInitializer() {
   }, []);
 
   useEffect(() => {
-    void initializeBrowserNotifications().then(setPermission);
     window.addEventListener("focus", refreshPermission);
     document.addEventListener("visibilitychange", refreshPermission);
 
@@ -30,13 +29,12 @@ export function BrowserNotificationInitializer() {
     };
   }, [refreshPermission]);
 
-  const turnOnNotifications = async () => {
+  const turnOnNotifications = () => {
     if (typeof Notification === "undefined") return;
 
     setShowGuide(true);
     if (Notification.permission === "default") {
-      const nextPermission = await Notification.requestPermission();
-      setPermission(nextPermission);
+      void initializeBrowserNotifications().then(setPermission);
     }
   };
 
@@ -73,7 +71,7 @@ export function BrowserNotificationInitializer() {
 
       {showGuide && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 px-5 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="notification-guide-title"
