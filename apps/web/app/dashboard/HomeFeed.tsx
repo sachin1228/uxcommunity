@@ -311,7 +311,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }
 
   const cardClassName =
-    "overflow-hidden rounded-xl border border-border [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+    "overflow-hidden rounded-xl border border-dashed border-border [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
 
   return (
     <>
