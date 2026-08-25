@@ -1,35 +1,25 @@
-import { neutral, blue, signal, dark } from "../tokens/colors";
+import { accent, neutral, signal } from "../tokens/colors";
 
-/**
- * Dark theme — Geist blue-700 (#52a8ff) as accent (lighter for dark bg legibility),
- * blue-600 (#0070f3) as hover (slightly darker).
- */
 export const darkTheme = {
-  background:        dark[900],
-  backgroundSubtle:  dark[800],
-
-  surface:           dark[800],
-  surfaceRaised:     dark[700],
-
-  foreground:        dark[100],
-  foregroundMuted:   dark[400],
-  foregroundSubtle:  neutral[500],
-
-  accent:            blue[700],     // #52a8ff — lighter for dark bg
-  accentHover:       blue[600],     // #0070f3 — hover goes slightly darker
-  accentSoft:        dark[700],
-  accentForeground:  neutral[0],
-
-  border:            dark[600],
-  borderSubtle:      dark[700],
-
+  background: neutral.void,
+  backgroundSubtle: neutral.carbon,
+  surface: neutral.carbon,
+  surfaceRaised: neutral.obsidian,
+  foreground: neutral.paper,
+  foregroundMuted: neutral.fog,
+  foregroundSubtle: neutral.ash,
+  accent: accent.lime,
+  accentHover: accent.limeHover,
+  accentSoft: neutral.obsidian,
+  accentForeground: neutral.void,
+  border: neutral.graphite,
+  borderSubtle: neutral.obsidian,
   signal,
-
-  overlay:           dark[900],
-  overlayRaised:     dark[800],
-  overlayElevated:   dark[700],
-  overlayForeground: dark[100],
-  overlayMuted:      dark[400],
+  overlay: neutral.void,
+  overlayRaised: neutral.carbon,
+  overlayElevated: neutral.obsidian,
+  overlayForeground: neutral.mist,
+  overlayMuted: neutral.fog,
 } as const;
 
 export type DarkTheme = typeof darkTheme;

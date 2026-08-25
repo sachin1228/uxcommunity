@@ -1,112 +1,4 @@
-/**
- * UX Community design system CSS custom properties.
- * Primary accent: #0070F3. Hover: #0060D1.
- */
-
-/* ─── Light mode (default) ─────────────────────────────────────────── */
-:root {
-  color-scheme: light dark;
-
-  --color-background:        #FAFAFA;
-  --color-background-subtle: #F5F5F5;
-
-  --color-surface:           #FFFFFF;
-  --color-surface-raised:    #F5F5F5;
-
-  --color-foreground:        #0A0A0A;
-  --color-foreground-muted:  #525252;
-  --color-foreground-subtle: #737373;
-
-  /* Accent */
-  --color-accent:            #0070F3;
-  --color-accent-rgb:        0 112 243;   /* RGB channels for opacity modifiers */
-  --color-accent-hover:      #0060D1;     /* darker hover shade */
-  --color-accent-soft:       #f0f8ff;     /* tinted bg */
-  --color-accent-foreground: #FFFFFF;
-
-  --color-border:            #EAEAEA;
-  --color-border-subtle:     #F5F5F5;
-
-  --color-signal:            #0070F3;
-
-  --color-overlay:            #0A0A0A;
-  --color-overlay-raised:     #111111;
-  --color-overlay-elevated:   #1A1A1A;
-  --color-overlay-foreground: #EDEDED;
-  --color-overlay-muted:      #737373;
-
-  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
-  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-card: 0 0 0 1px var(--color-border), 0 2px 4px rgb(0 0 0 / 0.04);
-
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   12px;
-  --radius-full: 9999px;
-
-  --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
-  --grid-size:       28px;
-}
-
-/* ─── Dark mode ─────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Backgrounds */
-    --color-background:        #09090B;
-    --color-background-subtle: #0E0E10;  /* sidebars */
-
-    --color-surface:           #121214;
-    --color-surface-raised:    #1B1B1F;  /* modals, dropdowns, popovers */
-    --color-surface-hover:     #17171A;  /* hover states */
-    --color-input-background:  #151517;  /* inputs & textareas */
-
-    --color-foreground:        #EDEDED;
-    --color-foreground-muted:  #737373;
-    --color-foreground-subtle: #525252;
-
-    /* Accent */
-    --color-accent:            #0070F3;
-    --color-accent-rgb:        0 112 243;
-    --color-accent-hover:      #0060D1;
-    --color-accent-soft:       #18243D;
-    --color-accent-foreground: #FFFFFF;
-
-    /* Borders */
-    --color-border:            #202024;
-    --color-border-subtle:     #1D1D21;  /* section dividers */
-    --color-border-strong:     #2D2D34;  /* active components */
-    --color-input-border:      #303036;  /* input fields */
-
-    --color-signal:            #0070F3;
-
-    /* Navigation */
-    --color-nav-hover:         #17171A;
-    --color-nav-active:        #18243D;
-    --color-nav-active-hover:  #1D2A46;
-
-    /* Neutral buttons */
-    --color-button-secondary:        #1A1A1E;
-    --color-button-secondary-hover:  #232329;
-    --color-button-secondary-active: #2A2A31;
-
-    --color-overlay:            #09090B;
-    --color-overlay-raised:     #121214;
-    --color-overlay-elevated:   #1B1B1F;
-    --color-overlay-foreground: #EDEDED;
-    --color-overlay-muted:      #737373;
-
-    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
-    --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
-    --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
-    --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
-
-    --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
-  }
-}
+@import "@uxcommunity/design-system/css/tokens.css";
 
 @tailwind base;
 @tailwind components;
@@ -114,23 +6,105 @@
 
 html,
 body {
-  height: 100%;
+  min-height: 100%;
+}
+
+html {
+  background-color: var(--color-background);
 }
 
 body {
-  font-family: var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif;
   background-color: var(--color-background);
   color: var(--color-foreground);
+  font-family: var(--font-inter-variable);
+  font-feature-settings: "cv01" 1, "ss03" 1, "zero" 1;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
 }
 
-/* ─── Grid theme utilities ───────────────────────────────────────────── */
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-paper);
+    font-weight: 510;
+    letter-spacing: -0.012em;
+    text-wrap: balance;
+  }
+
+  h1,
+  h2 {
+    letter-spacing: -0.022em;
+  }
+
+  a,
+  button,
+  input,
+  textarea,
+  select {
+    transition-duration: 160ms;
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+    transition-timing-function: ease-out;
+  }
+
+  button,
+  [role="button"] {
+    font-weight: 510;
+  }
+
+  input,
+  textarea,
+  select {
+    border-color: var(--color-input-border);
+    border-radius: var(--radius-inputs);
+    background: var(--color-input-background);
+    color: var(--color-mist);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-fog);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .ds-surface {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-cards);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .ds-eyebrow {
+    color: var(--color-fog);
+    font-family: var(--font-berkeley-mono);
+    font-size: 12px;
+    letter-spacing: -0.013em;
+  }
+}
+
 @layer utilities {
   .grid-dots {
-    background-image: radial-gradient(
-      circle,
-      var(--grid-dot-color) 1px,
-      transparent 1px
-    );
+    background-image: radial-gradient(circle, var(--grid-dot-color) 1px, transparent 1px);
     background-size: var(--grid-size) var(--grid-size);
   }
 
@@ -142,33 +116,92 @@ body {
   }
 }
 
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: none;
+/* Compatibility layer: legacy utilities now resolve through the new system. */
+.font-bold,
+.font-extrabold,
+.font-black {
+  font-weight: 590;
 }
 
-/* ─── Custom scrollbar ───────────────────────────────────────────────── */
+.font-semibold {
+  font-weight: 510;
+}
+
+.rounded-2xl,
+.rounded-3xl {
+  border-radius: var(--radius-cards);
+}
+
+.bg-blue-500,
+.bg-blue-600,
+.bg-blue-700 {
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+.hover\:bg-blue-600:hover,
+.hover\:bg-blue-700:hover,
+.hover\:bg-blue-800:hover {
+  background-color: var(--color-accent-hover);
+}
+
+.text-blue-400,
+.text-blue-500,
+.text-blue-600,
+.text-blue-700 {
+  color: var(--color-accent);
+}
+
+.border-blue-400,
+.border-blue-500,
+.border-blue-600 {
+  border-color: var(--color-accent);
+}
+
+.bg-blue-500\/10,
+.bg-blue-500\/20,
+.bg-blue-600\/10,
+.bg-blue-600\/20 {
+  background-color: var(--color-accent-soft);
+  color: var(--color-mist);
+}
+
+.ring-blue-500,
+.focus\:ring-blue-500:focus,
+.focus-visible\:ring-blue-500:focus-visible {
+  --tw-ring-color: var(--color-accent);
+}
+
 * {
+  scrollbar-color: rgb(255 255 255 / 0.12) transparent;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255 255 255 / 0.12) transparent;
 }
 
-*::-webkit-scrollbar { width: 4px; height: 4px; }
-*::-webkit-scrollbar-track { background: transparent; }
-*::-webkit-scrollbar-thumb { background: rgba(255 255 255 / 0.12); border-radius: 9999px; }
-*::-webkit-scrollbar-thumb:hover { background: rgba(255 255 255 / 0.22); }
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
 
-@media (prefers-color-scheme: light) {
-  * { scrollbar-color: rgba(0 0 0 / 0.12) transparent; }
-  *::-webkit-scrollbar-thumb { background: rgba(0 0 0 / 0.12); }
-  *::-webkit-scrollbar-thumb:hover { background: rgba(0 0 0 / 0.22); }
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: rgb(255 255 255 / 0.12);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.22);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
   }
 }

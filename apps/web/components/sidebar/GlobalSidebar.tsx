@@ -73,7 +73,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
         <p className="px-1 mb-3 font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
           Workspace
         </p>
-        <ul className="space-y-1">
+        <ul className="flex flex-col gap-1">
           <li>
             <Link
               href="/dashboard"
@@ -171,7 +171,7 @@ export function GlobalSidebar({ userId, mobile = false }: Props) {
                 <Plus size={11} strokeWidth={2.5} />
               </button>
             </div>
-            <ul className="space-y-0.5 px-3">
+            <ul className="flex flex-col gap-0.5 px-3">
               {sorted.map((c) => (
                 <CommunityRow
                   key={c.id}

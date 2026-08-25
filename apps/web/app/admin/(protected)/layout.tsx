@@ -26,7 +26,7 @@ export default async function AdminProtectedLayout({
       </aside>
 
       {/* Main content */}
-      <main className="ml-[12rem] mt-11 flex-1 px-6 py-5">
+      <main className="ml-[12rem] mt-11 min-w-0 flex-1 px-6 py-5">
         {children}
       </main>
     </div>

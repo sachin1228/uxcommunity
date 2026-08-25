@@ -43,7 +43,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background text-foreground">
       {/* Full-width topbar */}
-      <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border px-3 sm:px-5">
+      <header className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background-subtle/95 px-3 backdrop-blur sm:px-5">
         <MobileSidebar userId={userId} />
         <span className="text-lg font-medium leading-none tracking-tight text-foreground">
           <BrandLogo iconClassName="h-6 w-6" wordmarkClassName="text-lg" />

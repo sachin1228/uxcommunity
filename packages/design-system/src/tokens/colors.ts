@@ -1,60 +1,42 @@
-/**
- * Raw color palette — all primitive values.
- * These are the foundation of the design system; do not use them directly
- * in UI code. Reference semantic tokens from `themes/` instead.
- *
- * Official Geist blue scale — 100 = darkest, 1000 = lightest.
- * Source: vercel.com/geist/colors
- */
-
-export const blue = {
-  100:  "#000b1f", // deepest navy
-  200:  "#00254d",
-  300:  "#003c85",
-  400:  "#0057b7",
-  500:  "#006bdb",
-  600:  "#0070F3", // ← PRIMARY brand accent
-  700:  "#52a8ff",
-  800:  "#adcfff",
-  900:  "#d9ecff",
-  1000: "#f0f8ff", // barely-there tint — soft backgrounds
-} as const;
-
-/** Geist Neutral — clean, cool-neutral grays */
+/** Primitive colors for the midnight precision design language. */
 export const neutral = {
-  0:    "#FFFFFF",
-  50:   "#FAFAFA",
-  100:  "#F5F5F5",
-  200:  "#EAEAEA",
-  300:  "#E0E0E0",
-  400:  "#A8A8A8",
-  500:  "#737373",
-  600:  "#525252",
-  700:  "#404040",
-  800:  "#262626",
-  900:  "#171717",
-  1000: "#0A0A0A",
+  void: "#08090a",
+  carbon: "#0f1011",
+  obsidian: "#161718",
+  graphite: "#23252a",
+  smoke: "#383b3f",
+  ash: "#62666d",
+  fog: "#8a8f98",
+  mist: "#d0d6e0",
+  bone: "#e5e5e6",
+  paper: "#ffffff",
 } as const;
 
-/** Geist Dark — near-black backgrounds for dark mode */
-export const dark = {
-  900: "#0A0A0A",
-  800: "#111111",
-  700: "#1A1A1A",
-  600: "#2E2E2E",
-  500: "#3E3E3E",
-  400: "#737373",
-  100: "#EDEDED",
+export const accent = {
+  lime: "#e4f222",
+  limeHover: "#d5e31f",
+  green: "#27a644",
+  red: "#eb5757",
+  teal: "#02b8cc",
+  iris: "#6366f1",
+  lavender: "#8b5cf6",
 } as const;
 
-/** Brand signal */
-export const signal = blue[600] as const;
-
-export const colors = {
-  blue,
-  neutral,
-  dark,
-  signal,
+/** Backward-compatible alias; new interfaces should consume semantic themes. */
+export const blue = {
+  100: neutral.void,
+  200: neutral.carbon,
+  300: neutral.obsidian,
+  400: accent.limeHover,
+  500: accent.lime,
+  600: accent.lime,
+  700: accent.lime,
+  800: neutral.mist,
+  900: neutral.bone,
+  1000: neutral.paper,
 } as const;
 
+export const dark = neutral;
+export const signal = accent.lime;
+export const colors = { neutral, accent, blue, dark, signal } as const;
 export type Colors = typeof colors;

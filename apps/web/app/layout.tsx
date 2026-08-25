@@ -1,19 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
 import "./globals.css";
 
-const geist = Geist({
+const inter = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   variable: "--font-display",
 });
 
-const geistMono = Geist_Mono({
+const jetBrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400"],
   variable: "--font-mono",
 });
 
@@ -50,7 +49,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0070F3",
+  themeColor: "#08090a",
   colorScheme: "dark",
 };
 
@@ -62,7 +61,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${inter.variable} ${jetBrainsMono.variable} bg-background`}
       suppressHydrationWarning
     >
       <body className="bg-background text-foreground antialiased">

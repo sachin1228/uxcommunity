@@ -52,7 +52,7 @@ export function Modal({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-overlay/80 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
