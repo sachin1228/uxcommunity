@@ -220,39 +220,6 @@ export function EventCard({
           )}
         </div>
         <div className={`flex min-w-0 flex-1 flex-col ${isDetail ? "gap-2 p-4 sm:p-5" : "gap-1.5 py-5 pl-2 pr-4"}`}>
-          <div className="flex items-start justify-between gap-2">
-            <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"}`}>
-              {past ? "Past Event" : "Upcoming Event"}
-            </span>
-            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
-              {!past && (
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={rsvpPending || full}
-                  className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
-                >
-                  {rsvpPending ? (isDetail ? "Updating…" : "…") : event.user_rsvped ? "Going ✓" : full ? (isDetail ? "Event Full" : "Full") : "Join Event"}
-                </button>
-              )}
-              {!isDetail && (
-                <EventOptionsMenu
-                  saved={event.user_saved}
-                  shared={shared}
-                  reported={reported}
-                  isOwner={isOwner}
-                  deleting={deleting}
-                  saving={savePending}
-                  className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
-                  onSave={toggleSave}
-                  onShare={() => void handleShare()}
-                  onEdit={() => setShowEditModal(true)}
-                  onDelete={() => setConfirmDelete(true)}
-                  onReport={() => setReported(true)}
-                />
-              )}
-            </div>
-          </div>
           {isDetail ? (
             <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
           ) : (
@@ -291,6 +258,39 @@ export function EventCard({
             </p>
           )}
           {isDetail && (error || rsvpError) && <p className="font-body text-xs text-red-400">{error || rsvpError}</p>}
+          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+            <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"}`}>
+              {past ? "Past Event" : "Upcoming Event"}
+            </span>
+            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
+              {!past && (
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={rsvpPending || full}
+                  className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                >
+                  {rsvpPending ? (isDetail ? "Updating…" : "…") : event.user_rsvped ? "Going ✓" : full ? (isDetail ? "Event Full" : "Full") : "Join Event"}
+                </button>
+              )}
+              {!isDetail && (
+                <EventOptionsMenu
+                  saved={event.user_saved}
+                  shared={shared}
+                  reported={reported}
+                  isOwner={isOwner}
+                  deleting={deleting}
+                  saving={savePending}
+                  className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
+                  onSave={toggleSave}
+                  onShare={() => void handleShare()}
+                  onEdit={() => setShowEditModal(true)}
+                  onDelete={() => setConfirmDelete(true)}
+                  onReport={() => setReported(true)}
+                />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
