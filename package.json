@@ -10,6 +10,8 @@
     "dev:realtime": "npm run dev --workspace=apps/realtime",
     "build": "npm run build --workspace=apps/web",
     "start": "npm run start --workspace=apps/web",
+    "preview": "npm run preview --workspace=apps/web",
+    "cloudflare:build": "npm run cloudflare:build --workspace=apps/web",
     "lint": "npm run lint --workspace=apps/web",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
     "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
@@ -21,7 +23,7 @@
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"
   },
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=10.0.0"
   },
   "dependencies": {

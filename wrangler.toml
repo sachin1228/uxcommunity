@@ -1,0 +1,26 @@
+# Root-level shim for Cloudflare builds that run `npx wrangler preview`
+# from the monorepo root. The app-local configuration remains canonical at
+# apps/web/wrangler.toml.
+name = "uxcommunity-web"
+main = "apps/web/.open-next/worker.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
+workers_dev = true
+
+assets = { directory = "apps/web/.open-next/assets", binding = "ASSETS" }
+
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "uxcommunity-web"
+
+[images]
+binding = "IMAGES"
+
+[vars]
+NEXT_PUBLIC_APP_URL = "https://app.uxcommunity.in"
+NEXT_PUBLIC_SUPABASE_URL = "https://eauupthwlnarkauwifmw.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_3pzxV73JWbvg4t0j_111RQ_8VbfxYBl"
+NEXT_PUBLIC_REALTIME_URL = "https://rt.uxcommunity.in"
+
+[build]
+command = "npm run cloudflare:build"
