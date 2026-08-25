@@ -113,12 +113,14 @@ export default async function PublicResourceDetailPage({ params }: Props) {
   const communityName = communityData?.name ?? (resource.community_id ? "Community" : "Public post");
 
   return (
-    <ResourceDetailClient
-      resource={resource}
-      initialComments={initialComments}
-      currentUserId={userId}
-       communityId={resource.community_id ?? PUBLIC_CONTENT_SCOPE}
-      communityName={communityName}
-    />
+    <div className="mx-auto min-h-full w-full max-w-3xl">
+      <ResourceDetailClient
+        resource={resource}
+        initialComments={initialComments}
+        currentUserId={userId}
+        communityId={resource.community_id ?? PUBLIC_CONTENT_SCOPE}
+        communityName={communityName}
+      />
+    </div>
   );
 }

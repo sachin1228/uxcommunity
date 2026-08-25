@@ -334,7 +334,7 @@ export function ShowcaseDetailClient({
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
-        <section className={`mt-6 ${communityFeedLayout.detailSection}`}>
+        <section className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
             {post.comment_count}{" "}
             {post.comment_count === 1 ? "Comment" : "Comments"}

@@ -23,21 +23,16 @@ export default async function PublicThreadDetailPage({ params }: Props) {
     : { data: null }
 
   return (
-    <div className="flex h-full items-start">
-      <div className="min-w-0 flex-1 border-r border-border">
-        <ThreadDetailClient
-          thread={thread}
-          initialComments={comments}
-          currentUserId={userId}
-          communityId={thread.community_id ?? PUBLIC_CONTENT_SCOPE}
-          communityName={community?.name ?? (thread.community_id ? "Community" : "Public post")}
-          backHref="/dashboard"
-          flushLayout
-        />
-      </div>
-      <aside className="sticky top-6 hidden w-72 shrink-0 p-4 lg:block">
-        <h1 className="font-display text-lg font-semibold text-foreground">Discover</h1>
-      </aside>
+    <div className="mx-auto min-h-full w-full max-w-3xl">
+      <ThreadDetailClient
+        thread={thread}
+        initialComments={comments}
+        currentUserId={userId}
+        communityId={thread.community_id ?? PUBLIC_CONTENT_SCOPE}
+        communityName={community?.name ?? (thread.community_id ? "Community" : "Public post")}
+        backHref="/dashboard"
+        flushLayout
+      />
     </div>
   )
 }
