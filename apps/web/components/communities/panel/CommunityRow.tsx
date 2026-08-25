@@ -84,7 +84,7 @@ export function CommunityRow({
         <div className="flex-1 min-w-0">
           {/* Community name + timestamp */}
           <div className="flex items-center gap-1 mb-0.5 min-w-0">
-            <span className="min-w-0 truncate font-body text-[13px] font-medium text-foreground">
+            <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
               {c.name}
             </span>
             {c.is_private && (
@@ -98,7 +98,7 @@ export function CommunityRow({
           </div>
 
           {/* Meta: member count + city */}
-          <div className="mb-0.5 flex items-center gap-1 font-body text-[10px] leading-none text-foreground-muted">
+          <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
             <span> {fmtCount(c.member_count)} members</span>
             {c.type === "city" && c.reference_name && (
               <span>· {c.reference_name}</span>

@@ -81,7 +81,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       )}
       <div className="flex h-14 shrink-0 items-center gap-2.5 px-3">
         <ProfileDropdown {...user} />
-        <p className="min-w-0 flex-1 truncate font-body text-sm font-semibold text-foreground">
+        <p className="min-w-0 flex-1 truncate font-body text-base font-semibold text-foreground">
           {user.name}
         </p>
         <div className="flex items-center">
@@ -100,7 +100,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
                 homeActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -116,7 +116,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard/communities"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
                 exploreActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
@@ -132,7 +132,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           <li>
             <Link
               href="/dashboard/chat-with-designers"
-              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-xs font-medium transition-colors ${
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 font-body text-sm font-medium transition-colors ${
                 designersActive
                   ? "bg-surface-raised text-foreground"
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
