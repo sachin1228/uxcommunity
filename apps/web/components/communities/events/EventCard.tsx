@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Calendar, ExternalLink, Heart, MapPin, Video } from "lucide-react";
+import { Calendar, ExternalLink, Heart, MapPin, UserPlus, Video } from "lucide-react";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -210,70 +210,89 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className={isDetail ? "overflow-hidden rounded-lg bg-surface" : ""}>
-      <div className={`flex ${isDetail ? "min-h-[190px] flex-col sm:flex-row" : "gap-4"}`}>
-        <div className={`relative shrink-0 overflow-hidden ${isDetail ? "aspect-video w-full sm:aspect-auto sm:w-44" : "w-36"}`}>
+    <div className="relative overflow-hidden rounded-xl border border-border bg-surface-raised">
+      <div className="flex min-h-64 flex-col md:flex-row">
+        <div className={`relative min-h-52 shrink-0 overflow-hidden md:min-h-64 ${isDetail ? "md:w-5/12" : "md:w-2/5"}`}>
           {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
+            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 size-full object-cover" />
           ) : (
-            <div className={`h-full w-full bg-gradient-to-br ${gradient} ${isDetail ? "" : "min-h-[130px]"}`} />
+            <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} aria-hidden="true" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent" aria-hidden="true" />
         </div>
-        <div className={`flex min-w-0 flex-1 flex-col ${isDetail ? "gap-2 p-4 sm:p-5" : "gap-1.5 py-5 pl-2 pr-4"}`}>
-          {isDetail ? (
-            <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
-          ) : (
-            <h3 className="line-clamp-2 font-display text-sm font-semibold leading-snug text-foreground">{event.title}</h3>
-          )}
-          {event.description && (
-            <p className={`font-body text-foreground-muted ${isDetail ? "text-xs leading-relaxed" : "line-clamp-2 text-xs leading-relaxed"}`}>{event.description}</p>
-          )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-              <Calendar size={isDetail ? 12 : 11} className="shrink-0 text-accent" />
+
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-5 py-6 md:border-l md:border-t-0 md:px-7">
+          <span className="absolute -left-3 -top-3 hidden size-6 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -bottom-3 -left-3 hidden size-6 rounded-full border border-border bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -left-3 -top-3 size-6 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
+          <span className="absolute -right-3 -top-3 size-6 rounded-full border border-border bg-surface md:hidden" aria-hidden="true" />
+
+          <div className="flex items-start justify-between gap-4 pr-16">
+            <div className="min-w-0">
+              {isDetail ? (
+                <h1 className="text-balance font-display text-2xl font-bold leading-tight text-foreground">{event.title}</h1>
+              ) : (
+                <h3 className="line-clamp-2 text-balance font-display text-xl font-bold leading-tight text-foreground">{event.title}</h3>
+              )}
+              {event.description && (
+                <p className={`mt-2 font-body text-sm leading-6 text-foreground-muted ${isDetail ? "text-pretty" : "line-clamp-2"}`}>{event.description}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2.5 border-b border-border pb-5">
+            <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
+              <Calendar size={16} className="shrink-0 text-accent" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {event.is_online ? (
-              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-                <Video size={isDetail ? 12 : 11} className="shrink-0" />
+              <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
+                <Video size={16} className="shrink-0" aria-hidden="true" />
                 {isDetail && event.meet_link ? (
                   <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-                    Online (Google Meet) <ExternalLink size={10} />
+                    Online (Google Meet) <ExternalLink size={12} />
                   </a>
                 ) : event.meet_link ? "Online (Google Meet)" : "Online"}
               </span>
             ) : event.location ? (
-              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-                <MapPin size={isDetail ? 12 : 11} className="shrink-0" />{event.location}
+              <span className="inline-flex items-center gap-2 font-body text-sm text-foreground-muted">
+                <MapPin size={16} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{event.location}</span>
               </span>
             ) : null}
           </div>
-          <p className={`font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-            Hosted by <span className="font-semibold text-foreground">{authorName}</span>
-          </p>
-          <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-7 gap-y-4">
+            <div className="border-r border-border pr-7">
+              <p className="font-body text-xs text-foreground-subtle">Hosted by</p>
+              <p className="mt-1 font-display text-base font-semibold text-foreground">{authorName}</p>
+            </div>
+            <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
+          </div>
+
           {isDetail && event.max_attendees && (
-            <p className="font-body text-xs text-foreground-subtle">
+            <p className="mt-3 font-body text-xs text-foreground-subtle">
               {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
             </p>
           )}
-          {isDetail && (error || rsvpError) && <p className="font-body text-xs text-red-400">{error || rsvpError}</p>}
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"}`}>
-              {past ? "Past Event" : "Upcoming Event"}
-            </span>
-            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
-              {!past && (
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={rsvpPending || full}
-                  className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
-                >
-                  {rsvpPending ? (isDetail ? "Updating…" : "…") : event.user_rsvped ? "Going ✓" : full ? (isDetail ? "Event Full" : "Full") : "Join Event"}
-                </button>
-              )}
-              {!isDetail && (
+          {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
+
+          <div className="mt-auto flex items-end justify-between gap-4 pt-6">
+            {!past ? (
+              <button
+                type="button"
+                onClick={handleJoin}
+                disabled={rsvpPending || full}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-5 font-body text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+              >
+                <UserPlus size={17} aria-hidden="true" />
+                {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+              </button>
+            ) : (
+              <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
+            )}
+            {!isDetail && (
+              <div onClick={(e) => e.preventDefault()}>
                 <EventOptionsMenu
                   saved={event.user_saved}
                   shared={shared}
@@ -288,10 +307,15 @@ export function EventCard({
                   onDelete={() => setConfirmDelete(true)}
                   onReport={() => setReported(true)}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      <div className={`absolute right-5 top-0 flex w-20 flex-col items-center bg-accent px-2 pb-5 pt-4 text-center text-accent-foreground [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "opacity-70" : ""}`}>
+        <Calendar size={22} aria-hidden="true" />
+        <span className="mt-2 font-body text-[10px] font-semibold uppercase leading-4 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
       </div>
     </div>
   );
