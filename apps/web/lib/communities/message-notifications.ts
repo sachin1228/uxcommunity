@@ -18,13 +18,14 @@ export interface IncomingCommunityMessage {
   isReply: boolean;
 }
 
-const DEFAULT_PREFERENCES: MessageNotificationPreferences = {
+export const DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES: MessageNotificationPreferences = {
   sound: false,
-  browser: false,
+  browser: true,
 };
 const PREFERENCES_EVENT = "uxcommunity:message-notification-preferences";
 const seenMessageIds = new Set<string>();
 let audioContext: AudioContext | null = null;
+let permissionRequest: Promise<NotificationPermission> | null = null;
 
 function storageKey(userId: string) {
   return `uxcommunity:message-notifications:${userId}`;
@@ -33,14 +34,14 @@ function storageKey(userId: string) {
 export function readMessageNotificationPreferences(
   userId: string,
 ): MessageNotificationPreferences {
-  if (typeof window === "undefined") return DEFAULT_PREFERENCES;
+  if (typeof window === "undefined") return DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES;
   try {
     const value = window.localStorage.getItem(storageKey(userId));
-    if (!value) return DEFAULT_PREFERENCES;
+    if (!value) return DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES;
     const parsed = JSON.parse(value) as Partial<MessageNotificationPreferences>;
-    return { sound: parsed.sound === true, browser: parsed.browser === true };
+    return { sound: parsed.sound === true, browser: true };
   } catch {
-    return DEFAULT_PREFERENCES;
+    return DEFAULT_MESSAGE_NOTIFICATION_PREFERENCES;
   }
 }
 
@@ -71,6 +72,28 @@ export function shouldShowBrowserNotification(
   isPageAttentionAway: boolean,
 ) {
   return preferences.browser && permission === "granted" && isPageAttentionAway;
+}
+
+export async function ensureBrowserNotificationPermission(
+  permission: NotificationPermission | "unsupported",
+  requestPermission: () => Promise<NotificationPermission>,
+) {
+  if (permission !== "default") return permission;
+  return requestPermission();
+}
+
+export async function initializeBrowserNotifications() {
+  if (typeof Notification === "undefined") return "unsupported" as const;
+  if (Notification.permission !== "default") return Notification.permission;
+
+  permissionRequest ??= ensureBrowserNotificationPermission(
+    Notification.permission,
+    () => Notification.requestPermission(),
+  ).finally(() => {
+    permissionRequest = null;
+  });
+
+  return permissionRequest;
 }
 
 export function markMessageNotificationSeen(messageId: string) {
