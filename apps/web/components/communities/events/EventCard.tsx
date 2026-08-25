@@ -310,7 +310,7 @@ export function EventCard({
         </div>
       </div>
 
-      <div className={`absolute right-4 top-0 flex w-16 flex-col items-center bg-accent px-1.5 pb-4 pt-3 text-center text-accent-foreground [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "opacity-70" : ""}`}>
+      <div className={`absolute right-4 top-0 flex w-16 flex-col items-center px-1.5 pb-4 pt-3 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-accent text-accent-foreground"}`}>
         <Calendar size={18} aria-hidden="true" />
         <span className="mt-1.5 font-body text-[9px] font-semibold uppercase leading-3 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
       </div>
