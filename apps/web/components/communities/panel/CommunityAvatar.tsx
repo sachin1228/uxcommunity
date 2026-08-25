@@ -7,10 +7,9 @@ interface CommunityAvatarProps {
   imageUrl: string | null;
   name: string;
   type: string;
-  active: boolean;
 }
 
-export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvatarProps) {
+export function CommunityAvatar({ imageUrl, name, type }: CommunityAvatarProps) {
   const [failed, setFailed] = useState(false);
 
   if (imageUrl && !failed) {
@@ -29,10 +28,5 @@ export function CommunityAvatar({ imageUrl, name, type, active }: CommunityAvata
     );
   }
 
-  return (
-    <CommunityIcon
-      size={36}
-      className={active ? "bg-accent/20" : "bg-surface-raised"}
-    />
-  );
+  return <CommunityIcon size={36} className="bg-surface-raised" />;
 }
