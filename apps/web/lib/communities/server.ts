@@ -63,8 +63,8 @@ export async function fetchCommunityMetaSSR(
     : ({} as Record<string, string | null>);
 
   const resolvedImageUrl: string | null =
-    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ??
-    (community as any).image_url ?? null;
+    (community as any).image_url ??
+    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ?? null;
 
   // Top members for the info panel.
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);

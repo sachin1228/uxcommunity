@@ -97,7 +97,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     data: {
       community: {
         ...community,
-        image_url: (community.reference_id ? masterImageMap[community.reference_id] : undefined) ?? community.image_url ?? null,
+        image_url: community.image_url ?? (community.reference_id ? masterImageMap[community.reference_id] : undefined) ?? null,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,

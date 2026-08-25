@@ -80,7 +80,7 @@ export async function getSidebarCommunities(userId: string) {
     const reaction = row.last_reaction;
     return {
       ...community,
-      image_url: images[community.id] ?? community.image_url ?? null,
+      image_url: community.image_url ?? images[community.id] ?? null,
       reference_name: names[community.id] ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,
