@@ -378,7 +378,7 @@ export function EventDetailClient({
           />
         )}
         {/* Event post */}
-        <section className={communityFeedLayout.detailSection}>
+        <section className={`mx-5 md:mx-8 ${communityFeedLayout.detailCard}`}>
             <EventCard
               variant="detail"
               event={event}
