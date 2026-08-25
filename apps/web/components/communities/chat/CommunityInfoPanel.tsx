@@ -1,29 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  MapPin,
-  Calendar,
-  Users,
-  ExternalLink,
-} from "lucide-react";
+import { Calendar, MapPin } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
-
-interface UpcomingEvent {
-  id: string;
-  title: string;
-  event_date: string;
-  location: string | null;
-  is_online: boolean;
-  rsvp_count: number;
-  cover_image_url: string | null;
-  user_rsvped: boolean;
-}
 
 interface CommunityData {
   member_count: number;
@@ -40,163 +22,84 @@ interface CommunityInfoPanelProps {
   onlineCount?: number;
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  city:             "City",
-  sector:           "Industry",
-  interest:         "Interest",
-  company:          "Company",
-  experience_level: "Experience",
-};
-
-function fallbackDescription(type?: string, referenceName?: string | null): string {
-  const name = referenceName ?? "this topic";
-  switch (type) {
-    case "city":             return `Connect with designers based in ${name}.`;
-    case "company":          return `A space for designers working at ${name} to connect and grow together.`;
-    case "sector":           return `A community for designers in the ${name} industry.`;
-    case "interest":         return `Designers who share a passion for ${name}.`;
-    case "experience_level": return `A space for ${name} designers to connect and share.`;
-    case "general":          return "The default community for every UX Community designer.";
-    case "user":             return "A member-created community on UX Community.";
-    default:                 return "A designer community on UX Community.";
-  }
-}
-
-function fmtCreatedAt(iso?: string): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric", month: "short", year: "numeric",
-  });
-}
-
-function fmtEventDate(iso: string) {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
-  return `${date} · ${time}`;
-}
-
-// ─── Section wrapper — plain divider, no individual card ─────────────────────
-function Section({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="px-4 py-4 border-b border-border last:border-b-0">
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-body text-sm font-semibold text-foreground">
-          {title}
-        </span>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function SeeAll() {
-  return (
-    <button className="font-body text-xs text-accent hover:underline">
-      See all
-    </button>
-  );
-}
-
 interface CommunityRule {
   id: string;
   rule_text: string;
   order_index: number;
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
-export function CommunityInfoPanel({ community, communityId, currentUserId, onlineCount = 0 }: CommunityInfoPanelProps) {
-  const memberCount = community?.member_count ?? 0;
+const TYPE_LABELS: Record<string, string> = {
+  city: "City",
+  sector: "Industry",
+  interest: "Interest",
+  company: "Company",
+  experience_level: "Experience",
+};
 
-  const [upcomingEvent, setUpcomingEvent] = useState<UpcomingEvent | null>(null);
+function fallbackDescription(type?: string, referenceName?: string | null): string {
+  const name = referenceName ?? "this topic";
+  switch (type) {
+    case "city":
+      return `Connect with designers based in ${name}.`;
+    case "company":
+      return `A space for designers working at ${name} to connect and grow together.`;
+    case "sector":
+      return `A community for designers in the ${name} industry.`;
+    case "interest":
+      return `Designers who share a passion for ${name}.`;
+    case "experience_level":
+      return `A space for ${name} designers to connect and share.`;
+    case "general":
+      return "The default community for every UX Community designer.";
+    case "user":
+      return "A member-created community on UX Community.";
+    default:
+      return "A designer community on UX Community.";
+  }
+}
+
+function fmtCreatedAt(iso?: string): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export function CommunityInfoPanel({
+  community,
+  communityId,
+  currentUserId,
+  onlineCount = 0,
+}: CommunityInfoPanelProps) {
   const [postsToday, setPostsToday] = useState<number | null>(null);
   const [rules, setRules] = useState<CommunityRule[]>([]);
-  const [rsvpPending, setRsvpPending] = useState(false);
-  const [localRsvped, setLocalRsvped] = useState<boolean | null>(null);
-  const [localRsvpCount, setLocalRsvpCount] = useState<number | null>(null);
   const isVisible = useDocumentVisible();
-
-  const userRsvped = localRsvped ?? upcomingEvent?.user_rsvped ?? false;
-  const rsvpCount = localRsvpCount ?? upcomingEvent?.rsvp_count ?? 0;
-
-  async function handleRsvp(e: React.MouseEvent) {
-    e.preventDefault();
-    if (!upcomingEvent || rsvpPending) return;
-    const newRsvped = !userRsvped;
-    const newCount = rsvpCount + (newRsvped ? 1 : -1);
-    setLocalRsvped(newRsvped);
-    setLocalRsvpCount(newCount);
-    setRsvpPending(true);
-    try {
-      const res = await dedupeFetch(`/api/communities/${communityId}/events/${upcomingEvent.id}/rsvp`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        setLocalRsvped(data.rsvped);
-        setLocalRsvpCount(data.rsvp_count);
-      } else {
-        setLocalRsvped(userRsvped);
-        setLocalRsvpCount(rsvpCount);
-      }
-    } catch {
-      setLocalRsvped(userRsvped);
-      setLocalRsvpCount(rsvpCount);
-    } finally {
-      setRsvpPending(false);
-    }
-  }
 
   useEffect(() => {
     if (!communityId) return;
-
-    // ── Fetch events, stats, rules in parallel ─────────────────────────────
-    fetchJsonCached<{ events: UpcomingEvent[] }>(
-      `/api/communities/${communityId}/events`,
-      { staleMs: 60_000 },
-      currentUserId,
-    )
-      .then((data: { events: UpcomingEvent[] } | null) => {
-        if (!data?.events?.length) return;
-        const now = new Date();
-        const upcoming = data.events
-          .filter((e) => new Date(e.event_date) > now)
-          .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime());
-        const evt = upcoming[0] ?? null;
-        setUpcomingEvent(evt);
-        setLocalRsvped(null);
-        setLocalRsvpCount(null);
-      })
-      .catch(() => {/* silent */});
 
     fetchJsonCached<{ posts_today: number }>(
       `/api/communities/${communityId}/stats`,
       { staleMs: 60_000 },
       currentUserId,
     )
-      .then((data: { posts_today: number } | null) => {
+      .then((data) => {
         if (data != null) setPostsToday(data.posts_today);
       })
-      .catch(() => {/* silent */});
+      .catch(() => {});
 
     fetchJsonCached<{ rules: CommunityRule[] }>(
       `/api/communities/${communityId}/rules`,
       { staleMs: 60_000 },
       currentUserId,
     )
-      .then((data: { rules: CommunityRule[] } | null) => {
+      .then((data) => {
         if (data?.rules) setRules(data.rules);
       })
-      .catch(() => {/* silent */});
+      .catch(() => {});
 
-    // ── Realtime subscriptions ─────────────────────────────────────────────
     if (!isVisible || !currentUserId) return;
     const rulesClient = new RealtimeClient({
       room: realtimeRooms.rules(communityId),
@@ -204,17 +107,17 @@ export function CommunityInfoPanel({ community, communityId, currentUserId, onli
     });
     const unsubRules = rulesClient.on("rule", (data) => {
       const { event, rule } = data as { event?: string; rule: CommunityRule };
-      const updateRules = (prev: CommunityRule[]) => {
+      const updateRules = (previous: CommunityRule[]) => {
         if (event === "INSERT") {
-          if (prev.some((item) => item.id === rule.id)) return prev;
-          return [...prev, rule].sort((a, b) => a.order_index - b.order_index);
+          if (previous.some((item) => item.id === rule.id)) return previous;
+          return [...previous, rule].sort((a, b) => a.order_index - b.order_index);
         }
         if (event === "UPDATE") {
-          return prev
+          return previous
             .map((item) => (item.id === rule.id ? rule : item))
             .sort((a, b) => a.order_index - b.order_index);
         }
-        return prev.filter((item) => item.id !== rule.id);
+        return previous.filter((item) => item.id !== rule.id);
       };
       setRules(updateRules);
       patchCachedRequest<{ rules: CommunityRule[] }>(
@@ -225,219 +128,112 @@ export function CommunityInfoPanel({ community, communityId, currentUserId, onli
     });
     rulesClient.connect();
 
-    // ── Realtime RSVP sync — keep sidebar count in sync with event_rsvps ──
-    const eventsClient = new RealtimeClient({
-      room: realtimeRooms.events(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubRsvp = eventsClient.on("rsvp", (data) => {
-      const row = data as { event?: "INSERT" | "UPDATE" | "DELETE"; event_id?: string; user_id?: string } | null;
-      if (!row?.event_id) return;
-      setUpcomingEvent((prev) => {
-        if (!prev || prev.id !== row.event_id) return prev;
-        const delta = row.event === "INSERT" ? 1 : row.event === "DELETE" ? -1 : 0;
-        const newCount = Math.max(0, prev.rsvp_count + delta);
-        // If the change is from the current user, sync user_rsvped too
-        const isMe = currentUserId && row.user_id === currentUserId;
-        return {
-          ...prev,
-          rsvp_count: newCount,
-          user_rsvped: isMe
-            ? row.event === "INSERT"
-            : prev.user_rsvped,
-        };
-      });
-      // Keep local overrides in sync so the button reflects realtime state
-      if (currentUserId && row.user_id === currentUserId) {
-        setLocalRsvped(row.event === "INSERT");
-      }
-      setLocalRsvpCount(null); // let upcomingEvent.rsvp_count drive the count
-    });
-    eventsClient.connect();
-
     return () => {
       unsubRules();
       rulesClient.close();
-      unsubRsvp();
-      eventsClient.close();
     };
   }, [communityId, currentUserId, isVisible]);
 
+  const type = community?.type;
+  const referenceName = community?.reference_name ?? null;
+  const description =
+    community?.description ?? fallbackDescription(type, referenceName);
+  const tags = [
+    ...(type ? [TYPE_LABELS[type] ?? type] : []),
+    ...(referenceName ? [referenceName] : []),
+  ];
+  const stats = [
+    { label: "Members", value: (community?.member_count ?? 0).toLocaleString() },
+    { label: "Online", value: onlineCount.toLocaleString() },
+    {
+      label: "Messages",
+      value: postsToday != null ? postsToday.toLocaleString() : "—",
+    },
+  ];
+
   return (
-    // Outer wrapper — sizing + scroll, holds both cards
-    <div className="hidden w-72 shrink-0 flex-col gap-3 overflow-y-auto lg:flex">
-
-      {/* Main info card */}
-      <div className="border border-border mr-4 mt-4 rounded-xl flex flex-col">
-
-        {/* Upcoming Events — only shown when a real upcoming event exists */}
-        {upcomingEvent && (
-          <Section
-            title="Upcoming Events"
-            action={
-              <Link
-                href={`/dashboard/communities/${communityId}?tab=events`}
-                className="font-body text-xs text-accent hover:underline"
-              >
-                See all
-              </Link>
-            }
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
+        <section aria-labelledby="community-about-heading">
+          <h2
+            id="community-about-heading"
+            className="font-display text-xl font-semibold text-foreground"
           >
-            <div className="flex gap-3">
-              {/* Cover image — matches EventCard thumbnail style */}
-              <div className="w-16 h-16 rounded-lg bg-surface-raised shrink-0 flex items-center justify-center overflow-hidden border border-border">
-                {upcomingEvent.cover_image_url ? (
-                  <img
-                    src={upcomingEvent.cover_image_url}
-                    alt={upcomingEvent.title}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <Calendar size={20} className="text-foreground-subtle" />
-                )}
+            About
+          </h2>
+          <p className="mt-3 max-w-2xl font-body text-sm leading-relaxed text-foreground-muted">
+            {description}
+          </p>
+          <div className="mt-4 flex flex-col gap-2">
+            {type === "city" && referenceName && (
+              <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
+                <MapPin size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                {referenceName}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-body text-[13px] font-semibold text-foreground leading-snug mb-1">
-                  {upcomingEvent.title}
-                </p>
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                    <Calendar size={11} className="shrink-0" />
-                    {fmtEventDate(upcomingEvent.event_date)}
-                  </div>
-                  {upcomingEvent.location && (
-                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                      <MapPin size={11} className="shrink-0" />
-                      {upcomingEvent.location}
-                    </div>
-                  )}
-                  {upcomingEvent.is_online && !upcomingEvent.location && (
-                    <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                      <ExternalLink size={11} className="shrink-0" />
-                      Online
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1.5 font-body text-[12px] text-foreground-muted">
-                    <Users size={11} className="shrink-0" />
-                    {rsvpCount} going
-                  </div>
-                </div>
-              </div>
+            )}
+            <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
+              <Calendar size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+              Created {fmtCreatedAt(community?.created_at)}
             </div>
-
-            {/* Action row: Going toggle + View Event */}
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={handleRsvp}
-                disabled={rsvpPending}
-                className={`flex-1 rounded-lg py-1.5 font-body text-sm font-medium transition-colors disabled:opacity-50 ${
-                  userRsvped
-                    ? "bg-accent/15 text-accent hover:bg-accent/25"
-                    : "bg-accent text-accent-foreground hover:bg-accent-hover"
-                }`}
-              >
-                {rsvpPending ? "…" : userRsvped ? "Going ✓" : "Join Event"}
-              </button>
-              <Link
-                href={`/dashboard/communities/${communityId}/events/${upcomingEvent.id}`}
-                className="flex-1 flex items-center justify-center rounded-lg border border-border py-1.5 font-body text-sm font-medium text-foreground-muted hover:bg-surface-raised hover:text-foreground transition-colors"
-              >
-                View Event
-              </Link>
+          </div>
+          {tags.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full border border-border px-3 py-1 font-body text-xs text-foreground-muted"
+                >
+                  {tag}
+                </span>
+              ))}
             </div>
-          </Section>
-        )}
+          )}
+        </section>
 
-        {/* About */}
-        {(() => {
-          const type = community?.type;
-          const refName = community?.reference_name ?? null;
-          const description = community?.description
-            ?? fallbackDescription(type, refName);
-          const tags: string[] = [
-            ...(type ? [TYPE_LABELS[type] ?? type] : []),
-            ...(refName ? [refName] : []),
-          ];
-          return (
-            <Section title="About">
-              <p className="font-body text-[13px] text-foreground-muted leading-relaxed mb-3">
-                {description}
-              </p>
-              <div className="space-y-2 mb-3">
-                {type === "city" && refName && (
-                  <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
-                    <MapPin size={13} className="shrink-0 text-foreground-subtle" />
-                    {refName}
-                  </div>
-                )}
-                <div className="flex items-center gap-2 font-body text-[13px] text-foreground-muted">
-                  <Calendar size={13} className="shrink-0 text-foreground-subtle" />
-                  Created {fmtCreatedAt(community?.created_at)}
-                </div>
+        <section aria-labelledby="community-stats-heading" className="border-t border-border pt-6">
+          <h2
+            id="community-stats-heading"
+            className="font-display text-base font-semibold text-foreground"
+          >
+            Community Stats
+          </h2>
+          <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {stats.map(({ label, value }) => (
+              <div key={label} className="rounded-xl border border-border bg-surface-raised p-4">
+                <dd className="font-display text-xl font-bold text-foreground">{value}</dd>
+                <dt className="mt-1 font-body text-xs text-foreground-muted">{label}</dt>
               </div>
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2.5 py-0.5 rounded-full border border-border font-body text-[12px] text-foreground-muted"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </Section>
-          );
-        })()}
+            ))}
+          </dl>
+        </section>
 
-        {/* Community Rules — only shown when the community has rules */}
-        {rules.length > 0 && (
-          <Section title="Rules">
-            <ol className="flex flex-col gap-2.5">
-              {rules.map((rule, i) => (
-                <li key={rule.id} className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-surface-raised font-mono text-[10px] font-semibold text-foreground-muted select-none">
-                    {i + 1}
+        <section aria-labelledby="community-rules-heading" className="border-t border-border pt-6">
+          <h2
+            id="community-rules-heading"
+            className="font-display text-base font-semibold text-foreground"
+          >
+            Rules
+          </h2>
+          {rules.length > 0 ? (
+            <ol className="mt-4 flex flex-col gap-3">
+              {rules.map((rule, index) => (
+                <li key={rule.id} className="flex items-start gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-raised font-mono text-xs font-semibold text-foreground-muted">
+                    {index + 1}
                   </span>
-                  <span className="font-body text-[13px] text-foreground-muted leading-relaxed">
+                  <span className="pt-0.5 font-body text-sm leading-relaxed text-foreground-muted">
                     {rule.rule_text}
                   </span>
                 </li>
               ))}
             </ol>
-          </Section>
-        )}
-
-      </div>{/* end main info card */}
-
-      {/* Community Stats — separate card below */}
-      <div className="border border-border mr-4 mb-4 rounded-xl px-4 py-4">
-        <span className="font-body text-sm font-semibold text-foreground block mb-3">
-          Community Stats
-        </span>
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            { label: "Members",     value: memberCount.toLocaleString() },
-            { label: "Online",      value: onlineCount.toLocaleString() },
-            { label: "Messages", value: postsToday != null ? postsToday.toLocaleString() : "—" },
-          ].map(({ label, value }) => (
-            <div
-              key={label}
-              className="bg-surface-raised rounded-xl px-3 py-3 flex flex-col gap-0.5 border border-border"
-            >
-              <span className="font-body text-base font-bold text-foreground">
-                {value}
-              </span>
-              <span className="font-body text-[11px] text-foreground-muted leading-tight">
-                {label}
-              </span>
-            </div>
-          ))}
-        </div>
+          ) : (
+            <p className="mt-3 font-body text-sm text-foreground-muted">
+              No community rules have been added yet.
+            </p>
+          )}
+        </section>
       </div>
-
     </div>
   );
 }

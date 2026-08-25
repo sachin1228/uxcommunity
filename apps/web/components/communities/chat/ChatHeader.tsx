@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, Info, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -31,8 +31,8 @@ interface ChatHeaderProps {
   communityId?: string;
 }
 
-export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members";
-const DEFAULT_TABS: ChatTab[] = ["chat", "showcase", "threads", "events", "resources", "members"];
+export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "about";
+const DEFAULT_TABS: ChatTab[] = ["chat", "showcase", "threads", "events", "resources", "members", "about"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -162,7 +162,7 @@ export function ChatHeader({
   }
 
   const visibleTabs = community
-    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || tab === "about" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
     : DEFAULT_TABS;
 
   return (
@@ -287,6 +287,7 @@ export function ChatHeader({
                 ["events",    "Events",    Calendar],
                 ["resources", "Resources", BookMarked],
                 ["members",   "Members",   Users],
+                ["about",     "About",     Info],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
                 <button
                   key={tab}
