@@ -5,7 +5,7 @@
  *
  * Wraps thread/event detail pages in the same chrome as the main community
  * view: the ChatHeader (community name, member count, online count, tabs) on
- * top and CommunityInfoPanel on the right.
+ * top, with the detail content below.
  *
  * Data strategy:
  *   1. Pre-seed from the module-level metaCache (populated when the user
@@ -25,7 +25,6 @@ import {
   type CachedMeta,
 } from "@/lib/communities/cache";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
-import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 
 interface Community {
@@ -143,12 +142,6 @@ export function CommunityPageShell({
         />
         {children}
       </div>
-      <CommunityInfoPanel
-        community={community}
-        communityId={communityId}
-        currentUserId={currentUserId}
-        onlineCount={onlineCount}
-      />
     </div>
   );
 }

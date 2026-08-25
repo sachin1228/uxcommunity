@@ -664,7 +664,7 @@ export function CommunityChat({
     : null);
 
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "showcase", "threads", "events", "resources"]), "showcase", "members"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "showcase", "threads", "events", "resources"]), "showcase", "members", "about"]).has(activeTab)
       ? "chat"
       : activeTab;
 
@@ -726,7 +726,14 @@ export function CommunityChat({
             />
           )}
         </Modal>
-        {renderedTab === "showcase" ? (
+        {renderedTab === "about" ? (
+          <CommunityInfoPanel
+            community={displayCommunity}
+            communityId={communityId}
+            currentUserId={currentUserId}
+            onlineCount={onlineCount}
+          />
+        ) : renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "threads" ? (
           <ThreadsView
@@ -805,7 +812,7 @@ export function CommunityChat({
                 input={input}
                 sending={sending}
                 error={error}
-                placeholder={`Message ${displayCommunity?.name ?? ""}…`}
+                placeholder="Type a message…"
                 replyTo={replyTo}
                 pendingImagePreview={pendingImagePreview}
                 linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
@@ -826,8 +833,6 @@ export function CommunityChat({
         </div>
         )}
       </div>
-
-      <CommunityInfoPanel community={displayCommunity} communityId={communityId} currentUserId={currentUserId} onlineCount={onlineCount} />
     </div>
   );
 }

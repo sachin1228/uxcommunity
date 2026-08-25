@@ -5,9 +5,9 @@
  *
  * Shown while the community page's RSC payload streams in (during navigation
  * or initial load). It renders the REAL page chrome — ChatHeader (avatar,
- * name, member count, tabs) and the CommunityInfoPanel on the right — fed
- * from the module-level meta/sidebar caches, so the loading state looks like
- * the actual community page instead of a skeleton or a bare animation. Only
+ * name, member count, tabs) — fed from the module-level meta cache, so the
+ * loading state looks like the actual community page instead of a skeleton
+ * or a bare animation. Only
  * the chat message area shows the community Lottie while messages hydrate.
  *
  * loading.tsx receives no params, so the target community is read from
@@ -26,7 +26,6 @@ import {
 } from "@/lib/communities/cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHeader";
-import { CommunityInfoPanel } from "@/components/communities/chat/CommunityInfoPanel";
 import { ChatInput } from "@/components/communities/chat/ChatInput";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
@@ -201,13 +200,6 @@ export default function CommunityPageLoading() {
         </div>
         )}
       </div>
-
-      {/* Real info sidebar — renders from the cached community. */}
-      <CommunityInfoPanel
-        community={community}
-        communityId={communityId ?? ""}
-        currentUserId={cachedUserId ?? undefined}
-      />
     </div>
   );
 }
