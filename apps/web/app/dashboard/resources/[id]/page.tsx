@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
+import { DashboardSingleColumn } from "../../ContentLoader";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -113,7 +114,7 @@ export default async function PublicResourceDetailPage({ params }: Props) {
   const communityName = communityData?.name ?? (resource.community_id ? "Community" : "Public post");
 
   return (
-    <div className="mx-auto min-h-full w-full max-w-3xl">
+    <DashboardSingleColumn>
       <ResourceDetailClient
         resource={resource}
         initialComments={initialComments}
@@ -121,6 +122,6 @@ export default async function PublicResourceDetailPage({ params }: Props) {
         communityId={resource.community_id ?? PUBLIC_CONTENT_SCOPE}
         communityName={communityName}
       />
-    </div>
+    </DashboardSingleColumn>
   );
 }

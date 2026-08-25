@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
+import { DashboardSingleColumn } from "../../ContentLoader";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -107,7 +108,7 @@ export default async function PublicEventDetailPage({ params }: Props) {
   ]);
 
   return (
-    <div className="mx-auto min-h-full w-full max-w-3xl">
+    <DashboardSingleColumn>
       <EventDetailClient
         event={event}
         initialRsvps={initialRsvps}
@@ -120,6 +121,6 @@ export default async function PublicEventDetailPage({ params }: Props) {
         showCommunityAttribution
         backHref="/dashboard"
       />
-    </div>
+    </DashboardSingleColumn>
   );
 }
