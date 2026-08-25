@@ -1,53 +1,48 @@
 /**
  * Cloudflare R2 storage helper — server-side only.
  *
- * Thin wrapper around the AWS S3-compatible client that R2 exposes.
- * All image uploads in this app go through here instead of Supabase Storage.
- *
- * Required env vars (set in Vercel / .env.local):
- *   R2_ACCOUNT_ID          — Cloudflare account ID
- *   R2_ACCESS_KEY_ID       — R2 API token access key
- *   R2_SECRET_ACCESS_KEY   — R2 API token secret
- *   R2_BUCKET_NAME         — bucket name (e.g. "draft-images")
- *   R2_PUBLIC_URL          — public base URL for the bucket
- *                            (e.g. "https://pub-xxxx.r2.dev" or custom domain)
+ * All uploads use the native R2 bucket binding declared in wrangler.toml.
+ * R2_PUBLIC_URL is the public base URL used for persisted image URLs.
  */
 
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-function getClient(): S3Client {
-  const accountId = process.env.R2_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error(
-      "[r2] Missing R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, or R2_SECRET_ACCESS_KEY env vars."
-    );
-  }
-
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: { accessKeyId, secretAccessKey },
-  });
+export interface NativeR2ObjectBody {
+  arrayBuffer(): Promise<ArrayBuffer>;
 }
 
-function getBucket(): string {
-  const bucket = process.env.R2_BUCKET_NAME;
-  if (!bucket) throw new Error("[r2] Missing R2_BUCKET_NAME env var.");
-  return bucket;
+export interface NativeR2Bucket {
+  put(
+    key: string,
+    value: ArrayBuffer | ArrayBufferView,
+    options?: { httpMetadata?: { contentType?: string } }
+  ): Promise<unknown>;
+  get(key: string): Promise<NativeR2ObjectBody | null>;
+  delete(key: string): Promise<void>;
 }
+
+type R2Environment = {
+  R2_BUCKET?: NativeR2Bucket;
+};
 
 function getPublicBase(): string {
   const base = process.env.R2_PUBLIC_URL;
   if (!base) throw new Error("[r2] Missing R2_PUBLIC_URL env var.");
-  return base.replace(/\/$/, "");
+  return base.replace(/\/+$/, "");
+}
+
+export function requireR2Bucket(env: R2Environment): NativeR2Bucket {
+  if (!env.R2_BUCKET) {
+    throw new Error(
+      "[r2] Missing R2_BUCKET Cloudflare binding. Declare it in wrangler.toml."
+    );
+  }
+  return env.R2_BUCKET;
+}
+
+function getBucket(): NativeR2Bucket {
+  const { env } = getCloudflareContext();
+  return requireR2Bucket(env as R2Environment);
 }
 
 /** Returns the full public URL for a given R2 object key. */
@@ -69,38 +64,43 @@ export function parseR2Key(url: string): string | null {
   }
 }
 
-/** Upload a Buffer to R2 and return its public URL. */
+export async function putR2Object(
+  bucket: NativeR2Bucket,
+  key: string,
+  body: Buffer | Uint8Array | ArrayBuffer,
+  contentType: string
+): Promise<void> {
+  const bytes = body instanceof ArrayBuffer ? body : new Uint8Array(body);
+  await bucket.put(key, bytes, {
+    httpMetadata: { contentType },
+  });
+}
+
+export async function getR2Object(
+  bucket: NativeR2Bucket,
+  key: string
+): Promise<Buffer> {
+  const object = await bucket.get(key);
+  if (!object) throw new Error(`[r2] Object not found for key: ${key}`);
+  return Buffer.from(await object.arrayBuffer());
+}
+
+/** Upload bytes to R2 and return their public URL. */
 export async function uploadToR2(
   key: string,
-  body: Buffer,
+  body: Buffer | Uint8Array | ArrayBuffer,
   contentType: string
 ): Promise<string> {
-  const client = getClient();
-  await client.send(
-    new PutObjectCommand({
-      Bucket: getBucket(),
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    })
-  );
+  await putR2Object(getBucket(), key, body, contentType);
   return r2PublicUrl(key);
 }
 
 /** Download an R2 object by key and return it as a Buffer. */
 export async function downloadFromR2(key: string): Promise<Buffer> {
-  const client = getClient();
-  const resp = await client.send(
-    new GetObjectCommand({ Bucket: getBucket(), Key: key })
-  );
-  if (!resp.Body) throw new Error(`[r2] Empty body downloading key: ${key}`);
-  return Buffer.from(await resp.Body.transformToByteArray());
+  return getR2Object(getBucket(), key);
 }
 
-/** Delete an R2 object by key (best-effort — does not throw on 404). */
+/** Delete an R2 object by key (R2 treats a missing key as a successful delete). */
 export async function deleteFromR2(key: string): Promise<void> {
-  const client = getClient();
-  await client.send(
-    new DeleteObjectCommand({ Bucket: getBucket(), Key: key })
-  );
+  await getBucket().delete(key);
 }

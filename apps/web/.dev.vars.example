@@ -31,11 +31,9 @@ EMAIL_FROM=
 # --- GIPHY ---
 GIPHY_API_KEY=
 
-# --- R2 (existing uploads bucket; keep values as-is) ---
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET_NAME=
+# --- R2 ---
+# Bucket access uses the native R2_BUCKET binding declared in wrangler.toml.
+# Set only the public base URL used to build persisted object URLs.
 R2_PUBLIC_URL=
 
 # --- Moderation image service ---
