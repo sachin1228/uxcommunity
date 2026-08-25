@@ -812,7 +812,7 @@ export function CommunityChat({
                 input={input}
                 sending={sending}
                 error={error}
-                placeholder={`Message ${displayCommunity?.name ?? ""}…`}
+                placeholder="Type a message…"
                 replyTo={replyTo}
                 pendingImagePreview={pendingImagePreview}
                 linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
