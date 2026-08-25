@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Calendar, ExternalLink, Heart, MapPin, Video } from "lucide-react";
+import { Calendar, ExternalLink, Heart, MapPin, UserPlus, Video } from "lucide-react";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -31,55 +31,36 @@ function isPast(iso: string) {
 }
 
 function AvatarStack({
-  host,
   rsvps,
   count,
 }: {
-  host: { name: string; avatar_url: string | null } | null;
   rsvps?: EventRsvp[];
   count: number;
 }) {
-  const visible = rsvps?.slice(0, 5);
-  const name = host?.name ?? "M";
-  const placeholders = Math.min(Math.max(count - 1, 0), 4);
-  const shades = ["bg-accent/60", "bg-accent/45", "bg-accent/30", "bg-accent/20"];
+  const safeCount = Math.max(0, count);
+  const visible = rsvps?.slice(0, 5) ?? [];
 
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex items-center">
-        {visible ? visible.map((rsvp, index) => (
-          <div
-            key={rsvp.user_id}
-            style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-            className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
-          >
-            {rsvp.users?.avatar_url ? (
-              <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="h-full w-full object-cover" />
-            ) : (
-              <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
-            )}
-          </div>
-        )) : (
-          <>
-            <div className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15">
-              {host?.avatar_url ? (
-                <img src={host.avatar_url} alt={name} className="h-full w-full object-cover" />
+      {visible.length > 0 && (
+        <div className="flex items-center" aria-label={`${safeCount} attendees`}>
+          {visible.map((rsvp, index) => (
+            <div
+              key={rsvp.user_id}
+              style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
+              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
+            >
+              {rsvp.users?.avatar_url ? (
+                <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="font-display text-[10px] font-bold text-accent">{name.charAt(0).toUpperCase()}</span>
+                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
-            {Array.from({ length: placeholders }).map((_, index) => (
-              <div
-                key={index}
-                style={{ marginLeft: "-8px", zIndex: 9 - index }}
-                className={`relative h-7 w-7 shrink-0 rounded-full border-2 border-surface ${shades[index]}`}
-              />
-            ))}
-          </>
-        )}
-      </div>
-      <span className={`font-body ${rsvps ? "text-sm" : "text-xs"} ${count > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
-        {count === 0 ? "0 going" : visible && count > visible.length ? `+${count - visible.length} going` : `${count} going`}
+          ))}
+        </div>
+      )}
+      <span className={`font-body text-xs ${safeCount > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
+        {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
   );
@@ -125,6 +106,7 @@ export function EventCard({
   communityImage,
 }: EventCardProps) {
   const isDetail = variant === "detail";
+  const attendeePreviews = rsvps ?? event.rsvps;
   const isOwner = event.user_id === currentUserId;
   const past = isPast(event.end_date ?? event.event_date);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -159,7 +141,7 @@ export function EventCard({
     e.preventDefault();
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
-    const newCount = event.rsvp_count + (newRsvped ? 1 : -1);
+    const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
     onRsvpChanged(event.id, newRsvped, newCount);
     setRsvpPending(true);
     setRsvpError(null);
@@ -210,70 +192,105 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className={isDetail ? "overflow-hidden rounded-lg bg-surface" : ""}>
-      <div className={`flex ${isDetail ? "min-h-[190px] flex-col sm:flex-row" : "gap-4"}`}>
-        <div className={`relative shrink-0 overflow-hidden ${isDetail ? "aspect-video w-full sm:aspect-auto sm:w-44" : "w-36"}`}>
+    <div className="relative overflow-hidden rounded-lg border border-border bg-surface-raised">
+      <div className="flex min-h-52 flex-col md:flex-row">
+        <div className="relative shrink-0 overflow-hidden bg-background md:h-64 md:w-auto">
           {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="h-full w-full object-cover" />
+            <img src={event.cover_image_url} alt={event.title} className="block h-auto w-full md:h-64 md:w-auto md:max-w-md" />
           ) : (
-            <div className={`h-full w-full bg-gradient-to-br ${gradient} ${isDetail ? "" : "min-h-[130px]"}`} />
+            <div className={`h-44 w-full bg-gradient-to-br md:h-64 md:w-64 ${gradient}`} aria-hidden="true" />
           )}
         </div>
-        <div className={`flex min-w-0 flex-1 flex-col ${isDetail ? "gap-2 p-4 sm:p-5" : "gap-1.5 py-5 pl-2 pr-4"}`}>
-          {isDetail ? (
-            <h1 className="font-display text-lg font-bold leading-tight text-foreground">{event.title}</h1>
-          ) : (
-            <h3 className="line-clamp-2 font-display text-sm font-semibold leading-snug text-foreground">{event.title}</h3>
-          )}
-          {event.description && (
-            <p className={`font-body text-foreground-muted ${isDetail ? "text-xs leading-relaxed" : "line-clamp-2 text-xs leading-relaxed"}`}>{event.description}</p>
-          )}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-              <Calendar size={isDetail ? 12 : 11} className="shrink-0 text-accent" />
+
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-4 py-4 md:border-l md:border-t-0 md:px-5">
+          <span className="absolute -left-2 -top-2 z-10 hidden size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -bottom-2 -left-2 z-10 hidden size-4 rounded-full bg-surface md:block" aria-hidden="true" />
+          <span className="absolute -left-2 -top-2 z-10 size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:hidden" aria-hidden="true" />
+          <span className="absolute -right-2 -top-2 z-10 size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:hidden" aria-hidden="true" />
+
+          <div className="flex items-start justify-between gap-3 pr-12">
+            <div className="min-w-0">
+              {isDetail ? (
+                <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
+              ) : (
+                <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-foreground">{event.title}</h3>
+              )}
+              {event.description && (
+                <p className={`mt-1.5 font-body text-xs leading-5 text-foreground-muted ${isDetail ? "line-clamp-3 text-pretty" : "line-clamp-2"}`}>{event.description}</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-col gap-1.5 border-b border-border pb-3">
+            <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+              <Calendar size={16} className="shrink-0 text-accent" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {event.is_online ? (
-              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-                <Video size={isDetail ? 12 : 11} className="shrink-0" />
+              <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+                <Video size={14} className="shrink-0" aria-hidden="true" />
                 {isDetail && event.meet_link ? (
                   <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-                    Online (Google Meet) <ExternalLink size={10} />
+                    Online (Google Meet) <ExternalLink size={12} />
                   </a>
                 ) : event.meet_link ? "Online (Google Meet)" : "Online"}
               </span>
             ) : event.location ? (
-              <span className={`inline-flex items-center gap-1 font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-                <MapPin size={isDetail ? 12 : 11} className="shrink-0" />{event.location}
+              <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+                <MapPin size={14} className="shrink-0" aria-hidden="true" />
+                <span className="truncate">{event.location}</span>
               </span>
             ) : null}
           </div>
-          <p className={`font-body text-foreground-muted ${isDetail ? "text-xs" : "text-[11px]"}`}>
-            Hosted by <span className="font-semibold text-foreground">{authorName}</span>
-          </p>
-          <AvatarStack host={event.users} rsvps={isDetail ? rsvps : undefined} count={event.rsvp_count} />
-          {isDetail && event.max_attendees && (
-            <p className="font-body text-xs text-foreground-subtle">
-              {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
-            </p>
-          )}
-          {isDetail && (error || rsvpError) && <p className="font-body text-xs text-red-400">{error || rsvpError}</p>}
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-            <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-body text-[10px] font-medium ${past ? "border-border text-foreground-subtle" : "border-accent/50 text-accent"}`}>
-              {past ? "Past Event" : "Upcoming Event"}
-            </span>
-            <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.preventDefault()}>
-              {!past && (
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 md:flex-nowrap">
+            <div className="border-r border-border pr-5">
+              <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
+              <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
+            </div>
+            <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
+            <div className="ml-auto hidden shrink-0 md:block">
+              {!past ? (
                 <button
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
-                  className={`rounded-md px-3 py-1 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
                 >
-                  {rsvpPending ? (isDetail ? "Updating…" : "…") : event.user_rsvped ? "Going ✓" : full ? (isDetail ? "Event Full" : "Full") : "Join Event"}
+                  <UserPlus size={17} aria-hidden="true" />
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
                 </button>
+              ) : (
+                <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
               )}
-              {!isDetail && (
+            </div>
+          </div>
+
+          {isDetail && event.max_attendees && (
+            <p className="mt-3 font-body text-xs text-foreground-subtle">
+              {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
+            </p>
+          )}
+          {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
+
+          <div className="mt-auto flex items-end justify-between gap-3 pt-4 md:pt-0">
+            <div className="md:hidden">
+              {!past ? (
+                <button
+                  type="button"
+                  onClick={handleJoin}
+                  disabled={rsvpPending || full}
+                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                >
+                  <UserPlus size={17} aria-hidden="true" />
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                </button>
+              ) : (
+                <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
+              )}
+            </div>
+            {!isDetail && !menuInPostHeader && (
+              <div onClick={(e) => e.preventDefault()}>
                 <EventOptionsMenu
                   saved={event.user_saved}
                   shared={shared}
@@ -281,17 +298,21 @@ export function EventCard({
                   isOwner={isOwner}
                   deleting={deleting}
                   saving={savePending}
-                  className={menuInPostHeader ? "absolute right-5 top-6 z-10 md:right-8" : ""}
                   onSave={toggleSave}
                   onShare={() => void handleShare()}
                   onEdit={() => setShowEditModal(true)}
                   onDelete={() => setConfirmDelete(true)}
                   onReport={() => setReported(true)}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      <div className={`absolute right-4 top-0 flex w-16 flex-col items-center px-1.5 pb-4 pt-3 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-accent text-accent-foreground"}`}>
+        <Calendar size={18} aria-hidden="true" />
+        <span className="mt-1.5 font-body text-[9px] font-semibold uppercase leading-3 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
       </div>
     </div>
   );
@@ -299,6 +320,22 @@ export function EventCard({
   return (
     <>
       <article className={isDetail || menuInPostHeader ? "group" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border bg-surface"}`}>
+        {menuInPostHeader && !isDetail && (
+          <EventOptionsMenu
+            saved={event.user_saved}
+            shared={shared}
+            reported={reported}
+            isOwner={isOwner}
+            deleting={deleting}
+            saving={savePending}
+            className="absolute right-5 top-6 z-10 md:right-8"
+            onSave={toggleSave}
+            onShare={() => void handleShare()}
+            onEdit={() => setShowEditModal(true)}
+            onDelete={() => setConfirmDelete(true)}
+            onReport={() => setReported(true)}
+          />
+        )}
         {isDetail && (
           <div className="relative mb-4 flex items-center justify-between gap-3">
             <PostAuthorMeta
