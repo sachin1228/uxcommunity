@@ -57,7 +57,6 @@ export async function getSidebarCommunities(userId: string) {
     if (!byType[community.type]) byType[community.type] = [];
     byType[community.type].push({ id: community.id, reference_id: community.reference_id });
   }
-  const images: Record<string, string | null> = {};
   const names: Record<string, string | null> = {};
   const validIds = new Set<string>();
   await Promise.all(Object.entries(byType).map(async ([type, items]) => {
@@ -69,7 +68,6 @@ export async function getSidebarCommunities(userId: string) {
     for (const item of items) {
       if (!(item.reference_id in imageMap)) continue;
       validIds.add(item.id);
-      images[item.id] = imageMap[item.reference_id] ?? null;
       names[item.id] = nameMap[item.reference_id] ?? null;
     }
   }));
@@ -80,7 +78,7 @@ export async function getSidebarCommunities(userId: string) {
     const reaction = row.last_reaction;
     return {
       ...community,
-      image_url: community.image_url ?? images[community.id] ?? null,
+      image_url: community.image_url ?? null,
       reference_name: names[community.id] ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,

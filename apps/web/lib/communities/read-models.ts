@@ -5,7 +5,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import {
   getExperienceLevelNameMap,
-  getMasterImageMap,
   getMasterNameMap,
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
@@ -57,8 +56,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   if (communityError || !community) return { ok: false, status: 404, error: "Community not found." };
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [masterImageMap, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
-    hasMasterData ? getMasterImageMap(community.type) : Promise.resolve({} as Record<string, string | null>),
+  const [masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
     hasMasterData ? getMasterNameMap(community.type) : Promise.resolve({} as Record<string, string>),
     getExperienceLevelNameMap(),
     db.from("community_members").select("user_id, joined_at, role", { count: "exact" }).eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
@@ -97,7 +95,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     data: {
       community: {
         ...community,
-        image_url: community.image_url ?? (community.reference_id ? masterImageMap[community.reference_id] : undefined) ?? null,
+        image_url: community.image_url ?? null,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,

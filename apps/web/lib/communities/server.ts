@@ -1,6 +1,5 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -58,13 +57,7 @@ export async function fetchCommunityMetaSSR(
 
   if (!membership || !community) return null;
 
-  const masterImgMap = TABLE_LOOKUP[community.type as string]
-    ? await getMasterImageMap(community.type as string)
-    : ({} as Record<string, string | null>);
-
-  const resolvedImageUrl: string | null =
-    (community as any).image_url ??
-    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ?? null;
+  const resolvedImageUrl: string | null = (community as any).image_url ?? null;
 
   // Top members for the info panel.
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
