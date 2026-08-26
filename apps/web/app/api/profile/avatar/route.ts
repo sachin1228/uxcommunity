@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extensionForMime } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -53,6 +53,17 @@ export async function POST(request: NextRequest) {
     return moderationFailureResponse(moderation.decision);
   }
 
+  const { data: currentProfile, error: profileReadError } = await db
+    .from("designer_profiles")
+    .select("avatar_url")
+    .eq("user_id", session.userId!)
+    .single();
+
+  if (profileReadError) {
+    console.error("[profile/avatar] profile read error:", profileReadError);
+    return NextResponse.json({ error: "Failed to load the current profile picture." }, { status: 500 });
+  }
+
   const storedMime = moderation.mime ?? file.type;
   const key = `avatars/${session.userId}/${Date.now()}.${extensionForMime(storedMime)}`;
 
@@ -64,14 +75,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
   }
 
-  const { error: dbError } = await db
+  const { data: updatedProfile, error: dbError } = await db
     .from("designer_profiles")
     .update({ avatar_url: publicUrl, avatar_source: "upload" })
-    .eq("user_id", session.userId!);
+    .eq("user_id", session.userId!)
+    .select("user_id")
+    .single();
 
-  if (dbError) {
+  if (dbError || !updatedProfile) {
+    try {
+      await deleteFromR2(key);
+    } catch (cleanupError) {
+      console.error("[profile/avatar] new upload cleanup error:", cleanupError);
+    }
     console.error("[profile/avatar] profile update error:", dbError);
     return NextResponse.json({ error: "Failed to save profile picture." }, { status: 500 });
+  }
+
+  const previousKey = currentProfile.avatar_url
+    ? parseR2Key(currentProfile.avatar_url)
+    : null;
+  if (previousKey && previousKey !== key) {
+    try {
+      await deleteFromR2(previousKey);
+    } catch (cleanupError) {
+      console.error("[profile/avatar] previous upload cleanup error:", cleanupError);
+    }
   }
 
   return NextResponse.json({ avatar_url: publicUrl });

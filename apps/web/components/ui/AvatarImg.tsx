@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 const GENERATED_PROFILE_PICTURE_PATTERNS = [
   /^boring:\/\//i,
   /^https:\/\/(?:[^/]+\.)?dicebear\.com\//i,
@@ -38,7 +40,9 @@ export function AvatarImg({
   size = 40,
   className,
 }: AvatarImgProps) {
-  if (!url || isGeneratedProfilePicture(url)) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
+  if (!url || failedUrl === url || isGeneratedProfilePicture(url)) {
     return (
       <span
         role="img"
@@ -51,14 +55,15 @@ export function AvatarImg({
     );
   }
 
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt={`${name}'s profile picture`}
       width={size}
       height={size}
       className={className}
+      onError={() => setFailedUrl(url)}
     />
   );
 }

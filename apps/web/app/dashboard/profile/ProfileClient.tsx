@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressImage } from "@/lib/compressImage";
 import { ProfileCard } from "./components/ProfileCard";
@@ -55,6 +55,12 @@ export function ProfileClient({
   const memberSince = createdAt
     ? new Date(createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : null;
+
+  useEffect(() => {
+    return () => {
+      if (uploadPreview) URL.revokeObjectURL(uploadPreview);
+    };
+  }, [uploadPreview]);
 
   async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

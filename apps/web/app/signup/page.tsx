@@ -141,6 +141,12 @@ function SignupInner() {
     }
   }
 
+  useEffect(() => {
+    return () => {
+      if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+    };
+  }, [uploadPreviewUrl]);
+
   async function handleStep2(e: React.FormEvent) {
     e.preventDefault();
     setStep2Loading(true);

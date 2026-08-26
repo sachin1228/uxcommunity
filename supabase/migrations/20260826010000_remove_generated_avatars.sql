@@ -4,7 +4,7 @@
 update public.designer_profiles
 set avatar_url = null,
     avatar_source = null
-where avatar_source is distinct from 'upload'
+where (avatar_source is not null and avatar_source <> 'upload')
    or avatar_url ~* '^boring://'
    or avatar_url ~* '^https://([^/]+\.)?(dicebear\.com|robohash\.org|avataaars\.io|multiavatar\.com)/'
    or avatar_url ~* '^https://source\.boringavatars\.com/';
