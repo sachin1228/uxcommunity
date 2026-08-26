@@ -311,8 +311,7 @@ export function EventCard({
       </div>
 
       <div className={`absolute right-2 top-0 flex w-11 flex-col items-center px-0.5 pb-2 pt-1.5 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-emerald-500 text-white"}`}>
-        <Calendar size={12} aria-hidden="true" />
-        <span className="mt-0.5 font-body text-[7px] font-semibold uppercase leading-2.5 tracking-wide">{past ? "Past" : "Upcoming"}</span>
+        <span className="font-body text-[7px] font-semibold uppercase leading-2.5 tracking-wide">{past ? "Past" : "Upcoming"}</span>
       </div>
     </div>
   );
