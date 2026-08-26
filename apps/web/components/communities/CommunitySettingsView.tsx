@@ -251,9 +251,9 @@ export function CommunitySettingsView({
               type="button"
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? <Spinner size={12} className="text-white" /> : <Save size={12} />}
+              {saving ? <Spinner size={12} className="text-accent-foreground" /> : <Save size={12} />}
               Save changes
             </button>
             <button
@@ -383,7 +383,7 @@ export function CommunitySettingsView({
                       <span className="block font-body text-xs text-foreground-muted">{copy}</span>
                     </span>
                     {active && (
-                      <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-accent text-white shrink-0">
+                      <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground shrink-0">
                         <Check size={10} />
                       </span>
                     )}
@@ -417,7 +417,7 @@ export function CommunitySettingsView({
                     </div>
                     <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">{copy}</p>
                     <span className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border ${
-                      active ? "border-accent bg-accent text-white" : "border-border"
+                      active ? "border-accent bg-accent text-accent-foreground" : "border-border"
                     }`}>
                       {active && <Check size={9} />}
                     </span>
@@ -491,7 +491,7 @@ export function CommunitySettingsView({
                     <button
                       type="button"
                       onClick={commitNewRule}
-                      className="rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-white hover:bg-accent-hover transition-colors"
+                      className="rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
                     >
                       Add
                     </button>
