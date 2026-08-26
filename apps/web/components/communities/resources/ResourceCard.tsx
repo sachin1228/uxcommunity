@@ -152,7 +152,6 @@ export function ResourceCard({
   function handleSave(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    if (saveBusy) return;
     const newSaved = !desiredSaveRef.current;
     const newCount = Math.max(0, optimisticSaveCountRef.current + (newSaved ? 1 : -1));
     desiredSaveRef.current = newSaved;

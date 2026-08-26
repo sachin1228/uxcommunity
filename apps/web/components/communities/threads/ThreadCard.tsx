@@ -261,11 +261,13 @@ export function ThreadCard({
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     getSaveCoalescer().toggle();
   }
 
   function handleLike(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     getLikeCoalescer().toggle();
   }
 
