@@ -194,15 +194,15 @@ export function EventCard({
   const eventBody = (
     <div className="relative overflow-hidden rounded-lg border border-border bg-surface-raised">
       <div className="flex min-h-52 flex-col md:flex-row">
-        <div className="relative shrink-0 overflow-hidden bg-background md:h-64 md:w-auto">
+        <div className="relative shrink-0 overflow-hidden bg-background md:h-52 md:w-auto">
           {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="block h-auto w-full md:h-64 md:w-auto md:max-w-md" />
+            <img src={event.cover_image_url} alt={event.title} className="block h-auto w-full md:h-52 md:w-auto md:max-w-[14rem]" />
           ) : (
-            <div className={`h-44 w-full bg-gradient-to-br md:h-64 md:w-64 ${gradient}`} aria-hidden="true" />
+            <div className={`h-40 w-full bg-gradient-to-br md:h-52 md:w-52 ${gradient}`} aria-hidden="true" />
           )}
         </div>
 
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-4 py-4 md:border-l md:border-t-0 md:px-5">
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-3 py-3 md:border-l md:border-t-0 md:px-4">
           <span className="absolute -left-2 -top-2 z-10 hidden size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:block" aria-hidden="true" />
           <span className="absolute -bottom-2 -left-2 z-10 hidden size-4 rounded-full bg-surface md:block" aria-hidden="true" />
           <span className="absolute -left-2 -top-2 z-10 size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:hidden" aria-hidden="true" />
@@ -221,7 +221,7 @@ export function EventCard({
             </div>
           </div>
 
-          <div className="mt-3 flex flex-col gap-1.5 border-b border-border pb-3">
+          <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2">
             <span className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted">
               <Calendar size={16} className="shrink-0 text-accent" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
@@ -243,8 +243,8 @@ export function EventCard({
             ) : null}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 md:flex-nowrap">
-            <div className="border-r border-border pr-5">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 md:flex-nowrap">
+            <div className="border-r border-border pr-4">
               <p className="font-body text-[11px] text-foreground-subtle">Hosted by</p>
               <p className="mt-0.5 font-display text-sm font-semibold text-foreground">{authorName}</p>
             </div>
@@ -273,7 +273,7 @@ export function EventCard({
           )}
           {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-auto flex items-end justify-between gap-3 pt-4 md:pt-0">
+          <div className="mt-auto flex items-end justify-between gap-3 pt-3 md:pt-0">
             <div className="md:hidden">
               {!past ? (
                 <button
@@ -310,9 +310,9 @@ export function EventCard({
         </div>
       </div>
 
-      <div className={`absolute right-4 top-0 flex w-16 flex-col items-center px-1.5 pb-4 pt-3 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-accent text-accent-foreground"}`}>
-        <Calendar size={18} aria-hidden="true" />
-        <span className="mt-1.5 font-body text-[9px] font-semibold uppercase leading-3 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
+      <div className={`absolute right-3 top-0 flex w-14 flex-col items-center px-1 pb-3 pt-2 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-accent text-accent-foreground"}`}>
+        <Calendar size={15} aria-hidden="true" />
+        <span className="mt-1 font-body text-[8px] font-semibold uppercase leading-3 tracking-wide">{past ? "Past event" : "Upcoming event"}</span>
       </div>
     </div>
   );
