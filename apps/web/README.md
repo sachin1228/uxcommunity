@@ -56,6 +56,12 @@ Sessions use custom signed JWTs (`jose`) stored in an httpOnly cookie — **not*
 | `POST /api/applications` (per IP) | 5 requests / hour |
 | `POST /api/auth/reset-request` (per IP) | 5 requests / hour |
 
+Middleware also applies a global request-storm guard to application routes. It
+allows up to 40 requests per 10 seconds and 240 requests per minute per
+authenticated user (or proxy IP for public requests). Static assets and
+Next.js HMR endpoints are excluded. API requests receive a `429` JSON response;
+page requests are rewritten to `/too-many-requests` with `Retry-After` headers.
+
 **Fail-open policy:** if Redis is unreachable, the request is allowed through and the error is logged. See `lib/auth/rate-limit.ts` for details.
 
 Required env vars: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` — get both from the [Upstash console](https://console.upstash.com).
