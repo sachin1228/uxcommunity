@@ -273,7 +273,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
           <button
             type="button"
             onClick={leave}
-            className="rounded-lg bg-accent px-4 py-2 font-body text-sm font-medium text-white transition-opacity hover:opacity-90"
+            className="rounded-lg bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
           >
             Back to dashboard
           </button>
@@ -299,7 +299,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             onClick={toggleMic}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
               micState === "on"
-                ? "bg-accent text-white"
+                ? "bg-accent text-accent-foreground"
                 : "bg-background/70 text-foreground-muted hover:text-foreground"
             }`}
             aria-label={micState === "on" ? "Turn off microphone" : "Turn on microphone"}
@@ -352,7 +352,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             <button
               type="button"
               onClick={enterPark}
-              className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               autoFocus
             >
               Enter Bella Park

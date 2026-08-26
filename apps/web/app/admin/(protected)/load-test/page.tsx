@@ -496,7 +496,7 @@ function RunButton({
   ) : (
     <button
       onClick={onClick}
-      className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-white transition hover:bg-accent/90 disabled:opacity-50"
+      className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50"
     >
       <Play size={12} />
       {label}

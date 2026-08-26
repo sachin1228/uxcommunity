@@ -131,10 +131,10 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
               <button
                 onClick={handleJoin}
                 disabled={status === "loading"}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {status === "loading" ? (
-                  <><Spinner size={15} className="text-white" /> Joining…</>
+                  <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
                 ) : community.is_private ? (
                   <><Lock size={14} /> Request to join</>
                 ) : (
