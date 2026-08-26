@@ -36,6 +36,18 @@
   --color-overlay-foreground: #EDEDED;
   --color-overlay-muted:      #737373;
 
+  /* ─── Geist blue scale (light theme) ──────────────────────────── */
+  --ds-blue-100:  #f0f7ff;
+  --ds-blue-200:  #ebf5ff;
+  --ds-blue-300:  #e0f0ff;
+  --ds-blue-400:  #cce6ff;
+  --ds-blue-500:  #99ceff;
+  --ds-blue-600:  #52aeff;
+  --ds-blue-700:  #0072f5;
+  --ds-blue-800:  #0062d1;
+  --ds-blue-900:  #0068d6;
+  --ds-blue-1000: #00254d;
+
   --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
   --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
@@ -98,6 +110,18 @@
     --color-overlay-elevated:   #1B1B1F;
     --color-overlay-foreground: #EDEDED;
     --color-overlay-muted:      #737373;
+
+    /* ─── Geist blue scale (dark theme) ─────────────────────────────── */
+    --ds-blue-100:  #0f1c2e;
+    --ds-blue-200:  #10233d;
+    --ds-blue-300:  #0f2f57;
+    --ds-blue-400:  #0d3868;
+    --ds-blue-500:  #0a4380;
+    --ds-blue-600:  #0090ff;
+    --ds-blue-700:  #0072f5;
+    --ds-blue-800:  #0062d1;
+    --ds-blue-900:  #52a8ff;
+    --ds-blue-1000: #ebf6ff;
 
     --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
     --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);

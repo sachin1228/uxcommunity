@@ -3,21 +3,39 @@
  * These are the foundation of the design system; do not use them directly
  * in UI code. Reference semantic tokens from `themes/` instead.
  *
- * Official Geist blue scale — 100 = darkest, 1000 = lightest.
- * Source: vercel.com/geist/colors
+ * Official Geist blue scale — https://vercel.com/geist/colors
+ * 100 = lightest tint … 1000 = darkest. Step usage:
+ * 100 default bg · 200 hover bg · 300 active bg · 400 default border ·
+ * 500 hover border · 600 active border · 700 high-contrast bg ·
+ * 800 hover high-contrast bg · 900 secondary text · 1000 primary text.
+ * Light and dark themes ship separate hand-picked values.
  */
 
 export const blue = {
-  100:  "#000b1f", // deepest navy
-  200:  "#00254d",
-  300:  "#003c85",
-  400:  "#0057b7",
-  500:  "#006bdb",
-  600:  "#0070F3", // ← PRIMARY brand accent
-  700:  "#52a8ff",
-  800:  "#adcfff",
-  900:  "#d9ecff",
-  1000: "#f0f8ff", // barely-there tint — soft backgrounds
+  100:  "#f0f7ff",
+  200:  "#ebf5ff",
+  300:  "#e0f0ff",
+  400:  "#cce6ff",
+  500:  "#99ceff",
+  600:  "#52aeff",
+  700:  "#0072f5",
+  800:  "#0062d1",
+  900:  "#0068d6",
+  1000: "#00254d",
+} as const;
+
+/** Geist blue scale — dark theme values */
+export const blueDark = {
+  100:  "#0f1c2e",
+  200:  "#10233d",
+  300:  "#0f2f57",
+  400:  "#0d3868",
+  500:  "#0a4380",
+  600:  "#0090ff",
+  700:  "#0072f5",
+  800:  "#0062d1",
+  900:  "#52a8ff",
+  1000: "#ebf6ff",
 } as const;
 
 /** Geist Neutral — clean, cool-neutral grays */
@@ -52,6 +70,7 @@ export const signal = "#FFFFFF" as const;
 
 export const colors = {
   blue,
+  blueDark,
   neutral,
   dark,
   signal,
