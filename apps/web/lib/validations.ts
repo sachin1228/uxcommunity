@@ -62,15 +62,7 @@ export const completeSignupSchema = z.object({
   profile: signupStep2Schema,
   interest_ids: z.array(z.string().uuid()).max(100),
   token: z.string().min(1).optional(),
-  avatar_url: z.string().min(1).optional(),
-  avatar_source: z.enum([
-    "dicebear",
-    "boring-avatars",
-    "robohash",
-    "avataaars",
-    "multiavatar",
-    "upload",
-  ]),
+  avatar_source: z.literal("upload").optional(),
 });
 
 export const masterDataSchema = z.object({

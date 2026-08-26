@@ -5,16 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
 export function AppHeader() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
-  const avatarUrl =
-    user?.avatar_url && !user.avatar_url.startsWith('boring://') && !avatarError
-      ? user.avatar_url
-      : null;
+  const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
   const initials = user?.name
     ? user.name
         .split(' ')
