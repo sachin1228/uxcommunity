@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
-import { usePendingActions } from "@/lib/use-mutation";
 import { isPublicContentScope } from "@/lib/content-scope";
 import {
   CornerDownRight,
@@ -212,7 +210,6 @@ export function ShowcaseDetailClient({
 }) {
   const router = useGuardedRouter();
   const publicScope = isPublicContentScope(communityId);
-  const { run, isPending } = usePendingActions();
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
@@ -249,31 +246,6 @@ export function ShowcaseDetailClient({
       client.close();
     };
   }, [post.id, currentUserId, fetchComments, isVisible]);
-  async function toggle(action: "like" | "save") {
-    const key = action === "like" ? "user_liked" : "user_saved";
-    const active = post[key];
-    // Drop every click while a like/save is still in flight — a spam burst
-    // optimistically updates and requests exactly once.
-    await run("post", async () => {
-      setPost((value) => ({
-        ...value,
-        [key]: !active,
-        ...(action === "like"
-          ? { like_count: value.like_count + (active ? -1 : 1) }
-          : {}),
-      }));
-      const response = await dedupeFetch(
-        `/api/communities/${communityId}/showcase/${post.id}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
-        },
-        { cooldownMode: "url" },
-      );
-      if (!response.ok) setPost(initialPost);
-    });
-  }
   async function removePost() {
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
@@ -328,9 +300,9 @@ export function ShowcaseDetailClient({
           post={post}
           currentUserId={currentUserId}
           variant="detail"
-          busy={isPending("post")}
-          onToggleLike={() => void toggle("like")}
-          onToggleSave={() => void toggle("save")}
+          communityId={communityId}
+          onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
+          onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />

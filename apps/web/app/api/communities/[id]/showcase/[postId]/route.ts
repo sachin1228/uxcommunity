@@ -49,12 +49,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!post) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   if (!(await canInteract(db, id, (post as { is_public: boolean }).is_public, userId))) return NextResponse.json({ error: "Not a member." }, { status: 403 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  if (body.action !== "like" && body.action !== "save") return NextResponse.json({ error: "Invalid action." }, { status: 422 });
+  if ((body.action !== "like" && body.action !== "save") || typeof body.active !== "boolean") {
+    return NextResponse.json({ error: "An action and boolean active state are required." }, { status: 422 });
+  }
   const table = body.action === "like" ? "showcase_likes" : "showcase_saves";
-  const { data: existing } = await db.from(table).select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle();
-  const result = existing ? await db.from(table).delete().eq("post_id", postId).eq("user_id", userId) : await db.from(table).insert({ post_id: postId, user_id: userId });
+  const result = body.active
+    ? await db.from(table).upsert(
+        { post_id: postId, user_id: userId },
+        { onConflict: "post_id,user_id", ignoreDuplicates: true },
+      )
+    : await db.from(table).delete().eq("post_id", postId).eq("user_id", userId);
   if (result.error) return NextResponse.json({ error: "Could not update post." }, { status: 500 });
-  return NextResponse.json({ active: !existing });
+  const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
+    db.from(table).select("post_id").eq("post_id", postId).eq("user_id", userId).maybeSingle(),
+    db.from(table).select("post_id", { count: "exact", head: true }).eq("post_id", postId),
+  ]);
+  if (stateError || countError || Boolean(persisted) !== body.active) {
+    return NextResponse.json({ error: "Post state could not be confirmed." }, { status: 500 });
+  }
+  return NextResponse.json({ active: body.active, count: count ?? 0 });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {

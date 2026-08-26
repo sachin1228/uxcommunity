@@ -18,7 +18,6 @@ import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 
@@ -191,34 +190,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     ));
   }, [updateItems]);
 
-  const handleShowcaseInteraction = useCallback((id: string, action: "like" | "save") => {
-    updateItems((prev) => prev.map((it) => {
-      if (it._type !== "showcase" || it.id !== id) return it;
-      const key = action === "like" ? "user_liked" : "user_saved";
-      const active = it[key];
-      return {
-        ...it,
-        [key]: !active,
-        ...(action === "like" ? { like_count: it.like_count + (active ? -1 : 1) } : {}),
-      };
-    }));
-  }, [updateItems]);
-
-  const handleShowcaseLikeSave = useCallback(async (post: FeedShowcase, action: "like" | "save") => {
-    handleShowcaseInteraction(post.id, action);
-    const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
-    const response = await dedupeFetch(
-      `/api/communities/${scope}/showcase/${post.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      },
-      { cooldownMode: "url" },
-    );
-    if (!response.ok) handleShowcaseInteraction(post.id, action);
-  }, [handleShowcaseInteraction]);
-
   const handleShowcaseDeleted = useCallback(async (post: FeedShowcase) => {
     const scope = post.community_id ?? PUBLIC_CONTENT_SCOPE;
     const response = await fetch(
@@ -377,9 +348,18 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 post={{ ...group.item, community_id: group.item.community_id ?? "public" }}
                 currentUserId={currentUserId}
                 isLast
+                communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
                 onOpen={() => openShowcase(group.item)}
-                onToggleLike={() => void handleShowcaseLikeSave(group.item, "like")}
-                onToggleSave={() => void handleShowcaseLikeSave(group.item, "save")}
+                onLikeChanged={(liked, count) => updateItems((prev) => prev.map((item) =>
+                  item._type === "showcase" && item.id === group.item.id
+                    ? { ...item, user_liked: liked, like_count: count }
+                    : item
+                ))}
+                onSaveChanged={(saved) => updateItems((prev) => prev.map((item) =>
+                  item._type === "showcase" && item.id === group.item.id
+                    ? { ...item, user_saved: saved }
+                    : item
+                ))}
                 onEdit={() => setEditingShowcase(group.item)}
                 onDelete={() => setDeletingShowcase(group.item)}
               />
