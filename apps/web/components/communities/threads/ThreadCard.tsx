@@ -59,10 +59,9 @@ function renderWithLinks(text: string, isNested = false) {
 import { EditThreadModal } from "./EditThreadModal";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
-import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { useThreadInteractions } from "./useThreadInteractions";
 
 interface ThreadCardProps {
   thread: CommunityThread;
@@ -113,25 +112,21 @@ export function ThreadCard({
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const isOwner = thread.user_id === currentUserId;
 
-  const latestLikeRef = useRef({ thread, onLikeChanged });
-  const initialLikedRef = useRef(thread.user_liked);
-  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
-  const displayedSaved = optimisticSaved ?? thread.user_saved;
-  const likeCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
-  const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
-  const lastLikeConfirmedRef = useRef(thread.user_liked);
-  const lastSaveConfirmedRef = useRef(thread.user_saved);
-
-  useEffect(() => {
-    latestLikeRef.current = { thread, onLikeChanged };
+  const { toggleLike, toggleSave, likePending, savePending } = useThreadInteractions({
+    threadId: thread.id,
+    communityId,
+    liked: thread.user_liked,
+    likeCount: thread.like_count,
+    saved: thread.user_saved,
+    onLikeChanged,
+    onSaveChanged,
   });
+
   const [menuOpen, setMenuOpen]       = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
-  const [interactionError, setInteractionError] = useState<string | null>(null);
-  const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -145,12 +140,6 @@ export function ThreadCard({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [menuOpen]);
 
-  function showInteractionError(message: string) {
-    setInteractionError(message);
-    if (interactionErrorTimerRef.current) clearTimeout(interactionErrorTimerRef.current);
-    interactionErrorTimerRef.current = setTimeout(() => setInteractionError(null), 4000);
-  }
-
   async function handleDelete() {
     setDeleting(true);
     setMenuOpen(false);
@@ -162,118 +151,16 @@ export function ThreadCard({
     }
   }
 
-  useEffect(() => {
-    const threadId = thread.id;
-    const coordinator = new BooleanIntentCoalescer({
-      initialValue: initialLikedRef.current,
-      onOptimisticChange: (liked) => {
-        const current = latestLikeRef.current;
-        const count = Math.max(
-          0,
-          current.thread.like_count + (liked === current.thread.user_liked ? 0 : liked ? 1 : -1),
-        );
-        current.onLikeChanged(current.thread.id, liked, count);
-      },
-      persist: async (liked) => {
-        const response = await dedupeFetch(
-          `/api/communities/${communityId}/threads/${threadId}/like`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ liked }),
-          },
-          { cooldownMode: "url" },
-        );
-        const result = (await response.json().catch(() => null)) as {
-          liked?: boolean;
-          count?: number;
-          error?: string;
-        } | null;
-        if (!response.ok || typeof result?.liked !== "boolean") {
-          throw new Error(result?.error ?? "Failed to update like.");
-        }
-        const current = latestLikeRef.current;
-        current.onLikeChanged(threadId, result.liked, result.count ?? current.thread.like_count);
-        lastLikeConfirmedRef.current = result.liked;
-        return result.liked;
-      },
-      onError: (error) => {
-        showInteractionError(error instanceof Error ? error.message : "Failed to update like.");
-      },
-    });
-
-    likeCoalescerRef.current = coordinator;
-    return () => {
-      coordinator.dispose();
-      likeCoalescerRef.current = null;
-    };
-  }, [communityId, thread.id]);
-
-  function getSaveCoalescer() {
-    if (!saveCoalescerRef.current) {
-      saveCoalescerRef.current = new BooleanIntentCoalescer({
-        initialValue: thread.user_saved,
-        onOptimisticChange: (saved) => {
-          setOptimisticSaved(saved);
-          onSaveChanged(thread.id, saved);
-        },
-        persist: async (saved) => {
-          const response = await dedupeFetch(
-            `/api/communities/${communityId}/threads/${thread.id}/save`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ saved }),
-            },
-            { cooldownMode: "url" },
-          );
-          const result = (await response.json().catch(() => null)) as {
-            saved?: boolean;
-            error?: string;
-          } | null;
-          if (!response.ok || typeof result?.saved !== "boolean") {
-            throw new Error(result?.error ?? "Failed to update save.");
-          }
-          lastSaveConfirmedRef.current = result.saved;
-          return result.saved;
-        },
-        onError: (error) => {
-          showInteractionError(error instanceof Error ? error.message : "Failed to update save.");
-        },
-      });
-    }
-    return saveCoalescerRef.current;
-  }
-
-  useEffect(() => () => {
-    saveCoalescerRef.current?.dispose();
-    if (interactionErrorTimerRef.current) clearTimeout(interactionErrorTimerRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (thread.user_liked !== lastLikeConfirmedRef.current) {
-      likeCoalescerRef.current?.syncConfirmed(thread.user_liked);
-      lastLikeConfirmedRef.current = thread.user_liked;
-    }
-  }, [thread.user_liked]);
-
-  useEffect(() => {
-    if (thread.user_saved !== lastSaveConfirmedRef.current) {
-      saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
-      lastSaveConfirmedRef.current = thread.user_saved;
-    }
-  }, [thread.user_saved]);
-
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    getSaveCoalescer().toggle();
+    toggleSave();
   }
 
   function handleLike(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
-    likeCoalescerRef.current?.toggle();
+    toggleLike();
   }
 
   const authorName    = thread.users?.name ?? "Member";
@@ -321,11 +208,12 @@ export function ThreadCard({
                   handleSave(e);
                   setMenuOpen(false);
                 }}
-                aria-pressed={displayedSaved}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                aria-pressed={thread.user_saved}
+                disabled={savePending}
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
               >
-                <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
-                {displayedSaved ? "Unsave" : "Save"}
+                <Bookmark size={11} fill={thread.user_saved ? "currentColor" : "none"} />
+                {thread.user_saved ? "Unsave" : "Save"}
               </button>
               {isOwner ? (
                 <>
@@ -531,12 +419,6 @@ export function ThreadCard({
         return <>{imageGrid}{fileList}</>;
       })()}
 
-      {interactionError && (
-        <p role="status" className="mt-3 font-body text-xs text-red-400">
-          {interactionError}
-        </p>
-      )}
-
       {/* ── Footer: engagement · community ── */}
       <div className="mt-3 flex items-center justify-between gap-4">
         <div className="flex shrink-0 items-center gap-4">
@@ -546,7 +428,9 @@ export function ThreadCard({
             onClick={handleLike}
             aria-label={thread.user_liked ? "Unlike" : "Like"}
             aria-pressed={thread.user_liked}
-            className="group/like flex items-center gap-2"
+            aria-busy={likePending}
+            disabled={likePending}
+            className="group/like flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Heart
               size={20}
