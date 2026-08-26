@@ -255,10 +255,10 @@ export function EventCard({
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
-                  className={`inline-flex min-h-9 items-center gap-1.5 rounded-md px-3.5 font-body text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
                 >
-                  <UserPlus size={17} aria-hidden="true" />
-                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                  <UserPlus size={14} aria-hidden="true" />
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
                 </button>
               ) : (
                 <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
@@ -283,7 +283,7 @@ export function EventCard({
                   className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
                 >
                   <UserPlus size={14} aria-hidden="true" />
-                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Join Event"}
+                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
                 </button>
               ) : (
                 <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
