@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import {
   Heart, Bookmark, Flag, MessageSquare,
   MoreHorizontal, Paperclip, Pencil, Trash2,
@@ -11,6 +10,7 @@ import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -110,11 +110,13 @@ export function ThreadCard({
   cardStyle = "flat",
 }: ThreadCardProps) {
   const isDetail = variant === "detail";
+  const router = useGuardedRouter();
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const isOwner = thread.user_id === currentUserId;
 
   const latestLikeRef = useRef({ thread, onLikeChanged });
   const initialLikedRef = useRef(thread.user_liked);
+  const desiredLikeRef = useRef(thread.user_liked);
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
   const displayedSaved = optimisticSaved ?? thread.user_saved;
   const likeCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
@@ -165,6 +167,7 @@ export function ThreadCard({
     const coordinator = new BooleanIntentCoalescer({
       initialValue: initialLikedRef.current,
       onOptimisticChange: (liked) => {
+        desiredLikeRef.current = liked;
         const current = latestLikeRef.current;
         const count = Math.max(
           0,
@@ -180,7 +183,10 @@ export function ThreadCard({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ liked }),
           },
-          { cooldownMode: "url" },
+          // The coalescer already serializes this item's writes. Keep the
+          // request body in the dedupe key so a queued unlike cannot replay
+          // the preceding like response.
+          { cooldownMode: "exact" },
         );
         const result = (await response.json().catch(() => null)) as {
           liked?: boolean;
@@ -191,7 +197,11 @@ export function ThreadCard({
           throw new Error(result?.error ?? "Failed to update like.");
         }
         const current = latestLikeRef.current;
-        current.onLikeChanged(threadId, result.liked, result.count ?? current.thread.like_count);
+        // A response for an older intent must not overwrite a newer
+        // optimistic state in list/feed parents.
+        if (desiredLikeRef.current === result.liked) {
+          current.onLikeChanged(threadId, result.liked, result.count ?? current.thread.like_count);
+        }
         return result.liked;
       },
       onError: (error) => {
@@ -273,6 +283,20 @@ export function ThreadCard({
   const dateLabel     = isDetail
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.updated_at || thread.created_at);
+
+  function handleCardClick(event: React.MouseEvent<HTMLElement>) {
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    router.push(threadHref);
+  }
+
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Enter") return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    event.preventDefault();
+    router.push(threadHref);
+  }
 
   // ── Inner content (shared between list and detail) ───────────────────────
   const innerContent = (
@@ -582,18 +606,28 @@ export function ThreadCard({
           {innerContent}
         </article>
       ) : cardStyle === "card" ? (
-        <article className="group mx-auto w-full max-w-[40rem]">
-          <Link href={threadHref} prefetch={false} className={`block ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}>
-            {innerContent}
-          </Link>
+        <article
+          tabIndex={0}
+          role="link"
+          onClick={handleCardClick}
+          onKeyDown={handleCardKeyDown}
+          className={`group mx-auto w-full max-w-[40rem] cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}
+        >
+          {innerContent}
         </article>
       ) : (
-        <article className={`group ${isLast ? "" : communityFeedLayout.dividerBottom}`}>
-          <Link href={threadHref} prefetch={false} className={`block ${communityFeedLayout.row}`}>
+        <article
+          tabIndex={0}
+          role="link"
+          onClick={handleCardClick}
+          onKeyDown={handleCardKeyDown}
+          className={`group cursor-pointer ${isLast ? "" : communityFeedLayout.dividerBottom}`}
+        >
+          <div className={communityFeedLayout.row}>
             <div className={communityFeedLayout.content}>
               {innerContent}
             </div>
-          </Link>
+          </div>
         </article>
       )}
 
