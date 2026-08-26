@@ -119,6 +119,8 @@ export function ThreadCard({
   const displayedSaved = optimisticSaved ?? thread.user_saved;
   const likeCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
+  const lastLikeConfirmedRef = useRef(thread.user_liked);
+  const lastSaveConfirmedRef = useRef(thread.user_saved);
 
   useEffect(() => {
     latestLikeRef.current = { thread, onLikeChanged };
@@ -192,6 +194,7 @@ export function ThreadCard({
         }
         const current = latestLikeRef.current;
         current.onLikeChanged(threadId, result.liked, result.count ?? current.thread.like_count);
+        lastLikeConfirmedRef.current = result.liked;
         return result.liked;
       },
       onError: (error) => {
@@ -231,6 +234,7 @@ export function ThreadCard({
           if (!response.ok || typeof result?.saved !== "boolean") {
             throw new Error(result?.error ?? "Failed to update save.");
           }
+          lastSaveConfirmedRef.current = result.saved;
           return result.saved;
         },
         onError: (error) => {
@@ -247,11 +251,17 @@ export function ThreadCard({
   }, []);
 
   useEffect(() => {
-    likeCoalescerRef.current?.syncConfirmed(thread.user_liked);
+    if (thread.user_liked !== lastLikeConfirmedRef.current) {
+      likeCoalescerRef.current?.syncConfirmed(thread.user_liked);
+      lastLikeConfirmedRef.current = thread.user_liked;
+    }
   }, [thread.user_liked]);
 
   useEffect(() => {
-    saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
+    if (thread.user_saved !== lastSaveConfirmedRef.current) {
+      saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
+      lastSaveConfirmedRef.current = thread.user_saved;
+    }
   }, [thread.user_saved]);
 
   function handleSave(e: React.MouseEvent) {
