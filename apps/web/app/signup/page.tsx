@@ -1,12 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { compressImage } from "@/lib/compressImage";
-import { getAvatarSourceOptions, getAvatarTabLabel } from "@/lib/avatar";
-import type { AvatarOption, AvatarSource } from "@/lib/avatar";
 import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
@@ -66,26 +64,11 @@ function SignupInner() {
   const [step3Loading, setStep3Loading] = useState(false);
   const [step3Error,   setStep3Error]   = useState<string | null>(null);
 
-  // Step 4 — Avatar
-  const [activeAvatarTab,   setActiveAvatarTab]   = useState<AvatarSource>("dicebear");
-  const [selectedAvatar,    setSelectedAvatar]    = useState<AvatarOption | null>(null);
-  const [uploadedBlob,      setUploadedBlob]      = useState<Blob | null>(null);
-  const [uploadPreviewUrl,  setUploadPreviewUrl]  = useState<string | null>(null);
+  // Step 4 — Optional profile picture
+  const [uploadedBlob, setUploadedBlob] = useState<Blob | null>(null);
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [step4Loading, setStep4Loading] = useState(false);
-  const [step4Error,   setStep4Error]   = useState<string | null>(null);
-
-  const avatarSourceOptions = useMemo(
-    () => getAvatarSourceOptions(step1.name),
-    [step1.name]
-  );
-  const avatarTabs = (["dicebear", "boring-avatars", "robohash", "avataaars", "multiavatar"] as AvatarSource[]).map(
-    (key) => ({
-      key,
-      label: getAvatarTabLabel(key),
-      count: (avatarSourceOptions[key as keyof typeof avatarSourceOptions] as AvatarOption[]).length,
-    })
-  );
-  const visibleAvatarOptions = avatarSourceOptions[activeAvatarTab as keyof typeof avatarSourceOptions] as AvatarOption[];
+  const [step4Error, setStep4Error] = useState<string | null>(null);
 
   // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
@@ -175,9 +158,6 @@ function SignupInner() {
   async function handleStep3() {
     setStep3Loading(true);
     setStep3Error(null);
-    const options = getAvatarSourceOptions(step1.name);
-    setActiveAvatarTab("dicebear");
-    setSelectedAvatar(options.dicebear[0] ?? options.all[0] ?? null);
     setUploadedBlob(null);
     if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
     setUploadPreviewUrl(null);
@@ -196,17 +176,12 @@ function SignupInner() {
       if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
       setUploadedBlob(compressed);
       setUploadPreviewUrl(URL.createObjectURL(compressed));
-      setSelectedAvatar(null);
     } catch {
       setStep4Error("Failed to process image. Please try a different file.");
     }
   }
 
   async function handleStep4() {
-    if (!uploadedBlob && !selectedAvatar) {
-      setStep4Error("Please choose an avatar or upload a photo.");
-      return;
-    }
     setStep4Loading(true);
     setStep4Error(null);
     try {
@@ -215,15 +190,14 @@ function SignupInner() {
         profile: step2,
         interest_ids: selectedInterestIds,
         ...(token ? { token } : {}),
-        avatar_source: uploadedBlob ? "upload" : selectedAvatar!.source,
-        ...(!uploadedBlob && selectedAvatar ? { avatar_url: selectedAvatar.dbUrl } : {}),
+        ...(uploadedBlob ? { avatar_source: "upload" as const } : {}),
       };
 
       let res: Response;
       if (uploadedBlob) {
         const fd = new FormData();
         fd.append("payload", JSON.stringify(payload));
-        fd.append("file", uploadedBlob, "avatar.jpg");
+        fd.append("file", uploadedBlob, "profile-picture.jpg");
         res = await fetch("/api/signup/avatar", { method: "POST", body: fd });
       } else {
         res = await fetch("/api/signup/avatar", {
@@ -250,22 +224,6 @@ function SignupInner() {
     } finally {
       setStep4Loading(false);
     }
-  }
-
-  function handlePickAvatar(opt: AvatarOption) {
-    setSelectedAvatar(opt);
-    setUploadedBlob(null);
-    if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-    setUploadPreviewUrl(null);
-    setStep4Error(null);
-  }
-
-  function handleRemoveUpload() {
-    if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-    setUploadPreviewUrl(null);
-    setUploadedBlob(null);
-    const options = getAvatarSourceOptions(step1.name);
-    setSelectedAvatar(options[activeAvatarTab as keyof typeof options][0] as AvatarOption ?? options.all[0] ?? null);
   }
 
   return (
@@ -327,20 +285,19 @@ function SignupInner() {
         )}
 
         {tokenState.status === "valid" && step === 4 && (
-          <SignupStep4
-            avatarTabs={avatarTabs}
-            activeTab={activeAvatarTab}
-            onTabChange={setActiveAvatarTab}
-            visibleOptions={visibleAvatarOptions}
-            selectedAvatar={selectedAvatar}
-            uploadPreviewUrl={uploadPreviewUrl}
-            loading={step4Loading}
-            error={step4Error}
-            onPickAvatar={handlePickAvatar}
-            onFileSelect={handleFileSelect}
-            onRemoveUpload={handleRemoveUpload}
-            onSave={handleStep4}
-          />
+              <SignupStep4
+                uploadPreviewUrl={uploadPreviewUrl}
+                loading={step4Loading}
+                error={step4Error}
+                onFileSelect={handleFileSelect}
+                onRemoveUpload={() => {
+                  setUploadedBlob(null);
+                  if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+                  setUploadPreviewUrl(null);
+                }}
+                onSave={handleStep4}
+              />
+
         )}
 
         {step === "done" && (

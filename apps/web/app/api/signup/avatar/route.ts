@@ -16,23 +16,6 @@ import { completeSignupSchema } from "@/lib/validations";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const ALLOWED_AVATAR_DOMAINS = new Set([
-  "api.dicebear.com",
-  "source.boringavatars.com",
-  "robohash.org",
-  "api.avataaars.io",
-  "api.multiavatar.com",
-]);
-
-function isAllowedAvatarUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === "boring:") return true;
-    return parsed.protocol === "https:" && ALLOWED_AVATAR_DOMAINS.has(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
 
 function safeSignupError(error: { code?: string; message?: string }) {
   if (error.code === "23505") {
@@ -49,13 +32,13 @@ function safeSignupError(error: { code?: string; message?: string }) {
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = await rateLimit(`signup:complete:${ip}`, 5, 3600);
-  if (!rl.success) {
+  const rateLimitResult = await rateLimit(`signup:complete:${ip}`, 5, 3600);
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       {
         status: 429,
-        headers: { "Retry-After": String(Math.ceil((rl.resetAt - Date.now()) / 1000)) },
+        headers: { "Retry-After": String(Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000)) },
       }
     );
   }
@@ -89,7 +72,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { identity, profile, interest_ids, token, avatar_source } = parsed.data;
+  if (file && parsed.data.avatar_source !== "upload") {
+    return NextResponse.json({ error: "Invalid profile picture source." }, { status: 422 });
+  }
+  if (!file && parsed.data.avatar_source) {
+    return NextResponse.json({ error: "A profile picture file is required." }, { status: 422 });
+  }
+
+  const { identity, profile, interest_ids, token } = parsed.data;
   const db = createServiceClient();
   const nameDecision = await moderateText({ content: identity.name, contentType: "username" });
   await logModerationDecision(db, {
@@ -99,13 +89,10 @@ export async function POST(request: NextRequest) {
   });
   if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
-  let avatarUrl = parsed.data.avatar_url;
+  let profilePictureUrl: string | null = null;
   let uploadedKey: string | null = null;
 
   if (file) {
-    if (avatar_source !== "upload") {
-      return NextResponse.json({ error: "Invalid avatar source." }, { status: 422 });
-    }
     if (!ALLOWED_TYPES.includes(file.type)) {
       return NextResponse.json({ error: "Only JPEG, PNG, and WebP images are allowed." }, { status: 422 });
     }
@@ -122,13 +109,11 @@ export async function POST(request: NextRequest) {
     const storedMime = moderation.mime ?? file.type;
     uploadedKey = `avatars/pending/${randomUUID()}.${extensionForMime(storedMime)}`;
     try {
-      avatarUrl = await uploadToR2(uploadedKey, moderation.buffer, storedMime);
+      profilePictureUrl = await uploadToR2(uploadedKey, moderation.buffer, storedMime);
     } catch (error) {
       console.error("[signup/avatar] R2 upload error:", error);
       return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
     }
-  } else if (!avatarUrl || avatar_source === "upload" || !isAllowedAvatarUrl(avatarUrl)) {
-    return NextResponse.json({ error: "Avatar URL domain is not permitted." }, { status: 422 });
   }
 
   const passwordHash = await bcrypt.hash(identity.password, 12);
@@ -141,8 +126,8 @@ export async function POST(request: NextRequest) {
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,
     p_interest_ids: [...new Set(interest_ids)],
-    p_avatar_url: avatarUrl,
-    p_avatar_source: avatar_source,
+    p_avatar_url: profilePictureUrl,
+    p_avatar_source: profilePictureUrl ? "upload" : null,
     p_invitation_token: token ?? null,
   });
 
@@ -173,7 +158,7 @@ export async function POST(request: NextRequest) {
     email: identity.email.toLowerCase(),
     role: "user",
   });
-  const response = NextResponse.json({ success: true, userId, avatar_url: avatarUrl });
+  const response = NextResponse.json({ success: true, userId, avatar_url: profilePictureUrl });
   setSessionCookie(response, sessionToken, request.nextUrl.hostname);
   return response;
 }
