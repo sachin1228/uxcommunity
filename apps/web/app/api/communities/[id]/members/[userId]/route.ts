@@ -46,10 +46,10 @@ export async function GET(
     return NextResponse.json({ error: "Not a member." }, { status: 403 });
   }
 
-  // Fetch name + avatar + designation + company in parallel.
+  // Fetch name + avatar + designation in parallel.
   const [{ data: user }, { data: profile }] = await Promise.all([
     db.from("users").select("name").eq("id", userId).maybeSingle(),
-    db.from("designer_profiles").select("avatar_url, experience_level, companies(name)").eq("user_id", userId).maybeSingle(),
+    db.from("designer_profiles").select("avatar_url, experience_level").eq("user_id", userId).maybeSingle(),
   ]);
 
   if (!user) {
@@ -72,7 +72,6 @@ export async function GET(
     name: user.name,
     avatar_url: profile?.avatar_url ?? null,
     designation,
-    company: (profile as any)?.companies?.name ?? null,
   });
 }
 

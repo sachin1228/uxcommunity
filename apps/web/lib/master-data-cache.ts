@@ -1,7 +1,7 @@
 /**
  * Cached master-data image lookups.
  *
- * Master tables (cities, design_sectors, companies, etc.) change very rarely.
+ * Master tables (cities, design_sectors, etc.) change very rarely.
  * Caching their image_url maps server-side for 1 hour removes the per-request
  * Supabase round-trip and the associated DB read bytes / egress cost.
  *
@@ -18,7 +18,6 @@ export const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
   city:             { table: "cities",            idCol: "id" },
   sector:           { table: "design_sectors",    idCol: "id" },
   interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
 };
 

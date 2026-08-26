@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
 
-const VALID_TYPES = ["city", "sector", "interest", "company", "experience_level"] as const;
+const VALID_TYPES = ["city", "sector", "interest", "experience_level"] as const;
 
 const upsertSchema = z.object({
   scope: z.enum(["universal", "type", "community"]),

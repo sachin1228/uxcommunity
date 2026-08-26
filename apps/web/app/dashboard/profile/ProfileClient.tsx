@@ -15,7 +15,6 @@ interface Props {
   avatarUrl: string | null;
   avatarSource: string | null;
   city: string | null;
-  company: string | null;
   sector: string | null;
   experienceLevel: string | null;
   initialLinkedIn: string;
@@ -33,7 +32,6 @@ export function ProfileClient({
   createdAt,
   avatarUrl: initialAvatarUrl,
   city,
-  company,
   sector,
   experienceLevel,
   initialLinkedIn,
@@ -130,7 +128,6 @@ export function ProfileClient({
         memberSince={memberSince}
         onOpenAvatarPicker={() => setShowPicturePicker(true)}
         city={city}
-        company={company}
         sector={sector}
         experienceLevel={experienceLevel}
         linkedin={linkedin}

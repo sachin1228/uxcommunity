@@ -12,7 +12,6 @@ interface CommunityMember {
   name:        string;
   avatar_url:  string | null;
   designation: string | null;
-  company:     string | null;
   joined_at:   string;
   role:        string;
 }
@@ -206,7 +205,6 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
               name:        accepted.name,
               avatar_url:  accepted.avatar_url,
               designation: null,
-              company:     null,
               joined_at:   new Date().toISOString(),
               role:        "member",
             },
@@ -343,11 +341,9 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                           </span>
                         )}
                       </div>
-                      {(member.designation || member.company) && (
+                      {member.designation && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
-                          {member.designation && member.company
-                            ? `${member.designation} @ ${member.company}`
-                            : member.designation ?? `@ ${member.company}`}
+                          {member.designation}
                         </span>
                       )}
                     </div>

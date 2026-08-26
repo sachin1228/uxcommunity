@@ -27,50 +27,6 @@ insert into design_sectors (name) values
   ('Other')
 on conflict (name) do nothing;
 
--- ─── Companies ──────────────────────────────────────────────
-insert into companies (name) values
-  ('Google India'),
-  ('Microsoft India'),
-  ('Amazon India'),
-  ('Apple India'),
-  ('Meta India'),
-  ('Flipkart'),
-  ('Zomato'),
-  ('Swiggy'),
-  ('Paytm'),
-  ('PhonePe'),
-  ('Razorpay'),
-  ('CRED'),
-  ('Zepto'),
-  ('Meesho'),
-  ('Nykaa'),
-  ('Myntra'),
-  ('Urban Company'),
-  ('Ola'),
-  ('Rapido'),
-  ('Groww'),
-  ('Zerodha'),
-  ('BYJU''S'),
-  ('Unacademy'),
-  ('upGrad'),
-  ('Vedantu'),
-  ('Infosys'),
-  ('Wipro'),
-  ('TCS'),
-  ('HCL Technologies'),
-  ('Tech Mahindra'),
-  ('Accenture India'),
-  ('IBM India'),
-  ('Deloitte India'),
-  ('PwC India'),
-  ('McKinsey India'),
-  ('ThoughtWorks'),
-  ('Freshworks'),
-  ('Zoho'),
-  ('InMobi'),
-  ('Browserstack')
-on conflict (name) do nothing;
-
 -- ─── Indian Cities ──────────────────────────────────────────
 insert into cities (name) values
   ('Mumbai'),

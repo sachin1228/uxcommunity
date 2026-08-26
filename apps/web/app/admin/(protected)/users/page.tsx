@@ -8,7 +8,6 @@ import { AvatarThumb } from "@/components/admin/users/AvatarThumb";
 
 interface UserProfile {
   avatar_url?: string | null;
-  companies: { name: string } | null;
 }
 
 interface User {
@@ -99,11 +98,11 @@ export default function UsersPage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {["Name", "Email", "Company", "Joined", "Status", "Actions"].map((h, i) => (
+                {["Name", "Email", "Joined", "Status", "Actions"].map((h, i) => (
                   <th
                     key={h}
                     className={`px-4 py-2.5 font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider ${
-                      i === 5 ? "text-right" : "text-left"
+                      i === 4 ? "text-right" : "text-left"
                     }`}
                   >
                     {h}
@@ -138,11 +137,6 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-2.5">
                     <p className="font-body text-xs text-foreground-muted">{user.email}</p>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <p className="font-body text-xs text-foreground-muted">
-                      {user.designer_profiles?.companies?.name ?? "—"}
-                    </p>
                   </td>
                   <td className="px-4 py-2.5">
                     <p className="font-mono text-[10px] text-foreground-muted whitespace-nowrap">

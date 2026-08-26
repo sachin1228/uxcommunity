@@ -84,7 +84,6 @@ export function useSendMessage({
           name: currentUser.name,
           avatar_url: currentUser.avatar_url,
           designation: null,
-          company: null,
         },
         reactions: [],
         reply_to: replyTo

@@ -90,8 +90,7 @@ export function MasterDataPage({
         return (
           responseKey
             ? (data[responseKey] ?? [])
-            : (data.companies ??
-               data.cities ??
+            : (data.cities ??
                data.sectors ??
                data.interests ??
                data.experience_levels ??

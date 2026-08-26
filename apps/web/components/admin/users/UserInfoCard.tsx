@@ -59,7 +59,6 @@ export function UserInfoCard({ user, application, interests }: Props) {
           day: "numeric", month: "long", year: "numeric",
         })}
       />
-      <InfoRow label="Company" value={profile?.companies?.name ?? "—"} />
       <InfoRow label="City" value={profile?.cities?.name ?? "—"} />
       <InfoRow label="Industry Sector" value={profile?.design_sectors?.name ?? "—"} />
       <InfoRow

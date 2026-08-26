@@ -104,7 +104,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               type="text"
               value={addName}
               onChange={(e) => { setAddName(e.target.value); setAddError(null); }}
-              placeholder={`e.g. ${entity === "Company" ? "Figma" : entity === "City" ? "Pune" : "SaaS & Software"}`}
+              placeholder={`e.g. ${entity === "City" ? "Pune" : "SaaS & Software"}`}
               className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
             />
           </div>

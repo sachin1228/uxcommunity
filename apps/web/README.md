@@ -25,7 +25,7 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 | Applications | Review pending applications, approve or reject with email notification |
 | Users | View all members, block/unblock accounts |
 | Communities | Create/edit communities, delete messages |
-| Master data | Cities, companies, sectors, experience levels, interests, tools, Lottie animations |
+| Master data | Cities, sectors, experience levels, interests, tools, Lottie animations |
 
 ### API routes (`app/api/`)
 
@@ -36,7 +36,7 @@ Protected by middleware — requires a valid session with `role: "admin"`.
 | `/api/signup/*` | Multi-step onboarding (validate token, profile, avatar, interests, complete) |
 | `/api/profile/*` | Update profile and interests (authenticated) |
 | `/api/communities/*` | List, join, send/read messages, mark read |
-| `/api/data/*` | Public reference data (cities, sectors, experience levels, interests, companies) |
+| `/api/data/*` | Public reference data (cities, sectors, experience levels, interests) |
 | `/api/admin/*` | All admin CRUD — protected by admin session check |
 
 ## Auth

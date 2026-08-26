@@ -13,10 +13,9 @@ export async function POST() {
   const { data: profile } = await db
     .from("designer_profiles")
     .select(`
-      city_id, sector_id, company_id, experience_level,
+      city_id, sector_id, experience_level,
       cities(name, image_url),
-      design_sectors(name, image_url),
-      companies(name, image_url)
+      design_sectors(name, image_url)
     `)
     .eq("user_id", userId)
     .maybeSingle();
@@ -28,7 +27,7 @@ export async function POST() {
     .eq("user_id", userId);
 
   type CommunitySpec = {
-    type: "city" | "sector" | "interest" | "company" | "experience_level";
+    type: "city" | "sector" | "interest" | "experience_level";
     reference_id: string;
     name: string;
     image_url: string | null;
@@ -52,16 +51,6 @@ export async function POST() {
       reference_id: profile.sector_id,
       name: `${sector?.name ?? "Unknown Sector"} Community`,
       image_url: sector?.image_url ?? null,
-    });
-  }
-
-  if (profile?.company_id) {
-    const company = profile.companies as unknown as { name: string; image_url: string | null } | null;
-    specs.push({
-      type: "company",
-      reference_id: profile.company_id,
-      name: `${company?.name ?? "Unknown Company"} Designers`,
-      image_url: company?.image_url ?? null,
     });
   }
 
