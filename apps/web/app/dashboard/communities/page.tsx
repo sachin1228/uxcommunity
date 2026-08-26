@@ -19,7 +19,6 @@ type Community = CachedExploreCommunity;
 // ── Config ───────────────────────────────────────────────────────────────────
 
 const LOCK_REASON: Record<string, string> = {
-  company:          "Update your company in your profile to join",
   sector:           "Update your industry in your profile to join",
   city:             "Update your city in your profile to join",
   experience_level: "Update your experience level in your profile to join",
@@ -27,7 +26,6 @@ const LOCK_REASON: Record<string, string> = {
 
 const TABS = [
   { label: "All",        value: "all"              },
-  { label: "Company",    value: "company"          },
   { label: "Industry",   value: "sector"            },
   { label: "Interest",   value: "interest"          },
   { label: "Experience", value: "experience_level"  },

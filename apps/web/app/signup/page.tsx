@@ -48,12 +48,11 @@ function SignupInner() {
 
   // Step 2
   const [step, setStep] = useState<Step>(1);
-  const [companies,       setCompanies]       = useState<MasterItem[]>([]);
   const [cities,          setCities]          = useState<MasterItem[]>([]);
   const [sectors,         setSectors]         = useState<MasterItem[]>([]);
   const [experienceLevels, setExperienceLevels] = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
   const [step2, setStep2] = useState({
-    company_id: "", city_id: "", sector_id: "", experience_level: "",
+    city_id: "", sector_id: "", experience_level: "",
   });
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
@@ -91,7 +90,6 @@ function SignupInner() {
   useEffect(() => {
     if (step !== 2) return;
     Promise.all([
-      fetch("/api/data/companies").then((r) => r.json()).then((d) => setCompanies(d.companies ?? [])),
       fetch("/api/data/cities")   .then((r) => r.json()).then((d) => setCities(d.cities ?? [])),
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
       fetch("/api/data/experience-levels").then((r) => r.json()).then((d) => setExperienceLevels(d.experience_levels ?? [])),
@@ -151,7 +149,6 @@ function SignupInner() {
     e.preventDefault();
     setStep2Loading(true);
     setStep2Error(null);
-    if (!step2.company_id)       { setStep2Error("Please select a company.");             setStep2Loading(false); return; }
     if (!step2.city_id)          { setStep2Error("Please select a city.");                setStep2Loading(false); return; }
     if (!step2.sector_id)        { setStep2Error("Please select an industry sector.");    setStep2Loading(false); return; }
     if (!step2.experience_level) { setStep2Error("Please select your experience level."); setStep2Loading(false); return; }
@@ -269,7 +266,6 @@ function SignupInner() {
           <SignupStep2
             state={step2}
             onChange={(patch) => setStep2((p) => ({ ...p, ...patch }))}
-            companies={companies}
             cities={cities}
             sectors={sectors}
             experienceLevels={experienceLevels}

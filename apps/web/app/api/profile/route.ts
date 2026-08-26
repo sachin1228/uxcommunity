@@ -27,7 +27,7 @@ export async function GET() {
     db
       .from("designer_profiles")
       .select(
-        "avatar_url, avatar_source, experience_level, linkedin_url, portfolio_url, bio, cities(id, name), companies(id, name), design_sectors(id, name)"
+        "avatar_url, avatar_source, experience_level, linkedin_url, portfolio_url, bio, cities(id, name), design_sectors(id, name)"
       )
       .eq("user_id", userId)
       .maybeSingle(),

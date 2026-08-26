@@ -21,7 +21,6 @@ export async function GET(
       id, name, email, is_blocked, created_at, application_id,
       designer_profiles (
         experience_level, avatar_url, avatar_source,
-        companies ( name ),
         cities ( name ),
         design_sectors ( name )
       )

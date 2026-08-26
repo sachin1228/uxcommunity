@@ -6,7 +6,6 @@ const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
   city:             { table: "cities",            idCol: "id" },
   sector:           { table: "design_sectors",    idCol: "id" },
   interest:         { table: "design_interests",  idCol: "id" },
-  company:          { table: "companies",         idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
 };
 

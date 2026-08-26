@@ -52,7 +52,6 @@ export interface MessageUser {
   name: string;
   avatar_url: string | null;
   designation: string | null;
-  company: string | null;
 }
 
 export interface Reaction {

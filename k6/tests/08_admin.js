@@ -7,12 +7,11 @@
  *   GET /api/admin/communities
  *   GET /api/admin/cities
  *   GET /api/admin/sectors
- *   GET /api/admin/companies
  *   GET /api/admin/interests
  *   GET /api/admin/moderation
  *   GET /api/admin/tags
  *
- * Write paths (create city/sector/company/interest) are exercised once in the
+ * Write paths (create city/sector/interest) are exercised once in the
  * smoke test only to avoid polluting the database during high-VU runs.
  *
  * Requires: authenticated admin session. Call loginAdmin() before running.
@@ -28,7 +27,6 @@ const READ_ENDPOINTS = [
   { name: 'admin/communities',   path: '/api/admin/communities' },
   { name: 'admin/cities',        path: '/api/admin/cities' },
   { name: 'admin/sectors',       path: '/api/admin/sectors' },
-  { name: 'admin/companies',     path: '/api/admin/companies' },
   { name: 'admin/interests',     path: '/api/admin/interests' },
   { name: 'admin/moderation',    path: '/api/admin/moderation?status=pending&page=1' },
   { name: 'admin/tags',          path: '/api/admin/tags' },

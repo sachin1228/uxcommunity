@@ -10,7 +10,6 @@ const completePayload = {
     confirm_password: "analytical1",
   },
   profile: {
-    company_id: "11111111-1111-4111-8111-111111111111",
     city_id: "22222222-2222-4222-8222-222222222222",
     sector_id: "33333333-3333-4333-8333-333333333333",
     experience_level: "senior",
@@ -39,18 +38,11 @@ test("invitation completion accepts a complete payload with a token", () => {
   );
 });
 
-test("completion rejects mismatched passwords and malformed references", () => {
+test("completion rejects mismatched passwords", () => {
   assert.equal(
     completeSignupSchema.safeParse({
       ...completePayload,
       identity: { ...completePayload.identity, confirm_password: "different1" },
-    }).success,
-    false
-  );
-  assert.equal(
-    completeSignupSchema.safeParse({
-      ...completePayload,
-      profile: { ...completePayload.profile, company_id: "not-a-uuid" },
     }).success,
     false
   );

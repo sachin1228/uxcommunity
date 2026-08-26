@@ -8,7 +8,7 @@ A platform for UI/UX, product, and social media designers. Designers apply to jo
 |---|---|
 | **Application / onboarding** | Public apply form → admin review → approval email with invite link → multi-step sign-up (profile, avatar upload, interests) |
 | **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
-| **Admin panel** | Review and approve/reject applications; manage users (block/unblock); CRUD for master data: cities, companies, sectors, experience levels, interests, communities, Lottie animations. |
+| **Admin panel** | Review and approve/reject applications; manage users (block/unblock); CRUD for master data: cities, sectors, experience levels, interests, communities, Lottie animations. |
 | **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
 | **Image uploads** | Avatar and community images uploaded via signed Supabase Storage URLs, compressed server-side with `sharp`. |
 | **Rate limiting** | Redis-backed sliding-window rate limiter (Upstash) on login (IP + email), application submission, and password-reset requests. |

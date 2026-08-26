@@ -202,14 +202,12 @@ export function useRealtimeChat({
                   name: string;
                   avatar_url: string | null;
                   designation?: string | null;
-                  company?: string | null;
                 } | null) => {
                   if (!profile) return;
                   const resolvedUsers = {
                     name:        profile.name,
                     avatar_url:  profile.avatar_url,
                     designation: profile.designation ?? null,
-                    company:     profile.company ?? null,
                   };
                   membersRef.current = [
                     ...membersRef.current,
@@ -393,9 +391,9 @@ export function useRealtimeChat({
             `/api/communities/${communityId}/members/${targetUserId}`
           )
             .then((r) => (r.ok ? r.json() : null))
-            .then((profile: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null) => {
+            .then((profile: { name: string; avatar_url: string | null; designation?: string | null } | null) => {
               if (!profile) return;
-              const resolvedUsers = { name: profile.name, avatar_url: profile.avatar_url, designation: profile.designation ?? null, company: profile.company ?? null };
+              const resolvedUsers = { name: profile.name, avatar_url: profile.avatar_url, designation: profile.designation ?? null };
               membersRef.current = [
                 ...membersRef.current,
                 { user_id: targetUserId, users: resolvedUsers },

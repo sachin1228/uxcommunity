@@ -32,7 +32,6 @@ const TYPE_LABELS: Record<string, string> = {
   city: "City",
   sector: "Industry",
   interest: "Interest",
-  company: "Company",
   experience_level: "Experience",
 };
 
@@ -41,8 +40,6 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
   switch (type) {
     case "city":
       return `Connect with designers based in ${name}.`;
-    case "company":
-      return `A space for designers working at ${name} to connect and grow together.`;
     case "sector":
       return `A community for designers in the ${name} industry.`;
     case "interest":

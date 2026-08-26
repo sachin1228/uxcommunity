@@ -24,7 +24,7 @@ export default async function ProfilePage() {
     db
       .from("designer_profiles")
       .select(
-        "avatar_url, avatar_source, experience_level, linkedin_url, portfolio_url, bio, cities(id, name), companies(id, name), design_sectors(id, name)"
+        "avatar_url, avatar_source, experience_level, linkedin_url, portfolio_url, bio, cities(id, name), design_sectors(id, name)"
       )
       .eq("user_id", userId)
       .maybeSingle(),
@@ -86,7 +86,6 @@ export default async function ProfilePage() {
       avatarUrl={(profile as any)?.avatar_url ?? null}
       avatarSource={(profile as any)?.avatar_source ?? null}
       city={(profile as any)?.cities?.name ?? null}
-      company={(profile as any)?.companies?.name ?? null}
       sector={(profile as any)?.design_sectors?.name ?? null}
       experienceLevel={(profile as any)?.experience_level ?? null}
       initialLinkedIn={(profile as any)?.linkedin_url ?? ""}
