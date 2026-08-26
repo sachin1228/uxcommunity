@@ -6,6 +6,10 @@
 
 -- Replace database functions that previously depended on companies or the
 -- designer_profiles.company_id column before removing those database objects.
+drop function if exists public.get_community_message_page(
+  uuid, uuid, timestamptz, timestamptz, timestamptz, integer
+);
+
 create or replace function public.get_community_message_page(
   p_community_id uuid,
   p_user_id uuid,
@@ -98,6 +102,8 @@ $$;
 
 revoke all on function public.get_community_message_page(uuid, uuid, timestamptz, timestamptz, timestamptz, integer) from public, anon, authenticated;
 grant execute on function public.get_community_message_page(uuid, uuid, timestamptz, timestamptz, timestamptz, integer) to service_role;
+
+drop function if exists public.get_all_communities(uuid);
 
 create or replace function public.get_all_communities(p_user_id uuid)
 returns table (
