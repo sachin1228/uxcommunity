@@ -57,7 +57,11 @@ export class BooleanIntentCoalescer {
 
   syncConfirmed(value: boolean) {
     this.confirmed = value;
-    if (!this.isPending()) this.desired = value;
+    // Only sync desired when the coalescer is truly idle (no in-flight request,
+    // no pending timer, and desired already matches confirmed). If the user has
+    // queued a toggle (desired !== confirmed), don't override their intent —
+    // the next flush() will reconcile.
+    if (!this.isPending() && this.desired === this.confirmed) this.desired = value;
     this.notifyPending();
   }
 
