@@ -157,15 +157,6 @@ export function MessageList({
         </div>
       )}
 
-      {/* "Beginning of conversation" marker once we know there's nothing older */}
-      {!hasMoreAbove && mergedGroups.length > 0 && (
-        <div className="flex items-center justify-center py-4 px-5">
-          <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5">
-            Beginning of conversation
-          </span>
-        </div>
-      )}
-
       {/* Empty state — only shown once threads have loaded too, so we don't
           flash "Be the first to say something" in communities that have threads
           but no chat messages while the thread fetch is still in flight.     */}
