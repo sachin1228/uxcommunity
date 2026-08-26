@@ -68,7 +68,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
     ? await Promise.all([
         db.from("users").select("id, name").in("id", memberUserIds),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level").in("user_id", memberUserIds),
       ])
     : [{ data: [] }, { data: [] }];
 
@@ -87,7 +87,6 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         designation: profile?.experience_level
           ? cleanDesignation(experienceLevelNameMap[profile.experience_level] ?? profile.experience_level)
           : null,
-        company: profile?.companies?.name ?? null,
       } : null,
     };
   });
@@ -323,7 +322,7 @@ export async function loadCommunityMembersPage(
   const [{ data: users }, { data: profiles }, experienceLevelNameMap] = ids.length
     ? await Promise.all([
         db.from("users").select("id, name").in("id", ids),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", ids),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level").in("user_id", ids),
         getExperienceLevelNameMap(),
       ])
     : [{ data: [] }, { data: [] }, {} as Record<string, string>];
@@ -332,7 +331,6 @@ export async function loadCommunityMembersPage(
     user_id: string;
     avatar_url: string | null;
     experience_level: string | null;
-    companies: { name: string } | null;
   }>;
   const userMap = Object.fromEntries(userRows.map((user) => [user.id, user]));
   const profileMap = Object.fromEntries(profileRows.map((profile) => [profile.user_id, profile]));
@@ -348,7 +346,6 @@ export async function loadCommunityMembersPage(
       designation: profile?.experience_level
         ? cleanDesignation(experienceLevelNameMap[profile.experience_level] ?? profile.experience_level)
         : null,
-      company: profile?.companies?.name ?? null,
     }] : [];
   });
   return { ok: true, data: { members, has_more: allRows.length > 30, total: allRows.length } };

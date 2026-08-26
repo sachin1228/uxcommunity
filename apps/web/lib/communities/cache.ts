@@ -27,7 +27,7 @@ export interface CachedMessage {
   content: string;
   created_at: string;
   user_id: string;
-  users: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   status?: "sending" | "sent" | "failed";
   reactions?: MessageReaction[];
   reply_to?: ReplyPreview | null;
@@ -65,7 +65,7 @@ export interface CachedMeta {
   members: {
     user_id: string;
     role?: string;
-    users: { name: string; avatar_url: string | null; designation?: string | null; company?: string | null } | null;
+    users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   }[];
   fetchedAt: number;
 }
@@ -88,7 +88,7 @@ export interface SidebarLastReaction {
 export interface CachedSidebarCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "company" | "experience_level" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
   reference_name?: string | null;
   is_private?: boolean;
@@ -135,7 +135,7 @@ export const SIDEBAR_STALE_MS = 60_000;
 export interface CachedExploreCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "company" | "experience_level" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
   description: string | null;
   is_private?: boolean;

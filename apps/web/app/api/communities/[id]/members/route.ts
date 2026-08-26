@@ -80,7 +80,7 @@ export async function GET(
   const [{ data: users }, { data: profiles }] = await Promise.all([
     db.from("users").select("id, name").in("id", pageUserIds),
     db.from("designer_profiles")
-      .select("user_id, avatar_url, experience_level, companies(name)")
+      .select("user_id, avatar_url, experience_level")
       .in("user_id", pageUserIds),
   ]);
 
@@ -108,7 +108,6 @@ export async function GET(
         name:        u.name,
         avatar_url:  p?.avatar_url ?? null,
         designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-        company:     (p?.companies as any)?.name ?? null,
       };
     })
     .filter(Boolean);

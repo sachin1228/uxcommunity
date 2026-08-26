@@ -49,7 +49,6 @@ export const directSignupStep1Schema = z
   });
 
 export const signupStep2Schema = z.object({
-  company_id: z.string().uuid("Please select a company"),
   city_id: z.string().uuid("Please select a city"),
   sector_id: z.string().uuid("Please select a design sector"),
   // No longer validated against a hardcoded enum — the experience_levels table

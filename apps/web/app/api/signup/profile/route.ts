@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { company_id, city_id, sector_id, experience_level } = parsed.data;
+  const { city_id, sector_id, experience_level } = parsed.data;
   const db = createServiceClient();
 
   // Check if profile already exists
@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
 
   const { error } = await db.from("designer_profiles").insert({
     user_id: session.userId,
-    company_id,
     city_id,
     sector_id,
     experience_level,

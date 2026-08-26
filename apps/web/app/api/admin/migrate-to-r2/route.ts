@@ -27,7 +27,6 @@ function parseSupabasePath(url: string): { bucket: string; storagePath: string }
 }
 
 const MASTER_TABLES: { table: string; column: string }[] = [
-  { table: "companies",         column: "image_url" },
   { table: "cities",            column: "image_url" },
   { table: "design_sectors",    column: "image_url" },
   { table: "design_interests",  column: "image_url" },

@@ -6,7 +6,6 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 interface MasterItem { id: string; name: string; image_url?: string | null }
 
 interface Step2State {
-  company_id: string;
   city_id: string;
   sector_id: string;
   experience_level: string;
@@ -15,7 +14,6 @@ interface Step2State {
 interface SignupStep2Props {
   state: Step2State;
   onChange: (patch: Partial<Step2State>) => void;
-  companies: MasterItem[];
   cities: MasterItem[];
   sectors: MasterItem[];
   experienceLevels: { id: string; slug: string; label: string; image_url: string | null }[];
@@ -27,7 +25,6 @@ interface SignupStep2Props {
 export function SignupStep2({
   state,
   onChange,
-  companies,
   cities,
   sectors,
   experienceLevels,
@@ -48,19 +45,6 @@ export function SignupStep2({
             <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>
           </div>
         )}
-
-        <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">
-            Company <span className="text-red-400">*</span>
-          </span>
-          <SearchableSelect
-            options={companies.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
-            value={state.company_id}
-            onChange={(v) => onChange({ company_id: v })}
-            placeholder="Select a company"
-            allowOther otherLabel="Other"
-          />
-        </div>
 
         <div className="flex flex-col gap-1.5">
           <span className="font-body text-xs font-medium text-foreground">

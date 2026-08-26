@@ -1,6 +1,6 @@
 /**
  * Fills in auto-generated descriptions for communities that have none.
- * Auto-created communities (interest, city, company, sector, experience_level)
+ * Auto-created communities (interest, city, sector, experience_level)
  * are born with NULL description because the source tables have no description
  * column. This script backfills sensible defaults.
  *
@@ -45,8 +45,6 @@ function makeDescription(type, name) {
       return `A community for ${name} enthusiasts and professionals. Share work, get feedback, and grow together.`;
     case "city":
       return `Connect with designers based in ${name}. Local meetups, jobs, and conversations.`;
-    case "company":
-      return `A space for designers at ${name} to share ideas, resources, and support each other.`;
     case "sector":
       return `Designers working in the ${name} industry. Discuss trends, tools, and opportunities.`;
     case "experience_level":

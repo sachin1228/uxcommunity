@@ -31,7 +31,6 @@ interface PurgeSummary {
 }
 
 const TABLE_LABELS: Record<string, string> = {
-  companies:         "Companies",
   cities:            "Cities",
   design_sectors:    "Industry",
   design_interests:  "Interests",

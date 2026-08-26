@@ -2,7 +2,7 @@
 
 import {
   Camera, Mail, Calendar,
-  MapPin, Building2, Layers, Star, Lock,
+  MapPin, Layers, Star, Lock,
   Linkedin, Globe,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -17,7 +17,6 @@ interface ProfileCardProps {
   memberSince: string | null;
   onOpenAvatarPicker: () => void;
   city: string | null;
-  company: string | null;
   sector: string | null;
   experienceLevel: string | null;
   linkedin: string;
@@ -29,7 +28,7 @@ interface ProfileCardProps {
 export function ProfileCard({
   name, email, avatarUrl, memberSince,
   onOpenAvatarPicker,
-  city, company, sector, experienceLevel,
+  city, sector, experienceLevel,
   linkedin, portfolio, onLinkedinChange, onPortfolioChange,
 }: ProfileCardProps) {
   return (
@@ -123,11 +122,6 @@ export function ProfileCard({
         {city && (
           <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
             <MapPin size={10} className="text-accent shrink-0" />{city}
-          </span>
-        )}
-        {company && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <Building2 size={10} className="text-accent shrink-0" />{company}
           </span>
         )}
         {sector && (
