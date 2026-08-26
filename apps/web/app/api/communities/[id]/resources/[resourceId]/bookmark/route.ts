@@ -4,7 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 
 export async function POST(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; resourceId: string }> },
 ) {
   let session;
@@ -35,27 +35,26 @@ export async function POST(
     if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  // Toggle: delete if exists, insert if not
-  const { data: existing } = await db
-    .from("resource_bookmarks")
-    .select("resource_id")
-    .eq("resource_id", resourceId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existing) {
-    await db.from("resource_bookmarks").delete().eq("resource_id", resourceId).eq("user_id", userId);
-  } else {
-    await db.from("resource_bookmarks").insert({ resource_id: resourceId, user_id: userId });
+  const body = (await request.json().catch(() => null)) as { bookmarked?: unknown } | null;
+  if (typeof body?.bookmarked !== "boolean") {
+    return NextResponse.json({ error: "A boolean bookmarked state is required." }, { status: 400 });
   }
 
-  const { data: allBookmarks } = await db
-    .from("resource_bookmarks")
-    .select("resource_id")
-    .eq("resource_id", resourceId);
+  const mutation = body.bookmarked
+    ? await db.from("resource_bookmarks").upsert(
+        { resource_id: resourceId, user_id: userId },
+        { onConflict: "resource_id,user_id", ignoreDuplicates: true },
+      )
+    : await db.from("resource_bookmarks").delete().eq("resource_id", resourceId).eq("user_id", userId);
+  if (mutation.error) return NextResponse.json({ error: "Failed to update resource bookmark." }, { status: 500 });
 
-  return NextResponse.json({
-    bookmarked: !existing,
-    bookmark_count: (allBookmarks ?? []).length,
-  });
+  const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
+    db.from("resource_bookmarks").select("resource_id").eq("resource_id", resourceId).eq("user_id", userId).maybeSingle(),
+    db.from("resource_bookmarks").select("resource_id", { count: "exact", head: true }).eq("resource_id", resourceId),
+  ]);
+  if (stateError || countError || Boolean(persisted) !== body.bookmarked) {
+    return NextResponse.json({ error: "Resource bookmark state could not be confirmed." }, { status: 500 });
+  }
+
+  return NextResponse.json({ bookmarked: body.bookmarked, bookmark_count: count ?? 0 });
 }

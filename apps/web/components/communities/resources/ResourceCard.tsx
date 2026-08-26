@@ -127,7 +127,11 @@ export function ResourceCard({
     setSaveBusy(true);
     try {
       while (confirmedSaveRef.current !== desiredSaveRef.current) {
-        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/save`, { method: "POST" }, { cooldownMode: "url" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ saved: desiredSaveRef.current }),
+        }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource like");
         const result = (await response.json()) as { saved: boolean };
         confirmedSaveRef.current = result.saved;
@@ -164,7 +168,11 @@ export function ResourceCard({
     setBookmarkBusy(true);
     try {
       while (confirmedBookmarkRef.current !== desiredBookmarkRef.current) {
-        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, { method: "POST" }, { cooldownMode: "url" });
+        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/bookmark`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bookmarked: desiredBookmarkRef.current }),
+        }, { cooldownMode: "url" });
         if (!response.ok) throw new Error("Failed to update resource bookmark");
         const result = (await response.json()) as { bookmarked: boolean; bookmark_count: number };
         confirmedBookmarkRef.current = result.bookmarked;
@@ -209,7 +217,7 @@ export function ResourceCard({
       {menuOpen && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           {!isDetail && (
-            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} disabled={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
               <Bookmark size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
               {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
             </button>
@@ -249,7 +257,7 @@ export function ResourceCard({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saveBusy}
+                aria-busy={saveBusy}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${displayedSaved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
               >
                 {displayedSaved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
@@ -292,7 +300,7 @@ export function ResourceCard({
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
-              <button type="button" onClick={handleSave} aria-label={displayedSaved ? "Unlike" : "Like"} aria-pressed={displayedSaved} disabled={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+              <button type="button" onClick={handleSave} aria-label={displayedSaved ? "Unlike" : "Like"} aria-pressed={displayedSaved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
                 <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${displayedSaved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
                 <span className={`font-body text-sm font-semibold tabular-nums ${displayedSaved ? "text-red-500" : "text-white"}`}>{displayedSaveCount}</span>
               </button>

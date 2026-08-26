@@ -59,8 +59,9 @@ export function ShowcaseOptionsMenu({
               onToggleSave();
             }}
             aria-pressed={saved}
-            disabled={busy}
-            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised disabled:opacity-50"
+      aria-busy={busy}
+      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+
           >
             <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}

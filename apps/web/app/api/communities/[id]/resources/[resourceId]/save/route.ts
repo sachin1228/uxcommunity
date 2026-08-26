@@ -5,7 +5,7 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export async function POST(
-  _req: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string; resourceId: string }> },
 ) {
   let session;
@@ -36,36 +36,29 @@ export async function POST(
     if (!membership) return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
-  // Toggle: check if already saved
-  const { data: existing } = await db
-    .from("resource_saves")
-    .select("resource_id")
-    .eq("resource_id", resourceId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (existing) {
-    // Unsave
-    const { error } = await db
-      .from("resource_saves")
-      .delete()
-      .eq("resource_id", resourceId)
-      .eq("user_id", userId);
-    if (error) { console.error("[DELETE save]", error); return NextResponse.json({ error: "Failed to unsave resource." }, { status: 500 }); }
-    void publishRealtimeBatch([
-      { room: realtimeRooms.resources(communityId), topic: "save", data: { event: "DELETE", resource_id: resourceId, user_id: userId } },
-    ]);
-    return NextResponse.json({ saved: false });
-  } else {
-    // Save
-    const { error } = await db
-      .from("resource_saves")
-      .insert({ resource_id: resourceId, user_id: userId });
-    if (error) { console.error("[INSERT save]", error); return NextResponse.json({ error: "Failed to save resource." }, { status: 500 }); }
-    void publishRealtimeBatch([
-      { room: realtimeRooms.resources(communityId), topic: "save", data: { event: "INSERT", resource_id: resourceId, user_id: userId } },
-    ]);
-
-    return NextResponse.json({ saved: true }, { status: 201 });
+  const body = (await request.json().catch(() => null)) as { saved?: unknown } | null;
+  if (typeof body?.saved !== "boolean") {
+    return NextResponse.json({ error: "A boolean saved state is required." }, { status: 400 });
   }
+
+  const mutation = body.saved
+    ? await db.from("resource_saves").upsert(
+        { resource_id: resourceId, user_id: userId },
+        { onConflict: "resource_id,user_id", ignoreDuplicates: true },
+      )
+    : await db.from("resource_saves").delete().eq("resource_id", resourceId).eq("user_id", userId);
+  if (mutation.error) return NextResponse.json({ error: "Failed to update resource save." }, { status: 500 });
+
+  const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
+    db.from("resource_saves").select("resource_id").eq("resource_id", resourceId).eq("user_id", userId).maybeSingle(),
+    db.from("resource_saves").select("resource_id", { count: "exact", head: true }).eq("resource_id", resourceId),
+  ]);
+  if (stateError || countError || Boolean(persisted) !== body.saved) {
+    return NextResponse.json({ error: "Resource save state could not be confirmed." }, { status: 500 });
+  }
+
+  void publishRealtimeBatch([
+    { room: realtimeRooms.resources(communityId), topic: "save", data: { event: body.saved ? "INSERT" : "DELETE", resource_id: resourceId, user_id: userId } },
+  ]);
+  return NextResponse.json({ saved: body.saved, save_count: count ?? 0 });
 }

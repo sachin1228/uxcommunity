@@ -295,11 +295,12 @@ export function ThreadCard({
         <div
           className="relative shrink-0"
           ref={menuRef}
-          onClick={(e) => e.preventDefault()}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onKeyDown={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            onClick={(e) => { e.preventDefault(); setMenuOpen((prev) => !prev); }}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((prev) => !prev); }}
             aria-label="Thread options"
             className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
           >
