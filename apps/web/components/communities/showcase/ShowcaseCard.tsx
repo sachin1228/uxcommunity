@@ -8,6 +8,7 @@ import {
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
+import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { SHOWCASE_TYPES, type ShowcasePost } from "./types";
 
 interface ShowcaseCardProps {
@@ -15,11 +16,10 @@ interface ShowcaseCardProps {
   currentUserId: string;
   variant?: "list" | "detail";
   isLast?: boolean;
-  /** Disables like/save while a like/save mutation is in flight (spam guard). */
-  busy?: boolean;
+  communityId: string;
   onOpen?: () => void;
-  onToggleLike: () => void;
-  onToggleSave: () => void;
+  onLikeChanged: (liked: boolean, count: number) => void;
+  onSaveChanged: (saved: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -28,14 +28,23 @@ export function ShowcaseCard({
   post,
   currentUserId,
   variant = "list",
-  busy = false,
+  communityId,
   onOpen,
-  onToggleLike,
-  onToggleSave,
+  onLikeChanged,
+  onSaveChanged,
   onEdit,
   onDelete,
 }: ShowcaseCardProps) {
   const isDetail = variant === "detail";
+  const { toggleLike, toggleSave, likePending, savePending } = useShowcaseInteractions({
+    communityId,
+    postId: post.id,
+    liked: post.user_liked,
+    likeCount: post.like_count,
+    saved: post.user_saved,
+    onLikeChanged,
+    onSaveChanged,
+  });
   const typeLabel =
     SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label ??
     "Post";
@@ -53,8 +62,8 @@ export function ShowcaseCard({
         <ShowcaseOptionsMenu
           saved={post.user_saved}
           canManage={post.user_id === currentUserId}
-          busy={busy}
-          onToggleSave={onToggleSave}
+          busy={savePending}
+          onToggleSave={toggleSave}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -102,11 +111,11 @@ export function ShowcaseCard({
       >
         <button
           type="button"
-          onClick={onToggleLike}
+          onClick={toggleLike}
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
           aria-pressed={post.user_liked}
-          disabled={busy}
-          className="inline-flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+          aria-busy={likePending}
+          className="inline-flex items-center gap-2"
         >
           <Heart
             size={20}
