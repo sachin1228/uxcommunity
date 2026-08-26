@@ -40,8 +40,9 @@ export async function publishRealtime(payload: PublishPayload): Promise<void> {
       }),
       signal: AbortSignal.timeout(1500),
     });
-  } catch (error) {
-    console.error("[realtime] publish failed", error);
+  } catch {
+    // Realtime is best-effort — missed events are corrected by the next
+    // client-side poll/catch-up. Silently ignore in development.
   }
 }
 
@@ -70,7 +71,8 @@ export async function publishRealtimeBatch(events: PublishPayload[]): Promise<vo
       }),
       signal: AbortSignal.timeout(3000),
     });
-  } catch (error) {
-    console.error("[realtime] batch publish failed", error);
+  } catch {
+    // Realtime is best-effort — missed events are corrected by the next
+    // client-side poll/catch-up. Silently ignore in development.
   }
 }
