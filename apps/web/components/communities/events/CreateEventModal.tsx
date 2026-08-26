@@ -273,7 +273,7 @@ export function CreateEventModal({
                 onChange={(e) => setIsOnline(e.target.checked)}
                 className="sr-only"
               />
-              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isOnline ? "translate-x-6" : "translate-x-1"}`} />
+              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isOnline ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
             </span>
           </label>}
 
@@ -333,7 +333,7 @@ export function CreateEventModal({
                 onChange={(e) => setIsPublic(e.target.checked)}
                 className="sr-only"
               />
-              <span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-transform ${isPublic ? "translate-x-6" : "translate-x-1"}`} />
+              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
             </span>
           </label>}
         </div>
