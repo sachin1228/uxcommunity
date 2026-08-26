@@ -20,6 +20,7 @@ import {
   hasFreshLinkPreview,
 } from "@/lib/communities/linkPreviewCache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { usePendingMutation } from "@/lib/use-mutation";
 
 function useOgImage(url: string, enabled: boolean): string | null {
@@ -78,14 +79,14 @@ export function ResourceCard({
   const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
   const ogImage = useOgImage(resource.url, !hasFigmaPrototype && !isDetail);
 
-  const [optimisticSave, setOptimisticSave] = useState<{ saved: boolean; count: number } | null>(null);
-  const confirmedSaveRef = useRef(resource.user_saved);
-  const desiredSaveRef = useRef(resource.user_saved);
-  const optimisticSaveCountRef = useRef(resource.save_count);
-  const saveRequestRunningRef = useRef(false);
+  const latestSaveRef = useRef({ resource, onSaveChanged });
+  const initialSavedRef = useRef(resource.user_saved);
+  const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
-  const displayedSaved = optimisticSave?.saved ?? resource.user_saved;
-  const displayedSaveCount = optimisticSave?.count ?? resource.save_count;
+
+  useEffect(() => {
+    latestSaveRef.current = { resource, onSaveChanged };
+  });
 
   const [optimisticBookmark, setOptimisticBookmark] = useState<{ bookmarked: boolean; count: number } | null>(null);
   const confirmedBookmarkRef = useRef(resource.user_bookmarked);
@@ -121,44 +122,58 @@ export function ResourceCard({
     await runDelete();
   }
 
-  async function flushSaveIntent() {
-    if (saveRequestRunningRef.current) return;
-    saveRequestRunningRef.current = true;
-    setSaveBusy(true);
-    try {
-      while (confirmedSaveRef.current !== desiredSaveRef.current) {
-        const response = await dedupeFetch(`/api/communities/${communityId}/resources/${resource.id}/save`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ saved: desiredSaveRef.current }),
-        }, { cooldownMode: "url" });
-        if (!response.ok) throw new Error("Failed to update resource like");
-        const result = (await response.json()) as { saved: boolean };
-        confirmedSaveRef.current = result.saved;
-      }
-    } catch {
-      desiredSaveRef.current = confirmedSaveRef.current;
-      const rollbackCount = Math.max(0, optimisticSaveCountRef.current + (confirmedSaveRef.current ? 1 : -1));
-      optimisticSaveCountRef.current = rollbackCount;
-      setOptimisticSave({ saved: confirmedSaveRef.current, count: rollbackCount });
-      onSaveChanged(resource.id, confirmedSaveRef.current, rollbackCount);
-    } finally {
-      saveRequestRunningRef.current = false;
-      setSaveBusy(false);
-      setOptimisticSave(null);
-    }
-  }
+  useEffect(() => {
+    const resourceId = resource.id;
+    const coordinator = new BooleanIntentCoalescer({
+      initialValue: initialSavedRef.current,
+      onOptimisticChange: (saved) => {
+        const current = latestSaveRef.current;
+        const count = Math.max(
+          0,
+          current.resource.save_count + (saved === current.resource.user_saved ? 0 : saved ? 1 : -1),
+        );
+        current.onSaveChanged(current.resource.id, saved, count);
+      },
+      persist: async (saved) => {
+        const response = await dedupeFetch(
+          `/api/communities/${communityId}/resources/${resourceId}/save`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ saved }),
+          },
+          { cooldownMode: "url" },
+        );
+        const result = (await response.json().catch(() => null)) as {
+          saved?: boolean;
+          save_count?: number;
+          error?: string;
+        } | null;
+        if (!response.ok || typeof result?.saved !== "boolean") {
+          throw new Error(result?.error ?? "Failed to update resource like.");
+        }
+        const current = latestSaveRef.current;
+        current.onSaveChanged(resourceId, result.saved, result.save_count ?? current.resource.save_count);
+        return result.saved;
+      },
+      onPendingChange: setSaveBusy,
+    });
+
+    saveCoalescerRef.current = coordinator;
+    return () => {
+      coordinator.dispose();
+      saveCoalescerRef.current = null;
+    };
+  }, [communityId, resource.id]);
+
+  useEffect(() => {
+    saveCoalescerRef.current?.syncConfirmed(resource.user_saved);
+  }, [resource.user_saved]);
 
   function handleSave(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    const newSaved = !desiredSaveRef.current;
-    const newCount = Math.max(0, optimisticSaveCountRef.current + (newSaved ? 1 : -1));
-    desiredSaveRef.current = newSaved;
-    optimisticSaveCountRef.current = newCount;
-    setOptimisticSave({ saved: newSaved, count: newCount });
-    onSaveChanged(resource.id, newSaved, newCount);
-    void flushSaveIntent();
+    saveCoalescerRef.current?.toggle();
   }
 
   async function flushBookmarkIntent() {
@@ -257,11 +272,11 @@ export function ResourceCard({
                 type="button"
                 onClick={handleSave}
                 aria-busy={saveBusy}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${displayedSaved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${resource.user_saved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
               >
-                {displayedSaved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
-                {displayedSaved ? "Saved" : "Save"}
-                <span className="font-mono text-[10px]">{displayedSaveCount}</span>
+                {resource.user_saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+                {resource.user_saved ? "Saved" : "Save"}
+                <span className="font-mono text-[10px]">{resource.save_count}</span>
               </button>
               <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover">
                 <ExternalLink size={13} />Open
@@ -299,9 +314,9 @@ export function ResourceCard({
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
-              <button type="button" onClick={handleSave} aria-label={displayedSaved ? "Unlike" : "Like"} aria-pressed={displayedSaved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${displayedSaved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${displayedSaved ? "text-red-500" : "text-white"}`}>{displayedSaveCount}</span>
+              <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+                <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
+                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
