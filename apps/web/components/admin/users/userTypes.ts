@@ -4,7 +4,6 @@ export interface UserProfile {
   experience_level: string;
   avatar_url?: string | null;
   avatar_source?: string | null;
-  companies: { name: string } | null;
   cities: { name: string } | null;
   design_sectors: { name: string } | null;
 }

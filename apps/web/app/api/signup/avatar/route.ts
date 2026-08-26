@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
     p_name: identity.name,
     p_email: identity.email.toLowerCase(),
     p_password_hash: passwordHash,
-    p_company_id: profile.company_id,
     p_city_id: profile.city_id,
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,

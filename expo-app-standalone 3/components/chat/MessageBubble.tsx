@@ -234,7 +234,7 @@ export function MessageBubble({
 
       {/* ── Content column ── */}
       <View style={styles.contentCol}>
-        {/* Fix #3: sender name only — no designation/company badge */}
+        {/* Sender name only — no designation badge */}
         {showHeader && !isDeleted && (
           <Text style={[styles.senderName, { color: colors.mutedForeground }]}>
             {senderName}

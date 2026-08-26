@@ -7,7 +7,6 @@ import { requireSession } from "@/lib/auth/session";
  *
  * Access rules:
  *  - interest / general / user  → anyone can join
- *  - company                    → user's company_id must match community reference_id
  *  - sector                     → user's sector_id must match community reference_id
  *  - city                       → user's city_id must match community reference_id
  *  - experience_level           → user's experience_level slug must resolve to matching reference_id
@@ -41,15 +40,13 @@ export async function POST(
   if (!FREE_TYPES.has(community.type)) {
     const { data: profile } = await db
       .from("designer_profiles")
-      .select("city_id, sector_id, company_id, experience_level")
+      .select("city_id, sector_id, experience_level")
       .eq("user_id", userId)
       .maybeSingle();
 
     let allowed = false;
 
-    if (community.type === "company") {
-      allowed = profile?.company_id === community.reference_id;
-    } else if (community.type === "sector") {
+    if (community.type === "sector") {
       allowed = profile?.sector_id === community.reference_id;
     } else if (community.type === "city") {
       allowed = profile?.city_id === community.reference_id;
@@ -64,7 +61,6 @@ export async function POST(
 
     if (!allowed) {
       const labels: Record<string, string> = {
-        company:          "company",
         sector:           "industry",
         city:             "city",
         experience_level: "experience level",

@@ -8,14 +8,6 @@ create extension if not exists "pgcrypto";
 
 -- ─── Master-data tables ─────────────────────────────────────
 
-create table if not exists companies (
-  id         uuid primary key default gen_random_uuid(),
-  name       text not null unique,
-  is_active  boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
 create table if not exists cities (
   id         uuid primary key default gen_random_uuid(),
   name       text not null unique,
@@ -122,7 +114,6 @@ create type experience_level as enum (
 create table if not exists designer_profiles (
   id               uuid primary key default gen_random_uuid(),
   user_id          uuid not null unique references users (id) on delete cascade,
-  company_id       uuid references companies (id) on delete restrict,
   city_id          uuid references cities (id) on delete restrict,
   sector_id        uuid references design_sectors (id) on delete restrict,
   experience_level experience_level not null,
@@ -130,7 +121,6 @@ create table if not exists designer_profiles (
   updated_at       timestamptz not null default now()
 );
 
-create index if not exists idx_profiles_company on designer_profiles (company_id);
 create index if not exists idx_profiles_city    on designer_profiles (city_id);
 create index if not exists idx_profiles_sector  on designer_profiles (sector_id);
 
@@ -148,10 +138,6 @@ begin
   return new;
 end;
 $$;
-
-create or replace trigger trg_companies_updated_at
-  before update on companies
-  for each row execute function set_updated_at();
 
 create or replace trigger trg_cities_updated_at
   before update on cities
@@ -177,7 +163,6 @@ create or replace trigger trg_profiles_updated_at
 -- All writes go through the service-role key on the server.
 -- Enable RLS but allow service-role bypass (default behaviour).
 
-alter table companies         enable row level security;
 alter table cities            enable row level security;
 alter table design_sectors    enable row level security;
 alter table tags              enable row level security;

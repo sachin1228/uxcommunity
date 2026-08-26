@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Building2, Layers, Star, Lock } from "lucide-react";
+import { MapPin, Layers, Star, Lock } from "lucide-react";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
@@ -14,14 +14,12 @@ function SectionLabel({ num, label }: { num: string; label: string }) {
 
 interface ProfileIdentityProps {
   city: string | null;
-  company: string | null;
   sector: string | null;
   experienceLevel: string | null;
 }
 
 export function ProfileIdentity({
   city,
-  company,
   sector,
   experienceLevel,
 }: ProfileIdentityProps) {
@@ -33,12 +31,6 @@ export function ProfileIdentity({
           <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
             <MapPin size={13} className="text-accent shrink-0" />
             <span className="font-body text-sm text-foreground">{city}</span>
-          </div>
-        )}
-        {company && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <Building2 size={13} className="text-accent shrink-0" />
-            <span className="font-body text-sm text-foreground">{company}</span>
           </div>
         )}
         {sector && (

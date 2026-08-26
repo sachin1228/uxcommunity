@@ -71,7 +71,7 @@ export async function fetchCommunityMetaSSR(
   const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
     ? await Promise.all([
         db.from("users").select("id, name").in("id", memberUserIds),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level, companies(name)").in("user_id", memberUserIds),
+        db.from("designer_profiles").select("user_id, avatar_url, experience_level").in("user_id", memberUserIds),
       ])
     : [
         { data: [] as { id: string; name: string }[] },
@@ -97,7 +97,6 @@ export async function fetchCommunityMetaSSR(
             name:        memberUserMap[m.user_id],
             avatar_url:  p?.avatar_url ?? null,
             designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-            company:     (p?.companies as any)?.name ?? null,
           }
         : null,
     };
