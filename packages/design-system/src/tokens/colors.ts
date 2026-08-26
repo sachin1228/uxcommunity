@@ -48,7 +48,7 @@ export const dark = {
 } as const;
 
 /** Brand signal */
-export const signal = blue[600] as const;
+export const signal = "#FFFFFF" as const;
 
 export const colors = {
   blue,

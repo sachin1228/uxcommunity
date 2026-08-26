@@ -1,6 +1,6 @@
 /**
  * UX Community design system CSS custom properties.
- * Primary accent: #0070F3. Hover: #0060D1.
+ * Primary accent: white (dark) / black (light), Vercel-style.
  */
 
 /* ─── Light mode (default) ─────────────────────────────────────────── */
@@ -17,17 +17,17 @@
   --color-foreground-muted:  #525252;
   --color-foreground-subtle: #737373;
 
-  /* Accent */
-  --color-accent:            #0070F3;
-  --color-accent-rgb:        0 112 243;   /* RGB channels for opacity modifiers */
-  --color-accent-hover:      #0060D1;     /* darker hover shade */
-  --color-accent-soft:       #f0f8ff;     /* tinted bg */
+  /* Accent — inverted (Vercel): black primary in light mode */
+  --color-accent:            #0A0A0A;
+  --color-accent-rgb:        10 10 10;    /* RGB channels for opacity modifiers */
+  --color-accent-hover:      #333333;     /* darker hover shade */
+  --color-accent-soft:       #EBEBEB;     /* tinted bg */
   --color-accent-foreground: #FFFFFF;
 
   --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
-  --color-signal:            #0070F3;
+  --color-signal:            #0A0A0A;
 
   --color-overlay:            #0A0A0A;
   --color-overlay-raised:     #111111;
@@ -67,12 +67,12 @@
     --color-foreground-muted:  #737373;
     --color-foreground-subtle: #525252;
 
-    /* Accent */
-    --color-accent:            #0070F3;
-    --color-accent-rgb:        0 112 243;
-    --color-accent-hover:      #0060D1;
-    --color-accent-soft:       #18243D;
-    --color-accent-foreground: #FFFFFF;
+    /* Accent — white primary in dark mode (Vercel) */
+    --color-accent:            #FFFFFF;
+    --color-accent-rgb:        255 255 255;
+    --color-accent-hover:      #CCCCCC;
+    --color-accent-soft:       #1F1F23;
+    --color-accent-foreground: #000000;
 
     /* Borders */
     --color-border:            #202024;
@@ -80,12 +80,12 @@
     --color-border-strong:     #2D2D34;  /* active components */
     --color-input-border:      #303036;  /* input fields */
 
-    --color-signal:            #0070F3;
+    --color-signal:            #FFFFFF;
 
     /* Navigation */
     --color-nav-hover:         #17171A;
-    --color-nav-active:        #18243D;
-    --color-nav-active-hover:  #1D2A46;
+    --color-nav-active:        #1F1F23;
+    --color-nav-active-hover:  #26262B;
 
     /* Neutral buttons */
     --color-button-secondary:        #1A1A1E;
