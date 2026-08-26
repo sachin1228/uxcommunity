@@ -112,7 +112,7 @@ export function ThreadCard({
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const isOwner = thread.user_id === currentUserId;
 
-  const { toggleLike, toggleSave, likePending, savePending } = useThreadInteractions({
+  const { toggleLike, toggleSave } = useThreadInteractions({
     threadId: thread.id,
     communityId,
     liked: thread.user_liked,
@@ -149,18 +149,6 @@ export function ThreadCard({
     } finally {
       setDeleting(false);
     }
-  }
-
-  function handleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleSave();
-  }
-
-  function handleLike(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleLike();
   }
 
   const authorName    = thread.users?.name ?? "Member";
@@ -205,12 +193,13 @@ export function ThreadCard({
               <button
                 type="button"
                 onClick={(e) => {
-                  handleSave(e);
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleSave();
                   setMenuOpen(false);
                 }}
                 aria-pressed={thread.user_saved}
-                disabled={savePending}
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
               >
                 <Bookmark size={11} fill={thread.user_saved ? "currentColor" : "none"} />
                 {thread.user_saved ? "Unsave" : "Save"}
@@ -425,12 +414,10 @@ export function ThreadCard({
           {/* Like (Instagram-style heart) */}
           <button
             type="button"
-            onClick={handleLike}
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
             aria-label={thread.user_liked ? "Unlike" : "Like"}
             aria-pressed={thread.user_liked}
-            aria-busy={likePending}
-            disabled={likePending}
-            className="group/like flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="group/like flex items-center gap-2"
           >
             <Heart
               size={20}
