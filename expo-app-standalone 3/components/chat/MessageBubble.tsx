@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,26 +37,6 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const GENERATED_PROFILE_PICTURE_PATTERNS = [
-  /^boring:\/\//i,
-  /^https:\/\/(?:[^/]+\.)?dicebear\.com\//i,
-  /^https:\/\/(?:[^/]+\.)?robohash\.org\//i,
-  /^https:\/\/(?:[^/]+\.)?(?:api\.)?avataaars\.io\//i,
-  /^https:\/\/(?:[^/]+\.)?multiavatar\.com\//i,
-  /^https:\/\/source\.boringavatars\.com\//i,
-];
-
-function resolveProfilePictureUri(profilePictureUrl: string | null): string | null {
-  if (
-    !profilePictureUrl ||
-    GENERATED_PROFILE_PICTURE_PATTERNS.some((pattern) => pattern.test(profilePictureUrl))
-  ) {
-    return null;
-  }
-
-  return profilePictureUrl;
-}
-
 /**
  * Returns true when the entire string is 1–3 emoji with no other content.
  */
@@ -74,15 +55,10 @@ function isEmojiOnly(text: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Avatar with URL support and automatic initials fallback.
+ * Profile picture with automatic initials fallback.
  *
- * Handles all avatar_url formats stored in the DB:
- *   - null / ''                      → DiceBear generated from name
- *   - boring://{style}/{encodedSeed} → DiceBear (same as web AvatarImg)
- *   - https://source.boringavatars.com/... → DiceBear (legacy seed reuse)
- *   - any other https URL            → loaded directly
- *
- * If even the resolved URL fails to load, falls back to initials.
+ * Uploaded image URLs render directly. Missing, legacy generated, or failed
+ * image URLs fall back to the member's initials.
  */
 function Avatar({
   name,
@@ -109,7 +85,7 @@ function Avatar({
         { backgroundColor: colors.primarySoft, overflow: 'hidden' },
       ]}
     >
-      {!imageError ? (
+      {resolvedUri && !imageError ? (
         <Image
           source={{ uri: resolvedUri }}
           style={styles.avatarImage}

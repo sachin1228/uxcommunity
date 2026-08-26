@@ -37,7 +37,7 @@ const TABLE_LABELS: Record<string, string> = {
   design_interests:  "Interests",
   experience_levels: "Experience",
   communities:       "Communities",
-  designer_profiles: "User Avatars",
+  designer_profiles: "Profile Pictures",
 };
 
 export default function ToolsPage() {
@@ -137,8 +137,8 @@ export default function ToolsPage() {
             </h2>
             <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
               Copies every image that still lives in Supabase Storage into R2 and
-              updates the database URL. Images already in R2 or on external providers
-              (DiceBear, Robohash, etc.) are skipped. Safe to run more than once.
+              updates the database URL. Images already in R2 or hosted externally are
+              skipped. Safe to run more than once.
             </p>
 
             <button

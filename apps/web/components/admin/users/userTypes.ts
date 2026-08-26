@@ -51,8 +51,5 @@ export const EXPERIENCE_LABELS: Record<string, string> = {
 };
 
 export const AVATAR_SOURCE_LABELS: Record<string, string> = {
-  dicebear:         "DiceBear (generated)",
-  "boring-avatars": "Boring Avatars (generated)",
-  robohash:         "Robohash (generated)",
-  upload:           "Custom upload",
+  upload: "Profile picture upload",
 };
