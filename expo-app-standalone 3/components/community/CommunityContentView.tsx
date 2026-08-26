@@ -13,6 +13,7 @@ import {
   deleteCommunityContent, getLinkPreviewImage, setContentAction, toggleContentAction,
 } from '@/lib/communityContent';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
+import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { CommunityContentEditor } from './CommunityContentEditor';
 
 interface Props { communityId: string; kind: ContentKind; currentUserId: string }
@@ -149,7 +150,7 @@ function ContentCard({ item, kind, onOpen, onAction, onEdit, onDelete, isOwner }
     {resource && previewImage ? <Image source={{ uri: previewImage }} style={styles.cover} /> : null}
     <View style={styles.cardBody}>
       <View style={styles.authorRow}>
-        {item.users?.avatar_url ? <Image source={{ uri: item.users.avatar_url }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primarySoft }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{(item.users?.name ?? 'M')[0].toUpperCase()}</Text></View>}
+        {resolveProfilePictureUri(item.users?.avatar_url) ? <Image source={{ uri: resolveProfilePictureUri(item.users?.avatar_url)! }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primarySoft }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{(item.users?.name ?? 'M')[0].toUpperCase()}</Text></View>}
         <View style={styles.authorCopy}><Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>{item.users?.name ?? 'Community member'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{event ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : date.toLocaleDateString([], { month: 'short', day: 'numeric' })}</Text></View>
         <OptionsMenu isOwner={isOwner} onEdit={onEdit} onDelete={onDelete} />
       </View>
@@ -191,7 +192,7 @@ function ContentDetail({ visible, item, kind, onClose, onAction, onEdit, onDelet
         {event?.cover_image_url ? <Image source={{ uri: event.cover_image_url }} style={styles.detailCover} /> : null}
         {resource && previewImage ? <Image source={{ uri: previewImage }} style={styles.detailCover} /> : null}
         <View style={styles.authorRow}>
-          {item.users?.avatar_url ? <Image source={{ uri: item.users.avatar_url }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primarySoft }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{(item.users?.name ?? 'M')[0].toUpperCase()}</Text></View>}
+          {resolveProfilePictureUri(item.users?.avatar_url) ? <Image source={{ uri: resolveProfilePictureUri(item.users?.avatar_url)! }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.primarySoft }]}><Text style={[styles.avatarText, { color: colors.primary }]}>{(item.users?.name ?? 'M')[0].toUpperCase()}</Text></View>}
           <View style={styles.authorCopy}><Text style={[styles.author, { color: colors.foreground }]}>{item.users?.name ?? 'Community member'}</Text><Text style={[styles.meta, { color: colors.mutedForeground }]}>{new Date(event?.event_date ?? item.created_at).toLocaleString()}</Text></View>
         </View>
         <Text style={[styles.detailTitle, { color: colors.foreground }]}>{item.title}</Text>

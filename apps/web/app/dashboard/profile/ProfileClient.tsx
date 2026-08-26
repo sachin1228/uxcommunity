@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Spinner } from "@/components/ui/Spinner";
 import { compressImage } from "@/lib/compressImage";
-import { getAvatarTabLabel, getAllAvatarOptions } from "@/lib/avatar";
-import type { AvatarOption, AvatarSource } from "@/lib/avatar";
 import { ProfileCard } from "./components/ProfileCard";
 import { ProfileThreads } from "./components/ProfileThreads";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
@@ -31,122 +28,84 @@ interface Props {
 }
 
 export function ProfileClient({
-  initialName, email, createdAt, avatarUrl: initialAvatarUrl,
-  city, company, sector, experienceLevel,
-  initialLinkedIn, initialPortfolio, initialBio,
-  initialInterestIds, allInterests,
-  initialThreads, currentUserId,
+  initialName,
+  email,
+  createdAt,
+  avatarUrl: initialAvatarUrl,
+  city,
+  company,
+  sector,
+  experienceLevel,
+  initialLinkedIn,
+  initialPortfolio,
+  initialThreads,
+  currentUserId,
 }: Props) {
   const router = useRouter();
-
-  // Form state
-  const [name,        setName]        = useState(initialName);
-  const [bio,         setBio]         = useState(initialBio);
-  const [linkedin,    setLinkedin]    = useState(initialLinkedIn);
-  const [portfolio,   setPortfolio]   = useState(initialPortfolio);
-  const [interestIds, setInterestIds] = useState<string[]>(initialInterestIds);
-
-  // Avatar state
-  const [avatarUrl,         setAvatarUrl]         = useState(initialAvatarUrl);
-  const [showAvatarPicker,  setShowAvatarPicker]  = useState(false);
-  const [avatarTab,         setAvatarTab]         = useState<"generated" | "upload">("generated");
-  const [activeAvatarLib,   setActiveAvatarLib]   = useState<AvatarSource>("dicebear");
-  const [pickedAvatar,      setPickedAvatar]      = useState<AvatarOption | null>(null);
-  const [uploadBlob,        setUploadBlob]        = useState<Blob | null>(null);
-  const [uploadPreview,     setUploadPreview]     = useState<string | null>(null);
-  const [avatarSaving,      setAvatarSaving]      = useState(false);
-  const [avatarError,       setAvatarError]       = useState<string | null>(null);
+  const [name] = useState(initialName);
+  const [linkedin, setLinkedin] = useState(initialLinkedIn);
+  const [portfolio, setPortfolio] = useState(initialPortfolio);
+  const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [showPicturePicker, setShowPicturePicker] = useState(false);
+  const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [pictureSaving, setPictureSaving] = useState(false);
+  const [pictureError, setPictureError] = useState<string | null>(null);
 
   const memberSince = createdAt
     ? new Date(createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : null;
 
-  const avatarLibOptions = useMemo(() => {
-    const all = getAllAvatarOptions(name || initialName);
-    return {
-      dicebear:         all.filter((o) => o.source === "dicebear"),
-      "boring-avatars": all.filter((o) => o.source === "boring-avatars"),
-      robohash:         all.filter((o) => o.source === "robohash"),
-      avataaars:        all.filter((o) => o.source === "avataaars"),
-      multiavatar:      all.filter((o) => o.source === "multiavatar"),
+  useEffect(() => {
+    return () => {
+      if (uploadPreview) URL.revokeObjectURL(uploadPreview);
     };
-  }, [name, initialName]);
+  }, [uploadPreview]);
 
-  const avatarLibTabs = (
-    ["dicebear", "boring-avatars", "robohash", "avataaars", "multiavatar"] as AvatarSource[]
-  ).map((key) => ({
-    key,
-    label: getAvatarTabLabel(key),
-    count: (avatarLibOptions[key as keyof typeof avatarLibOptions] as AvatarOption[]).length,
-  }));
-
-  const visibleAvatarOptions =
-    (avatarLibOptions[activeAvatarLib as keyof typeof avatarLibOptions] as AvatarOption[]) ?? [];
-
-  // ── Avatar file select ──────────────────────────────────────────────────
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
     if (!file) return;
-    e.target.value = "";
-    setAvatarError(null);
+    event.target.value = "";
+    setPictureError(null);
     try {
       const compressed = await compressImage(file);
       if (uploadPreview) URL.revokeObjectURL(uploadPreview);
       setUploadBlob(compressed);
       setUploadPreview(URL.createObjectURL(compressed));
-      setPickedAvatar(null);
     } catch {
-      setAvatarError("Failed to process image. Please try a different file.");
+      setPictureError("Failed to process the profile picture. Please try a different file.");
     }
   }
 
-  // ── Save avatar ─────────────────────────────────────────────────────────
-  async function handleSaveAvatar() {
-    if (!uploadBlob && !pickedAvatar) return;
-    setAvatarSaving(true);
-    setAvatarError(null);
+  async function handleSavePicture() {
+    if (!uploadBlob) return;
+    setPictureSaving(true);
+    setPictureError(null);
     try {
-      let res: Response;
-      if (uploadBlob) {
-        const fd = new FormData();
-        fd.append("file", uploadBlob, "avatar.jpg");
-        res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
-      } else {
-        res = await fetch("/api/profile/avatar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ avatar_url: pickedAvatar!.dbUrl, avatar_source: pickedAvatar!.source }),
-        });
-      }
-      const data = await res.json();
-      if (!res.ok) {
-        setAvatarError(data.error ?? "Failed to update avatar.");
+      const formData = new FormData();
+      formData.append("file", uploadBlob, "profile-picture.jpg");
+      const response = await fetch("/api/profile/avatar", { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) {
+        setPictureError(data.error ?? "Failed to update profile picture.");
         return;
       }
       setAvatarUrl(data.avatar_url);
-      closeAvatarPicker();
+      closePicturePicker();
       router.refresh();
     } catch {
-      setAvatarError("Network error. Please try again.");
+      setPictureError("Network error. Please try again.");
     } finally {
-      setAvatarSaving(false);
+      setPictureSaving(false);
     }
   }
 
-  function closeAvatarPicker() {
-    setShowAvatarPicker(false);
-    setPickedAvatar(null);
+  function closePicturePicker() {
+    setShowPicturePicker(false);
     setUploadBlob(null);
     if (uploadPreview) URL.revokeObjectURL(uploadPreview);
     setUploadPreview(null);
-    setAvatarError(null);
-  }
-
-  function handlePickAvatar(opt: AvatarOption) {
-    setPickedAvatar(opt);
-    setUploadBlob(null);
-    if (uploadPreview) URL.revokeObjectURL(uploadPreview);
-    setUploadPreview(null);
+    setPictureError(null);
   }
 
   function handleRemoveUpload() {
@@ -156,11 +115,10 @@ export function ProfileClient({
   }
 
   return (
-    <div className="max-w-4xl mx-auto  mt-8">
-      {/* Page header */}
+    <div className="mx-auto mt-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
-        <p className="font-body text-sm text-foreground-muted mt-0.5">
+        <p className="mt-0.5 font-body text-sm text-foreground-muted">
           How you appear to others in the community
         </p>
       </div>
@@ -170,7 +128,7 @@ export function ProfileClient({
         email={email}
         avatarUrl={avatarUrl}
         memberSince={memberSince}
-        onOpenAvatarPicker={() => setShowAvatarPicker(true)}
+        onOpenAvatarPicker={() => setShowPicturePicker(true)}
         city={city}
         company={company}
         sector={sector}
@@ -188,25 +146,15 @@ export function ProfileClient({
         currentUserAvatar={avatarUrl}
       />
 
-
-      {/* Avatar picker modal */}
-      {showAvatarPicker && (
+      {showPicturePicker && (
         <AvatarPickerModal
-          avatarTab={avatarTab}
-          onTabChange={setAvatarTab}
-          avatarLibTabs={avatarLibTabs}
-          activeLibTab={activeAvatarLib}
-          onLibTabChange={setActiveAvatarLib}
-          visibleOptions={visibleAvatarOptions}
-          pickedAvatar={pickedAvatar}
           uploadPreview={uploadPreview}
-          saving={avatarSaving}
-          error={avatarError}
-          onPickAvatar={handlePickAvatar}
+          saving={pictureSaving}
+          error={pictureError}
           onFileSelect={handleFileSelect}
           onRemoveUpload={handleRemoveUpload}
-          onSave={handleSaveAvatar}
-          onClose={closeAvatarPicker}
+          onSave={handleSavePicture}
+          onClose={closePicturePicker}
         />
       )}
     </div>

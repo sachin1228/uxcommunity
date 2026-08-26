@@ -84,103 +84,6 @@ async function hashPassword(plain) {
   return bcrypt.hash(plain, 10);
 }
 
-// Rotate through the avatar styles already supported by the app. The user's
-// email remains the seed, so each profile gets a stable avatar on every rerun
-// while adjacent load-test users visibly use different avatar families.
-const AVATAR_VARIANTS = [
-  { source: 'boring-avatars', style: 'marble' },
-  { source: 'boring-avatars', style: 'beam' },
-  { source: 'boring-avatars', style: 'pixel' },
-  { source: 'boring-avatars', style: 'sunset' },
-  { source: 'boring-avatars', style: 'ring' },
-  { source: 'boring-avatars', style: 'bauhaus' },
-  { source: 'boring-avatars', style: 'triangles' },
-  { source: 'dicebear', style: 'adventurer' },
-  { source: 'dicebear', style: 'big-ears' },
-  { source: 'dicebear', style: 'big-smile' },
-  { source: 'dicebear', style: 'bottts' },
-  { source: 'dicebear', style: 'croodles' },
-  { source: 'dicebear', style: 'fun-emoji' },
-  { source: 'dicebear', style: 'lorelei' },
-  { source: 'dicebear', style: 'micah' },
-  { source: 'dicebear', style: 'notionists' },
-  { source: 'dicebear', style: 'open-peeps' },
-  { source: 'robohash', style: 'set1' },
-  { source: 'robohash', style: 'set2' },
-  { source: 'robohash', style: 'set3' },
-  { source: 'robohash', style: 'set4' },
-];
-
-function avatarVariantFor(email) {
-  const match = email.match(/_(\d+)@k6test\.invalid$/);
-  const index = match ? Number(match[1]) - 1 : 0;
-  return AVATAR_VARIANTS[index % AVATAR_VARIANTS.length];
-}
-
-function avatarFor(email) {
-  const { source, style } = avatarVariantFor(email);
-  const seed = encodeURIComponent(email);
-
-  if (source === 'boring-avatars') {
-    return {
-      avatar_url: `boring://${style}/${seed}`,
-      avatar_source: source,
-    };
-  }
-
-  if (source === 'dicebear') {
-    return {
-      avatar_url: `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}`,
-      avatar_source: source,
-    };
-  }
-
-  return {
-    avatar_url: `https://robohash.org/${seed}?set=${style}&size=200x200`,
-    avatar_source: source,
-  };
-}
-
-function isSeederGeneratedAvatar(profile, email) {
-  if (typeof profile?.avatar_url !== 'string') return false;
-
-  // Legacy formats — always regenerate to the current varied style.
-  if (profile.avatar_url.startsWith('https://source.boringavatars.com/')) return true;
-
-  // The pre-varied-styles seeder gave every user the same beam style.
-  if (profile.avatar_url === `boring://beam/${encodeURIComponent(email)}`) return true;
-
-  // If the profile already has exactly the correct variant for this user's
-  // index, leave it alone — no update needed.
-  const correct = avatarFor(email);
-  if (profile.avatar_url === correct.avatar_url) return false;
-
-  // Has a seeder-generated URL for a different variant — update to the
-  // correct one. Manually selected avatars use the user's name (not their
-  // email) as seed and won't match any entry here.
-  return AVATAR_VARIANTS.some(({ source, style }) => {
-    const generated = avatarForWithVariant(email, source, style).avatar_url;
-    return profile.avatar_url === generated;
-  });
-}
-
-function avatarForWithVariant(email, source, style) {
-  const seed = encodeURIComponent(email);
-  if (source === 'boring-avatars') {
-    return { avatar_url: `boring://${style}/${seed}`, avatar_source: source };
-  }
-  if (source === 'dicebear') {
-    return {
-      avatar_url: `https://api.dicebear.com/9.x/${style}/svg?seed=${seed}`,
-      avatar_source: source,
-    };
-  }
-  return {
-    avatar_url: `https://robohash.org/${seed}?set=${style}&size=200x200`,
-    avatar_source: source,
-  };
-}
-
 // ── Fetch existing seeded users (skip already-created ones) ────────────────
 async function fetchExistingEmails() {
   const { data } = await db
@@ -225,7 +128,7 @@ async function main() {
 
   console.log(`   ${toCreate.length} new users to create.\n`);
 
-  // ── Insert users in batches ──────────────────────────────────────────────
+  // ── Insert users in batches ──���───────────────────────────────────────────
   const createdUserIds = {}; // email → id
 
   for (let b = 0; b < toCreate.length; b += BATCH_SIZE) {
@@ -267,41 +170,26 @@ async function main() {
 
   // ── Create designer_profiles (required for login) ────────────────────────
   const allIds        = Object.values(createdUserIds);
-  const emailByUserId = Object.fromEntries(
-    Object.entries(createdUserIds).map(([email, userId]) => [userId, email]),
-  );
-
-  // Check which profiles already exist, including their avatar fields. The
-  // seeder must repair older profiles created before avatar support was added
-  // and profiles created with the old remote avatar URL format.
-  const existingProfiles = new Map();
+  // Test users intentionally have no profile picture. This exercises the same
+  // initials fallback used for members who skip the optional upload.
+  const existingProfileIds = new Set();
   for (let b = 0; b < allIds.length; b += BATCH_SIZE) {
     const batch = allIds.slice(b, b + BATCH_SIZE);
     const { data } = await db
       .from('designer_profiles')
-      .select('user_id, avatar_url, avatar_source')
+      .select('user_id')
       .in('user_id', batch);
-    for (const p of data || []) existingProfiles.set(p.user_id, p);
+    for (const profile of data || []) existingProfileIds.add(profile.user_id);
   }
 
-  const profilesNeeded = allIds.filter(id => !existingProfiles.has(id));
-  const profilesMissingAvatars = allIds.filter(
-    id => {
-      const profile = existingProfiles.get(id);
-      return existingProfiles.has(id) &&
-        (!profile.avatar_url ||
-          isSeederGeneratedAvatar(profile, emailByUserId[id]));
-    },
-  );
-  console.log(`   ${profilesNeeded.length} profiles to create.`);
-  console.log(`   ${profilesMissingAvatars.length} existing profiles need avatars.\n`);
+  const profilesNeeded = allIds.filter(id => !existingProfileIds.has(id));
+  console.log(`   ${profilesNeeded.length} profiles to create.\n`);
 
   for (let b = 0; b < profilesNeeded.length; b += BATCH_SIZE) {
     const batch = profilesNeeded.slice(b, b + BATCH_SIZE);
-    const rows  = batch.map(id => ({
-      user_id:          id,
+    const rows = batch.map(id => ({
+      user_id: id,
       experience_level: experienceLevel,
-      ...avatarFor(emailByUserId[id]),
     }));
 
     const { error } = await db.from('designer_profiles').insert(rows);
@@ -311,30 +199,7 @@ async function main() {
       process.stdout.write(`   Created profiles ${b + 1}–${Math.min(b + BATCH_SIZE, profilesNeeded.length)} / ${profilesNeeded.length}\r`);
     }
   }
-
-  // Fill only missing avatars so rerunning the seeder never overwrites a
-  // member's existing custom avatar. Updates are chunked to avoid firing
-  // hundreds of requests at once.
-  for (let b = 0; b < profilesMissingAvatars.length; b += BATCH_SIZE) {
-    const batch = profilesMissingAvatars.slice(b, b + BATCH_SIZE);
-    const results = await Promise.all(
-      batch.map(userId =>
-        db
-          .from('designer_profiles')
-          .update({
-            ...avatarFor(emailByUserId[userId]),
-          })
-          .eq('user_id', userId),
-      ),
-    );
-    const failed = results.find(result => result.error);
-    if (failed?.error) {
-      console.error(`   ✗ Avatar update batch ${b} error:`, failed.error.message);
-    } else {
-      process.stdout.write(`   Added avatars ${b + 1}–${Math.min(b + BATCH_SIZE, profilesMissingAvatars.length)} / ${profilesMissingAvatars.length}\r`);
-    }
-  }
-  console.log(`\n   ✓ Profiles and avatars done.\n`);
+  console.log(`\n   ✓ Profiles done.\n`);
 
   // ── Join all users to the community ─────────────────────────────────────
   const { data: existingMembers } = await db

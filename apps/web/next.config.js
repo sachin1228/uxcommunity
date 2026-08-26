@@ -25,29 +25,14 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@uxcommunity/shared", "@uxcommunity/design-system"],
   allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],
+  // Allow Next.js <Image> to optimise uploaded images from Supabase storage.
   images: {
-    // Allow Next.js <Image> to optimise images from Supabase storage and the
-    // external avatar providers (DiceBear, Robohash, etc.).
-    // Next.js converts to WebP, resizes to the requested dimensions, and caches
-    // the result — cutting Supabase egress on every subsequent page load.
     remotePatterns: [
-      // Supabase storage (project-specific)
       {
         protocol: "https",
         hostname: supabaseHostname,
         pathname: "/storage/v1/object/public/**",
       },
-      // DiceBear avatars
-      { protocol: "https", hostname: "api.dicebear.com" },
-      // Robohash
-      { protocol: "https", hostname: "robohash.org" },
-      // Avataaars
-      { protocol: "https", hostname: "api.avataaars.io" },
-      { protocol: "https", hostname: "avataaars.io" },
-      // Multiavatar
-      { protocol: "https", hostname: "api.multiavatar.com" },
-      // Boring Avatars CDN
-      { protocol: "https", hostname: "source.boringavatars.com" },
       // GIPHY CDN (for GIF and sticker messages)
       { protocol: "https", hostname: "media.giphy.com" },
       { protocol: "https", hostname: "media0.giphy.com" },

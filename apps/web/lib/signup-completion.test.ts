@@ -16,12 +16,12 @@ const completePayload = {
     experience_level: "senior",
   },
   interest_ids: ["44444444-4444-4444-8444-444444444444"],
-  avatar_url: "https://api.dicebear.com/9.x/notionists/svg?seed=Ada",
-  avatar_source: "dicebear" as const,
+  avatar_url: "https://images.example.test/profiles/ada.jpg",
+  avatar_source: "upload" as const,
 };
 
-test("final signup requires identity, profile, interests, and avatar", () => {
-  for (const key of ["identity", "profile", "interest_ids", "avatar_source"] as const) {
+test("final signup requires identity, profile, and interests", () => {
+  for (const key of ["identity", "profile", "interest_ids"] as const) {
     const abandoned = { ...completePayload } as Record<string, unknown>;
     delete abandoned[key];
     assert.equal(completeSignupSchema.safeParse(abandoned).success, false);
