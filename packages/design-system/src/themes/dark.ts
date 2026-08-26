@@ -1,8 +1,8 @@
-import { neutral, blue, signal, dark } from "../tokens/colors";
+import { neutral, signal, dark } from "../tokens/colors";
 
 /**
- * Dark theme — Geist blue-700 (#52a8ff) as accent (lighter for dark bg legibility),
- * blue-600 (#0070f3) as hover (slightly darker).
+ * Dark theme — white (#ffffff) as accent (Vercel-style primary),
+ * #cccccc as hover (slightly dimmed).
  */
 export const darkTheme = {
   background:        dark[900],
@@ -15,10 +15,10 @@ export const darkTheme = {
   foregroundMuted:   dark[400],
   foregroundSubtle:  neutral[500],
 
-  accent:            blue[700],     // #52a8ff — lighter for dark bg
-  accentHover:       blue[600],     // #0070f3 — hover goes slightly darker
+  accent:            "#FFFFFF" as const,  // white primary (Vercel)
+  accentHover:       "#CCCCCC" as const,  // hover dims slightly
   accentSoft:        dark[700],
-  accentForeground:  neutral[0],
+  accentForeground:  neutral[1000],       // black text on white
 
   border:            dark[600],
   borderSubtle:      dark[700],

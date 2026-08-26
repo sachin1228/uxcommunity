@@ -363,7 +363,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
           {links.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {links.map((link) => (
-                <div key={link} className="flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 font-body text-xs text-blue-400">
+                <div key={link} className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1 font-body text-xs text-accent">
                   <LinkIcon size={11} />
                   <span className="max-w-[220px] truncate">{link}</span>
                   <button type="button" onClick={() => setLinks((c) => c.filter((l) => l !== link))} aria-label={`Remove ${link}`}>
