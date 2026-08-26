@@ -57,7 +57,7 @@ Sessions use custom signed JWTs (`jose`) stored in an httpOnly cookie — **not*
 | `POST /api/auth/reset-request` (per IP) | 5 requests / hour |
 
 Middleware also applies a global request-storm guard to application routes. It
-allows up to 40 requests per 10 seconds and 240 requests per minute per
+allows up to 20 requests per 10 seconds and 120 requests per minute per
 authenticated user (or proxy IP for public requests). Static assets and
 Next.js HMR endpoints are excluded. API requests receive a `429` JSON response;
 page requests are rewritten to `/too-many-requests` with `Retry-After` headers.

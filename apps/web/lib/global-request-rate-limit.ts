@@ -6,8 +6,8 @@ import { rateLimit, type RateLimitResult } from "@/lib/auth/rate-limit";
  * but catches browser refresh/navigation loops before they become expensive.
  */
 export const GLOBAL_REQUEST_LIMITS = {
-  burst: { limit: 40, windowS: 10 },
-  sustained: { limit: 240, windowS: 60 },
+  burst: { limit: 20, windowS: 10 },
+  sustained: { limit: 120, windowS: 60 },
 } as const;
 
 export interface GlobalRequestRateLimitResult {
