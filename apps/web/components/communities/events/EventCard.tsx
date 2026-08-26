@@ -310,8 +310,8 @@ export function EventCard({
         </div>
       </div>
 
-      <div className={`absolute right-2 top-0 flex w-11 flex-col items-center px-0.5 pb-2 pt-1.5 text-center [clip-path:polygon(0_0,100%_0,100%_100%,50%_82%,0_100%)] ${past ? "bg-foreground text-background" : "bg-emerald-500 text-white"}`}>
-        <span className="font-body text-[7px] font-semibold uppercase leading-2.5 tracking-wide">{past ? "Past" : "Upcoming"}</span>
+      <div className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${past ? "bg-foreground/10 text-foreground-muted" : "bg-emerald-500/15 text-emerald-400"}`}>
+        {past ? "Past" : "Upcoming"}
       </div>
     </div>
   );
