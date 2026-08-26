@@ -1,6 +1,6 @@
 export const communityFeedLayout = {
-  content: "mx-auto w-full max-w-4xl",
-  detailContent: "mx-auto w-full max-w-4xl",
+  content: "mx-auto w-full max-w-[40rem]",
+  detailContent: "mx-auto w-full max-w-[40rem]",
   gutters: "px-5 md:px-8",
   pageHeader: "px-5 py-7 md:px-8",
   pageHeaderWithFilters: "px-5 pb-2 pt-7 md:px-8",
