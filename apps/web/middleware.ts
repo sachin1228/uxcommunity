@@ -4,13 +4,62 @@ import {
   LEGACY_SESSION_COOKIE,
   verifySession,
 } from "@/lib/auth/session";
+import {
+  checkGlobalRequestRateLimit,
+  getGlobalRequestKey,
+  getRateLimitHeaders,
+} from "@/lib/global-request-rate-limit";
+
+function isApiRequest(pathname: string): boolean {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function tooManyRequestsResponse(
+  request: NextRequest,
+  resetAt: number,
+  remaining: number
+) {
+  const headers = getRateLimitHeaders({ remaining, resetAt });
+
+  if (isApiRequest(request.nextUrl.pathname)) {
+    return NextResponse.json(
+      {
+        error: "Too many requests. Please wait a moment and try again.",
+      },
+      { status: 429, headers }
+    );
+  }
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/too-many-requests";
+  url.search = "";
+
+  return NextResponse.rewrite(url, { status: 429, headers });
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Let the fallback page render even while the request identity is blocked.
+  if (pathname === "/too-many-requests" || pathname === "/api/healthz") {
+    return NextResponse.next();
+  }
+
   const token =
     request.cookies.get(SESSION_COOKIE)?.value ??
     request.cookies.get(LEGACY_SESSION_COOKIE)?.value;
   const session = token ? await verifySession(token) : null;
+
+  const globalLimit = await checkGlobalRequestRateLimit(
+    getGlobalRequestKey(request, session?.userId)
+  );
+  if (!globalLimit.success) {
+    return tooManyRequestsResponse(
+      request,
+      globalLimit.resetAt,
+      globalLimit.remaining
+    );
+  }
 
   // Redirect already-authenticated users away from / and /login
   if (pathname === "/" || pathname === "/login") {
@@ -45,5 +94,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/login", "/admin/:path*", "/dashboard/:path*"],
+  // Protect application requests while excluding static assets and HMR.
+  matcher: [
+    "/((?!_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml|webmanifest)$).*)",
+  ],
 };

@@ -59,6 +59,14 @@ export async function rateLimit(
   limit: number,
   windowS: number
 ): Promise<RateLimitResult> {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return {
+      success: true,
+      remaining: limit,
+      resetAt: Date.now() + windowS * 1000,
+    };
+  }
+
   try {
     const limiter = getLimiter(limit, windowS);
     const result = await limiter.limit(key);
