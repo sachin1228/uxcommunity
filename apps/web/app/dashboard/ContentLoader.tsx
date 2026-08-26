@@ -3,7 +3,7 @@ import { Spinner } from "@/components/ui/Spinner";
 
 /** Single-column shell shared by the homepage and every public card detail route. */
 export function DashboardSingleColumn({ children }: { children: ReactNode }) {
-  return <div className="mx-auto min-h-full w-full max-w-3xl">{children}</div>;
+  return <div className="mx-auto min-h-full w-full max-w-[40rem]">{children}</div>;
 }
 
 /** Loading shell for dashboard pages without a secondary rail. */
