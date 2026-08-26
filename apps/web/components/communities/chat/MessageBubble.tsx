@@ -724,10 +724,10 @@ export function MessageBubble({
                       : `rounded-2xl px-3 pt-2 pb-1.5 ${
                           isMe
                             ? msg.status === "sending"
-                              ? "bg-accent opacity-70"
+                              ? "bg-[#adcfff] opacity-70 [--color-accent-foreground:#000000]"
                               : msg.status === "failed"
                               ? "bg-red-500/80"
-                              : "bg-accent"
+                              : "bg-[#adcfff] [--color-accent-foreground:#000000]"
                             : "bg-surface-raised shadow-sm"
                         }`
                   }`}
