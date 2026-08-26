@@ -207,7 +207,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
             <button
               type="button"
               onClick={() => navigator.clipboard.writeText(created.invite_url).catch(() => {})}
-              className="rounded-md bg-accent px-3 py-2 font-body text-xs font-medium text-white transition-colors hover:bg-accent-hover"
+              className="rounded-md bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
             >
               Copy
             </button>
@@ -218,7 +218,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
               onCreated(created);
               handleClose();
             }}
-            className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+            className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
           >
             Open Community
           </button>
@@ -291,7 +291,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       </div>
                       <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">{copy}</p>
                       <span className={`absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full border ${
-                        active ? "border-accent bg-accent text-white" : "border-border"
+                        active ? "border-accent bg-accent text-accent-foreground" : "border-border"
                       }`}>
                         {active && <Check size={10} />}
                       </span>
@@ -391,7 +391,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 type="button"
                 onClick={() => setStep((prev) => prev + 1)}
                 disabled={!canContinue}
-                className="rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Continue
               </button>
@@ -400,9 +400,9 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canContinue || submitting}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting && <Spinner size={14} className="text-white" />}
+                {submitting && <Spinner size={14} className="text-accent-foreground" />}
                 {submitting ? "Creating..." : "Create Community"}
               </button>
             )}
