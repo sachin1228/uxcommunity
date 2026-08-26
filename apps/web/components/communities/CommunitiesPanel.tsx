@@ -69,7 +69,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
                 aria-label="Create community"
                 title="Create community"
               >
@@ -87,7 +87,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 font-body text-xs font-medium text-black transition-colors hover:bg-[#cccccc]"
               >
                 <Plus size={12} />
                 Create Community
@@ -103,7 +103,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
                 aria-label="Create community"
                 title="Create community"
               >

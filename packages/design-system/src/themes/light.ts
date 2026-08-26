@@ -1,7 +1,8 @@
-import { neutral, blue, signal, dark } from "../tokens/colors";
+import { neutral, signal, dark } from "../tokens/colors";
 
 /**
- * Light theme — #0070F3 as primary accent, #0060D1 as hover.
+ * Light theme — black (#0A0A0A) as primary accent (Vercel-style inversion),
+ * #333333 as hover.
  */
 export const lightTheme = {
   background:        neutral[50],
@@ -14,9 +15,9 @@ export const lightTheme = {
   foregroundMuted:   neutral[600],
   foregroundSubtle:  neutral[500],
 
-  accent:            "#0070F3" as const,
-  accentHover:       "#0060D1" as const,
-  accentSoft:        blue[1000],    // #f0f8ff — tinted bg
+  accent:            neutral[1000], // black primary (Vercel light-mode inversion)
+  accentHover:       "#333333" as const,
+  accentSoft:        neutral[200],  // tinted bg
   accentForeground:  neutral[0],
 
   border:            neutral[200],

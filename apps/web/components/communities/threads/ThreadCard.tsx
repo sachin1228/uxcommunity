@@ -14,7 +14,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
-/** Render text with URLs highlighted blue.
+/** Render text with URLs highlighted in the accent color.
  *  isNested=true → uses <span onClick> to avoid <a> inside <a> (list card wrapper). */
 function renderWithLinks(text: string, isNested = false) {
   const parts: React.ReactNode[] = [];
@@ -30,7 +30,7 @@ function renderWithLinks(text: string, isNested = false) {
           key={match.index}
           role="link"
           tabIndex={0}
-          className="text-blue-400 hover:underline break-all cursor-pointer"
+          className="text-accent hover:underline break-all cursor-pointer"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); } }}
         >
@@ -44,7 +44,7 @@ function renderWithLinks(text: string, isNested = false) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-400 hover:underline break-all"
+          className="text-accent hover:underline break-all"
           onClick={(e) => e.stopPropagation()}
         >
           {url}

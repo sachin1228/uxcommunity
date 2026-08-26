@@ -128,8 +128,8 @@ export default function ToolsPage() {
       {/* ── Migrate Supabase → R2 ─────────────────────────────────────────── */}
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
-            <ArrowRightLeft size={18} className="text-blue-400" />
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
+            <ArrowRightLeft size={18} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
@@ -144,7 +144,7 @@ export default function ToolsPage() {
             <button
               onClick={runMigration}
               disabled={migrateStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-blue-500 px-3.5 py-1.5 font-body text-xs font-medium text-white transition-colors hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {migrateStatus === "running" ? (
                 <>

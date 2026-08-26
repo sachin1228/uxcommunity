@@ -2,7 +2,7 @@
 
 export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg: string }> = {
   question:     { border: "#7C3AED", text: "#A78BFA", bg: "rgba(124,58,237,0.10)" },
-  discussion:   { border: "#0070F3", text: "#60A5FA", bg: "rgba(0,112,243,0.10)"  },
+  discussion:   { border: "#737373", text: "#E5E5E5", bg: "rgba(255,255,255,0.08)" },
   idea:         { border: "#D97706", text: "#FCD34D", bg: "rgba(217,119,6,0.10)"  },
   feedback:     { border: "#EA580C", text: "#FB923C", bg: "rgba(234,88,12,0.10)"  },
   referral:     { border: "#16A34A", text: "#4ADE80", bg: "rgba(22,163,74,0.10)"  },
