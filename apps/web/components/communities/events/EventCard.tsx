@@ -192,7 +192,7 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className="relative overflow-hidden rounded-lg border border-border bg-surface-raised">
+    <div className="relative overflow-hidden rounded-lg bg-surface-raised">
       <div className="flex min-h-52 flex-col md:flex-row">
         <div className="relative shrink-0 overflow-hidden bg-background md:h-52 md:w-auto">
           {event.cover_image_url ? (
@@ -203,11 +203,6 @@ export function EventCard({
         </div>
 
         <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-3 py-3 md:border-l md:border-t-0 md:px-4">
-          <span className="absolute -left-2 -top-2 z-10 hidden size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -bottom-2 -left-2 z-10 hidden size-4 rounded-full bg-surface md:block" aria-hidden="true" />
-          <span className="absolute -left-2 -top-2 z-10 size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:hidden" aria-hidden="true" />
-          <span className="absolute -right-2 -top-2 z-10 size-4 rounded-full bg-surface before:absolute before:left-0 before:top-2 before:h-px before:w-full before:bg-surface md:hidden" aria-hidden="true" />
-
           <div className="flex items-start justify-between gap-3 pr-12">
             <div className="min-w-0">
               {isDetail ? (

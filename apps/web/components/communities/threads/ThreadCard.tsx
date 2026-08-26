@@ -368,7 +368,7 @@ export function ThreadCard({
         const newFormat = thread.description.trimStart().startsWith(thread.title.trim());
         if (newFormat) {
           return (
-            <p className={`mt-3 font-body text-[15px] font-medium leading-relaxed text-foreground ${isDetail ? "whitespace-pre-wrap" : "line-clamp-4"}`}>
+            <p className={`mt-3 font-body text-[15px] font-normal leading-relaxed text-foreground ${isDetail ? "whitespace-pre-wrap" : "line-clamp-4"}`}>
               {renderWithLinks(thread.description, !isDetail)}
             </p>
           );
