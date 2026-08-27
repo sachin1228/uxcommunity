@@ -12,7 +12,6 @@
  *   POST /api/communities/:id/messages/:msgId/reactions — switch emoji
  *   DELETE /api/communities/:id/messages/:msgId     — soft-delete own message
  *   PATCH  /api/communities/:id/read                — mark community as read
- *   GET    /api/communities/:id/stats               — posts_today count
  *
  * Requires: active user session (call loginUser before invoking).
  * Set TEST_COMMUNITY_ID to a community the test user is a member of.
@@ -292,24 +291,6 @@ export function chatMessageTests() {
         try {
           const b = JSON.parse(r.body);
           return 'previousLastReadAt' in b;
-        } catch { return false; }
-      },
-    });
-    sleep(0.1);
-  });
-
-  // ── 13. GET stats ──────────────────────────────────────────────────────────
-  group('chat — GET stats (posts_today)', () => {
-    const res = http.get(
-      `${BASE_URL}/api/communities/${COMMUNITY_ID}/stats`,
-      { tags: { name: 'chat/stats-get' } },
-    );
-    check(res, {
-      'chat/stats-get: status 200': (r) => r.status === 200,
-      'chat/stats-get: has posts_today': (r) => {
-        try {
-          const b = JSON.parse(r.body);
-          return typeof b.posts_today === 'number';
         } catch { return false; }
       },
     });

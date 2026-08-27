@@ -19,7 +19,6 @@ interface CommunityInfoPanelProps {
   community: CommunityData | null;
   communityId: string;
   currentUserId?: string;
-  onlineCount?: number;
 }
 
 interface CommunityRule {
@@ -68,24 +67,12 @@ export function CommunityInfoPanel({
   community,
   communityId,
   currentUserId,
-  onlineCount = 0,
 }: CommunityInfoPanelProps) {
-  const [postsToday, setPostsToday] = useState<number | null>(null);
   const [rules, setRules] = useState<CommunityRule[]>([]);
   const isVisible = useDocumentVisible();
 
   useEffect(() => {
     if (!communityId) return;
-
-    fetchJsonCached<{ posts_today: number }>(
-      `/api/communities/${communityId}/stats`,
-      { staleMs: 60_000 },
-      currentUserId,
-    )
-      .then((data) => {
-        if (data != null) setPostsToday(data.posts_today);
-      })
-      .catch(() => {});
 
     fetchJsonCached<{ rules: CommunityRule[] }>(
       `/api/communities/${communityId}/rules`,
@@ -139,15 +126,6 @@ export function CommunityInfoPanel({
     ...(type ? [TYPE_LABELS[type] ?? type] : []),
     ...(referenceName ? [referenceName] : []),
   ];
-  const stats = [
-    { label: "Members", value: (community?.member_count ?? 0).toLocaleString() },
-    { label: "Online", value: onlineCount.toLocaleString() },
-    {
-      label: "Messages",
-      value: postsToday != null ? postsToday.toLocaleString() : "—",
-    },
-  ];
-
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-5 py-6 md:px-8 md:py-8">
@@ -185,23 +163,6 @@ export function CommunityInfoPanel({
               ))}
             </div>
           )}
-        </section>
-
-        <section aria-labelledby="community-stats-heading" className="border-t border-border pt-6">
-          <h2
-            id="community-stats-heading"
-            className="font-display text-base font-semibold text-foreground"
-          >
-            Community Stats
-          </h2>
-          <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {stats.map(({ label, value }) => (
-              <div key={label} className="rounded-xl border border-border bg-surface-raised p-4">
-                <dd className="font-display text-xl font-bold text-foreground">{value}</dd>
-                <dt className="mt-1 font-body text-xs text-foreground-muted">{label}</dt>
-              </div>
-            ))}
-          </dl>
         </section>
 
         <section aria-labelledby="community-rules-heading" className="border-t border-border pt-6">

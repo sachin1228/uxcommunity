@@ -5,14 +5,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 import {
   loadCommunityMessagePage,
   loadCommunityReadModel,
-  loadCommunityStats,
   type ReadResult,
 } from "@/lib/communities/read-models";
 type Params = { params: Promise<{ id: string }> };
-type Section = "community" | "messages" | "rules" | "stats";
+type Section = "community" | "messages" | "rules";
 
 /**
- * Sections that gate the whole response. The rest (rules, stats) are cheap
+ * Sections that gate the whole response. Rules are a cheap
  * extras bundled so the client's info panel reads them from the hydrated
  * request cache instead of firing separate fetches; if one fails, the
  * bootstrap still succeeds and the client falls back to the individual
@@ -50,9 +49,9 @@ export async function GET(_request: NextRequest, context: Params) {
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
-    // Cheap sections bundled into the same request so the right-hand info
-    // panel (stats, rules) never needs its own network round trips. Shapes
-    // match the standalone /stats and /rules endpoints so the hydrated
+    // Cheap rules are bundled into the same request so the info panel never
+    // needs its own network round trip. The shape matches the standalone
+    // /rules endpoint so the hydrated
     // request-cache entries are interchangeable with them.
     ["rules", async () => {
       const { data, error } = await db
@@ -63,7 +62,6 @@ export async function GET(_request: NextRequest, context: Params) {
       if (error) throw new Error("Failed to load rules.");
       return { rules: data ?? [] };
     }],
-    ["stats", async () => unwrapReadResult(await loadCommunityStats(communityId))],
   ];
 
   const settled = await Promise.allSettled(

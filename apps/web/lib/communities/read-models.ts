@@ -363,19 +363,6 @@ export async function loadCommunityRules(
   return { ok: true, data: { rules: data ?? [] } };
 }
 
-export async function loadCommunityStats(communityId: string): Promise<ReadResult<{ posts_today: number }>> {
-  const todayStart = new Date();
-  todayStart.setUTCHours(0, 0, 0, 0);
-  const { count, error } = await createServiceClient()
-    .from("community_messages")
-    .select("*", { count: "exact", head: true })
-    .eq("community_id", communityId)
-    .is("deleted_at", null)
-    .gte("created_at", todayStart.toISOString());
-  if (error) return { ok: false, status: 500, error: "Failed to load community stats." };
-  return { ok: true, data: { posts_today: count ?? 0 } };
-}
-
 export async function loadCommunityMessagePage(
   communityId: string,
   userId: string,
