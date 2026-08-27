@@ -131,7 +131,7 @@ export function CommunityPageShell({
   // handleTabChange handles the routing correctly via ?tab=resources above.
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden bg-background">
       <div className="flex-1 flex flex-col overflow-hidden">
         <ChatHeader
           community={community}
