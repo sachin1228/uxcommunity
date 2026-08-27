@@ -109,7 +109,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup,
 }: {
   url: string;
   isMe: boolean;
@@ -118,12 +118,13 @@ function BubbleImage({
   standalone?: boolean;
   createdAt?: string;
   status?: CachedMessage["status"];
+  isFirstInGroup?: boolean;
 }) {
   return (
     <div
       className={`relative ${
         standalone
-          ? `overflow-hidden rounded-xl rounded-tr-sm border-2 ${
+          ? `overflow-hidden rounded-xl ${isFirstInGroup ? "rounded-tl-sm" : ""} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
@@ -580,10 +581,18 @@ function isEmojiOnly(text: string): boolean {
 }
 
 /** Placeholder shown for soft-deleted messages. */
-function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
+function DeletedBubble({
+  isMe,
+  createdAt,
+  isFirstInGroup,
+}: {
+  isMe: boolean;
+  createdAt: string;
+  isFirstInGroup: boolean;
+}) {
   return (
     <div
-      className={`inline-flex select-none items-center gap-1.5 rounded-2xl rounded-tr-sm px-3 pt-2 pb-1.5 shadow-sm
+      className={`inline-flex select-none items-center gap-1.5 rounded-2xl ${isFirstInGroup ? "rounded-tl-sm" : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -649,6 +658,7 @@ export function MessageBubble({
     isEmojiOnly(msg.content);
 
   const rowHighlight = highlighted ? "bg-black/60" : "";
+  const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
     setDeleteConfirmOpen(false);
@@ -693,7 +703,7 @@ export function MessageBubble({
           )}
 
           {isDeleted ? (
-            <DeletedBubble isMe={isMe} createdAt={msg.created_at} />
+            <DeletedBubble isMe={isMe} createdAt={msg.created_at} isFirstInGroup={isFirstInGroup} />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className="flex items-center gap-1">
@@ -746,7 +756,7 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `rounded-2xl rounded-tr-sm px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `rounded-2xl ${isFirstInGroup ? "rounded-tl-sm" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
@@ -766,6 +776,7 @@ export function MessageBubble({
                       standalone={imageOnly}
                       createdAt={msg.created_at}
                       status={msg.status}
+                      isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
                     />
                   )}
