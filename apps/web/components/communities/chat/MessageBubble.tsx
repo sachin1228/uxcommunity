@@ -132,7 +132,7 @@ function BubbleImage({
     >
       <div
         className={standalone
-          ? `relative overflow-hidden ${isFirstInGroup ? "rounded-tl-none" : "rounded-lg"} border-2 ${
+          ? `relative overflow-hidden ${isFirstInGroup ? "rounded-tl-none" : "rounded-xl"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
@@ -614,7 +614,7 @@ function DeletedBubble({
 }) {
   return (
     <div
-      className={`relative inline-flex select-none items-center gap-1.5 rounded-lg ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative inline-flex select-none items-center gap-1.5 rounded-xl ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -781,7 +781,7 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `relative rounded-lg ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `relative rounded-xl ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
