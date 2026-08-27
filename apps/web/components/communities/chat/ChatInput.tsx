@@ -246,6 +246,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
               <textarea
                 ref={ref}
+                data-chat-input
                 value={input}
                 onChange={(e) => {
                   onChange(e.target.value);
@@ -266,6 +267,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   disabled={sending}
                   className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
+                  title="Send"
                 >
                   <svg
                     viewBox="0 0 24 24"

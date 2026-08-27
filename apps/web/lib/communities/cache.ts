@@ -33,6 +33,7 @@ export interface CachedMessage {
   reply_to?: ReplyPreview | null;
   image_url?: string | null;
   deleted_at?: string | null;
+  edited_at?: string | null;
 }
 
 /** A thread-created event shown inline in the chat timeline. */
@@ -403,6 +404,39 @@ export function patchSidebarLastMessage(
     (current) => ({
       communities: current.communities.map((community) =>
         community.id === communityId ? patch(community) : community
+      ),
+    }),
+  );
+  notifySidebarMessageChanged();
+}
+
+/** Updates the sidebar preview when an existing latest message is edited. */
+export function patchSidebarMessageContent(
+  communityId: string,
+  messageId: string,
+  content: string,
+): void {
+  const patch = (community: CachedSidebarCommunity): CachedSidebarCommunity => {
+    if (community.last_message?.id !== messageId) return community;
+    return {
+      ...community,
+      last_message: { ...community.last_message, content },
+    };
+  };
+
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.map((community) =>
+        community.id === communityId ? patch(community) : community,
+      ),
+    };
+  }
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (current) => ({
+      communities: current.communities.map((community) =>
+        community.id === communityId ? patch(community) : community,
       ),
     }),
   );

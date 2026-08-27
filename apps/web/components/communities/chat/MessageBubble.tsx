@@ -1,14 +1,16 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect } from "react";
-import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal } from "lucide-react";
+import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
+import { MessageBubbleTail } from "./MessageBubbleTail";
 
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
 interface MessageBubbleProps {
@@ -24,6 +26,7 @@ interface MessageBubbleProps {
   onRetrySend: (msgId: string) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
 }
@@ -69,20 +72,18 @@ function ReplyBubble({
 function ReactionPills({
   reactions,
   currentUserId,
-  isMe,
   msgId,
   onReaction,
 }: {
   reactions: MessageReaction[];
   currentUserId: string;
-  isMe: boolean;
   msgId: string;
   onReaction: (msgId: string, emoji: string) => void;
 }) {
   if (!reactions || reactions.length === 0) return null;
 
   return (
-    <div className={`flex flex-wrap gap-1 mt-1 absolute -bottom-[14px] left-[12px] ${isMe ? "justify-end" : "justify-start"}`}>
+    <div className="absolute -bottom-[14px] left-3 mt-1 flex flex-wrap justify-start gap-1">
       {reactions.map(({ emoji, user_ids }) => {
         const iMine = user_ids.includes(currentUserId);
         return (
@@ -110,7 +111,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup,
 }: {
   url: string;
   isMe: boolean;
@@ -119,19 +120,25 @@ function BubbleImage({
   standalone?: boolean;
   createdAt?: string;
   status?: CachedMessage["status"];
+  isFirstInGroup?: boolean;
 }) {
   return (
     <div
       className={`relative ${
         standalone
-          ? `overflow-hidden rounded-xl border-2 ${
+          ? ""
+          : "mb-1"
+      }`}
+    >
+      <div
+        className={standalone
+          ? `relative overflow-hidden ${isFirstInGroup ? "rounded-tl-none" : "rounded-[10px]"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
             }`
-          : "mb-1"
-      }`}
-    >
+          : "relative"}
+      >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
@@ -166,6 +173,7 @@ function BubbleImage({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -205,7 +213,10 @@ function DeleteConfirmDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
-    >
+      >
+      {standalone && isFirstInGroup && (
+        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
+      )}
       <div
         className="bg-[#1c1c1e] border border-white/[0.08] rounded-2xl shadow-2xl w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -251,6 +262,7 @@ function MessageHoverActions({
   currentUserId,
   onReaction,
   onReply,
+  onEdit,
   onCopy,
   onDeleteClick,
   menuOpen,
@@ -266,6 +278,7 @@ function MessageHoverActions({
   currentUserId: string;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDeleteClick: () => void;
   menuOpen: boolean;
@@ -281,6 +294,17 @@ function MessageHoverActions({
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
   const myEmoji = msg.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji;
   const canCopy = !!msg.content && !isDeleted;
+  const [editAvailable, setEditAvailable] = useState(() => canEditMessage(msg.created_at));
+
+  useEffect(() => {
+    const createdAtMs = Date.parse(msg.created_at);
+    const remaining = createdAtMs + MESSAGE_EDIT_WINDOW_MS - Date.now();
+
+    if (!Number.isFinite(createdAtMs) || remaining <= 0) return;
+
+    const timeoutId = window.setTimeout(() => setEditAvailable(false), remaining + 1);
+    return () => window.clearTimeout(timeoutId);
+  }, [msg.created_at]);
 
   // Close picker when clicking outside
   useEffect(() => {
@@ -426,6 +450,21 @@ function MessageHoverActions({
             </button>
           )}
 
+          {isMe && canCopy && editAvailable && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(msg);
+                onMenuOpenChange(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              role="menuitem"
+            >
+              <Pencil size={14} className="text-foreground-muted shrink-0" />
+              <span>Edit</span>
+            </button>
+          )}
+
           {isMe && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
@@ -564,20 +603,31 @@ function isEmojiOnly(text: string): boolean {
 }
 
 /** Placeholder shown for soft-deleted messages. */
-function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
+function DeletedBubble({
+  isMe,
+  createdAt,
+  isFirstInGroup,
+}: {
+  isMe: boolean;
+  createdAt: string;
+  isFirstInGroup: boolean;
+}) {
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 select-none
+      className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
-          ? "rounded-tr-sm bg-[var(--ds-blue-500)] border border-white/10"
-          : "rounded-tl-sm bg-surface-raised/60 border border-white/5"
+          ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
+          : "bg-surface-raised"
         }`}
     >
-      <Ban size={13} className={isMe ? "text-white shrink-0" : "text-foreground-muted/50 shrink-0"} />
-      <span className={`font-body text-xs  ${isMe ? "text-white" : "text-foreground-muted/60"}`}>
+      {isFirstInGroup && (
+        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
+      )}
+      <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+      <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-white" : "text-foreground-muted/50"}`}>
+      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>
@@ -597,6 +647,7 @@ export function MessageBubble({
   onRetrySend,
   onReaction,
   onReply,
+  onEdit,
   onCopy,
   onDelete,
 }: MessageBubbleProps) {
@@ -632,6 +683,7 @@ export function MessageBubble({
     isEmojiOnly(msg.content);
 
   const rowHighlight = highlighted ? "bg-black/60" : "";
+  const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
     setDeleteConfirmOpen(false);
@@ -653,7 +705,7 @@ export function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex items-start gap-2 w-full px-5 transition-colors duration-300 ${rowHighlight} ${
+        className={`group flex w-full items-start justify-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
           isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
         }`}
         onMouseMove={handleRowMouseMove}
@@ -667,7 +719,7 @@ export function MessageBubble({
         </div>
 
         {/* Content column */}
-        <div className="max-w-[65%]">
+        <div className="min-w-0 max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
             <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
@@ -676,7 +728,7 @@ export function MessageBubble({
           )}
 
           {isDeleted ? (
-            <DeletedBubble isMe={isMe} createdAt={msg.created_at} />
+            <DeletedBubble isMe={isMe} createdAt={msg.created_at} isFirstInGroup={isFirstInGroup} />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className="flex items-center gap-1">
@@ -684,6 +736,9 @@ export function MessageBubble({
                 <div className="flex flex-col items-start select-none">
                   <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
                   <div className="flex items-center gap-1 mt-0.5">
+                    {msg.edited_at && (
+                      <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
+                    )}
                     <span className="font-mono text-[10px] text-foreground-muted/70">
                       {fmtTime(msg.created_at)}
                     </span>
@@ -698,7 +753,7 @@ export function MessageBubble({
                     )}
                   </div>
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
               <MessageHoverActions
                 msg={msg}
@@ -707,6 +762,7 @@ export function MessageBubble({
                 currentUserId={currentUserId}
                 onReaction={onReaction}
                 onReply={onReply}
+                onEdit={onEdit}
                 onCopy={onCopy}
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}
@@ -724,18 +780,27 @@ export function MessageBubble({
                     menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
                   } ${
                     imageOnly
-                      ? "flex flex-col items-end"
-                      : `rounded-2xl px-3 pt-2 pb-1.5 ${
+                      ? "flex flex-col items-start"
+                      : `relative rounded-[10px] ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
                               : msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised shadow-sm"
+                            : "bg-surface-raised"
                         }`
                   }`}
                 >
+                  {isFirstInGroup && (
+                    <MessageBubbleTail
+                      className={isMe
+                        ? msg.status === "failed"
+                          ? "text-red-500/80"
+                          : "text-[var(--ds-blue-700)]"
+                        : "text-surface-raised"}
+                    />
+                  )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
                     <BubbleImage
@@ -745,6 +810,7 @@ export function MessageBubble({
                       standalone={imageOnly}
                       createdAt={msg.created_at}
                       status={msg.status}
+                      isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
                     />
                   )}
@@ -757,6 +823,11 @@ export function MessageBubble({
                   )}
                   {!imageOnly && (
                     <div className="flex items-center justify-end gap-1 mt-1">
+                      {msg.edited_at && (
+                        <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
+                          edited
+                        </span>
+                      )}
                       <span className={`font-mono text-[10px] ${
                         isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
                       }`}>
@@ -780,6 +851,7 @@ export function MessageBubble({
                     currentUserId={currentUserId}
                     onReaction={onReaction}
                     onReply={onReply}
+                    onEdit={onEdit}
                     onCopy={onCopy}
                     onDeleteClick={() => setDeleteConfirmOpen(true)}
                     menuOpen={menuOpen}
@@ -789,7 +861,7 @@ export function MessageBubble({
                     dotsVisible={nearBubble}
                   />
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
               {/* Emoji reaction button to the right of bubble */}
               <MessageHoverActions
@@ -799,6 +871,7 @@ export function MessageBubble({
                 currentUserId={currentUserId}
                 onReaction={onReaction}
                 onReply={onReply}
+                onEdit={onEdit}
                 onCopy={onCopy}
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}

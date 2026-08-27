@@ -59,6 +59,7 @@ interface MessageListProps {
   onRetrySend: (msgId: string) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
 }
@@ -85,6 +86,7 @@ export function MessageList({
   onRetrySend,
   onReaction,
   onReply,
+  onEdit,
   onCopy,
   onDelete,
 }: MessageListProps) {
@@ -241,6 +243,7 @@ export function MessageList({
                   onRetrySend={onRetrySend}
                   onReaction={onReaction}
                   onReply={onReply}
+                  onEdit={onEdit}
                   onCopy={onCopy}
                   onDelete={onDelete}
                 />
