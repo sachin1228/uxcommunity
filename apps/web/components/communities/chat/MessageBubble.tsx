@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useRef, useEffect } from "react";
-import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal } from "lucide-react";
+import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 
@@ -24,6 +24,7 @@ interface MessageBubbleProps {
   onRetrySend: (msgId: string) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
 }
@@ -251,6 +252,7 @@ function MessageHoverActions({
   currentUserId,
   onReaction,
   onReply,
+  onEdit,
   onCopy,
   onDeleteClick,
   menuOpen,
@@ -266,6 +268,7 @@ function MessageHoverActions({
   currentUserId: string;
   onReaction: (msgId: string, emoji: string) => void;
   onReply: (msg: CachedMessage) => void;
+  onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDeleteClick: () => void;
   menuOpen: boolean;
@@ -423,6 +426,21 @@ function MessageHoverActions({
             >
               <Copy size={14} className="text-foreground-muted shrink-0" />
               <span>Copy</span>
+            </button>
+          )}
+
+          {isMe && canCopy && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(msg);
+                onMenuOpenChange(false);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              role="menuitem"
+            >
+              <Pencil size={14} className="text-foreground-muted shrink-0" />
+              <span>Edit</span>
             </button>
           )}
 
@@ -597,6 +615,7 @@ export function MessageBubble({
   onRetrySend,
   onReaction,
   onReply,
+  onEdit,
   onCopy,
   onDelete,
 }: MessageBubbleProps) {
@@ -684,6 +703,9 @@ export function MessageBubble({
                 <div className="flex flex-col items-start select-none">
                   <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
                   <div className="flex items-center gap-1 mt-0.5">
+                    {msg.edited_at && (
+                      <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
+                    )}
                     <span className="font-mono text-[10px] text-foreground-muted/70">
                       {fmtTime(msg.created_at)}
                     </span>
@@ -707,6 +729,7 @@ export function MessageBubble({
                 currentUserId={currentUserId}
                 onReaction={onReaction}
                 onReply={onReply}
+                onEdit={onEdit}
                 onCopy={onCopy}
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}
@@ -757,6 +780,11 @@ export function MessageBubble({
                   )}
                   {!imageOnly && (
                     <div className="flex items-center justify-end gap-1 mt-1">
+                      {msg.edited_at && (
+                        <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
+                          edited
+                        </span>
+                      )}
                       <span className={`font-mono text-[10px] ${
                         isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
                       }`}>
@@ -780,6 +808,7 @@ export function MessageBubble({
                     currentUserId={currentUserId}
                     onReaction={onReaction}
                     onReply={onReply}
+                    onEdit={onEdit}
                     onCopy={onCopy}
                     onDeleteClick={() => setDeleteConfirmOpen(true)}
                     menuOpen={menuOpen}
@@ -799,6 +828,7 @@ export function MessageBubble({
                 currentUserId={currentUserId}
                 onReaction={onReaction}
                 onReply={onReply}
+                onEdit={onEdit}
                 onCopy={onCopy}
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}

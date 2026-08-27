@@ -2,7 +2,7 @@
 
 import { forwardRef, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, ImageIcon, Smile, Link } from "lucide-react";
+import { X, ImageIcon, Smile, Link, Check } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
@@ -13,6 +13,7 @@ interface ChatInputProps {
   error: string | null;
   placeholder: string;
   replyTo: ReplyPreview | null;
+  isEditing?: boolean;
   pendingImagePreview: string | null;
   /** First URL detected in the current input, or null. */
   linkPreviewUrl?: string | null;
@@ -20,6 +21,7 @@ interface ChatInputProps {
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSend: () => void;
   onCancelReply: () => void;
+  onCancelEdit?: () => void;
   onImageSelect: (file: File) => void;
   onImageRemove: () => void;
   onBlur?: () => void;
@@ -36,10 +38,10 @@ interface PickerPos {
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
-      input, sending, error, placeholder, replyTo,
+      input, sending, error, placeholder, replyTo, isEditing = false,
       pendingImagePreview, linkPreviewUrl,
       onChange, onKeyDown, onSend, onCancelReply,
-      onImageSelect, onImageRemove, onBlur,
+      onImageSelect, onImageRemove, onBlur, onCancelEdit,
       onEmojiSelect, onGifSelect,
     },
     ref
@@ -50,7 +52,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
-    const canSend = !!input.trim() || !!pendingImagePreview;
+    const canSend = !!input.trim() || (!isEditing && !!pendingImagePreview);
 
     // ── helpers ────────────────────────────────────────────────────────────
 
@@ -136,7 +138,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         )}
 
         {/* Image preview bar */}
-        {pendingImagePreview && (
+        {pendingImagePreview && !isEditing && (
           <div className="flex items-center gap-2 mb-1 px-2 py-2 rounded-xl bg-surface-raised">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -193,8 +195,29 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               }}
             />
 
+            {/* Edit preview inside the box */}
+            {isEditing && (
+              <div className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]">
+                <div className="flex-1 min-w-0 py-2 pl-2 rounded-sm">
+                  <p className="font-body text-[11px] font-semibold text-accent truncate">
+                    Edit message
+                  </p>
+                  <p className="font-body text-[11px] text-foreground-muted truncate">
+                    Update the text and save your changes
+                  </p>
+                </div>
+                <button
+                  onClick={onCancelEdit}
+                  className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-2 rounded-full hover:bg-surface"
+                  aria-label="Cancel edit"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            )}
+
             {/* Reply preview inside the box */}
-            {replyTo && (
+            {replyTo && !isEditing && (
               <div className="flex items-center gap-2 mt-2 mb-1 mx-2 border-l-2 rounded-md border-accent bg-[color-mix(in_srgb,var(--surface)_80%,transparent)]">
                 <div className="flex-1 min-w-0 py-2 pl-2 rounded-sm">
                   <p className="font-body text-[11px] font-semibold text-accent truncate">
@@ -217,7 +240,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             {/* Input row */}
             <div className="flex items-center gap-2 min-h-[52px]">
               {/* Emoji + Image picker buttons */}
-              <div className="flex items-center">
+              <div className={`flex items-center ${isEditing ? "hidden" : ""}`}>
                 <button
                   type="button"
                   onClick={togglePicker}
@@ -246,6 +269,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
               <textarea
                 ref={ref}
+                data-chat-input
                 value={input}
                 onChange={(e) => {
                   onChange(e.target.value);
@@ -265,16 +289,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onClick={() => { closePicker(); onSend(); }}
                   disabled={sending}
                   className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-                  aria-label="Send"
+                  aria-label={isEditing ? "Save edited message" : "Send"}
+                  title={isEditing ? "Save edit" : "Send"}
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="w-[15px] h-[15px]"
-                    style={{ marginLeft: "1px" }}
-                  >
-                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                  </svg>
+                  {isEditing ? <Check size={18} /> : (
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="w-[15px] h-[15px]"
+                      style={{ marginLeft: "1px" }}
+                    >
+                      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                  )}
                 </button>
               )}
             </div>{/* end input row */}
