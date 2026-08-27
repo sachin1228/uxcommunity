@@ -68,7 +68,7 @@ export function MessageEditModal({
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="relative max-w-[65%] rounded-2xl rounded-tl-none bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white]">
+          <div className="relative max-w-[65%] rounded-lg rounded-tl-none bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white]">
             <MessageBubbleTail className="text-[var(--ds-blue-700)]" />
             <p className="whitespace-pre-wrap break-words font-body text-[15px] leading-6">
               {input || message.content}
