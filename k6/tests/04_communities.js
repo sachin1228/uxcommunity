@@ -5,7 +5,6 @@
  *   GET  /api/communities
  *   GET  /api/communities/all
  *   GET  /api/communities/:id
- *   GET  /api/communities/:id/stats
  *   GET  /api/communities/:id/messages
  *   POST /api/communities/:id/messages
  *   POST /api/communities/:id/messages/:msgId/reactions
@@ -53,17 +52,6 @@ export function communityTests() {
     });
     check(res, {
       'communities/single: status 200 or 404': (r) =>
-        r.status === 200 || r.status === 404,
-    });
-    sleep(0.1);
-  });
-
-  group('communities — stats', () => {
-    const res = http.get(`${BASE_URL}/api/communities/${COMMUNITY_ID}/stats`, {
-      tags: { name: 'communities/stats' },
-    });
-    check(res, {
-      'communities/stats: status 200 or 404': (r) =>
         r.status === 200 || r.status === 404,
     });
     sleep(0.1);

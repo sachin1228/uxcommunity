@@ -228,21 +228,6 @@ export default function () {
     sleep(0.1);
   });
 
-  // ── 7. Get community stats ───────────────────────────────────────────
-  group('stats', () => {
-    const res = http.get(
-      `${BASE_URL}/api/communities/${COMMUNITY_ID}/stats`,
-      { tags: { name: 'chat/stats' } },
-    );
-    check(res, {
-      'stats: status 200': (r) => r.status === 200,
-      'stats: posts_today is number': (r) => {
-        try { return typeof JSON.parse(r.body).posts_today === 'number'; } catch { return false; }
-      },
-    });
-    sleep(0.1);
-  });
-
   // ── 8. Clean up own message ──────────────────────────────────────────
   if (sentMsgId) {
     group('delete own message', () => {

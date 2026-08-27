@@ -6,7 +6,6 @@
  *   2. Send a message
  *   3. React to a message
  *   4. Mark as read
- *   5. Check stats
  *
  * Scenarios:
  *   - default  : 20 VUs for 3 min — steady active-chat load
@@ -157,21 +156,6 @@ export default function () {
       'chat/read: status 200': (r) => r.status === 200,
       'chat/read: ok true': (r) => {
         try { return JSON.parse(r.body).ok === true; } catch { return false; }
-      },
-    });
-    sleep(0.1);
-  });
-
-  // ── Check stats ───────────────────────────────────────────────────────────
-  group('chat — stats', () => {
-    const res = http.get(
-      `${BASE_URL}/api/communities/${COMMUNITY_ID}/stats`,
-      { tags: { name: 'chat/stats-get' } },
-    );
-    check(res, {
-      'chat/stats: status 200': (r) => r.status === 200,
-      'chat/stats: posts_today is number': (r) => {
-        try { return typeof JSON.parse(r.body).posts_today === 'number'; } catch { return false; }
       },
     });
     sleep(0.1);

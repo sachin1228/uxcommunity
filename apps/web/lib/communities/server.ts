@@ -22,7 +22,6 @@ export interface SSRCommunitySections {
   showcase?: unknown;
   members?: unknown;
   rules?: unknown;
-  stats?: unknown;
 }
 
 export interface SSRCommunityMeta {

@@ -99,7 +99,6 @@ export function CommunityChat({
       [`${base}/showcase`, initialSections.showcase],
       [`${base}/members?page=0`, initialSections.members],
       [`${base}/rules`, initialSections.rules],
-      [`${base}/stats`, initialSections.stats],
     ];
     for (const [url, value] of urls) {
       if (value !== undefined) setCachedRequest(url, value, currentUserId);
@@ -731,7 +730,6 @@ export function CommunityChat({
             community={displayCommunity}
             communityId={communityId}
             currentUserId={currentUserId}
-            onlineCount={onlineCount}
           />
         ) : renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />

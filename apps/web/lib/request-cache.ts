@@ -105,7 +105,7 @@ export function getCachedRequest<T>(url: string, userId?: string): T | undefined
 function getBootstrapBackedRequest(url: string): BootstrapBackedRequest | null {
   const parsed = new URL(url, "http://uxcommunity.local")
   const match = parsed.pathname.match(
-    /^\/api\/communities\/([^/]+)(?:\/(messages|permissions|unread|showcase|threads|events|resources|members|rules|stats))?$/,
+    /^\/api\/communities\/([^/]+)(?:\/(messages|permissions|unread|showcase|threads|events|resources|members|rules))?$/,
   )
   if (!match) return null
 
@@ -234,7 +234,6 @@ export type CommunityBootstrap = {
   showcase?: unknown
   members?: unknown
   rules?: unknown
-  stats?: unknown
   failures?: Array<{ section: string; message: string }>
 }
 
@@ -259,7 +258,6 @@ export async function fetchAndHydrateCommunityBootstrap(
     [`${base}/showcase`, data.showcase],
     [`${base}/members?page=0`, data.members],
     [`${base}/rules`, data.rules],
-    [`${base}/stats`, data.stats],
   ]
   for (const [url, value] of sections) {
     if (value !== undefined) setCachedRequest(url, value, userId)

@@ -219,7 +219,6 @@ test("hydrates every supplied community bootstrap section into canonical user ke
       showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
       members: { members: [{ user_id: "member-a" }], has_more: false },
       rules: { rules: [{ id: "rule-a" }] },
-      stats: { posts_today: 3 },
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -239,7 +238,6 @@ test("hydrates every supplied community bootstrap section into canonical user ke
     "/api/communities/community-a/showcase",
     "/api/communities/community-a/members?page=0",
     "/api/communities/community-a/rules",
-    "/api/communities/community-a/stats",
   ]
   await Promise.all(urls.map((url) => fetchJsonCached(url, {}, "user-a")))
 
@@ -250,13 +248,6 @@ test("hydrates every supplied community bootstrap section into canonical user ke
       "user-a",
     )?.members[0]?.user_id,
     "member-a",
-  )
-  assert.equal(
-    getCachedRequest<{ posts_today: number }>(
-      "/api/communities/community-a/stats",
-      "user-a",
-    )?.posts_today,
-    3,
   )
   assert.equal(getCachedRequest(urls[4], "user-b"), undefined)
 })
@@ -277,7 +268,6 @@ test("coordinates concurrent bootstrap-backed reads through one bootstrap reques
       showcase: { posts: [{ id: "showcase-a" }], nextCursor: null },
       members: { members: [{ user_id: "member-a" }], has_more: false },
       rules: { rules: [{ id: "rule-a" }] },
-      stats: { posts_today: 3 },
     }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -296,7 +286,6 @@ test("coordinates concurrent bootstrap-backed reads through one bootstrap reques
     `${base}/resources`,
     `${base}/members?page=0`,
     `${base}/rules`,
-    `${base}/stats`,
   ]
   const values = await Promise.all(
     urls.map((url) => fetchJsonCached<unknown>(url, {}, "user-a")),
