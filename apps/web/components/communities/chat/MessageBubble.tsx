@@ -3,7 +3,7 @@
 import { Fragment, useState, useRef, useEffect } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, MESSAGE_BUBBLE_TAIL } from "./chatUtils";
 
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
@@ -125,14 +125,19 @@ function BubbleImage({
     <div
       className={`relative ${
         standalone
-          ? `overflow-hidden rounded-xl ${isFirstInGroup ? "rounded-tl-sm" : ""} border-2 ${
+          ? `${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe ? "before:bg-[var(--ds-blue-700)]" : "before:bg-surface-raised"}` : ""}`
+          : "mb-1"
+      }`}
+    >
+      <div
+        className={standalone
+          ? `relative overflow-hidden rounded-xl border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
             }`
-          : "mb-1"
-      }`}
-    >
+          : "relative"}
+      >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
@@ -167,6 +172,7 @@ function BubbleImage({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -604,7 +610,7 @@ function DeletedBubble({
 }) {
   return (
     <div
-      className={`inline-flex select-none items-center gap-1.5 rounded-2xl ${isFirstInGroup ? "rounded-tl-sm" : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative inline-flex select-none items-center gap-1.5 rounded-2xl ${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe ? "before:bg-[var(--ds-blue-700)]" : "before:bg-surface-raised"}` : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -768,7 +774,11 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `rounded-2xl ${isFirstInGroup ? "rounded-tl-sm" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `relative rounded-2xl ${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe
+                        ? msg.status === "failed"
+                          ? "before:bg-red-500/80"
+                          : "before:bg-[var(--ds-blue-700)]"
+                        : "before:bg-surface-raised"}` : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"

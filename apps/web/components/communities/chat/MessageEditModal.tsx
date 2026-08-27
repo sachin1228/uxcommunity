@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Check, CheckCheck, Smile, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { CachedMessage } from "@/lib/communities/cache";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, MESSAGE_BUBBLE_TAIL } from "./chatUtils";
 
 interface MessageEditModalProps {
   message: CachedMessage;
@@ -67,7 +67,7 @@ export function MessageEditModal({
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="max-w-[65%] rounded-2xl rounded-tl-sm bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white]">
+          <div className={`relative max-w-[65%] rounded-2xl bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white] ${MESSAGE_BUBBLE_TAIL} before:bg-[var(--ds-blue-700)]`}>
             <p className="whitespace-pre-wrap break-words font-body text-[15px] leading-6">
               {input || message.content}
             </p>
