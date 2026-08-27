@@ -123,7 +123,7 @@ function BubbleImage({
     <div
       className={`relative ${
         standalone
-          ? `overflow-hidden rounded-xl border-2 ${
+          ? `overflow-hidden rounded-xl rounded-tr-sm border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
@@ -583,7 +583,7 @@ function isEmojiOnly(text: string): boolean {
 function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
   return (
     <div
-      className={`inline-flex select-none items-center gap-1.5 rounded-2xl px-3 pt-2 pb-1.5 shadow-sm
+      className={`inline-flex select-none items-center gap-1.5 rounded-2xl rounded-tr-sm px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -746,7 +746,7 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `rounded-2xl px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `rounded-2xl rounded-tr-sm px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
