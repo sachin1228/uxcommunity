@@ -1,8 +1,8 @@
 // ─── Shared chat utilities ────────────────────────────────────────────────
 
-/** Small top-left tail used by the first bubble in a consecutive author run. */
+/** Flat top-left corner and small tail used by the first bubble in a consecutive author run. */
 export const MESSAGE_BUBBLE_TAIL =
-  "before:pointer-events-none before:absolute before:-left-3 before:top-0 before:z-0 before:h-5 before:w-5 before:content-[''] before:[clip-path:polygon(100%_0,100%_100%,0_0)]";
+  "rounded-tl-none before:pointer-events-none before:absolute before:-left-3 before:top-0 before:z-0 before:h-5 before:w-5 before:content-[''] before:[clip-path:polygon(100%_0,100%_100%,0_0)]";
 
 export function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", {

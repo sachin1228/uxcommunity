@@ -131,7 +131,7 @@ function BubbleImage({
     >
       <div
         className={standalone
-          ? `relative overflow-hidden rounded-xl border-2 ${
+          ? `relative overflow-hidden ${isFirstInGroup ? "rounded-tl-none" : "rounded-xl"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
