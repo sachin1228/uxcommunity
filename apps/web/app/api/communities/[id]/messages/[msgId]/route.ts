@@ -6,6 +6,7 @@ import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import { canEditMessage } from "@/lib/communities/message-edit";
 
 /**
  * PATCH /api/communities/[id]/messages/[msgId]
@@ -47,6 +48,12 @@ export async function PATCH(
   if (msg.user_id !== userId) return NextResponse.json({ error: "You can only edit your own messages." }, { status: 403 });
   if (msg.deleted_at) return NextResponse.json({ error: "Deleted messages cannot be edited." }, { status: 409 });
   if (!msg.content) return NextResponse.json({ error: "This message has no editable text." }, { status: 409 });
+  if (!canEditMessage(msg.created_at)) {
+    return NextResponse.json(
+      { error: "Messages can only be edited within 15 minutes of sending." },
+      { status: 409 },
+    );
+  }
 
   const moderation = moderateWithLocalTextRules({ content, contentType: "chat_message", userId });
   if (!moderation.allowed) {

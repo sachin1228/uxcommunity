@@ -9,6 +9,7 @@ import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communi
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
 interface MessageBubbleProps {
@@ -283,6 +284,17 @@ function MessageHoverActions({
   const triggerBtnRef = useRef<HTMLButtonElement>(null);
   const myEmoji = msg.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji;
   const canCopy = !!msg.content && !isDeleted;
+  const [editAvailable, setEditAvailable] = useState(() => canEditMessage(msg.created_at));
+
+  useEffect(() => {
+    const createdAtMs = Date.parse(msg.created_at);
+    const remaining = createdAtMs + MESSAGE_EDIT_WINDOW_MS - Date.now();
+
+    if (!Number.isFinite(createdAtMs) || remaining <= 0) return;
+
+    const timeoutId = window.setTimeout(() => setEditAvailable(false), remaining + 1);
+    return () => window.clearTimeout(timeoutId);
+  }, [msg.created_at]);
 
   // Close picker when clicking outside
   useEffect(() => {
@@ -428,7 +440,7 @@ function MessageHoverActions({
             </button>
           )}
 
-          {isMe && canCopy && (
+          {isMe && canCopy && editAvailable && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
