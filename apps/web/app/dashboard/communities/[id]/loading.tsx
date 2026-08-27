@@ -129,7 +129,7 @@ export default function CommunityPageLoading() {
   }
 
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex overflow-hidden bg-background">
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Real chat chrome — identical to the page, so committing is seamless. */}
         <ChatHeader
@@ -153,7 +153,7 @@ export default function CommunityPageLoading() {
             exactly like the committed page. */
         <div className="flex-1 overflow-hidden relative">
           <div
-            className="absolute inset-0 overflow-y-auto pb-24"
+            className="absolute inset-0 overflow-y-auto bg-background pb-24"
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
