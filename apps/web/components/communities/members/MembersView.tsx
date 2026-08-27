@@ -234,7 +234,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Search */}
       <div className="px-5 py-3 shrink-0">
         <div className="relative">

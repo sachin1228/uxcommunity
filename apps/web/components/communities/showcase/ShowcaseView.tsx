@@ -129,7 +129,7 @@ export function ShowcaseView({
     router.push(`/dashboard/communities/${communityId}/showcase/${post.id}`);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div
         className={`${communityFeedLayout.content} ${
           !loading && posts.length

@@ -147,7 +147,7 @@ export function EventsView({
   const past = events.filter((e) => new Date(e.end_date ?? e.event_date) < now);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div className={`${communityFeedLayout.content} ${!loading && events.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
