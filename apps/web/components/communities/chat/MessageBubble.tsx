@@ -3,7 +3,8 @@
 import { Fragment, useState, useRef, useEffect } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime, MESSAGE_BUBBLE_TAIL } from "./chatUtils";
+import { fmtTime } from "./chatUtils";
+import { MessageBubbleTail } from "./MessageBubbleTail";
 
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
@@ -125,7 +126,7 @@ function BubbleImage({
     <div
       className={`relative ${
         standalone
-          ? `${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe ? "before:bg-[var(--ds-blue-700)]" : "before:bg-surface-raised"}` : ""}`
+          ? ""
           : "mb-1"
       }`}
     >
@@ -212,7 +213,10 @@ function DeleteConfirmDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
-    >
+      >
+      {standalone && isFirstInGroup && (
+        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
+      )}
       <div
         className="bg-[#1c1c1e] border border-white/[0.08] rounded-2xl shadow-2xl w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -610,12 +614,15 @@ function DeletedBubble({
 }) {
   return (
     <div
-      className={`relative inline-flex select-none items-center gap-1.5 rounded-2xl ${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe ? "before:bg-[var(--ds-blue-700)]" : "before:bg-surface-raised"}` : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative inline-flex select-none items-center gap-1.5 rounded-2xl ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
         }`}
     >
+      {isFirstInGroup && (
+        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
+      )}
       <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
@@ -774,11 +781,7 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `relative rounded-2xl ${isFirstInGroup ? `${MESSAGE_BUBBLE_TAIL} ${isMe
-                        ? msg.status === "failed"
-                          ? "before:bg-red-500/80"
-                          : "before:bg-[var(--ds-blue-700)]"
-                        : "before:bg-surface-raised"}` : ""} px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `relative rounded-2xl ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
@@ -789,6 +792,15 @@ export function MessageBubble({
                         }`
                   }`}
                 >
+                  {isFirstInGroup && (
+                    <MessageBubbleTail
+                      className={isMe
+                        ? msg.status === "failed"
+                          ? "text-red-500/80"
+                          : "text-[var(--ds-blue-700)]"
+                        : "text-surface-raised"}
+                    />
+                  )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
                     <BubbleImage
