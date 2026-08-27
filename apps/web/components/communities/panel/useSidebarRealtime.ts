@@ -336,6 +336,28 @@ export function useSidebarRealtime({
 
       // ── Soft-delete ────────────────────────────────────────────────────
       unsubscribes.push(
+        client.on(`message-edit:${cid}`, (data) => {
+          const updated = data as {
+            community_id: string;
+            created_at: string;
+            content: string;
+          };
+          if (!joinedCommunityIds.has(updated.community_id)) return;
+
+          setCommunities((prev) =>
+            applyUpdate(prev, updated.community_id, (c) => {
+              if (c.last_message?.created_at !== updated.created_at) return c;
+              return {
+                ...c,
+                last_message: { ...c.last_message!, content: updated.content },
+              };
+            }),
+          );
+        }),
+      );
+
+      // ── Soft-delete ────────────────────────────────────────────────────
+      unsubscribes.push(
         client.on(`message-delete:${cid}`, (data) => {
           const updated = data as {
             community_id: string;

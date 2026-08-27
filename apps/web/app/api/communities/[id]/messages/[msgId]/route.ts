@@ -2,6 +2,108 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
+import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
+import { moderationFailureResponse } from "@/lib/moderation/http";
+import { logModerationDecision } from "@/lib/moderation/log";
+import { contentHash } from "@/lib/moderation/normalize";
+import { canEditMessage } from "@/lib/communities/message-edit";
+
+/**
+ * PATCH /api/communities/[id]/messages/[msgId]
+ *
+ * Edits the text of an owned message. Images and reply metadata are kept as-is;
+ * the client only exposes this action for messages that contain text.
+ */
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; msgId: string }> }
+) {
+  let session;
+  try { session = await requireSession("user"); } catch (e) { return e as Response; }
+  const userId = session.userId!;
+  const { id: communityId, msgId } = await params;
+
+  let content: string;
+  try {
+    const body = await req.json();
+    content = typeof body.content === "string" ? body.content.trim() : "";
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  if (!content) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
+  if (content.length > 2000) return NextResponse.json({ error: "Message too long." }, { status: 422 });
+
+  const db = createServiceClient();
+  const { data: msg } = (await db
+    .from("community_messages")
+    .select("id, user_id, created_at, content, deleted_at")
+    .eq("id", msgId)
+    .eq("community_id", communityId)
+    .maybeSingle()) as unknown as {
+    data: { id: string; user_id: string; created_at: string; content: string | null; deleted_at: string | null } | null;
+  };
+
+  if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
+  if (msg.user_id !== userId) return NextResponse.json({ error: "You can only edit your own messages." }, { status: 403 });
+  if (msg.deleted_at) return NextResponse.json({ error: "Deleted messages cannot be edited." }, { status: 409 });
+  if (!msg.content) return NextResponse.json({ error: "This message has no editable text." }, { status: 409 });
+  if (!canEditMessage(msg.created_at)) {
+    return NextResponse.json(
+      { error: "Messages can only be edited within 15 minutes of sending." },
+      { status: 409 },
+    );
+  }
+
+  const moderation = moderateWithLocalTextRules({ content, contentType: "chat_message", userId });
+  if (!moderation.allowed) {
+    await logModerationDecision(db, {
+      userId,
+      contentType: "chat_message",
+      contentRefId: msgId,
+      contentHash: contentHash(content),
+      decision: moderation,
+    });
+    return moderationFailureResponse(moderation);
+  }
+
+  const editedAt = new Date().toISOString();
+  const { error } = await db
+    .from("community_messages")
+    .update({ content, edited_at: editedAt })
+    .eq("id", msgId)
+    .eq("community_id", communityId)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("[PATCH message]", error);
+    return NextResponse.json({ error: "Failed to edit message." }, { status: 500 });
+  }
+
+  after(async () => {
+    try {
+      const publishDb = createServiceClient();
+      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
+      await publishChatFanout({
+        communityId,
+        memberUserIds: memberIds,
+        chatTopic: "message-edit",
+        chatData: { id: msgId, content, edited_at: editedAt },
+        panelTopic: "message-edit",
+        panelData: {
+          community_id: communityId,
+          created_at: msg.created_at,
+          content,
+          edited_at: editedAt,
+        },
+      });
+    } catch (err) {
+      console.error("[PATCH message] realtime fan-out error:", err);
+    }
+  });
+
+  return NextResponse.json({ id: msgId, content, edited_at: editedAt });
+}
 
 /**
  * DELETE /api/communities/[id]/messages/[msgId]

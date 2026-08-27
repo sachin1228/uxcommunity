@@ -236,6 +236,28 @@ export function useRealtimeChat({
       }),
     );
 
+    // ── Message edit ────────────────────────────────────────────────────────
+    unsubscribes.push(
+      client.on("message-edit", (data) => {
+        const updated = data as {
+          id: string;
+          content: string;
+          edited_at: string | null;
+        };
+
+        setMessages((prev) => {
+          if (!prev.some((m) => m.id === updated.id)) return prev;
+          const next = prev.map((m) =>
+            m.id === updated.id
+              ? { ...m, content: updated.content, edited_at: updated.edited_at }
+              : m,
+          );
+          msgCache.set(communityId, next);
+          return next;
+        });
+      }),
+    );
+
     // ── Message soft-delete (UPDATE with deleted_at set) ─────────────────
     unsubscribes.push(
       client.on("message-delete", (data) => {

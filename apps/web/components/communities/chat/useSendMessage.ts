@@ -631,6 +631,7 @@ export function useSendMessage({
     setInput,
     sending,
     error,
+    setError,
     handleSend,
     handleKeyDown,
     handleCancelSend,

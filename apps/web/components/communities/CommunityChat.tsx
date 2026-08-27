@@ -13,6 +13,7 @@ import {
   metaCache,
   msgCache,
   msgFetchedAt,
+  patchSidebarMessageContent,
 } from "@/lib/communities/cache";
 import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import {
@@ -27,6 +28,7 @@ import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
+import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
 import type { CommunityThread } from "./threads/types";
 import { EventsView } from "./events/EventsView";
@@ -214,6 +216,8 @@ export function CommunityChat({
 
   // ── Reply state ───────────────────────────────────────────────────────────
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
+  const [editingMessage, setEditingMessage] = useState<CachedMessage | null>(null);
+  const [editingSaving, setEditingSaving] = useState(false);
   const handleReply = useCallback((msg: CachedMessage) => {
     setReplyTo({
       id:        msg.id,
@@ -523,6 +527,7 @@ export function CommunityChat({
     setInput,
     sending,
     error,
+    setError,
     handleSend,
     handleKeyDown,
     handleCancelSend,
@@ -543,6 +548,79 @@ export function CommunityChat({
     onClearReply: handleClearReply,
     scrollToBottomRef: bottomRef,
   });
+
+  const handleEdit = useCallback((msg: CachedMessage) => {
+    setEditingMessage(msg);
+    setReplyTo(null);
+    setError(null);
+    setInput(msg.content);
+  }, [setError, setInput]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessage(null);
+    setInput("");
+    setError(null);
+    if (inputRef.current) inputRef.current.style.height = "24px";
+    inputRef.current?.focus();
+  }, [inputRef, setError, setInput]);
+
+  const handleEditSave = useCallback(async () => {
+    if (!editingMessage || editingSaving) return;
+    const content = input.trim();
+    if (!content) {
+      setError("Message cannot be empty.");
+      return;
+    }
+
+    const originalContent = editingMessage.content;
+    const messageId = editingMessage.id;
+    setEditingSaving(true);
+    setError(null);
+    setMessages((prev) => {
+      const next = prev.map((message) =>
+        message.id === messageId ? { ...message, content } : message,
+      );
+      msgCache.set(communityId, next);
+      return next;
+    });
+    patchSidebarMessageContent(communityId, messageId, content);
+
+    try {
+      const res = await fetch(`/api/communities/${communityId}/messages/${messageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const data = await res.json().catch(() => ({})) as { content?: string; edited_at?: string; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to edit message.");
+
+      setMessages((prev) => {
+        const next = prev.map((message) =>
+          message.id === messageId
+            ? { ...message, content: data.content ?? content, edited_at: data.edited_at ?? new Date().toISOString() }
+            : message,
+        );
+        msgCache.set(communityId, next);
+        return next;
+      });
+      setEditingMessage(null);
+      setInput("");
+      if (inputRef.current) inputRef.current.style.height = "24px";
+      inputRef.current?.focus();
+    } catch (error) {
+      setMessages((prev) => {
+        const next = prev.map((message) =>
+          message.id === messageId ? { ...message, content: originalContent } : message,
+        );
+        msgCache.set(communityId, next);
+        return next;
+      });
+      patchSidebarMessageContent(communityId, messageId, originalContent);
+      setError(error instanceof Error ? error.message : "Failed to edit message.");
+    } finally {
+      setEditingSaving(false);
+    }
+  }, [communityId, editingMessage, editingSaving, input, inputRef, setError, setInput, setMessages]);
 
   // Insert emoji at the cursor position in the textarea
   const handleEmojiSelect = useCallback(
@@ -585,10 +663,9 @@ export function CommunityChat({
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === "Enter" && !event.shiftKey) setTyping(false);
       handleKeyDown(event);
     },
-    [handleKeyDown, setTyping],
+    [handleKeyDown],
   );
 
   // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
@@ -725,6 +802,23 @@ export function CommunityChat({
             />
           )}
         </Modal>
+        {editingMessage && (
+          <MessageEditModal
+            message={editingMessage}
+            input={input}
+            saving={editingSaving}
+            error={error}
+            onChange={setInput}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void handleEditSave();
+              }
+            }}
+            onSave={() => void handleEditSave()}
+            onClose={handleCancelEdit}
+          />
+        )}
         {renderedTab === "about" ? (
           <CommunityInfoPanel
             community={displayCommunity}
@@ -786,6 +880,7 @@ export function CommunityChat({
               onRetrySend={handleRetrySend}
               onReaction={handleReaction}
               onReply={handleReply}
+              onEdit={handleEdit}
               onCopy={handleCopy}
               onDelete={handleDelete}
             />
@@ -808,7 +903,7 @@ export function CommunityChat({
               <ChatInput
                 ref={inputRef}
                 input={input}
-                sending={sending}
+                sending={sending || editingSaving}
                 error={error}
                 placeholder="Type a message…"
                 replyTo={replyTo}
