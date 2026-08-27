@@ -28,6 +28,7 @@ import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
+import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
 import type { CommunityThread } from "./threads/types";
 import { EventsView } from "./events/EventsView";
@@ -553,11 +554,6 @@ export function CommunityChat({
     setReplyTo(null);
     setError(null);
     setInput(msg.content);
-    setTimeout(() => {
-      const textarea = document.querySelector<HTMLTextAreaElement>("[data-chat-input]");
-      textarea?.focus();
-      if (textarea) textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
-    }, 50);
   }, [setError, setInput]);
 
   const handleCancelEdit = useCallback(() => {
@@ -662,22 +658,14 @@ export function CommunityChat({
 
   const handleInputSend = useCallback(() => {
     setTyping(false);
-    if (editingMessage) void handleEditSave();
-    else void handleSend();
-  }, [editingMessage, handleEditSave, handleSend, setTyping]);
+    void handleSend();
+  }, [handleSend, setTyping]);
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === "Enter" && !event.shiftKey) {
-        event.preventDefault();
-        setTyping(false);
-        if (editingMessage) void handleEditSave();
-        else handleKeyDown(event);
-        return;
-      }
       handleKeyDown(event);
     },
-    [editingMessage, handleEditSave, handleKeyDown, setTyping],
+    [handleKeyDown],
   );
 
   // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
@@ -814,6 +802,23 @@ export function CommunityChat({
             />
           )}
         </Modal>
+        {editingMessage && (
+          <MessageEditModal
+            message={editingMessage}
+            input={input}
+            saving={editingSaving}
+            error={error}
+            onChange={setInput}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void handleEditSave();
+              }
+            }}
+            onSave={() => void handleEditSave()}
+            onClose={handleCancelEdit}
+          />
+        )}
         {renderedTab === "about" ? (
           <CommunityInfoPanel
             community={displayCommunity}
@@ -902,7 +907,6 @@ export function CommunityChat({
                 error={error}
                 placeholder="Type a message…"
                 replyTo={replyTo}
-                isEditing={!!editingMessage}
                 pendingImagePreview={pendingImagePreview}
                 linkPreviewUrl={input.trim() ? extractFirstUrl(input) : null}
                 onChange={handleInputChange}
@@ -910,7 +914,6 @@ export function CommunityChat({
                 onSend={handleInputSend}
                 onBlur={handleInputBlur}
                 onCancelReply={handleClearReply}
-                onCancelEdit={handleCancelEdit}
                 onImageSelect={handleImageSelect}
                 onImageRemove={handleImageClear}
                 onEmojiSelect={handleEmojiSelect}
