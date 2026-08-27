@@ -758,7 +758,7 @@ export function CommunityChat({
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="absolute inset-0 overflow-y-auto pb-24"
+            className="absolute inset-0 overflow-y-auto bg-background pb-24"
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",

@@ -11,11 +11,10 @@ type Params = { params: Promise<{ id: string }> };
 type Section = "community" | "messages" | "rules";
 
 /**
- * Sections that gate the whole response. Rules are a cheap
- * extras bundled so the client's info panel reads them from the hydrated
- * request cache instead of firing separate fetches; if one fails, the
- * bootstrap still succeeds and the client falls back to the individual
- * endpoint.
+ * Sections that gate the whole response. Rules are a cheap extra bundled so
+ * the client's info panel reads them from the hydrated request cache instead
+ * of firing a separate fetch; if rules fail, bootstrap still succeeds and
+ * the client falls back to the individual endpoint.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
 
@@ -51,8 +50,7 @@ export async function GET(_request: NextRequest, context: Params) {
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
     // Cheap rules are bundled into the same request so the info panel never
     // needs its own network round trip. The shape matches the standalone
-    // /rules endpoint so the hydrated
-    // request-cache entries are interchangeable with them.
+    // /rules endpoint, so the hydrated request-cache entries are interchangeable.
     ["rules", async () => {
       const { data, error } = await db
         .from("community_rules")

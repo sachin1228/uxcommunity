@@ -124,7 +124,11 @@ function BubbleImage({
     <div
       className={`relative ${
         standalone
-          ? "overflow-hidden rounded-xl border-2 border-accent"
+          ? `overflow-hidden rounded-xl border-2 ${
+              isMe
+                ? "border-[var(--ds-blue-700)]"
+                : "border-border bg-surface-raised"
+            }`
           : "mb-1"
       }`}
     >
@@ -565,15 +569,15 @@ function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }
     <div
       className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 select-none
         ${isMe
-          ? "rounded-tr-sm bg-accent/50 border border-white/10"
+          ? "rounded-tr-sm bg-[var(--ds-blue-500)] border border-white/10"
           : "rounded-tl-sm bg-surface-raised/60 border border-white/5"
         }`}
     >
-      <Ban size={13} className={isMe ? "text-accent-foreground opacity-40 shrink-0" : "text-foreground-muted/50 shrink-0"} />
-      <span className={`font-body text-xs  ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted/60"}`}>
+      <Ban size={13} className={isMe ? "text-white shrink-0" : "text-foreground-muted/50 shrink-0"} />
+      <span className={`font-body text-xs  ${isMe ? "text-white" : "text-foreground-muted/60"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-accent-foreground opacity-40" : "text-foreground-muted/50"}`}>
+      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-white" : "text-foreground-muted/50"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>

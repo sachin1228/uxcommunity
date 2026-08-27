@@ -186,7 +186,7 @@ export function ThreadsView({
   const filteredThreads = filter === "all" ? threads : threads.filter((thread) => thread.category === filter);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-background">
       <div className={`${communityFeedLayout.content} ${!loading && threads.length > 0 ? communityFeedLayout.pageHeaderWithFilters : communityFeedLayout.pageHeader}`}>
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
