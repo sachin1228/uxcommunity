@@ -70,20 +70,18 @@ function ReplyBubble({
 function ReactionPills({
   reactions,
   currentUserId,
-  isMe,
   msgId,
   onReaction,
 }: {
   reactions: MessageReaction[];
   currentUserId: string;
-  isMe: boolean;
   msgId: string;
   onReaction: (msgId: string, emoji: string) => void;
 }) {
   if (!reactions || reactions.length === 0) return null;
 
   return (
-    <div className={`flex flex-wrap gap-1 mt-1 absolute -bottom-[14px] left-[12px] ${isMe ? "justify-end" : "justify-start"}`}>
+    <div className="absolute -bottom-[14px] left-3 mt-1 flex flex-wrap justify-start gap-1">
       {reactions.map(({ emoji, user_ids }) => {
         const iMine = user_ids.includes(currentUserId);
         return (
@@ -585,17 +583,17 @@ function isEmojiOnly(text: string): boolean {
 function DeletedBubble({ isMe, createdAt }: { isMe: boolean; createdAt: string }) {
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 select-none
+      className={`inline-flex select-none items-center gap-1.5 rounded-2xl px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
-          ? "rounded-tr-sm bg-[var(--ds-blue-500)] border border-white/10"
-          : "rounded-tl-sm bg-surface-raised/60 border border-white/5"
+          ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
+          : "bg-surface-raised"
         }`}
     >
-      <Ban size={13} className={isMe ? "text-white shrink-0" : "text-foreground-muted/50 shrink-0"} />
-      <span className={`font-body text-xs  ${isMe ? "text-white" : "text-foreground-muted/60"}`}>
+      <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+      <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`font-mono text-[10px] ml-1 shrink-0 ${isMe ? "text-white" : "text-foreground-muted/50"}`}>
+      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>
@@ -672,7 +670,7 @@ export function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex items-start gap-2 w-full px-5 transition-colors duration-300 ${rowHighlight} ${
+        className={`group flex w-full items-start justify-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
           isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
         }`}
         onMouseMove={handleRowMouseMove}
@@ -686,7 +684,7 @@ export function MessageBubble({
         </div>
 
         {/* Content column */}
-        <div className="max-w-[65%]">
+        <div className="min-w-0 max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
             <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
@@ -720,7 +718,7 @@ export function MessageBubble({
                     )}
                   </div>
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
               <MessageHoverActions
                 msg={msg}
@@ -747,15 +745,15 @@ export function MessageBubble({
                     menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
                   } ${
                     imageOnly
-                      ? "flex flex-col items-end"
-                      : `rounded-2xl px-3 pt-2 pb-1.5 ${
+                      ? "flex flex-col items-start"
+                      : `rounded-2xl px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
                               : msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised shadow-sm"
+                            : "bg-surface-raised"
                         }`
                   }`}
                 >
@@ -818,7 +816,7 @@ export function MessageBubble({
                     dotsVisible={nearBubble}
                   />
                 </div>
-                <ReactionPills reactions={reactions} currentUserId={currentUserId} isMe={isMe} msgId={msg.id} onReaction={onReaction} />
+                <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
               {/* Emoji reaction button to the right of bubble */}
               <MessageHoverActions
