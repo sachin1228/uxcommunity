@@ -42,45 +42,45 @@ export function MessageEditModal({
     <Modal
       open
       onClose={onClose}
-      maxWidth="max-w-3xl"
+      maxWidth="max-w-xl"
       hideCloseButton
-      panelClassName="overflow-hidden rounded-2xl border-white/[0.08] bg-[#111] p-0 shadow-2xl"
+      panelClassName="overflow-hidden rounded-2xl border-border bg-surface p-0 shadow-2xl"
     >
       <div className="flex max-h-[calc(100vh-2rem)] flex-col">
-        <div className="flex shrink-0 items-center gap-4 px-7 py-5">
+        <div className="flex shrink-0 items-center gap-4 border-b border-border px-6 py-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            className="rounded-full p-1 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close edit message dialog"
           >
             <X size={25} strokeWidth={2} />
           </button>
-          <h2 className="font-body text-xl font-medium text-white">Edit message</h2>
+          <h2 className="font-body text-lg font-medium text-foreground">Edit message</h2>
         </div>
 
         <div
-          className="flex min-h-[300px] flex-1 items-center justify-end px-7 py-8"
+          className="flex min-h-[280px] flex-1 items-center justify-start px-6 py-8"
           style={{
-            backgroundColor: "#111",
-            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px)",
+            backgroundColor: "var(--color-background)",
+            backgroundImage: "radial-gradient(circle, color-mix(in srgb, var(--color-foreground) 4%, transparent) 1px, transparent 1px)",
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="max-w-[72%] rounded-2xl rounded-tr-sm bg-[#075e54] px-3 py-2 text-white shadow-sm">
+          <div className="max-w-[65%] rounded-2xl bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white]">
             <p className="whitespace-pre-wrap break-words font-body text-[15px] leading-6">
               {input || message.content}
             </p>
-            <div className="mt-1 flex items-center justify-end gap-1 text-white/60">
+            <div className="mt-1 flex items-center justify-end gap-1 text-accent-foreground opacity-60">
               <span className="font-mono text-[10px]">{fmtTime(message.created_at)}</span>
               <CheckCheck size={12} />
             </div>
           </div>
         </div>
 
-        <div className="shrink-0 px-7 pb-7 pt-3">
+        <div className="shrink-0 px-6 pb-6 pt-3">
           {error && <p className="mb-2 font-body text-xs text-red-400">{error}</p>}
-          <div className="flex items-end gap-3 border-b-2 border-[#25d366] pb-2">
+          <div className="flex items-end gap-3 border-b-2 border-accent pb-2">
             <textarea
               ref={textareaRef}
               data-edit-message-input
@@ -93,12 +93,12 @@ export function MessageEditModal({
               onKeyDown={onKeyDown}
               rows={1}
               placeholder="Edit message"
-              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent font-body text-[16px] leading-7 text-white outline-none placeholder:text-white/45"
+              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent font-body text-[16px] leading-7 text-foreground outline-none placeholder:text-foreground-muted"
               disabled={saving}
             />
             <button
               type="button"
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white/65 transition-colors hover:bg-white/10 hover:text-white"
+              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
               aria-label="Add emoji"
               title="Add emoji"
             >
@@ -108,7 +108,7 @@ export function MessageEditModal({
               type="button"
               onClick={onSave}
               disabled={saving || !input.trim()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25d366] text-[#0b211a] transition-colors hover:bg-[#20bd5b] disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Save edited message"
               title="Save edit"
             >
