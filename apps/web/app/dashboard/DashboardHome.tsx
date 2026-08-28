@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DashboardSingleColumn } from "./ContentLoader";
 import { HomeFeed } from "./HomeFeed";
+import { HomeFeedFilters } from "./HomeFeedFilters";
 import { HomePostComposer } from "./HomePostComposer";
 
 interface DashboardHomeProps {
@@ -21,6 +22,7 @@ export function DashboardHome({ name, avatarUrl, userId }: DashboardHomeProps) {
         avatarUrl={avatarUrl}
         onCreated={() => setRefreshToken((value) => value + 1)}
       />
+      <HomeFeedFilters />
       <HomeFeed currentUserId={userId} refreshToken={refreshToken} />
     </DashboardSingleColumn>
   );
