@@ -15,7 +15,7 @@ export function HomeFeedFilters() {
               <span
                 key={filter}
                 aria-current={filter === "Newest" ? "page" : undefined}
-                className={`px-4 py-2.5 font-body text-sm font-semibold tracking-wide sm:px-6 sm:text-base ${
+                className={`px-4 py-2.5 font-body text-sm font-semibold uppercase tracking-wide sm:px-6 sm:text-base ${
                   index > 0 ? "border-l border-border-strong" : ""
                 } ${filter === "Newest" ? "bg-accent/10 text-accent" : "text-foreground-muted"}`}
               >
