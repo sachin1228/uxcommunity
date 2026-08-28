@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -127,6 +127,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
               <Library size={15} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
+            </div>
+          </li>
+          <li>
+            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+              <Briefcase size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Jobs</span>
             </div>
           </li>
           <li>
