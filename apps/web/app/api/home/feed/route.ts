@@ -9,6 +9,23 @@ const PAGE_SIZE = 30;
 
 export const dynamic = "force-dynamic";
 
+function isHomeThread(item: Json): item is { [key: string]: Json | undefined } {
+  return typeof item === "object"
+    && item !== null
+    && !Array.isArray(item)
+    && item._type === "thread"
+    && item.community_id === null;
+}
+
+function normalizeHomeThread(item: { [key: string]: Json | undefined }): Json {
+  return {
+    ...item,
+    attachments: Array.isArray(item.attachments) ? item.attachments : [],
+    links: Array.isArray(item.links) ? item.links : [],
+    tags: Array.isArray(item.tags) ? item.tags : [],
+  };
+}
+
 // The home feed is read by every user on every dashboard visit. Recomputing it
 // per request runs ~30 × ~6 correlated count subqueries in get_home_feed_page,
 // which is heavy for the free-tier micro compute and the 5GB egress budget.
@@ -25,7 +42,14 @@ const loadFeedPage = unstable_cache(
     );
     if (error) throw error;
 
-    return (data ?? []).map(({ item }) => item);
+    // Keep this boundary defensive while older databases still have the
+    // pre-simplification mixed-content RPC installed. The migration narrows
+    // the SQL query too, but the route must never pass legacy non-thread cards
+    // to the thread-only homepage.
+    return (data ?? [])
+      .map(({ item }) => item)
+      .filter(isHomeThread)
+      .map(normalizeHomeThread);
   },
   ["home-feed"],
   { revalidate: 10 },

@@ -416,8 +416,9 @@ export function ThreadCard({
 
       {/* ── Attachments — LinkedIn-style image grid ── */}
       {(() => {
-        const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
-        const files  = thread.attachments.filter((a) => !a.type.startsWith("image/"));
+        const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
+        const images = attachments.filter((a) => a.type.startsWith("image/"));
+        const files  = attachments.filter((a) => !a.type.startsWith("image/"));
 
         const fileList = files.length > 0 ? (
           <div className="mt-3 space-y-1.5">
