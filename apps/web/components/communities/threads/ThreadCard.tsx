@@ -310,7 +310,7 @@ export function ThreadCard({
           createdAt={thread.updated_at || thread.created_at}
           dateLabel={dateLabel}
           dateInline
-          secondaryLabel={isHomepagePost ? undefined : `Threads · ${category?.label ?? "Post"}`}
+          secondaryLabel={isHomepagePost ? "Public post" : `Threads · ${category?.label ?? "Post"}`}
         />
 
         {/* ··· menu */}
