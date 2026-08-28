@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(16);
+select plan(17);
 
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
@@ -69,7 +69,7 @@ select ok(
 
 insert into public.community_showcase_posts
   (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
-select null, context.user_id, 'public showcase fixture', 'not shown on home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
+select null, context.user_id, 'standalone showcase fixture', 'not shown on home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
 from rpc_test_context as context;
 
 insert into public.community_threads
@@ -81,6 +81,10 @@ insert into public.community_showcase_posts
   (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
 select context.community_id, context.user_id, 'community showcase fixture', 'hidden from home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], false, clock_timestamp()
 from rpc_test_context as context;
+
+update public.community_showcase_posts
+set is_public = true, description = 'shown on home feed'
+where title = 'community showcase fixture';
 
 select is(
   (select count(*)::integer
@@ -97,9 +101,19 @@ select is(
    from rpc_test_context context,
      lateral public.get_home_feed_page(context.user_id, null, 100) feed
    where feed.item->>'_type' = 'showcase'
-     and feed.item->>'title' = 'public showcase fixture'),
+     and feed.item->>'title' = 'standalone showcase fixture'),
   0,
-  'home feed excludes public showcase posts'
+  'home feed excludes standalone showcase posts'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100) feed
+   where feed.item->>'_type' = 'showcase'
+     and feed.item->>'title' = 'community showcase fixture'),
+  1,
+  'home feed includes public community showcase posts'
 );
 
 select is(
