@@ -6,6 +6,7 @@ import {
   Paperclip, X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -131,6 +132,8 @@ interface CreateThreadModalProps {
   communityId?: string;
   onClose: () => void;
   onCreated: (thread: CommunityThread) => void;
+  name?: string;
+  avatarUrl?: string | null;
   initialIsPublic?: boolean;
   publicOnly?: boolean;
 }
@@ -139,6 +142,8 @@ export function CreateThreadModal({
   communityId,
   onClose,
   onCreated,
+  name,
+  avatarUrl,
   initialIsPublic = false,
   publicOnly = false,
 }: CreateThreadModalProps) {
@@ -267,187 +272,251 @@ export function CreateThreadModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl"
+        className={`max-h-[min(820px,calc(100vh-2rem))] w-full overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl ${publicOnly ? "max-w-3xl" : "max-w-2xl"}`}
       >
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
-            Create Thread
-          </h2>
-          <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="px-6 py-5 space-y-4">
-          {/* ── Toolbar (top) ── */}
-          <div className="flex items-center gap-1">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,application/pdf,application/zip,text/plain"
-              className="hidden"
-              onChange={handleFiles}
-            />
-            <button
-              type="button"
-              disabled={uploading || attachments.length >= 5}
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {uploading ? <Spinner size={14} /> : <ImageIcon size={14} />}
-              {uploading ? "Uploading…" : "Photo"}
-            </button>
-          </div>
-
-          {/* ── Main composer textarea ── */}
-          <textarea
-            ref={textareaRef}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="What do you want to talk about?"
-            rows={4}
-            className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-          />
-
-          {/* ── Image previews ── */}
-          <ImageGrid images={images} onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))} />
-
-          {/* ── Non-image file list ── */}
-          {nonImages.length > 0 && (
-            <div className="space-y-1.5">
-              {nonImages.map((att) => (
-                <div key={att.url} className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 font-body text-xs text-foreground-muted">
-                  <Paperclip size={13} />
-                  <span className="min-w-0 flex-1 truncate">{att.name}</span>
-                  <button type="button" onClick={() => setAttachments((c) => c.filter((a) => a.url !== att.url))} aria-label={`Remove ${att.name}`}>
-                    <X size={13} />
-                  </button>
+        {publicOnly ? (
+          <>
+            <div className="flex items-center justify-between border-b border-border px-6 py-5 sm:px-8">
+              <div className="flex items-center gap-3">
+                <AvatarImg url={avatarUrl ?? null} name={name ?? "Designer"} size={44} className="rounded-full" />
+                <div>
+                  <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
+                    {name ?? "Designer"}
+                  </h2>
+                  <div className="mt-0.5 flex items-center gap-1.5 font-body text-xs text-foreground-muted">
+                    <Globe size={12} />
+                    <span>Post to public feed</span>
+                  </div>
                 </div>
-              ))}
+              </div>
+              <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
+                <X size={22} />
+              </button>
             </div>
-          )}
 
-          {/* ── Divider ── */}
-          <div className="border-t border-border" />
+            <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-8">
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="What do you want to talk about?"
+                rows={7}
+                autoFocus
+                className="min-h-48 w-full resize-none overflow-hidden bg-transparent px-1 py-1 font-body text-lg leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle sm:min-h-56 sm:text-xl"
+              />
 
-          {/* ── Category ── */}
-          <fieldset>
-            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
-              What&apos;s this about?
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {THREAD_CATEGORIES.map((item) => {
-                const colors = CATEGORY_COLORS[item.value] ?? CATEGORY_COLORS["discussion"];
-                const active = category === item.value;
-                return (
-                  <button
-                    key={item.value}
-                    type="button"
-                    onClick={() => setCategory(item.value)}
-                    className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-body text-xs font-medium transition-all"
-                    style={{
-                      border: `1px solid ${active ? colors.border : "#303036"}`,
-                      color:  active ? colors.text : "#737373",
-                      background: active ? colors.bg : "transparent",
-                    }}
-                  >
-                    <CategoryIcon category={item.value} size={12} />
-                    {item.label}
-                  </button>
-                );
-              })}
+              <ImageGrid images={images} onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))} />
+
+              <div className="flex items-center gap-2 border-t border-border pt-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFiles}
+                />
+                <button
+                  type="button"
+                  disabled={uploading || attachments.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {uploading ? <Spinner size={16} /> : <ImageIcon size={18} />}
+                  {uploading ? "Uploading…" : "Add image"}
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
+                <p className="font-body text-xs leading-relaxed text-foreground-muted">
+                  This post will be shared to the public feed only — not to any community. To create a resource or event, join a relevant community.
+                </p>
+              </div>
+
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+                <span>
+                  <span className="block font-body text-sm font-medium text-foreground">Allow replies</span>
+                  <span className="block font-body text-xs text-foreground-muted">Other members can reply to this post.</span>
+                </span>
+                <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${allowReplies ? "bg-accent" : "bg-border"}`}>
+                  <input type="checkbox" checked={allowReplies} onChange={(e) => setAllowReplies(e.target.checked)} className="sr-only" />
+                  <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${allowReplies ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
+                </span>
+              </label>
             </div>
-          </fieldset>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between border-b border-border px-6 py-4">
+              <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
+                Create Thread
+              </h2>
+              <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
 
-          {/* ── Tags ── */}
-          <div ref={tagDropdownRef} className="relative">
-            <label className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Tags <span className="font-normal text-foreground-subtle">(up to 3)</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => setTagDropdownOpen((o) => !o)}
-              className={`flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-surface-raised px-3 py-2 text-left transition-colors ${tagDropdownOpen ? "border-accent" : "border-border"}`}
-            >
-              {tags.length === 0 && <span className="font-body text-sm text-foreground-subtle">Select up to 3 tags…</span>}
-              {tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-0.5 font-body text-xs text-accent">
-                  {tag}
-                  <span
-                    role="button" tabIndex={0}
-                    onClick={(e) => { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); } }}
-                    className="cursor-pointer"
-                  >
-                    <X size={10} />
+            <div className="space-y-4 px-6 py-5">
+              <div className="flex items-center gap-1">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*,application/pdf,application/zip,text/plain"
+                  className="hidden"
+                  onChange={handleFiles}
+                />
+                <button
+                  type="button"
+                  disabled={uploading || attachments.length >= 5}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {uploading ? <Spinner size={14} /> : <ImageIcon size={14} />}
+                  {uploading ? "Uploading…" : "Photo"}
+                </button>
+              </div>
+
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                placeholder="What do you want to talk about?"
+                rows={4}
+                className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              />
+
+              <ImageGrid images={images} onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))} />
+
+              {nonImages.length > 0 && (
+                <div className="space-y-1.5">
+                  {nonImages.map((att) => (
+                    <div key={att.url} className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 font-body text-xs text-foreground-muted">
+                      <Paperclip size={13} />
+                      <span className="min-w-0 flex-1 truncate">{att.name}</span>
+                      <button type="button" onClick={() => setAttachments((c) => c.filter((a) => a.url !== att.url))} aria-label={`Remove ${att.name}`}>
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="border-t border-border" />
+
+              <fieldset>
+                <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
+                  What&apos;s this about?
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {THREAD_CATEGORIES.map((item) => {
+                    const colors = CATEGORY_COLORS[item.value] ?? CATEGORY_COLORS["discussion"];
+                    const active = category === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setCategory(item.value)}
+                        className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-body text-xs font-medium transition-all"
+                        style={{
+                          border: `1px solid ${active ? colors.border : "#303036"}`,
+                          color: active ? colors.text : "#737373",
+                          background: active ? colors.bg : "transparent",
+                        }}
+                      >
+                        <CategoryIcon category={item.value} size={12} />
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+
+              <div ref={tagDropdownRef} className="relative">
+                <label className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+                  Tags <span className="font-normal text-foreground-subtle">(up to 3)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setTagDropdownOpen((o) => !o)}
+                  className={`flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-surface-raised px-3 py-2 text-left transition-colors ${tagDropdownOpen ? "border-accent" : "border-border"}`}
+                >
+                  {tags.length === 0 && <span className="font-body text-sm text-foreground-subtle">Select up to 3 tags…</span>}
+                  {tags.map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-0.5 font-body text-xs text-accent">
+                      {tag}
+                      <span
+                        role="button" tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); }}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); } }}
+                        className="cursor-pointer"
+                      >
+                        <X size={10} />
+                      </span>
+                    </span>
+                  ))}
+                  <ChevronDown size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
+                </button>
+                {tagDropdownOpen && (
+                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
+                    {THREAD_TAGS.map((tag) => {
+                      const selected = tags.includes(tag);
+                      const maxed = !selected && tags.length >= 3;
+                      return (
+                        <button
+                          key={tag} type="button" disabled={maxed}
+                          onClick={() => {
+                            if (selected) setTags((c) => c.filter((t) => t !== tag));
+                            else if (tags.length < 3) setTags((c) => [...c, tag]);
+                          }}
+                          className={`flex w-full items-center gap-2.5 px-3 py-2 font-body text-sm transition-colors ${selected ? "bg-accent/10 text-accent" : maxed ? "cursor-not-allowed text-foreground-subtle opacity-40" : "text-foreground hover:bg-surface-raised"}`}
+                        >
+                          <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-accent bg-accent" : "border-border"}`}>
+                            {selected && <Check size={10} className="text-accent-foreground" />}
+                          </span>
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+                <span>
+                  <span className="block font-body text-sm font-medium text-foreground">Allow replies</span>
+                  <span className="block font-body text-xs text-foreground-muted">Other members can reply to this thread.</span>
+                </span>
+                <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${allowReplies ? "bg-accent" : "bg-border"}`}>
+                  <input type="checkbox" checked={allowReplies} onChange={(e) => setAllowReplies(e.target.checked)} className="sr-only" />
+                  <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${allowReplies ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+                <span className="flex items-center gap-2.5">
+                  <Globe size={15} className="shrink-0 text-foreground-muted" />
+                  <span>
+                    <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+                    <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
                   </span>
                 </span>
-              ))}
-              <ChevronDown size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
-            {tagDropdownOpen && (
-              <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
-                {THREAD_TAGS.map((tag) => {
-                  const selected = tags.includes(tag);
-                  const maxed = !selected && tags.length >= 3;
-                  return (
-                    <button
-                      key={tag} type="button" disabled={maxed}
-                      onClick={() => {
-                        if (selected) setTags((c) => c.filter((t) => t !== tag));
-                        else if (tags.length < 3) setTags((c) => [...c, tag]);
-                      }}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2 font-body text-sm transition-colors ${selected ? "bg-accent/10 text-accent" : maxed ? "cursor-not-allowed text-foreground-subtle opacity-40" : "text-foreground hover:bg-surface-raised"}`}
-                    >
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-accent bg-accent" : "border-border"}`}>
-                        {selected && <Check size={10} className="text-accent-foreground" />}
-                      </span>
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+                  <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
+                  <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
+                </span>
+              </label>
+            </div>
+          </>
+        )}
 
-          {/* ── Toggles ── */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span>
-              <span className="block font-body text-sm font-medium text-foreground">Allow replies</span>
-              <span className="block font-body text-xs text-foreground-muted">Other members can reply to this thread.</span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${allowReplies ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={allowReplies} onChange={(e) => setAllowReplies(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${allowReplies ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
-
-          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <Globe size={15} className="shrink-0 text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>}
-        </div>
-
-        {/* ── Error ── */}
         {error && (
-          <div className="mx-6 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
+          <div className="mx-6 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 sm:mx-8">
             <p className="font-body text-sm text-red-400">{error}</p>
           </div>
         )}
 
-        {/* ── Footer ── */}
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <div className="flex justify-end gap-3 border-t border-border px-6 py-4 sm:px-8">
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">
             Cancel
           </button>

@@ -113,6 +113,7 @@ export function ThreadCard({
   const router = useGuardedRouter();
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const isOwner = thread.user_id === currentUserId;
+  const isHomepagePost = isPublicContentScope(communityId);
 
   const latestLikeRef = useRef({ thread, onLikeChanged });
   const initialLikedRef = useRef(thread.user_liked);
@@ -309,7 +310,7 @@ export function ThreadCard({
           createdAt={thread.updated_at || thread.created_at}
           dateLabel={dateLabel}
           dateInline
-          secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
+          secondaryLabel={isHomepagePost ? "Public post" : `Threads · ${category?.label ?? "Post"}`}
         />
 
         {/* ··· menu */}
@@ -416,8 +417,9 @@ export function ThreadCard({
 
       {/* ── Attachments — LinkedIn-style image grid ── */}
       {(() => {
-        const images = thread.attachments.filter((a) => a.type.startsWith("image/"));
-        const files  = thread.attachments.filter((a) => !a.type.startsWith("image/"));
+        const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
+        const images = attachments.filter((a) => a.type.startsWith("image/"));
+        const files  = attachments.filter((a) => !a.type.startsWith("image/"));
 
         const fileList = files.length > 0 ? (
           <div className="mt-3 space-y-1.5">
