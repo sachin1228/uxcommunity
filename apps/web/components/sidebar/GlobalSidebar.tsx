@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Library, MessageSquare, Plus, Users } from "lucide-react";
+import { Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -119,7 +119,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Users size={15} className="shrink-0" />
+              <Compass size={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
             </Link>
           </li>
