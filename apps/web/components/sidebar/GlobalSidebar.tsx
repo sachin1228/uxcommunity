@@ -129,6 +129,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="flex-1 truncate">Library</span>
             </div>
           </li>
+          <li>
+            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+              <Plus size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Start a community</span>
+            </div>
+          </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
             <Link
