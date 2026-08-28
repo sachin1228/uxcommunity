@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare, Plus, Users } from "lucide-react";
+import { Home, Library, MessageSquare, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -122,6 +122,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <Users size={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
             </Link>
+          </li>
+          <li>
+            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+              <Library size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Library</span>
+            </div>
           </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
