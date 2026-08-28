@@ -43,9 +43,11 @@ export function PostAuthorMeta({
             </span>
           )}
         </div>
-        <span className="font-body text-[11px] text-foreground-subtle">
-          {secondaryLabel ?? (!dateInline ? relativeDate : null)}
-        </span>
+        {(secondaryLabel ?? (!dateInline ? relativeDate : null)) && (
+          <span className="font-body text-[11px] text-foreground-subtle">
+            {secondaryLabel ?? relativeDate}
+          </span>
+        )}
       </div>
     </div>
   );
