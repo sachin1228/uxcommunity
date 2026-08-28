@@ -19,7 +19,6 @@ interface CreateResourceModalProps {
   onClose: () => void;
   onCreated: (resource: CommunityResource) => void;
   initialIsPublic?: boolean;
-  publicOnly?: boolean;
 }
 
 function isValidHttpUrl(s: string) {
@@ -34,7 +33,6 @@ export function CreateResourceModal({
   onClose,
   onCreated,
   initialIsPublic = false,
-  publicOnly = false,
 }: CreateResourceModalProps) {
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
@@ -108,9 +106,7 @@ export function CreateResourceModal({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
-        publicOnly ? "/api/home/posts/resources" : `/api/communities/${communityId}/resources`,
-        {
+      const res = await fetch(`/api/communities/${communityId}/resources`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -119,10 +115,9 @@ export function CreateResourceModal({
           description: description.trim(),
           resource_type: resourceType,
           tags,
-           is_public: publicOnly ? true : isPublic,
+          is_public: isPublic,
         }),
-        },
-      );
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create resource.");
       onCreated(data.resource as CommunityResource);
@@ -265,10 +260,10 @@ export function CreateResourceModal({
           </label>
 
           {/* Make public toggle */}
-          {!publicOnly && <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span>
               <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-              <span className="block font-body text-xs text-foreground-muted">This resource will appear on the home feed for all members.</span>
+              <span className="block font-body text-xs text-foreground-muted">Allow members outside this community to view the resource.</span>
             </span>
             <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
               <input
@@ -279,7 +274,7 @@ export function CreateResourceModal({
               />
               <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
             </span>
-          </label>}
+          </label>
 
           {/* Tags */}
           <div className="relative">

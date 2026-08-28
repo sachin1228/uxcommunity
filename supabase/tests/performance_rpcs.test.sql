@@ -69,7 +69,12 @@ select ok(
 
 insert into public.community_showcase_posts
   (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
-select null, context.user_id, 'public showcase fixture', 'shown on home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
+select null, context.user_id, 'public showcase fixture', 'not shown on home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
+from rpc_test_context as context;
+
+insert into public.community_threads
+  (community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at)
+select null, context.user_id, 'public thread fixture', 'shown on home feed', 'question', array['fixture'], '[]'::jsonb, array[]::text[], true, true, clock_timestamp()
 from rpc_test_context as context;
 
 insert into public.community_showcase_posts
@@ -81,10 +86,10 @@ select is(
   (select count(*)::integer
    from rpc_test_context context,
      lateral public.get_home_feed_page(context.user_id, null, 100) feed
-   where feed.item->>'_type' = 'showcase'
-     and feed.item->>'title' = 'public showcase fixture'),
+   where feed.item->>'_type' = 'thread'
+     and feed.item->>'title' = 'public thread fixture'),
   1,
-  'home feed includes public showcase posts'
+  'home feed includes public threads'
 );
 
 select is(
@@ -92,19 +97,19 @@ select is(
    from rpc_test_context context,
      lateral public.get_home_feed_page(context.user_id, null, 100) feed
    where feed.item->>'_type' = 'showcase'
-     and feed.item->>'title' = 'community showcase fixture'),
+     and feed.item->>'title' = 'public showcase fixture'),
   0,
-  'home feed excludes non-public showcase posts'
+  'home feed excludes public showcase posts'
 );
 
 select is(
-  (select feed.item->>'author' is not null
+  (select feed.item->'users'->>'name' is not null
    from rpc_test_context context,
      lateral public.get_home_feed_page(context.user_id, null, 100) feed
-   where feed.item->>'_type' = 'showcase'
+   where feed.item->>'_type' = 'thread'
    limit 1),
   true,
-  'home feed showcase items include author metadata'
+  'home feed thread items include author metadata'
 );
 
 select * from finish();
