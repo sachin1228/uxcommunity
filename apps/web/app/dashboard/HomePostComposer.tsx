@@ -37,7 +37,7 @@ export function HomePostComposer({ name, avatarUrl, onCreated }: HomePostCompose
             type="button"
             onClick={() => setEditorOpen(true)}
             aria-label="Start a public post"
-            className="flex min-h-11 w-full items-center rounded-xl border border-border-strong bg-surface-raised px-4 text-left font-body text-sm text-foreground-muted transition-colors hover:border-accent/50 hover:bg-surface-raised/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            className="flex min-h-11 w-full items-center rounded-xl border border-border bg-surface-raised px-4 text-left font-body text-sm text-foreground-muted transition-colors hover:border-accent/50 hover:bg-surface-raised/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
             <span>What do you want to talk about?</span>
           </button>
