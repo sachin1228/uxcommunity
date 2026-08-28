@@ -9,6 +9,26 @@ const PAGE_SIZE = 30;
 
 export const dynamic = "force-dynamic";
 
+type HomeFeedObject = { [key: string]: Json | undefined };
+
+function isHomeFeedItem(item: Json): item is HomeFeedObject {
+  if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
+  const kind = item._type;
+  return (kind === "thread" || kind === "event" || kind === "resource" || kind === "showcase")
+    && (kind === "thread" || (item.community_id !== null && item.community_id !== undefined));
+}
+
+function normalizeHomeFeedItem(item: HomeFeedObject): Json {
+  return {
+    ...item,
+    ...(item._type === "thread" ? {
+      attachments: Array.isArray(item.attachments) ? item.attachments : [],
+      links: Array.isArray(item.links) ? item.links : [],
+      tags: Array.isArray(item.tags) ? item.tags : [],
+    } : {}),
+  };
+}
+
 // The home feed is read by every user on every dashboard visit. Recomputing it
 // per request runs ~30 × ~6 correlated count subqueries in get_home_feed_page,
 // which is heavy for the free-tier micro compute and the 5GB egress budget.
@@ -25,9 +45,17 @@ const loadFeedPage = unstable_cache(
     );
     if (error) throw error;
 
-    const items = (data ?? []).map(({ item }) => item);
+    // Keep this boundary defensive while older databases still have the
+    // pre-simplification mixed-content RPC installed. Community-public cards
+    // remain part of the homepage, while old standalone event/resource/
+    // showcase records are intentionally left out.
+    const items = (data ?? [])
+      .map(({ item }) => item)
+      .filter(isHomeFeedItem)
+      .map(normalizeHomeFeedItem);
     const eventIds = items.flatMap((item) =>
-      typeof item === "object" && item !== null && !Array.isArray(item) && item._type === "event" && typeof item.id === "string"
+      typeof item === "object" && item !== null && !Array.isArray(item)
+        && item._type === "event" && typeof item.id === "string"
         ? [item.id]
         : [],
     );
@@ -41,7 +69,8 @@ const loadFeedPage = unstable_cache(
     const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
 
     return items.map((item) =>
-      typeof item === "object" && item !== null && !Array.isArray(item) && item._type === "event" && typeof item.id === "string"
+      typeof item === "object" && item !== null && !Array.isArray(item)
+        && item._type === "event" && typeof item.id === "string"
         ? { ...item, rsvps: previewMap.get(item.id) ?? [] }
         : item,
     );

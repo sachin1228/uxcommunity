@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { isPublicContentScope } from "@/lib/content-scope";
 import {
   CornerDownRight,
   Send,
@@ -209,7 +208,6 @@ export function ShowcaseDetailClient({
   backLabel?: string;
 }) {
   const router = useGuardedRouter();
-  const publicScope = isPublicContentScope(communityId);
   const [post, setPost] = useState(initialPost);
   const [comments, setComments] = useState(initialComments);
   const [editing, setEditing] = useState(false);
@@ -252,7 +250,7 @@ export function ShowcaseDetailClient({
       { method: "DELETE" },
     );
     if (response.ok)
-      router.push(backHref ?? (publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`));
+      router.push(backHref ?? `/dashboard/communities/${communityId}?tab=showcase`);
   }
   function posted(comment: ShowcaseComment) {
     if (comment.parent_id)
@@ -292,8 +290,8 @@ export function ShowcaseDetailClient({
         className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}
       >
         <BackLink
-          href={backHref ?? (publicScope ? "/dashboard" : `/dashboard/communities/${communityId}?tab=showcase`)}
-          label={backLabel ?? (publicScope ? "Home" : "Showcase")}
+          href={backHref ?? `/dashboard/communities/${communityId}?tab=showcase`}
+          label={backLabel ?? "Showcase"}
           className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
         />
         <ShowcaseCard
@@ -351,8 +349,7 @@ export function ShowcaseDetailClient({
       </div>
       {editing && (
         <CreateShowcaseModal
-          communityId={publicScope ? "public" : communityId}
-          publicOnly={publicScope}
+          communityId={communityId}
           initialIsPublic={post.is_public}
           post={post}
           onClose={() => setEditing(false)}
