@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Library, MessageSquare, Plus, Users } from "lucide-react";
+import { Home, MessageSquare, Plus, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -125,7 +125,21 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           </li>
           <li>
             <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
-              <Library size={15} className="shrink-0" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="15"
+                height="15"
+                viewBox="0 0 20 20"
+                data-icon-shape="non-circular"
+                focusable="false"
+                aria-hidden="true"
+                className="shrink-0"
+              >
+                <path
+                  fill="currentColor"
+                  d="M3 3h6v14H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 0h6a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6V3Zm-1 1v14H3v-2h6V4Z"
+                />
+              </svg>
               <span className="flex-1 truncate">Library</span>
             </div>
           </li>
