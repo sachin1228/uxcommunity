@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Check, Lock, ChevronRight } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { CommunityIcon } from "@/components/communities/CommunityIcon";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -18,18 +18,11 @@ type Community = CachedExploreCommunity;
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
-const LOCK_REASON: Record<string, string> = {
-  sector:           "Update your industry in your profile to join",
-  city:             "Update your city in your profile to join",
-  experience_level: "Update your experience level in your profile to join",
-};
+const LOCK_REASON: Record<string, string> = {};
 
 const TABS = [
   { label: "All",        value: "all"              },
-  { label: "Industry",   value: "sector"            },
   { label: "Interest",   value: "interest"          },
-  { label: "Experience", value: "experience_level"  },
-  { label: "City",       value: "city"              },
   { label: "Member-led", value: "user"              },
 ] as const;
 
@@ -247,8 +240,11 @@ export default function CommunitiesIndexPage() {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
+  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level"]);
+
   const filtered = communities.filter((c) => {
     if (c.joined) return false;
+    if (HIDDEN_TYPES.has(c.type)) return false;
     const matchesTab    = activeTab === "all" || c.type === activeTab;
     const matchesSearch = c.name.toLowerCase().includes(search.trim().toLowerCase());
     return matchesTab && matchesSearch;
@@ -287,7 +283,7 @@ export default function CommunitiesIndexPage() {
         </div>
 
         {/* Pill filters */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex items-center gap-2 pb-1">
           {TABS.map((tab) => {
             const isActive = activeTab === tab.value;
             return (
@@ -303,10 +299,7 @@ export default function CommunitiesIndexPage() {
                 {tab.label}
               </button>
             );
-          })}
-          <div className="shrink-0 text-foreground-muted">
-            <ChevronRight size={16} />
-          </div>
+          }          )}
         </div>
       </div>
 
