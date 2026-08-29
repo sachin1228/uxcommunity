@@ -7,7 +7,7 @@ const colors = {
   light: {
     // Legacy alias
     text: '#0A0A0A',
-    tint: '#0070F3',
+    tint: '#0A0A0A',
 
     // Core surfaces
     background: '#FAFAFA',
@@ -18,10 +18,10 @@ const colors = {
     cardForeground: '#0A0A0A',
 
     // Primary action color — buttons, links, active states
-    primary: '#0070F3',
+    primary: '#0A0A0A',
     primaryForeground: '#FFFFFF',
-    primaryHover: '#0060D1',
-    primarySoft: '#f0f8ff',
+    primaryHover: '#333333',
+    primarySoft: '#EBEBEB',
 
     // Secondary / less-emphasis surfaces
     secondary: '#F5F5F5',
@@ -33,9 +33,9 @@ const colors = {
     foregroundSoft: '#8a8a8a',
 
     // Accent (same as primary in light mode)
-    accent: '#0070F3',
+    accent: '#0A0A0A',
     accentForeground: '#FFFFFF',
-    accentSoft: '#f0f8ff',
+    accentSoft: '#EBEBEB',
 
     // Destructive / error states
     destructive: '#ef4444',
@@ -56,7 +56,7 @@ const colors = {
 
   dark: {
     text: '#EDEDED',
-    tint: '#52a8ff',
+    tint: '#FFFFFF',
 
     background: '#09090B',
     foreground: '#EDEDED',
@@ -64,10 +64,10 @@ const colors = {
     card: '#121214',
     cardForeground: '#EDEDED',
 
-    primary: '#0070F3',
-    primaryForeground: '#FFFFFF',
-    primaryHover: '#0060D1',
-    primarySoft: '#18243D',
+    primary: '#FFFFFF',
+    primaryForeground: '#000000',
+    primaryHover: '#CCCCCC',
+    primarySoft: '#1F1F23',
 
     secondary: '#1A1A1E',
     secondaryForeground: '#EDEDED',
@@ -76,9 +76,9 @@ const colors = {
     mutedForeground: '#525252',
     foregroundSoft: '#888888',
 
-    accent: '#0070F3',
-    accentForeground: '#FFFFFF',
-    accentSoft: '#18243D',
+    accent: '#FFFFFF',
+    accentForeground: '#000000',
+    accentSoft: '#1F1F23',
 
     destructive: '#ef4444',
     destructiveForeground: '#FFFFFF',
