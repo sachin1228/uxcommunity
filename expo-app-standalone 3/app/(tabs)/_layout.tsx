@@ -144,6 +144,12 @@ function ClassicTabLayout() {
             ),
         }}
       />
+      <Tabs.Screen
+        name="explore"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
