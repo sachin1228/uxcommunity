@@ -320,6 +320,16 @@ export default function CommunityChat() {
             {communityName}
           </Text>
         </View>
+
+        <View style={styles.headerActions}>
+          <Pressable style={[styles.startPostBtn, { backgroundColor: colors.primary }]}>
+            <Feather name="plus" size={14} color="#fff" />
+            <Text style={styles.startPostBtnText}>Start a post</Text>
+          </Pressable>
+          <Pressable style={styles.headerMenuBtn}>
+            <Feather name="more-horizontal" size={20} color={colors.foreground} />
+          </Pressable>
+        </View>
       </View>
 
       <View style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}>
@@ -452,6 +462,32 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: 'Geist_600SemiBold',
     flexShrink: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  startPostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  startPostBtnText: {
+    color: '#fff',
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 12,
+  },
+  headerMenuBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
   },
   center: {
     flex: 1,
