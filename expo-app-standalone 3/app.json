@@ -4,7 +4,7 @@
     "slug": "uxcommunity",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-square.png",
     "scheme": "uxcommunity",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -25,7 +25,7 @@
       "package": "in.uxcommunity.app",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "foregroundImage": "./assets/images/icon-circle.png",
         "backgroundColor": "#09090B"
       }
     },
