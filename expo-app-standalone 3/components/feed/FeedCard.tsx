@@ -38,10 +38,6 @@ function formatEventDateTime(iso: string): string {
   return `${date} \u2022 ${time}`;
 }
 
-function getDomain(url: string): string {
-  try { return new URL(url).hostname.replace('www.', ''); } catch { return url; }
-}
-
 const CATEGORY_LABELS: Record<string, string> = {
   question: 'Question', discussion: 'Discussion', idea: 'Idea',
   feedback: 'Feedback', referral: 'Referral', collaboration: 'Collaboration',
@@ -458,11 +454,6 @@ function ResourceCard({ item }: { item: FeedResource }) {
         ) : ogImage ? (
           <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" />
         ) : null}
-
-        <View style={[styles.domainPill, { borderColor: colors.border }]}>
-          <Feather name="external-link" size={11} color={colors.mutedForeground} />
-          <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>{getDomain(item.url)}</Text>
-        </View>
       </View>
 
       <View style={styles.footer}>
@@ -626,8 +617,6 @@ const styles = StyleSheet.create({
   // Resource
   resourceTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 14, lineHeight: 20 },
   ogImage: { width: '100%', height: 200, borderRadius: 10, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
-  domainPill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
-  domainText: { fontFamily: 'Geist_400Regular', fontSize: 12 },
 
   // Showcase
   showcaseTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 22 },
