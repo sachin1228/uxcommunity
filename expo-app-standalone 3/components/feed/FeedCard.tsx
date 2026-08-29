@@ -169,13 +169,18 @@ function PostAuthorMeta({
 // CommunityPostLabel
 // ---------------------------------------------------------------------------
 
-function CommunityPostLabel({ name }: { name: string | null }) {
+function CommunityPostLabel({ name, image }: { name: string | null; image?: string | null }) {
   const colors = useColors();
   if (!name) return null;
+  const imgUri = resolveProfilePictureUri(image);
   return (
     <View style={labelStyles.row}>
       <Text style={[labelStyles.text, { color: colors.foregroundSoft }]}>posted in </Text>
-      <View style={[labelStyles.dot, { backgroundColor: colors.primary + '30' }]} />
+      {imgUri ? (
+        <Image source={{ uri: imgUri }} style={labelStyles.communityAvatar} />
+      ) : (
+        <View style={[labelStyles.dot, { backgroundColor: colors.primary + '30' }]} />
+      )}
       <Text style={[labelStyles.name, { color: colors.mutedForeground }]} numberOfLines={1}>{name}</Text>
     </View>
   );
@@ -257,7 +262,7 @@ function ThreadCard({ item }: { item: FeedThread }) {
             <Text style={[styles.statCount, { color: colors.foreground }]}>{item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}</Text>
           </View>
         </View>
-        <CommunityPostLabel name={item.community_name} />
+        <CommunityPostLabel name={item.community_name} image={item.community_image} />
       </View>
 
       <OptionsMenu visible={menuVisible} onClose={() => setMenuVisible(false)} items={[
@@ -371,7 +376,7 @@ function EventCard({ item }: { item: FeedEvent }) {
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.like_count}</Text>
           </Pressable>
         </View>
-        <CommunityPostLabel name={item.community_name} />
+        <CommunityPostLabel name={item.community_name} image={item.community_image} />
       </View>
 
       <OptionsMenu visible={menuVisible} onClose={() => setMenuVisible(false)} items={[
@@ -467,7 +472,7 @@ function ResourceCard({ item }: { item: FeedResource }) {
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.save_count}</Text>
           </Pressable>
         </View>
-        <CommunityPostLabel name={item.community_name} />
+        <CommunityPostLabel name={item.community_name} image={item.community_image} />
       </View>
 
       <OptionsMenu visible={menuVisible} onClose={() => setMenuVisible(false)} items={[
@@ -547,7 +552,7 @@ function ShowcaseCard({ item }: { item: FeedShowcase }) {
             <Feather name="external-link" size={14} color={colors.primary} />
           </View>
         ) : (
-          <CommunityPostLabel name={item.community_name} />
+          <CommunityPostLabel name={item.community_name} image={item.community_image} />
         )}
       </View>
 
@@ -648,5 +653,6 @@ const labelStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   text: { fontFamily: 'Geist_400Regular', fontSize: 11 },
   dot: { width: 14, height: 14, borderRadius: 7, marginHorizontal: 3 },
+  communityAvatar: { width: 14, height: 14, borderRadius: 7, marginHorizontal: 3 },
   name: { fontFamily: 'Geist_500Medium', fontSize: 11, maxWidth: 120 },
 });
