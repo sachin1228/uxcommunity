@@ -149,7 +149,7 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
             {
               backgroundColor: canSend
                 ? pressed ? colors.primaryHover : colors.primary
-                : colors.subtle,
+                : colors.mutedForeground + '20',
             },
           ]}
         >
