@@ -208,6 +208,12 @@ function ThreadCard({ item }: { item: FeedThread }) {
     try { await reportFeedItem(item); Alert.alert('Reported', 'Thanks for your report.'); } catch { /* ignore */ }
   }, [item]);
 
+  const handleLike = useCallback(async () => {
+    try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
+  }, [item, refetch]);
+
+  const threadImages = (item.attachments ?? []).filter(a => a.type.startsWith('image/'));
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <PostAuthorMeta
@@ -225,14 +231,26 @@ function ThreadCard({ item }: { item: FeedThread }) {
         {item.description ? (
           <Text style={[styles.threadDesc, { color: colors.mutedForeground }]} numberOfLines={3}>{item.description}</Text>
         ) : null}
+
+        {threadImages.length > 0 ? (
+          <View style={threadImages.length === 1 ? styles.threadImgSingle : styles.threadImgGrid}>
+            {threadImages.slice(0, 4).map((img, i) => (
+              <Image key={img.url} source={{ uri: img.url }} style={
+                threadImages.length === 1
+                  ? styles.threadImgFull
+                  : [styles.threadImgHalf, i >= 2 && { marginTop: 2 }]
+              } resizeMode="cover" />
+            ))}
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
-          <View style={styles.stat}>
+          <Pressable style={styles.stat} onPress={handleLike}>
             {item.user_liked ? <AntDesign name="heart" size={20} color="#ef4444" /> : <Feather name="heart" size={20} color={colors.foreground} />}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.like_count}</Text>
-          </View>
+          </Pressable>
           <View style={styles.stat}>
             <Feather name="message-circle" size={20} color={colors.foreground} />
             <Text style={[styles.statCount, { color: colors.foreground }]}>{item.comment_count} {item.comment_count === 1 ? 'comment' : 'comments'}</Text>
@@ -281,6 +299,10 @@ function EventCard({ item }: { item: FeedEvent }) {
   const handleReport = useCallback(async () => {
     try { await reportFeedItem(item); Alert.alert('Reported', 'Thanks for your report.'); } catch { /* ignore */ }
   }, [item]);
+
+  const handleLike = useCallback(async () => {
+    try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
+  }, [item, refetch]);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -343,10 +365,10 @@ function EventCard({ item }: { item: FeedEvent }) {
 
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
         <View style={styles.footerLeft}>
-          <View style={styles.stat}>
+          <Pressable style={styles.stat} onPress={handleLike}>
             {item.user_liked ? <AntDesign name="heart" size={20} color="#ef4444" /> : <Feather name="heart" size={20} color={colors.foreground} />}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.like_count}</Text>
-          </View>
+          </Pressable>
         </View>
         <CommunityPostLabel name={item.community_name} />
       </View>
@@ -397,6 +419,10 @@ function ResourceCard({ item }: { item: FeedResource }) {
     try { await reportFeedItem(item); Alert.alert('Reported', 'Thanks for your report.'); } catch { /* ignore */ }
   }, [item]);
 
+  const handleLike = useCallback(async () => {
+    try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
+  }, [item, refetch]);
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <PostAuthorMeta
@@ -420,10 +446,10 @@ function ResourceCard({ item }: { item: FeedResource }) {
 
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
-          <View style={styles.stat}>
+          <Pressable style={styles.stat} onPress={handleLike}>
             {item.user_liked ? <AntDesign name="heart" size={20} color="#ef4444" /> : <Feather name="heart" size={20} color={colors.foreground} />}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.save_count}</Text>
-          </View>
+          </Pressable>
         </View>
         <CommunityPostLabel name={item.community_name} />
       </View>
@@ -466,6 +492,10 @@ function ShowcaseCard({ item }: { item: FeedShowcase }) {
     try { await reportFeedItem(item); Alert.alert('Reported', 'Thanks for your report.'); } catch { /* ignore */ }
   }, [item]);
 
+  const handleLike = useCallback(async () => {
+    try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
+  }, [item, refetch]);
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <PostAuthorMeta
@@ -486,10 +516,10 @@ function ShowcaseCard({ item }: { item: FeedShowcase }) {
 
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
-          <View style={styles.stat}>
+          <Pressable style={styles.stat} onPress={handleLike}>
             {item.user_liked ? <AntDesign name="heart" size={20} color="#ef4444" /> : <Feather name="heart" size={20} color={colors.foreground} />}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>{item.like_count}</Text>
-          </View>
+          </Pressable>
           <View style={styles.stat}>
             <Feather name="message-circle" size={20} color={colors.foreground} />
             <Text style={[styles.statCount, { color: colors.foreground }]}>{item.comment_count}</Text>
@@ -547,6 +577,10 @@ const styles = StyleSheet.create({
   // Thread
   threadTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 14, lineHeight: 20 },
   threadDesc: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 18, marginTop: 2 },
+  threadImgSingle: { marginTop: 8, borderRadius: 10, overflow: 'hidden' },
+  threadImgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 8, borderRadius: 10, overflow: 'hidden' },
+  threadImgFull: { width: '100%', height: 240 },
+  threadImgHalf: { width: '49.8%', height: 160 },
 
   // Event
   eventBody: { flexDirection: 'row', marginHorizontal: 20, marginTop: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden', minHeight: 140 },
