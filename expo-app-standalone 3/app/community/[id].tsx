@@ -290,8 +290,8 @@ export default function CommunityChat() {
           },
         ]}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+        <Pressable onPress={() => router.back()} hitSlop={8} style={[styles.headerIconBtn, { backgroundColor: colors.mutedForeground + '20' }]}>
+          <Feather name="arrow-left" size={20} color={colors.foreground} />
         </Pressable>
 
         <View style={styles.headerCenter}>
@@ -318,11 +318,11 @@ export default function CommunityChat() {
         </View>
 
         <View style={styles.headerActions}>
-          <Pressable style={styles.headerIconBtn}>
-            <Feather name="search" size={20} color={colors.foreground} />
+          <Pressable style={[styles.headerIconBtn, { backgroundColor: colors.mutedForeground + '20' }]}>
+            <Feather name="search" size={18} color={colors.foreground} />
           </Pressable>
-          <Pressable style={styles.headerIconBtn}>
-            <Feather name="more-horizontal" size={20} color={colors.foreground} />
+          <Pressable style={[styles.headerIconBtn, { backgroundColor: colors.mutedForeground + '20' }]}>
+            <Feather name="more-horizontal" size={18} color={colors.foreground} />
           </Pressable>
         </View>
       </View>
@@ -465,11 +465,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   headerIconBtn: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
+    borderRadius: 99,
   },
   postBanner: {
     flexDirection: 'row',
