@@ -133,13 +133,6 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Explore',
-          tabBarButton: () => null,
-        }}
-      />
-      <Tabs.Screen
         name="jobs"
         options={{
           title: 'Jobs',
