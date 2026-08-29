@@ -23,6 +23,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: 'list.bullet', selected: 'list.bullet.indent' }} />
         <Label>Feed</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="library">
+        <Icon sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }} />
+        <Label>Library</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="explore">
         <Icon sf={{ default: 'safari', selected: 'safari.fill' }} />
         <Label>Explore</Label>
@@ -100,6 +104,18 @@ function ClassicTabLayout() {
               <SymbolView name="list.bullet" tintColor={color} size={28} />
             ) : (
               <FeedIcon size={26} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="library"
+        options={{
+          title: 'Library',
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="books.vertical" tintColor={color} size={28} />
+            ) : (
+              <Feather name="book-open" size={26} color={color} />
             ),
         }}
       />
