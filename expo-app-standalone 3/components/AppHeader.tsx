@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
@@ -11,6 +12,7 @@ export function AppHeader() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const router = useRouter();
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
   const initials = user?.name
@@ -42,6 +44,7 @@ export function AppHeader() {
           accessibilityLabel="Explore"
           accessibilityRole="button"
           hitSlop={8}
+          onPress={() => router.push('/(tabs)/explore')}
           style={({ pressed }) => [
             styles.iconButton,
             { backgroundColor: pressed ? colors.background : 'transparent' },
