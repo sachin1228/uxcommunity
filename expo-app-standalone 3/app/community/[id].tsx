@@ -322,7 +322,7 @@ export default function CommunityChat() {
         </View>
 
         <View style={styles.headerActions}>
-          <Pressable style={[styles.startPostBtn, { backgroundColor: colors.primary }]}>
+          <Pressable style={styles.startPostBtn}>
             <Feather name="plus" size={14} color="#fff" />
             <Text style={styles.startPostBtnText}>Start a post</Text>
           </Pressable>
@@ -476,6 +476,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    backgroundColor: '#3b82f6',
   },
   startPostBtnText: {
     color: '#fff',
