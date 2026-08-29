@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AntDesign, Feather } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
 import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +9,8 @@ import { getLinkPreviewImage } from '@/lib/communityContent';
 import { toggleFeedLike, toggleFeedSave, deleteFeedItem, reportFeedItem, parseFigmaUrl, getFigmaEmbedUrl } from '@/lib/feed';
 import { useFeed } from '@/hooks/useFeed';
 import type { FeedItem, FeedThread, FeedEvent, FeedResource, FeedShowcase } from '@/lib/feed';
+
+const LazyWebView = React.lazy(() => import('react-native-webview').then(m => ({ default: m.WebView })));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -452,21 +453,28 @@ function ResourceCard({ item }: { item: FeedResource }) {
         {isFigmaPrototype && figmaEmbedUrl ? (
           <View style={[styles.figmaEmbed, { borderColor: colors.border }]}>
             <View style={styles.figmaWebviewWrap}>
-              <WebView
-                source={{ uri: figmaEmbedUrl }}
-                style={styles.figmaWebview}
-                javaScriptEnabled
-                scrollEnabled={false}
-                showsHorizontalScrollIndicator={false}
-                showsVerticalScrollIndicator={false}
-                startInLoadingState
-                renderLoading={() => (
-                  <View style={styles.figmaLoading}>
-                    <ActivityIndicator size="small" color={colors.mutedForeground} />
-                    <Text style={[styles.figmaLoadingText, { color: colors.mutedForeground }]}>Loading prototype…</Text>
-                  </View>
-                )}
-              />
+              <Suspense fallback={
+                <View style={styles.figmaLoading}>
+                  <ActivityIndicator size="small" color={colors.mutedForeground} />
+                  <Text style={[styles.figmaLoadingText, { color: colors.mutedForeground }]}>Loading prototype…</Text>
+                </View>
+              }>
+                <LazyWebView
+                  source={{ uri: figmaEmbedUrl }}
+                  style={styles.figmaWebview}
+                  javaScriptEnabled
+                  scrollEnabled={false}
+                  showsHorizontalScrollIndicator={false}
+                  showsVerticalScrollIndicator={false}
+                  startInLoadingState
+                  renderLoading={() => (
+                    <View style={styles.figmaLoading}>
+                      <ActivityIndicator size="small" color={colors.mutedForeground} />
+                      <Text style={[styles.figmaLoadingText, { color: colors.mutedForeground }]}>Loading prototype…</Text>
+                    </View>
+                  )}
+                />
+              </Suspense>
             </View>
             <View style={[styles.figmaFooter, { borderTopColor: colors.border }]}>
               <Text style={[styles.figmaFooterLabel, { color: colors.mutedForeground }]}>Interactive prototype</Text>
