@@ -291,45 +291,54 @@ export default function CommunityChat() {
         ]}
       >
         <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backBtn}>
-          <Feather name="arrow-left" size={26} color={colors.foreground} />
+          <Feather name="arrow-left" size={22} color={colors.foreground} />
         </Pressable>
 
         <View style={styles.headerCenter}>
           {communityImage ? (
             <Image
               source={{ uri: communityImage }}
-              style={[styles.headerAvatar, { borderColor: colors.border }]}
+              style={styles.headerAvatar}
             />
           ) : (
-            <View
-              style={[
-                styles.headerAvatar,
-                styles.headerAvatarFallback,
-                { backgroundColor: colors.primarySoft },
-              ]}
-            >
+            <View style={[styles.headerAvatar, styles.headerAvatarFallback, { backgroundColor: colors.primarySoft }]}>
               <Text style={[styles.headerAvatarText, { color: colors.primary }]}>
                 {communityName.slice(0, 1).toUpperCase()}
               </Text>
             </View>
           )}
-          <Text
-            style={[styles.headerTitle, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
-            {communityName}
-          </Text>
+          <View style={styles.headerTextCol}>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {communityName}
+            </Text>
+            <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+              Public Community
+            </Text>
+          </View>
         </View>
 
         <View style={styles.headerActions}>
-          <Pressable style={styles.startPostBtn}>
-            <Feather name="plus" size={14} color="#fff" />
-            <Text style={styles.startPostBtnText}>Start a post</Text>
+          <Pressable style={styles.headerIconBtn}>
+            <Feather name="search" size={20} color={colors.foreground} />
           </Pressable>
-          <Pressable style={styles.headerMenuBtn}>
+          <Pressable style={styles.headerIconBtn}>
             <Feather name="more-horizontal" size={20} color={colors.foreground} />
           </Pressable>
         </View>
+      </View>
+
+      {/* Start a post banner */}
+      <View style={[styles.postBanner, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={styles.postBannerLeft}>
+          <Feather name="star" size={16} color="#a78bfa" />
+          <Text style={[styles.postBannerText, { color: colors.mutedForeground }]}>
+            Share your thoughts, ask questions,{'\n'}or showcase your work to the community.
+          </Text>
+        </View>
+        <Pressable style={styles.startPostBtn}>
+          <Feather name="plus" size={14} color="#fff" />
+          <Text style={styles.startPostBtnText}>Start a post</Text>
+        </Pressable>
       </View>
 
       <View style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}>
@@ -405,7 +414,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingBottom: 12,
+    paddingBottom: 10,
     gap: 8,
   },
   backBtn: {
@@ -419,9 +428,83 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    gap: 8,
+    gap: 10,
     minWidth: 0,
+  },
+  headerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    flexShrink: 0,
+  },
+  headerAvatarFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: {
+    fontSize: 16,
+    fontFamily: 'Geist_600SemiBold',
+  },
+  headerTextCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontFamily: 'Geist_700Bold',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Geist_400Regular',
+    marginTop: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    flexShrink: 0,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  },
+  postBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  postBannerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  postBannerText: {
+    fontSize: 12,
+    fontFamily: 'Geist_400Regular',
+    lineHeight: 16,
+    flex: 1,
+  },
+  startPostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#3b82f6',
+    flexShrink: 0,
+  },
+  startPostBtnText: {
+    color: '#fff',
+    fontFamily: 'Geist_600SemiBold',
+    fontSize: 12,
   },
   tabsShell: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -442,53 +525,6 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontFamily: 'Geist_600SemiBold',
-  },
-  headerAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexShrink: 0,
-  },
-  headerAvatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerAvatarText: {
-    fontSize: 12,
-    fontFamily: 'Geist_600SemiBold',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontFamily: 'Geist_600SemiBold',
-    flexShrink: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-  },
-  startPostBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#3b82f6',
-  },
-  startPostBtnText: {
-    color: '#fff',
-    fontFamily: 'Geist_600SemiBold',
-    fontSize: 12,
-  },
-  headerMenuBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
   },
   center: {
     flex: 1,
