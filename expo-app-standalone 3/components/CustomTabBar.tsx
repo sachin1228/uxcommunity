@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { FeedIcon } from '@/components/icons/FeedIcon';
 
 interface Tab {
   key: string;
@@ -75,8 +74,8 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
 
           return (
             <Pressable key={tab.key} onPress={onPress} style={styles.tab}>
-              {isFocused && <View style={[styles.indicator, { backgroundColor: colors.foreground }]} />}
               <View style={styles.tabContent}>
+                {isFocused && <View style={[styles.indicator, { backgroundColor: colors.foreground }]} />}
                 {tab.icon(color)}
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {tab.label}
@@ -101,20 +100,23 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    paddingTop: 0,
   },
   tab: {
     flex: 1,
-  },
-  indicator: {
-    height: 2,
-    width: '100%',
   },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
     gap: 2,
-    paddingVertical: 6,
+    paddingVertical: 8,
+  },
+  indicator: {
+    position: 'absolute',
+    top: 0,
+    left: '20%',
+    right: '20%',
+    height: 2,
+    borderRadius: 1,
   },
   label: {
     fontSize: 10,
