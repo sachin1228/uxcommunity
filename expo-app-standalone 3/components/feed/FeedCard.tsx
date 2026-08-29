@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { getLinkPreviewImage } from '@/lib/communityContent';
 import type { FeedItem, FeedThread, FeedEvent, FeedResource, FeedShowcase } from '@/lib/feed';
 
 // ---------------------------------------------------------------------------
@@ -294,6 +295,15 @@ function EventCard({ item }: { item: FeedEvent }) {
 function ResourceCard({ item }: { item: FeedResource }) {
   const colors = useColors();
   const typeLabel = RESOURCE_TYPE_LABELS[item.resource_type] ?? item.resource_type;
+  const [ogImage, setOgImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLinkPreviewImage(item.url).then((img) => {
+      if (!cancelled) setOgImage(img);
+    });
+    return () => { cancelled = true; };
+  }, [item.url]);
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -307,6 +317,11 @@ function ResourceCard({ item }: { item: FeedResource }) {
         <Text style={[styles.resourceTitle, { color: colors.foreground }]} numberOfLines={3}>
           {item.description || item.title}
         </Text>
+
+        {/* OG image preview */}
+        {ogImage ? (
+          <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" />
+        ) : null}
 
         {/* Domain pill */}
         <View style={[styles.domainPill, { borderColor: colors.border }]}>
@@ -552,6 +567,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
     lineHeight: 20,
+  },
+  ogImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 10,
+    marginTop: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   domainPill: {
     flexDirection: 'row',

@@ -8,6 +8,7 @@ import { Tabs } from 'expo-router';
 import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
 import { SymbolView } from 'expo-symbols';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FeedIcon } from '@/components/icons/FeedIcon';
 
 // iOS 26+ uses NativeTabs with liquid glass. Older iOS / Android / web fall back
 // to the classic Tabs with a blurred tab bar.
@@ -98,7 +99,7 @@ function ClassicTabLayout() {
             isIOS ? (
               <SymbolView name="list.bullet" tintColor={color} size={28} />
             ) : (
-              <Feather name="list" size={26} color={color} />
+              <FeedIcon size={26} color={color} />
             ),
         }}
       />
