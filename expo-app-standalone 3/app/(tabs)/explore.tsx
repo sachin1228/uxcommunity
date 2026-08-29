@@ -164,27 +164,33 @@ export default function ExploreTab() {
 
       {/* Tabs */}
       <View style={styles.tabRow}>
-        {TABS.map((tab) => (
-          <Pressable
-            key={tab.value}
-            style={[
-              styles.tab,
-              { borderColor: 'transparent' },
-              activeTab === tab.value && { borderColor: colors.primary, backgroundColor: colors.primary + '15' },
-            ]}
-            onPress={() => setActiveTab(tab.value)}
-          >
-            <Text
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.value;
+          return (
+            <Pressable
+              key={tab.value}
               style={[
-                styles.tabText,
-                { color: colors.mutedForeground },
-                activeTab === tab.value && { color: colors.primary, fontFamily: 'Geist_600SemiBold' },
+                styles.tab,
+                {
+                  borderColor: isActive ? colors.foreground : colors.border,
+                  backgroundColor: isActive ? colors.foreground : 'transparent',
+                },
               ]}
+              onPress={() => setActiveTab(tab.value)}
             >
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
+              <Text
+                style={[
+                  styles.tabText,
+                  {
+                    color: isActive ? colors.background : colors.mutedForeground,
+                  },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Error */}
@@ -288,12 +294,12 @@ const styles = StyleSheet.create({
   // Tabs
   tabRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 99,
+    borderWidth: 1,
   },
-  tabText: { fontFamily: 'Geist_500Medium', fontSize: 13 },
+  tabText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
 
   // Sections
   sectionTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 14, marginTop: 20, marginBottom: 8 },
