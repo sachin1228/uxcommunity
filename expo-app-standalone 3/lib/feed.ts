@@ -82,3 +82,55 @@ export async function getHomeFeed(before?: string): Promise<FeedResponse> {
   const { data } = await apiFetch<FeedResponse>(`/api/home/feed${query}`);
   return data;
 }
+
+// ---------------------------------------------------------------------------
+// Feed action helpers — same endpoints as the web app
+// ---------------------------------------------------------------------------
+
+type FeedContentType = 'threads' | 'events' | 'resources' | 'showcase';
+
+function communityPath(item: FeedItem): string | null {
+  if (!item.community_id) return null;
+  return `/api/communities/${item.community_id}`;
+}
+
+function contentPath(item: FeedItem): string | null {
+  const base = communityPath(item);
+  if (!base) return null;
+  const kind: FeedContentType =
+    item._type === 'showcase' ? 'showcase' : `${item._type}s`;
+  return `${base}/${kind}/${item.id}`;
+}
+
+export async function toggleFeedLike(item: FeedItem): Promise<{ liked: boolean; like_count: number }> {
+  const path = contentPath(item);
+  if (!path) throw new Error('Cannot like items without a community');
+  const { data } = await apiFetch<{ liked: boolean; like_count: number }>(
+    `${path}/like`,
+    { method: 'POST', body: { liked: !item.user_liked } },
+  );
+  return data;
+}
+
+export async function toggleFeedSave(item: FeedItem): Promise<{ saved: boolean; save_count?: number }> {
+  const path = contentPath(item);
+  if (!path) throw new Error('Cannot save items without a community');
+  const { data } = await apiFetch<{ saved: boolean; save_count?: number }>(
+    `${path}/save`,
+    { method: 'POST', body: { saved: !item.user_saved } },
+  );
+  return data;
+}
+
+export async function deleteFeedItem(item: FeedItem): Promise<void> {
+  const path = contentPath(item);
+  if (!path) throw new Error('Cannot delete items without a community');
+  await apiFetch(path, { method: 'DELETE' });
+}
+
+export async function reportFeedItem(item: FeedItem): Promise<void> {
+  await apiFetch('/api/report', {
+    method: 'POST',
+    body: { content_type: item._type, content_id: item.id },
+  });
+}
