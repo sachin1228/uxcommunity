@@ -39,7 +39,7 @@ export function AppHeader() {
 
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel="Notifications"
+          accessibilityLabel="Explore"
           accessibilityRole="button"
           hitSlop={8}
           style={({ pressed }) => [
@@ -47,7 +47,7 @@ export function AppHeader() {
             { backgroundColor: pressed ? colors.background : 'transparent' },
           ]}
         >
-          <Feather name="bell" size={22} color={colors.mutedForeground} />
+          <Feather name="compass" size={22} color={colors.mutedForeground} />
         </Pressable>
 
         {avatarUrl ? (

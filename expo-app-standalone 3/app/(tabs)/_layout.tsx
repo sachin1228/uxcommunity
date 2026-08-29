@@ -27,9 +27,9 @@ function NativeTabLayout() {
         <Icon sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }} />
         <Label>Library</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="explore">
-        <Icon sf={{ default: 'safari', selected: 'safari.fill' }} />
-        <Label>Explore</Label>
+      <NativeTabs.Trigger name="notifications">
+        <Icon sf={{ default: 'bell', selected: 'bell.fill' }} />
+        <Label>Notifications</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="jobs">
         <Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} />
@@ -121,15 +121,22 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bell" tintColor={color} size={28} />
+            ) : (
+              <Feather name="bell" size={26} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           title: 'Explore',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="safari" tintColor={color} size={28} />
-            ) : (
-              <Feather name="compass" size={26} color={color} />
-            ),
+          tabBarButton: () => null,
         }}
       />
       <Tabs.Screen
