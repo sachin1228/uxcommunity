@@ -16,8 +16,8 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'list.bullet', selected: 'list.bullet.indent' }} />
-        <Label>Feed</Label>
+        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="communities">
         <Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
@@ -87,12 +87,12 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Feed',
+          title: 'Home',
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="list.bullet" tintColor={color} size={28} />
+              <SymbolView name="house" tintColor={color} size={28} />
             ) : (
-              <FeedIcon size={26} color={color} />
+              <Feather name="home" size={26} color={color} />
             ),
         }}
       />
