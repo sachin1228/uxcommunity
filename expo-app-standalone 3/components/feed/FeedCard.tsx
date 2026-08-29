@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AntDesign, Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { getLinkPreviewImage } from '@/lib/communityContent';
@@ -76,6 +76,28 @@ const GRADIENTS = [
 ];
 
 // ---------------------------------------------------------------------------
+// Three-dot menu button
+// ---------------------------------------------------------------------------
+
+function OptionsButton({ colors }: { colors: ReturnType<typeof useColors> }) {
+  return (
+    <Pressable style={optStyles.btn}>
+      <Feather name="more-horizontal" size={16} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
+const optStyles = StyleSheet.create({
+  btn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 6,
+  },
+});
+
+// ---------------------------------------------------------------------------
 // PostAuthorMeta — matches web app exactly
 // ---------------------------------------------------------------------------
 
@@ -83,10 +105,12 @@ function PostAuthorMeta({
   users,
   createdAt,
   secondaryLabel,
+  right,
 }: {
   users: FeedItem['users'];
   createdAt: string;
   secondaryLabel?: string;
+  right?: React.ReactNode;
 }) {
   const colors = useColors();
   const avatarUri = resolveProfilePictureUri(users?.avatar_url);
@@ -108,7 +132,9 @@ function PostAuthorMeta({
           <Text style={[metaStyles.name, { color: colors.foreground }]} numberOfLines={1}>
             {name}
           </Text>
-          <Text style={[metaStyles.date, { color: colors.foregroundSoft }]}>{formatTime(createdAt)}</Text>
+          <Text style={[metaStyles.date, { color: colors.foregroundSoft }]}>
+            {' \u00b7 '}{formatTime(createdAt)}
+          </Text>
         </View>
         {secondaryLabel ? (
           <Text style={[metaStyles.secondary, { color: colors.foregroundSoft }]} numberOfLines={1}>
@@ -116,6 +142,7 @@ function PostAuthorMeta({
           </Text>
         ) : null}
       </View>
+      {right}
     </View>
   );
 }
@@ -149,6 +176,7 @@ function ThreadCard({ item }: { item: FeedThread }) {
         users={item.users}
         createdAt={item.created_at}
         secondaryLabel={`Threads \u00b7 ${CATEGORY_LABELS[item.category] ?? item.category}`}
+        right={<OptionsButton colors={colors} />}
       />
 
       <View style={styles.body}>
@@ -165,7 +193,11 @@ function ThreadCard({ item }: { item: FeedThread }) {
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <View style={styles.stat}>
-            <Feather name="heart" size={20} color={item.user_liked ? '#ef4444' : colors.foreground} />
+            {item.user_liked ? (
+              <AntDesign name="heart" size={20} color="#ef4444" />
+            ) : (
+              <Feather name="heart" size={20} color={colors.foreground} />
+            )}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>
               {item.like_count}
             </Text>
@@ -190,7 +222,8 @@ function ThreadCard({ item }: { item: FeedThread }) {
 function EventCard({ item }: { item: FeedEvent }) {
   const colors = useColors();
   const gradientIdx = item.id.charCodeAt(0) % GRADIENTS.length;
-  const [g1, g2] = GRADIENTS[gradientIdx];
+  const [g1] = GRADIENTS[gradientIdx];
+  const isPast = new Date(item.event_date) < new Date();
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -198,6 +231,7 @@ function EventCard({ item }: { item: FeedEvent }) {
         users={item.users}
         createdAt={item.created_at}
         secondaryLabel={`Event \u00b7 ${item.is_online ? 'Online' : item.location ?? 'Offline'}`}
+        right={<OptionsButton colors={colors} />}
       />
 
       <View style={styles.eventBody}>
@@ -211,9 +245,28 @@ function EventCard({ item }: { item: FeedEvent }) {
         )}
 
         <View style={styles.eventContent}>
-          <Text style={[styles.eventTitle, { color: colors.foreground }]} numberOfLines={2}>
-            {item.title}
-          </Text>
+          <View style={styles.eventTitleRow}>
+            <Text style={[styles.eventTitle, { color: colors.foreground, flex: 1 }]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            {/* Upcoming / Past badge — inside the card */}
+            <View style={[
+              styles.eventBadge,
+              isPast
+                ? { backgroundColor: colors.muted }
+                : { backgroundColor: '#10b98125' },
+            ]}>
+              <Text style={[
+                styles.eventBadgeText,
+                isPast
+                  ? { color: colors.mutedForeground }
+                  : { color: '#10b981' },
+              ]}>
+                {isPast ? 'Past' : 'Upcoming'}
+              </Text>
+            </View>
+          </View>
+
           {item.description ? (
             <Text style={[styles.eventDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
               {item.description}
@@ -256,27 +309,14 @@ function EventCard({ item }: { item: FeedEvent }) {
         </View>
       </View>
 
-      {/* Upcoming / Past badge */}
-      <View style={[
-        styles.eventBadge,
-        new Date(item.event_date) > new Date()
-          ? { backgroundColor: '#10b98125' }
-          : { backgroundColor: colors.muted },
-      ]}>
-        <Text style={[
-          styles.eventBadgeText,
-          new Date(item.event_date) > new Date()
-            ? { color: '#10b981' }
-            : { color: colors.mutedForeground },
-        ]}>
-          {new Date(item.event_date) > new Date() ? 'Upcoming' : 'Past'}
-        </Text>
-      </View>
-
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
         <View style={styles.footerLeft}>
           <View style={styles.stat}>
-            <Feather name="heart" size={20} color={item.user_liked ? '#ef4444' : colors.foreground} />
+            {item.user_liked ? (
+              <AntDesign name="heart" size={20} color="#ef4444" />
+            ) : (
+              <Feather name="heart" size={20} color={colors.foreground} />
+            )}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>
               {item.like_count}
             </Text>
@@ -311,6 +351,7 @@ function ResourceCard({ item }: { item: FeedResource }) {
         users={item.users}
         createdAt={item.created_at}
         secondaryLabel={`Resources \u00b7 ${typeLabel}`}
+        right={<OptionsButton colors={colors} />}
       />
 
       <View style={styles.body}>
@@ -318,12 +359,10 @@ function ResourceCard({ item }: { item: FeedResource }) {
           {item.description || item.title}
         </Text>
 
-        {/* OG image preview */}
         {ogImage ? (
           <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" />
         ) : null}
 
-        {/* Domain pill */}
         <View style={[styles.domainPill, { borderColor: colors.border }]}>
           <Feather name="external-link" size={11} color={colors.mutedForeground} />
           <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -335,7 +374,11 @@ function ResourceCard({ item }: { item: FeedResource }) {
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <View style={styles.stat}>
-            <Feather name="heart" size={20} color={item.user_liked ? '#ef4444' : colors.foreground} />
+            {item.user_liked ? (
+              <AntDesign name="heart" size={20} color="#ef4444" />
+            ) : (
+              <Feather name="heart" size={20} color={colors.foreground} />
+            )}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>
               {item.save_count}
             </Text>
@@ -360,6 +403,7 @@ function ShowcaseCard({ item }: { item: FeedShowcase }) {
         users={item.users}
         createdAt={item.created_at}
         secondaryLabel={`Showcase \u00b7 ${SHOWCASE_TYPE_LABELS[item.post_type] ?? item.post_type}`}
+        right={<OptionsButton colors={colors} />}
       />
 
       <View style={styles.body}>
@@ -378,7 +422,11 @@ function ShowcaseCard({ item }: { item: FeedShowcase }) {
       <View style={styles.footer}>
         <View style={styles.footerLeft}>
           <View style={styles.stat}>
-            <Feather name="heart" size={20} color={item.user_liked ? '#ef4444' : colors.foreground} />
+            {item.user_liked ? (
+              <AntDesign name="heart" size={20} color="#ef4444" />
+            ) : (
+              <Feather name="heart" size={20} color={colors.foreground} />
+            )}
             <Text style={[styles.statCount, { color: item.user_liked ? '#ef4444' : colors.foreground }]}>
               {item.like_count}
             </Text>
@@ -492,6 +540,11 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 4,
   },
+  eventTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
   eventTitle: {
     fontFamily: 'Geist_600SemiBold',
     fontSize: 14,
@@ -548,9 +601,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   eventBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 99,
@@ -651,12 +701,10 @@ const metaStyles = StyleSheet.create({
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   name: {
     fontFamily: 'Geist_500Medium',
     fontSize: 15,
-    flex: 1,
   },
   date: {
     fontFamily: 'Geist_400Regular',
