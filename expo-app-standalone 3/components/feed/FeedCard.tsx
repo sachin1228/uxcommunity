@@ -1,16 +1,14 @@
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AntDesign, Feather } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { getLinkPreviewImage } from '@/lib/communityContent';
 import { toggleFeedLike, toggleFeedSave, deleteFeedItem, reportFeedItem, parseFigmaUrl, getFigmaEmbedUrl } from '@/lib/feed';
 import { useFeed } from '@/hooks/useFeed';
+import { FigmaEmbed } from '@/components/feed/FigmaEmbed';
 import type { FeedItem, FeedThread, FeedEvent, FeedResource, FeedShowcase } from '@/lib/feed';
-
-const LazyWebView = React.lazy(() => import('react-native-webview').then(m => ({ default: m.WebView })));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -431,10 +429,6 @@ function ResourceCard({ item }: { item: FeedResource }) {
     try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
   }, [item, refetch]);
 
-  const openFigma = useCallback(() => {
-    WebBrowser.openBrowserAsync(item.url);
-  }, [item.url]);
-
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <PostAuthorMeta
@@ -451,52 +445,11 @@ function ResourceCard({ item }: { item: FeedResource }) {
         <Text style={[styles.resourceTitle, { color: colors.foreground }]} numberOfLines={3}>{item.description || item.title}</Text>
 
         {isFigmaPrototype && figmaEmbedUrl ? (
-          <View style={[styles.figmaEmbed, { borderColor: colors.border }]}>
-            <View style={styles.figmaWebviewWrap}>
-              <Suspense fallback={
-                <View style={styles.figmaLoading}>
-                  <ActivityIndicator size="small" color={colors.mutedForeground} />
-                  <Text style={[styles.figmaLoadingText, { color: colors.mutedForeground }]}>Loading prototype…</Text>
-                </View>
-              }>
-                <LazyWebView
-                  source={{ uri: figmaEmbedUrl }}
-                  style={styles.figmaWebview}
-                  javaScriptEnabled
-                  scrollEnabled={false}
-                  showsHorizontalScrollIndicator={false}
-                  showsVerticalScrollIndicator={false}
-                  startInLoadingState
-                  renderLoading={() => (
-                    <View style={styles.figmaLoading}>
-                      <ActivityIndicator size="small" color={colors.mutedForeground} />
-                      <Text style={[styles.figmaLoadingText, { color: colors.mutedForeground }]}>Loading prototype…</Text>
-                    </View>
-                  )}
-                />
-              </Suspense>
-            </View>
-            <View style={[styles.figmaFooter, { borderTopColor: colors.border }]}>
-              <Text style={[styles.figmaFooterLabel, { color: colors.mutedForeground }]}>Interactive prototype</Text>
-              <Pressable onPress={openFigma} style={styles.figmaFooterBtn}>
-                <Text style={[styles.figmaFooterLink, { color: colors.primary }]}>View full screen</Text>
-                <Feather name="maximize-2" size={12} color={colors.primary} />
-              </Pressable>
-            </View>
-          </View>
-        ) : isFigmaPrototype ? (
-          <Pressable style={[styles.figmaPreview, { backgroundColor: colors.muted + '20', borderColor: colors.border }]} onPress={openFigma}>
-            <View style={styles.figmaIconRow}>
-              <View style={[styles.figmaIconBg, { backgroundColor: '#a259ff' }]}>
-                <Text style={styles.figmaIconText}>F</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.figmaLabel, { color: colors.foreground }]}>Figma prototype</Text>
-                <Text style={[styles.figmaSublabel, { color: colors.mutedForeground }]}>Tap to open interactive preview</Text>
-              </View>
-              <Feather name="external-link" size={16} color={colors.primary} />
-            </View>
-          </Pressable>
+          <FigmaEmbed
+            embedUrl={figmaEmbedUrl}
+            fallbackUrl={item.url}
+            colors={{ mutedForeground: colors.mutedForeground, primary: colors.primary, border: colors.border }}
+          />
         ) : ogImage ? (
           <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" />
         ) : null}
@@ -670,21 +623,6 @@ const styles = StyleSheet.create({
   ogImage: { width: '100%', height: 200, borderRadius: 10, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
   domainPill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
   domainText: { fontFamily: 'Geist_400Regular', fontSize: 12 },
-  figmaEmbed: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden', marginTop: 4 },
-  figmaWebviewWrap: { aspectRatio: 16 / 10, backgroundColor: '#1e1e1e' },
-  figmaWebview: { flex: 1 },
-  figmaLoading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  figmaLoadingText: { fontFamily: 'Geist_400Regular', fontSize: 12 },
-  figmaFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
-  figmaFooterLabel: { fontFamily: 'Geist_400Regular', fontSize: 12 },
-  figmaFooterBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  figmaFooterLink: { fontFamily: 'Geist_500Medium', fontSize: 12 },
-  figmaPreview: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, padding: 12, marginTop: 4 },
-  figmaIconRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  figmaIconBg: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  figmaIconText: { color: '#fff', fontFamily: 'Geist_700Bold', fontSize: 18 },
-  figmaLabel: { fontFamily: 'Geist_600SemiBold', fontSize: 13 },
-  figmaSublabel: { fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 1 },
 
   // Showcase
   showcaseTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 22 },
