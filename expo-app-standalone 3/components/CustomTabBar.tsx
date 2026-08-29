@@ -9,34 +9,34 @@ import { FeedIcon } from '@/components/icons/FeedIcon';
 interface Tab {
   key: string;
   label: string;
-  icon: (color: string, focused: boolean) => React.ReactNode;
+  icon: (color: string) => React.ReactNode;
 }
 
 const TABS: Tab[] = [
   {
     key: 'index',
     label: 'Home',
-    icon: (color, focused) => <Feather name="home" size={22} color={color} />,
+    icon: (color) => <Feather name="home" size={24} color={color} />,
   },
   {
     key: 'communities',
     label: 'Communities',
-    icon: (color, focused) => <Feather name={focused ? 'message-square' : 'message-circle'} size={22} color={color} />,
+    icon: (color) => <Feather name="message-circle" size={24} color={color} />,
   },
   {
     key: 'library',
     label: 'Library',
-    icon: (color, focused) => <Feather name="book-open" size={22} color={color} />,
+    icon: (color) => <Feather name="book-open" size={24} color={color} />,
   },
   {
     key: 'notifications',
     label: 'Notifications',
-    icon: (color, focused) => <Feather name="bell" size={22} color={color} />,
+    icon: (color) => <Feather name="bell" size={24} color={color} />,
   },
   {
     key: 'jobs',
     label: 'Jobs',
-    icon: (color, focused) => <Feather name="briefcase" size={22} color={color} />,
+    icon: (color) => <Feather name="briefcase" size={24} color={color} />,
   },
 ];
 
@@ -77,7 +77,7 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
             <Pressable key={tab.key} onPress={onPress} style={styles.tab}>
               {isFocused && <View style={[styles.indicator, { backgroundColor: colors.foreground }]} />}
               <View style={styles.tabContent}>
-                {tab.icon(color, isFocused)}
+                {tab.icon(color)}
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {tab.label}
                 </Text>
@@ -101,22 +101,20 @@ const styles = StyleSheet.create({
   },
   tabs: {
     flexDirection: 'row',
-    paddingTop: 6,
+    paddingTop: 0,
   },
   tab: {
     flex: 1,
-    alignItems: 'center',
+  },
+  indicator: {
+    height: 2,
+    width: '100%',
   },
   tabContent: {
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
-    paddingVertical: 4,
-  },
-  indicator: {
-    width: 20,
-    height: 2,
-    borderRadius: 1,
-    marginBottom: 2,
+    paddingVertical: 6,
   },
   label: {
     fontSize: 10,
