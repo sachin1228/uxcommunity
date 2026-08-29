@@ -15,13 +15,13 @@ import { FeedIcon } from '@/components/icons/FeedIcon';
 function NativeTabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="communities">
-        <Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
-        <Label>Communities</Label>
-      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: 'list.bullet', selected: 'list.bullet.indent' }} />
         <Label>Feed</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="communities">
+        <Icon sf={{ default: 'bubble.left.and.bubble.right', selected: 'bubble.left.and.bubble.right.fill' }} />
+        <Label>Communities</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="library">
         <Icon sf={{ default: 'books.vertical', selected: 'books.vertical.fill' }} />
@@ -50,6 +50,7 @@ function ClassicTabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.mutedForeground,
@@ -84,18 +85,6 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="communities"
-        options={{
-          title: 'Communities',
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={28} />
-            ) : (
-              <Feather name="message-circle" size={26} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
         name="index"
         options={{
           title: 'Feed',
@@ -104,6 +93,18 @@ function ClassicTabLayout() {
               <SymbolView name="list.bullet" tintColor={color} size={28} />
             ) : (
               <FeedIcon size={26} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="communities"
+        options={{
+          title: 'Communities',
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="bubble.left.and.bubble.right" tintColor={color} size={28} />
+            ) : (
+              <Feather name="message-circle" size={26} color={color} />
             ),
         }}
       />
