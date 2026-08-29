@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Image, Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AntDesign, Feather } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import { getLinkPreviewImage } from '@/lib/communityContent';
-import { toggleFeedLike, toggleFeedSave, deleteFeedItem, reportFeedItem } from '@/lib/feed';
+import { toggleFeedLike, toggleFeedSave, deleteFeedItem, reportFeedItem, parseFigmaUrl, getFigmaEmbedUrl } from '@/lib/feed';
 import { useFeed } from '@/hooks/useFeed';
 import type { FeedItem, FeedThread, FeedEvent, FeedResource, FeedShowcase } from '@/lib/feed';
 
@@ -396,11 +397,16 @@ function ResourceCard({ item }: { item: FeedResource }) {
   const typeLabel = RESOURCE_TYPE_LABELS[item.resource_type] ?? item.resource_type;
   const [ogImage, setOgImage] = useState<string | null>(null);
 
+  const figmaLink = parseFigmaUrl(item.url);
+  const figmaEmbedUrl = getFigmaEmbedUrl(item.url);
+  const isFigmaPrototype = figmaLink?.kind === 'prototype';
+
   useEffect(() => {
+    if (isFigmaPrototype) return;
     let cancelled = false;
     getLinkPreviewImage(item.url).then((img) => { if (!cancelled) setOgImage(img); });
     return () => { cancelled = true; };
-  }, [item.url]);
+  }, [item.url, isFigmaPrototype]);
 
   const handleSave = useCallback(async () => {
     try { await toggleFeedSave(item); refetch(); } catch { /* ignore */ }
@@ -423,6 +429,10 @@ function ResourceCard({ item }: { item: FeedResource }) {
     try { await toggleFeedLike(item); refetch(); } catch { /* ignore */ }
   }, [item, refetch]);
 
+  const openFigma = useCallback(() => {
+    WebBrowser.openBrowserAsync(item.url);
+  }, [item.url]);
+
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <PostAuthorMeta
@@ -437,7 +447,24 @@ function ResourceCard({ item }: { item: FeedResource }) {
 
       <View style={styles.body}>
         <Text style={[styles.resourceTitle, { color: colors.foreground }]} numberOfLines={3}>{item.description || item.title}</Text>
-        {ogImage ? <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" /> : null}
+
+        {isFigmaPrototype ? (
+          <Pressable style={[styles.figmaPreview, { backgroundColor: colors.muted + '20', borderColor: colors.border }]} onPress={openFigma}>
+            <View style={styles.figmaIconRow}>
+              <View style={[styles.figmaIconBg, { backgroundColor: '#a259ff' }]}>
+                <Text style={styles.figmaIconText}>F</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.figmaLabel, { color: colors.foreground }]}>Figma prototype</Text>
+                <Text style={[styles.figmaSublabel, { color: colors.mutedForeground }]}>Tap to open interactive preview</Text>
+              </View>
+              <Feather name="external-link" size={16} color={colors.primary} />
+            </View>
+          </Pressable>
+        ) : ogImage ? (
+          <Image source={{ uri: ogImage }} style={styles.ogImage} resizeMode="contain" />
+        ) : null}
+
         <View style={[styles.domainPill, { borderColor: colors.border }]}>
           <Feather name="external-link" size={11} color={colors.mutedForeground} />
           <Text style={[styles.domainText, { color: colors.mutedForeground }]} numberOfLines={1}>{getDomain(item.url)}</Text>
@@ -607,6 +634,12 @@ const styles = StyleSheet.create({
   ogImage: { width: '100%', height: 200, borderRadius: 10, marginTop: 4, backgroundColor: 'rgba(255,255,255,0.05)' },
   domainPill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, marginTop: 4 },
   domainText: { fontFamily: 'Geist_400Regular', fontSize: 12 },
+  figmaPreview: { borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, padding: 12, marginTop: 4 },
+  figmaIconRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  figmaIconBg: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  figmaIconText: { color: '#fff', fontFamily: 'Geist_700Bold', fontSize: 18 },
+  figmaLabel: { fontFamily: 'Geist_600SemiBold', fontSize: 13 },
+  figmaSublabel: { fontFamily: 'Geist_400Regular', fontSize: 11, marginTop: 1 },
 
   // Showcase
   showcaseTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 22 },
