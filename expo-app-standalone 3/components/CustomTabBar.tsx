@@ -1,6 +1,6 @@
 import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
@@ -8,16 +8,35 @@ import { useColors } from '@/hooks/useColors';
 interface Tab {
   key: string;
   label: string;
-  outline: string;
-  filled: string;
+  icon: (color: string) => React.ReactNode;
 }
 
 const TABS: Tab[] = [
-  { key: 'index', label: 'Home', outline: 'home', filled: 'home' },
-  { key: 'communities', label: 'Communities', outline: 'message-circle', filled: 'message1' },
-  { key: 'library', label: 'Library', outline: 'book-open', filled: 'book' },
-  { key: 'notifications', label: 'Notifications', outline: 'bell', filled: 'bell' },
-  { key: 'jobs', label: 'Jobs', outline: 'briefcase', filled: 'switcher' },
+  {
+    key: 'index',
+    label: 'Home',
+    icon: (color) => <Feather name="home" size={24} color={color} />,
+  },
+  {
+    key: 'communities',
+    label: 'Communities',
+    icon: (color) => <Feather name="message-circle" size={24} color={color} />,
+  },
+  {
+    key: 'library',
+    label: 'Library',
+    icon: (color) => <Feather name="book-open" size={24} color={color} />,
+  },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    icon: (color) => <Feather name="bell" size={24} color={color} />,
+  },
+  {
+    key: 'jobs',
+    label: 'Jobs',
+    icon: (color) => <Feather name="briefcase" size={24} color={color} />,
+  },
 ];
 
 interface CustomTabBarProps {
@@ -33,7 +52,9 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.subtle, borderTopColor: colors.border }]}>
-      {isIOS && <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />}
+      {isIOS && (
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill} />
+      )}
       <View style={[styles.tabs, { paddingBottom: bottomInset }]}>
         {TABS.map((tab) => {
           const index = state.routes.findIndex((r: any) => r.name === tab.key);
@@ -55,11 +76,7 @@ export function CustomTabBar({ state, navigation }: CustomTabBarProps) {
             <Pressable key={tab.key} onPress={onPress} style={styles.tab}>
               <View style={styles.tabContent}>
                 {isFocused && <View style={[styles.indicator, { backgroundColor: colors.foreground }]} />}
-                {isFocused ? (
-                  <AntDesign name={tab.filled as any} size={24} color={color} />
-                ) : (
-                  <Feather name={tab.outline as any} size={24} color={color} />
-                )}
+                {tab.icon(color)}
                 <Text style={[styles.label, { color }]} numberOfLines={1}>
                   {tab.label}
                 </Text>
@@ -81,8 +98,12 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
-  tabs: { flexDirection: 'row' },
-  tab: { flex: 1 },
+  tabs: {
+    flexDirection: 'row',
+  },
+  tab: {
+    flex: 1,
+  },
   tabContent: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -97,5 +118,8 @@ const styles = StyleSheet.create({
     height: 2,
     borderRadius: 1,
   },
-  label: { fontSize: 10, fontFamily: 'Geist_500Medium' },
+  label: {
+    fontSize: 10,
+    fontFamily: 'Geist_500Medium',
+  },
 });
