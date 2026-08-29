@@ -274,7 +274,7 @@ export default function ExploreTab() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 60 },
   emptyText: { fontFamily: 'Geist_400Regular', fontSize: 14, marginTop: 8 },
   listContent: { paddingHorizontal: 16, paddingBottom: 40 },
 
