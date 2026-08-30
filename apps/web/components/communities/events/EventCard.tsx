@@ -6,7 +6,7 @@ import { Calendar, ExternalLink, Heart, MapPin, UserPlus, Video } from "lucide-r
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
@@ -165,9 +165,7 @@ export function EventCard({
   }
 
   async function handleShare() {
-    const fallbackPath = isPublicContentScope(communityId)
-      ? publicContentHref("event", event.id)
-      : `/dashboard/communities/${communityId}/events/${event.id}`;
+    const fallbackPath = `/dashboard/communities/${communityId}/events/${event.id}`;
     const url = isDetail ? window.location.href : `${window.location.origin}${fallbackPath}`;
     if (navigator.share) {
       try { await navigator.share({ title: event.title, url }); } catch { /* dismissed */ }
@@ -179,9 +177,7 @@ export function EventCard({
   }
 
   const authorName = event.users?.name ?? "Member";
-  const eventHref = detailHref ?? (isPublicContentScope(communityId)
-    ? publicContentHref("event", event.id)
-    : `/dashboard/communities/${communityId}/events/${event.id}`);
+  const eventHref = detailHref ?? `/dashboard/communities/${communityId}/events/${event.id}`;
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
   const gradients = [
     "from-violet-500/80 to-pink-500/80",

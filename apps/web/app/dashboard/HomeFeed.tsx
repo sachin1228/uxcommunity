@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Globe } from "lucide-react";
+
 
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
@@ -12,7 +12,7 @@ import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
-import { PUBLIC_CONTENT_SCOPE } from "@/lib/content-scope";
+
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
@@ -240,8 +240,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   if (!items.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <Globe size={32} className="mb-3 text-foreground-subtle" />
-        <p className="font-body text-sm font-medium text-foreground-muted">Nothing public yet</p>
+        <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>
         <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
           When community members share threads, events, resources, or showcase
           work publicly, they&apos;ll appear here.
@@ -286,11 +285,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               <ThreadCard
                 thread={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
-                communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                communityId={group.item.community_id ?? ""}
                 communityName={group.item.community_name ?? undefined}
                 communityImage={group.item.community_image}
                 communityNamePlacement="below"
-                detailHref={`/dashboard/threads/${group.item.id}`}
                 onUpdated={handleThreadUpdated}
                 onLikeChanged={handleThreadLikeChanged}
                 onSaveChanged={handleThreadSaveChanged}
@@ -317,7 +315,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                   event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                   rsvps={group.item.rsvps}
                   currentUserId={currentUserId}
-                  communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                  communityId={group.item.community_id ?? ""}
                   detailHref={group.item.community_id ? `/dashboard/communities/${group.item.community_id}/events/${group.item.id}` : undefined}
                   menuInPostHeader
                   communityName={group.item.community_name ?? undefined}
@@ -340,7 +338,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 post={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
                 isLast
-                communityId={group.item.community_id ?? PUBLIC_CONTENT_SCOPE}
+                communityId={group.item.community_id ?? ""}
                 onOpen={() => openShowcase(group.item)}
                 onLikeChanged={(liked, count) => updateItems((prev) => prev.map((item) =>
                   item._type === "showcase" && item.id === group.item.id
@@ -367,7 +365,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
             <ResourceCard
               resource={{ ...resource, community_id: resource.community_id ?? "" }}
               currentUserId={currentUserId}
-              communityId={resource.community_id ?? PUBLIC_CONTENT_SCOPE}
+              communityId={resource.community_id ?? ""}
               communityName={resource.community_name ?? undefined}
               communityImage={resource.community_image}
               onUpdated={handleResourceUpdated}
