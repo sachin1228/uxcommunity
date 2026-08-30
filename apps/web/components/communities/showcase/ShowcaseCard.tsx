@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ExternalLink,
   Heart,
   MessageCircle,
 } from "lucide-react";
@@ -9,7 +8,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
-import { SHOWCASE_TYPES, type ShowcasePost } from "./types";
+import { type ShowcasePost } from "./types";
 
 interface ShowcaseCardProps {
   post: ShowcasePost;
@@ -45,9 +44,7 @@ export function ShowcaseCard({
     onLikeChanged,
     onSaveChanged,
   });
-  const typeLabel =
-    SHOWCASE_TYPES.find((item) => item.value === post.post_type)?.label ??
-    "Post";
+  const typeLabel = "Showcase";
 
   const card = (
     <>
@@ -144,17 +141,6 @@ export function ShowcaseCard({
         )}
 
         <div className="flex-1" />
-        {post.project_url && (
-          <a
-            href={post.project_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-accent"
-          >
-            View project
-            <ExternalLink size={14} />
-          </a>
-        )}
       </div>
     </>
   );
