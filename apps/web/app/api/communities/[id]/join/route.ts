@@ -6,10 +6,12 @@ import { requireSession } from "@/lib/auth/session";
  * POST /api/communities/[id]/join
  *
  * Access rules:
- *  - interest / general / user  → anyone can join
+ *  - interest / general / user  → anyone can join (unless private)
  *  - sector                     → user's sector_id must match community reference_id
  *  - city                       → user's city_id must match community reference_id
  *  - experience_level           → user's experience_level slug must resolve to matching reference_id
+ *
+ * For private communities, a join request is created instead of direct membership.
  */
 export async function POST(
   _req: NextRequest,
@@ -25,7 +27,7 @@ export async function POST(
   // 1. Load community
   const { data: community } = await db
     .from("communities")
-    .select("id, type, reference_id")
+    .select("id, type, reference_id, is_private")
     .eq("id", communityId)
     .eq("is_active", true)
     .maybeSingle();
@@ -75,7 +77,32 @@ export async function POST(
     }
   }
 
-  // 3. Upsert membership
+  // 3. Private communities require owner approval
+  if (community.is_private) {
+    // Delete any existing declined request to allow re-requesting
+    await db
+      .from("community_join_requests")
+      .delete()
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .eq("status", "declined");
+
+    // Upsert a join request (idempotent — resets to pending if previous was declined)
+    const { error: reqErr } = await db
+      .from("community_join_requests")
+      .upsert(
+        { community_id: communityId, user_id: userId, status: "pending" },
+        { onConflict: "community_id,user_id", ignoreDuplicates: true },
+      );
+
+    if (reqErr) {
+      return NextResponse.json({ error: "Failed to submit join request." }, { status: 500 });
+    }
+
+    return NextResponse.json({ status: "requested", communityId });
+  }
+
+  // 4. Public communities — join immediately
   const { error } = await db
     .from("community_members")
     .upsert(
