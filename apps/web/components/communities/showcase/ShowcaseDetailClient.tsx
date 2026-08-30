@@ -292,7 +292,7 @@ export function ShowcaseDetailClient({
         <BackLink
           href={backHref ?? `/dashboard/communities/${communityId}?tab=showcase`}
           label={backLabel ?? "Showcase"}
-          className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
+          className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted"
         />
         <ShowcaseCard
           post={post}
@@ -303,7 +303,7 @@ export function ShowcaseDetailClient({
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
-        <section className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
+        <section className={`mt-6 ${communityFeedLayout.card}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
             {post.comment_count}{" "}
             {post.comment_count === 1 ? "Comment" : "Comments"}
