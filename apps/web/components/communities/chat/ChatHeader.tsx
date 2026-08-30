@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BookMarked, Calendar, ChevronDown, Info, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
-import { invalidateOnArchive, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
+import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
@@ -142,7 +142,16 @@ export function ChatHeader({
     if (confirmAction === "leave") {
       const response = await dedupeFetch(`/api/communities/${community.id}/members`, { method: "DELETE" });
       if (!response.ok) { setBusy(false); return; }
-      invalidateOnLeave(community.id);
+
+      const result = await response.json().catch(() => ({}));
+
+      if (result.community_deleted) {
+        // Community was hard-deleted (last member left) — remove from all caches
+        invalidateOnCommunityDeleted(community.id);
+      } else {
+        // Normal leave or ownership transfer — membership removed
+        invalidateOnLeave(community.id);
+      }
     } else {
       const response = await dedupeFetch(`/api/communities/${community.id}/archive`, { method: "POST" });
       if (!response.ok) { setBusy(false); return; }

@@ -231,6 +231,29 @@ export function invalidateOnLeave(communityId: string): void {
   notifySidebarChanged();
 }
 
+/** Remove a community from all caches after it has been hard-deleted. */
+export function invalidateOnCommunityDeleted(communityId: string): void {
+  if (exploreStore.data) {
+    exploreStore.data = {
+      ...exploreStore.data,
+      communities: exploreStore.data.communities.filter((c) => c.id !== communityId),
+    };
+  }
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
+    };
+    setCachedRequest("/api/communities", {
+      communities: sidebarStore.data.communities,
+    });
+  } else {
+    invalidateRequest("/api/communities");
+  }
+  evictCommunityState(communityId);
+  notifySidebarChanged();
+}
+
 /** Hide a community for this user while retaining the membership. */
 /**
  * Surgically update fields on a single community in the sidebar store
