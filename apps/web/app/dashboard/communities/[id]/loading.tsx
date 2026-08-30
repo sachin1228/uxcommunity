@@ -31,22 +31,35 @@ import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 
 function communityIdFromPath(pathname: string): string | null {
-  const match = pathname.match(/^\/dashboard\/communities\/([^/]+)/);
+  const match = pathname.match(/^\/dashboard\/communities\/([^/?]+)/);
   return match?.[1] ?? null;
 }
 
 /** Which header tab is active for the target route — mirrors the real pages. */
-function activeTabFromPath(pathname: string): ChatTab {
-  const match = pathname.match(
+function activeTabFromPath(pathAndSearch: string): ChatTab {
+  // First check sub-routes like /threads/[id], /showcase/[id] etc.
+  const pathMatch = pathAndSearch.match(
     /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//,
   );
-  switch (match?.[1]) {
-    case "threads":   return "threads";
-    case "events":    return "events";
-    case "resources": return "resources";
-    case "showcase":  return "showcase";
-    default:           return "chat";
+  if (pathMatch?.[1]) {
+    switch (pathMatch[1]) {
+      case "threads":   return "threads";
+      case "events":    return "events";
+      case "resources": return "resources";
+      case "showcase":  return "showcase";
+    }
   }
+
+  // Then check the ?tab= search param (e.g. when navigating back from a detail page)
+  const searchMatch = pathAndSearch.match(/[?&]tab=([a-zA-Z]+)/);
+  if (searchMatch?.[1]) {
+    const tab = searchMatch[1] as ChatTab;
+    if (["chat", "showcase", "threads", "events", "resources", "members", "about"].includes(tab)) {
+      return tab;
+    }
+  }
+
+  return "chat";
 }
 
 function subscribeToLocation(callback: () => void) {
@@ -59,7 +72,7 @@ function subscribeToLocation(callback: () => void) {
 }
 
 function getLocationPathname() {
-  return window.location.pathname;
+  return window.location.pathname + window.location.search;
 }
 
 function getServerPathname() {
@@ -78,14 +91,15 @@ export default function CommunityPageLoading() {
   );
 
   const communityId = communityIdFromPath(pathname);
+  const activeTab: ChatTab = communityId ? activeTabFromPath(pathname) : "chat";
 
-  // Detail view pages (threads/events/resources/showcase) live under /[id]/
-  // too. They share the community chrome, but their content is a detail feed,
-  // not a chat — so only the chat tab gets the Lottie + input loading; detail
-  // pages get a plain spinner in the middle content area.
-  const isDetailView =
+  // Only the chat tab gets the full Lottie + input loading UI.
+  // All other tabs (showcase, threads, events, resources, members, about)
+  // and detail pages (sub-routes like /threads/[id]) get a simple spinner.
+  const showChatLoading =
+    activeTab === "chat" &&
     communityId !== null &&
-    /\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//.test(
+    !/\/dashboard\/communities\/[^/]+\/(threads|events|resources|showcase)\//.test(
       pathname,
     );
 
@@ -117,7 +131,6 @@ export default function CommunityPageLoading() {
 
   const community = cached?.community ?? null;
   const members = cached?.members ?? [];
-  const activeTab: ChatTab = communityId ? activeTabFromPath(pathname) : "chat";
 
   function handleTabChange(tab: ChatTab) {
     if (!communityId) return;
@@ -140,13 +153,7 @@ export default function CommunityPageLoading() {
           communityId={communityId ?? undefined}
         />
 
-        {isDetailView ? (
-          /* Detail view page — spinner in the middle content area, matching
-             its real layout (thread/event/resource/showcase feed). */
-          <div className="flex-1 flex items-center justify-center">
-            <Spinner size={28} />
-          </div>
-        ) : (
+        {showChatLoading ? (
         /* Chat message area — mirrors the real chat layout: dotted scroll
             background with the community Lottie, and the input box pinned to
             the bottom. Only the Lottie is "loading"; everything else looks
@@ -198,6 +205,11 @@ export default function CommunityPageLoading() {
             </div>
           </div>
         </div>
+        ) : (
+          /* Non-chat tab or detail page — spinner in the middle content area. */
+          <div className="flex-1 flex items-center justify-center">
+            <Spinner size={28} />
+          </div>
         )}
       </div>
     </div>
