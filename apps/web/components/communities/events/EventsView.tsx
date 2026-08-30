@@ -53,7 +53,7 @@ export function EventsView({
       ]);
       const allEvents = [...(upcomingData.events ?? []), ...(pastData.events ?? [])];
       setEvents(allEvents);
-      setNextCursor(upcomingData.nextCursor ?? null);
+      setNextCursor(allEvents.length > 25 ? upcomingData.nextCursor ?? null : null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
