@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { Calendar, ExternalLink, Heart, MapPin, UserPlus, Video } from "lucide-react";
+import { Calendar, ExternalLink, Heart, MapPin, MessageCircle, UserPlus, Video } from "lucide-react";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -79,7 +78,7 @@ interface EventCardProps {
   rsvps?: EventRsvp[];
   error?: string | null;
   onRsvpSettled?: () => void | Promise<void>;
-  detailHref?: string;
+  onOpen?: () => void;
   edgeToEdgeDivider?: boolean;
   menuInPostHeader?: boolean;
   communityName?: string;
@@ -99,7 +98,7 @@ export function EventCard({
   rsvps,
   error,
   onRsvpSettled,
-  detailHref,
+  onOpen,
   edgeToEdgeDivider = false,
   menuInPostHeader = false,
   communityName,
@@ -126,8 +125,6 @@ export function EventCard({
     onSaveChanged,
   });
 
-  // Reusable mutation pattern: `pending` drives the disabled/spinner state and
-  // concurrent invocations share the same in-flight request.
   const { run: runDelete, pending: deleting } = usePendingMutation(async () => {
     const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}`, { method: "DELETE" });
     if (response.ok) onDeleted(event.id);
@@ -139,6 +136,7 @@ export function EventCard({
 
   async function handleJoin(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
     const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
@@ -164,7 +162,9 @@ export function EventCard({
     }
   }
 
-  async function handleShare() {
+  async function handleShare(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
     const fallbackPath = `/dashboard/communities/${communityId}/events/${event.id}`;
     const url = isDetail ? window.location.href : `${window.location.origin}${fallbackPath}`;
     if (navigator.share) {
@@ -177,7 +177,6 @@ export function EventCard({
   }
 
   const authorName = event.users?.name ?? "Member";
-  const eventHref = detailHref ?? `/dashboard/communities/${communityId}/events/${event.id}`;
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
   const gradients = [
     "from-violet-500/80 to-pink-500/80",
@@ -280,23 +279,6 @@ export function EventCard({
                 <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
               )}
             </div>
-            {!isDetail && !menuInPostHeader && (
-              <div onClick={(e) => e.preventDefault()}>
-                <EventOptionsMenu
-                  saved={event.user_saved}
-                  shared={shared}
-                  reported={reported}
-                  isOwner={isOwner}
-                  deleting={deleting}
-                  saving={savePending}
-                  onSave={toggleSave}
-                  onShare={() => void handleShare()}
-                  onEdit={() => setShowEditModal(true)}
-                  onDelete={() => setConfirmDelete(true)}
-                  onReport={() => setReported(true)}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -308,54 +290,42 @@ export function EventCard({
   );
 
   return (
-    <>
-      <article className={isDetail || menuInPostHeader ? "group" : `group ${edgeToEdgeDivider ? communityFeedLayout.dividerBottom : "overflow-hidden rounded-xl border border-border bg-surface"}`}>
-        {menuInPostHeader && !isDetail && (
-          <EventOptionsMenu
-            saved={event.user_saved}
-            shared={shared}
-            reported={reported}
-            isOwner={isOwner}
-            deleting={deleting}
-            saving={savePending}
-            className="absolute right-5 top-6 z-10 md:right-8"
-            onSave={toggleSave}
-            onShare={() => void handleShare()}
-            onEdit={() => setShowEditModal(true)}
-            onDelete={() => setConfirmDelete(true)}
-            onReport={() => setReported(true)}
+    <article
+      tabIndex={onOpen && !isDetail ? 0 : undefined}
+      role={onOpen && !isDetail ? "link" : undefined}
+      onClick={onOpen && !isDetail ? onOpen : undefined}
+      onKeyDown={onOpen && !isDetail ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+      className={`${isDetail || menuInPostHeader ? "group" : `${communityFeedLayout.card} ${onOpen ? communityFeedLayout.cardInteractive : ""} ${onOpen ? "cursor-pointer" : ""}`}`}
+    >
+      {(isDetail || (!menuInPostHeader && !isDetail)) && (
+        <div className="flex items-start justify-between gap-3">
+          <PostAuthorMeta
+            name={event.users?.name}
+            avatarUrl={event.users?.avatar_url}
+            createdAt={event.created_at}
+            dateInline
+            secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? communityName}`}
           />
-        )}
-        {isDetail && (
-          <div className="relative mb-4 flex items-center justify-between gap-3">
-            <PostAuthorMeta
-              name={event.users?.name}
-              avatarUrl={event.users?.avatar_url}
-              createdAt={event.created_at}
-              dateInline
-              secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? communityName}`}
-            />
+          <div onClick={(e) => e.preventDefault()}>
             <EventOptionsMenu
               saved={event.user_saved}
               shared={shared}
               reported={reported}
               isOwner={isOwner}
+              past={past}
               deleting={deleting}
               saving={savePending}
               onSave={toggleSave}
               onShare={() => void handleShare()}
               onEdit={() => setShowEditModal(true)}
-              onDelete={() => void handleDelete()}
+              onDelete={() => isDetail ? void handleDelete() : setConfirmDelete(true)}
               onReport={() => setReported(true)}
             />
           </div>
-        )}
-        {isDetail ? eventBody : (
-          <Link href={eventHref} prefetch={false} className={`block ${edgeToEdgeDivider ? communityFeedLayout.gutters : ""}`}>
-            {eventBody}
-          </Link>
-        )}
-      </article>
+        </div>
+      )}
+      <div className="mt-4">{eventBody}</div>
+
       <div className="mt-3 flex items-center justify-between gap-4">
         <button
           type="button"
@@ -367,11 +337,17 @@ export function EventCard({
           <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
           <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
         </button>
-        {communityName && (
-          <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
-        )}
+
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
+          <MessageCircle size={20} />
+          {event.comment_count ?? 0}
+        </span>
+
+        <div className="flex-1" />
+        {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
-      {showEditModal && (
+
+      {showEditModal && !past && (
         <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
       )}
       <ConfirmDialog
@@ -381,6 +357,6 @@ export function EventCard({
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
       />
-    </>
+    </article>
   );
 }
