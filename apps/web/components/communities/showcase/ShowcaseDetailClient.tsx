@@ -303,6 +303,7 @@ export function ShowcaseDetailClient({
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
+        {post.allow_replies !== false && (
         <section className={`mt-6 ${communityFeedLayout.card}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
             {post.comment_count}{" "}
@@ -331,7 +332,6 @@ export function ShowcaseDetailClient({
                     communityId={communityId}
                     postId={post.id}
                     currentUserId={currentUserId}
-                    reply
                     onPosted={posted}
                     onDeleted={deleted}
                   />
@@ -339,12 +339,13 @@ export function ShowcaseDetailClient({
               </div>
             ))}
             {!comments.length && (
-              <p className="py-12 text-center font-body text-sm text-foreground-muted">
+              <p className="text-center font-body text-sm text-foreground-muted">
                 No comments yet. Be the first!
               </p>
             )}
           </div>
         </section>
+        )}
       </div>
       {editing && (
         <CreateShowcaseModal

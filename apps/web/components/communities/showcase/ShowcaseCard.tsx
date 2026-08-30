@@ -108,6 +108,7 @@ export function ShowcaseCard({
           </span>
         </button>
 
+        {post.allow_replies !== false && (
         <button
           type="button"
           onClick={onOpen}
@@ -116,6 +117,7 @@ export function ShowcaseCard({
           <MessageCircle size={20} />
           {post.comment_count}
         </button>
+        )}
 
         <div className="flex-1" />
         {communityName && <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}

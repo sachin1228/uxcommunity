@@ -7,7 +7,7 @@ export const SHOWCASE_CATEGORIES: { value: ShowcaseCategory | "all"; label: stri
 export interface ShowcasePost {
   id: string; community_id: string; user_id: string; title: string;
   image_url: string; category: ShowcaseCategory; created_at: string; updated_at: string;
-  is_public: boolean; like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean;
+  is_public: boolean; allow_replies: boolean; like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean;
   author: { name: string; avatar_url: string | null };
 }
 
