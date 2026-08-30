@@ -18,6 +18,7 @@ export interface CommunityEvent {
   rsvp_count: number;
   user_rsvped: boolean;
   like_count: number;
+  comment_count: number;
   user_liked: boolean;
   save_count: number;
   user_saved: boolean;

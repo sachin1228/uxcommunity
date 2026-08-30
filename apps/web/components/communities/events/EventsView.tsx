@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
+import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -10,9 +10,9 @@ import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { communityFeedLayout } from "../feed-layout";
-import { PostAuthorMeta } from "../PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 const EVENTS_STALE_MS = 60_000;
 
@@ -24,6 +24,7 @@ export function EventsView({
   currentUserId: string;
 }) {
   initRequestCache(currentUserId);
+  const router = useGuardedRouter();
   const requestUrl = `/api/communities/${communityId}/events`;
   const cached = getCachedRequest<{ events?: CommunityEvent[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.events ?? []);
@@ -32,19 +33,27 @@ export function EventsView({
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
+  const [filter, setFilter] = useState<"upcoming" | "past">("upcoming");
   const isVisible = useDocumentVisible();
 
   const fetchEvents = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
-        requestUrl,
-        { staleMs: EVENTS_STALE_MS, force },
-        currentUserId,
-      );
-      setEvents(data.events ?? []);
-      setNextCursor(data.nextCursor ?? null);
+      const [upcomingData, pastData] = await Promise.all([
+        fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
+          requestUrl,
+          { staleMs: EVENTS_STALE_MS, force },
+          currentUserId,
+        ),
+        fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
+          `${requestUrl}?cursor=past`,
+          { staleMs: EVENTS_STALE_MS, force },
+          currentUserId,
+        ),
+      ]);
+      const allEvents = [...(upcomingData.events ?? []), ...(pastData.events ?? [])];
+      setEvents(allEvents);
+      setNextCursor(allEvents.length > 25 ? upcomingData.nextCursor ?? null : null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
@@ -169,9 +178,8 @@ export function EventsView({
         {!loading && events.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
             {[
-              { value: "all" as const, label: "All events", icon: CalendarDays },
-              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock },
-              { value: "past" as const, label: "Past", icon: CalendarCheck2 },
+              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
+              { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -183,7 +191,7 @@ export function EventsView({
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
                   <Icon size={14} aria-hidden="true" />
-                  {item.label}
+                  {item.label} ({item.count})
                 </button>
               );
             })}
@@ -218,25 +226,11 @@ export function EventsView({
           </div>
         ) : (
           <div className={communityFeedLayout.cardList}>
-            {[
-              ...(filter === "all" || filter === "upcoming" ? upcoming : []),
-              ...(filter === "all" || filter === "past" ? past : []),
-            ].map((event) => {
+            {(filter === "upcoming" ? upcoming : past).map((event) => {
               const isPast = new Date(event.end_date ?? event.event_date) < now;
 
               return (
-                <article
-                  key={event.id}
-                  className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive} relative ${isPast ? "opacity-60" : ""}`}
-                >
-                  <PostAuthorMeta
-                    name={event.users?.name}
-                    avatarUrl={event.users?.avatar_url}
-                    createdAt={event.created_at}
-                    dateInline
-                    secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                    className="mb-3"
-                  />
+                <div key={event.id} className={isPast ? "opacity-60" : ""}>
                   <EventCard
                     event={event}
                     currentUserId={currentUserId}
@@ -246,9 +240,9 @@ export function EventsView({
                     onRsvpChanged={handleRsvpChanged}
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
-                    menuInPostHeader
+                    onOpen={() => router.push(`/dashboard/communities/${communityId}/events/${event.id}`)}
                   />
-                </article>
+                </div>
               );
             })}
             {nextCursor && (
