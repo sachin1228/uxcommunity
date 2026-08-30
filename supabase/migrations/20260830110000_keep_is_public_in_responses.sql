@@ -34,9 +34,9 @@ begin
   )
   select to_jsonb(p) || jsonb_build_object(
     'users', case when u.id is null then null else jsonb_build_object('name', u.name, 'avatar_url', dp.avatar_url) end,
-    'vote_count', (select count(*) from public.thread_votes v where v.thread_id = p.id),
+    'like_count', (select count(*) from public.thread_likes l where l.thread_id = p.id),
     'comment_count', (select count(*) from public.thread_comments c where c.thread_id = p.id),
-    'user_voted', exists(select 1 from public.thread_votes v where v.thread_id = p.id and v.user_id = p_user_id),
+    'user_liked', exists(select 1 from public.thread_likes l where l.thread_id = p.id and l.user_id = p_user_id),
     'user_saved', exists(select 1 from public.thread_saves s where s.thread_id = p.id and s.user_id = p_user_id)
   )
   from page p
