@@ -182,11 +182,18 @@ export async function DELETE(
       ]);
     } else {
       // Last member leaving — hard delete community and all child data
-      // Clean up join requests first (not covered by all cascades)
-      await db
-        .from("community_join_requests")
-        .delete()
-        .eq("community_id", communityId);
+      // Clean up tables not covered by CASCADE (text-based references)
+      await Promise.all([
+        db
+          .from("community_join_requests")
+          .delete()
+          .eq("community_id", communityId),
+        db
+          .from("lottie_settings")
+          .delete()
+          .eq("scope", "community")
+          .eq("scope_key", communityId),
+      ]);
 
       const { error: deleteErr } = await db
         .from("communities")
