@@ -363,7 +363,7 @@ export function ResourceCard({
                 <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
                 <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-white"}`}>{resource.save_count}</span>
               </button>
-              {communityName && <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
+              {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
           </>
         )}

@@ -88,11 +88,10 @@ export function ShowcaseCard({
 
       <div
         className="mt-3 flex items-center gap-4"
-        onClick={(event) => event.stopPropagation()}
       >
         <button
           type="button"
-          onClick={toggleLike}
+          onClick={(e) => { e.stopPropagation(); toggleLike(); }}
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
           aria-pressed={post.user_liked}
           aria-busy={likePending}
@@ -109,18 +108,14 @@ export function ShowcaseCard({
         </button>
 
         {post.allow_replies !== false && (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
-        >
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
           <MessageCircle size={20} />
           {post.comment_count}
-        </button>
+        </span>
         )}
 
         <div className="flex-1" />
-        {communityName && <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
+        {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
     </article>
   );
