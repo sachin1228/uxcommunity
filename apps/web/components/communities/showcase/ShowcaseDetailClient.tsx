@@ -297,7 +297,6 @@ export function ShowcaseDetailClient({
         <ShowcaseCard
           post={post}
           currentUserId={currentUserId}
-          variant="detail"
           communityId={communityId}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}

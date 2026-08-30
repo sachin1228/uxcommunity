@@ -13,7 +13,6 @@ import { SHOWCASE_CATEGORIES, type ShowcasePost } from "./types";
 interface ShowcaseCardProps {
   post: ShowcasePost;
   currentUserId: string;
-  variant?: "list" | "detail";
   isLast?: boolean;
   communityId: string;
   onOpen?: () => void;
@@ -26,7 +25,6 @@ interface ShowcaseCardProps {
 export function ShowcaseCard({
   post,
   currentUserId,
-  variant = "list",
   communityId,
   onOpen,
   onLikeChanged,
@@ -34,7 +32,6 @@ export function ShowcaseCard({
   onEdit,
   onDelete,
 }: ShowcaseCardProps) {
-  const isDetail = variant === "detail";
   const { toggleLike, toggleSave, likePending, savePending } = useShowcaseInteractions({
     communityId,
     postId: post.id,
@@ -46,8 +43,14 @@ export function ShowcaseCard({
   });
   const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
 
-  const card = (
-    <>
+  return (
+    <article
+      tabIndex={onOpen ? 0 : undefined}
+      role={onOpen ? "link" : undefined}
+      onClick={onOpen}
+      onKeyDown={onOpen ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+      className={`${communityFeedLayout.card} ${onOpen ? communityFeedLayout.cardInteractive : ""} ${onOpen ? "cursor-pointer" : ""}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <PostAuthorMeta
           name={post.author.name}
@@ -66,44 +69,26 @@ export function ShowcaseCard({
         />
       </div>
 
-      {isDetail ? (
-        <h1 className="mt-4 text-pretty font-display text-xl font-semibold text-foreground">
-          {post.title}
-        </h1>
-      ) : (
-        <h2 className="mt-3 text-pretty font-display text-sm font-semibold text-foreground">
-          {post.title}
-        </h2>
-      )}
+      <h2 className="mt-3 text-pretty font-display text-sm font-semibold text-foreground">
+        {post.title}
+      </h2>
 
       {post.description && (
-        <p
-          className={`font-body text-foreground-muted ${
-            isDetail
-              ? "mt-2 whitespace-pre-wrap text-sm leading-relaxed"
-              : "mt-1.5 line-clamp-3 text-xs leading-relaxed"
-          }`}
-        >
+        <p className="mt-1.5 font-body text-xs leading-relaxed text-foreground-muted line-clamp-3">
           {post.description}
         </p>
       )}
 
-      <div
-        className={`overflow-hidden rounded-xl border border-border bg-surface-raised ${
-          isDetail ? "mt-4" : "mt-3 max-h-[480px]"
-        }`}
-      >
+      <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
         <img
           src={post.image_url}
           alt={`Preview of ${post.title}`}
-          className={`w-full object-cover ${
-            isDetail ? "max-h-[620px]" : "max-h-[480px]"
-          }`}
+          className="max-h-[480px] w-full object-cover"
         />
       </div>
 
       <div
-        className={`flex items-center gap-4 ${isDetail ? "mt-4" : "mt-3"}`}
+        className="mt-3 flex items-center gap-4"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -124,42 +109,17 @@ export function ShowcaseCard({
           </span>
         </button>
 
-        {isDetail ? (
-          <span className="inline-flex items-center gap-2 font-body text-sm text-foreground">
-            <MessageCircle size={20} />
-            {post.comment_count}
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
-          >
-            <MessageCircle size={20} />
-            {post.comment_count}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onOpen}
+          className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
+        >
+          <MessageCircle size={20} />
+          {post.comment_count}
+        </button>
 
         <div className="flex-1" />
       </div>
-    </>
-  );
-
-  if (isDetail) {
-    return <article className={`mx-5 md:mx-8 ${communityFeedLayout.detailCard}`}>{card}</article>;
-  }
-
-  return (
-    <article
-      tabIndex={0}
-      role="link"
-      onClick={onOpen}
-      onKeyDown={(event) => {
-        if (event.key === "Enter") onOpen?.();
-      }}
-      className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive} cursor-pointer`}
-    >
-      {card}
     </article>
   );
 }
