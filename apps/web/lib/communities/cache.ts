@@ -144,6 +144,8 @@ export interface CachedExploreCommunity {
   joined: boolean;
   /** Whether the current user is allowed to join this community based on their profile. */
   can_join: boolean;
+  /** Whether the user has a pending join request for this private community. */
+  has_pending_request?: boolean;
 }
 
 export const exploreStore: {
@@ -212,6 +214,29 @@ export function invalidateOnLeave(communityId: string): void {
       communities: exploreStore.data.communities.map((c) =>
         c.id === communityId ? { ...c, joined: false } : c
       ),
+    };
+  }
+  if (sidebarStore.data) {
+    sidebarStore.data = {
+      ...sidebarStore.data,
+      communities: sidebarStore.data.communities.filter((c) => c.id !== communityId),
+    };
+    setCachedRequest("/api/communities", {
+      communities: sidebarStore.data.communities,
+    });
+  } else {
+    invalidateRequest("/api/communities");
+  }
+  evictCommunityState(communityId);
+  notifySidebarChanged();
+}
+
+/** Remove a community from all caches after it has been hard-deleted. */
+export function invalidateOnCommunityDeleted(communityId: string): void {
+  if (exploreStore.data) {
+    exploreStore.data = {
+      ...exploreStore.data,
+      communities: exploreStore.data.communities.filter((c) => c.id !== communityId),
     };
   }
   if (sidebarStore.data) {
