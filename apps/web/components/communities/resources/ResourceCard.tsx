@@ -14,6 +14,7 @@ import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { FigmaEmbed } from "./FigmaEmbed";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
+import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 import {
   fetchLinkPreview,
   getCachedLinkPreview,
@@ -23,21 +24,25 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { usePendingMutation } from "@/lib/use-mutation";
 
-function useOgImage(url: string, enabled: boolean): string | null {
-  const [image, setImage] = useState<string | null>(() =>
-    enabled ? (getCachedLinkPreview(url)?.image ?? null) : null,
+function useLinkPreview(url: string, enabled: boolean) {
+  const [data, setData] = useState<LinkPreviewData | null | undefined>(
+    enabled ? (getCachedLinkPreview(url) ?? undefined) : null,
   );
 
   useEffect(() => {
-    if (!enabled || hasFreshLinkPreview(url)) return;
+    if (!enabled) return;
+    if (hasFreshLinkPreview(url)) {
+      setData(getCachedLinkPreview(url) ?? null);
+      return;
+    }
     let cancelled = false;
     void fetchLinkPreview(url).then((result) => {
-      if (!cancelled) setImage(result.data?.image ?? null);
+      if (!cancelled) setData(result.data);
     });
     return () => { cancelled = true; };
   }, [enabled, url]);
 
-  return image;
+  return data;
 }
 
 function getDomain(url: string) {
@@ -77,7 +82,7 @@ export function ResourceCard({
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
   const isOwner = resource.user_id === currentUserId;
   const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
-  const ogImage = useOgImage(resource.url, !hasFigmaPrototype && !isDetail);
+  const linkPreview = useLinkPreview(resource.url, !hasFigmaPrototype && !isDetail);
 
   const latestSaveRef = useRef({ resource, onSaveChanged });
   const initialSavedRef = useRef(resource.user_saved);
@@ -307,10 +312,50 @@ export function ResourceCard({
             </a>
             {hasFigmaPrototype ? (
               <FigmaEmbed url={resource.url} compact className="mt-4" />
-            ) : ogImage ? (
-              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-4 block w-fit max-w-full overflow-hidden rounded-xl bg-surface">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={ogImage} alt="" className="block h-auto max-h-96 max-w-full object-contain" onError={(event) => { (event.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+            ) : linkPreview && (linkPreview.title || linkPreview.description || linkPreview.image) ? (
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-surface-raised p-4 transition-opacity duration-150 hover:opacity-90 active:opacity-75"
+              >
+                <div className="min-w-0 flex-1">
+                  {linkPreview.title && (
+                    <p className="line-clamp-2 font-display text-[12px] font-semibold leading-snug text-foreground">
+                      {linkPreview.title}
+                    </p>
+                  )}
+                  {linkPreview.description && (
+                    <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-foreground-muted">
+                      {linkPreview.description}
+                    </p>
+                  )}
+                  <div className="mt-2.5 flex items-center gap-1.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${getDomain(resource.url)}&sz=32`}
+                      alt=""
+                      width={14}
+                      height={14}
+                      className="h-3.5 w-3.5 rounded-sm"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                    />
+                    <span className="truncate font-body text-[11px] text-foreground-subtle">
+                      {getDomain(resource.url)}
+                    </span>
+                  </div>
+                </div>
+                {linkPreview.image && (
+                  <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-surface">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={linkPreview.image}
+                      alt=""
+                      className="block h-full w-full object-cover"
+                      onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
+                    />
+                  </div>
+                )}
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
