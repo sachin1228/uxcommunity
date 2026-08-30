@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
-import { EditResourceModal } from "./EditResourceModal";
+import { ResourceFormModal } from "./ResourceFormModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -369,7 +369,7 @@ export function ResourceCard({
         )}
       </article>
       {showEditModal && (
-        <EditResourceModal resource={resource} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={(updated) => { onUpdated(updated); setShowEditModal(false); }} />
+        <ResourceFormModal mode="edit" resource={resource} communityId={communityId} onClose={() => setShowEditModal(false)} onSaved={(updated) => { onUpdated(updated); setShowEditModal(false); }} />
       )}
       <ConfirmDialog
         open={confirmDelete}

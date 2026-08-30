@@ -23,7 +23,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
-import { CreateResourceModal } from "./CreateResourceModal";
+import { ResourceFormModal } from "./ResourceFormModal";
 import { ResourceCard } from "./ResourceCard";
 import { communityFeedLayout } from "../feed-layout";
 import { Spinner } from "@/components/ui/Spinner";
@@ -301,10 +301,11 @@ export function ResourcesView({
       </div>
 
       {showCreateModal && (
-        <CreateResourceModal
+        <ResourceFormModal
+          mode="create"
           communityId={communityId}
           onClose={() => setShowCreateModal(false)}
-          onCreated={handleCreated}
+          onSaved={handleCreated}
         />
       )}
     </div>

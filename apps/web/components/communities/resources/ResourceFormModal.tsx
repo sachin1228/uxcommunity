@@ -14,10 +14,12 @@ import {
   isLinkPreviewLoading,
 } from "@/lib/communities/linkPreviewCache";
 
-interface CreateResourceModalProps {
-  communityId?: string;
+interface ResourceFormModalProps {
+  mode: "create" | "edit";
+  communityId: string;
+  resource?: CommunityResource;
   onClose: () => void;
-  onCreated: (resource: CommunityResource) => void;
+  onSaved: (resource: CommunityResource) => void;
   initialIsPublic?: boolean;
 }
 
@@ -28,18 +30,22 @@ function isValidHttpUrl(s: string) {
   } catch { return false; }
 }
 
-export function CreateResourceModal({
+export function ResourceFormModal({
+  mode,
   communityId,
+  resource,
   onClose,
-  onCreated,
+  onSaved,
   initialIsPublic = false,
-}: CreateResourceModalProps) {
-  const [url, setUrl] = useState("");
-  const [description, setDescription] = useState("");
-  const [resourceType, setResourceType] = useState<ResourceType>("article");
-  const [tags, setTags] = useState<string[]>([]);
+}: ResourceFormModalProps) {
+  const isEdit = mode === "edit";
+
+  const [url, setUrl] = useState(resource?.url ?? "");
+  const [description, setDescription] = useState(resource?.description ?? "");
+  const [resourceType, setResourceType] = useState<ResourceType>(resource?.resource_type ?? "article");
+  const [tags, setTags] = useState<string[]>(resource?.tags ?? []);
+  const [isPublic, setIsPublic] = useState(resource?.is_public ?? initialIsPublic);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
-  const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const figmaLink = useMemo(() => parseFigmaUrl(url), [url]);
@@ -48,10 +54,12 @@ export function CreateResourceModal({
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewDismissed, setPreviewDismissed] = useState(false);
-  // True when the in-flight request was started by another component.
   const [fromExistingRequest, setFromExistingRequest] = useState(false);
   const previewAbortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initialFetchDoneRef = useRef(false);
+  const urlEffectFirstRunRef = useRef(true);
+
   const fetchPreview = useCallback(async (rawUrl: string) => {
     if (previewAbortRef.current) previewAbortRef.current.abort();
     const ctrl = new AbortController();
@@ -64,8 +72,7 @@ export function CreateResourceModal({
       const result = await fetchLinkPreview(rawUrl.trim());
       if (!ctrl.signal.aborted) {
         setPreview(result.data);
-        // Auto-fill the single description field from the most useful preview copy.
-        if (result.data && !description.trim()) {
+        if (result.data && !isEdit && !description.trim()) {
           const previewDescription = result.data.description ?? result.data.title;
           if (previewDescription) setDescription(previewDescription.slice(0, 2000));
         }
@@ -76,8 +83,22 @@ export function CreateResourceModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounce URL changes → fetch preview
+  // Fetch preview for the initial URL on mount (edit mode)
   useEffect(() => {
+    if (isEdit && !initialFetchDoneRef.current && isValidHttpUrl(resource?.url ?? "")) {
+      initialFetchDoneRef.current = true;
+      fetchPreview(resource!.url);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Debounce URL changes → re-fetch preview
+  useEffect(() => {
+    if (isEdit && urlEffectFirstRunRef.current) {
+      urlEffectFirstRunRef.current = false;
+      return;
+    }
+
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!isValidHttpUrl(url)) {
       if (previewAbortRef.current) previewAbortRef.current.abort();
@@ -89,7 +110,8 @@ export function CreateResourceModal({
     setPreviewDismissed(false);
     debounceRef.current = setTimeout(() => fetchPreview(url.trim()), 700);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [url, fetchPreview]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -106,8 +128,13 @@ export function CreateResourceModal({
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(`/api/communities/${communityId}/resources`, {
-        method: "POST",
+      const endpoint = isEdit
+        ? `/api/communities/${communityId}/resources/${resource!.id}`
+        : `/api/communities/${communityId}/resources`;
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: description.trim().slice(0, 120),
@@ -119,11 +146,11 @@ export function CreateResourceModal({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to create resource.");
-      onCreated(data.resource as CommunityResource);
+      if (!res.ok) throw new Error(data.error ?? `Failed to ${isEdit ? "update" : "create"} resource.`);
+      onSaved(data.resource as CommunityResource);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create resource.");
+      setError(err instanceof Error ? err.message : `Failed to ${isEdit ? "update" : "create"} resource.`);
     } finally {
       setSaving(false);
     }
@@ -136,7 +163,7 @@ export function CreateResourceModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="create-resource-title"
+      aria-labelledby="resource-form-title"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <form
@@ -145,11 +172,11 @@ export function CreateResourceModal({
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="create-resource-title" className="font-display text-xl font-semibold text-foreground">
-              Share a Resource
+            <h2 id="resource-form-title" className="font-display text-xl font-semibold text-foreground">
+              {isEdit ? "Edit Resource" : "Share a Resource"}
             </h2>
             <p className="mt-1 font-body text-sm text-foreground-muted">
-              Share something useful with your community.
+              {isEdit ? "Update the details of your resource." : "Share something useful with your community."}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
@@ -158,7 +185,47 @@ export function CreateResourceModal({
         </div>
 
         <div className="mt-6 space-y-5">
-          {/* URL first — so metadata can auto-fill the description */}
+          {/* Description */}
+          <label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+              Description <span className="text-accent">*</span>
+            </span>
+            <textarea
+              value={description}
+              maxLength={2000}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What makes this resource worth sharing?"
+              rows={4}
+              required
+              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+            />
+          </label>
+
+          {/* Resource type */}
+          <fieldset>
+            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
+              Type <span className="text-accent">*</span>
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {RESOURCE_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setResourceType(t.value)}
+                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
+                    resourceType === t.value
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
+                  }`}
+                >
+                  <ResourceTypeIcon type={t.value} size={11} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          {/* URL */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
               URL <span className="text-accent">*</span>
@@ -170,13 +237,12 @@ export function CreateResourceModal({
                   const nextUrl = e.target.value;
                   setUrl(nextUrl);
                   setPreviewDismissed(false);
-                  if (parseFigmaUrl(nextUrl)) setResourceType("figma");
+                  if (!isEdit && parseFigmaUrl(nextUrl)) setResourceType("figma");
                 }}
                 placeholder="https://..."
                 type="url"
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
               />
-              {/* Always-mounted icon slot — avoids animation restart jitter on mount/unmount */}
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner
                   size={14}
@@ -190,7 +256,8 @@ export function CreateResourceModal({
             </div>
           </label>
 
-          {figmaLink && (
+          {/* Figma detection banner */}
+          {!isEdit && figmaLink && (
             <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
               <Check size={14} aria-hidden="true" />
               <span className="font-body text-xs font-medium">
@@ -218,63 +285,6 @@ export function CreateResourceModal({
               )}
             </div>
           )}
-
-          {/* Resource type */}
-          <fieldset>
-            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
-              Type <span className="text-accent">*</span>
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {RESOURCE_TYPES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setResourceType(t.value)}
-                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
-                    resourceType === t.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-                  }`}
-                >
-                  <ResourceTypeIcon type={t.value} size={11} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Description */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="text-accent">*</span>
-            </span>
-            <textarea
-              value={description}
-              maxLength={2000}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What makes this resource worth sharing?"
-              rows={4}
-              required
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-            />
-          </label>
-
-          {/* Make public toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span>
-              <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-              <span className="block font-body text-xs text-foreground-muted">Allow members outside this community to view the resource.</span>
-            </span>
-            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="sr-only"
-              />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
 
           {/* Tags */}
           <div className="relative">
@@ -335,6 +345,21 @@ export function CreateResourceModal({
               </div>
             )}
           </div>
+
+          {/* Share publicly */}
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span className="flex items-center gap-2.5">
+              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <span>
+                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
+              </span>
+            </span>
+            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
+              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
+            </span>
+          </label>
         </div>
 
         {error && (
@@ -353,7 +378,7 @@ export function CreateResourceModal({
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
-            {saving ? "Sharing…" : "Share Resource"}
+            {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
           </button>
         </div>
       </form>
