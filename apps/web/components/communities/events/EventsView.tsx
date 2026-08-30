@@ -39,13 +39,21 @@ export function EventsView({
   const fetchEvents = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
-      const data = await fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
-        requestUrl,
-        { staleMs: EVENTS_STALE_MS, force },
-        currentUserId,
-      );
-      setEvents(data.events ?? []);
-      setNextCursor(data.nextCursor ?? null);
+      const [upcomingData, pastData] = await Promise.all([
+        fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
+          requestUrl,
+          { staleMs: EVENTS_STALE_MS, force },
+          currentUserId,
+        ),
+        fetchJsonCached<{ events?: CommunityEvent[]; nextCursor?: string | null }>(
+          `${requestUrl}?cursor=past`,
+          { staleMs: EVENTS_STALE_MS, force },
+          currentUserId,
+        ),
+      ]);
+      const allEvents = [...(upcomingData.events ?? []), ...(pastData.events ?? [])];
+      setEvents(allEvents);
+      setNextCursor(upcomingData.nextCursor ?? null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load events.");
