@@ -324,7 +324,7 @@ export function EventCard({
           </div>
         </div>
       )}
-      <div className="mt-3">{eventBody}</div>
+      <div className="mt-4">{eventBody}</div>
 
       <div className="mt-3 flex items-center justify-between gap-4">
         <button
