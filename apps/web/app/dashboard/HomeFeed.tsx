@@ -339,6 +339,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 currentUserId={currentUserId}
                 isLast
                 communityId={group.item.community_id ?? ""}
+                communityName={group.item.community_name ?? undefined}
+                communityImage={group.item.community_image}
                 onOpen={() => openShowcase(group.item)}
                 onLikeChanged={(liked, count) => updateItems((prev) => prev.map((item) =>
                   item._type === "showcase" && item.id === group.item.id

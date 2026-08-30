@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { CommunityPostLabel } from "../CommunityPostLabel";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { SHOWCASE_CATEGORIES, type ShowcasePost } from "./types";
@@ -15,6 +16,8 @@ interface ShowcaseCardProps {
   currentUserId: string;
   isLast?: boolean;
   communityId: string;
+  communityName?: string;
+  communityImage?: string | null;
   onOpen?: () => void;
   onLikeChanged: (liked: boolean, count: number) => void;
   onSaveChanged: (saved: boolean) => void;
@@ -26,6 +29,8 @@ export function ShowcaseCard({
   post,
   currentUserId,
   communityId,
+  communityName,
+  communityImage,
   onOpen,
   onLikeChanged,
   onSaveChanged,
@@ -119,6 +124,7 @@ export function ShowcaseCard({
         </button>
 
         <div className="flex-1" />
+        {communityName && <CommunityPostLabel communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
     </article>
   );
