@@ -9,7 +9,6 @@ interface BaseContent {
   community_id: string;
   user_id: string;
   title: string;
-  description: string | null;
   is_public: boolean;
   created_at: string;
   updated_at: string;

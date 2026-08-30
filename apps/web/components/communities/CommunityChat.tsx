@@ -146,7 +146,6 @@ export function CommunityChat({
         community_id: thread.community_id,
         user_id: thread.user_id,
         title: thread.title,
-        description: thread.description,
         category: thread.category,
         attachments: thread.attachments ?? [],
         created_at: thread.created_at,

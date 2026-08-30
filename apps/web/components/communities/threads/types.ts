@@ -49,7 +49,6 @@ export interface CommunityThread {
   community_id: string;
   user_id: string;
   title: string;
-  description: string;
   category: ThreadCategory;
   tags: string[];
   attachments: ThreadAttachment[];

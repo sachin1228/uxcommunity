@@ -482,7 +482,6 @@ export function ThreadDetailClient({
               thread={thread}
               currentUserId={currentUserId}
               communityId={communityId}
-              variant="detail"
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
               onUpdated={handleUpdated}

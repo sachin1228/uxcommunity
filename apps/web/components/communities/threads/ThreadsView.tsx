@@ -16,6 +16,7 @@ import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./types";
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
@@ -37,6 +38,7 @@ export function ThreadsView({
   onThreadCreated?: (thread: CommunityThread) => void;
 }) {
   initRequestCache(currentUserId);
+  const router = useGuardedRouter();
   const requestUrl = `/api/communities/${communityId}/threads`;
   const cached = getCachedRequest<{ threads?: CommunityThread[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [threads, setThreads] = useState<CommunityThread[]>(() => cached?.threads ?? []);
@@ -285,8 +287,7 @@ export function ThreadsView({
                   onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}
                   onDeleted={handleDeleted}
-                  isLast={index === filteredThreads.length - 1}
-                  cardStyle="card"
+                  onOpen={() => router.push(`/dashboard/communities/${communityId}/threads/${thread.id}`)}
                 />
               ))}
               {hasMore && (
