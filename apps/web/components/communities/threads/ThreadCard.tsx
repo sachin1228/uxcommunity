@@ -587,6 +587,7 @@ export function ThreadCard({
 
         {communityName && communityNamePlacement === "below" && (
           <CommunityPostLabel
+            communityId={communityId}
             communityName={communityName}
             communityImage={communityImage}
             className="min-w-0 justify-end text-right"
