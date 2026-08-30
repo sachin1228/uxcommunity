@@ -4,14 +4,15 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
-async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string) {
-  const postQuery = db.from("community_showcase_posts").select("id, is_public").eq("id", postId).eq("community_id", communityId);
+async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
+  const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
   const [membership, { data: postRaw }] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     postQuery.maybeSingle(),
   ]);
-  const post = postRaw as { is_public: boolean } | null;
+  const post = postRaw as { is_public: boolean; allow_replies: boolean } | null;
   if (!post) return false;
+  if (requireRepliesEnabled && !post.allow_replies) return false;
   // Non-members can still comment on a community post that was published
   // publicly — the home feed surfaces these to everyone.
   return Boolean(membership) || post.is_public === true;
@@ -38,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id, postId } = await params; const userId = session.userId!; const db = createServiceClient();
-  if (!(await access(db, id, postId, userId))) return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  if (!(await access(db, id, postId, userId, true))) return NextResponse.json({ error: "Comments are not allowed on this showcase." }, { status: 403 });
   const limit = await rateLimit(`showcase:comment:${userId}:60s`, 15, 60); if (!limit.success) return NextResponse.json({ error: "Too many comments." }, { status: 429 });
   let payload: Record<string, unknown>; try { payload = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const body = typeof payload.body === "string" ? payload.body.trim() : ""; const parentId = typeof payload.parent_id === "string" ? payload.parent_id : null;

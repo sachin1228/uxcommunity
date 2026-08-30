@@ -292,19 +292,19 @@ export function ShowcaseDetailClient({
         <BackLink
           href={backHref ?? `/dashboard/communities/${communityId}?tab=showcase`}
           label={backLabel ?? "Showcase"}
-          className={`mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted ${communityFeedLayout.detailSection}`}
+          className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted"
         />
         <ShowcaseCard
           post={post}
           currentUserId={currentUserId}
-          variant="detail"
           communityId={communityId}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
-        <section className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
+        {post.allow_replies !== false && (
+        <section className={`mt-6 ${communityFeedLayout.card}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
             {post.comment_count}{" "}
             {post.comment_count === 1 ? "Comment" : "Comments"}
@@ -332,7 +332,6 @@ export function ShowcaseDetailClient({
                     communityId={communityId}
                     postId={post.id}
                     currentUserId={currentUserId}
-                    reply
                     onPosted={posted}
                     onDeleted={deleted}
                   />
@@ -340,12 +339,13 @@ export function ShowcaseDetailClient({
               </div>
             ))}
             {!comments.length && (
-              <p className="py-12 text-center font-body text-sm text-foreground-muted">
+              <p className="text-center font-body text-sm text-foreground-muted">
                 No comments yet. Be the first!
               </p>
             )}
           </div>
         </section>
+        )}
       </div>
       {editing && (
         <CreateShowcaseModal
