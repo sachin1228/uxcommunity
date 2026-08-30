@@ -14,7 +14,6 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import type { ShowcasePost } from "@/components/communities/showcase/types";
 
 import { communityFeedLayout } from "@/components/communities/feed-layout";
-import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
@@ -302,31 +301,20 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "event") {
           return (
             <li key={`event-${group.item.id}`} className={cardClassName}>
-              <div className={`${communityFeedLayout.row} relative`}>
-                <PostAuthorMeta
-                  name={group.item.users?.name}
-                  avatarUrl={group.item.users?.avatar_url}
-                  createdAt={group.item.created_at}
-                  dateInline
-                  secondaryLabel={`Event · ${group.item.is_online ? "Online" : group.item.location ?? "Offline"}`}
-                  className="mb-3"
-                />
-                <EventCard
-                  event={{ ...group.item, community_id: group.item.community_id ?? "" }}
-                  rsvps={group.item.rsvps}
-                  currentUserId={currentUserId}
-                  communityId={group.item.community_id ?? ""}
-                  detailHref={group.item.community_id ? `/dashboard/communities/${group.item.community_id}/events/${group.item.id}` : undefined}
-                  menuInPostHeader
-                  communityName={group.item.community_name ?? undefined}
-                  communityImage={group.item.community_image}
-                  onUpdated={handleEventUpdated}
-                  onDeleted={handleEventDeleted}
-                  onRsvpChanged={handleEventRsvpChanged}
-                  onLikeChanged={handleEventLikeChanged}
-                  onSaveChanged={handleEventSaveChanged}
-                />
-              </div>
+              <EventCard
+                event={{ ...group.item, community_id: group.item.community_id ?? "" }}
+                rsvps={group.item.rsvps}
+                currentUserId={currentUserId}
+                communityId={group.item.community_id ?? ""}
+                communityName={group.item.community_name ?? undefined}
+                communityImage={group.item.community_image}
+                onOpen={() => group.item.community_id ? router.push(`/dashboard/communities/${group.item.community_id}/events/${group.item.id}`) : undefined}
+                onUpdated={handleEventUpdated}
+                onDeleted={handleEventDeleted}
+                onRsvpChanged={handleEventRsvpChanged}
+                onLikeChanged={handleEventLikeChanged}
+                onSaveChanged={handleEventSaveChanged}
+              />
             </li>
           );
         }

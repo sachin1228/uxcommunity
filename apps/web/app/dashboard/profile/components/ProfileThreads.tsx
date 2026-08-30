@@ -16,7 +16,6 @@ import type { CommunityResource } from "@/components/communities/resources/types
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
-import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 
 type Tab = "threads" | "events" | "resources" | "saved";
@@ -333,26 +332,19 @@ export function ProfileThreads({
           ) : (
             <div className="space-y-3">
               {events.map((event) => (
-                  <div key={event.id}>
-                    <PostAuthorMeta
-                      name={event.users?.name}
-                      avatarUrl={event.users?.avatar_url}
-                      createdAt={event.created_at}
-                      dateInline
-                      secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                      className="mb-3"
-                    />
-                    <EventCard
-                      event={patchUser(event)}
-                      currentUserId={currentUserId}
-                      communityId={event.community_id}
-                      onUpdated={handleEventUpdated(event.id)}
-                      onDeleted={handleEventDeleted}
-                      onRsvpChanged={handleRsvpChanged}
-                      onLikeChanged={handleEventLikeChanged}
-                      onSaveChanged={handleEventSaveChanged}
-                    />
-                  </div>
+                  <EventCard
+                    key={event.id}
+                    event={patchUser(event)}
+                    currentUserId={currentUserId}
+                    communityId={event.community_id}
+                    communityName={event.community?.name}
+                    onOpen={() => router.push(`/dashboard/communities/${event.community_id}/events/${event.id}`)}
+                    onUpdated={handleEventUpdated(event.id)}
+                    onDeleted={handleEventDeleted}
+                    onRsvpChanged={handleRsvpChanged}
+                    onLikeChanged={handleEventLikeChanged}
+                    onSaveChanged={handleEventSaveChanged}
+                  />
               ))}
             </div>
           )
@@ -430,62 +422,55 @@ export function ProfileThreads({
                 if (item.type === "event") {
                   const event = item.data;
                   return (
-                    <div key={`event-${event.id}`}>
-                      <PostAuthorMeta
-                        name={event.users?.name}
-                        avatarUrl={event.users?.avatar_url}
-                        createdAt={event.created_at}
-                        dateInline
-                        secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                        className="mb-3"
-                      />
-                      <EventCard
-                        event={patchUser(event)}
-                        currentUserId={currentUserId}
-                        communityId={event.community_id}
-                        onUpdated={(updated) =>
-                          setSavedItems((current) =>
-                            current.map((i) =>
-                              i.type === "event" && i.data.id === event.id
-                                ? { ...i, data: { ...i.data, ...updated } }
-                                : i,
-                            ),
-                          )
-                        }
-                        onDeleted={(eventId) =>
-                          setSavedItems((current) =>
-                            current.filter((i) => !(i.type === "event" && i.data.id === eventId)),
-                          )
-                        }
-                        onRsvpChanged={(eventId, rsvped, count) =>
-                          setSavedItems((current) =>
-                            current.map((i) =>
-                              i.type === "event" && i.data.id === event.id
-                                ? { ...i, data: { ...i.data, user_rsvped: rsvped, rsvp_count: count } }
-                                : i,
-                            ),
-                          )
-                        }
-                        onLikeChanged={(eventId, liked, count) =>
-                          setSavedItems((current) =>
-                            current.map((i) =>
-                              i.type === "event" && i.data.id === eventId
-                                ? { ...i, data: { ...i.data, user_liked: liked, like_count: count } }
-                                : i,
-                            ),
-                          )
-                        }
-                        onSaveChanged={(eventId, saved, count) =>
-                          setSavedItems((current) =>
-                            current.map((i) =>
-                              i.type === "event" && i.data.id === event.id
-                                ? { ...i, data: { ...i.data, user_saved: saved, save_count: count } }
-                                : i,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
+                    <EventCard
+                      key={`event-${event.id}`}
+                      event={patchUser(event)}
+                      currentUserId={currentUserId}
+                      communityId={event.community_id}
+                      communityName={event.community?.name}
+                      onOpen={() => router.push(`/dashboard/communities/${event.community_id}/events/${event.id}`)}
+                      onUpdated={(updated) =>
+                        setSavedItems((current) =>
+                          current.map((i) =>
+                            i.type === "event" && i.data.id === event.id
+                              ? { ...i, data: { ...i.data, ...updated } }
+                              : i,
+                          ),
+                        )
+                      }
+                      onDeleted={(eventId) =>
+                        setSavedItems((current) =>
+                          current.filter((i) => !(i.type === "event" && i.data.id === eventId)),
+                        )
+                      }
+                      onRsvpChanged={(eventId, rsvped, count) =>
+                        setSavedItems((current) =>
+                          current.map((i) =>
+                            i.type === "event" && i.data.id === event.id
+                              ? { ...i, data: { ...i.data, user_rsvped: rsvped, rsvp_count: count } }
+                              : i,
+                          ),
+                        )
+                      }
+                      onLikeChanged={(eventId, liked, count) =>
+                        setSavedItems((current) =>
+                          current.map((i) =>
+                            i.type === "event" && i.data.id === eventId
+                              ? { ...i, data: { ...i.data, user_liked: liked, like_count: count } }
+                              : i,
+                          ),
+                        )
+                      }
+                      onSaveChanged={(eventId, saved, count) =>
+                        setSavedItems((current) =>
+                          current.map((i) =>
+                            i.type === "event" && i.data.id === event.id
+                              ? { ...i, data: { ...i.data, user_saved: saved, save_count: count } }
+                              : i,
+                          ),
+                        )
+                      }
+                    />
                   );
                 }
 

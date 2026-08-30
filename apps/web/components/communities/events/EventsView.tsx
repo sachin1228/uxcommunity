@@ -10,9 +10,9 @@ import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { communityFeedLayout } from "../feed-layout";
-import { PostAuthorMeta } from "../PostAuthorMeta";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 const EVENTS_STALE_MS = 60_000;
 
@@ -24,6 +24,7 @@ export function EventsView({
   currentUserId: string;
 }) {
   initRequestCache(currentUserId);
+  const router = useGuardedRouter();
   const requestUrl = `/api/communities/${communityId}/events`;
   const cached = getCachedRequest<{ events?: CommunityEvent[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.events ?? []);
@@ -221,18 +222,7 @@ export function EventsView({
               const isPast = new Date(event.end_date ?? event.event_date) < now;
 
               return (
-                <article
-                  key={event.id}
-                  className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive} relative ${isPast ? "opacity-60" : ""}`}
-                >
-                  <PostAuthorMeta
-                    name={event.users?.name}
-                    avatarUrl={event.users?.avatar_url}
-                    createdAt={event.created_at}
-                    dateInline
-                    secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? "Offline"}`}
-                    className="mb-3"
-                  />
+                <div key={event.id} className={isPast ? "opacity-60" : ""}>
                   <EventCard
                     event={event}
                     currentUserId={currentUserId}
@@ -242,9 +232,9 @@ export function EventsView({
                     onRsvpChanged={handleRsvpChanged}
                     onLikeChanged={handleLikeChanged}
                     onSaveChanged={handleSaveChanged}
-                    menuInPostHeader
+                    onOpen={() => router.push(`/dashboard/communities/${communityId}/events/${event.id}`)}
                   />
-                </article>
+                </div>
               );
             })}
             {nextCursor && (

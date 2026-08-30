@@ -31,13 +31,14 @@ async function enrichEvents(
   const eventIds = rows.map((r) => r.id as string);
   const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
 
-  const [{ data: users }, { data: profiles }, aggregatesResult] = await Promise.all([
+  const [{ data: users }, { data: profiles }, aggregatesResult, commentCountsResult] = await Promise.all([
     db.from("users").select("id, name").in("id", authorIds),
     db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
     callPerformanceRpc(db, "get_event_list_aggregates", {
       p_user_id: currentUserId,
       p_event_ids: eventIds,
     }),
+    db.from("event_comments").select("event_id").in("event_id", eventIds),
   ]);
 
   if (aggregatesResult.error) {
@@ -50,6 +51,12 @@ async function enrichEvents(
   const aggregateMap = new Map(
     (aggregatesResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]),
   );
+
+  // Count comments per event
+  const commentCountMap = new Map<string, number>();
+  for (const row of (commentCountsResult.data ?? []) as Array<{ event_id: string }>) {
+    commentCountMap.set(row.event_id, (commentCountMap.get(row.event_id) ?? 0) + 1);
+  }
 
   return rows.map((row) => {
     const authorId = row.user_id as string;
@@ -65,6 +72,7 @@ async function enrichEvents(
       user_liked: aggregate?.user_liked === true,
       save_count: Number(aggregate?.save_count ?? 0),
       user_saved: aggregate?.user_saved === true,
+      comment_count: commentCountMap.get(row.id as string) ?? 0,
     };
   });
 }
