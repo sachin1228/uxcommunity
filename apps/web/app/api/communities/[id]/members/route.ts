@@ -117,6 +117,9 @@ export async function GET(
 
 /**
  * DELETE /api/communities/[id]/members — leave the community.
+ *
+ * For private communities, also cleans up any join request history so the user
+ * must request approval again if they want to rejoin.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -128,6 +131,14 @@ export async function DELETE(
   const { id: communityId } = await params;
   const db = createServiceClient();
 
+  // Check if community is private before leaving
+  const { data: community } = await db
+    .from("communities")
+    .select("is_private")
+    .eq("id", communityId)
+    .maybeSingle();
+
+  // Delete membership
   const { error } = await db
     .from("community_members")
     .delete()
@@ -137,5 +148,15 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: "Failed to leave community." }, { status: 500 });
   }
+
+  // For private communities, clean up join request history so user must request again
+  if (community?.is_private) {
+    await db
+      .from("community_join_requests")
+      .delete()
+      .eq("community_id", communityId)
+      .eq("user_id", userId);
+  }
+
   return NextResponse.json({ success: true });
 }

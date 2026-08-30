@@ -144,6 +144,8 @@ export interface CachedExploreCommunity {
   joined: boolean;
   /** Whether the current user is allowed to join this community based on their profile. */
   can_join: boolean;
+  /** Whether the user has a pending join request for this private community. */
+  has_pending_request?: boolean;
 }
 
 export const exploreStore: {

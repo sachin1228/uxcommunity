@@ -130,13 +130,20 @@ function CommunityCard({
                 document.body
               )}
             </>
+          ) : c.has_pending_request ? (
+            <button
+              disabled
+              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
+            >
+              Request sent
+            </button>
           ) : (
             <button
               onClick={() => onJoin(c.id)}
               disabled={joining}
               className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
             >
-              {joining ? "…" : "Join"}
+              {joining ? "…" : c.is_private ? "Request to join" : "Join"}
             </button>
           )}
         </div>
@@ -210,8 +217,9 @@ export default function CommunitiesIndexPage() {
 
     try {
       const res = await dedupeFetch(`/api/communities/${communityId}/join`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         // Roll back optimistic update on failure
         setCommunities((prev) =>
           prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
@@ -225,6 +233,21 @@ export default function CommunitiesIndexPage() {
           };
         }
         setErrorMsg(data.error ?? "Failed to join. Please try again.");
+        setTimeout(() => setErrorMsg(null), 4000);
+      } else if (data.status === "requested") {
+        // Private community — request sent, not yet a member
+        setCommunities((prev) =>
+          prev.map((c) => c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c),
+        );
+        if (exploreStore.data) {
+          exploreStore.data = {
+            ...exploreStore.data,
+            communities: exploreStore.data.communities.map((c) =>
+              c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c,
+            ),
+          };
+        }
+        setErrorMsg("Request sent! Waiting for owner approval.");
         setTimeout(() => setErrorMsg(null), 4000);
       }
     } catch {
