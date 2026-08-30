@@ -2,22 +2,16 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
-import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string) {
-  let postQuery = db.from("community_showcase_posts").select("id, is_public").eq("id", postId);
-  postQuery = isPublicContentScope(communityId)
-    ? postQuery.is("community_id", null).eq("is_public", true)
-    : postQuery.eq("community_id", communityId);
-  const postPromise = postQuery.maybeSingle();
-  const membershipPromise = isPublicContentScope(communityId)
-    ? Promise.resolve({ data: { joined_at: "" } })
-    : db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
-  const [{ data: membership }, { data: postRaw }] = await Promise.all([membershipPromise, postPromise]);
+  const postQuery = db.from("community_showcase_posts").select("id, is_public").eq("id", postId).eq("community_id", communityId);
+  const [membership, { data: postRaw }] = await Promise.all([
+    db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    postQuery.maybeSingle(),
+  ]);
   const post = postRaw as { is_public: boolean } | null;
   if (!post) return false;
-  if (isPublicContentScope(communityId)) return true;
   // Non-members can still comment on a community post that was published
   // publicly — the home feed surfaces these to everyone.
   return Boolean(membership) || post.is_public === true;

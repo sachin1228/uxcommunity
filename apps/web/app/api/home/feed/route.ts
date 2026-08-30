@@ -15,7 +15,7 @@ function isHomeFeedItem(item: Json): item is HomeFeedObject {
   if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
   const kind = item._type;
   return (kind === "thread" || kind === "event" || kind === "resource" || kind === "showcase")
-    && (kind === "thread" || (item.community_id !== null && item.community_id !== undefined));
+    && item.community_id !== null && item.community_id !== undefined;
 }
 
 function normalizeHomeFeedItem(item: HomeFeedObject): Json {
