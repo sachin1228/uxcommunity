@@ -18,7 +18,7 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
   const post = { ...row, author: { name: author?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: enriched.length, user_liked: Boolean(myLike), user_saved: Boolean(mySave) } as ShowcasePost;
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[40rem] pb-6 pt-6">
+      <div className="mx-auto w-full max-w-[40rem]">
         <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} backHref="/dashboard" backLabel="Home" />
       </div>
     </div>
