@@ -304,7 +304,7 @@ export function EventCard({
             avatarUrl={event.users?.avatar_url}
             createdAt={event.created_at}
             dateInline
-            secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? communityName}`}
+            secondaryLabel={event.is_online ? "Event · Online" : event.location ? `Event · ${event.location}` : "Event"}
           />
           <div onClick={(e) => e.preventDefault()}>
             <EventOptionsMenu
