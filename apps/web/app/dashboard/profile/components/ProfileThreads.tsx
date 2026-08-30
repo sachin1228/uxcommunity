@@ -17,6 +17,7 @@ import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 type Tab = "threads" | "events" | "resources" | "saved";
 
@@ -67,6 +68,7 @@ export function ProfileThreads({
   const [threads, setThreads]     = useState(initialThreads);
   const pendingLikes              = useRef<Set<string>>(new Set());
   const isVisible = useDocumentVisible();
+  const router = useGuardedRouter();
 
   // ── Events tab ────────────────────────────────────────────────────────────
   const [events, setEvents]           = useState<ProfileEvent[]>([]);
@@ -312,6 +314,7 @@ export function ProfileThreads({
                   onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}
                   onDeleted={handleDeleted}
+                  onOpen={() => router.push(`/dashboard/communities/${thread.community_id}/threads/${thread.id}`)}
                 />
               ))}
             </div>
@@ -419,6 +422,7 @@ export function ProfileThreads({
                         );
                         handleDeleted(threadId);
                       }}
+                      onOpen={() => router.push(`/dashboard/communities/${thread.community_id}/threads/${thread.id}`)}
                     />
                   );
                 }

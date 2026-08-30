@@ -12,21 +12,10 @@ import { CategoryIcon } from "./categoryIcons";
 import { CATEGORY_COLORS } from "./threadShared";
 import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
-/** Derive a title (≤120 chars) and description from the single composer body. */
-function bodyToThread(body: string): { title: string; description: string } {
+/** Derive a title (≤120 chars) from the composer body. */
+function bodyToTitle(body: string): string {
   const trimmed = body.trim();
-  const firstLine = trimmed.split("\n")[0]?.trim() ?? "";
-  const title = (firstLine || trimmed).slice(0, 120) || "Thread";
-  return { title, description: trimmed || title };
-}
-
-/** Reconstruct a single composer body from existing title + description. */
-function threadToBody(thread: CommunityThread): string {
-  const { title, description } = thread;
-  // If description already starts with the title (new-format threads), use description as-is.
-  if (description.startsWith(title)) return description;
-  // Old-format threads: combine title + description.
-  return description ? `${title}\n\n${description}` : title;
+  return trimmed.slice(0, 120) || "Thread";
 }
 
 // ── Shared image grid (used inside the modal for previews with remove buttons) ──
@@ -134,7 +123,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
-  const [body,           setBody]           = useState(() => threadToBody(thread));
+  const [body,           setBody]           = useState(thread.title);
   const [category,       setCategory]       = useState<ThreadCategory>(thread.category);
   const [tags,           setTags]           = useState<string[]>(thread.tags);
   const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
@@ -225,14 +214,14 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
       setError("Write something before saving.");
       return;
     }
-    const { title, description } = bodyToThread(body);
+    const title = bodyToTitle(body);
     setSaving(true);
     setError(null);
     try {
       const response = await fetch(`/api/communities/${communityId}/threads/${thread.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic }),
+        body: JSON.stringify({ title, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Failed to update thread.");

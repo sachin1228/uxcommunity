@@ -293,7 +293,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onLikeChanged={handleThreadLikeChanged}
                 onSaveChanged={handleThreadSaveChanged}
                 onDeleted={handleThreadDeleted}
-                isLast
+                onOpen={() => router.push(`/dashboard/threads/${group.item.id}`)}
               />
             </li>
           );
