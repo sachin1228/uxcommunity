@@ -308,7 +308,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 communityId={group.item.community_id ?? ""}
                 communityName={group.item.community_name ?? undefined}
                 communityImage={group.item.community_image}
-                onOpen={() => group.item.community_id ? router.push(`/dashboard/communities/${group.item.community_id}/events/${group.item.id}`) : undefined}
+                onOpen={() => router.push(`/dashboard/events/${group.item.id}`)}
                 onUpdated={handleEventUpdated}
                 onDeleted={handleEventDeleted}
                 onRsvpChanged={handleEventRsvpChanged}
