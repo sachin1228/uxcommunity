@@ -65,13 +65,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!limit.success) return NextResponse.json({ error: "Too many posts. Try again shortly." }, { status: 429 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  const description = typeof body.description === "string" ? body.description.trim() : "";
   const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : "";
   const category = typeof body.category === "string" ? body.category : "";
   const isPublic = body.is_public === true;
-  if (!title || title.length > 120 || description.length > 1200 || !imageUrl || imageUrl.length > 2048) return NextResponse.json({ error: "Check the title, description, and preview image." }, { status: 422 });
+  if (!title || title.length > 120 || !imageUrl || imageUrl.length > 2048) return NextResponse.json({ error: "Check the title and preview image." }, { status: 422 });
   if (!CATEGORIES.has(category)) return NextResponse.json({ error: "Invalid category." }, { status: 422 });
-  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, description, image_url: imageUrl, category, is_public: isPublic }).select("*").single();
+  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, category, is_public: isPublic }).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }

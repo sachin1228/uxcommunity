@@ -78,12 +78,6 @@ export function ShowcaseCard({
         {post.title}
       </h2>
 
-      {post.description && (
-        <p className="mt-1.5 font-body text-xs leading-relaxed text-foreground-muted line-clamp-3">
-          {post.description}
-        </p>
-      )}
-
       <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
         <img
           src={post.image_url}
