@@ -7,8 +7,9 @@ import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { LinkPreviewCard } from "./LinkPreviewCard";
+import { FigmaEmbed } from "./FigmaEmbed";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
-import { parseFigmaUrl } from "@/lib/communities/figma";
+import { parseFigmaUrl, getFigmaEmbedUrl } from "@/lib/communities/figma";
 import {
   fetchLinkPreview,
   isLinkPreviewLoading,
@@ -49,6 +50,7 @@ export function ResourceFormModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const figmaLink = useMemo(() => parseFigmaUrl(url), [url]);
+  const hasFigmaPrototype = useMemo(() => getFigmaEmbedUrl(url) !== null, [url]);
 
   // Link preview state
   const [preview, setPreview] = useState<LinkPreviewData | null>(null);
@@ -257,7 +259,7 @@ export function ResourceFormModal({
           </label>
 
           {/* Figma detection banner */}
-          {!isEdit && figmaLink && (
+          {figmaLink && (
             <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
               <Check size={14} aria-hidden="true" />
               <span className="font-body text-xs font-medium">
@@ -266,8 +268,10 @@ export function ResourceFormModal({
             </div>
           )}
 
-          {/* Link preview card */}
-          {showPreview && (
+          {/* Figma prototype embed or link preview */}
+          {hasFigmaPrototype ? (
+            <FigmaEmbed url={url} compact />
+          ) : showPreview ? (
             <div className="relative">
               {previewLoading && !preview && (
                 <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
@@ -284,7 +288,7 @@ export function ResourceFormModal({
                 />
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Tags */}
           <div className="relative">
