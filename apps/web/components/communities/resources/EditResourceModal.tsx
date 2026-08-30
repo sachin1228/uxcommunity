@@ -167,6 +167,43 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
         </div>
 
         <div className="mt-6 space-y-5">
+          {/* Description */}
+          <label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+              Description <span className="text-accent">*</span>
+            </span>
+            <textarea
+              value={description}
+              maxLength={2000}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              required
+              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+            />
+          </label>
+
+          {/* Resource type */}
+          <fieldset>
+            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">Type</legend>
+            <div className="flex flex-wrap gap-2">
+              {RESOURCE_TYPES.map((t) => (
+                <button
+                  key={t.value}
+                  type="button"
+                  onClick={() => setResourceType(t.value)}
+                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
+                    resourceType === t.value
+                      ? "border-accent bg-accent/15 text-accent"
+                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
+                  }`}
+                >
+                  <ResourceTypeIcon type={t.value} size={11} />
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
           {/* URL */}
           <label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
@@ -207,58 +244,6 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
               )}
             </div>
           )}
-
-          {/* Resource type */}
-          <fieldset>
-            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">Type</legend>
-            <div className="flex flex-wrap gap-2">
-              {RESOURCE_TYPES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setResourceType(t.value)}
-                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
-                    resourceType === t.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-                  }`}
-                >
-                  <ResourceTypeIcon type={t.value} size={11} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Description */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="text-accent">*</span>
-            </span>
-            <textarea
-              value={description}
-              maxLength={2000}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              required
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-            />
-          </label>
-
-          {/* Share publicly */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <Globe size={15} className="shrink-0 text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
 
           {/* Tags */}
           <div className="relative">
@@ -319,6 +304,21 @@ export function EditResourceModal({ resource, communityId, onClose, onUpdated }:
               </div>
             )}
           </div>
+
+          {/* Share publicly */}
+          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
+            <span className="flex items-center gap-2.5">
+              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <span>
+                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
+                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
+              </span>
+            </span>
+            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
+              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
+              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
+            </span>
+          </label>
         </div>
 
         {error && (
