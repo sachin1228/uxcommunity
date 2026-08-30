@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarCheck2, CalendarClock, CalendarDays, CalendarX2, Plus } from "lucide-react";
+import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
 import { RealtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -32,7 +32,7 @@ export function EventsView({
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
+  const [filter, setFilter] = useState<"upcoming" | "past">("upcoming");
   const isVisible = useDocumentVisible();
 
   const fetchEvents = useCallback(async (background = false, force = false) => {
@@ -169,7 +169,6 @@ export function EventsView({
         {!loading && events.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
             {[
-              { value: "all" as const, label: "All events", icon: CalendarDays },
               { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock },
               { value: "past" as const, label: "Past", icon: CalendarCheck2 },
             ].map((item) => {
@@ -218,10 +217,7 @@ export function EventsView({
           </div>
         ) : (
           <div className={communityFeedLayout.cardList}>
-            {[
-              ...(filter === "all" || filter === "upcoming" ? upcoming : []),
-              ...(filter === "all" || filter === "past" ? past : []),
-            ].map((event) => {
+            {(filter === "upcoming" ? upcoming : past).map((event) => {
               const isPast = new Date(event.end_date ?? event.event_date) < now;
 
               return (
