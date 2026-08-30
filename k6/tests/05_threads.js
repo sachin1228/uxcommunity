@@ -43,7 +43,6 @@ export function threadTests() {
       `${BASE_URL}/api/communities/${COMMUNITY_ID}/threads`,
       JSON.stringify({
         title:       `k6 test thread [VU:${__VU} ITER:${__ITER}]`,
-        description: 'Automated stress test thread — safe to delete.',
         category:    'discussion', // valid: question|discussion|idea|feedback|referral|collaboration
         tags:        ['k6', 'test'],
         links:       [],
@@ -138,12 +137,11 @@ export function threadTests() {
       });
     }
 
-    group('threads — patch (update title + description)', () => {
+    group('threads — patch (update title)', () => {
       const res = http.patch(
         `${BASE_URL}/api/communities/${COMMUNITY_ID}/threads/${threadId}`,
         JSON.stringify({
           title:       `k6 updated thread [VU:${__VU}]`,
-          description: 'Updated by k6 stress test — safe to delete.',
           category:    'discussion',
           tags:        [],
           links:       [],

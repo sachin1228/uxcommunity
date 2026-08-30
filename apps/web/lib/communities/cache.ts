@@ -42,7 +42,6 @@ export interface CachedThreadEvent {
   community_id: string;
   user_id: string;
   title: string;
-  description: string;
   category: string;
   attachments: Array<{ name: string; url: string; type: string; size: number }>;
   created_at: string;

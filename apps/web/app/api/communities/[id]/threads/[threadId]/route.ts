@@ -91,7 +91,7 @@ export async function GET(
 
   let threadQuery = db
     .from("community_threads")
-    .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
     .eq("id", threadId);
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
@@ -134,7 +134,6 @@ export async function PATCH(
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request body." }, { status: 400 }); }
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  const description = typeof body.description === "string" ? body.description.trim() : "";
   const category = body.category as ThreadCategory;
   const tags = normalizeTags(body.tags);
   const links = normalizeLinks(body.links);
@@ -143,10 +142,9 @@ export async function PATCH(
   const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
-  if (!description || description.length > 10000) return NextResponse.json({ error: "Description is required and must be 10,000 characters or fewer." }, { status: 422 });
   if (!CATEGORIES.has(category) || !tags || !links || !attachments) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
 
-  const text = `${title}\n\n${description}`;
+  const text = title;
   const decision = await moderateText({ content: text, contentType: "post", userId });
   if (!decision.allowed) {
     await logModerationDecision(db, { userId, contentType: "post", contentHash: contentHash(text), decision });
@@ -155,9 +153,9 @@ export async function PATCH(
 
   const { data: updated, error } = await db
     .from("community_threads")
-    .update({ title, description, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic })
+    .update({ title, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic })
     .eq("id", threadId)
-    .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
     .single();
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }

@@ -378,37 +378,16 @@ export function ThreadCard({
         </div>
       </div>
 
-      {/* ── Title + Body ──
-          New-format threads store the full body in description (first line = title).
-          Old-format threads have a separate title and description.
-          When description starts with the title we're in new-format: skip the
-          heading and show description directly. */}
-      {(() => {
-        const newFormat = thread.description.trimStart().startsWith(thread.title.trim());
-        if (newFormat) {
-          return (
-            <p className={`mt-3 font-body text-[15px] font-normal leading-relaxed text-foreground ${isDetail ? "whitespace-pre-wrap" : "line-clamp-4"}`}>
-              {renderWithLinks(thread.description, !isDetail)}
-            </p>
-          );
-        }
-        return (
-          <>
-            {isDetail ? (
-              <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
-                {thread.title}
-              </h1>
-            ) : (
-              <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-                {thread.title}
-              </h3>
-            )}
-            <p className={`mt-1.5 font-body text-xs leading-relaxed text-foreground-muted ${isDetail ? "whitespace-pre-wrap" : "line-clamp-3"}`}>
-              {renderWithLinks(thread.description, !isDetail)}
-            </p>
-          </>
-        );
-      })()}
+      {/* ── Title ── */}
+      {isDetail ? (
+        <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
+          {renderWithLinks(thread.title, !isDetail)}
+        </h1>
+      ) : (
+        <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
+          {renderWithLinks(thread.title, !isDetail)}
+        </h3>
+      )}
 
 
       {/* ── Attachments — LinkedIn-style image grid ── */}

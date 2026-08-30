@@ -376,7 +376,6 @@ export function useRealtimeChat({
           community_id: string;
           user_id: string;
           title: string;
-          description: string;
           category: string;
           attachments: Array<{ name: string; url: string; type: string; size: number }>;
           created_at: string;
@@ -391,7 +390,6 @@ export function useRealtimeChat({
           community_id: row.community_id,
           user_id:      row.user_id,
           title:        row.title,
-          description:  row.description,
           category:     row.category,
           attachments:  row.attachments ?? [],
           created_at:   row.created_at,
@@ -435,13 +433,12 @@ export function useRealtimeChat({
       }),
     );
 
-    // ── Thread updated (title / description / category / attachments) ───
+    // ── Thread updated (title / category / attachments) ───
     unsubscribes.push(
       client.on("thread-update", (data) => {
         const row = data as {
           id: string;
           title: string;
-          description: string;
           category: string;
           attachments: Array<{ name: string; url: string; type: string; size: number }>;
         };
@@ -451,7 +448,6 @@ export function useRealtimeChat({
               ? {
                   ...e,
                   title:       row.title,
-                  description: row.description,
                   category:    row.category,
                   attachments: row.attachments ?? [],
                 }

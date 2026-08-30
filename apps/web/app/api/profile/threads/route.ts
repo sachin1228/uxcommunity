@@ -16,7 +16,7 @@ export async function GET() {
   const { data, error } = await db
     .from("community_threads")
     .select(
-      "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at, communities(name)",
+      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, created_at, updated_at, communities(name)",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })

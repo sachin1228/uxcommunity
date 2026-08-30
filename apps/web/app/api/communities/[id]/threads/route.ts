@@ -196,7 +196,6 @@ export async function POST(
   }
 
   const title = typeof body.title === "string" ? body.title.trim() : "";
-  const description = typeof body.description === "string" ? body.description.trim() : "";
   const category = body.category as ThreadCategory;
   const tags = normalizeTags(body.tags);
   const links = normalizeLinks(body.links);
@@ -207,14 +206,11 @@ export async function POST(
   if (!title || title.length > 120) {
     return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
   }
-  if (!description || description.length > 10000) {
-    return NextResponse.json({ error: "Description is required and must be 10,000 characters or fewer." }, { status: 422 });
-  }
   if (!CATEGORIES.has(category) || !tags || !links || !attachments) {
     return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
   }
 
-  const text = `${title}\n\n${description}`;
+  const text = title;
   const decision = await moderateText({ content: text, contentType: "post", userId });
   if (!decision.allowed) {
     await logModerationDecision(db, {
@@ -232,7 +228,6 @@ export async function POST(
       community_id: communityId,
       user_id: userId,
       title,
-      description,
       category,
       tags,
       attachments,
@@ -241,7 +236,7 @@ export async function POST(
       is_public: isPublic,
     })
     .select(
-      "id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at",
+      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at",
     )
     .single();
 

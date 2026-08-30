@@ -12,12 +12,10 @@ import { CategoryIcon } from "./categoryIcons";
 import { CATEGORY_COLORS } from "./threadShared";
 import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
-/** Derive a title (≤120 chars) and description from the single composer body. */
-function bodyToThread(body: string): { title: string; description: string } {
+/** Derive a title (≤120 chars) from the composer body. */
+function bodyToTitle(body: string): string {
   const trimmed = body.trim();
-  const firstLine = trimmed.split("\n")[0]?.trim() ?? "";
-  const title = (firstLine || trimmed).slice(0, 120) || "Thread";
-  return { title, description: trimmed || title };
+  return trimmed.slice(0, 120) || "Thread";
 }
 
 // ── Shared image grid (used inside the modal for previews with remove buttons) ──
@@ -222,7 +220,7 @@ export function CreateThreadModal({
       setError("Write something before posting.");
       return;
     }
-    const { title, description } = bodyToThread(body);
+    const title = bodyToTitle(body);
     const extractedLinks = [...new Set(body.match(/https?:\/\/[^\s<>"]+/g) ?? [])];
     setSaving(true);
     setError(null);
@@ -234,7 +232,6 @@ export function CreateThreadModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          description,
           category,
           tags,
           attachments,

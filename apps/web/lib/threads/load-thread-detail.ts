@@ -14,7 +14,7 @@ type LoadOptions = {
 async function loadThread(db: Database, options: LoadOptions): Promise<CommunityThread | null> {
   let query = db
     .from("community_threads")
-    .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
     .eq("id", options.threadId)
 
   if (options.communityId) query = query.eq("community_id", options.communityId)
