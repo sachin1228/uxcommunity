@@ -178,8 +178,8 @@ export function EventsView({
         {!loading && events.length > 0 && (
           <div className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}>
             {[
-              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock },
-              { value: "past" as const, label: "Past", icon: CalendarCheck2 },
+              { value: "upcoming" as const, label: "Upcoming", icon: CalendarClock, count: upcoming.length },
+              { value: "past" as const, label: "Past", icon: CalendarCheck2, count: past.length },
             ].map((item) => {
               const Icon = item.icon;
               return (
@@ -191,7 +191,7 @@ export function EventsView({
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
                   <Icon size={14} aria-hidden="true" />
-                  {item.label}
+                  {item.label} ({item.count})
                 </button>
               );
             })}
