@@ -9,6 +9,7 @@ interface EventOptionsMenuProps {
   shared?: boolean;
   reported?: boolean;
   isOwner: boolean;
+  past?: boolean;
   deleting?: boolean;
   saving?: boolean;
   className?: string;
@@ -24,6 +25,7 @@ export function EventOptionsMenu({
   shared = false,
   reported = false,
   isOwner,
+  past = false,
   deleting = false,
   saving = false,
   className = "",
@@ -81,7 +83,7 @@ export function EventOptionsMenu({
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
             <Share2 size={12} /> {shared ? "Copied!" : "Share"}
           </button>
-          {isOwner && onEdit && onDelete && (
+          {isOwner && !past && onEdit && onDelete && (
             <>
               <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
                 <Pencil size={12} /> Edit

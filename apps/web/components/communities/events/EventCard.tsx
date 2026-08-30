@@ -287,6 +287,7 @@ export function EventCard({
                   shared={shared}
                   reported={reported}
                   isOwner={isOwner}
+                  past={past}
                   deleting={deleting}
                   saving={savePending}
                   onSave={toggleSave}
@@ -316,6 +317,7 @@ export function EventCard({
             shared={shared}
             reported={reported}
             isOwner={isOwner}
+            past={past}
             deleting={deleting}
             saving={savePending}
             className="absolute right-5 top-6 z-10 md:right-8"
@@ -340,6 +342,7 @@ export function EventCard({
               shared={shared}
               reported={reported}
               isOwner={isOwner}
+              past={past}
               deleting={deleting}
               saving={savePending}
               onSave={toggleSave}
@@ -371,7 +374,7 @@ export function EventCard({
           <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
         )}
       </div>
-      {showEditModal && (
+      {showEditModal && !past && (
         <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
       )}
       <ConfirmDialog
