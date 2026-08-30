@@ -7,12 +7,11 @@ import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
 import { ShowcaseCard } from "@/components/communities/showcase/ShowcaseCard";
-import { ShowcaseDetailClient } from "@/components/communities/showcase/ShowcaseDetailClient";
 import { CreateShowcaseModal } from "@/components/communities/showcase/CreateShowcaseModal";
 import type { CommunityThread } from "@/components/communities/threads/types";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
-import type { ShowcasePost, ShowcaseComment } from "@/components/communities/showcase/types";
+import type { ShowcasePost } from "@/components/communities/showcase/types";
 
 import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { PostAuthorMeta } from "@/components/communities/PostAuthorMeta";
@@ -20,6 +19,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 
 // Feed item as returned by /api/home/feed — typed union
 type FeedThread = Omit<CommunityThread, "community_id"> & { _type: "thread"; community_id: string | null; community_name: string | null; community_image: string | null };
@@ -46,9 +46,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);
   const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
-  const [viewingShowcase, setViewingShowcase] = useState<FeedShowcase | null>(null);
-  const [viewingComments, setViewingComments] = useState<ShowcaseComment[]>([]);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const router = useGuardedRouter();
 
   const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
@@ -177,20 +175,9 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     updateItems((prev) => prev.filter((it) => !(it._type === "resource" && it.id === id)));
   }, [updateItems]);
 
-  const openShowcase = useCallback(async (post: FeedShowcase) => {
-    if (!post.community_id) return;
-    setViewingShowcase(post);
-    setLoadingDetail(true);
-    try {
-      const res = await fetch(`/api/communities/${post.community_id}/showcase/${post.id}/comments`, { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setViewingComments(data.comments ?? []);
-      }
-    } catch { /* ignore */ } finally {
-      setLoadingDetail(false);
-    }
-  }, []);
+  const openShowcase = useCallback((post: FeedShowcase) => {
+    router.push(`/dashboard/showcase/${post.id}`);
+  }, [router]);
 
   const handleShowcaseUpdated = useCallback((updated: ShowcasePost) => {
     setEditingShowcase(null);
@@ -246,34 +233,6 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
       <div role="alert" className="flex flex-col items-center justify-center gap-2 py-20 text-center">
         <p className="font-body text-sm font-medium text-red-400">Couldn&apos;t load your feed</p>
         <p className="max-w-sm font-body text-xs text-foreground-subtle">{error}</p>
-      </div>
-    );
-  }
-
-  if (viewingShowcase && viewingShowcase.community_id) {
-    return (
-      <div className="flex-1 overflow-y-auto">
-        <div className={`${communityFeedLayout.detailContent} pb-6`}>
-          <button
-            type="button"
-            onClick={() => { setViewingShowcase(null); setViewingComments([]); }}
-            className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
-          >
-            ← Home
-          </button>
-          {loadingDetail ? (
-            <div className="flex justify-center py-12"><Spinner size={24} /></div>
-          ) : (
-            <div className="[&>div>div>a:first-child]:hidden">
-              <ShowcaseDetailClient
-                initialPost={{ ...viewingShowcase, community_id: viewingShowcase.community_id }}
-                initialComments={viewingComments}
-                currentUserId={currentUserId}
-                communityId={viewingShowcase.community_id}
-              />
-            </div>
-          )}
-        </div>
       </div>
     );
   }
