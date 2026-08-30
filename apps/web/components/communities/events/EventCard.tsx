@@ -279,24 +279,6 @@ export function EventCard({
                 <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
               )}
             </div>
-            {!isDetail && !menuInPostHeader && (
-              <div onClick={(e) => e.preventDefault()}>
-                <EventOptionsMenu
-                  saved={event.user_saved}
-                  shared={shared}
-                  reported={reported}
-                  isOwner={isOwner}
-                  past={past}
-                  deleting={deleting}
-                  saving={savePending}
-                  onSave={toggleSave}
-                  onShare={() => void handleShare()}
-                  onEdit={() => setShowEditModal(true)}
-                  onDelete={() => setConfirmDelete(true)}
-                  onReport={() => setReported(true)}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -324,7 +306,7 @@ export function EventCard({
             dateInline
             secondaryLabel={`Event · ${event.is_online ? "Online" : event.location ?? communityName}`}
           />
-          {isDetail && (
+          <div onClick={(e) => e.preventDefault()}>
             <EventOptionsMenu
               saved={event.user_saved}
               shared={shared}
@@ -336,13 +318,13 @@ export function EventCard({
               onSave={toggleSave}
               onShare={() => void handleShare()}
               onEdit={() => setShowEditModal(true)}
-              onDelete={() => void handleDelete()}
+              onDelete={() => isDetail ? void handleDelete() : setConfirmDelete(true)}
               onReport={() => setReported(true)}
             />
-          )}
+          </div>
         </div>
       )}
-      {isDetail ? eventBody : eventBody}
+      {eventBody}
 
       <div className="mt-3 flex items-center justify-between gap-4">
         <button
