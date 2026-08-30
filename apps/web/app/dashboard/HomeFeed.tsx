@@ -253,7 +253,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   if (viewingShowcase && viewingShowcase.community_id) {
     return (
       <div className="flex-1 overflow-y-auto">
-        <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
+        <div className={`${communityFeedLayout.detailContent} pb-6`}>
           {loadingDetail ? (
             <div className="flex justify-center py-12"><Spinner size={24} /></div>
           ) : (
@@ -262,7 +262,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               initialComments={viewingComments}
               currentUserId={currentUserId}
               communityId={viewingShowcase.community_id}
-              backHref="/home"
+              backHref="/dashboard"
               backLabel="Home"
             />
           )}
