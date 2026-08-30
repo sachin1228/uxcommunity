@@ -95,12 +95,13 @@ export function ShowcaseCard({
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
           aria-pressed={post.user_liked}
           aria-busy={likePending}
-          className="inline-flex items-center gap-2"
+          className="group/like inline-flex items-center gap-2"
         >
           <Heart
             size={20}
+            strokeWidth={2}
             fill={post.user_liked ? "currentColor" : "none"}
-            className={post.user_liked ? "text-red-500" : "text-foreground"}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-red-500" : "text-foreground"}`}
           />
           <span className="font-body text-sm font-semibold text-foreground">
             {post.like_count}
