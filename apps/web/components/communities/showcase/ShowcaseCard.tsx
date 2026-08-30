@@ -136,7 +136,7 @@ export function ShowcaseCard({
             className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground"
           >
             <MessageCircle size={20} />
-            {post.comment_count} {post.comment_count === 1 ? "comment" : "comments"}
+            {post.comment_count}
           </button>
         )}
 
