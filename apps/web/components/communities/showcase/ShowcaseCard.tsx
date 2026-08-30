@@ -8,7 +8,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
-import { type ShowcasePost } from "./types";
+import { SHOWCASE_CATEGORIES, type ShowcasePost } from "./types";
 
 interface ShowcaseCardProps {
   post: ShowcasePost;
@@ -44,7 +44,7 @@ export function ShowcaseCard({
     onLikeChanged,
     onSaveChanged,
   });
-  const typeLabel = "Showcase";
+  const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
 
   const card = (
     <>
@@ -54,7 +54,7 @@ export function ShowcaseCard({
           avatarUrl={post.author.avatar_url}
           createdAt={post.created_at}
           dateInline
-          secondaryLabel={`Showcase · ${typeLabel}`}
+          secondaryLabel={`Showcase · ${categoryLabel}`}
         />
         <ShowcaseOptionsMenu
           saved={post.user_saved}
