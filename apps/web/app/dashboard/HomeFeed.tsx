@@ -254,17 +254,24 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     return (
       <div className="flex-1 overflow-y-auto">
         <div className={`${communityFeedLayout.detailContent} pb-6`}>
+          <button
+            type="button"
+            onClick={() => { setViewingShowcase(null); setViewingComments([]); }}
+            className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
+          >
+            ← Home
+          </button>
           {loadingDetail ? (
             <div className="flex justify-center py-12"><Spinner size={24} /></div>
           ) : (
-            <ShowcaseDetailClient
-              initialPost={{ ...viewingShowcase, community_id: viewingShowcase.community_id }}
-              initialComments={viewingComments}
-              currentUserId={currentUserId}
-              communityId={viewingShowcase.community_id}
-              backHref="/dashboard"
-              backLabel="Home"
-            />
+            <div className="[&>div>div>a:first-child]:hidden">
+              <ShowcaseDetailClient
+                initialPost={{ ...viewingShowcase, community_id: viewingShowcase.community_id }}
+                initialComments={viewingComments}
+                currentUserId={currentUserId}
+                communityId={viewingShowcase.community_id}
+              />
+            </div>
           )}
         </div>
       </div>
