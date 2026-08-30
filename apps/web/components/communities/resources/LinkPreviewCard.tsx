@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Globe, X } from "lucide-react";
+import { Globe, X } from "lucide-react";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
 
 interface LinkPreviewCardProps {
@@ -8,16 +8,15 @@ interface LinkPreviewCardProps {
   onDismiss?: () => void;
 }
 
-export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
-  const domain = (() => {
-    try { return new URL(data.url).hostname.replace(/^www\./, ""); }
-    catch { return data.siteName ?? ""; }
-  })();
+function getDomain(url: string) {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; }
+}
 
-  const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
+  const domain = getDomain(data.url);
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-border bg-surface-raised">
+    <div className="relative flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-surface-raised p-4">
       {onDismiss && (
         <button
           type="button"
@@ -29,68 +28,48 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
         </button>
       )}
 
-      {data.image && (
-        <div className="relative h-40 w-full overflow-hidden bg-surface">
+      <div className="min-w-0 flex-1">
+        {data.title && (
+          <p className="line-clamp-2 font-display text-[12px] font-semibold leading-snug text-foreground">
+            {data.title}
+          </p>
+        )}
+        {data.description && (
+          <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-foreground-muted">
+            {data.description}
+          </p>
+        )}
+        <div className="mt-2.5 flex items-center gap-1.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={data.image}
+            src={`https://www.google.com/s2/favicons?domain=${domain}&sz=32`}
             alt=""
-            className="h-full w-full object-cover"
-            onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-          />
-        </div>
-      )}
-
-      <div className="flex items-start gap-3 p-3">
-        {/* Favicon */}
-        <div className="mt-0.5 shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={faviconUrl}
-            alt=""
-            width={16}
-            height={16}
-            className="h-4 w-4 rounded-sm"
+            width={14}
+            height={14}
+            className="h-3.5 w-3.5 rounded-sm"
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.display = "none";
               (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "block");
             }}
           />
           <Globe size={14} className="hidden text-foreground-subtle" />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {/* Site name */}
-          {domain && (
-            <p className="mb-0.5 truncate font-body text-[10px] uppercase tracking-wide text-foreground-subtle">
-              {data.siteName ?? domain}
-            </p>
-          )}
-          {/* Title */}
-          {data.title && (
-            <p className="line-clamp-2 font-body text-sm font-medium leading-snug text-foreground">
-              {data.title}
-            </p>
-          )}
-          {/* Description */}
-          {data.description && (
-            <p className="mt-1 line-clamp-2 font-body text-xs leading-relaxed text-foreground-muted">
-              {data.description}
-            </p>
-          )}
-          {/* URL */}
-          <a
-            href={data.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 inline-flex items-center gap-1 truncate font-body text-[11px] text-foreground-subtle hover:text-accent"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <ExternalLink size={10} />
-            <span className="truncate">{domain}</span>
-          </a>
+          <span className="truncate font-body text-[11px] text-foreground-subtle">
+            {domain}
+          </span>
         </div>
       </div>
+
+      {data.image && (
+        <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-surface">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={data.image}
+            alt=""
+            className="block h-full w-full object-cover"
+            onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
+          />
+        </div>
+      )}
     </div>
   );
 }
