@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Heart, Bookmark, Flag,
+  Heart, Bookmark, Flag, MessageCircle,
   MoreHorizontal, Paperclip, Pencil, Trash2,
 } from "lucide-react";
 
@@ -556,6 +556,12 @@ export function ThreadCard({
               {thread.like_count}
             </span>
           </button>
+
+          {/* Comments */}
+          <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
+            <MessageCircle size={20} strokeWidth={2} />
+            {thread.comment_count}
+          </span>
         </div>
 
         {communityName && communityNamePlacement === "below" && (
