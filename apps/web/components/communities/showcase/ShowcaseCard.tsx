@@ -71,7 +71,7 @@ export function ShowcaseCard({
           {post.title}
         </h1>
       ) : (
-        <h2 className="mt-3 text-pretty font-display text-base font-semibold text-foreground">
+        <h2 className="mt-3 text-pretty font-display text-sm font-semibold text-foreground">
           {post.title}
         </h2>
       )}
