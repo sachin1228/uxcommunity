@@ -6,7 +6,6 @@ import {
   Paperclip, X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { AvatarImg } from "@/components/ui/AvatarImg";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -134,8 +133,6 @@ interface CreateThreadModalProps {
   onCreated: (thread: CommunityThread) => void;
   name?: string;
   avatarUrl?: string | null;
-  initialIsPublic?: boolean;
-  publicOnly?: boolean;
 }
 
 export function CreateThreadModal({
@@ -144,8 +141,6 @@ export function CreateThreadModal({
   onCreated,
   name,
   avatarUrl,
-  initialIsPublic = false,
-  publicOnly = false,
 }: CreateThreadModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
@@ -157,7 +152,7 @@ export function CreateThreadModal({
   const tagDropdownRef   = useRef<HTMLDivElement>(null);
   const [attachments,    setAttachments]    = useState<ThreadAttachment[]>([]);
   const [allowReplies,   setAllowReplies]   = useState(true);
-  const [isPublic,       setIsPublic]       = useState(initialIsPublic);
+  const [isPublic,       setIsPublic]       = useState(false);
   const [uploading,      setUploading]      = useState(false);
   const [saving,         setSaving]         = useState(false);
   const [error,          setError]          = useState<string | null>(null);
@@ -203,9 +198,7 @@ export function CreateThreadModal({
         }
         formData.append("file", payload);
         const response = await fetch(
-          publicOnly
-            ? "/api/home/uploads/threads"
-            : `/api/communities/${communityId}/threads/upload`,
+          `/api/communities/${communityId}/threads/upload`,
           {
           method: "POST",
           body: formData,
@@ -235,7 +228,7 @@ export function CreateThreadModal({
     setError(null);
     try {
       const response = await fetch(
-        publicOnly ? "/api/home/posts/threads" : `/api/communities/${communityId}/threads`,
+        `/api/communities/${communityId}/threads`,
         {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -247,7 +240,7 @@ export function CreateThreadModal({
           attachments,
           links: extractedLinks,
           allow_replies: allowReplies,
-          is_public: publicOnly ? true : isPublic,
+          is_public: isPublic,
         }),
         },
       );
@@ -272,81 +265,8 @@ export function CreateThreadModal({
     >
       <form
         onSubmit={handleSubmit}
-        className={`max-h-[min(820px,calc(100vh-2rem))] w-full overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl ${publicOnly ? "max-w-3xl" : "max-w-2xl"}`}
+        className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl"
       >
-        {publicOnly ? (
-          <>
-            <div className="flex items-center justify-between border-b border-border px-6 py-5 sm:px-8">
-              <div className="flex items-center gap-3">
-                <AvatarImg url={avatarUrl ?? null} name={name ?? "Designer"} size={44} className="rounded-full" />
-                <div>
-                  <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
-                    {name ?? "Designer"}
-                  </h2>
-                  <div className="mt-0.5 flex items-center gap-1.5 font-body text-xs text-foreground-muted">
-                    <Globe size={12} />
-                    <span>Post to public feed</span>
-                  </div>
-                </div>
-              </div>
-              <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-                <X size={22} />
-              </button>
-            </div>
-
-            <div className="space-y-5 px-6 py-6 sm:px-8 sm:py-8">
-              <textarea
-                ref={textareaRef}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                placeholder="What do you want to talk about?"
-                rows={7}
-                autoFocus
-                className="min-h-48 w-full resize-none overflow-hidden bg-transparent px-1 py-1 font-body text-lg leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle sm:min-h-56 sm:text-xl"
-              />
-
-              <ImageGrid images={images} onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))} />
-
-              <div className="flex items-center gap-2 border-t border-border pt-4">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFiles}
-                />
-                <button
-                  type="button"
-                  disabled={uploading || attachments.length >= 5}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center gap-2 rounded-lg px-3 py-2 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {uploading ? <Spinner size={16} /> : <ImageIcon size={18} />}
-                  {uploading ? "Uploading…" : "Add image"}
-                </button>
-              </div>
-
-              <div className="rounded-xl border border-accent/20 bg-accent/5 px-4 py-3">
-                <p className="font-body text-xs leading-relaxed text-foreground-muted">
-                  This post will be shared to the public feed only — not to any community. To create a resource or event, join a relevant community.
-                </p>
-              </div>
-
-              <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-                <span>
-                  <span className="block font-body text-sm font-medium text-foreground">Allow replies</span>
-                  <span className="block font-body text-xs text-foreground-muted">Other members can reply to this post.</span>
-                </span>
-                <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${allowReplies ? "bg-accent" : "bg-border"}`}>
-                  <input type="checkbox" checked={allowReplies} onChange={(e) => setAllowReplies(e.target.checked)} className="sr-only" />
-                  <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${allowReplies ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-                </span>
-              </label>
-            </div>
-          </>
-        ) : (
-          <>
             <div className="flex items-center justify-between border-b border-border px-6 py-4">
               <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
                 Create Thread
@@ -507,8 +427,6 @@ export function CreateThreadModal({
                 </span>
               </label>
             </div>
-          </>
-        )}
 
         {error && (
           <div className="mx-6 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 sm:mx-8">

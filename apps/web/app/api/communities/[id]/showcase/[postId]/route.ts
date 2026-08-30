@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { isPublicContentScope } from "@/lib/content-scope";
 
 const TYPES = new Set(["finished", "wip", "case_study", "feedback"]);
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
 
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
   const query = db.from("community_showcase_posts").select("*").eq("id", postId);
-  return (isPublicContentScope(communityId) ? query.is("community_id", null).eq("is_public", true) : query.eq("community_id", communityId)).maybeSingle();
+  return query.eq("community_id", communityId).maybeSingle();
 }
 
 async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<string, unknown>, userId: string) {
@@ -26,7 +25,7 @@ async function enrich(db: ReturnType<typeof createServiceClient>, row: Record<st
 }
 
 async function canInteract(db: ReturnType<typeof createServiceClient>, communityId: string, isPublic: boolean, userId: string) {
-  if (isPublicContentScope(communityId) || isPublic) return true;
+  if (isPublic) return true;
   // Non-public community posts stay member-only.
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
   return Boolean(data);

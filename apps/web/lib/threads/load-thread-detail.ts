@@ -9,7 +9,6 @@ type LoadOptions = {
   threadId: string
   userId: string
   communityId?: string
-  publicOnly?: boolean
 }
 
 async function loadThread(db: Database, options: LoadOptions): Promise<CommunityThread | null> {
@@ -19,7 +18,6 @@ async function loadThread(db: Database, options: LoadOptions): Promise<Community
     .eq("id", options.threadId)
 
   if (options.communityId) query = query.eq("community_id", options.communityId)
-  if (options.publicOnly) query = query.eq("is_public", true)
 
   const { data } = await query.maybeSingle()
   if (!data) return null

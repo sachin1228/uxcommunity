@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { isPublicContentScope, publicContentHref } from "@/lib/content-scope";
+import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 export type NotificationType =
@@ -282,19 +282,13 @@ export function deferCommunityNotification(input: DeferredCommunityNotificationI
 }
 
 export function threadHref(communityId: string, threadId: string) {
-  return isPublicContentScope(communityId)
-    ? publicContentHref("thread", threadId)
-    : `/dashboard/communities/${communityId}/threads/${threadId}`;
+  return `/dashboard/communities/${communityId}/threads/${threadId}`;
 }
 
 export function resourceHref(communityId: string, resourceId: string) {
-  return isPublicContentScope(communityId)
-    ? publicContentHref("resource", resourceId)
-    : `/dashboard/communities/${communityId}/resources/${resourceId}`;
+  return `/dashboard/communities/${communityId}/resources/${resourceId}`;
 }
 
 export function eventHref(communityId: string, eventId: string) {
-  return isPublicContentScope(communityId)
-    ? publicContentHref("event", eventId)
-    : `/dashboard/communities/${communityId}/events/${eventId}`;
+  return `/dashboard/communities/${communityId}/events/${eventId}`;
 }
