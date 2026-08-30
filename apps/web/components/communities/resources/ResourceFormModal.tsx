@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Check, ChevronDown, Globe, X } from "lucide-react";
+import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityResource, ResourceType } from "./types";
-import { RESOURCE_TYPES, RESOURCE_TAGS } from "./types";
+import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 import { FigmaEmbed } from "./FigmaEmbed";
@@ -44,9 +44,7 @@ export function ResourceFormModal({
   const [url, setUrl] = useState(resource?.url ?? "");
   const [description, setDescription] = useState(resource?.description ?? "");
   const [resourceType, setResourceType] = useState<ResourceType>(resource?.resource_type ?? "article");
-  const [tags, setTags] = useState<string[]>(resource?.tags ?? []);
   const [isPublic, setIsPublic] = useState(resource?.is_public ?? initialIsPublic);
-  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const figmaLink = useMemo(() => parseFigmaUrl(url), [url]);
@@ -143,7 +141,6 @@ export function ResourceFormModal({
           url: url.trim(),
           description: description.trim(),
           resource_type: resourceType,
-          tags,
           is_public: isPublic,
         }),
       });
@@ -289,66 +286,6 @@ export function ResourceFormModal({
               )}
             </div>
           ) : null}
-
-          {/* Tags */}
-          <div className="relative">
-            <label className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Tags <span className="font-normal text-foreground-subtle">(up to 3)</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => setTagDropdownOpen((o) => !o)}
-              className={`flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border bg-surface-raised px-3 py-2 text-left transition-colors ${tagDropdownOpen ? "border-accent" : "border-border"}`}
-            >
-              {tags.length === 0 && (
-                <span className="font-body text-sm text-foreground-subtle">Select up to 3 tags…</span>
-              )}
-              {tags.map((tag) => (
-                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2.5 py-1 font-body text-xs text-accent">
-                  {tag}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Remove ${tag}`}
-                    onClick={(e) => { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); } }}
-                    className="cursor-pointer"
-                  >
-                    <X size={11} />
-                  </span>
-                </span>
-              ))}
-              <ChevronDown size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
-            </button>
-            {tagDropdownOpen && (
-              <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
-                {RESOURCE_TAGS.map((tag) => {
-                  const selected = tags.includes(tag);
-                  const maxed = !selected && tags.length >= 3;
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      disabled={maxed}
-                      onClick={() => {
-                        if (selected) setTags((c) => c.filter((t) => t !== tag));
-                        else if (tags.length < 3) setTags((c) => [...c, tag]);
-                        setTagDropdownOpen(false);
-                      }}
-                      className={`flex w-full items-center gap-2.5 px-3 py-2 font-body text-sm transition-colors ${
-                        selected ? "bg-accent/10 text-accent" : maxed ? "cursor-not-allowed text-foreground-subtle opacity-40" : "text-foreground hover:bg-surface-raised"
-                      }`}
-                    >
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-accent bg-accent" : "border-border"}`}>
-                        {selected && <Check size={10} className="text-accent-foreground" />}
-                      </span>
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
 
           {/* Share publicly */}
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
