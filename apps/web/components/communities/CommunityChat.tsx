@@ -741,7 +741,7 @@ export function CommunityChat({
     : null);
 
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "showcase", "threads", "events", "resources"]), "showcase", "members", "about"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members", "about"]).has(activeTab)
       ? "chat"
       : activeTab;
 

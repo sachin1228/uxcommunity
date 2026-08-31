@@ -32,7 +32,7 @@ interface ChatHeaderProps {
 }
 
 export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "about";
-const DEFAULT_TABS: ChatTab[] = ["chat", "showcase", "threads", "events", "resources", "members", "about"];
+const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "about"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -291,10 +291,10 @@ export function ChatHeader({
             <nav className="flex items-center gap-1 overflow-x-auto md:gap-3" aria-label="Community views">
               {([
                 ["chat",      "Chat",      MessageCircle],
-                ["showcase",  "Showcase",  Sparkles],
                 ["threads",   "Threads",   MessagesSquare],
-                ["events",    "Events",    Calendar],
+                ["showcase",  "Showcase",  Sparkles],
                 ["resources", "Resources", BookMarked],
+                ["events",    "Events",    Calendar],
                 ["members",   "Members",   Users],
                 ["about",     "About",     Info],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
