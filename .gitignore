@@ -73,6 +73,7 @@ supabase/.branches/
 playwright-report/
 test-results/
 coverage/
+k6/data/
 
 # Cypress
 cypress/videos/
