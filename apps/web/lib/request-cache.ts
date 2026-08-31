@@ -17,13 +17,13 @@ type BootstrapBackedRequest = {
 
 const DEFAULT_STALE_MS = 60_000
 /**
- * Community bootstrap data (read model + first message page) is cached for 5
+ * Community bootstrap data (read model + first message page) is cached for 15
  * minutes so revisiting a community renders instantly from cache. Realtime
  * keeps the chat current while viewing, and useRealtimeChat runs an
  * incremental ?after= catch-up on every fresh subscription, so messages sent
  * while the user was away are still picked up.
  */
-export const COMMUNITY_BOOTSTRAP_STALE_MS = 5 * 60_000
+export const COMMUNITY_BOOTSTRAP_STALE_MS = 15 * 60_000
 export const DASHBOARD_STALE_MS = {
   communities: 60_000,
   homeFeed: 60_000,

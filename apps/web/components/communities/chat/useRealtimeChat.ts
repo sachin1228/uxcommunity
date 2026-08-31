@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useCallback, MutableRefObject } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/rooms";
+import { realtimePool } from "@/lib/realtime/pool";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
@@ -65,10 +64,7 @@ export function useRealtimeChat({
 
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.chat(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
+    const client = realtimePool.acquire(communityId, { id: currentUserId, name: null, avatar: null });
 
     const unsubscribes: Array<() => void> = [];
 
@@ -467,7 +463,7 @@ export function useRealtimeChat({
     );
 
     // On (re)connect, run an incremental ?after= catch-up. The client cache can
-    // be up to 5 minutes old when revisiting a community, so every fresh
+    // be up to 15 minutes old when revisiting a community, so every fresh
     // subscription (first mount, reconnect, or tab regain) fetches anything
     // missed while away. Debounced so rapid reconnect events collapse into a
     // single fetch.
@@ -485,7 +481,7 @@ export function useRealtimeChat({
     return () => {
       unsubStatus();
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
+      realtimePool.release(communityId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, fetchMessages, isVisible]);

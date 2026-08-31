@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
@@ -9,6 +9,7 @@ import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 import { NotificationBell } from "@/app/dashboard/NotificationBell";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
@@ -55,6 +56,14 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
     if (ta > tb) return -1;
     return a.name.localeCompare(b.name);
   });
+
+  // Prefetch bootstrap data on hover so clicking is instant (cache hit).
+  const prefetchCommunity = useCallback(
+    (communityId: string) => {
+      fetchAndHydrateCommunityBootstrap(communityId, userId).catch(() => {});
+    },
+    [userId],
+  );
 
   const homeActive =
     isMatch("/dashboard", pathname) &&
@@ -213,6 +222,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
                   onClick={() => handleNavigate(c.id)}
+                  onHover={() => prefetchCommunity(c.id)}
                 />
               ))}
             </ul>

@@ -29,6 +29,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
     <CommunityChat
       communityId={id}
       currentUserId={userId}
+      currentUserName={ssrData?.currentUserName ?? "Someone"}
       initialMeta={ssrData?.meta}
       initialLastReadAt={ssrData?.lastReadAt}
       initialTab={initialTab}

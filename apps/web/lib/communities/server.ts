@@ -27,6 +27,7 @@ export interface SSRCommunitySections {
 export interface SSRCommunityMeta {
   meta: CachedMeta;
   lastReadAt: string | null;
+  currentUserName: string;
 }
 
 /**
@@ -48,11 +49,13 @@ export async function fetchCommunityMetaSSR(
     { data: community },
     { count: memberCount },
     { data: memberRows },
+    { data: currentUser },
   ] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
     db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
     db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
+    db.from("users").select("name").eq("id", userId).maybeSingle(),
   ]);
 
   if (!membership || !community) return null;
@@ -118,5 +121,6 @@ export async function fetchCommunityMetaSSR(
   return {
     meta,
     lastReadAt: (membership as unknown as { last_read_at: string | null }).last_read_at ?? null,
+    currentUserName: currentUser?.name ?? "Someone",
   };
 }

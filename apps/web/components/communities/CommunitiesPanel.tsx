@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { MessageSquare, Plus, Search } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "./panel/CommunityRow";
 import { CreateCommunityModal } from "./CreateCommunityModal";
 import { useSidebarCommunities } from "./panel/useSidebarCommunities";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 
 export function CommunitiesPanel({ userId }: { userId: string }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -27,6 +28,14 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
     if (ta > tb) return -1;
     return a.name.localeCompare(b.name);
   });
+
+  // Prefetch bootstrap data on hover so clicking is instant (cache hit).
+  const prefetchCommunity = useCallback(
+    (communityId: string) => {
+      fetchAndHydrateCommunityBootstrap(communityId, userId).catch(() => {});
+    },
+    [userId],
+  );
 
   return (
     <div className="flex flex-col h-full w-72 shrink-0 border-r border-border">
@@ -118,6 +127,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
                   onClick={() => handleNavigate(c.id)}
+                  onHover={() => prefetchCommunity(c.id)}
                 />
               ))}
             </ul>
