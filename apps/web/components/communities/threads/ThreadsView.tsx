@@ -12,7 +12,7 @@ import {
   UserRoundPlus,
   UsersRound,
 } from "lucide-react";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
@@ -80,20 +80,17 @@ export function ThreadsView({
     if (!isVisible) return;
     const initialFetch = window.setTimeout(() => void fetchThreads(true), 0);
 
-    const client = new RealtimeClient({
-      room: realtimeRooms.threads(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
+    const room = realtimeRooms.threads(communityId);
     const unsubscribes: Array<() => void> = [];
 
     // Subscribe to thread changes
     unsubscribes.push(
-      client.on("thread", () => void fetchThreads(true, true)),
+      realtimeClient.on(room, "thread", () => void fetchThreads(true, true)),
     );
 
     // Subscribe to like changes for realtime like counts
     unsubscribes.push(
-      client.on("like", (data) => {
+      realtimeClient.on(room, "like", (data) => {
         const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
         if (!record?.thread_id) return;
         // Skip own likes — already handled optimistically on click
@@ -115,12 +112,12 @@ export function ThreadsView({
       }),
     );
 
-    client.connect();
+    realtimeClient.connect();
 
     return () => {
       window.clearTimeout(initialFetch);
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [communityId, currentUserId, fetchThreads, isVisible]);
 

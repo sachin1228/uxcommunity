@@ -7,7 +7,7 @@ import {
   BookMarked,
   Bookmark,
 } from "lucide-react";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ProfileThread } from "@/components/communities/threads/types";
@@ -128,12 +128,9 @@ export function ProfileThreads({
   // ── Realtime subscriptions for threads ───────────────────────────────────
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.profile(currentUserId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
+    const room = realtimeRooms.profile(currentUserId);
 
-    const unsubThread = client.on("thread", async () => {
+    const unsubThread = realtimeClient.on(room, "thread", async () => {
       try {
         const response = await fetch("/api/profile/threads", { cache: "no-store" });
         if (!response.ok) return;
@@ -142,7 +139,7 @@ export function ProfileThreads({
       } catch { /* reconciled on next refresh */ }
     });
 
-    const unsubLike = client.on("like", (data) => {
+    const unsubLike = realtimeClient.on(room, "like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id) return;
       const threadId = record.thread_id;
@@ -157,11 +154,11 @@ export function ProfileThreads({
       );
     });
 
-    client.connect();
+    realtimeClient.connect();
     return () => {
       unsubThread();
       unsubLike();
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [currentUserId, isVisible]);
 

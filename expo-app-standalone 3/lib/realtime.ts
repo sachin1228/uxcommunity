@@ -1,18 +1,26 @@
-"use client";
-
 /**
- * Singleton browser client for the Cloudflare realtime service.
+ * Cloudflare Realtime client for React Native / Expo.
+ *
+ * Singleton multiplexed client — one WebSocket to UserDO, multiple logical rooms.
+ * Each room supports multiple logical topics (chat, typing, presence, etc.).
  *
  * Architecture:
- *   Component → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
+ *   Hook → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
- * The UserDO (user:${userId}) owns the single client WebSocket and routes
- * logical subscriptions to community DOs. Every message includes a `room`
- * field so the UserDO knows which community DO to route to.
+ * Authentication: passes the session JWT as a query parameter since React
+ * Native's WebSocket API does not support custom headers.
  *
- * The session JWT travels automatically via the same-origin cookie on the
- * WebSocket handshake.
+ * Requires in .env:
+ *   EXPO_PUBLIC_REALTIME_URL=wss://rt.uxcommunity.in
  */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const REALTIME_URL = process.env.EXPO_PUBLIC_REALTIME_URL ?? '';
+const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
+
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 15_000;
 
 export interface RealtimeUser {
   id: string;
@@ -31,16 +39,21 @@ type EventHandler = (data: unknown, sender?: string) => void;
 type PresenceHandler = (users: RealtimePresenceUser[]) => void;
 type StatusHandler = (connected: boolean) => void;
 
-const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 15_000;
-
-function buildWebSocketUrl(baseUrl: string, userId: string): string {
-  if (!baseUrl) {
-    return `/ws?room=user:${encodeURIComponent(userId)}`;
+/**
+ * Build a WebSocket URL pointing at the UserDO.
+ * Passes the session token as a query parameter for authentication.
+ */
+async function buildWebSocketUrl(userId: string): Promise<string> {
+  const token = await AsyncStorage.getItem(SESSION_STORAGE_KEY).catch(() => null);
+  const base = REALTIME_URL || '';
+  if (!base) {
+    console.warn('[realtime] EXPO_PUBLIC_REALTIME_URL is not set');
+    return '';
   }
-  const wsBase = baseUrl.replace(/^http/, "ws");
-  return `${wsBase}/ws?room=user:${encodeURIComponent(userId)}`;
+  const wsBase = base.replace(/^http/, 'ws');
+  const params = new URLSearchParams({ room: `user:${userId}` });
+  if (token) params.set('token', token);
+  return `${wsBase}/ws?${params.toString()}`;
 }
 
 interface RoomState {
@@ -51,19 +64,17 @@ interface RoomState {
 }
 
 /**
- * Singleton RealtimeClient — one per browser session.
+ * Singleton RealtimeClient — one per app session.
  *
- * Maintains ONE WebSocket to the UserDO. Components subscribe to logical
- * rooms and topics; the UserDO handles routing to community DOs.
+ * Maintains ONE WebSocket to the UserDO. Hooks subscribe to logical
+ * rooms and topics; the UserDO routes to community DOs.
  *
- * Protocol — every client message includes a `room` field:
+ * Every message includes a `room` field:
  *   { t: "subscribe",   room: "chat:communityA",    topic: "chat" }
- *   { t: "unsubscribe", room: "chat:communityA",    topic: "typing" }
  *   { t: "publish",     room: "chat:communityA",    topic: "typing", data: {} }
  *
- * Server events include a `room` field for routing:
+ * Server events include `room` for routing:
  *   { t: "event", room: "chat:communityA", topic: "chat", data: ..., sender: "..." }
- *   { t: "presence", room: "chat:communityA", users: [...] }
  */
 class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -75,9 +86,7 @@ class RealtimeClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string[] = [];
 
-  /** roomName → room state */
   private rooms = new Map<string, RoomState>();
-
   private globalEvents = new Map<string, Set<EventHandler>>();
   private globalPresenceHandlers = new Set<PresenceHandler>();
   private globalStatusHandlers = new Set<StatusHandler>();
@@ -95,13 +104,16 @@ class RealtimeClient {
     this.open();
   }
 
-  private open(): void {
+  private async open(): Promise<void> {
     if (this.ws && this.ws.readyState < WebSocket.CLOSING) return;
     if (!this.userId) return;
 
+    const url = await buildWebSocketUrl(this.userId);
+    if (!url) return;
+
     let ws: WebSocket;
     try {
-      ws = new WebSocket(buildWebSocketUrl(REALTIME_URL, this.userId));
+      ws = new WebSocket(url);
     } catch {
       this.scheduleReconnect();
       return;
@@ -114,14 +126,14 @@ class RealtimeClient {
       this.emitGlobalStatus(true);
 
       if (this.user) {
-        ws.send(JSON.stringify({ t: "join", user: this.user }));
+        ws.send(JSON.stringify({ t: 'join', user: this.user }));
       }
 
       for (const msg of this.pending.splice(0)) ws.send(msg);
       this.resubscribeAll();
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = (event: { data: string | ArrayBuffer }) => {
       let msg: {
         t?: string;
         room?: string;
@@ -135,21 +147,21 @@ class RealtimeClient {
         connectionId?: string;
       };
       try {
-        msg = JSON.parse(String(event.data));
+        msg = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data));
       } catch {
         return;
       }
 
-      if (msg.t === "hello") {
+      if (msg.t === 'hello') {
         // Connection established
-      } else if (msg.t === "event" && msg.topic && msg.room) {
+      } else if (msg.t === 'event' && msg.topic && msg.room) {
         this.dispatchToRoom(msg.room, msg.topic, msg.data, msg.sender);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
-      } else if (msg.t === "presence" && msg.room) {
+      } else if (msg.t === 'presence' && msg.room) {
         this.presenceCache.set(msg.room, msg.users ?? []);
         this.emitRoomPresence(msg.room, msg.users ?? []);
         this.emitGlobalPresence(msg.users ?? []);
-      } else if (msg.t === "presence_delta" && msg.room) {
+      } else if (msg.t === 'presence_delta' && msg.room) {
         const cached = this.presenceCache.get(msg.room) ?? [];
         let updated: RealtimePresenceUser[];
         if (msg.joined) {
@@ -162,8 +174,8 @@ class RealtimeClient {
         this.presenceCache.set(msg.room, updated);
         this.emitRoomPresence(msg.room, updated);
         this.emitGlobalPresence(updated);
-      } else if (msg.t === "error") {
-        console.warn("[realtime]", msg.message);
+      } else if (msg.t === 'error') {
+        console.warn('[realtime]', msg.message);
       }
     };
 
@@ -222,7 +234,7 @@ class RealtimeClient {
     this.presenceCache.delete(room);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       for (const topic of state.topics.keys()) {
-        this.sendToWs({ t: "unsubscribe", room, topic });
+        this.sendToWs({ t: 'unsubscribe', room, topic });
       }
     }
   }
@@ -283,7 +295,7 @@ class RealtimeClient {
   // ── Publishing ────────────────────────────────────────────────────────────
 
   publish(room: string, topic: string, data: unknown): void {
-    this.sendToWs({ t: "publish", room, topic, data });
+    this.sendToWs({ t: 'publish', room, topic, data });
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -321,7 +333,7 @@ class RealtimeClient {
   // ── Internal helpers ──────────────────────────────────────────────────────
 
   private sendTopicSubscribe(room: string, topic: string): void {
-    this.sendToWs({ t: "subscribe", room, topic });
+    this.sendToWs({ t: 'subscribe', room, topic });
   }
 
   private sendToWs(msg: unknown): void {
@@ -340,7 +352,7 @@ class RealtimeClient {
     if (!handlers) return;
     for (const handler of handlers) {
       try { handler(data, sender); } catch (error) {
-        console.error("[realtime] event handler error", error);
+        console.error('[realtime] event handler error', error);
       }
     }
   }
@@ -350,7 +362,7 @@ class RealtimeClient {
     if (!handlers) return;
     for (const handler of handlers) {
       try { handler(data, sender); } catch (error) {
-        console.error("[realtime] global event handler error", error);
+        console.error('[realtime] global event handler error', error);
       }
     }
   }
@@ -360,7 +372,7 @@ class RealtimeClient {
     if (!state) return;
     for (const handler of state.presenceHandlers) {
       try { handler(users); } catch (error) {
-        console.error("[realtime] presence handler error", error);
+        console.error('[realtime] presence handler error', error);
       }
     }
   }
@@ -368,7 +380,7 @@ class RealtimeClient {
   private emitGlobalPresence(users: RealtimePresenceUser[]): void {
     for (const handler of this.globalPresenceHandlers) {
       try { handler(users); } catch (error) {
-        console.error("[realtime] global presence handler error", error);
+        console.error('[realtime] global presence handler error', error);
       }
     }
   }
@@ -376,14 +388,24 @@ class RealtimeClient {
   private emitGlobalStatus(connected: boolean): void {
     for (const handler of this.globalStatusHandlers) {
       try { handler(connected); } catch (error) {
-        console.error("[realtime] status handler error", error);
+        console.error('[realtime] status handler error', error);
       }
     }
   }
 }
 
 /**
- * Singleton RealtimeClient shared across the entire app.
- * One client = one WebSocket to UserDO = all logical room subscriptions.
+ * Singleton RealtimeClient — one WebSocket to UserDO, all logical room subscriptions.
  */
 export const realtimeClient = new RealtimeClient();
+
+/**
+ * Room name helpers — matches the web app's rooms.ts.
+ */
+export const realtimeRooms = {
+  chat: (communityId: string) => `chat:${communityId}`,
+  presence: (communityId: string) => `presence:${communityId}`,
+  threads: (communityId: string) => `threads:${communityId}`,
+  events: (communityId: string) => `events:${communityId}`,
+  resources: (communityId: string) => `resources:${communityId}`,
+} as const;

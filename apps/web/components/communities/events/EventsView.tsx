@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
@@ -66,22 +66,19 @@ export function EventsView({
     if (!isVisible) return;
     queueMicrotask(() => void fetchEvents(true));
 
-    const client = new RealtimeClient({
-      room: realtimeRooms.events(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
+    const room = realtimeRooms.events(communityId);
     const unsubscribes: Array<() => void> = [];
 
-    unsubscribes.push(client.on("event", () => void fetchEvents(true, true)));
-    unsubscribes.push(client.on("rsvp", () => void fetchEvents(true, true)));
-    unsubscribes.push(client.on("like", () => void fetchEvents(true, true)));
-    unsubscribes.push(client.on("save", () => void fetchEvents(true, true)));
+    unsubscribes.push(realtimeClient.on(room, "event", () => void fetchEvents(true, true)));
+    unsubscribes.push(realtimeClient.on(room, "rsvp", () => void fetchEvents(true, true)));
+    unsubscribes.push(realtimeClient.on(room, "like", () => void fetchEvents(true, true)));
+    unsubscribes.push(realtimeClient.on(room, "save", () => void fetchEvents(true, true)));
 
-    client.connect();
+    realtimeClient.connect();
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [communityId, currentUserId, fetchEvents, isVisible]);
 

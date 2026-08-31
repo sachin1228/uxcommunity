@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Calendar, MapPin } from "lucide-react";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
@@ -85,11 +85,8 @@ export function CommunityInfoPanel({
       .catch(() => {});
 
     if (!isVisible || !currentUserId) return;
-    const rulesClient = new RealtimeClient({
-      room: realtimeRooms.rules(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubRules = rulesClient.on("rule", (data) => {
+    const rulesRoom = realtimeRooms.rules(communityId);
+    const unsubRules = realtimeClient.on(rulesRoom, "rule", (data) => {
       const { event, rule } = data as { event?: string; rule: CommunityRule };
       const updateRules = (previous: CommunityRule[]) => {
         if (event === "INSERT") {
@@ -110,11 +107,11 @@ export function CommunityInfoPanel({
         currentUserId,
       );
     });
-    rulesClient.connect();
+    realtimeClient.connect();
 
     return () => {
       unsubRules();
-      rulesClient.close();
+      realtimeClient.unsubscribe(rulesRoom);
     };
   }, [communityId, currentUserId, isVisible]);
 

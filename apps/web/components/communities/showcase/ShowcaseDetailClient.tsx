@@ -10,7 +10,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { BackLink } from "@/components/ui/BackLink";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
@@ -233,15 +233,12 @@ export function ShowcaseDetailClient({
   }, [communityId, post.id]);
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.showcase(post.id),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsub = client.on("comment", () => void fetchComments());
-    client.connect();
+    const room = realtimeRooms.showcase(post.id);
+    const unsub = realtimeClient.on(room, "comment", () => void fetchComments());
+    realtimeClient.connect();
     return () => {
       unsub();
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [post.id, currentUserId, fetchComments, isVisible]);
   async function removePost() {

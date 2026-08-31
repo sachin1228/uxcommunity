@@ -1,5 +1,6 @@
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
+export { UserDO } from "./user";
 export { Room } from "./room";
 
 const SESSION_COOKIE = "uxcommunity_session";
@@ -33,6 +34,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // Redact sensitive query params from any logging
+    const safeUrl = new URL(url);
+    if (safeUrl.searchParams.has("token")) safeUrl.searchParams.set("token", "[REDACTED]");
+
     if (url.pathname === "/ws") {
       return handleUpgrade(request, env, url);
     }
@@ -51,19 +56,23 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
 
   // Authenticate via the same JWT the web app issues.
   const cookies = parseCookies(request.headers.get("Cookie"));
-  const token =
-    cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE);
+  const cookieToken = cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE);
+  const queryToken = url.searchParams.get("token");
+  const token = cookieToken ?? queryToken;
   const session = token ? await verifyJwt(token, env.SESSION_SECRET) : null;
   const userId = session?.userId;
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const id = env.ROOM.idFromName(room);
-  const stub = env.ROOM.get(id);
+  // Route based on room prefix:
+  //   user:${userId}  → UserDO  (client WebSocket gateway)
+  //   chat:${id} etc  → Room DO (community-scoped)
+  const isUserRoom = room.startsWith("user:");
+  const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
+  const id = namespace.idFromName(room);
+  const stub = namespace.get(id);
 
-  // Forward the upgrade to the room's Durable Object, carrying the verified
-  // user id on a header the DO trusts (Worker→DO is within the same project).
   const forwarded = new Request(request, {
     headers: new Headers([
       ...request.headers,
@@ -96,7 +105,6 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
     return new Response("Bad request", { status: 400 });
   }
 
-  // Accept a single event (backward compatible) or a batched fan-out.
   const events = Array.isArray(body.events)
     ? body.events
     : body.room && body.topic
@@ -107,15 +115,14 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
     return new Response("Missing room", { status: 400 });
   }
 
-  // Fan-out can exceed the 50-subrequest cap per Worker invocation, so process
-  // the events in sequential chunks (each chunk runs its DO fetches in parallel).
+  // Fan-out in chunks (each chunk runs its DO fetches in parallel).
   const CHUNK = 40;
   for (let i = 0; i < events.length; i += CHUNK) {
     const chunk = events.slice(i, i + CHUNK);
     await Promise.all(
       chunk.map(async (event) => {
-        const id = env.ROOM.idFromName(event.room);
-        const stub = env.ROOM.get(id);
+        const id = env.COMMUNITY_DO.idFromName(event.room);
+        const stub = env.COMMUNITY_DO.get(id);
         return stub.fetch(
           new Request(request.url, {
             method: "POST",

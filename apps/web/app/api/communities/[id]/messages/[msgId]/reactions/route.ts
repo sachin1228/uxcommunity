@@ -2,7 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import type { MessageReaction } from "@/lib/communities/cache";
-import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
+import { publishChatEvent } from "@/lib/realtime/server";
 
 interface Params {
   params: Promise<{ id: string; msgId: string }>;
@@ -103,66 +103,36 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  // Broadcast the transition to the chat room + every member's sidebar panel.
+  // Broadcast the transition to the community chat room.
   // Skip when the upsert was a no-op (same emoji already set on this message).
   if (!(desiredEmoji !== null && existingEmoji === desiredEmoji)) {
     after(async () => {
       try {
-        const publishDb = createServiceClient();
-        const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
-
         if (desiredEmoji === null) {
           if (!existingEmoji) return; // nothing was removed
-          await publishChatFanout({
+          await publishChatEvent({
             communityId,
-            memberUserIds: memberIds,
-            chatTopic: "reaction-delete",
-            chatData: { message_id: messageId, user_id: userId, emoji: existingEmoji },
-            panelTopic: "reaction-delete",
-            panelData: {
-              community_id: communityId,
-              message_id: messageId,
-              user_id: userId,
-              emoji: existingEmoji,
-              created_at: existingRow?.created_at,
-            },
+            topic: "reaction-delete",
+            data: { message_id: messageId, user_id: userId, emoji: existingEmoji },
           });
         } else if (existingEmoji && existingEmoji !== desiredEmoji) {
-          await publishChatFanout({
+          await publishChatEvent({
             communityId,
-            memberUserIds: memberIds,
-            chatTopic: "reaction-update",
-            chatData: {
+            topic: "reaction-update",
+            data: {
               old: { message_id: messageId, user_id: userId, emoji: existingEmoji },
               new: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
             },
-            panelTopic: "reaction-update",
-            panelData: {
-              community_id: communityId,
-              message_id: messageId,
-              user_id: userId,
-              emoji: desiredEmoji,
-              created_at: now,
-            },
           });
         } else {
-          await publishChatFanout({
+          await publishChatEvent({
             communityId,
-            memberUserIds: memberIds,
-            chatTopic: "reaction-insert",
-            chatData: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
-            panelTopic: "reaction-insert",
-            panelData: {
-              community_id: communityId,
-              message_id: messageId,
-              user_id: userId,
-              emoji: desiredEmoji,
-              created_at: now,
-            },
+            topic: "reaction-insert",
+            data: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
           });
         }
       } catch (err) {
-        console.error("[reactions] realtime fan-out error:", err);
+        console.error("[reactions] realtime publish error:", err);
       }
     });
   }

@@ -7,10 +7,23 @@ workers_dev = true
 # Secrets are injected via `wrangler secret put` in production:
 #   SESSION_SECRET           — shared with the web app (JWT signing secret)
 #   REALTIME_PUBLISH_SECRET  — server-to-server secret for the /publish endpoint
+#   RPC_SECRET               — defense-in-depth for DO-to-DO RPC calls
+#   API_SECRET               — internal API secret for membership checks
 
 [durable_objects]
-bindings = [{ name = "ROOM", class_name = "Room" }]
+bindings = [
+  { name = "COMMUNITY_DO", class_name = "Room" },
+  { name = "USER_DO", class_name = "UserDO" },
+]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserDO"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = []

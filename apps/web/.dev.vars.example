@@ -14,6 +14,9 @@ NEXT_PUBLIC_REALTIME_URL=
 REALTIME_URL=
 REALTIME_PUBLISH_SECRET=
 
+# --- Internal API auth (realtime DO -> web API membership check) ---
+API_SECRET=
+
 # --- Auth / secrets (prod: `wrangler secret put <NAME>`) ---
 SESSION_SECRET=
 

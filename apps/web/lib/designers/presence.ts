@@ -15,7 +15,7 @@
  * - WebRTC signaling rides on the `signal` topic, targeted by composite id.
  */
 
-import { RealtimeClient, RealtimePresenceUser } from "@/lib/realtime/client";
+import { realtimeClient, type RealtimePresenceUser } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 
 export interface RemoteUser {
@@ -57,7 +57,7 @@ function makeInstanceId(): string {
 }
 
 export class StudioPresence {
-  private client: RealtimeClient;
+  private room: string;
   private userId: string;
   private instanceId = makeInstanceId();
   private opts: PresenceOptions;
@@ -74,25 +74,24 @@ export class StudioPresence {
   constructor(opts: PresenceOptions) {
     this.userId = opts.userId;
     this.opts = opts;
-    this.client = new RealtimeClient({
-      room: realtimeRooms.designers(),
-      user: { id: opts.userId, name: opts.name, avatar: opts.avatar },
-    });
+    this.room = realtimeRooms.designers();
 
-    this.client.on(POS_TOPIC, (data, sender) => this.onPos(data, sender));
-    this.client.on(SIGNAL_TOPIC, (data) => this.onSignal(data));
-    this.client.onPresence((users) => {
+    realtimeClient.init({ id: opts.userId, name: opts.name, avatar: opts.avatar });
+
+    realtimeClient.on(this.room, POS_TOPIC, (data, sender) => this.onPos(data, sender));
+    realtimeClient.on(this.room, SIGNAL_TOPIC, (data) => this.onSignal(data));
+    realtimeClient.onPresence(this.room, (users) => {
       for (const u of users) this.nameByUserId.set(u.id, u.name ?? u.id);
       this.opts.onOnlineCount(users.length);
       this.opts.onPresenceUsers(users);
     });
-    this.client.onStatus((connected) => {
+    realtimeClient.onStatus((connected) => {
       this.opts.onConnected(connected);
     });
   }
 
   connect() {
-    this.client.connect();
+    realtimeClient.connect();
   }
 
   /** Composite identity for this tab: `userId:instanceId`. */
@@ -118,7 +117,7 @@ export class StudioPresence {
   }
 
   sendSignal(to: string, data: SignalPayload) {
-    this.client.publish(SIGNAL_TOPIC, {
+    realtimeClient.publish(this.room, SIGNAL_TOPIC, {
       from: this.getSelfId(),
       to,
       data,
@@ -134,11 +133,11 @@ export class StudioPresence {
       window.clearTimeout(this.remoteTimer);
       this.remoteTimer = null;
     }
-    this.client.close();
+    realtimeClient.unsubscribe(this.room);
   }
 
   private publishPos() {
-    this.client.publish(POS_TOPIC, {
+    realtimeClient.publish(this.room, POS_TOPIC, {
       uid: this.userId,
       iid: this.instanceId,
       x: Math.round(this.lastX * 100) / 100,

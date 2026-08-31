@@ -1,18 +1,31 @@
 import { useCallback, useEffect } from 'react';
 import { AppState } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { ContentByKind, ContentKind, getCommunityContent } from '@/lib/communityContent';
-
-const TABLES: Record<ContentKind, string[]> = {
-  threads: ['community_threads', 'thread_likes', 'thread_saves', 'thread_comments'],
-  events: ['community_events', 'event_rsvps', 'event_saves'],
-  resources: ['community_resources', 'resource_saves', 'resource_bookmarks', 'resource_comments'],
-};
 
 export function communityContentKey(communityId: string, kind: ContentKind) {
   return ['community-content', communityId, kind] as const;
 }
+
+/**
+ * Map content kind → Cloudflare Realtime room and the topics to subscribe.
+ * Each kind subscribes to the appropriate room and listens for relevant events.
+ */
+const ROOM_TOPICS: Record<ContentKind, { getRoom: (cid: string) => string; topics: string[] }> = {
+  threads: {
+    getRoom: (cid) => realtimeRooms.threads(cid),
+    topics: ['thread', 'like', 'save'],
+  },
+  events: {
+    getRoom: (cid) => realtimeRooms.events(cid),
+    topics: ['event', 'rsvp', 'like', 'save'],
+  },
+  resources: {
+    getRoom: (cid) => realtimeRooms.resources(cid),
+    topics: ['resource', 'save'],
+  },
+};
 
 export function useCommunityContent<K extends ContentKind>(communityId: string, kind: K, enabled = true) {
   const queryClient = useQueryClient();
@@ -29,20 +42,22 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     staleTime: 20_000,
   });
 
+  // Realtime subscription via Cloudflare singleton
   useEffect(() => {
     if (!communityId || !enabled) return;
-    const channel = supabase.channel(`mobile-${kind}-${communityId}`);
-    TABLES[kind].forEach((table) => {
-      channel.on(
-        'postgres_changes',
-        table.startsWith('community_')
-          ? { event: '*', schema: 'public', table, filter: `community_id=eq.${communityId}` }
-          : { event: '*', schema: 'public', table },
-        invalidate
-      );
-    });
-    channel.subscribe();
-    return () => { void supabase.removeChannel(channel); };
+
+    const config = ROOM_TOPICS[kind];
+    const room = config.getRoom(communityId);
+    realtimeClient.connect(room);
+
+    const unsubscribes = config.topics.map((topic) =>
+      realtimeClient.on(room, topic, invalidate)
+    );
+
+    return () => {
+      unsubscribes.forEach((unsub) => unsub());
+      realtimeClient.unsubscribe(room);
+    };
   }, [communityId, enabled, invalidate, kind]);
 
   useEffect(() => {

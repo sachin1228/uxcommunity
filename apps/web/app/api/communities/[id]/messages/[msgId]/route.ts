@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
+import { publishChatEvent } from "@/lib/realtime/server";
 import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -82,23 +82,13 @@ export async function PATCH(
 
   after(async () => {
     try {
-      const publishDb = createServiceClient();
-      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
-      await publishChatFanout({
+      await publishChatEvent({
         communityId,
-        memberUserIds: memberIds,
-        chatTopic: "message-edit",
-        chatData: { id: msgId, content, edited_at: editedAt },
-        panelTopic: "message-edit",
-        panelData: {
-          community_id: communityId,
-          created_at: msg.created_at,
-          content,
-          edited_at: editedAt,
-        },
+        topic: "message-edit",
+        data: { id: msgId, content, edited_at: editedAt },
       });
     } catch (err) {
-      console.error("[PATCH message] realtime fan-out error:", err);
+      console.error("[PATCH message] realtime publish error:", err);
     }
   });
 
@@ -155,25 +145,16 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete message." }, { status: 500 });
   }
 
-  // Broadcast the soft-delete to the chat room + every member's sidebar panel.
+  // Broadcast the soft-delete to the community chat room.
   after(async () => {
     try {
-      const publishDb = createServiceClient();
-      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
-      await publishChatFanout({
+      await publishChatEvent({
         communityId,
-        memberUserIds: memberIds,
-        chatTopic: "message-delete",
-        chatData: { id: msgId, deleted_at: deletedAt },
-        panelTopic: "message-delete",
-        panelData: {
-          community_id: communityId,
-          created_at: msg.created_at,
-          deleted_at: deletedAt,
-        },
+        topic: "message-delete",
+        data: { id: msgId, deleted_at: deletedAt },
       });
     } catch (err) {
-      console.error("[DELETE message] realtime fan-out error:", err);
+      console.error("[DELETE message] realtime publish error:", err);
     }
   });
 

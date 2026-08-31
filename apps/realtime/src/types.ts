@@ -1,19 +1,21 @@
 /**
- * Shared protocol types between the Cloudflare realtime service and the
- * client SDK (apps/web/lib/realtime/).
+ * Wire-protocol types for the Cloudflare realtime service.
  *
- * Wire format is JSON. Every WebSocket connection targets exactly ONE room
- * (a Durable Object), identified by the `?room=` query param on /ws.
+ * All messages are JSON. The `room` field is required on every client→server
+ * message and included on every server→client event so the client can route
+ * to the correct handler.
+ *
+ * Connection model:
+ *   Client → UserDO (user:${userId}) → Community DOs (chat:${communityId}, etc.)
  */
 
-/** Server → client. Sent immediately after the socket is accepted. */
+// ── Server → Client ────────────────────────────────────────────────────────
+
 export interface HelloMessage {
   t: "hello";
-  room: string;
   connectionId: string;
 }
 
-/** Server → client. A published event for this room. */
 export interface EventMessage {
   t: "event";
   room: string;
@@ -22,7 +24,6 @@ export interface EventMessage {
   sender?: string;
 }
 
-/** Server → client. Full presence snapshot for this room. */
 export interface PresenceUser {
   id: string;
   name: string | null;
@@ -36,30 +37,55 @@ export interface PresenceMessage {
   users: PresenceUser[];
 }
 
-/** Server → client. */
+export interface PresenceDeltaMessage {
+  t: "presence_delta";
+  room: string;
+  joined?: PresenceUser;
+  left?: { id: string };
+}
+
 export interface ErrorMessage {
   t: "error";
   message: string;
 }
 
-/** Client → server. Must be the first message; declares identity for the room. */
+// ── Client → Server ────────────────────────────────────────────────────────
+
 export interface JoinMessage {
   t: "join";
   user: { id: string; name: string; avatar: string | null };
 }
 
-/** Client → server. Low-trust publish (typing, presence heartbeat). Rebroadcast to other members of the room. */
+export interface SubscribeMessage {
+  t: "subscribe";
+  room: string;
+  topic: string;
+}
+
+export interface UnsubscribeMessage {
+  t: "unsubscribe";
+  room: string;
+  topic: string;
+}
+
 export interface PublishMessage {
   t: "publish";
+  room: string;
   topic: string;
   data: unknown;
 }
 
-export type ClientMessage = JoinMessage | PublishMessage;
+export type ClientMessage =
+  | JoinMessage
+  | SubscribeMessage
+  | UnsubscribeMessage
+  | PublishMessage;
+
 export type ServerMessage =
   | HelloMessage
   | EventMessage
   | PresenceMessage
+  | PresenceDeltaMessage
   | ErrorMessage;
 
 /** Server-to-server publish payload for POST /publish. */

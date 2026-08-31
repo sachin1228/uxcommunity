@@ -2,11 +2,12 @@
  * Loads and keeps messages live for a single community chat.
  * - Initial load: last 50 messages via GET /api/communities/:id/messages
  * - Pagination: older messages via ?before=<ISO>
- * - Realtime: Supabase postgres_changes on community_messages + message_reactions
+ * - Realtime: Cloudflare Durable Object WebSocket (message, message-edit,
+ *   message-delete, reaction-insert/update/delete)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import {
   getMessages,
   markRead,
@@ -22,7 +23,6 @@ export function useChatMessages(communityId: string) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -79,115 +79,171 @@ export function useChatMessages(communityId: string) {
     );
   }, []);
 
-  // Realtime subscription
+  // Realtime subscription via Cloudflare singleton
   useEffect(() => {
-    const channel = supabase
-      .channel(`chat:${communityId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'community_messages',
-          filter: `community_id=eq.${communityId}`,
-        },
-        (payload) => {
-          const row = payload.new as Message;
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === row.id)) return prev;
-            // Reuse avatar/user info already known from earlier messages
-            const knownUser =
-              prev.find((m) => m.user_id === row.user_id && m.users)?.users ?? null;
-            return [
-              ...prev,
-              {
-                ...row,
-                users: knownUser,
-                reactions: [],
-                reply_to: null,
-                deleted_at: null,
-              },
-            ];
-          });
-          // Mark read since user is in the chat
-          if (row.user_id !== user?.id) {
-            markRead(communityId).catch(() => {});
-          }
+    if (!user?.id) return;
+
+    const room = realtimeRooms.chat(communityId);
+
+    realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
+    realtimeClient.connect(room);
+
+    const unsubscribes: Array<() => void> = [];
+
+    // New message
+    unsubscribes.push(
+      realtimeClient.on(room, 'message', (data) => {
+        const row = data as {
+          id: string;
+          community_id: string;
+          user_id: string;
+          content: string;
+          created_at: string;
+          reply_to_id: string | null;
+          image_url: string | null;
+        };
+
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === row.id)) return prev;
+          const knownUser =
+            prev.find((m) => m.user_id === row.user_id && m.users)?.users ?? null;
+          return [
+            ...prev,
+            {
+              ...row,
+              users: knownUser,
+              reactions: [],
+              reply_to: null,
+              deleted_at: null,
+            },
+          ];
+        });
+        if (row.user_id !== user.id) {
+          markRead(communityId).catch(() => {});
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'community_messages',
-          filter: `community_id=eq.${communityId}`,
-        },
-        (payload) => {
-          const row = payload.new as Message;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === row.id
-                ? { ...m, content: row.content, deleted_at: row.deleted_at, image_url: row.image_url }
-                : m
-            )
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_reactions',
-          filter: `community_id=eq.${communityId}`,
-        },
-        (payload) => {
-          const row = (payload.new ?? payload.old) as {
-            message_id: string;
-            user_id: string;
-            emoji: string;
-          };
+      }),
+    );
 
-          // Rebuild reactions optimistically from the event
-          setMessages((prev) =>
-            prev.map((m) => {
-              if (m.id !== row.message_id) return m;
+    // Message edit
+    unsubscribes.push(
+      realtimeClient.on(room, 'message-edit', (data) => {
+        const row = data as {
+          id: string;
+          content: string;
+          edited_at: string | null;
+        };
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === row.id
+              ? { ...m, content: row.content, edited_at: row.edited_at }
+              : m
+          )
+        );
+      }),
+    );
 
-              let reactions = [...m.reactions];
-              const idx = reactions.findIndex((r) => r.emoji === row.emoji);
+    // Message soft-delete
+    unsubscribes.push(
+      realtimeClient.on(room, 'message-delete', (data) => {
+        const row = data as {
+          id: string;
+          deleted_at: string | null;
+        };
+        if (!row.deleted_at) return;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === row.id
+              ? { ...m, deleted_at: row.deleted_at, content: '', image_url: null, reply_to: null, reactions: [] }
+              : m
+          )
+        );
+      }),
+    );
 
-              if (payload.eventType === 'DELETE') {
-                if (idx === -1) return m;
-                const updated = reactions[idx].user_ids.filter((uid) => uid !== row.user_id);
-                if (updated.length === 0) {
-                  reactions = reactions.filter((_, i) => i !== idx);
-                } else {
-                  reactions[idx] = { ...reactions[idx], user_ids: updated };
-                }
+    // Reaction insert/update/delete
+    unsubscribes.push(
+      realtimeClient.on(room, 'reaction-insert', (data) => {
+        const r = data as { message_id: string; user_id: string; emoji: string };
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== r.message_id) return m;
+            let reactions = [...m.reactions];
+            const idx = reactions.findIndex((rx) => rx.emoji === r.emoji);
+            if (idx === -1) {
+              reactions.push({ emoji: r.emoji, user_ids: [r.user_id] });
+            } else if (!reactions[idx].user_ids.includes(r.user_id)) {
+              reactions[idx] = {
+                ...reactions[idx],
+                user_ids: [...reactions[idx].user_ids, r.user_id],
+              };
+            }
+            return { ...m, reactions };
+          })
+        );
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(room, 'reaction-update', (data) => {
+        const { old: oldR, new: newR } = data as {
+          old: { message_id: string; user_id: string; emoji: string };
+          new: { message_id: string; user_id: string; emoji: string };
+        };
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== newR.message_id) return m;
+            let reactions = [...m.reactions];
+            const oldIdx = reactions.findIndex((rx) => rx.emoji === oldR.emoji);
+            if (oldIdx !== -1) {
+              const updated = reactions[oldIdx].user_ids.filter((uid) => uid !== oldR.user_id);
+              if (updated.length === 0) {
+                reactions = reactions.filter((_, i) => i !== oldIdx);
               } else {
-                // INSERT or UPDATE — toggle/add
-                if (idx === -1) {
-                  reactions.push({ emoji: row.emoji, user_ids: [row.user_id] });
-                } else if (!reactions[idx].user_ids.includes(row.user_id)) {
-                  reactions[idx] = {
-                    ...reactions[idx],
-                    user_ids: [...reactions[idx].user_ids, row.user_id],
-                  };
-                }
+                reactions[oldIdx] = { ...reactions[oldIdx], user_ids: updated };
               }
-              return { ...m, reactions };
-            })
-          );
-        }
-      )
-      .subscribe();
+            }
+            const newIdx = reactions.findIndex((rx) => rx.emoji === newR.emoji);
+            if (newIdx === -1) {
+              reactions.push({ emoji: newR.emoji, user_ids: [newR.user_id] });
+            } else if (!reactions[newIdx].user_ids.includes(newR.user_id)) {
+              reactions[newIdx] = {
+                ...reactions[newIdx],
+                user_ids: [...reactions[newIdx].user_ids, newR.user_id],
+              };
+            }
+            return { ...m, reactions };
+          })
+        );
+      }),
+    );
 
-    channelRef.current = channel;
+    unsubscribes.push(
+      realtimeClient.on(room, 'reaction-delete', (data) => {
+        const r = data as { message_id: string; user_id: string; emoji: string };
+        if (!r.message_id || !r.user_id || !r.emoji) return;
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== r.message_id) return m;
+            let reactions = [...m.reactions];
+            const idx = reactions.findIndex((rx) => rx.emoji === r.emoji);
+            if (idx === -1) return m;
+            const updated = reactions[idx].user_ids.filter((uid) => uid !== r.user_id);
+            if (updated.length === 0) {
+              reactions = reactions.filter((_, i) => i !== idx);
+            } else {
+              reactions[idx] = { ...reactions[idx], user_ids: updated };
+            }
+            return { ...m, reactions };
+          })
+        );
+      }),
+    );
+
     return () => {
-      supabase.removeChannel(channel);
+      unsubscribes.forEach((unsub) => unsub());
+      realtimeClient.unsubscribe(room);
     };
-  }, [communityId, user?.id]);
+  }, [communityId, user?.id, user?.name]);
 
   useEffect(() => {
     load();
