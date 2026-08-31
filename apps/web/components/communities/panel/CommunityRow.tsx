@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
@@ -53,6 +54,8 @@ interface CommunityRowProps {
   /** If set, shown instead of the last-message preview. */
   typingText?: string;
   onClick: () => void;
+  /** Called on hover to prefetch bootstrap data for instant navigation. */
+  onHover?: () => void;
 }
 
 export function CommunityRow({
@@ -60,14 +63,26 @@ export function CommunityRow({
   active,
   typingText,
   onClick,
+  onHover,
 }: CommunityRowProps) {
   const { lastReaction } = c;
   const preview = c.last_message ? formatPreview(c.last_message) : null;
+
+  // Throttle prefetch to avoid hammering the network on rapid mouse moves.
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimerRef.current) return;
+    onHover?.();
+    hoverTimerRef.current = setTimeout(() => {
+      hoverTimerRef.current = null;
+    }, 2000); // max 1 prefetch per 2s per row
+  }, [onHover]);
 
   return (
     <li>
       <button
         onClick={onClick}
+        onMouseEnter={handleMouseEnter}
         className={`flex w-full items-start gap-[11px] rounded-lg px-[9px] py-[9px] text-left transition-colors ${
           active
             ? "bg-surface-raised text-foreground"

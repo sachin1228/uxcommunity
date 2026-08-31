@@ -64,6 +64,7 @@ interface DateGroup {
 export function CommunityChat({
   communityId,
   currentUserId,
+  currentUserName,
   initialMeta,
   initialMessages,
   initialLastReadAt,
@@ -72,6 +73,7 @@ export function CommunityChat({
 }: {
   communityId: string;
   currentUserId: string;
+  currentUserName: string;
   initialMeta?: CachedMeta;
   initialMessages?: CachedMessage[];
   initialLastReadAt?: string | null;
@@ -461,12 +463,12 @@ export function CommunityChat({
   }, [communityId, fetchMessages, setMessages]);
 
   const currentUserMember = members.find((member) => member.user_id === currentUserId);
-  const currentUserName = currentUserMember?.users?.name ?? "Someone";
+  const resolvedUserName = currentUserMember?.users?.name ?? currentUserName ?? "Someone";
   const currentUserAvatar = currentUserMember?.users?.avatar_url ?? null;
   const { typingUsers, setTyping } = useTypingPresence({
     communityId,
     currentUserId,
-    currentUserName,
+    currentUserName: resolvedUserName,
   });
 
   const { onlineCount } = useOnlinePresence({ communityId, currentUserId });

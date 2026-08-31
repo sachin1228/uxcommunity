@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { realtimePool } from "@/lib/realtime/pool";
 import {
   sidebarStore,
   SIDEBAR_STALE_MS,
@@ -29,6 +30,13 @@ type Community = CachedSidebarCommunity;
 export function useSidebarCommunities(userId: string) {
   const router   = useGuardedRouter();
   const pathname = usePathname();
+
+  // Initialize the realtime pool with the current user on first mount.
+  // This must happen before any component calls realtimePool.acquire().
+  useEffect(() => {
+    realtimePool.init({ id: userId, name: null, avatar: null });
+    return () => realtimePool.destroyAll();
+  }, [userId]);
 
   const activeCommunityId = pathname.match(
     /\/dashboard\/communities\/([^/]+)/
