@@ -34,6 +34,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    // Redact sensitive query params from any logging
+    const safeUrl = new URL(url);
+    if (safeUrl.searchParams.has("token")) safeUrl.searchParams.set("token", "[REDACTED]");
+
     if (url.pathname === "/ws") {
       return handleUpgrade(request, env, url);
     }

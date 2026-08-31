@@ -2,33 +2,39 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 
 /**
- * What survives DO hibernation/eviction:
+ * Hibernation-safe state model:
  *
- * 1. WebSocket attachments (via ws.serializeAttachment / deserializeAttachment)
- *    - Client WS attachment: { userId: string }
- *    - Community WS attachment: { communityId: string, topics: string[] }
+ * Survives DO hibernation/eviction:
+ *   WS attachments (via serializeAttachment/deserializeAttachment):
+ *     Client WS: { userId: string }
+ *     Community WS: { communityId: string, topics: string[], gen: number }
+ *   Persistent storage:
+ *     community_subs:${userId}:${communityId}: { topics: string[], gen: number }
  *
- * 2. Persistent storage (this.ctx.storage)
- *    - key `community_subs:${userId}:${communityId}` → { topics: string[] }
- *    - Used to reconnect community DOs after hibernation
+ * Lost on hibernation (rebuilt on wake):
+ *   this.clients Map → rebuilt from ctx.getWebSockets() client attachments
+ *   this.communityConns Map → rebuilt from surviving community WS + storage
  *
- * What is LOST on hibernation:
- * - this.clients Map (rebuilt from surviving WS attachments via ctx.getWebSockets())
- * - this.communityConns Map (rebuilt from surviving community WS attachments + storage)
+ * Reconstruction (blockConcurrencyWhile):
+ *   1. ctx.getWebSockets() → surviving sockets
+ *   2. Client WS → rebuild clients Map from userId attachment
+ *   3. Community WS → rebuild communityConns from communityId+topics attachment
+ *   4. Storage → find missing community connections → reconnect with stored topics
  *
- * Reconstruction flow on wake:
- *   1. ctx.getWebSockets() → surviving client + community sockets
- *   2. For each client WS: deserialize userId from attachment
- *   3. For each community WS: deserialize communityId + topics from attachment
- *   4. Read storage for community_subs to find what needs reconnecting
- *   5. Reconnect missing community DO connections
- *   6. Resubscribe topics on reconnected connections
+ * Race prevention:
+ *   gen (generation) counter on subscriptions prevents stale unsubscribe from
+ *   deleting a newer subscribe. Each subscribe increments gen; unsubscribe
+ *   only deletes if gen matches.
  */
 
 interface ClientState {
   userId: string;
-  /** room → set of subscribed topics (rebuilt from community WS topics on wake) */
-  subscriptions: Map<string, Set<string>>;
+  subscriptions: Map<string, SubscriptionEntry>;
+}
+
+interface SubscriptionEntry {
+  topics: Set<string>;
+  gen: number;
 }
 
 interface CommunityConn {
@@ -37,9 +43,14 @@ interface CommunityConn {
   topics: Set<string>;
   ready: boolean;
   buffer: string[];
+  retryCount: number;
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const COMMUNITY_SUB_KEY_PREFIX = "community_subs:";
+const MAX_RETRY_DELAY_MS = 60_000;
+const BASE_RETRY_MS = 1_000;
+const MAX_RETRIES = 10;
 
 export class UserDO extends DurableObject<Env> {
   private clients = new Map<WebSocket, ClientState>();
@@ -47,7 +58,6 @@ export class UserDO extends DurableObject<Env> {
   private reconstructed = false;
 
   async fetch(request: Request): Promise<Response> {
-    // On first fetch after hibernation, reconstruct state from surviving sockets.
     if (!this.reconstructed) {
       await this.ctx.blockConcurrencyWhile(() => this.reconstructState());
       this.reconstructed = true;
@@ -62,24 +72,19 @@ export class UserDO extends DurableObject<Env> {
   // ── Hibernation-safe state reconstruction ──────────────────────────────
 
   private async reconstructState(): Promise<void> {
-    // 1. Rebuild client map from surviving client WS attachments.
-    const userCommunities = new Map<string, Set<string>>();
-
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = ws.deserializeAttachment() as
-        | { userId?: string; communityId?: string; topics?: string[] }
+        | { userId?: string; communityId?: string; topics?: string[]; gen?: number }
         | undefined;
 
       if (!attachment) continue;
 
       if (attachment.userId && !attachment.communityId) {
-        // Client WebSocket
         this.clients.set(ws, {
           userId: attachment.userId,
           subscriptions: new Map(),
         });
       } else if (attachment.communityId) {
-        // Community DO WebSocket (survived hibernation)
         const topics = new Set(attachment.topics ?? []);
         this.communityConns.set(attachment.communityId, {
           ws,
@@ -87,12 +92,13 @@ export class UserDO extends DurableObject<Env> {
           topics,
           ready: true,
           buffer: [],
+          retryCount: 0,
+          retryTimer: null,
         });
-        // We'll figure out which clients subscribe to this community below
       }
     }
 
-    // 2. Read persistent storage to find all community subscriptions.
+    // Rebuild subscription state from storage and reconnect missing community DOs.
     const userIds = new Set<string>();
     for (const [, state] of this.clients) {
       userIds.add(state.userId);
@@ -101,21 +107,23 @@ export class UserDO extends DurableObject<Env> {
     for (const userId of userIds) {
       const keys = await this.findStorageKeys(`${COMMUNITY_SUB_KEY_PREFIX}${userId}:`);
       for (const key of keys) {
-        const sub = await this.ctx.storage.get<{ topics: string[] }>(key);
+        const sub = await this.ctx.storage.get<{ topics: string[]; gen: number }>(key);
         if (!sub || sub.topics.length === 0) continue;
 
         const communityId = key.slice(`${COMMUNITY_SUB_KEY_PREFIX}${userId}:`.length);
 
-        // Rebuild client subscription map
         for (const [, state] of this.clients) {
           if (state.userId !== userId) continue;
-          state.subscriptions.set(communityId, new Set(sub.topics));
 
-          // Ensure community connection exists
+          const entry: SubscriptionEntry = {
+            topics: new Set(sub.topics),
+            gen: sub.gen ?? 0,
+          };
+          state.subscriptions.set(communityId, entry);
+
           if (!this.communityConns.has(communityId)) {
-            this.connectToCommunity(communityId, userId, new Set(sub.topics));
+            this.connectToCommunity(communityId, userId, entry.topics);
           } else {
-            // Resubscribe topics on existing connection
             const conn = this.communityConns.get(communityId)!;
             for (const topic of sub.topics) {
               if (!conn.topics.has(topic)) {
@@ -146,8 +154,6 @@ export class UserDO extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-
-    // Attachment survives hibernation — only store the userId.
     server.serializeAttachment({ userId });
 
     this.clients.set(server, {
@@ -178,12 +184,9 @@ export class UserDO extends DurableObject<Env> {
 
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== state.userId) return;
-      this.sendToClient(ws, {
-        t: "hello",
-        connectionId: crypto.randomUUID(),
-      });
+      this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
     } else if (msg.t === "subscribe" && msg.room && msg.topic) {
-      await this.handleSubscribe(ws, state, msg.room, msg.topic);
+      await this.handleSubscribe(state, msg.room, msg.topic);
     } else if (msg.t === "unsubscribe" && msg.room && msg.topic) {
       await this.handleUnsubscribe(state, msg.room, msg.topic);
     } else if (msg.t === "publish" && msg.room && msg.topic) {
@@ -195,9 +198,8 @@ export class UserDO extends DurableObject<Env> {
     const state = this.clients.get(ws);
     if (!state) return;
 
-    // Remove client and clean up storage
-    for (const [room, topics] of state.subscriptions) {
-      for (const topic of topics) {
+    for (const [room, entry] of state.subscriptions) {
+      for (const topic of entry.topics) {
         this.sendToCommunityById(room, { t: "unsubscribe", topic });
       }
       await this.removeCommunitySub(state.userId, room);
@@ -210,27 +212,30 @@ export class UserDO extends DurableObject<Env> {
     await this.webSocketClose(ws);
   }
 
-  // ── Subscription routing ─────────────────────────────────────────────
+  // ── Subscription routing (race-safe) ─────────────────────────────────
 
   private async handleSubscribe(
-    ws: WebSocket,
     state: ClientState,
     room: string,
     topic: string,
   ): Promise<void> {
-    let topics = state.subscriptions.get(room);
-    if (!topics) {
-      topics = new Set();
-      state.subscriptions.set(room, topics);
+    let entry = state.subscriptions.get(room);
+    if (!entry) {
+      entry = { topics: new Set(), gen: 0 };
+      state.subscriptions.set(room, entry);
     }
-    const isNew = topics.size === 0;
-    topics.add(topic);
+    const isNew = entry.topics.size === 0;
+    entry.topics.add(topic);
+    entry.gen++;
 
-    // Persist to storage (survives hibernation)
-    await this.addCommunitySub(state.userId, room, topic);
+    // Persist with generation counter
+    await this.ctx.storage.put(this.storageKey(state.userId, room), {
+      topics: [...entry.topics],
+      gen: entry.gen,
+    });
 
     if (isNew) {
-      this.connectToCommunity(room, state.userId, topics);
+      this.connectToCommunity(room, state.userId, entry.topics);
     }
     this.sendToCommunityById(room, { t: "subscribe", topic });
   }
@@ -240,16 +245,25 @@ export class UserDO extends DurableObject<Env> {
     room: string,
     topic: string,
   ): Promise<void> {
-    const topics = state.subscriptions.get(room);
-    if (!topics) return;
-    topics.delete(topic);
+    const entry = state.subscriptions.get(room);
+    if (!entry) return;
 
-    // Update storage
-    if (topics.size === 0) {
+    const currentGen = entry.gen;
+    entry.topics.delete(topic);
+    entry.gen++;
+
+    if (entry.topics.size === 0) {
       state.subscriptions.delete(room);
       await this.removeCommunitySub(state.userId, room);
     } else {
-      await this.setCommunityTopics(state.userId, room, topics);
+      // Only write if gen hasn't advanced (no newer subscribe raced ahead)
+      const stored = await this.ctx.storage.get<{ gen: number }>(this.storageKey(state.userId, room));
+      if (!stored || stored.gen === currentGen) {
+        await this.ctx.storage.put(this.storageKey(state.userId, room), {
+          topics: [...entry.topics],
+          gen: entry.gen,
+        });
+      }
     }
 
     this.sendToCommunityById(room, { t: "unsubscribe", topic });
@@ -262,8 +276,8 @@ export class UserDO extends DurableObject<Env> {
     topic: string,
     data: unknown,
   ): Promise<void> {
-    const topics = state.subscriptions.get(room);
-    if (!topics || !topics.has(topic)) return;
+    const entry = state.subscriptions.get(room);
+    if (!entry || !entry.topics.has(topic)) return;
 
     this.sendToCommunityById(room, {
       t: "publish",
@@ -273,7 +287,7 @@ export class UserDO extends DurableObject<Env> {
     });
   }
 
-  // ── Community DO connections (hibernation-safe) ──────────────────────
+  // ── Community DO connections (with bounded exponential retry) ─────────
 
   private connectToCommunity(
     room: string,
@@ -296,27 +310,34 @@ export class UserDO extends DurableObject<Env> {
       },
     );
 
+    const conn: CommunityConn = {
+      ws: null as unknown as WebSocket,
+      communityId: room,
+      topics: new Set(topics),
+      ready: false,
+      buffer: [],
+      retryCount: 0,
+      retryTimer: null,
+    };
+    this.communityConns.set(room, conn);
+
     stub.fetch(upgraded).then((response) => {
       const ws = (response as unknown as { webSocket?: WebSocket }).webSocket;
-      if (!ws) return;
+      if (!ws) {
+        this.retryCommunityConnect(room, userId, topics);
+        return;
+      }
 
-      // acceptWebSocket ensures this socket survives future hibernations.
       this.ctx.acceptWebSocket(ws);
 
-      // Attachment survives hibernation — store communityId and topics.
       ws.serializeAttachment({
         communityId: room,
         topics: [...topics],
       });
 
-      const conn: CommunityConn = {
-        ws,
-        communityId: room,
-        topics: new Set(topics),
-        ready: true,
-        buffer: [],
-      };
-      this.communityConns.set(room, conn);
+      conn.ws = ws;
+      conn.ready = true;
+      conn.retryCount = 0;
 
       ws.addEventListener("message", (event: MessageEvent) => {
         this.onCommunityMessage(room, String(event.data));
@@ -330,23 +351,73 @@ export class UserDO extends DurableObject<Env> {
         this.onCommunityDisconnect(room);
       });
 
-      // Flush any buffered messages
+      // Flush buffered messages
       for (const buffered of conn.buffer) {
         try { ws.send(buffered); } catch { /* ignore */ }
       }
       conn.buffer = [];
     }).catch(() => {
-      // Connection failed; will retry on next publish
+      this.retryCommunityConnect(room, userId, topics);
     });
   }
 
+  private retryCommunityConnect(
+    room: string,
+    userId: string,
+    topics: Set<string>,
+  ): void {
+    const conn = this.communityConns.get(room);
+    if (!conn) return;
+
+    // Check if any client still needs this community
+    let stillNeeded = false;
+    for (const [, state] of this.clients) {
+      if (state.subscriptions.has(room) && state.subscriptions.get(room)!.topics.size > 0) {
+        stillNeeded = true;
+        break;
+      }
+    }
+    if (!stillNeeded) {
+      this.communityConns.delete(room);
+      return;
+    }
+
+    if (conn.retryCount >= MAX_RETRIES) {
+      // Give up after max retries
+      this.communityConns.delete(room);
+      return;
+    }
+
+    const delay = Math.min(
+      BASE_RETRY_MS * 2 ** conn.retryCount,
+      MAX_RETRY_DELAY_MS,
+    );
+    conn.retryCount++;
+
+    conn.retryTimer = setTimeout(() => {
+      conn.retryTimer = null;
+      this.communityConns.delete(room);
+      this.connectToCommunity(room, userId, topics);
+    }, delay);
+  }
+
   private onCommunityDisconnect(room: string): void {
+    const conn = this.communityConns.get(room);
+    if (!conn) return;
+
+    // Cancel any pending retry
+    if (conn.retryTimer) {
+      clearTimeout(conn.retryTimer);
+      conn.retryTimer = null;
+    }
+
     this.communityConns.delete(room);
 
     // Reconnect if any client still needs this community
     for (const [, state] of this.clients) {
-      if (state.subscriptions.has(room) && state.subscriptions.get(room)!.size > 0) {
-        this.connectToCommunity(room, state.userId, state.subscriptions.get(room)!);
+      const entry = state.subscriptions.get(room);
+      if (entry && entry.topics.size > 0) {
+        this.connectToCommunity(room, state.userId, entry.topics);
         break;
       }
     }
@@ -371,11 +442,11 @@ export class UserDO extends DurableObject<Env> {
     }
 
     for (const [ws, state] of this.clients) {
-      const topics = state.subscriptions.get(room);
-      if (!topics || topics.size === 0) continue;
+      const entry = state.subscriptions.get(room);
+      if (!entry || entry.topics.size === 0) continue;
 
       if (msg.t === "event" && msg.topic) {
-        if (!topics.has(msg.topic)) continue;
+        if (!entry.topics.has(msg.topic)) continue;
         if (msg.sender === state.userId) continue;
         this.sendToClient(ws, {
           t: "event",
@@ -398,13 +469,15 @@ export class UserDO extends DurableObject<Env> {
 
     let anyClientSubscribed = false;
     for (const [, state] of this.clients) {
-      if (state.subscriptions.has(room) && state.subscriptions.get(room)!.size > 0) {
+      const entry = state.subscriptions.get(room);
+      if (entry && entry.topics.size > 0) {
         anyClientSubscribed = true;
         break;
       }
     }
     if (!anyClientSubscribed) {
-      try { conn.ws.close(); } catch { /* ignore */ }
+      if (conn.retryTimer) clearTimeout(conn.retryTimer);
+      try { conn.ws?.close(); } catch { /* ignore */ }
       this.communityConns.delete(room);
     }
   }
@@ -417,59 +490,26 @@ export class UserDO extends DurableObject<Env> {
 
   private sendToCommunity(conn: CommunityConn, msg: unknown): void {
     const json = JSON.stringify(msg);
-    if (conn.ready && conn.ws.readyState === WebSocket.OPEN) {
+    if (conn.ready && conn.ws?.readyState === WebSocket.OPEN) {
       try { conn.ws.send(json); } catch { /* ignore */ }
     } else {
       conn.buffer.push(json);
     }
   }
 
-  // ── Persistent storage helpers ───────────────────────────────────────
+  // ── Storage helpers ──────────────────────────────────────────────────
 
   private storageKey(userId: string, communityId: string): string {
     return `${COMMUNITY_SUB_KEY_PREFIX}${userId}:${communityId}`;
   }
 
-  private async addCommunitySub(
-    userId: string,
-    communityId: string,
-    topic: string,
-  ): Promise<void> {
-    const key = this.storageKey(userId, communityId);
-    const existing = await this.ctx.storage.get<{ topics: string[] }>(key);
-    const topics = existing?.topics ?? [];
-    if (!topics.includes(topic)) {
-      topics.push(topic);
-      await this.ctx.storage.put(key, { topics });
-    }
-  }
-
-  private async removeCommunitySub(
-    userId: string,
-    communityId: string,
-  ): Promise<void> {
-    const key = this.storageKey(userId, communityId);
-    await this.ctx.storage.delete(key);
-  }
-
-  private async setCommunityTopics(
-    userId: string,
-    communityId: string,
-    topics: Set<string>,
-  ): Promise<void> {
-    const key = this.storageKey(userId, communityId);
-    if (topics.size === 0) {
-      await this.ctx.storage.delete(key);
-    } else {
-      await this.ctx.storage.put(key, { topics: [...topics] });
-    }
+  private async removeCommunitySub(userId: string, communityId: string): Promise<void> {
+    await this.ctx.storage.delete(this.storageKey(userId, communityId));
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
   private sendToClient(ws: WebSocket, msg: unknown): void {
-    try {
-      ws.send(JSON.stringify(msg));
-    } catch { /* ignore */ }
+    try { ws.send(JSON.stringify(msg)); } catch { /* ignore */ }
   }
 }

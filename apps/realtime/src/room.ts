@@ -87,39 +87,51 @@ export class Room extends DurableObject<Env> {
 
   /**
    * Check if a user is authorized to access this community.
-   * Queries the community_members table directly (this DO is trusted).
+   * FAILS CLOSED: any error or timeout = rejected.
+   *
+   * Strategy:
+   *   1. Check storage cache (fast path)
+   *   2. Query membership via internal API
+   *   3. Cache positive results for 5 min, negative results for 1 min
+   *   4. On any error → reject (fail closed)
    */
   private async isAuthorized(userId: string): Promise<boolean> {
+    const cacheKey = `auth:${userId}`;
     try {
-      // Use the environment's storage or a direct DB query.
-      // For Cloudflare Durable Objects, we use the storage API to cache
-      // the membership check. The first check hits the DB via a fetch
-      // to the Worker, subsequent checks use the cached result.
-      const cacheKey = `auth:${userId}`;
       const cached = await this.ctx.storage.get<boolean>(cacheKey);
       if (cached !== undefined) return cached;
+    } catch {
+      // Storage read failed — fail closed
+      return false;
+    }
 
-      // Fetch membership from the Worker's API endpoint.
-      // This is a server-to-server call within the same project.
-      const communityId = this.communityIdFromRoom();
-      const response = await fetch(
+    const communityId = this.communityIdFromRoom();
+    let response: Response | null = null;
+    try {
+      response = await fetch(
         `https://internal/api/communities/${communityId}/members/${userId}/check`,
         { method: "GET", headers: { "x-realtime-publish-secret": "internal" } },
-      ).catch(() => null);
-
-      // If the internal endpoint is not available, allow the connection
-      // (the community DO trusts the Worker's routing). In production,
-      // implement the actual membership check.
-      const authorized = response?.ok ?? true;
-
-      // Cache for 5 minutes
-      await this.ctx.storage.put(cacheKey, authorized);
-      return authorized;
+      );
     } catch {
-      // On error, allow the connection (fail-open for availability).
-      // In production, consider fail-closed for security.
-      return true;
+      // Network error — fail closed
+      return false;
     }
+
+    if (!response) {
+      // Fetch returned null — fail closed
+      return false;
+    }
+
+    const authorized = response.ok;
+
+    try {
+      // Cache positive for 5 min, negative for 1 min
+      await this.ctx.storage.put(cacheKey, authorized);
+    } catch {
+      // Storage write failed — not critical, just means next check re-queries
+    }
+
+    return authorized;
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
