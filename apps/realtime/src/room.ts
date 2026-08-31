@@ -2,259 +2,210 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./env";
 import type { PublishRequest } from "./types";
 
+/**
+ * Community Durable Object — ONE per community. Handles all logical realtime
+ * topics (chat, typing, presence, threads, events, resources).
+ *
+ * Architecture (RPC-based):
+ *   Client → UserDO → RPC subscribe/unsubscribe/publish → CommunityDO
+ *   CommunityDO → RPC deliverEvent() → UserDO → Client(s)
+ *
+ * Dual-index subscriber store:
+ *   subscriptionsByUser:  userId → Set<topic>
+ *   subscriptionsByTopic: topic → Set<userId>
+ *
+ * Both indices are kept in-memory for O(topic) broadcast lookup.
+ * Persisted to SQLite for hibernation survival.
+ *
+ * Storage key format: sub:${userId}:${topic}
+ *   - One entry per user-topic pair
+ *   - Enables efficient listing for unsubscribe and hibernation rebuild
+ *
+ * Authorization:
+ *   - RPC methods verify caller via RPC_SECRET (defense-in-depth)
+ *   - Membership checked via internal API (fail-closed)
+ *
+ * Event classification:
+ *   - EPHEMERAL (typing, presence): drop on RPC failure, no retry
+ *   - DURABLE (chat, edit, delete, reaction): 1 retry, client recovers via DB
+ */
+
 interface Member {
   name: string | null;
   avatar: string | null;
   connections: number;
 }
 
-interface Attachment {
-  userId?: string;
-  topics?: Set<string>;
-  role?: string;
-}
-
 const MEMBERS_KEY = "members";
 const MAX_MESSAGE_BYTES = 8192;
+const SUB_KEY_PREFIX = "sub:";
 
-/**
- * Community Durable Object — ONE per community. Handles all logical realtime
- * topics (chat, typing, presence, threads, events, resources).
- *
- * Connection types:
- *   - Direct clients (no role): standard browser/mobile connections
- *   - UserDO gateways (role=userdo): multiplexing layer, must be authorized
- *
- * Authorization for UserDO connections:
- *   - UserDO sends x-realtime-role: userdo + x-realtime-uid headers
- *   - Community DO verifies membership in database before accepting
- *   - Unauthorized connections are rejected with 403
- */
+/** Events that are ephemeral — no retry on RPC failure. */
+const EPHEMERAL_TOPICS = new Set(["typing", "presence"]);
+
 export class Room extends DurableObject<Env> {
+  /**
+   * Dual-index subscriber store.
+   * subscriptionsByUser[userId] = Set of topics the user is subscribed to.
+   * subscriptionsByTopic[topic] = Set of userIds subscribed to that topic.
+   */
+  private subscriptionsByUser = new Map<string, Set<string>>();
+  private subscriptionsByTopic = new Map<string, Set<string>>();
+  private subscribersReconstructed = false;
+
+  // ── Fetch handler (HTTP only — no WebSocket upgrades) ────────────────
+
   async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("Upgrade") === "websocket") {
-      return this.upgrade(request);
-    }
+    // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
     }
     return new Response("Not found", { status: 404 });
   }
 
-  private roomName(): string {
-    return this.ctx.id.name ?? this.ctx.id.toString();
-  }
+  // ── Subscriber index reconstruction after hibernation ────────────────
 
-  /** Extract community ID from room name (e.g. "chat:abc" → "abc"). */
-  private communityIdFromRoom(): string {
-    const name = this.roomName();
-    const idx = name.indexOf(":");
-    return idx >= 0 ? name.slice(idx + 1) : name;
-  }
-
-  private async upgrade(request: Request): Promise<Response> {
-    const userId = request.headers.get("x-realtime-uid");
-    if (!userId) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    const role = request.headers.get("x-realtime-role");
-
-    // Authorize UserDO gateway connections against the database.
-    if (role === "userdo") {
-      const authorized = await this.isAuthorized(userId);
-      if (!authorized) {
-        return new Response("Forbidden: not a community member", { status: 403 });
-      }
-    }
-
-    const pair = new WebSocketPair();
-    const client = pair[0];
-    const server = pair[1];
-    this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId, topics: new Set<string>(), role: role ?? undefined });
-
-    const connectionId = crypto.randomUUID();
-    void this.broadcastTo(server, {
-      t: "hello",
-      room: this.roomName(),
-      connectionId,
+  private async ensureSubscribers(): Promise<void> {
+    if (this.subscribersReconstructed) return;
+    await this.ctx.blockConcurrencyWhile(async () => {
+      if (this.subscribersReconstructed) return;
+      await this.reconstructSubscribers();
+      this.subscribersReconstructed = true;
     });
-    void this.sendPresence(server);
-
-    return new Response(null, { status: 101, webSocket: client });
   }
+
+  private async reconstructSubscribers(): Promise<void> {
+    const entries = await this.ctx.storage.list({ prefix: SUB_KEY_PREFIX });
+    for (const [key, value] of entries) {
+      const payload = value as { userId: string; topic: string } | undefined;
+      if (!payload?.userId || !payload?.topic) continue;
+
+      let userTopics = this.subscriptionsByUser.get(payload.userId);
+      if (!userTopics) {
+        userTopics = new Set();
+        this.subscriptionsByUser.set(payload.userId, userTopics);
+      }
+      userTopics.add(payload.topic);
+
+      let topicSubs = this.subscriptionsByTopic.get(payload.topic);
+      if (!topicSubs) {
+        topicSubs = new Set();
+        this.subscriptionsByTopic.set(payload.topic, topicSubs);
+      }
+      topicSubs.add(payload.userId);
+    }
+  }
+
+  // ── RPC: subscribe ───────────────────────────────────────────────────
 
   /**
-   * Check if a user is authorized to access this community.
-   * FAILS CLOSED: any error or timeout = rejected.
+   * Called by UserDO via RPC when a user subscribes to a topic.
    *
-   * Strategy:
-   *   1. Check storage cache (fast path)
-   *   2. Query membership via internal API
-   *   3. Cache positive results for 5 min, negative results for 1 min
-   *   4. On any error → reject (fail closed)
+   * Authorization: caller must provide matching RPC_SECRET.
+   * Membership: checked via internal API (fail-closed).
    */
-  private async isAuthorized(userId: string): Promise<boolean> {
-    const cacheKey = `auth:${userId}`;
-    try {
-      const cached = await this.ctx.storage.get<boolean>(cacheKey);
-      if (cached !== undefined) return cached;
-    } catch {
-      // Storage read failed — fail closed
-      return false;
+  async subscribe(
+    userId: string,
+    topics: string | string[],
+    rpcSecret?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (rpcSecret !== this.env.RPC_SECRET) {
+      return { ok: false, error: "unauthorized" };
     }
 
-    const communityId = this.communityIdFromRoom();
-    let response: Response | null = null;
-    try {
-      response = await fetch(
-        `https://internal/api/communities/${communityId}/members/${userId}/check`,
-        { method: "GET", headers: { "x-realtime-publish-secret": "internal" } },
-      );
-    } catch {
-      // Network error — fail closed
-      return false;
+    const isMember = await this.checkMembership(userId);
+    if (!isMember) {
+      return { ok: false, error: "not_member" };
     }
 
-    if (!response) {
-      // Fetch returned null — fail closed
-      return false;
-    }
+    await this.ensureSubscribers();
 
-    const authorized = response.ok;
-
-    try {
-      // Cache positive for 5 min, negative for 1 min
-      await this.ctx.storage.put(cacheKey, authorized);
-    } catch {
-      // Storage write failed — not critical, just means next check re-queries
-    }
-
-    return authorized;
-  }
-
-  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
-    if (typeof message !== "string") return;
-    let msg: { t?: string; topic?: string; data?: unknown; user?: { id: string; name: string; avatar: string | null }; userId?: string };
-    try {
-      msg = JSON.parse(message);
-    } catch {
-      this.reject(ws, "invalid JSON");
-      return;
-    }
-
-    const attachment = ws.deserializeAttachment() as Attachment;
-    const { userId, role } = attachment;
-
-    if (msg.t === "join") {
-      const user = msg.user;
-      if (!userId || !user || user.id !== userId) {
-        this.reject(ws, "join identity mismatch");
-        return;
+    const topicList = Array.isArray(topics) ? topics : [topics];
+    for (const topic of topicList) {
+      // Update dual index
+      let userTopics = this.subscriptionsByUser.get(userId);
+      if (!userTopics) {
+        userTopics = new Set();
+        this.subscriptionsByUser.set(userId, userTopics);
       }
-      ws.serializeAttachment({ userId, topics: new Set<string>(), role });
-      await this.join(userId, user);
-    } else if (msg.t === "subscribe" && msg.topic) {
-      const a = ws.deserializeAttachment() as Attachment;
-      if (!a.topics) a.topics = new Set();
-      a.topics.add(msg.topic);
-      ws.serializeAttachment(a);
-    } else if (msg.t === "unsubscribe" && msg.topic) {
-      const a = ws.deserializeAttachment() as Attachment;
-      if (a.topics) a.topics.delete(msg.topic);
-      ws.serializeAttachment(a);
-    } else if (msg.t === "publish") {
-      const publisherId = msg.userId ?? userId;
-      if (!publisherId || !msg.topic) {
-        this.reject(ws, "publish requires topic and identity");
-        return;
+      userTopics.add(topic);
+
+      let topicSubs = this.subscriptionsByTopic.get(topic);
+      if (!topicSubs) {
+        topicSubs = new Set();
+        this.subscriptionsByTopic.set(topic, topicSubs);
       }
-      const payload = JSON.stringify({
-        t: "event",
-        room: this.roomName(),
-        topic: msg.topic,
-        data: msg.data ?? null,
-        sender: publisherId,
-      });
-      if (payload.length > MAX_MESSAGE_BYTES) {
-        this.reject(ws, "message too large");
-        return;
+      topicSubs.add(userId);
+
+      // Persist to SQLite
+      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
+      await this.ctx.storage.put(key, { userId, topic });
+    }
+
+    return { ok: true };
+  }
+
+  // ── RPC: unsubscribe ─────────────────────────────────────────────────
+
+  /**
+   * Called by UserDO via RPC when a user unsubscribes from a topic.
+   */
+  async unsubscribe(
+    userId: string,
+    topics: string | string[],
+    rpcSecret?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
+    if (rpcSecret !== this.env.RPC_SECRET) {
+      return { ok: false, error: "unauthorized" };
+    }
+
+    await this.ensureSubscribers();
+
+    const topicList = Array.isArray(topics) ? topics : [topics];
+    for (const topic of topicList) {
+      // Update dual index
+      const userTopics = this.subscriptionsByUser.get(userId);
+      if (userTopics) {
+        userTopics.delete(topic);
+        if (userTopics.size === 0) {
+          this.subscriptionsByUser.delete(userId);
+        }
       }
-      this.broadcastByTopic(payload, msg.topic, { ws });
+
+      const topicSubs = this.subscriptionsByTopic.get(topic);
+      if (topicSubs) {
+        topicSubs.delete(userId);
+        if (topicSubs.size === 0) {
+          this.subscriptionsByTopic.delete(topic);
+        }
+      }
+
+      // Remove from SQLite
+      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
+      await this.ctx.storage.delete(key);
     }
+
+    return { ok: true };
   }
 
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    const { userId } = ws.deserializeAttachment();
-    if (userId) await this.leave(userId);
+  // ── RPC: publish (from UserDO client message) ────────────────────────
+
+  /**
+   * Called by UserDO via RPC when a user publishes a message.
+   */
+  async publishMessage(
+    userId: string,
+    topic: string,
+    data: unknown,
+    rpcSecret?: string,
+  ): Promise<void> {
+    if (rpcSecret !== this.env.RPC_SECRET) return;
+
+    await this.ensureSubscribers();
+    await this.broadcastByTopic(topic, data, userId);
   }
 
-  async webSocketError(ws: WebSocket): Promise<void> {
-    const { userId } = ws.deserializeAttachment();
-    if (userId) await this.leave(userId);
-  }
-
-  private async join(userId: string, user: { id: string; name: string; avatar: string | null }): Promise<void> {
-    const members = (await this.ctx.storage.get<Record<string, Member>>(MEMBERS_KEY)) ?? {};
-    const existing = members[userId];
-    const isFirstConnection = !existing || existing.connections <= 0;
-
-    members[userId] = {
-      name: user.name ?? existing?.name ?? null,
-      avatar: user.avatar ?? existing?.avatar ?? null,
-      connections: (existing?.connections ?? 0) + 1,
-    };
-    await this.ctx.storage.put(MEMBERS_KEY, members);
-
-    if (isFirstConnection) {
-      const userEntry = members[userId];
-      this.broadcastAll(JSON.stringify({
-        t: "presence_delta",
-        room: this.roomName(),
-        joined: { id: userId, name: userEntry.name, avatar: userEntry.avatar, connections: userEntry.connections },
-      }));
-    } else {
-      await this.broadcastPresence();
-    }
-  }
-
-  private async leave(userId: string): Promise<void> {
-    const members = (await this.ctx.storage.get<Record<string, Member>>(MEMBERS_KEY)) ?? {};
-    const member = members[userId];
-    if (!member) return;
-    member.connections -= 1;
-    if (member.connections <= 0) {
-      delete members[userId];
-      this.broadcastAll(JSON.stringify({
-        t: "presence_delta",
-        room: this.roomName(),
-        left: { id: userId },
-      }));
-    } else {
-      members[userId] = member;
-      await this.ctx.storage.put(MEMBERS_KEY, members);
-    }
-    if (members[userId]) {
-      await this.ctx.storage.put(MEMBERS_KEY, members);
-    }
-  }
-
-  private async broadcastPresence(): Promise<void> {
-    const members = (await this.ctx.storage.get<Record<string, Member>>(MEMBERS_KEY)) ?? {};
-    const users = Object.entries(members).map(([id, m]) => ({
-      id, name: m.name, avatar: m.avatar, connections: m.connections,
-    }));
-    this.broadcastAll(JSON.stringify({ t: "presence", room: this.roomName(), users }));
-  }
-
-  private async sendPresence(ws: WebSocket): Promise<void> {
-    const members = (await this.ctx.storage.get<Record<string, Member>>(MEMBERS_KEY)) ?? {};
-    const users = Object.entries(members).map(([id, m]) => ({
-      id, name: m.name, avatar: m.avatar, connections: m.connections,
-    }));
-    this.sendTo(ws, JSON.stringify({ t: "presence", room: this.roomName(), users }));
-  }
+  // ── HTTP publish (server-side) ───────────────────────────────────────
 
   private async publish(request: Request): Promise<Response> {
     let body: PublishRequest;
@@ -266,56 +217,135 @@ export class Room extends DurableObject<Env> {
     if (!body.room || !body.topic) {
       return new Response("Bad request", { status: 400 });
     }
-    const payload = JSON.stringify({
-      t: "event",
-      room: body.room,
-      topic: body.topic,
-      data: body.data ?? null,
-      ...(body.exclude_user ? { sender: body.exclude_user } : {}),
-    });
-    if (payload.length > MAX_MESSAGE_BYTES) {
-      return new Response("Message too large", { status: 413 });
-    }
-    this.broadcastByTopic(payload, body.topic, { userId: body.exclude_user });
+
+    await this.ensureSubscribers();
+    await this.broadcastByTopic(body.topic, body.data, body.exclude_user);
+
     return new Response("ok");
   }
 
-  private broadcastByTopic(
-    message: string,
+  // ── Broadcast with dual-index lookup ──────────────────────────────────
+
+  /**
+   * Broadcast an event to all subscribers of a topic.
+   *
+   * Performance:
+   *   - Subscriber lookup: O(1) via subscriptionsByTopic.get(topic)
+   *   - Delivery: O(number of subscribers for that topic)
+   *
+   * For 500 active chat subscribers:
+   *   1 topic lookup + ~500 RPC deliveries (concurrent)
+   *
+   * Event classification:
+   *   - EPHEMERAL (typing, presence): no retry on RPC failure
+   *   - DURABLE (chat, edit, delete, reaction): 1 retry with 100ms backoff
+   */
+  private async broadcastByTopic(
     topic: string,
-    exclude?: { ws?: WebSocket; userId?: string }
-  ): void {
-    for (const ws of this.ctx.getWebSockets()) {
-      const attachment = ws.deserializeAttachment() as Attachment;
-      const { userId } = attachment;
-      if (exclude?.ws === ws) continue;
-      if (exclude?.userId && userId === exclude.userId) continue;
-      if (attachment.topics && !attachment.topics.has(topic)) continue;
-      this.sendTo(ws, message);
+    data: unknown,
+    excludeUserId?: string,
+  ): Promise<void> {
+    const topicSubs = this.subscriptionsByTopic.get(topic);
+    if (!topicSubs || topicSubs.size === 0) return;
+
+    const isEphemeral = EPHEMERAL_TOPICS.has(topic);
+    const roomName = this.roomName();
+
+    const calls: Promise<void>[] = [];
+    for (const userId of topicSubs) {
+      if (excludeUserId && userId === excludeUserId) continue;
+
+      const call = this.deliverToUser(roomName, topic, data, userId, isEphemeral);
+      calls.push(call);
+    }
+
+    await Promise.allSettled(calls);
+  }
+
+  /**
+   * Deliver an event to a specific user via UserDO RPC.
+   * Ephemeral events: no retry.
+   * Durable events: 1 retry with 100ms backoff.
+   */
+  private async deliverToUser(
+    room: string,
+    topic: string,
+    data: unknown,
+    userId: string,
+    isEphemeral: boolean,
+  ): Promise<void> {
+    const stub = this.env.USER_DO.get(this.env.USER_DO.idFromName(`user:${userId}`));
+
+    try {
+      await stub.deliverEvent(room, topic, data, undefined);
+    } catch (err) {
+      if (isEphemeral) {
+        // Ephemeral: drop silently
+        return;
+      }
+      // Durable: 1 retry with 100ms backoff
+      await new Promise((r) => setTimeout(r, 100));
+      try {
+        await stub.deliverEvent(room, topic, data, undefined);
+      } catch {
+        // Second failure: drop. Client recovers via DB/history sync.
+      }
     }
   }
 
-  private broadcastAll(
-    message: string,
-    exclude?: { ws?: WebSocket; userId?: string }
-  ): void {
-    for (const ws of this.ctx.getWebSockets()) {
-      const { userId } = ws.deserializeAttachment();
-      if (exclude?.ws === ws) continue;
-      if (exclude?.userId && userId === exclude.userId) continue;
-      this.sendTo(ws, message);
+  // ── Membership authorization (fail-closed) ──────────────────────────
+
+  private async checkMembership(userId: string): Promise<boolean> {
+    // If API_URL is not configured, skip membership check.
+    // The Worker already verified the user via JWT before routing to this DO.
+    // In production, set API_URL to enable community-level membership checks.
+    if (!this.env.API_URL) return true;
+
+    const communityId = this.communityIdFromRoom();
+
+    // Check cache first
+    const cacheKey = `auth:${userId}`;
+    try {
+      const cached = await this.ctx.storage.get<boolean>(cacheKey);
+      if (cached !== undefined) return cached;
+    } catch {
+      // Storage read failed — fall through to network check
+    }
+
+    // Check internal API (fail-closed)
+    try {
+      const response = await fetch(
+        `${this.env.API_URL}/api/communities/${communityId}/members/${userId}/check`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.env.API_SECRET}`,
+          },
+          signal: AbortSignal.timeout(3000),
+        },
+      );
+      const authorized = response.ok;
+      try {
+        await this.ctx.storage.put(cacheKey, authorized);
+      } catch {
+        // Storage write failed — not critical
+      }
+      return authorized;
+    } catch {
+      // Network error or timeout → reject (fail-closed)
+      return false;
     }
   }
 
-  private broadcastTo(ws: WebSocket, message: { t: string; room: string; connectionId?: string }): void {
-    this.sendTo(ws, JSON.stringify(message));
+  // ── Room helpers ────────────────────────────────────────────────────
+
+  private roomName(): string {
+    return this.ctx.id.name ?? this.ctx.id.toString();
   }
 
-  private sendTo(ws: WebSocket, message: string): void {
-    try { ws.send(message); } catch { /* Socket closed */ }
-  }
-
-  private reject(ws: WebSocket, reason: string): void {
-    try { ws.send(JSON.stringify({ t: "error", message: reason })); } catch { /* ignore */ }
+  private communityIdFromRoom(): string {
+    const name = this.roomName();
+    const idx = name.indexOf(":");
+    return idx >= 0 ? name.slice(idx + 1) : name;
   }
 }

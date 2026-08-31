@@ -1,0 +1,350 @@
+/**
+ * Diagnostic integration tests to trace EXACTLY where message delivery fails.
+ *
+ * TEST B: Direct CommunityDO (bypass UserDO)
+ *   Client → Worker → CommunityDO directly
+ *   Verifies: CommunityDO topic filtering + /publish delivery works in isolation.
+ *
+ * TEST C: UserDO → CommunityDO isolated DO-to-DO WebSocket
+ *   Client → UserDO → CommunityDO → /publish → back to UserDO → client
+ *   Verifies: the specific DO-to-DO WebSocket mechanism works.
+ *
+ * TEST D: Logging instrumented full-flow test
+ *   Full architecture with console.log at every step.
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { unstable_dev } from "wrangler";
+import type { UnstableDevWorker } from "wrangler";
+import WebSocket from "ws";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+
+const devVars = readFileSync(resolve(__dirname, "../.dev.vars"), "utf-8");
+const vars = Object.fromEntries(
+  devVars.split("\n").filter(Boolean).map((l) => {
+    const [k, ...v] = l.split("=");
+    return [k.trim(), v.join("=").trim()];
+  })
+);
+const REALTIME_SECRET = vars.SESSION_SECRET;
+const PUBLISH_SECRET = vars.REALTIME_PUBLISH_SECRET;
+
+let worker: UnstableDevWorker;
+let baseUrl: string;
+
+async function createToken(userId: string): Promise<string> {
+  const { SignJWT } = await import("jose");
+  const secret = new TextEncoder().encode(REALTIME_SECRET);
+  return new SignJWT({ userId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(secret);
+}
+
+function connectWs(room: string, token: string) {
+  const url = `${baseUrl}/ws?room=${encodeURIComponent(room)}&token=${token}`;
+  const ws = new WebSocket(url);
+  const messages: any[] = [];
+  ws.on("message", (data) => {
+    try { messages.push(JSON.parse(String(data))); } catch { /* ignore */ }
+  });
+  return {
+    ws,
+    messages,
+    close: () => { try { ws.close(); } catch { /* ignore */ } },
+  };
+}
+
+function waitForOpen(ws: WebSocket, ms = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (ws.readyState === WebSocket.OPEN) return resolve();
+    const t = setTimeout(() => reject(new Error("WS open timeout")), ms);
+    ws.on("open", () => { clearTimeout(t); resolve(); });
+  });
+}
+
+function waitForMessage(messages: any[], type: string, ms = 5000): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const check = () => {
+      const msg = messages.find((m) => m.t === type);
+      if (msg) return resolve(msg);
+      if (Date.now() - start > ms) return reject(new Error(`Timeout waiting for ${type}`));
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+async function publish(room: string, topic: string, data: unknown) {
+  return fetch(`${baseUrl}/publish`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-realtime-publish-secret": PUBLISH_SECRET,
+    },
+    body: JSON.stringify({ room, topic, data }),
+  });
+}
+
+beforeAll(async () => {
+  worker = await unstable_dev("src/index.ts", {
+    configPath: "wrangler.toml",
+    experimentalExcludeMiniflareV1: true,
+  });
+  baseUrl = `http://127.0.0.1:${worker.port}`;
+}, 30_000);
+
+afterAll(async () => {
+  await worker?.stop();
+});
+
+// ============================================================================
+// TEST B: DIRECT CommunityDO — bypass UserDO entirely
+//
+// Client connects directly to chat:xxx via the Worker.
+// The Worker routes to CommunityDO (Room).
+// Client subscribes to topics by sending { t:"subscribe", topic:"chat" }.
+// /publish goes to CommunityDO which broadcastsByTopic.
+// ============================================================================
+
+describe("TEST B: Direct CommunityDO (bypass UserDO)", () => {
+  it("client connects directly to CommunityDO, subscribes, and receives published event", async () => {
+    const token = await createToken("user_direct1");
+    // Connect directly to a community room (not user:xxx)
+    const { ws, messages, close } = connectWs("chat:comm_direct", token);
+    try {
+      await waitForOpen(ws);
+      console.log("[TEST-B] STEP 1: Client WebSocket connected to CommunityDO");
+
+      // The CommunityDO sends hello on connect
+      const hello = await waitForMessage(messages, "hello");
+      console.log("[TEST-B] STEP 2: Received hello from CommunityDO:", JSON.stringify(hello));
+      expect(hello.t).toBe("hello");
+
+      // Subscribe to a topic
+      ws.send(JSON.stringify({ t: "subscribe", topic: "chat" }));
+      console.log("[TEST-B] STEP 3: Sent subscribe message");
+      await new Promise((r) => setTimeout(r, 300));
+
+      // Publish via HTTP endpoint
+      console.log("[TEST-B] STEP 4: Publishing via /publish...");
+      await publish("chat:comm_direct", "chat", { text: "direct-test" });
+      console.log("[TEST-B] STEP 5: /publish returned");
+
+      // Wait for event
+      try {
+        const event = await waitForMessage(messages, "event", 5000);
+        console.log("[TEST-B] STEP 6: RECEIVED EVENT:", JSON.stringify(event));
+        expect(event.t).toBe("event");
+        expect(event.topic).toBe("chat");
+        expect(event.data.text).toBe("direct-test");
+        console.log("[TEST-B] RESULT: PASS — Direct CommunityDO delivery works");
+      } catch (e) {
+        console.log("[TEST-B] STEP 6: FAILED — No event received after /publish");
+        console.log("[TEST-B] All messages received:", JSON.stringify(messages));
+        throw e;
+      }
+    } finally { close(); }
+  }, 15000);
+
+  it("two clients on same CommunityDO both receive events (direct)", async () => {
+    const token1 = await createToken("user_direct_a");
+    const token2 = await createToken("user_direct_b");
+    const conn1 = connectWs("chat:comm_direct2", token1);
+    const conn2 = connectWs("chat:comm_direct2", token2);
+
+    try {
+      await waitForOpen(conn1.ws);
+      await waitForOpen(conn2.ws);
+      const h1 = await waitForMessage(conn1.messages, "hello");
+      const h2 = await waitForMessage(conn2.messages, "hello");
+      console.log("[TEST-B-2] Both clients connected to CommunityDO directly");
+
+      conn1.ws.send(JSON.stringify({ t: "subscribe", topic: "chat" }));
+      conn2.ws.send(JSON.stringify({ t: "subscribe", topic: "chat" }));
+      await new Promise((r) => setTimeout(r, 300));
+      console.log("[TEST-B-2] Both subscribed to 'chat' topic");
+
+      await publish("chat:comm_direct2", "chat", { text: "to-both-direct" });
+      console.log("[TEST-B-2] Published, waiting for events...");
+
+      const ev1 = await waitForMessage(conn1.messages, "event", 5000);
+      const ev2 = await waitForMessage(conn2.messages, "event", 5000);
+      console.log("[TEST-B-2] Client 1 received:", JSON.stringify(ev1));
+      console.log("[TEST-B-2] Client 2 received:", JSON.stringify(ev2));
+      expect(ev1.data.text).toBe("to-both-direct");
+      expect(ev2.data.text).toBe("to-both-direct");
+      console.log("[TEST-B-2] RESULT: PASS — Both direct clients received event");
+    } finally {
+      conn1.close();
+      conn2.close();
+    }
+  }, 15000);
+});
+
+// ============================================================================
+// TEST C: UserDO → CommunityDO isolated
+//
+// Client connects to UserDO (user:xxx).
+// Client subscribes to chat:comm_diag topic.
+// /publish goes to CommunityDO.
+// The question: does the CommunityDO send the event to the UserDO?
+// ============================================================================
+
+describe("TEST C: UserDO → CommunityDO (full architecture)", () => {
+  it("single client: subscribe via UserDO, /publish to CommunityDO, event arrives", async () => {
+    const token = await createToken("user_diag1");
+    const { ws, messages, close } = connectWs("user:user_diag1", token);
+    try {
+      await waitForOpen(ws);
+      console.log("[TEST-C] STEP 1: Client connected to UserDO");
+
+      ws.send(JSON.stringify({ t: "join", user: { id: "user_diag1", name: "Diag1", avatar: null } }));
+      const hello = await waitForMessage(messages, "hello");
+      console.log("[TEST-C] STEP 2: Received hello:", JSON.stringify(hello));
+
+      // Subscribe
+      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_diag", topic: "chat" }));
+      console.log("[TEST-C] STEP 3: Sent subscribe for chat:comm_diag/chat");
+      // Give UserDO time to connect to CommunityDO and subscribe
+      await new Promise((r) => setTimeout(r, 2000));
+      console.log("[TEST-C] STEP 4: Waited 2s for UserDO→CommunityDO connection");
+
+      // Publish
+      console.log("[TEST-C] STEP 5: Publishing to chat:comm_diag...");
+      const pubRes = await publish("chat:comm_diag", "chat", { text: "diag-test" });
+      console.log("[TEST-C] STEP 6: /publish returned status:", pubRes.status);
+
+      // Wait
+      await new Promise((r) => setTimeout(r, 3000));
+      console.log("[TEST-C] STEP 7: Waited 3s for delivery");
+
+      const events = messages.filter((m) => m.t === "event");
+      console.log("[TEST-C] STEP 8: Total event messages received:", events.length);
+      console.log("[TEST-C] STEP 8: All messages:", JSON.stringify(messages));
+
+      if (events.length === 0) {
+        console.log("[TEST-C] RESULT: FAIL — No events received through UserDO");
+        console.log("[TEST-C] The event delivery chain CommunityDO → UserDO → client is broken");
+      } else {
+        console.log("[TEST-C] RESULT: PASS — Event received through UserDO");
+        expect(events[0].data.text).toBe("diag-test");
+      }
+    } finally { close(); }
+  }, 20000);
+
+  it("multiple clients: both subscribe via separate UserDOs, both should receive", async () => {
+    const token1 = await createToken("user_diag_a");
+    const token2 = await createToken("user_diag_b");
+    const conn1 = connectWs("user:user_diag_a", token1);
+    const conn2 = connectWs("user:user_diag_b", token2);
+
+    try {
+      await waitForOpen(conn1.ws);
+      await waitForOpen(conn2.ws);
+      conn1.ws.send(JSON.stringify({ t: "join", user: { id: "user_diag_a", name: "DA", avatar: null } }));
+      conn2.ws.send(JSON.stringify({ t: "join", user: { id: "user_diag_b", name: "DB", avatar: null } }));
+      await waitForMessage(conn1.messages, "hello");
+      await waitForMessage(conn2.messages, "hello");
+      console.log("[TEST-C-2] Both clients connected to their UserDOs");
+
+      conn1.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_diag2", topic: "chat" }));
+      conn2.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_diag2", topic: "chat" }));
+      console.log("[TEST-C-2] Both subscribed to chat:comm_diag2/chat");
+      await new Promise((r) => setTimeout(r, 2000));
+
+      await publish("chat:comm_diag2", "chat", { text: "to-both-diag" });
+      console.log("[TEST-C-2] Published, waiting 5s...");
+      await new Promise((r) => setTimeout(r, 5000));
+
+      const ev1 = conn1.messages.filter((m) => m.t === "event");
+      const ev2 = conn2.messages.filter((m) => m.t === "event");
+      console.log("[TEST-C-2] Client A events:", ev1.length, JSON.stringify(ev1));
+      console.log("[TEST-C-2] Client B events:", ev2.length, JSON.stringify(ev2));
+
+      if (ev1.length === 0 && ev2.length === 0) {
+        console.log("[TEST-C-2] RESULT: FAIL — Neither client received events via UserDO");
+      } else {
+        console.log("[TEST-C-2] RESULT: PASS");
+      }
+      expect(ev1.length + ev2.length).toBeGreaterThan(0);
+    } finally {
+      conn1.close();
+      conn2.close();
+    }
+  }, 30000);
+});
+
+// ============================================================================
+// TEST D: Diagnostic logging of the exact chain
+//
+// This test adds explicit waits and logs at each step of the chain
+// to prove exactly WHERE the event disappears.
+// ============================================================================
+
+describe("TEST D: Step-by-step diagnostic trace", () => {
+  it("traces every hop: client → UserDO → CommunityDO → publish → CommunityDO → UserDO → client", async () => {
+    const token = await createToken("user_trace1");
+    const { ws, messages, close } = connectWs("user:user_trace1", token);
+
+    try {
+      // === STEP 1: Client connects to Worker → UserDO ===
+      await waitForOpen(ws);
+      console.log("[TRACE] STEP 1 PASS: Client WebSocket opened to Worker");
+
+      // === STEP 2: Client sends join → UserDO responds with hello ===
+      ws.send(JSON.stringify({ t: "join", user: { id: "user_trace1", name: "Trace", avatar: null } }));
+      const hello = await waitForMessage(messages, "hello");
+      console.log("[TRACE] STEP 2 PASS: UserDO sent hello:", hello.connectionId ? "has connectionId" : "MISSING connectionId");
+
+      // === STEP 3: Client sends subscribe → UserDO processes it ===
+      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_trace", topic: "chat" }));
+      console.log("[TRACE] STEP 3: Client sent subscribe for chat:comm_trace/chat");
+
+      // === STEP 4: Wait for UserDO to establish CommunityDO connection ===
+      // The UserDO's connectToCommunity is async (fire-and-forget)
+      // We need to wait for it to complete
+      await new Promise((r) => setTimeout(r, 3000));
+      console.log("[TRACE] STEP 4: Waited 3s for UserDO → CommunityDO WebSocket to establish");
+
+      // === STEP 5: Publish directly to CommunityDO ===
+      console.log("[TRACE] STEP 5: Sending /publish to CommunityDO chat:comm_trace...");
+      const pubRes = await publish("chat:comm_trace", "chat", { text: "trace-test" });
+      console.log("[TRACE] STEP 5 RESULT: /publish returned status", pubRes.status);
+
+      // === STEP 6: Wait and check if event arrives at client ===
+      await new Promise((r) => setTimeout(r, 5000));
+
+      const eventMessages = messages.filter((m) => m.t === "event");
+      const presenceMessages = messages.filter((m) => m.t === "presence" || m.t === "presence_delta");
+      const errorMessages = messages.filter((m) => m.t === "error");
+      const allTypes = messages.map((m) => m.t);
+
+      console.log("[TRACE] STEP 6: After 5s wait:");
+      console.log("[TRACE]   - event messages:", eventMessages.length);
+      console.log("[TRACE]   - presence messages:", presenceMessages.length);
+      console.log("[TRACE]   - error messages:", errorMessages.length);
+      console.log("[TRACE]   - all message types:", allTypes);
+      console.log("[TRACE]   - total messages:", messages.length);
+
+      if (eventMessages.length > 0) {
+        console.log("[TRACE] STEP 6 PASS: Event received:", JSON.stringify(eventMessages[0]));
+      } else {
+        console.log("[TRACE] STEP 6 FAIL: No event messages received");
+        console.log("[TRACE] DIAGNOSIS:");
+        console.log("[TRACE]   The /publish endpoint returned 200 (STEP 5 PASS)");
+        console.log("[TRACE]   But no event reached the client (STEP 6 FAIL)");
+        console.log("[TRACE]   This means the CommunityDO → UserDO WebSocket path is broken.");
+        console.log("[TRACE]   Either:");
+        console.log("[TRACE]   (a) CommunityDO ctx.getWebSockets() doesn't include the UserDO socket");
+        console.log("[TRACE]   (b) CommunityDO sends but UserDO never receives on its community ws");
+        console.log("[TRACE]   (c) UserDO receives but doesn't forward to the client");
+      }
+
+      expect(eventMessages.length).toBeGreaterThan(0);
+    } finally { close(); }
+  }, 30000);
+});
