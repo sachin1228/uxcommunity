@@ -68,8 +68,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const homeActive =
     isMatch("/dashboard", pathname) &&
     !isMatch("/dashboard/communities", pathname) &&
-    !isMatch("/dashboard/chat-with-designers", pathname);
+    !isMatch("/dashboard/chat-with-designers", pathname) &&
+    !isMatch("/dashboard/library", pathname) &&
+    !isMatch("/dashboard/jobs", pathname);
   const exploreActive = pathname === "/dashboard/communities";
+  const libraryActive = isMatch("/dashboard/library", pathname);
+  const jobsActive = isMatch("/dashboard/jobs", pathname);
   // Hidden: "Chat with designers" is no longer shown in the sidebar.
   // const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
@@ -133,22 +137,40 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             </Link>
           </li>
           <li>
-            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+            <Link
+              href="/dashboard/library"
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
+                libraryActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
               <Library size={15} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
-            </div>
+            </Link>
           </li>
           <li>
-            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+            <Link
+              href="/dashboard/jobs"
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
+                jobsActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
               <Briefcase size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
-            </div>
+            </Link>
           </li>
           <li>
-            <div className="flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal text-foreground-muted">
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="flex w-full cursor-pointer items-center gap-[11px] rounded-lg px-[11px] py-[7px] text-left font-body text-sm font-normal text-foreground-muted transition-colors hover:text-foreground hover:bg-surface-raised"
+            >
               <Plus size={15} className="shrink-0" />
               <span className="flex-1 truncate">Start a community</span>
-            </div>
+            </button>
           </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
