@@ -202,7 +202,7 @@ export class Room extends DurableObject<Env> {
     if (rpcSecret !== this.env.RPC_SECRET) return;
 
     await this.ensureSubscribers();
-    await this.broadcastByTopic(topic, data, userId);
+    await this.broadcastByTopic(topic, data, userId, userId);
   }
 
   // ── HTTP publish (server-side) ───────────────────────────────────────
@@ -244,6 +244,7 @@ export class Room extends DurableObject<Env> {
     topic: string,
     data: unknown,
     excludeUserId?: string,
+    senderUserId?: string,
   ): Promise<void> {
     const topicSubs = this.subscriptionsByTopic.get(topic);
     if (!topicSubs || topicSubs.size === 0) return;
@@ -255,7 +256,7 @@ export class Room extends DurableObject<Env> {
     for (const userId of topicSubs) {
       if (excludeUserId && userId === excludeUserId) continue;
 
-      const call = this.deliverToUser(roomName, topic, data, userId, isEphemeral);
+      const call = this.deliverToUser(roomName, topic, data, userId, isEphemeral, senderUserId);
       calls.push(call);
     }
 
@@ -273,18 +274,19 @@ export class Room extends DurableObject<Env> {
     data: unknown,
     userId: string,
     isEphemeral: boolean,
+    senderUserId?: string,
   ): Promise<void> {
     const stub = this.env.USER_DO.get(this.env.USER_DO.idFromName(`user:${userId}`));
 
     try {
-      await stub.deliverEvent(room, topic, data, undefined);
+      await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
     } catch (err) {
       if (isEphemeral) {
         return;
       }
       await new Promise((r) => setTimeout(r, 100));
       try {
-        await stub.deliverEvent(room, topic, data, undefined);
+        await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
       } catch {
         // Second failure: drop
       }

@@ -82,6 +82,7 @@ export function ThreadsView({
 
     const room = realtimeRooms.threads(communityId);
     const unsubscribes: Array<() => void> = [];
+    const unsubRoom = realtimeClient.subscribe(room);
 
     // Subscribe to thread changes
     unsubscribes.push(
@@ -117,7 +118,7 @@ export function ThreadsView({
     return () => {
       window.clearTimeout(initialFetch);
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [communityId, currentUserId, fetchThreads, isVisible]);
 

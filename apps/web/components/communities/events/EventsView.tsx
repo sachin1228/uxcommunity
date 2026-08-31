@@ -68,6 +68,7 @@ export function EventsView({
 
     const room = realtimeRooms.events(communityId);
     const unsubscribes: Array<() => void> = [];
+    const unsubRoom = realtimeClient.subscribe(room);
 
     unsubscribes.push(realtimeClient.on(room, "event", () => void fetchEvents(true, true)));
     unsubscribes.push(realtimeClient.on(room, "rsvp", () => void fetchEvents(true, true)));
@@ -78,7 +79,7 @@ export function EventsView({
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [communityId, currentUserId, fetchEvents, isVisible]);
 

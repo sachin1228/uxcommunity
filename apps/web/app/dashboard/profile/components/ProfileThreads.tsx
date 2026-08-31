@@ -129,6 +129,7 @@ export function ProfileThreads({
   useEffect(() => {
     if (!isVisible) return;
     const room = realtimeRooms.profile(currentUserId);
+    const unsubRoom = realtimeClient.subscribe(room);
 
     const unsubThread = realtimeClient.on(room, "thread", async () => {
       try {
@@ -158,7 +159,7 @@ export function ProfileThreads({
     return () => {
       unsubThread();
       unsubLike();
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [currentUserId, isVisible]);
 

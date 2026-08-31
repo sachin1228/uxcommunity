@@ -48,7 +48,7 @@ export function useSidebarTyping({
 
     for (const comm of subscribed) {
       const chatRoom = realtimeRooms.chat(comm.id);
-      realtimeClient.subscribe(chatRoom);
+      const unsubRoom = realtimeClient.subscribe(chatRoom);
       realtimeClient.connect();
 
       unsubscribes.push(
@@ -66,7 +66,7 @@ export function useSidebarTyping({
           flush();
         }),
       );
-      unsubscribes.push(() => realtimeClient.unsubscribe(chatRoom));
+      unsubscribes.push(unsubRoom);
     }
 
     const timer = window.setInterval(flush, 1000);

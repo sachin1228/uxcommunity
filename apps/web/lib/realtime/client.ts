@@ -6,12 +6,12 @@
  * Architecture:
  *   Component → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
- * The UserDO (user:${userId}) owns the single client WebSocket and routes
- * logical subscriptions to community DOs. Every message includes a `room`
- * field so the UserDO knows which community DO to route to.
- *
- * The session JWT travels automatically via the same-origin cookie on the
- * WebSocket handshake.
+ * Reference-counted subscriptions:
+ *   Each room tracks:
+ *     - topicRefs: refcount per topic (how many on() calls)
+ *     - subscribed: whether subscribe() was called
+ *   Room is only cleaned up when BOTH topicRefs reach 0 AND subscribed is false.
+ *   This prevents one component's cleanup from killing another's subscriptions.
  */
 
 export interface RealtimeUser {
@@ -45,8 +45,12 @@ function buildWebSocketUrl(baseUrl: string, userId: string): string {
 
 interface RoomState {
   room: string;
-  topics: Map<string, Set<EventHandler>>;
+  /** Reference count per topic — incremented by on(), decremented by returned cleanup. */
+  topicRefs: Map<string, number>;
+  /** Actual handler sets per topic. */
+  topicHandlers: Map<string, Set<EventHandler>>;
   presenceHandlers: Set<PresenceHandler>;
+  /** Whether subscribe() was called for this room. */
   subscribed: boolean;
 }
 
@@ -56,14 +60,15 @@ interface RoomState {
  * Maintains ONE WebSocket to the UserDO. Components subscribe to logical
  * rooms and topics; the UserDO handles routing to community DOs.
  *
- * Protocol — every client message includes a `room` field:
- *   { t: "subscribe",   room: "chat:communityA",    topic: "chat" }
- *   { t: "unsubscribe", room: "chat:communityA",    topic: "typing" }
- *   { t: "publish",     room: "chat:communityA",    topic: "typing", data: {} }
+ * Reference-counted lifecycle:
+ *   on(room, topic, handler)  → increments topic refcount, subscribes if first
+ *   returned cleanup()        → decrements refcount, unsubscribes if last
+ *   subscribe(room)           → marks room as desired
+ *   returned cleanup()        → marks room as undesired, removes if no handlers
  *
- * Server events include a `room` field for routing:
- *   { t: "event", room: "chat:communityA", topic: "chat", data: ..., sender: "..." }
- *   { t: "presence", room: "chat:communityA", users: [...] }
+ * Room is only removed when BOTH:
+ *   - All topic refcounts are 0 (no handlers)
+ *   - subscribed === false (no subscribe() callers)
  */
 class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -189,78 +194,116 @@ class RealtimeClient {
     }, delay);
   }
 
+  /**
+   * Resubscribe all rooms that have active handlers or are marked as subscribed.
+   * Called after WebSocket reconnect.
+   */
   private resubscribeAll(): void {
     for (const [roomName, state] of this.rooms) {
-      if (state.subscribed) {
-        for (const topic of state.topics.keys()) {
-          this.sendTopicSubscribe(roomName, topic);
+      const hasHandlers = state.topicRefs.size > 0;
+      if (state.subscribed || hasHandlers) {
+        for (const [topic, refCount] of state.topicRefs) {
+          if (refCount > 0) {
+            this.sendTopicSubscribe(roomName, topic);
+          }
         }
       }
     }
   }
 
-  // ── Subscription management ───────────────────────────────────────────────
+  // ── Subscription management (reference-counted) ──────────────────────────
 
+  /**
+   * Mark a room as desired. Does NOT create subscriptions by itself.
+   * Pair with on() to subscribe to specific topics.
+   * Returns an unsubscribe function that cleans up when ALL users are done.
+   */
   subscribe(room: string): () => void {
-    if (!this.rooms.has(room)) {
-      this.rooms.set(room, {
-        room,
-        topics: new Map(),
-        presenceHandlers: new Set(),
-        subscribed: false,
-      });
-    }
-    const state = this.rooms.get(room)!;
+    const state = this.getOrCreateRoom(room);
     state.subscribed = true;
-    return () => this.unsubscribe(room);
+    return () => {
+      state.subscribed = false;
+      this.maybeRemoveRoom(room);
+    };
   }
 
+  /**
+   * @deprecated Use the ref-counted on()/subscribe() pattern instead.
+   * This method forcefully removes a room. Only use if you are the sole consumer.
+   */
   unsubscribe(room: string): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    this.rooms.delete(room);
-    this.presenceCache.delete(room);
+
+    // Send unsubscribe for all topics with active handlers
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      for (const topic of state.topics.keys()) {
-        this.sendToWs({ t: "unsubscribe", room, topic });
+      for (const [topic, refCount] of state.topicRefs) {
+        if (refCount > 0) {
+          this.sendToWs({ t: "unsubscribe", room, topic });
+        }
       }
     }
+
+    state.topicRefs.clear();
+    state.topicHandlers.clear();
+    state.presenceHandlers.clear();
+    state.subscribed = false;
+    this.rooms.delete(room);
+    this.presenceCache.delete(room);
   }
 
+  /**
+   * Register an event handler for a specific room + topic.
+   * Reference-counted: the topic subscription stays active as long as
+   * at least one handler is registered. Returns a cleanup function.
+   */
   on(room: string, topic: string, handler: EventHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.getOrCreateRoom(room);
 
-    let topicSet = state.topics.get(topic);
+    // Increment refcount
+    const prev = state.topicRefs.get(topic) ?? 0;
+    state.topicRefs.set(topic, prev + 1);
+
+    // Add handler
+    let topicSet = state.topicHandlers.get(topic);
     if (!topicSet) {
       topicSet = new Set();
-      state.topics.set(topic, topicSet);
+      state.topicHandlers.set(topic, topicSet);
     }
     topicSet.add(handler);
 
-    this.sendTopicSubscribe(room, topic);
+    // If this is the first handler for this topic, send subscribe
+    if (prev === 0) {
+      this.sendTopicSubscribe(room, topic);
+    }
 
+    // Return cleanup function
     return () => {
       topicSet!.delete(handler);
+      const current = state.topicRefs.get(topic) ?? 0;
+      if (current <= 1) {
+        // Last handler removed — unsubscribe from server
+        state.topicRefs.delete(topic);
+        state.topicHandlers.delete(topic);
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.sendToWs({ t: "unsubscribe", room, topic });
+        }
+      } else {
+        state.topicRefs.set(topic, current - 1);
+      }
+      this.maybeRemoveRoom(room);
     };
   }
 
   off(room: string, topic: string, handler: EventHandler): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    const topicSet = state.topics.get(topic);
+    const topicSet = state.topicHandlers.get(topic);
     if (topicSet) topicSet.delete(handler);
   }
 
   onPresence(room: string, handler: PresenceHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.getOrCreateRoom(room);
     state.presenceHandlers.add(handler);
 
     const cached = this.presenceCache.get(room);
@@ -269,7 +312,8 @@ class RealtimeClient {
     }
 
     return () => {
-      state!.presenceHandlers.delete(handler);
+      state.presenceHandlers.delete(handler);
+      this.maybeRemoveRoom(room);
     };
   }
 
@@ -320,6 +364,34 @@ class RealtimeClient {
 
   // ── Internal helpers ──────────────────────────────────────────────────────
 
+  private getOrCreateRoom(room: string): RoomState {
+    let state = this.rooms.get(room);
+    if (!state) {
+      state = {
+        room,
+        topicRefs: new Map(),
+        topicHandlers: new Map(),
+        presenceHandlers: new Set(),
+        subscribed: false,
+      };
+      this.rooms.set(room, state);
+    }
+    return state;
+  }
+
+  /**
+   * Remove a room from the map if it has no active handlers and is not subscribed.
+   */
+  private maybeRemoveRoom(room: string): void {
+    const state = this.rooms.get(room);
+    if (!state) return;
+    const hasHandlers = state.topicRefs.size > 0;
+    if (!state.subscribed && !hasHandlers && state.presenceHandlers.size === 0) {
+      this.rooms.delete(room);
+      this.presenceCache.delete(room);
+    }
+  }
+
   private sendTopicSubscribe(room: string, topic: string): void {
     this.sendToWs({ t: "subscribe", room, topic });
   }
@@ -336,7 +408,7 @@ class RealtimeClient {
   private dispatchToRoom(room: string, topic: string, data: unknown, sender?: string): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    const handlers = state.topics.get(topic);
+    const handlers = state.topicHandlers.get(topic);
     if (!handlers) return;
     for (const handler of handlers) {
       try { handler(data, sender); } catch (error) {

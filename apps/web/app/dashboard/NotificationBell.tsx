@@ -126,6 +126,7 @@ export function NotificationBell({ userId }: Props) {
     const room = realtimeRooms.notifications(userId);
 
     const unsubscribes: Array<() => void> = [];
+    const unsubRoom = realtimeClient.subscribe(room);
 
     unsubscribes.push(
       realtimeClient.on(room, "insert", (data) => {
@@ -174,7 +175,7 @@ export function NotificationBell({ userId }: Props) {
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [patchNotificationCache, userId, isVisible]);
 

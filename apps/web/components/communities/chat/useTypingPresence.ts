@@ -85,7 +85,7 @@ export function useTypingPresence({
 
     const chatRoom = realtimeRooms.chat(communityId);
     realtimeClient.init({ id: currentUserId, name: currentUserName, avatar: null });
-    realtimeClient.subscribe(chatRoom);
+    const unsubRoom = realtimeClient.subscribe(chatRoom);
     realtimeClient.connect();
     lastSentAtRef.current = 0;
 
@@ -113,7 +113,7 @@ export function useTypingPresence({
       window.clearInterval(expiryTimer);
       typingMapRef.current.clear();
       unsub();
-      realtimeClient.unsubscribe(chatRoom);
+      unsubRoom();
       setTypingUsers([]);
     };
   }, [communityId, currentUserId, currentUserName, flushTypingUsers, isVisible]);

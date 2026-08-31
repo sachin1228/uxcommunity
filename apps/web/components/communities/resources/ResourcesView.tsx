@@ -85,6 +85,7 @@ export function ResourcesView({
 
     const room = realtimeRooms.resources(communityId);
     const unsubscribes: Array<() => void> = [];
+    const unsubRoom = realtimeClient.subscribe(room);
 
     unsubscribes.push(realtimeClient.on(room, "resource", () => void fetchResources(true, true)));
     unsubscribes.push(
@@ -109,7 +110,7 @@ export function ResourcesView({
     return () => {
       window.clearTimeout(initialFetch);
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [communityId, currentUserId, fetchResources, isVisible]);
 
