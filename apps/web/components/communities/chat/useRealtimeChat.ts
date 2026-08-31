@@ -64,7 +64,7 @@ export function useRealtimeChat({
 
   useEffect(() => {
     if (!isVisible) return;
-    const client = realtimePool.acquire(communityId);
+    const client = realtimePool.acquire(communityId, { id: currentUserId, name: null, avatar: null });
 
     const unsubscribes: Array<() => void> = [];
 

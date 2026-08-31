@@ -31,16 +31,21 @@ class RealtimePool {
 
   /**
    * Initialize with the current user. Called once on sidebar mount.
+   * Safe to call multiple times — only the first call takes effect.
    */
   init(user: RealtimeUser): void {
-    this.user = user;
+    if (!this.user) this.user = user;
   }
 
   /**
    * Get or create a WebSocket connection for a community chat room.
    * Increments the reference count. Caller MUST call `release()` when done.
+   *
+   * If `init()` hasn't been called yet (sidebar hasn't mounted), the caller
+   * can pass a `user` fallback to lazily initialize the pool.
    */
-  acquire(communityId: string): RealtimeClient {
+  acquire(communityId: string, user?: RealtimeUser): RealtimeClient {
+    if (!this.user && user) this.user = user;
     if (!this.user) {
       throw new Error("[realtime-pool] init() must be called before acquire()");
     }
