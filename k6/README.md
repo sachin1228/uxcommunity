@@ -84,29 +84,29 @@ Always run the **smoke test first** to confirm the app is up and all routes resp
 ```bash
 k6 run k6/scenarios/smoke.js \
   -e BASE_URL=https://app.uxcommunity.in \
-  -e ADMIN_EMAIL=admin@uxcommunity.in \
-  -e ADMIN_PASSWORD=sachingalaxy1228@ \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e ADMIN_EMAIL=your-admin-email \
+  -e ADMIN_PASSWORD=your-admin-password \
+  -e TEST_USER_EMAIL=your-test-email \
+  -e TEST_USER_PASSWORD=your-test-password \
+  -e TEST_COMMUNITY_ID=your-community-uuid
 ```
 
 ### Load test (steady-state)
 ```bash
 k6 run k6/scenarios/load.js \
   -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e TEST_USER_EMAIL=your-test-email \
+  -e TEST_USER_PASSWORD=your-test-password \
+  -e TEST_COMMUNITY_ID=your-community-uuid
 ```
 
 ### Stress test (spike to 200 VUs)
 ```bash
 k6 run k6/scenarios/stress.js \
   -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e TEST_USER_EMAIL=your-test-email \
+  -e TEST_USER_PASSWORD=your-test-password \
+  -e TEST_COMMUNITY_ID=your-community-uuid
 ```
 
 ### Concurrent chat with thousands of distinct users
@@ -116,9 +116,9 @@ limits don't interfere across VUs.
 
 **Step 1 — seed users into your DB (run once):**
 ```bash
-SUPABASE_URL=https://xxx.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
-TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859 \
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
+TEST_COMMUNITY_ID=your-community-uuid \
 K6_USER_COUNT=500 \
 node k6/scripts/seed-users.js
 ```
@@ -130,7 +130,7 @@ This creates 500 users with profiles + community membership and writes
 ```bash
 k6 run k6/scenarios/chat_concurrent.js \
   -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859 \
+  -e TEST_COMMUNITY_ID=your-community-uuid \
   -e CONCURRENT_VUS=500
 ```
 
@@ -140,8 +140,8 @@ Custom metrics tracked: `chat_messages_sent`, `chat_rate_limit_hits`, `chat_reac
 
 **Step 3 — clean up after testing:**
 ```bash
-SUPABASE_URL=https://xxx.supabase.co \
-SUPABASE_SERVICE_ROLE_KEY=eyJ... \
+SUPABASE_URL=https://your-project.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key \
 node k6/scripts/cleanup-users.js
 ```
 
@@ -160,9 +160,9 @@ k6 run k6/scenarios/chat_load.js \
 ```bash
 k6 run k6/scenarios/soak.js \
   -e BASE_URL=https://app.uxcommunity.in \
-  -e TEST_USER_EMAIL=patilsachin1228@gmail.com \
-  -e TEST_USER_PASSWORD=sachin1228 \
-  -e TEST_COMMUNITY_ID=2d98706f-367c-441b-9d5d-ace92fa8a859
+  -e TEST_USER_EMAIL=your-test-email \
+  -e TEST_USER_PASSWORD=your-test-password \
+  -e TEST_COMMUNITY_ID=your-community-uuid
 ```
 
 ---
