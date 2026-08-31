@@ -21,7 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { RealtimeClient, realtimeRooms } from '@/lib/realtime';
+import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -80,7 +80,7 @@ export function useCommunities() {
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
 
-  const clientsRef     = useRef<RealtimeClient[]>([]);
+  const unsubscribesRef = useRef<Array<() => void>>([]);
   const typingTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   /** Cached sender names keyed by user_id — mirrors web's resolvedNames Map. */
   const resolvedNames  = useRef(new Map<string, string>());
@@ -162,275 +162,286 @@ export function useCommunities() {
     setTyping(next);
   }, []);
 
-  // ── Realtime subscriptions via Cloudflare ──────────────────────────────────
+  // ── Realtime subscriptions via Cloudflare singleton ────────────────────────
   const subscribeAll = useCallback(
     (communityIds: string[]) => {
-      // Close existing clients
-      clientsRef.current.forEach((c) => c.close());
-      clientsRef.current = [];
+      // Clean up existing subscriptions
+      unsubscribesRef.current.forEach((unsub) => unsub());
+      unsubscribesRef.current = [];
 
       if (!user?.id) return;
 
+      realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
+
       communityIds.forEach((cid) => {
-        const client = new RealtimeClient({
-          room: realtimeRooms.chat(cid),
-          user: { id: user.id, name: user.name ?? null, avatar: null },
-        });
+        const room = realtimeRooms.chat(cid);
+
+        realtimeClient.connect(room);
 
         // ── New message ───────────────────────────────────────────────────
-        client.on('message', (data) => {
-          const row = data as {
-            id: string;
-            community_id: string;
-            content: string | null;
-            created_at: string;
-            user_id: string;
-            reply_to_id?: string | null;
-            image_url?: string | null;
-          };
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'message', (data) => {
+            const row = data as {
+              id: string;
+              community_id: string;
+              content: string | null;
+              created_at: string;
+              user_id: string;
+              reply_to_id?: string | null;
+              image_url?: string | null;
+            };
 
-          const isOwn   = row.user_id === user?.id;
-          const isActive = communityStore.activeCommunityId === cid;
-          const knownName = resolvedNames.current.get(row.user_id) ?? null;
+            const isOwn   = row.user_id === user?.id;
+            const isActive = communityStore.activeCommunityId === cid;
+            const knownName = resolvedNames.current.get(row.user_id) ?? null;
 
-          const newMsg: LastMessage = {
-            id:           row.id,
-            content:      row.content,
-            created_at:   row.created_at,
-            user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
-            is_own:       isOwn,
-            is_reply:     !!row.reply_to_id,
-            reply_to_user: null,
-            has_image:    !row.content && !!row.image_url,
-            is_deleted:   false,
-          };
+            const newMsg: LastMessage = {
+              id:           row.id,
+              content:      row.content,
+              created_at:   row.created_at,
+              user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
+              is_own:       isOwn,
+              is_reply:     !!row.reply_to_id,
+              reply_to_user: null,
+              has_image:    !row.content && !!row.image_url,
+              is_deleted:   false,
+            };
 
-          setCommunities((prev) => {
-            const patched = prev.map((c) => {
-              if (c.id !== cid) return c;
-              return {
-                ...c,
-                is_archived:   false,
-                lastReaction:  null,
-                last_message:  newMsg,
-                unread_count:  isOwn || isActive ? c.unread_count : c.unread_count + 1,
-              };
+            setCommunities((prev) => {
+              const patched = prev.map((c) => {
+                if (c.id !== cid) return c;
+                return {
+                  ...c,
+                  is_archived:   false,
+                  lastReaction:  null,
+                  last_message:  newMsg,
+                  unread_count:  isOwn || isActive ? c.unread_count : c.unread_count + 1,
+                };
+              });
+              return bubbleToTop(patched, cid);
             });
-            // Bubble to top — mirrors WhatsApp/Telegram UX
-            return bubbleToTop(patched, cid);
-          });
 
-          // Async: resolve unknown sender name, then patch preview
-          if (!isOwn && !resolvedNames.current.has(row.user_id)) {
-            const msgAt    = row.created_at;
-            const senderId = row.user_id;
-            resolveName(cid, senderId).then((name) => {
-              if (!name) return;
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                  return { ...c, last_message: { ...c.last_message!, user: { name } } };
-                })
-              );
-            });
-          }
-
-          // Async: resolve reply_to_user for reply messages
-          if (row.reply_to_id) {
-            const msgAt   = row.created_at;
-            const replyId = row.reply_to_id;
-            apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
-              .then(({ data }) => {
-                if (!data?.user_name) return;
-                const firstName = data.user_name.split(' ')[0];
+            // Async: resolve unknown sender name, then patch preview
+            if (!isOwn && !resolvedNames.current.has(row.user_id)) {
+              const msgAt    = row.created_at;
+              const senderId = row.user_id;
+              resolveName(cid, senderId).then((name) => {
+                if (!name) return;
                 setCommunities((prev) =>
                   prev.map((c) => {
                     if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                    return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
+                    return { ...c, last_message: { ...c.last_message!, user: { name } } };
+                  })
+                );
+              });
+            }
+
+            // Async: resolve reply_to_user for reply messages
+            if (row.reply_to_id) {
+              const msgAt   = row.created_at;
+              const replyId = row.reply_to_id;
+              apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
+                .then(({ data }) => {
+                  if (!data?.user_name) return;
+                  const firstName = data.user_name.split(' ')[0];
+                  setCommunities((prev) =>
+                    prev.map((c) => {
+                      if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
+                      return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
+                    })
+                  );
+                })
+                .catch(() => {});
+            }
+          }),
+        );
+
+        // ── Message edit ──────────────────────────────────────────────────
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'message-edit', (data) => {
+            const row = data as { community_id: string; created_at: string; content: string };
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== row.community_id || c.last_message?.created_at !== row.created_at) return c;
+                return { ...c, last_message: { ...c.last_message!, content: row.content } };
+              })
+            );
+          }),
+        );
+
+        // ── Message soft-delete ───────────────────────────────────────────
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'message-delete', (data) => {
+            const row = data as { community_id: string; created_at: string; deleted_at: string | null };
+            if (!row.deleted_at) return;
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== cid || c.last_message?.created_at !== row.created_at) return c;
+                return {
+                  ...c,
+                  last_message: {
+                    ...c.last_message!,
+                    content: null,
+                    is_deleted: true,
+                    has_image: false,
+                  },
+                };
+              })
+            );
+          }),
+        );
+
+        // ── Reaction added ────────────────────────────────────────────────
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'reaction-insert', (data) => {
+            const r = data as {
+              community_id: string; message_id: string;
+              user_id: string; emoji: string; created_at?: string;
+            };
+            const isOwn     = r.user_id === user?.id;
+            const knownName = resolvedNames.current.get(r.user_id);
+
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== cid) return c;
+                if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+                const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
+                return {
+                  ...c,
+                  lastReaction: {
+                    messageId:    r.message_id,
+                    emoji:        r.emoji,
+                    createdAt:    r.created_at ?? new Date().toISOString(),
+                    firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                    isOwn,
+                    messagePreview: reactionSnippet(fallback?.content, false),
+                  } as LastReaction,
+                };
+              })
+            );
+
+            // Async: fetch message content for accurate snippet
+            apiFetch<{ content?: string | null; image_url?: string | null }>(
+              `/api/communities/${cid}/messages/${r.message_id}`
+            )
+              .then(({ data: msg }) => {
+                const preview = reactionSnippet(msg?.content, !!msg?.image_url);
+                const rAt = r.created_at;
+                setCommunities((prev) =>
+                  prev.map((c) => {
+                    if (c.id !== cid || !c.lastReaction) return c;
+                    if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
+                    return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
                   })
                 );
               })
               .catch(() => {});
-          }
-        });
 
-        // ── Message edit ──────────────────────────────────────────────────
-        client.on('message-edit', (data) => {
-          const row = data as { community_id: string; created_at: string; content: string };
-          setCommunities((prev) =>
-            prev.map((c) => {
-              if (c.id !== row.community_id || c.last_message?.created_at !== row.created_at) return c;
-              return { ...c, last_message: { ...c.last_message!, content: row.content } };
-            })
-          );
-        });
-
-        // ── Message soft-delete ───────────────────────────────────────────
-        client.on('message-delete', (data) => {
-          const row = data as { community_id: string; created_at: string; deleted_at: string | null };
-          if (!row.deleted_at) return;
-          setCommunities((prev) =>
-            prev.map((c) => {
-              if (c.id !== cid || c.last_message?.created_at !== row.created_at) return c;
-              return {
-                ...c,
-                last_message: {
-                  ...c.last_message!,
-                  content: null,
-                  is_deleted: true,
-                  has_image: false,
-                },
-              };
-            })
-          );
-        });
-
-        // ── Reaction added ────────────────────────────────────────────────
-        client.on('reaction-insert', (data) => {
-          const r = data as {
-            community_id: string; message_id: string;
-            user_id: string; emoji: string; created_at?: string;
-          };
-          const isOwn     = r.user_id === user?.id;
-          const knownName = resolvedNames.current.get(r.user_id);
-
-          setCommunities((prev) =>
-            prev.map((c) => {
-              if (c.id !== cid) return c;
-              if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
-              const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
-              return {
-                ...c,
-                lastReaction: {
-                  messageId:    r.message_id,
-                  emoji:        r.emoji,
-                  createdAt:    r.created_at ?? new Date().toISOString(),
-                  firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
-                  isOwn,
-                  messagePreview: reactionSnippet(fallback?.content, false),
-                } as LastReaction,
-              };
-            })
-          );
-
-          // Async: fetch message content for accurate snippet
-          apiFetch<{ content?: string | null; image_url?: string | null }>(
-            `/api/communities/${cid}/messages/${r.message_id}`
-          )
-            .then(({ data: msg }) => {
-              const preview = reactionSnippet(msg?.content, !!msg?.image_url);
-              const rAt = r.created_at;
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid || !c.lastReaction) return c;
-                  if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
-                  return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
-                })
-              );
-            })
-            .catch(() => {});
-
-          // Async: resolve reactor name
-          if (!isOwn && !resolvedNames.current.has(r.user_id)) {
-            const msgId = r.message_id;
-            const rEmoji = r.emoji;
-            const rAt   = r.created_at;
-            resolveName(cid, r.user_id).then((name) => {
-              if (!name) return;
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid || !c.lastReaction) return c;
-                  if (c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== rAt) return c;
-                  return { ...c, lastReaction: { ...c.lastReaction!, firstName: name.split(' ')[0] } };
-                })
-              );
-            });
-          }
-        });
+            // Async: resolve reactor name
+            if (!isOwn && !resolvedNames.current.has(r.user_id)) {
+              const msgId = r.message_id;
+              const rEmoji = r.emoji;
+              const rAt   = r.created_at;
+              resolveName(cid, r.user_id).then((name) => {
+                if (!name) return;
+                setCommunities((prev) =>
+                  prev.map((c) => {
+                    if (c.id !== cid || !c.lastReaction) return c;
+                    if (c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== rAt) return c;
+                    return { ...c, lastReaction: { ...c.lastReaction!, firstName: name.split(' ')[0] } };
+                  })
+                );
+              });
+            }
+          }),
+        );
 
         // ── Reaction updated ──────────────────────────────────────────────
-        client.on('reaction-update', (data) => {
-          const r = data as {
-            community_id: string; message_id: string;
-            user_id: string; emoji: string; created_at?: string;
-          };
-          const isOwn     = r.user_id === user?.id;
-          const knownName = resolvedNames.current.get(r.user_id);
-          setCommunities((prev) =>
-            prev.map((c) => {
-              if (c.id !== cid) return c;
-              if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
-              return {
-                ...c,
-                lastReaction: {
-                  messageId:     r.message_id,
-                  emoji:         r.emoji,
-                  createdAt:     r.created_at ?? new Date().toISOString(),
-                  firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
-                  isOwn,
-                  messagePreview: c.lastReaction?.messagePreview ?? 'a message',
-                } as LastReaction,
-              };
-            })
-          );
-        });
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'reaction-update', (data) => {
+            const r = data as {
+              community_id: string; message_id: string;
+              user_id: string; emoji: string; created_at?: string;
+            };
+            const isOwn     = r.user_id === user?.id;
+            const knownName = resolvedNames.current.get(r.user_id);
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== cid) return c;
+                if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+                return {
+                  ...c,
+                  lastReaction: {
+                    messageId:     r.message_id,
+                    emoji:         r.emoji,
+                    createdAt:     r.created_at ?? new Date().toISOString(),
+                    firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                    isOwn,
+                    messagePreview: c.lastReaction?.messagePreview ?? 'a message',
+                  } as LastReaction,
+                };
+              })
+            );
+          }),
+        );
 
         // ── Reaction removed ──────────────────────────────────────────────
-        client.on('reaction-delete', (data) => {
-          const r = data as {
-            message_id?: string; user_id?: string;
-            emoji?: string; created_at?: string;
-          };
-          if (!r.message_id || !r.emoji) return;
-          setCommunities((prev) =>
-            prev.map((c) => {
-              if (c.id !== cid || !c.lastReaction) return c;
-              if (c.lastReaction.messageId === r.message_id && c.lastReaction.emoji === r.emoji) {
-                return { ...c, lastReaction: null };
-              }
-              return c;
-            })
-          );
-        });
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'reaction-delete', (data) => {
+            const r = data as {
+              message_id?: string; user_id?: string;
+              emoji?: string; created_at?: string;
+            };
+            if (!r.message_id || !r.emoji) return;
+            setCommunities((prev) =>
+              prev.map((c) => {
+                if (c.id !== cid || !c.lastReaction) return c;
+                if (c.lastReaction.messageId === r.message_id && c.lastReaction.emoji === r.emoji) {
+                  return { ...c, lastReaction: null };
+                }
+                return c;
+              })
+            );
+          }),
+        );
 
         // ── Typing (from chat room) ───────────────────────────────────────
-        client.on('typing', (data) => {
-          const payload = (data ?? {}) as Record<string, unknown>;
-          const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
-          const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
-          const isTyping = payload?.typing === true;
-          const ts = typeof payload?.ts === 'number' ? payload.ts : Date.now();
+        unsubscribesRef.current.push(
+          realtimeClient.on(room, 'typing', (data) => {
+            const payload = (data ?? {}) as Record<string, unknown>;
+            const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
+            const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
+            const isTyping = payload?.typing === true;
+            const ts = typeof payload?.ts === 'number' ? payload.ts : Date.now();
 
-          if (!senderId || senderId === user?.id) return;
+            if (!senderId || senderId === user?.id) return;
 
-          let userMap = typingMapRef.current.get(cid);
-          if (!userMap) {
-            userMap = new Map();
-            typingMapRef.current.set(cid, userMap);
-          }
+            let userMap = typingMapRef.current.get(cid);
+            if (!userMap) {
+              userMap = new Map();
+              typingMapRef.current.set(cid, userMap);
+            }
 
-          if (isTyping) {
-            userMap.set(senderId, { name, lastSeen: ts });
-          } else {
-            userMap.delete(senderId);
-            if (userMap.size === 0) typingMapRef.current.delete(cid);
-          }
+            if (isTyping) {
+              userMap.set(senderId, { name, lastSeen: ts });
+            } else {
+              userMap.delete(senderId);
+              if (userMap.size === 0) typingMapRef.current.delete(cid);
+            }
 
-          flushTyping();
+            flushTyping();
 
-          const key = `${cid}:${senderId}`;
-          clearTimeout(typingTimers.current[key]);
-          if (isTyping) {
-            typingTimers.current[key] = setTimeout(() => {
-              userMap?.delete(senderId);
-              if (userMap && userMap.size === 0) typingMapRef.current.delete(cid);
-              flushTyping();
-            }, TYPING_EXPIRY_MS);
-          }
-        });
-
-        client.connect();
-        clientsRef.current.push(client);
+            const key = `${cid}:${senderId}`;
+            clearTimeout(typingTimers.current[key]);
+            if (isTyping) {
+              typingTimers.current[key] = setTimeout(() => {
+                userMap?.delete(senderId);
+                if (userMap && userMap.size === 0) typingMapRef.current.delete(cid);
+                flushTyping();
+              }, TYPING_EXPIRY_MS);
+            }
+          }),
+        );
       });
     },
     [user?.id, user?.name, resolveName, flushTyping]
@@ -446,8 +457,8 @@ export function useCommunities() {
     const ids = communities.map((c) => c.id).sort();
     subscribeAll(ids);
     return () => {
-      clientsRef.current.forEach((c) => c.close());
-      clientsRef.current = [];
+      unsubscribesRef.current.forEach((unsub) => unsub());
+      unsubscribesRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

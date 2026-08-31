@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { Spinner } from "@/components/ui/Spinner";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
@@ -123,15 +123,12 @@ export function NotificationBell({ userId }: Props) {
 
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.notifications(userId),
-      user: { id: userId, name: null, avatar: null },
-    });
+    const room = realtimeRooms.notifications(userId);
 
     const unsubscribes: Array<() => void> = [];
 
     unsubscribes.push(
-      client.on("insert", (data) => {
+      realtimeClient.on(room, "insert", (data) => {
         const next = data as NotificationItem;
         setNotifications((prev) => [next, ...prev.filter((item) => item.id !== next.id)].slice(0, MAX_ITEMS));
         if (!next.read_at) setUnreadCount((count) => count + 1);
@@ -143,7 +140,7 @@ export function NotificationBell({ userId }: Props) {
     );
 
     unsubscribes.push(
-      client.on("update", (data) => {
+      realtimeClient.on(room, "update", (data) => {
         const { next, old: previous } = data as {
           next: NotificationItem;
           old: Partial<NotificationItem>;
@@ -162,7 +159,7 @@ export function NotificationBell({ userId }: Props) {
     );
 
     unsubscribes.push(
-      client.on("delete", (data) => {
+      realtimeClient.on(room, "delete", (data) => {
         const previous = data as NotificationItem;
         setNotifications((prev) => prev.filter((item) => item.id !== previous.id));
         if (!previous.read_at) setUnreadCount((count) => Math.max(0, count - 1));
@@ -173,11 +170,11 @@ export function NotificationBell({ userId }: Props) {
       }),
     );
 
-    client.connect();
+    realtimeClient.connect(room);
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [patchNotificationCache, userId, isVisible]);
 

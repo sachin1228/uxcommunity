@@ -5,7 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RealtimeClient, realtimeRooms } from '@/lib/realtime';
+import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { useAuth } from '@/context/AuthContext';
 
 interface TypingEntry {
@@ -20,7 +20,7 @@ const TYPING_DEBOUNCE_MS = 1000;
 export function useTypingPresence(communityId: string) {
   const { user } = useAuth();
   const [typists, setTypists] = useState<TypingEntry[]>([]);
-  const clientRef = useRef<RealtimeClient | null>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const expireTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -28,13 +28,12 @@ export function useTypingPresence(communityId: string) {
   useEffect(() => {
     if (!user?.id) return;
 
-    const client = new RealtimeClient({
-      room: realtimeRooms.chat(communityId),
-      user: { id: user.id, name: user.name ?? null, avatar: null },
-    });
-    clientRef.current = client;
+    const room = realtimeRooms.chat(communityId);
 
-    const unsub = client.on('typing', (data) => {
+    realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
+    realtimeClient.connect(room);
+
+    const unsub = realtimeClient.on(room, 'typing', (data) => {
       const payload = (data ?? {}) as Record<string, unknown>;
       const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
       const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
@@ -58,28 +57,28 @@ export function useTypingPresence(communityId: string) {
       }
     });
 
-    client.connect();
+    unsubRef.current = unsub;
 
     return () => {
       unsub();
-      client.close();
-      clientRef.current = null;
+      unsubRef.current = null;
       Object.values(expireTimers.current).forEach(clearTimeout);
+      realtimeClient.unsubscribe(room);
     };
   }, [communityId, user?.id, user?.name]);
 
   const sendTyping = useCallback(
     (isTyping: boolean) => {
-      const client = clientRef.current;
-      if (!client || !user) return;
-      client.publish('typing', {
+      if (!user) return;
+      const room = realtimeRooms.chat(communityId);
+      realtimeClient.publish(room, 'typing', {
         user_id: user.id,
         name: user.name,
         typing: isTyping,
         ts: Date.now(),
       });
     },
-    [user]
+    [user, communityId]
   );
 
   /** Call on every keystroke. Debounces stop-typing automatically. */

@@ -10,21 +10,31 @@ interface Member {
 
 interface Attachment {
   userId?: string;
+  /** Logical topics this socket has subscribed to (e.g. "chat", "typing", "threads"). */
+  topics?: Set<string>;
 }
 
 const MEMBERS_KEY = "members";
 const MAX_MESSAGE_BYTES = 8192;
 
 /**
- * One room = one Durable Object. Holds all WebSockets subscribed to that room,
- * tracks presence (who is connected), and rebroadcasts both server-published
- * events (via POST /publish) and low-trust client publishes (typing, etc.).
+ * Community Durable Object — ONE per community. Handles all logical realtime
+ * topics (chat, typing, presence, threads, events, resources) for that community.
+ *
+ * Each client connects once via a single WebSocket and subscribes to the
+ * logical topics it needs. Events are filtered per-socket by topic.
  *
  * Uses the WebSocket Hibernation API: `acceptWebSocket` lets the runtime evict
  * this object between messages without dropping connections. Identity and
  * presence live in storage so they survive eviction.
  *
- * Chat rooms also handle typing events — no separate typing room needed.
+ * Topic subscription model:
+ *   - Client sends `{ t: "subscribe", topic: "chat" }` to receive chat events.
+ *   - Client sends `{ t: "unsubscribe", topic: "typing" }` to stop typing events.
+ *   - Presence (snapshots + deltas) is always sent to all sockets regardless
+ *     of topic subscriptions (presence reflects who is in the room).
+ *   - Server-side publishes (via POST /publish) also respect topic subscriptions:
+ *     a publish to topic "chat" only reaches sockets subscribed to "chat".
  */
 export class Room extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -37,7 +47,6 @@ export class Room extends DurableObject<Env> {
     return new Response("Not found", { status: 404 });
   }
 
-  /** WebSocket upgrade. The Worker has already verified the session JWT. */
   private roomName(): string {
     return this.ctx.id.name ?? this.ctx.id.toString();
   }
@@ -52,7 +61,8 @@ export class Room extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId });
+    // Start with no topic subscriptions — client must subscribe explicitly.
+    server.serializeAttachment({ userId, topics: new Set<string>() });
 
     const connectionId = crypto.randomUUID();
     void this.broadcastTo(server, {
@@ -83,8 +93,17 @@ export class Room extends DurableObject<Env> {
         this.reject(ws, "join identity mismatch");
         return;
       }
-      ws.serializeAttachment({ userId });
+      ws.serializeAttachment({ userId, topics: new Set<string>() });
       await this.join(userId, user);
+    } else if (msg.t === "subscribe" && msg.topic) {
+      const attachment = ws.deserializeAttachment() as Attachment;
+      if (!attachment.topics) attachment.topics = new Set();
+      attachment.topics.add(msg.topic);
+      ws.serializeAttachment(attachment);
+    } else if (msg.t === "unsubscribe" && msg.topic) {
+      const attachment = ws.deserializeAttachment() as Attachment;
+      if (attachment.topics) attachment.topics.delete(msg.topic);
+      ws.serializeAttachment(attachment);
     } else if (msg.t === "publish") {
       if (!userId || !msg.topic) {
         this.reject(ws, "publish requires topic and identity");
@@ -101,12 +120,10 @@ export class Room extends DurableObject<Env> {
         this.reject(ws, "message too large");
         return;
       }
-      // Exclude only the sending socket, so the same user's other tabs still
-      // receive the event (needed for presence/voice rooms and multi-tab sync).
-      this.broadcast(payload, { ws });
+      // Broadcast with topic filtering. Exclude the sending socket so the
+      // same user's other tabs still receive the event.
+      this.broadcastByTopic(payload, msg.topic, { ws });
     }
-    // subscribe/unsubscribe are no-ops for single-topic rooms but accepted
-    // for protocol compatibility with multiplexed clients.
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -132,15 +149,14 @@ export class Room extends DurableObject<Env> {
     await this.ctx.storage.put(MEMBERS_KEY, members);
 
     if (isFirstConnection) {
-      // Delta: user joined
       const userEntry = members[userId];
-      this.broadcast(JSON.stringify({
+      // Presence deltas are sent to ALL sockets (not topic-filtered).
+      this.broadcastAll(JSON.stringify({
         t: "presence_delta",
         room: this.roomName(),
         joined: { id: userId, name: userEntry.name, avatar: userEntry.avatar, connections: userEntry.connections },
       }));
     } else {
-      // Full snapshot for multi-connection users
       await this.broadcastPresence();
     }
   }
@@ -152,8 +168,7 @@ export class Room extends DurableObject<Env> {
     member.connections -= 1;
     if (member.connections <= 0) {
       delete members[userId];
-      // Delta: user left
-      this.broadcast(JSON.stringify({
+      this.broadcastAll(JSON.stringify({
         t: "presence_delta",
         room: this.roomName(),
         left: { id: userId },
@@ -162,7 +177,6 @@ export class Room extends DurableObject<Env> {
       members[userId] = member;
       await this.ctx.storage.put(MEMBERS_KEY, members);
     }
-    // Only store if member still exists
     if (members[userId]) {
       await this.ctx.storage.put(MEMBERS_KEY, members);
     }
@@ -176,7 +190,8 @@ export class Room extends DurableObject<Env> {
       avatar: m.avatar,
       connections: m.connections,
     }));
-    this.broadcast(JSON.stringify({ t: "presence", room: this.roomName(), users }));
+    // Presence snapshots are sent to ALL sockets (not topic-filtered).
+    this.broadcastAll(JSON.stringify({ t: "presence", room: this.roomName(), users }));
   }
 
   private async sendPresence(ws: WebSocket): Promise<void> {
@@ -211,13 +226,36 @@ export class Room extends DurableObject<Env> {
     if (payload.length > MAX_MESSAGE_BYTES) {
       return new Response("Message too large", { status: 413 });
     }
-    // Server-side publishes keep excluding by userId (the sender already has
-    // the row from the API response).
-    this.broadcast(payload, { userId: body.exclude_user });
+    // Server-side publishes also respect topic subscriptions.
+    this.broadcastByTopic(payload, body.topic, { userId: body.exclude_user });
     return new Response("ok");
   }
 
-  private broadcast(
+  /**
+   * Broadcast a message to all sockets subscribed to the given topic.
+   * Excludes a specific socket or user if specified.
+   */
+  private broadcastByTopic(
+    message: string,
+    topic: string,
+    exclude?: { ws?: WebSocket; userId?: string }
+  ): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      const attachment = ws.deserializeAttachment() as Attachment;
+      const { userId } = attachment;
+      if (exclude?.ws === ws) continue;
+      if (exclude?.userId && userId === exclude.userId) continue;
+      // Only send to sockets that have subscribed to this topic.
+      if (attachment.topics && !attachment.topics.has(topic)) continue;
+      this.sendTo(ws, message);
+    }
+  }
+
+  /**
+   * Broadcast a message to ALL connected sockets (no topic filtering).
+   * Used for presence snapshots and deltas which are room-wide.
+   */
+  private broadcastAll(
     message: string,
     exclude?: { ws?: WebSocket; userId?: string }
   ): void {

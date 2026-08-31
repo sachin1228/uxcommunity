@@ -6,7 +6,7 @@ import {
   CornerDownRight, MessageSquare, MoreHorizontal, Send, Trash2,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource, ResourceComment } from "./types";
@@ -266,18 +266,12 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
   useEffect(() => {
     if (!isVisible) return;
 
-    const commentsClient = new RealtimeClient({
-      room: realtimeRooms.resourceComments(resource.id),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubComments = commentsClient.on("comment", () => void fetchComments());
-    commentsClient.connect();
+    const commentsRoom = realtimeRooms.resourceComments(resource.id);
+    const unsubComments = realtimeClient.on(commentsRoom, "comment", () => void fetchComments());
+    realtimeClient.connect(commentsRoom);
 
-    const resourcesClient = new RealtimeClient({
-      room: realtimeRooms.resources(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubSaves = resourcesClient.on("save", (data) => {
+    const resourcesRoom = realtimeRooms.resources(communityId);
+    const unsubSaves = realtimeClient.on(resourcesRoom, "save", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; resource_id?: string; user_id?: string } | null;
       if (!record?.resource_id || record.resource_id !== resource.id) return;
       if (record.user_id === currentUserId) return;
@@ -286,13 +280,13 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
         save_count: record.event === "INSERT" ? r.save_count + 1 : Math.max(0, r.save_count - 1),
       }));
     });
-    resourcesClient.connect();
+    realtimeClient.connect(resourcesRoom);
 
     return () => {
       unsubComments();
-      commentsClient.close();
+      realtimeClient.unsubscribe(commentsRoom);
       unsubSaves();
-      resourcesClient.close();
+      realtimeClient.unsubscribe(resourcesRoom);
     };
   }, [resource.id, communityId, currentUserId, fetchComments, isVisible]);
 

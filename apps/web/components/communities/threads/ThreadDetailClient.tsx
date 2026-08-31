@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { BackLink } from "@/components/ui/BackLink";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
@@ -325,23 +325,17 @@ export function ThreadDetailClient({
   useEffect(() => {
     if (!isVisible) return;
 
-    const commentsClient = new RealtimeClient({
-      room: realtimeRooms.threadComments(thread.id),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubComments = commentsClient.on("comment", (data) => {
+    const commentsRoom = realtimeRooms.threadComments(thread.id);
+    const unsubComments = realtimeClient.on(commentsRoom, "comment", (data) => {
       const record = data as { user_id?: string } | null;
       // Local mutations already patch state and cache synchronously.
       if (record?.user_id === currentUserId) return;
       void fetchComments();
     });
-    commentsClient.connect();
+    realtimeClient.connect(commentsRoom);
 
-    const likesClient = new RealtimeClient({
-      room: realtimeRooms.threads(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
-    const unsubLikes = likesClient.on("like", (data) => {
+    const likesRoom = realtimeRooms.threads(communityId);
+    const unsubLikes = realtimeClient.on(likesRoom, "like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id || record.thread_id !== thread.id) return;
       if (record.user_id === currentUserId) return;
@@ -360,13 +354,13 @@ export function ThreadDetailClient({
         (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, like_count: next.like_count } : next }),
       );
     });
-    likesClient.connect();
+    realtimeClient.connect(likesRoom);
 
     return () => {
       unsubComments();
-      commentsClient.close();
+      realtimeClient.unsubscribe(commentsRoom);
       unsubLikes();
-      likesClient.close();
+      realtimeClient.unsubscribe(likesRoom);
     };
   }, [communityId, thread.id, currentUserId, detailUrl, fetchComments, isVisible]);
 

@@ -6,9 +6,6 @@
 export const realtimeRooms = {
   chat: (communityId: string) => `chat:${communityId}`,
   presence: (communityId: string) => `presence:${communityId}`,
-  typing: (communityId: string) => `typing:${communityId}`,
-  /** @deprecated Panel rooms are no longer used. Sidebar state is derived from chat events. */
-  panel: (userId: string) => `panel:${userId}`,
   profile: (userId: string) => `profile:${userId}`,
   notifications: (userId: string) => `notifications:${userId}`,
   threads: (communityId: string) => `threads:${communityId}`,

@@ -17,7 +17,7 @@ import {
   Type,
   Wrench,
 } from "lucide-react";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
@@ -83,15 +83,12 @@ export function ResourcesView({
     if (!isVisible) return;
     const initialFetch = window.setTimeout(() => void fetchResources(true), 0);
 
-    const client = new RealtimeClient({
-      room: realtimeRooms.resources(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
+    const room = realtimeRooms.resources(communityId);
     const unsubscribes: Array<() => void> = [];
 
-    unsubscribes.push(client.on("resource", () => void fetchResources(true, true)));
+    unsubscribes.push(realtimeClient.on(room, "resource", () => void fetchResources(true, true)));
     unsubscribes.push(
-      client.on("save", (data) => {
+      realtimeClient.on(room, "save", (data) => {
         const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; resource_id?: string; user_id?: string } | null;
         if (!record?.resource_id) return;
         if (record.user_id === currentUserId) return;
@@ -107,12 +104,12 @@ export function ResourcesView({
       }),
     );
 
-    client.connect();
+    realtimeClient.connect(room);
 
     return () => {
       window.clearTimeout(initialFetch);
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
+      realtimeClient.unsubscribe(room);
     };
   }, [communityId, currentUserId, fetchResources, isVisible]);
 

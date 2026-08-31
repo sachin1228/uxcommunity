@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import { RealtimeClient } from "@/lib/realtime/client";
+import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 
-/**
- * Tracks how many members are currently online in a community using the
- * Cloudflare realtime presence snapshot. Each tab joins the room; the hook
- * returns the number of distinct online users (including the current user).
- */
 export function useOnlinePresence({
   communityId,
   currentUserId,
@@ -22,20 +17,19 @@ export function useOnlinePresence({
 
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.presence(communityId),
-      user: { id: currentUserId, name: null, avatar: null },
-    });
 
-    const unsubPresence = client.onPresence((users) => {
+    const presenceRoom = realtimeRooms.presence(communityId);
+    realtimeClient.init({ id: currentUserId, name: null, avatar: null });
+    realtimeClient.subscribe(presenceRoom);
+    realtimeClient.connect(presenceRoom);
+
+    const unsubPresence = realtimeClient.onPresence(presenceRoom, (users) => {
       setOnlineCount(users.length);
     });
 
-    client.connect();
-
     return () => {
       unsubPresence();
-      client.close();
+      realtimeClient.unsubscribe(presenceRoom);
     };
   }, [communityId, currentUserId, isVisible]);
 
