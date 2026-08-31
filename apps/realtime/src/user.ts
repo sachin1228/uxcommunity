@@ -317,14 +317,9 @@ export class UserDO extends DurableObject<Env> {
     }
 
     for (const [ws, state] of this.clients) {
-      // Check room subscription
       const entry = state.subscriptions.get(room);
       if (!entry || entry.topics.size === 0) continue;
-
-      // Check topic subscription
       if (!entry.topics.has(topic)) continue;
-
-      // Don't echo to sender
       if (sender && sender === state.userId) continue;
 
       this.sendToClient(ws, {

@@ -280,15 +280,13 @@ export class Room extends DurableObject<Env> {
       await stub.deliverEvent(room, topic, data, undefined);
     } catch (err) {
       if (isEphemeral) {
-        // Ephemeral: drop silently
         return;
       }
-      // Durable: 1 retry with 100ms backoff
       await new Promise((r) => setTimeout(r, 100));
       try {
         await stub.deliverEvent(room, topic, data, undefined);
       } catch {
-        // Second failure: drop. Client recovers via DB/history sync.
+        // Second failure: drop
       }
     }
   }
