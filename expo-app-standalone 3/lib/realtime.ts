@@ -60,7 +60,6 @@ interface RoomState {
   room: string;
   topics: Map<string, Set<EventHandler>>;
   presenceHandlers: Set<PresenceHandler>;
-  subscribed: boolean;
 }
 
 /**
@@ -69,12 +68,10 @@ interface RoomState {
  * Maintains ONE WebSocket to the UserDO. Hooks subscribe to logical
  * rooms and topics; the UserDO routes to community DOs.
  *
- * Every message includes a `room` field:
- *   { t: "subscribe",   room: "chat:communityA",    topic: "chat" }
- *   { t: "publish",     room: "chat:communityA",    topic: "typing", data: {} }
- *
- * Server events include `room` for routing:
- *   { t: "event", room: "chat:communityA", topic: "chat", data: ..., sender: "..." }
+ * Uses ref-counted subscriptions so multiple hooks can subscribe to the
+ * same room/topic without interfering with each other. Server unsubscribe
+ * is only sent when the last handler for a topic is removed, and room
+ * cleanup only happens when the last topic's refcount hits zero.
  */
 class RealtimeClient {
   private ws: WebSocket | null = null;
@@ -87,6 +84,10 @@ class RealtimeClient {
   private pending: string[] = [];
 
   private rooms = new Map<string, RoomState>();
+  /** Per-room refcount — how many topics in this room have active handlers. */
+  private roomRefs = new Map<string, number>();
+  /** Per-topic refcount — `room:topic` → number of active handlers. */
+  private topicRefs = new Map<string, number>();
   private globalEvents = new Map<string, Set<EventHandler>>();
   private globalPresenceHandlers = new Set<PresenceHandler>();
   private globalStatusHandlers = new Set<StatusHandler>();
@@ -203,7 +204,7 @@ class RealtimeClient {
 
   private resubscribeAll(): void {
     for (const [roomName, state] of this.rooms) {
-      if (state.subscribed) {
+      if ((this.roomRefs.get(roomName) ?? 0) > 0) {
         for (const topic of state.topics.keys()) {
           this.sendTopicSubscribe(roomName, topic);
         }
@@ -211,52 +212,91 @@ class RealtimeClient {
     }
   }
 
-  // ── Subscription management ───────────────────────────────────────────────
+  // ── Subscription management (ref-counted) ───────────────────────────────
 
-  subscribe(room: string): () => void {
+  private ensureRoom(room: string): RoomState {
     if (!this.rooms.has(room)) {
       this.rooms.set(room, {
         room,
         topics: new Map(),
         presenceHandlers: new Set(),
-        subscribed: false,
       });
     }
-    const state = this.rooms.get(room)!;
-    state.subscribed = true;
+    return this.rooms.get(room)!;
+  }
+
+  private topicKey(room: string, topic: string): string {
+    return `${room}::${topic}`;
+  }
+
+  /**
+   * Subscribe to a room. Increments room refcount.
+   * Returns an unsubscribe function — call it when the subscriber is done.
+   */
+  subscribe(room: string): () => void {
+    this.ensureRoom(room);
+    this.roomRefs.set(room, (this.roomRefs.get(room) ?? 0) + 1);
     return () => this.unsubscribe(room);
   }
 
+  /**
+   * Unsubscribe from a room. Decrements room refcount; when it hits zero,
+   * removes the room from the map and sends unsubscribe for all topics.
+   */
   unsubscribe(room: string): void {
-    const state = this.rooms.get(room);
-    if (!state) return;
-    this.rooms.delete(room);
-    this.presenceCache.delete(room);
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      for (const topic of state.topics.keys()) {
-        this.sendToWs({ t: 'unsubscribe', room, topic });
+    const refs = (this.roomRefs.get(room) ?? 1) - 1;
+    if (refs <= 0) {
+      this.roomRefs.delete(room);
+      const state = this.rooms.get(room);
+      this.rooms.delete(room);
+      this.presenceCache.delete(room);
+      if (state && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        for (const topic of state.topics.keys()) {
+          this.sendToWs({ t: 'unsubscribe', room, topic });
+          this.topicRefs.delete(this.topicKey(room, topic));
+        }
       }
+    } else {
+      this.roomRefs.set(room, refs);
     }
   }
 
+  /**
+   * Register an event handler for a room+topic. Automatically subscribes to
+   * the room if not already subscribed. Sends server subscribe on the first
+   * handler for a given topic.
+   *
+   * Returns a cleanup function that removes the handler. When the last
+   * handler for a topic is removed, sends server unsubscribe.
+   */
   on(room: string, topic: string, handler: EventHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.ensureRoom(room);
+    this.roomRefs.set(room, (this.roomRefs.get(room) ?? 0) + 1);
 
     let topicSet = state.topics.get(topic);
     if (!topicSet) {
       topicSet = new Set();
       state.topics.set(topic, topicSet);
     }
-    topicSet.add(handler);
 
-    this.sendTopicSubscribe(room, topic);
+    const key = this.topicKey(room, topic);
+    const wasEmpty = topicSet.size === 0;
+    topicSet.add(handler);
+    this.topicRefs.set(key, (this.topicRefs.get(key) ?? 0) + 1);
+
+    if (wasEmpty) {
+      this.sendTopicSubscribe(room, topic);
+    }
 
     return () => {
       topicSet!.delete(handler);
+      const refs = (this.topicRefs.get(key) ?? 1) - 1;
+      if (refs <= 0) {
+        this.topicRefs.delete(key);
+        this.sendToWs({ t: 'unsubscribe', room, topic });
+      } else {
+        this.topicRefs.set(key, refs);
+      }
     };
   }
 
@@ -268,11 +308,7 @@ class RealtimeClient {
   }
 
   onPresence(room: string, handler: PresenceHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.ensureRoom(room);
     state.presenceHandlers.add(handler);
 
     const cached = this.presenceCache.get(room);
@@ -318,6 +354,8 @@ class RealtimeClient {
   destroy(): void {
     this.close();
     this.rooms.clear();
+    this.roomRefs.clear();
+    this.topicRefs.clear();
     this.presenceCache.clear();
     this.globalEvents.clear();
     this.globalPresenceHandlers.clear();

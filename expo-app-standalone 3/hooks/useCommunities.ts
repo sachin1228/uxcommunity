@@ -176,7 +176,7 @@ export function useCommunities() {
       communityIds.forEach((cid) => {
         const room = realtimeRooms.chat(cid);
 
-        realtimeClient.connect(room);
+        unsubscribesRef.current.push(realtimeClient.subscribe(room));
 
         // ── New message ───────────────────────────────────────────────────
         unsubscribesRef.current.push(

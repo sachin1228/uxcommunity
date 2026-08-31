@@ -86,9 +86,9 @@ export function useChatMessages(communityId: string) {
     const room = realtimeRooms.chat(communityId);
 
     realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
-    realtimeClient.connect(room);
 
     const unsubscribes: Array<() => void> = [];
+    unsubscribes.push(realtimeClient.subscribe(room));
 
     // New message
     unsubscribes.push(
@@ -241,7 +241,6 @@ export function useChatMessages(communityId: string) {
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
     };
   }, [communityId, user?.id, user?.name]);
 

@@ -31,7 +31,9 @@ export function useTypingPresence(communityId: string) {
     const room = realtimeRooms.chat(communityId);
 
     realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
-    realtimeClient.connect(room);
+
+    const unsubscribes: Array<() => void> = [];
+    unsubscribes.push(realtimeClient.subscribe(room));
 
     const unsub = realtimeClient.on(room, 'typing', (data) => {
       const payload = (data ?? {}) as Record<string, unknown>;
@@ -61,9 +63,9 @@ export function useTypingPresence(communityId: string) {
 
     return () => {
       unsub();
+      unsubscribes.forEach((u) => u());
       unsubRef.current = null;
       Object.values(expireTimers.current).forEach(clearTimeout);
-      realtimeClient.unsubscribe(room);
     };
   }, [communityId, user?.id, user?.name]);
 

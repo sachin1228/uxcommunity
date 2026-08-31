@@ -48,15 +48,16 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
 
     const config = ROOM_TOPICS[kind];
     const room = config.getRoom(communityId);
-    realtimeClient.connect(room);
 
-    const unsubscribes = config.topics.map((topic) =>
-      realtimeClient.on(room, topic, invalidate)
-    );
+    const unsubscribes: Array<() => void> = [];
+    unsubscribes.push(realtimeClient.subscribe(room));
+
+    config.topics.forEach((topic) => {
+      unsubscribes.push(realtimeClient.on(room, topic, invalidate));
+    });
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
     };
   }, [communityId, enabled, invalidate, kind]);
 
