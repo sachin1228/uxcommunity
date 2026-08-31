@@ -2,6 +2,9 @@
  * useCommunities — complete port of web's sidebar logic:
  *   useSidebarCommunities + useSidebarRealtime + useSidebarTyping
  *
+ * Uses Cloudflare Realtime (via Durable Object WebSocket) instead of
+ * Supabase Realtime for all application events.
+ *
  * Parity with web:
  * - Bubble-to-top: community moves to position 0 on any new message (WhatsApp UX)
  * - Unread increment: skips own messages and the currently-open community
@@ -13,13 +16,12 @@
  * - Out-of-order reaction guard: skip if existing lastReaction is newer
  * - is_archived: false forced on new message arrival
  * - Separate reaction INSERT / UPDATE / DELETE handlers (matches web)
- * - Subscriptions keyed on sorted IDs string (not length)
  * - Background reconciliation on AppState 'active': max(server, local) unread
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { RealtimeClient, realtimeRooms } from '@/lib/realtime';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
@@ -78,11 +80,12 @@ export function useCommunities() {
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState<TypingMap>({});
 
-  const channelsRef   = useRef<ReturnType<typeof supabase.channel>[]>([]);
-  const typingTimers  = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const clientsRef     = useRef<RealtimeClient[]>([]);
+  const typingTimers   = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   /** Cached sender names keyed by user_id — mirrors web's resolvedNames Map. */
-  const resolvedNames = useRef(new Map<string, string>());
-  const reconcileRef  = useRef(false);
+  const resolvedNames  = useRef(new Map<string, string>());
+  const reconcileRef   = useRef(false);
+  const typingMapRef   = useRef<Map<string, Map<string, { name: string; lastSeen: number }>>>(new Map());
 
   // ── Name resolution ────────────────────────────────────────────────────────
   const resolveName = useCallback(async (commId: string, uid: string): Promise<string | null> => {
@@ -138,283 +141,299 @@ export function useCommunities() {
     }
   }, []);
 
-  // ── Realtime subscriptions ─────────────────────────────────────────────────
+  // ── Typing flush helper ────────────────────────────────────────────────────
+  const flushTyping = useCallback(() => {
+    const now = Date.now();
+    typingMapRef.current.forEach((userMap) => {
+      for (const [uid, entry] of userMap.entries()) {
+        if (now - entry.lastSeen > TYPING_EXPIRY_MS) userMap.delete(uid);
+      }
+    });
+    const next: TypingMap = {};
+    typingMapRef.current.forEach((userMap, commId) => {
+      if (userMap.size > 0) {
+        next[commId] = [...userMap.values()].map((e) => ({
+          user_id: [...userMap.entries()].find(([, v]) => v === e)![0],
+          name: e.name,
+          ts: e.lastSeen,
+        }));
+      }
+    });
+    setTyping(next);
+  }, []);
+
+  // ── Realtime subscriptions via Cloudflare ──────────────────────────────────
   const subscribeAll = useCallback(
     (communityIds: string[]) => {
-      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
-      channelsRef.current = [];
+      // Close existing clients
+      clientsRef.current.forEach((c) => c.close());
+      clientsRef.current = [];
+
+      if (!user?.id) return;
 
       communityIds.forEach((cid) => {
-        const panel = supabase
-          .channel(`panel:${cid}`)
+        const client = new RealtimeClient({
+          room: realtimeRooms.chat(cid),
+          user: { id: user.id, name: user.name ?? null, avatar: null },
+        });
 
-          // ── New message ───────────────────────────────────────────────────
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'community_messages', filter: `community_id=eq.${cid}` },
-            (payload) => {
-              const row = payload.new as {
-                id: string;
-                community_id: string;
-                content: string | null;
-                created_at: string;
-                user_id: string;
-                reply_to_id?: string | null;
-                image_url?: string | null;
+        // ── New message ───────────────────────────────────────────────────
+        client.on('message', (data) => {
+          const row = data as {
+            id: string;
+            community_id: string;
+            content: string | null;
+            created_at: string;
+            user_id: string;
+            reply_to_id?: string | null;
+            image_url?: string | null;
+          };
+
+          const isOwn   = row.user_id === user?.id;
+          const isActive = communityStore.activeCommunityId === cid;
+          const knownName = resolvedNames.current.get(row.user_id) ?? null;
+
+          const newMsg: LastMessage = {
+            id:           row.id,
+            content:      row.content,
+            created_at:   row.created_at,
+            user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
+            is_own:       isOwn,
+            is_reply:     !!row.reply_to_id,
+            reply_to_user: null,
+            has_image:    !row.content && !!row.image_url,
+            is_deleted:   false,
+          };
+
+          setCommunities((prev) => {
+            const patched = prev.map((c) => {
+              if (c.id !== cid) return c;
+              return {
+                ...c,
+                is_archived:   false,
+                lastReaction:  null,
+                last_message:  newMsg,
+                unread_count:  isOwn || isActive ? c.unread_count : c.unread_count + 1,
               };
+            });
+            // Bubble to top — mirrors WhatsApp/Telegram UX
+            return bubbleToTop(patched, cid);
+          });
 
-              const isOwn   = row.user_id === user?.id;
-              const isActive = communityStore.activeCommunityId === cid;
-              const knownName = resolvedNames.current.get(row.user_id) ?? null;
+          // Async: resolve unknown sender name, then patch preview
+          if (!isOwn && !resolvedNames.current.has(row.user_id)) {
+            const msgAt    = row.created_at;
+            const senderId = row.user_id;
+            resolveName(cid, senderId).then((name) => {
+              if (!name) return;
+              setCommunities((prev) =>
+                prev.map((c) => {
+                  if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
+                  return { ...c, last_message: { ...c.last_message!, user: { name } } };
+                })
+              );
+            });
+          }
 
-              const newMsg: LastMessage = {
-                id:           row.id,
-                content:      row.content,
-                created_at:   row.created_at,
-                user:         { name: isOwn ? (user?.name?.split(' ')[0] ?? 'You') : (knownName ?? '') },
-                is_own:       isOwn,
-                is_reply:     !!row.reply_to_id,
-                reply_to_user: null,
-                has_image:    !row.content && !!row.image_url,
-                is_deleted:   false,
-              };
-
-              setCommunities((prev) => {
-                const patched = prev.map((c) => {
-                  if (c.id !== cid) return c;
-                  return {
-                    ...c,
-                    is_archived:   false,
-                    lastReaction:  null,
-                    last_message:  newMsg,
-                    unread_count:  isOwn || isActive ? c.unread_count : c.unread_count + 1,
-                  };
-                });
-                // Bubble to top — mirrors WhatsApp/Telegram UX
-                return bubbleToTop(patched, cid);
-              });
-
-              // Async: resolve unknown sender name, then patch preview
-              if (!isOwn && !resolvedNames.current.has(row.user_id)) {
-                const msgAt    = row.created_at;
-                const senderId = row.user_id;
-                resolveName(cid, senderId).then((name) => {
-                  if (!name) return;
-                  setCommunities((prev) =>
-                    prev.map((c) => {
-                      if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                      return { ...c, last_message: { ...c.last_message!, user: { name } } };
-                    })
-                  );
-                });
-              }
-
-              // Async: resolve reply_to_user for reply messages
-              if (row.reply_to_id) {
-                const msgAt   = row.created_at;
-                const replyId = row.reply_to_id;
-                apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
-                  .then(({ data }) => {
-                    if (!data?.user_name) return;
-                    const firstName = data.user_name.split(' ')[0];
-                    setCommunities((prev) =>
-                      prev.map((c) => {
-                        if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
-                        return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
-                      })
-                    );
+          // Async: resolve reply_to_user for reply messages
+          if (row.reply_to_id) {
+            const msgAt   = row.created_at;
+            const replyId = row.reply_to_id;
+            apiFetch<{ user_name?: string }>(`/api/communities/${cid}/messages/${replyId}`)
+              .then(({ data }) => {
+                if (!data?.user_name) return;
+                const firstName = data.user_name.split(' ')[0];
+                setCommunities((prev) =>
+                  prev.map((c) => {
+                    if (c.id !== cid || c.last_message?.created_at !== msgAt) return c;
+                    return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } };
                   })
-                  .catch(() => {});
-              }
-            }
-          )
+                );
+              })
+              .catch(() => {});
+          }
+        });
 
-          // ── Soft-delete ───────────────────────────────────────────────────
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'community_messages', filter: `community_id=eq.${cid}` },
-            (payload) => {
-              const row = payload.new as { created_at: string; deleted_at: string | null };
-              if (!row.deleted_at) return;
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid || c.last_message?.created_at !== row.created_at) return c;
-                  return {
-                    ...c,
-                    last_message: {
-                      ...c.last_message!,
-                      content: null,
-                      is_deleted: true,
-                      has_image: false,
-                    },
-                  };
-                })
-              );
-            }
-          )
+        // ── Message edit ──────────────────────────────────────────────────
+        client.on('message-edit', (data) => {
+          const row = data as { community_id: string; created_at: string; content: string };
+          setCommunities((prev) =>
+            prev.map((c) => {
+              if (c.id !== row.community_id || c.last_message?.created_at !== row.created_at) return c;
+              return { ...c, last_message: { ...c.last_message!, content: row.content } };
+            })
+          );
+        });
 
-          // ── Reaction added ────────────────────────────────────────────────
-          .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'message_reactions', filter: `community_id=eq.${cid}` },
-            (payload) => {
-              const r = payload.new as {
-                community_id: string; message_id: string;
-                user_id: string; emoji: string; created_at?: string;
+        // ── Message soft-delete ───────────────────────────────────────────
+        client.on('message-delete', (data) => {
+          const row = data as { community_id: string; created_at: string; deleted_at: string | null };
+          if (!row.deleted_at) return;
+          setCommunities((prev) =>
+            prev.map((c) => {
+              if (c.id !== cid || c.last_message?.created_at !== row.created_at) return c;
+              return {
+                ...c,
+                last_message: {
+                  ...c.last_message!,
+                  content: null,
+                  is_deleted: true,
+                  has_image: false,
+                },
               };
-              const isOwn     = r.user_id === user?.id;
-              const knownName = resolvedNames.current.get(r.user_id);
+            })
+          );
+        });
 
-              // Apply with what we know now
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid) return c;
-                  // Out-of-order guard — mirror web
-                  if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
-                  const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
-                  return {
-                    ...c,
-                    lastReaction: {
-                      messageId:    r.message_id,
-                      emoji:        r.emoji,
-                      createdAt:    r.created_at ?? new Date().toISOString(),
-                      firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
-                      isOwn,
-                      messagePreview: reactionSnippet(fallback?.content, false),
-                    } as LastReaction,
-                  };
-                })
-              );
+        // ── Reaction added ────────────────────────────────────────────────
+        client.on('reaction-insert', (data) => {
+          const r = data as {
+            community_id: string; message_id: string;
+            user_id: string; emoji: string; created_at?: string;
+          };
+          const isOwn     = r.user_id === user?.id;
+          const knownName = resolvedNames.current.get(r.user_id);
 
-              // Async: fetch message content for accurate snippet
-              apiFetch<{ content?: string | null; image_url?: string | null }>(
-                `/api/communities/${cid}/messages/${r.message_id}`
-              )
-                .then(({ data: msg }) => {
-                  const preview = reactionSnippet(msg?.content, !!msg?.image_url);
-                  const rAt = r.created_at;
-                  setCommunities((prev) =>
-                    prev.map((c) => {
-                      if (c.id !== cid || !c.lastReaction) return c;
-                      if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
-                      return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
-                    })
-                  );
-                })
-                .catch(() => {});
-
-              // Async: resolve reactor name
-              if (!isOwn && !resolvedNames.current.has(r.user_id)) {
-                const msgId = r.message_id;
-                const rEmoji = r.emoji;
-                const rAt   = r.created_at;
-                resolveName(cid, r.user_id).then((name) => {
-                  if (!name) return;
-                  setCommunities((prev) =>
-                    prev.map((c) => {
-                      if (c.id !== cid || !c.lastReaction) return c;
-                      if (c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== rAt) return c;
-                      return { ...c, lastReaction: { ...c.lastReaction!, firstName: name.split(' ')[0] } };
-                    })
-                  );
-                });
-              }
-            }
-          )
-
-          // ── Reaction updated ──────────────────────────────────────────────
-          .on(
-            'postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'message_reactions', filter: `community_id=eq.${cid}` },
-            (payload) => {
-              const r = payload.new as {
-                community_id: string; message_id: string;
-                user_id: string; emoji: string; created_at?: string;
+          setCommunities((prev) =>
+            prev.map((c) => {
+              if (c.id !== cid) return c;
+              if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+              const fallback = c.last_message?.id === r.message_id ? c.last_message : null;
+              return {
+                ...c,
+                lastReaction: {
+                  messageId:    r.message_id,
+                  emoji:        r.emoji,
+                  createdAt:    r.created_at ?? new Date().toISOString(),
+                  firstName:    isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                  isOwn,
+                  messagePreview: reactionSnippet(fallback?.content, false),
+                } as LastReaction,
               };
-              const isOwn     = r.user_id === user?.id;
-              const knownName = resolvedNames.current.get(r.user_id);
-              setCommunities((prev) =>
-                prev.map((c) => {
-                  if (c.id !== cid) return c;
-                  if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
-                  return {
-                    ...c,
-                    lastReaction: {
-                      messageId:     r.message_id,
-                      emoji:         r.emoji,
-                      createdAt:     r.created_at ?? new Date().toISOString(),
-                      firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
-                      isOwn,
-                      messagePreview: c.lastReaction?.messagePreview ?? 'a message',
-                    } as LastReaction,
-                  };
-                })
-              );
-            }
-          )
+            })
+          );
 
-          // ── Reaction removed ──────────────────────────────────────────────
-          .on(
-            'postgres_changes',
-            { event: 'DELETE', schema: 'public', table: 'message_reactions', filter: `community_id=eq.${cid}` },
-            (payload) => {
-              const r = payload.old as {
-                message_id?: string; user_id?: string;
-                emoji?: string; created_at?: string;
-              };
-              if (!r.message_id || !r.emoji) return;
+          // Async: fetch message content for accurate snippet
+          apiFetch<{ content?: string | null; image_url?: string | null }>(
+            `/api/communities/${cid}/messages/${r.message_id}`
+          )
+            .then(({ data: msg }) => {
+              const preview = reactionSnippet(msg?.content, !!msg?.image_url);
+              const rAt = r.created_at;
               setCommunities((prev) =>
                 prev.map((c) => {
                   if (c.id !== cid || !c.lastReaction) return c;
-                  if (c.lastReaction.messageId === r.message_id && c.lastReaction.emoji === r.emoji) {
-                    return { ...c, lastReaction: null };
-                  }
-                  return c;
+                  if (c.lastReaction.messageId !== r.message_id || c.lastReaction.emoji !== r.emoji || c.lastReaction.createdAt !== rAt) return c;
+                  return { ...c, lastReaction: { ...c.lastReaction!, messagePreview: preview } };
                 })
               );
-            }
-          )
+            })
+            .catch(() => {});
 
-          .subscribe();
-
-        // ── Typing broadcast ──────────────────────────────────────────────
-        const typingCh = supabase
-          .channel(`community-typing:${cid}`, {
-            config: { broadcast: { ack: false, self: false } },
-          })
-          .on('broadcast', { event: 'typing' }, ({ payload }) => {
-            const { user_id, name, typing: isTyping, ts } = payload as {
-              user_id: string; name: string; typing: boolean; ts: number;
-            };
-            if (user_id === user?.id) return;
-
-            setTyping((prev) => {
-              const existing = prev[cid] ?? [];
-              const updated: TypingEntry[] = isTyping
-                ? [...existing.filter((e) => e.user_id !== user_id), { user_id, name, ts }]
-                : existing.filter((e) => e.user_id !== user_id);
-              return { ...prev, [cid]: updated };
+          // Async: resolve reactor name
+          if (!isOwn && !resolvedNames.current.has(r.user_id)) {
+            const msgId = r.message_id;
+            const rEmoji = r.emoji;
+            const rAt   = r.created_at;
+            resolveName(cid, r.user_id).then((name) => {
+              if (!name) return;
+              setCommunities((prev) =>
+                prev.map((c) => {
+                  if (c.id !== cid || !c.lastReaction) return c;
+                  if (c.lastReaction.messageId !== msgId || c.lastReaction.emoji !== rEmoji || c.lastReaction.createdAt !== rAt) return c;
+                  return { ...c, lastReaction: { ...c.lastReaction!, firstName: name.split(' ')[0] } };
+                })
+              );
             });
+          }
+        });
 
-            const key = `${cid}:${user_id}`;
-            clearTimeout(typingTimers.current[key]);
-            if (isTyping) {
-              typingTimers.current[key] = setTimeout(() => {
-                setTyping((prev) => ({
-                  ...prev,
-                  [cid]: (prev[cid] ?? []).filter((e) => e.user_id !== user_id),
-                }));
-              }, TYPING_EXPIRY_MS);
-            }
-          })
-          .subscribe();
+        // ── Reaction updated ──────────────────────────────────────────────
+        client.on('reaction-update', (data) => {
+          const r = data as {
+            community_id: string; message_id: string;
+            user_id: string; emoji: string; created_at?: string;
+          };
+          const isOwn     = r.user_id === user?.id;
+          const knownName = resolvedNames.current.get(r.user_id);
+          setCommunities((prev) =>
+            prev.map((c) => {
+              if (c.id !== cid) return c;
+              if (c.lastReaction?.createdAt && r.created_at && c.lastReaction.createdAt > r.created_at) return c;
+              return {
+                ...c,
+                lastReaction: {
+                  messageId:     r.message_id,
+                  emoji:         r.emoji,
+                  createdAt:     r.created_at ?? new Date().toISOString(),
+                  firstName:     isOwn ? 'You' : (knownName?.split(' ')[0] ?? 'Someone'),
+                  isOwn,
+                  messagePreview: c.lastReaction?.messagePreview ?? 'a message',
+                } as LastReaction,
+              };
+            })
+          );
+        });
 
-        channelsRef.current.push(panel, typingCh);
+        // ── Reaction removed ──────────────────────────────────────────────
+        client.on('reaction-delete', (data) => {
+          const r = data as {
+            message_id?: string; user_id?: string;
+            emoji?: string; created_at?: string;
+          };
+          if (!r.message_id || !r.emoji) return;
+          setCommunities((prev) =>
+            prev.map((c) => {
+              if (c.id !== cid || !c.lastReaction) return c;
+              if (c.lastReaction.messageId === r.message_id && c.lastReaction.emoji === r.emoji) {
+                return { ...c, lastReaction: null };
+              }
+              return c;
+            })
+          );
+        });
+
+        // ── Typing (from chat room) ───────────────────────────────────────
+        client.on('typing', (data) => {
+          const payload = (data ?? {}) as Record<string, unknown>;
+          const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
+          const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
+          const isTyping = payload?.typing === true;
+          const ts = typeof payload?.ts === 'number' ? payload.ts : Date.now();
+
+          if (!senderId || senderId === user?.id) return;
+
+          let userMap = typingMapRef.current.get(cid);
+          if (!userMap) {
+            userMap = new Map();
+            typingMapRef.current.set(cid, userMap);
+          }
+
+          if (isTyping) {
+            userMap.set(senderId, { name, lastSeen: ts });
+          } else {
+            userMap.delete(senderId);
+            if (userMap.size === 0) typingMapRef.current.delete(cid);
+          }
+
+          flushTyping();
+
+          const key = `${cid}:${senderId}`;
+          clearTimeout(typingTimers.current[key]);
+          if (isTyping) {
+            typingTimers.current[key] = setTimeout(() => {
+              userMap?.delete(senderId);
+              if (userMap && userMap.size === 0) typingMapRef.current.delete(cid);
+              flushTyping();
+            }, TYPING_EXPIRY_MS);
+          }
+        });
+
+        client.connect();
+        clientsRef.current.push(client);
       });
     },
-    // user?.id and user?.name are the only user-derived values used inside
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [user?.id, user?.name, resolveName]
+    [user?.id, user?.name, resolveName, flushTyping]
   );
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -427,8 +446,8 @@ export function useCommunities() {
     const ids = communities.map((c) => c.id).sort();
     subscribeAll(ids);
     return () => {
-      channelsRef.current.forEach((ch) => supabase.removeChannel(ch));
-      channelsRef.current = [];
+      clientsRef.current.forEach((c) => c.close());
+      clientsRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, MutableRefObject } from "react";
-import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/rooms";
+import { realtimePool } from "@/lib/realtime/pool";
 import {
-  isSidebarReactionStale,
   sidebarStore,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
@@ -45,13 +43,22 @@ function applyUpdate(
 }
 
 /**
- * Subscribes to message + reaction events for every joined community (via the
- * Cloudflare realtime service) and keeps the sidebar preview in sync.
+ * Subscribes to chat room events for every joined community via the Cloudflare
+ * realtime service and keeps the sidebar preview in sync.
  *
- * One room (panel:<userId>) carries per-community topics:
- *  - message:<cid>         → new message (updates last_message, clears lastReaction)
- *  - message-delete:<cid>  → soft-deleted message
- *  - reaction-insert/update/delete:<cid> → lastReaction preview
+ * NEW ARCHITECTURE: Instead of subscribing to a single `panel:${userId}` room
+ * (which required N panel publishes per message), this hook subscribes to each
+ * community's `chat:${communityId}` room via the connection pool. This means:
+ *   - 1 message → 1 realtime publish → broadcast to connected clients
+ *   - No per-member fan-out
+ *   - Sidebar state derived from chat room events
+ *
+ * Events consumed from chat rooms:
+ *  - message         → new message (updates last_message, clears lastReaction)
+ *  - message-edit    → edited message
+ *  - message-delete  → soft-deleted message
+ *  - reaction-insert/update/delete → lastReaction preview
+ *  - typing          → sidebar typing indicator
  */
 export function useSidebarRealtime({
   communities,
@@ -72,10 +79,6 @@ export function useSidebarRealtime({
   useEffect(() => {
     if (!communities.length) return;
 
-    const client = new RealtimeClient({
-      room: realtimeRooms.panel(userId),
-      user: { id: userId, name: null, avatar: null },
-    });
     const unsubscribes: Array<() => void> = [];
 
     // Cache resolved sender names for the lifetime of this subscription.
@@ -122,16 +125,6 @@ export function useSidebarRealtime({
       row: ReactionRow,
       message?: ReactionMessage | null,
     ) {
-      if (
-        isSidebarReactionStale(
-          row.community_id,
-          row.message_id,
-          row.created_at,
-        )
-      ) {
-        return;
-      }
-
       const isOwn = row.user_id === userId;
 
       setCommunities((prev) =>
@@ -205,9 +198,13 @@ export function useSidebarRealtime({
     for (const community of communities) {
       const cid = community.id;
 
+      // Acquire a connection to the community's chat room via the pool.
+      // If the chat view already has a connection open, this reuses it.
+      const client = realtimePool.acquire(cid, { id: userId, name: null, avatar: null });
+
       // ── New message ─────────────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`message:${cid}`, (data) => {
+        client.on("message", (data) => {
           const row = data as {
             id: string;
             community_id: string;
@@ -334,9 +331,9 @@ export function useSidebarRealtime({
         }),
       );
 
-      // ── Soft-delete ────────────────────────────────────────────────────
+      // ── Message edit ────────────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`message-edit:${cid}`, (data) => {
+        client.on("message-edit", (data) => {
           const updated = data as {
             community_id: string;
             created_at: string;
@@ -358,7 +355,7 @@ export function useSidebarRealtime({
 
       // ── Soft-delete ────────────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`message-delete:${cid}`, (data) => {
+        client.on("message-delete", (data) => {
           const updated = data as {
             community_id: string;
             created_at: string;
@@ -386,7 +383,7 @@ export function useSidebarRealtime({
 
       // ── Reaction added ─────────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`reaction-insert:${cid}`, (data) => {
+        client.on("reaction-insert", (data) => {
           const r = data as ReactionRow;
           if (!joinedCommunityIds.has(r.community_id)) return;
           if (
@@ -424,7 +421,7 @@ export function useSidebarRealtime({
 
       // ── Reaction changed ───────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`reaction-update:${cid}`, (data) => {
+        client.on("reaction-update", (data) => {
           const r = data as ReactionRow;
           if (!joinedCommunityIds.has(r.community_id)) return;
           if (
@@ -437,7 +434,7 @@ export function useSidebarRealtime({
 
       // ── Reaction removed ──────────────────────────────────────────────
       unsubscribes.push(
-        client.on(`reaction-delete:${cid}`, (data) => {
+        client.on("reaction-delete", (data) => {
           const r = data as {
             community_id?: string;
             message_id?: string;
@@ -476,13 +473,14 @@ export function useSidebarRealtime({
           );
         }),
       );
-    }
 
-    client.connect();
+      // Release the pool reference when the effect cleans up.
+      // The pool keeps the connection warm for 5 minutes.
+      unsubscribes.push(() => realtimePool.release(cid));
+    }
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      client.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityIds, userId]);

@@ -1,15 +1,24 @@
-"use client";
-
 /**
- * Browser client for the Cloudflare realtime service (apps/realtime).
+ * Cloudflare Realtime client for React Native / Expo.
  *
- * One RealtimeClient = one room = one WebSocket. It mirrors the subscribe/
- * presence/publish model that components previously got from Supabase
- * Realtime, but talks to a Cloudflare Durable Object instead.
+ * Replaces Supabase Realtime for application realtime events (chat, typing,
+ * reactions). Uses the same WebSocket endpoint, protocol, and event model
+ * as the web app.
  *
- * The session JWT travels automatically via the same-origin cookie on the
- * WebSocket handshake, so no token plumbing is needed client-side.
+ * Authentication: passes the session JWT as a query parameter since React
+ * Native's WebSocket API does not support custom headers.
+ *
+ * Requires in .env:
+ *   EXPO_PUBLIC_REALTIME_URL=wss://rt.uxcommunity.in
  */
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const REALTIME_URL = process.env.EXPO_PUBLIC_REALTIME_URL ?? '';
+const SESSION_STORAGE_KEY = '@auth/uxcommunity_session';
+
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 15_000;
 
 export interface RealtimeUser {
   id: string;
@@ -28,46 +37,35 @@ type EventHandler = (data: unknown, sender?: string) => void;
 type PresenceHandler = (users: RealtimePresenceUser[]) => void;
 type StatusHandler = (connected: boolean) => void;
 
-const REALTIME_URL =
-  process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
-
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 15_000;
+/**
+ * Build a WebSocket URL for the realtime service. Passes the session token
+ * as a query parameter for authentication (React Native cannot set cookies
+ * on WebSocket handshakes).
+ */
+async function buildWebSocketUrl(room: string): Promise<string> {
+  const token = await AsyncStorage.getItem(SESSION_STORAGE_KEY).catch(() => null);
+  const base = REALTIME_URL || '';
+  if (!base) {
+    console.warn('[realtime] EXPO_PUBLIC_REALTIME_URL is not set');
+    return '';
+  }
+  const wsBase = base.replace(/^http/, 'ws');
+  const params = new URLSearchParams({ room });
+  if (token) params.set('token', token);
+  return `${wsBase}/ws?${params.toString()}`;
+}
 
 /**
- * Build a `ws:`/`wss:` URL for the realtime WebSocket. `NEXT_PUBLIC_REALTIME_URL`
- * is an https:// origin (e.g. https://rt.uxcommunity.in), but the WebSocket
- * constructor rejects non-ws schemes with a SyntaxError. When the var is empty
- * (local dev), fall back to a same-origin relative path so the request goes to
- * whatever serves the page.
+ * Cloudflare Realtime client for React Native.
+ *
+ * One RealtimeClient = one room = one WebSocket. Uses the same protocol
+ * as the web client (apps/web/lib/realtime/client.ts).
  */
-function buildWebSocketUrl(baseUrl: string, room: string): string {
-  if (!baseUrl) {
-    // NEXT_PUBLIC_REALTIME_URL is missing from this build. The same-origin
-    // fallback only works when something on this origin serves /ws (local
-    // dev); in production it 404s and every feature silently degrades to
-    // polling. Surface it instead of failing quietly.
-    console.warn(
-      "[realtime] NEXT_PUBLIC_REALTIME_URL is not set — realtime (typing, messages, reactions) will fall back to polling. Set it at build time (see wrangler.toml [vars])."
-    );
-    return `/ws?room=${encodeURIComponent(room)}`;
-  }
-  const wsBase = baseUrl.replace(/^http/, "ws");
-  return `${wsBase}/ws?room=${encodeURIComponent(room)}`;
-}
-
-interface RealtimeClientOptions {
-  room: string;
-  user: RealtimeUser;
-  /** Reconnect on unexpected drop (default true). */
-  reconnect?: boolean;
-}
-
 export class RealtimeClient {
   private ws: WebSocket | null = null;
-  private readonly url: string;
-  private readonly user: RealtimeUser;
-  private readonly reconnectEnabled: boolean;
+  private room: string;
+  private user: RealtimeUser;
+  private reconnectEnabled: boolean;
 
   private manuallyClosed = false;
   private connected = false;
@@ -75,27 +73,31 @@ export class RealtimeClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string[] = [];
 
-  private readonly events = new Map<string, Set<EventHandler>>();
-  private readonly presenceHandlers = new Set<PresenceHandler>();
-  private readonly statusHandlers = new Set<StatusHandler>();
+  private events = new Map<string, Set<EventHandler>>();
+  private presenceHandlers = new Set<PresenceHandler>();
+  private statusHandlers = new Set<StatusHandler>();
   private cachedPresence: RealtimePresenceUser[] = [];
 
-  constructor(options: RealtimeClientOptions) {
-    this.url = buildWebSocketUrl(REALTIME_URL, options.room);
+  constructor(options: { room: string; user: RealtimeUser; reconnect?: boolean }) {
+    this.room = options.room;
     this.user = options.user;
     this.reconnectEnabled = options.reconnect ?? true;
   }
 
-  connect(): void {
+  async connect(): Promise<void> {
     this.manuallyClosed = false;
-    this.open();
+    await this.open();
   }
 
-  private open(): void {
+  private async open(): Promise<void> {
     if (this.ws && this.ws.readyState < WebSocket.CLOSING) return;
+
+    const url = await buildWebSocketUrl(this.room);
+    if (!url) return;
+
     let ws: WebSocket;
     try {
-      ws = new WebSocket(this.url);
+      ws = new WebSocket(url);
     } catch {
       this.scheduleReconnect();
       return;
@@ -109,25 +111,25 @@ export class RealtimeClient {
       for (const msg of this.pending.splice(0)) ws.send(msg);
       ws.send(
         JSON.stringify({
-          t: "join",
+          t: 'join',
           user: this.user,
         }),
       );
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = (event: { data: string | ArrayBuffer }) => {
       let msg: { t?: string; room?: string; topic?: string; data?: unknown; sender?: string; users?: RealtimePresenceUser[]; joined?: RealtimePresenceUser; left?: { id: string }; message?: string };
       try {
-        msg = JSON.parse(String(event.data));
+        msg = JSON.parse(typeof event.data === 'string' ? event.data : String(event.data));
       } catch {
         return;
       }
-      if (msg.t === "event" && msg.topic) {
+      if (msg.t === 'event' && msg.topic) {
         this.dispatch(msg.topic, msg.data, msg.sender);
-      } else if (msg.t === "presence") {
-        this.emitPresence(msg.users ?? []);
-      } else if (msg.t === "presence_delta") {
-        // Apply delta to the cached presence list
+      } else if (msg.t === 'presence') {
+        this.cachedPresence = msg.users ?? [];
+        this.emitPresence(this.cachedPresence);
+      } else if (msg.t === 'presence_delta') {
         if (msg.joined) {
           this.cachedPresence = [
             ...this.cachedPresence.filter((u) => u.id !== msg.joined!.id),
@@ -137,8 +139,8 @@ export class RealtimeClient {
           this.cachedPresence = this.cachedPresence.filter((u) => u.id !== msg.left!.id);
         }
         this.emitPresence(this.cachedPresence);
-      } else if (msg.t === "error") {
-        console.warn("[realtime]", msg.message);
+      } else if (msg.t === 'error') {
+        console.warn('[realtime]', msg.message);
       }
     };
 
@@ -197,7 +199,7 @@ export class RealtimeClient {
 
   /** Send a low-trust event (typing, presence heartbeat) to other members. */
   publish(topic: string, data: unknown): void {
-    const msg = JSON.stringify({ t: "publish", topic, data });
+    const msg = JSON.stringify({ t: 'publish', topic, data });
     this.send(msg);
   }
 
@@ -239,7 +241,7 @@ export class RealtimeClient {
       try {
         handler(data, sender);
       } catch (error) {
-        console.error("[realtime] event handler error", error);
+        console.error('[realtime] event handler error', error);
       }
     }
   }
@@ -249,7 +251,7 @@ export class RealtimeClient {
       try {
         handler(users);
       } catch (error) {
-        console.error("[realtime] presence handler error", error);
+        console.error('[realtime] presence handler error', error);
       }
     }
   }
@@ -259,8 +261,20 @@ export class RealtimeClient {
       try {
         handler(connected);
       } catch (error) {
-        console.error("[realtime] status handler error", error);
+        console.error('[realtime] status handler error', error);
       }
     }
   }
 }
+
+/**
+ * Room name helpers — matches the web app's rooms.ts.
+ */
+export const realtimeRooms = {
+  chat: (communityId: string) => `chat:${communityId}`,
+  typing: (communityId: string) => `typing:${communityId}`,
+  presence: (communityId: string) => `presence:${communityId}`,
+  threads: (communityId: string) => `threads:${communityId}`,
+  events: (communityId: string) => `events:${communityId}`,
+  resources: (communityId: string) => `resources:${communityId}`,
+} as const;

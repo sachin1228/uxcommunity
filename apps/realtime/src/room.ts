@@ -23,6 +23,8 @@ const MAX_MESSAGE_BYTES = 8192;
  * Uses the WebSocket Hibernation API: `acceptWebSocket` lets the runtime evict
  * this object between messages without dropping connections. Identity and
  * presence live in storage so they survive eviction.
+ *
+ * Chat rooms also handle typing events — no separate typing room needed.
  */
 export class Room extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -103,6 +105,8 @@ export class Room extends DurableObject<Env> {
       // receive the event (needed for presence/voice rooms and multi-tab sync).
       this.broadcast(payload, { ws });
     }
+    // subscribe/unsubscribe are no-ops for single-topic rooms but accepted
+    // for protocol compatibility with multiplexed clients.
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
@@ -118,13 +122,27 @@ export class Room extends DurableObject<Env> {
   private async join(userId: string, user: { id: string; name: string; avatar: string | null }): Promise<void> {
     const members = (await this.ctx.storage.get<Record<string, Member>>(MEMBERS_KEY)) ?? {};
     const existing = members[userId];
+    const isFirstConnection = !existing || existing.connections <= 0;
+
     members[userId] = {
       name: user.name ?? existing?.name ?? null,
       avatar: user.avatar ?? existing?.avatar ?? null,
       connections: (existing?.connections ?? 0) + 1,
     };
     await this.ctx.storage.put(MEMBERS_KEY, members);
-    await this.broadcastPresence();
+
+    if (isFirstConnection) {
+      // Delta: user joined
+      const userEntry = members[userId];
+      this.broadcast(JSON.stringify({
+        t: "presence_delta",
+        room: this.roomName(),
+        joined: { id: userId, name: userEntry.name, avatar: userEntry.avatar, connections: userEntry.connections },
+      }));
+    } else {
+      // Full snapshot for multi-connection users
+      await this.broadcastPresence();
+    }
   }
 
   private async leave(userId: string): Promise<void> {
@@ -134,11 +152,20 @@ export class Room extends DurableObject<Env> {
     member.connections -= 1;
     if (member.connections <= 0) {
       delete members[userId];
+      // Delta: user left
+      this.broadcast(JSON.stringify({
+        t: "presence_delta",
+        room: this.roomName(),
+        left: { id: userId },
+      }));
     } else {
       members[userId] = member;
+      await this.ctx.storage.put(MEMBERS_KEY, members);
     }
-    await this.ctx.storage.put(MEMBERS_KEY, members);
-    await this.broadcastPresence();
+    // Only store if member still exists
+    if (members[userId]) {
+      await this.ctx.storage.put(MEMBERS_KEY, members);
+    }
   }
 
   private async broadcastPresence(): Promise<void> {

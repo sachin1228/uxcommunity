@@ -1,11 +1,11 @@
 /**
  * Sends and receives typing presence for a single chat room.
- * Channel: community-typing:${communityId}  (Supabase Broadcast)
+ * Uses Cloudflare Realtime (chat room) instead of Supabase Broadcast.
  * Event: typing  Payload: { user_id, name, typing: boolean, ts }
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { RealtimeClient, realtimeRooms } from '@/lib/realtime';
 import { useAuth } from '@/context/AuthContext';
 
 interface TypingEntry {
@@ -20,55 +20,63 @@ const TYPING_DEBOUNCE_MS = 1000;
 export function useTypingPresence(communityId: string) {
   const { user } = useAuth();
   const [typists, setTypists] = useState<TypingEntry[]>([]);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const clientRef = useRef<RealtimeClient | null>(null);
   const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const expireTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
-    const channel = supabase
-      .channel(`community-typing:${communityId}`, {
-        config: { broadcast: { ack: false, self: false } },
-      })
-      .on('broadcast', { event: 'typing' }, ({ payload }) => {
-        const { user_id, name, typing: isTyping, ts } = payload as {
-          user_id: string;
-          name: string;
-          typing: boolean;
-          ts: number;
-        };
-        if (user_id === user?.id) return;
+    if (!user?.id) return;
 
-        setTypists((prev) => {
-          if (isTyping) {
-            return [...prev.filter((e) => e.user_id !== user_id), { user_id, name, ts }];
-          }
-          return prev.filter((e) => e.user_id !== user_id);
-        });
+    const client = new RealtimeClient({
+      room: realtimeRooms.chat(communityId),
+      user: { id: user.id, name: user.name ?? null, avatar: null },
+    });
+    clientRef.current = client;
 
-        clearTimeout(expireTimers.current[user_id]);
+    const unsub = client.on('typing', (data) => {
+      const payload = (data ?? {}) as Record<string, unknown>;
+      const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
+      const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
+      const isTyping = payload?.typing === true;
+      const ts = typeof payload?.ts === 'number' ? payload.ts : Date.now();
+
+      if (!senderId || senderId === user.id) return;
+
+      setTypists((prev) => {
         if (isTyping) {
-          expireTimers.current[user_id] = setTimeout(() => {
-            setTypists((prev) => prev.filter((e) => e.user_id !== user_id));
-          }, TYPING_EXPIRY_MS);
+          return [...prev.filter((e) => e.user_id !== senderId), { user_id: senderId, name, ts }];
         }
-      })
-      .subscribe();
+        return prev.filter((e) => e.user_id !== senderId);
+      });
 
-    channelRef.current = channel;
+      clearTimeout(expireTimers.current[senderId]);
+      if (isTyping) {
+        expireTimers.current[senderId] = setTimeout(() => {
+          setTypists((prev) => prev.filter((e) => e.user_id !== senderId));
+        }, TYPING_EXPIRY_MS);
+      }
+    });
+
+    client.connect();
+
     return () => {
-      supabase.removeChannel(channel);
+      unsub();
+      client.close();
+      clientRef.current = null;
       Object.values(expireTimers.current).forEach(clearTimeout);
     };
-  }, [communityId, user?.id]);
+  }, [communityId, user?.id, user?.name]);
 
   const sendTyping = useCallback(
     (isTyping: boolean) => {
-      if (!channelRef.current || !user) return;
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { user_id: user.id, name: user.name, typing: isTyping, ts: Date.now() },
+      const client = clientRef.current;
+      if (!client || !user) return;
+      client.publish('typing', {
+        user_id: user.id,
+        name: user.name,
+        typing: isTyping,
+        ts: Date.now(),
       });
     },
     [user]

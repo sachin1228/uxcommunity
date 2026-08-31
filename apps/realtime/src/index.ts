@@ -50,9 +50,12 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
   }
 
   // Authenticate via the same JWT the web app issues.
+  // Accept from cookie (web) or query param (mobile/React Native).
   const cookies = parseCookies(request.headers.get("Cookie"));
-  const token =
+  const cookieToken =
     cookies.get(SESSION_COOKIE) ?? cookies.get(LEGACY_SESSION_COOKIE);
+  const queryToken = url.searchParams.get("token");
+  const token = cookieToken ?? queryToken;
   const session = token ? await verifyJwt(token, env.SESSION_SECRET) : null;
   const userId = session?.userId;
   if (!userId) {

@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/rooms";
+import { realtimePool } from "@/lib/realtime/pool";
 
 const TYPING_IDLE_MS = 1600;
 const TYPING_EXPIRY_MS = 3500;
@@ -17,9 +16,8 @@ export interface TypingUser {
 /**
  * Broadcasts ephemeral typing state over the Cloudflare realtime service.
  *
- * Typing is a fire-and-forget event bus with no persistent state: the DO
- * rebroadcasts each publish to the room's other members (the sender is
- * excluded automatically, mirroring Supabase's `self: false`).
+ * Typing events are published to the community's chat room (same connection
+ * used for message delivery). No separate typing room connection is needed.
  *
  * Each typing user is tracked locally with a `lastSeen` timestamp; the expiry
  * timer removes anyone who hasn't sent a heartbeat in TYPING_EXPIRY_MS ms.
@@ -34,7 +32,6 @@ export function useTypingPresence({
   currentUserName: string;
 }) {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
-  const clientRef = useRef<RealtimeClient | null>(null);
   const isVisible = useDocumentVisible();
   const typingRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,7 +77,7 @@ export function useTypingPresence({
    */
   const broadcast = useCallback(
     (typing: boolean) => {
-      const client = clientRef.current;
+      const client = realtimePool.peek(communityId);
       if (!client) return;
 
       const now = Date.now();
@@ -97,7 +94,7 @@ export function useTypingPresence({
         ts: now,
       });
     },
-    [],
+    [communityId],
   );
 
   const setTyping = useCallback(
@@ -119,11 +116,9 @@ export function useTypingPresence({
 
   useEffect(() => {
     if (!isVisible) return;
-    const client = new RealtimeClient({
-      room: realtimeRooms.typing(communityId),
-      user: { id: currentUserId, name: currentUserName, avatar: null },
-    });
-    clientRef.current = client;
+
+    // Acquire a pool connection to the chat room (reuses existing if open).
+    const client = realtimePool.acquire(communityId, { id: currentUserId, name: currentUserName, avatar: null });
     lastSentAtRef.current = 0;
 
     const unsub = client.on(
@@ -149,8 +144,6 @@ export function useTypingPresence({
       },
     );
 
-    client.connect();
-
     // Sweep the local map every second to expire anyone who went silent
     // without sending an explicit "typing: false" (e.g. closed the tab).
     const expiryTimer = window.setInterval(flushTypingUsers, 1000);
@@ -158,15 +151,14 @@ export function useTypingPresence({
     return () => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       typingRef.current = false;
-      clientRef.current = null;
       lastSentAtRef.current = 0;
       window.clearInterval(expiryTimer);
       typingMapRef.current.clear();
       unsub();
-      client.close();
+      realtimePool.release(communityId);
       setTypingUsers([]);
     };
-  }, [communityId, currentUserId, flushTypingUsers, isVisible]);
+  }, [communityId, currentUserId, currentUserName, flushTypingUsers, isVisible]);
 
   return { typingUsers, setTyping };
 }

@@ -2,25 +2,24 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import { RealtimeClient } from "@/lib/realtime/client";
-import { realtimeRooms } from "@/lib/realtime/rooms";
+import { realtimePool } from "@/lib/realtime/pool";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 const TYPING_EXPIRY_MS = 3500;
 
 /**
- * Subscribes to the same `typing:<id>` rooms used by CommunityChat's
- * useTypingPresence, but across joined communities at once.
+ * Subscribes to typing events across joined communities via the chat room
+ * connections (same connections used for message delivery).
+ *
+ * Since typing events are now published to the chat room, no separate typing
+ * room connections are needed. This hook acquires pool connections and listens
+ * for "typing" events on the chat rooms.
  *
  * Returns a Map<communityId, displayText> so the sidebar can show
- * "John is typing…" in place of the last-message preview for any community
- * where someone is actively typing — including the currently open one, so
- * the indicator stays visible consistently (the chat window shows it above
- * the input, the sidebar shows it in the row).
+ * "John is typing…" in place of the last-message preview.
  *
  * Read-only — this hook never broadcasts (the active chat's useTypingPresence
- * handles broadcasting for the current user). One WebSocket per community, so
- * this subscribes to at most TYPING_CHANNEL_LIMIT communities.
+ * handles broadcasting for the current user).
  */
 const TYPING_CHANNEL_LIMIT = 8;
 
@@ -73,12 +72,10 @@ export function useSidebarTyping({
       setTypingMap(next);
     };
 
-    const clients: RealtimeClient[] = [];
+    const releases: Array<() => void> = [];
     for (const comm of subscribed) {
-      const client = new RealtimeClient({
-        room: realtimeRooms.typing(comm.id),
-        user: { id: userId, name: null, avatar: null },
-      });
+      // Acquire a pool connection to the chat room (reuses existing if open).
+      const client = realtimePool.acquire(comm.id, { id: userId, name: null, avatar: null });
       client.on(
         "typing",
         (data) => {
@@ -110,8 +107,7 @@ export function useSidebarTyping({
           flush();
         },
       );
-      client.connect();
-      clients.push(client);
+      releases.push(() => realtimePool.release(comm.id));
     }
 
     // Sweep every second to expire anyone who closed their tab silently.
@@ -120,7 +116,7 @@ export function useSidebarTyping({
     return () => {
       window.clearInterval(timer);
       stateRef.current.clear();
-      clients.forEach((client) => client.close());
+      releases.forEach((release) => release());
       setTypingMap(new Map());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -8,7 +8,7 @@ import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
-import { loadCommunityMemberUserIds, publishChatFanout } from "@/lib/realtime/server";
+import { publishChatEvent } from "@/lib/realtime/server";
 import { createServerTimer } from "@/lib/server-timing";
 
 export async function GET(
@@ -195,19 +195,11 @@ export async function POST(
               decision: aiDecision,
             }),
           ]);
-          // Propagate the soft-delete to the chat room + sidebar panels.
-          const memberIds = await loadCommunityMemberUserIds(moderationDb, communityId);
-          await publishChatFanout({
+          // Propagate the soft-delete to the community chat room.
+          await publishChatEvent({
             communityId,
-            memberUserIds: memberIds,
-            chatTopic: "message-delete",
-            chatData: { id: capturedId, deleted_at: deletedAt },
-            panelTopic: "message-delete",
-            panelData: {
-              community_id: communityId,
-              created_at: inserted.created_at,
-              deleted_at: deletedAt,
-            },
+            topic: "message-delete",
+            data: { id: capturedId, deleted_at: deletedAt },
           });
         }
       } catch (err) {
@@ -216,19 +208,16 @@ export async function POST(
     });
   }
 
-  // ── Phase 3: realtime fan-out after the response is sent ─────────────────
-  // Broadcast the new message to the community chat room plus every member's
-  // sidebar panel room (one batched request). Fire-and-forget: missed events
-  // are corrected by the client's next poll/catch-up.
+  // ── Phase 3: realtime publish after the response is sent ──────────────────
+  // Publish ONE event to the community chat room. Connected clients receive it
+  // directly. Sidebar state is derived client-side from chat events.
+  // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
   after(async () => {
     try {
-      const publishDb = createServiceClient();
-      const memberIds = await loadCommunityMemberUserIds(publishDb, communityId);
-      await publishChatFanout({
+      await publishChatEvent({
         communityId,
-        memberUserIds: memberIds,
-        chatTopic: "message",
-        chatData: {
+        topic: "message",
+        data: {
           id: inserted.id,
           community_id: communityId,
           user_id: inserted.user_id,
@@ -237,10 +226,9 @@ export async function POST(
           reply_to_id: inserted.reply_to_id ?? null,
           image_url: inserted.image_url ?? null,
         },
-        panelTopic: "message",
       });
     } catch (err) {
-      console.error("[POST message] realtime fan-out error:", err);
+      console.error("[POST message] realtime publish error:", err);
     }
   });
 
