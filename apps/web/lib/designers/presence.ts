@@ -70,6 +70,7 @@ export class StudioPresence {
   private lastTrackAt = 0;
   private remoteDirty = false;
   private remoteTimer: number | null = null;
+  private cleanups: Array<() => void> = [];
 
   constructor(opts: PresenceOptions) {
     this.userId = opts.userId;
@@ -78,16 +79,18 @@ export class StudioPresence {
 
     realtimeClient.init({ id: opts.userId, name: opts.name, avatar: opts.avatar });
 
-    realtimeClient.on(this.room, POS_TOPIC, (data, sender) => this.onPos(data, sender));
-    realtimeClient.on(this.room, SIGNAL_TOPIC, (data) => this.onSignal(data));
-    realtimeClient.onPresence(this.room, (users) => {
-      for (const u of users) this.nameByUserId.set(u.id, u.name ?? u.id);
-      this.opts.onOnlineCount(users.length);
-      this.opts.onPresenceUsers(users);
-    });
-    realtimeClient.onStatus((connected) => {
-      this.opts.onConnected(connected);
-    });
+    this.cleanups.push(
+      realtimeClient.on(this.room, POS_TOPIC, (data, sender) => this.onPos(data, sender)),
+      realtimeClient.on(this.room, SIGNAL_TOPIC, (data) => this.onSignal(data)),
+      realtimeClient.onPresence(this.room, (users) => {
+        for (const u of users) this.nameByUserId.set(u.id, u.name ?? u.id);
+        this.opts.onOnlineCount(users.length);
+        this.opts.onPresenceUsers(users);
+      }),
+      realtimeClient.onStatus((connected) => {
+        this.opts.onConnected(connected);
+      }),
+    );
   }
 
   connect() {
@@ -133,7 +136,8 @@ export class StudioPresence {
       window.clearTimeout(this.remoteTimer);
       this.remoteTimer = null;
     }
-    realtimeClient.unsubscribe(this.room);
+    for (const cleanup of this.cleanups) cleanup();
+    this.cleanups = [];
   }
 
   private publishPos() {

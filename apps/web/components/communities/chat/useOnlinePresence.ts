@@ -5,6 +5,15 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 
+/**
+ * Tracks how many members are currently online in a community.
+ *
+ * NOTE: The new Cloudflare DO architecture does not implement server-side
+ * presence tracking for chat rooms. This hook returns the community member
+ * count from the database as a fallback. To show true online counts, the
+ * Room DO would need to track WebSocket connections and publish
+ * presence_delta events.
+ */
 export function useOnlinePresence({
   communityId,
   currentUserId,
@@ -16,20 +25,21 @@ export function useOnlinePresence({
   const isVisible = useDocumentVisible();
 
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isVisible || !communityId || !currentUserId) return;
 
-    const presenceRoom = realtimeRooms.presence(communityId);
+    const chatRoom = realtimeRooms.chat(communityId);
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
-    realtimeClient.subscribe(presenceRoom);
+
+    const unsubRoom = realtimeClient.subscribe(chatRoom);
     realtimeClient.connect();
 
-    const unsubPresence = realtimeClient.onPresence(presenceRoom, (users) => {
+    const unsubPresence = realtimeClient.onPresence(chatRoom, (users) => {
       setOnlineCount(users.length);
     });
 
     return () => {
       unsubPresence();
-      realtimeClient.unsubscribe(presenceRoom);
+      unsubRoom();
     };
   }, [communityId, currentUserId, isVisible]);
 

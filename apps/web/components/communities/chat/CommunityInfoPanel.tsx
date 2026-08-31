@@ -107,11 +107,12 @@ export function CommunityInfoPanel({
         currentUserId,
       );
     });
+    const unsubRoom = realtimeClient.subscribe(rulesRoom);
     realtimeClient.connect();
 
     return () => {
       unsubRules();
-      realtimeClient.unsubscribe(rulesRoom);
+      unsubRoom();
     };
   }, [communityId, currentUserId, isVisible]);
 

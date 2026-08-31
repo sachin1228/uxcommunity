@@ -113,22 +113,22 @@ export async function POST(req: NextRequest, { params }: Params) {
           await publishChatEvent({
             communityId,
             topic: "reaction-delete",
-            data: { message_id: messageId, user_id: userId, emoji: existingEmoji },
+            data: { community_id: communityId, message_id: messageId, user_id: userId, emoji: existingEmoji },
           });
         } else if (existingEmoji && existingEmoji !== desiredEmoji) {
           await publishChatEvent({
             communityId,
             topic: "reaction-update",
             data: {
-              old: { message_id: messageId, user_id: userId, emoji: existingEmoji },
-              new: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
+              old: { community_id: communityId, message_id: messageId, user_id: userId, emoji: existingEmoji },
+              new: { community_id: communityId, message_id: messageId, user_id: userId, emoji: desiredEmoji },
             },
           });
         } else {
           await publishChatEvent({
             communityId,
             topic: "reaction-insert",
-            data: { message_id: messageId, user_id: userId, emoji: desiredEmoji },
+            data: { community_id: communityId, message_id: messageId, user_id: userId, emoji: desiredEmoji },
           });
         }
       } catch (err) {

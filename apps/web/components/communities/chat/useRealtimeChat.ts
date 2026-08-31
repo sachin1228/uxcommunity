@@ -66,7 +66,7 @@ export function useRealtimeChat({
     if (!isVisible) return;
 
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
-    realtimeClient.subscribe(chatRoom);
+    const unsubRoom = realtimeClient.subscribe(chatRoom);
     realtimeClient.connect();
 
     const unsubscribes: Array<() => void> = [];
@@ -368,7 +368,7 @@ export function useRealtimeChat({
     return () => {
       unsubStatus();
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(chatRoom);
+      unsubRoom();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId, fetchMessages, isVisible]);

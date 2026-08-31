@@ -267,10 +267,12 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     if (!isVisible) return;
 
     const commentsRoom = realtimeRooms.resourceComments(resource.id);
+    const unsubCommentsRoom = realtimeClient.subscribe(commentsRoom);
     const unsubComments = realtimeClient.on(commentsRoom, "comment", () => void fetchComments());
     realtimeClient.connect();
 
     const resourcesRoom = realtimeRooms.resources(communityId);
+    const unsubResourcesRoom = realtimeClient.subscribe(resourcesRoom);
     const unsubSaves = realtimeClient.on(resourcesRoom, "save", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; resource_id?: string; user_id?: string } | null;
       if (!record?.resource_id || record.resource_id !== resource.id) return;
@@ -284,9 +286,9 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
 
     return () => {
       unsubComments();
-      realtimeClient.unsubscribe(commentsRoom);
+      unsubCommentsRoom();
       unsubSaves();
-      realtimeClient.unsubscribe(resourcesRoom);
+      unsubResourcesRoom();
     };
   }, [resource.id, communityId, currentUserId, fetchComments, isVisible]);
 

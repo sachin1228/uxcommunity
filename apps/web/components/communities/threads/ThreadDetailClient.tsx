@@ -326,6 +326,7 @@ export function ThreadDetailClient({
     if (!isVisible) return;
 
     const commentsRoom = realtimeRooms.threadComments(thread.id);
+    const unsubCommentsRoom = realtimeClient.subscribe(commentsRoom);
     const unsubComments = realtimeClient.on(commentsRoom, "comment", (data) => {
       const record = data as { user_id?: string } | null;
       // Local mutations already patch state and cache synchronously.
@@ -335,6 +336,7 @@ export function ThreadDetailClient({
     realtimeClient.connect();
 
     const likesRoom = realtimeRooms.threads(communityId);
+    const unsubLikesRoom = realtimeClient.subscribe(likesRoom);
     const unsubLikes = realtimeClient.on(likesRoom, "like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id || record.thread_id !== thread.id) return;
@@ -358,9 +360,9 @@ export function ThreadDetailClient({
 
     return () => {
       unsubComments();
-      realtimeClient.unsubscribe(commentsRoom);
+      unsubCommentsRoom();
       unsubLikes();
-      realtimeClient.unsubscribe(likesRoom);
+      unsubLikesRoom();
     };
   }, [communityId, thread.id, currentUserId, detailUrl, fetchComments, isVisible]);
 

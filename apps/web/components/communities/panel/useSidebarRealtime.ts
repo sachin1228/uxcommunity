@@ -109,7 +109,7 @@ export function useSidebarRealtime({
     for (const community of communities) {
       const cid = community.id;
       const chatRoom = realtimeRooms.chat(cid);
-      realtimeClient.subscribe(chatRoom);
+      const unsubRoom = realtimeClient.subscribe(chatRoom);
       realtimeClient.connect();
 
       unsubscribes.push(
@@ -223,7 +223,7 @@ export function useSidebarRealtime({
         }),
       );
 
-      unsubscribes.push(() => realtimeClient.unsubscribe(chatRoom));
+      unsubscribes.push(unsubRoom);
     }
 
     return () => { unsubscribes.forEach((unsub) => unsub()); };

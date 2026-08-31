@@ -234,11 +234,12 @@ export function ShowcaseDetailClient({
   useEffect(() => {
     if (!isVisible) return;
     const room = realtimeRooms.showcase(post.id);
+    const unsubRoom = realtimeClient.subscribe(room);
     const unsub = realtimeClient.on(room, "comment", () => void fetchComments());
     realtimeClient.connect();
     return () => {
       unsub();
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [post.id, currentUserId, fetchComments, isVisible]);
   async function removePost() {
