@@ -1,11 +1,11 @@
 /**
  * Cloudflare Realtime client for React Native / Expo.
  *
- * Singleton multiplexed client — one WebSocket, multiple logical rooms.
+ * Singleton multiplexed client — one WebSocket to UserDO, multiple logical rooms.
  * Each room supports multiple logical topics (chat, typing, presence, etc.).
  *
  * Architecture:
- *   Hook → realtimeClient (singleton) → 1 WebSocket → Room DO
+ *   Hook → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
  * Authentication: passes the session JWT as a query parameter since React
  * Native's WebSocket API does not support custom headers.
@@ -40,11 +40,10 @@ type PresenceHandler = (users: RealtimePresenceUser[]) => void;
 type StatusHandler = (connected: boolean) => void;
 
 /**
- * Build a WebSocket URL for the realtime service. Passes the session token
- * as a query parameter for authentication (React Native cannot set cookies
- * on WebSocket handshakes).
+ * Build a WebSocket URL pointing at the UserDO.
+ * Passes the session token as a query parameter for authentication.
  */
-async function buildWebSocketUrl(room: string): Promise<string> {
+async function buildWebSocketUrl(userId: string): Promise<string> {
   const token = await AsyncStorage.getItem(SESSION_STORAGE_KEY).catch(() => null);
   const base = REALTIME_URL || '';
   if (!base) {
@@ -52,14 +51,11 @@ async function buildWebSocketUrl(room: string): Promise<string> {
     return '';
   }
   const wsBase = base.replace(/^http/, 'ws');
-  const params = new URLSearchParams({ room });
+  const params = new URLSearchParams({ room: `user:${userId}` });
   if (token) params.set('token', token);
   return `${wsBase}/ws?${params.toString()}`;
 }
 
-/**
- * Per-room state tracked by the singleton client.
- */
 interface RoomState {
   room: string;
   topics: Map<string, Set<EventHandler>>;
@@ -68,62 +64,51 @@ interface RoomState {
 }
 
 /**
- * Multiplexed RealtimeClient — singleton per app session.
+ * Singleton RealtimeClient — one per app session.
  *
- * Maintains ONE WebSocket connection. Hooks subscribe to logical rooms
- * and topics; the Worker/DO handles routing.
+ * Maintains ONE WebSocket to the UserDO. Hooks subscribe to logical
+ * rooms and topics; the UserDO routes to community DOs.
  *
- * Usage:
- *   realtimeClient.init(user);
- *   realtimeClient.connect('chat:community123');
- *   realtimeClient.subscribe('chat:community123');
- *   realtimeClient.on('chat:community123', 'message', handler);
- *   realtimeClient.publish('chat:community123', 'typing', { ... });
- *   realtimeClient.unsubscribe('chat:community123');
+ * Every message includes a `room` field:
+ *   { t: "subscribe",   room: "chat:communityA",    topic: "chat" }
+ *   { t: "publish",     room: "chat:communityA",    topic: "typing", data: {} }
+ *
+ * Server events include `room` for routing:
+ *   { t: "event", room: "chat:communityA", topic: "chat", data: ..., sender: "..." }
  */
 class RealtimeClient {
   private ws: WebSocket | null = null;
-  private activeRoom: string | null = null;
   private user: RealtimeUser | null = null;
+  private userId: string | null = null;
   private manuallyClosed = false;
   private connected = false;
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pending: string[] = [];
 
-  /** roomName → room state */
   private rooms = new Map<string, RoomState>();
-
-  /** Global handlers (backward compat) */
   private globalEvents = new Map<string, Set<EventHandler>>();
   private globalPresenceHandlers = new Set<PresenceHandler>();
   private globalStatusHandlers = new Set<StatusHandler>();
-
-  /** Presence cache per room */
   private presenceCache = new Map<string, RealtimePresenceUser[]>();
 
-  /**
-   * Initialize with the current user. Called once on app mount.
-   */
   init(user: RealtimeUser): void {
-    if (!this.user) this.user = user;
+    if (!this.user) {
+      this.user = user;
+      this.userId = user.id;
+    }
   }
 
-  /**
-   * Connect the WebSocket. Safe to call multiple times.
-   * The room parameter determines which DO to connect to.
-   */
-  connect(room?: string): void {
-    if (room) this.activeRoom = room;
+  connect(): void {
     this.manuallyClosed = false;
     this.open();
   }
 
   private async open(): Promise<void> {
     if (this.ws && this.ws.readyState < WebSocket.CLOSING) return;
-    if (!this.activeRoom) return;
+    if (!this.userId) return;
 
-    const url = await buildWebSocketUrl(this.activeRoom);
+    const url = await buildWebSocketUrl(this.userId);
     if (!url) return;
 
     let ws: WebSocket;
@@ -140,15 +125,11 @@ class RealtimeClient {
       this.reconnectAttempt = 0;
       this.emitGlobalStatus(true);
 
-      // Send join identity
       if (this.user) {
         ws.send(JSON.stringify({ t: 'join', user: this.user }));
       }
 
-      // Flush pending messages
       for (const msg of this.pending.splice(0)) ws.send(msg);
-
-      // Re-subscribe to all rooms
       this.resubscribeAll();
     };
 
@@ -173,18 +154,15 @@ class RealtimeClient {
 
       if (msg.t === 'hello') {
         // Connection established
-      } else if (msg.t === 'event' && msg.topic) {
-        const eventRoom = msg.room ?? this.activeRoom ?? '';
-        this.dispatchToRoom(eventRoom, msg.topic, msg.data, msg.sender);
+      } else if (msg.t === 'event' && msg.topic && msg.room) {
+        this.dispatchToRoom(msg.room, msg.topic, msg.data, msg.sender);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
-      } else if (msg.t === 'presence') {
-        const presRoom = msg.room ?? this.activeRoom ?? '';
-        this.presenceCache.set(presRoom, msg.users ?? []);
-        this.emitRoomPresence(presRoom, msg.users ?? []);
+      } else if (msg.t === 'presence' && msg.room) {
+        this.presenceCache.set(msg.room, msg.users ?? []);
+        this.emitRoomPresence(msg.room, msg.users ?? []);
         this.emitGlobalPresence(msg.users ?? []);
-      } else if (msg.t === 'presence_delta') {
-        const presRoom = msg.room ?? this.activeRoom ?? '';
-        const cached = this.presenceCache.get(presRoom) ?? [];
+      } else if (msg.t === 'presence_delta' && msg.room) {
+        const cached = this.presenceCache.get(msg.room) ?? [];
         let updated: RealtimePresenceUser[];
         if (msg.joined) {
           updated = [...cached.filter((u) => u.id !== msg.joined!.id), msg.joined];
@@ -193,8 +171,8 @@ class RealtimeClient {
         } else {
           updated = cached;
         }
-        this.presenceCache.set(presRoom, updated);
-        this.emitRoomPresence(presRoom, updated);
+        this.presenceCache.set(msg.room, updated);
+        this.emitRoomPresence(msg.room, updated);
         this.emitGlobalPresence(updated);
       } else if (msg.t === 'error') {
         console.warn('[realtime]', msg.message);
@@ -204,14 +182,10 @@ class RealtimeClient {
     ws.onclose = () => {
       this.connected = false;
       this.emitGlobalStatus(false);
-      if (!this.manuallyClosed && this.reconnectEnabled()) this.scheduleReconnect();
+      if (!this.manuallyClosed) this.scheduleReconnect();
     };
 
     ws.onerror = () => {};
-  }
-
-  private reconnectEnabled(): boolean {
-    return true;
   }
 
   private scheduleReconnect(): void {
@@ -229,18 +203,16 @@ class RealtimeClient {
 
   private resubscribeAll(): void {
     for (const [roomName, state] of this.rooms) {
-      if (state.subscribed) this.sendSubscribe(roomName);
-      for (const topic of state.topics.keys()) {
-        this.sendTopicSubscribe(roomName, topic);
+      if (state.subscribed) {
+        for (const topic of state.topics.keys()) {
+          this.sendTopicSubscribe(roomName, topic);
+        }
       }
     }
   }
 
   // ── Subscription management ───────────────────────────────────────────────
 
-  /**
-   * Subscribe to a room on the server. Returns an unsubscribe function.
-   */
   subscribe(room: string): () => void {
     if (!this.rooms.has(room)) {
       this.rooms.set(room, {
@@ -250,26 +222,23 @@ class RealtimeClient {
         subscribed: false,
       });
     }
-    this.sendSubscribe(room);
+    const state = this.rooms.get(room)!;
+    state.subscribed = true;
     return () => this.unsubscribe(room);
   }
 
-  /**
-   * Unsubscribe from a room. Removes all topic handlers for that room.
-   */
   unsubscribe(room: string): void {
+    const state = this.rooms.get(room);
+    if (!state) return;
     this.rooms.delete(room);
     this.presenceCache.delete(room);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      for (const topic of state.topics.keys()) {
+        this.sendToWs({ t: 'unsubscribe', room, topic });
+      }
+    }
   }
 
-  /**
-   * Register an event handler for a specific room and topic.
-   * Returns an unsubscribe function.
-   *
-   * @param room - Room name (e.g. "chat:communityA")
-   * @param topic - Event topic (e.g. "message", "typing")
-   * @param handler - Callback invoked with (data, sender?)
-   */
   on(room: string, topic: string, handler: EventHandler): () => void {
     let state = this.rooms.get(room);
     if (!state) {
@@ -291,9 +260,6 @@ class RealtimeClient {
     };
   }
 
-  /**
-   * Remove a specific event handler.
-   */
   off(room: string, topic: string, handler: EventHandler): void {
     const state = this.rooms.get(room);
     if (!state) return;
@@ -301,10 +267,6 @@ class RealtimeClient {
     if (topicSet) topicSet.delete(handler);
   }
 
-  /**
-   * Register a presence handler for a specific room.
-   * Returns an unsubscribe function.
-   */
   onPresence(room: string, handler: PresenceHandler): () => void {
     let state = this.rooms.get(room);
     if (!state) {
@@ -323,10 +285,6 @@ class RealtimeClient {
     };
   }
 
-  /**
-   * Register a handler for connection status changes.
-   * Returns an unsubscribe function.
-   */
   onStatus(handler: StatusHandler): () => void {
     this.globalStatusHandlers.add(handler);
     return () => {
@@ -336,19 +294,12 @@ class RealtimeClient {
 
   // ── Publishing ────────────────────────────────────────────────────────────
 
-  /**
-   * Send a low-trust event (typing, presence heartbeat) to a room.
-   */
   publish(room: string, topic: string, data: unknown): void {
-    const msg = JSON.stringify({ t: 'publish', topic, data });
-    this.send(msg);
+    this.sendToWs({ t: 'publish', room, topic, data });
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-  /**
-   * Close the WebSocket. Subscriptions are preserved for reconnect.
-   */
   close(): void {
     this.manuallyClosed = true;
     if (this.reconnectTimer !== null) {
@@ -364,9 +315,6 @@ class RealtimeClient {
     this.emitGlobalStatus(false);
   }
 
-  /**
-   * Close and clear all state. Called on logout.
-   */
   destroy(): void {
     this.close();
     this.rooms.clear();
@@ -375,7 +323,7 @@ class RealtimeClient {
     this.globalPresenceHandlers.clear();
     this.globalStatusHandlers.clear();
     this.user = null;
-    this.activeRoom = null;
+    this.userId = null;
   }
 
   isConnected(): boolean {
@@ -384,22 +332,16 @@ class RealtimeClient {
 
   // ── Internal helpers ──────────────────────────────────────────────────────
 
-  private sendSubscribe(room: string): void {
-    const state = this.rooms.get(room);
-    if (state) state.subscribed = true;
-  }
-
   private sendTopicSubscribe(room: string, topic: string): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ t: 'subscribe', topic }));
-    }
+    this.sendToWs({ t: 'subscribe', room, topic });
   }
 
-  private send(msg: string): void {
+  private sendToWs(msg: unknown): void {
+    const json = JSON.stringify(msg);
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(msg);
+      this.ws.send(json);
     } else {
-      this.pending.push(msg);
+      this.pending.push(json);
     }
   }
 
@@ -438,7 +380,7 @@ class RealtimeClient {
   private emitGlobalPresence(users: RealtimePresenceUser[]): void {
     for (const handler of this.globalPresenceHandlers) {
       try { handler(users); } catch (error) {
-        console.error('[realtime] presence handler error', error);
+        console.error('[realtime] global presence handler error', error);
       }
     }
   }
@@ -453,8 +395,7 @@ class RealtimeClient {
 }
 
 /**
- * Singleton multiplexed RealtimeClient shared across the entire app.
- * One client = one WebSocket session = all logical room subscriptions.
+ * Singleton RealtimeClient — one WebSocket to UserDO, all logical room subscriptions.
  */
 export const realtimeClient = new RealtimeClient();
 

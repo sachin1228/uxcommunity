@@ -268,7 +268,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
 
     const commentsRoom = realtimeRooms.resourceComments(resource.id);
     const unsubComments = realtimeClient.on(commentsRoom, "comment", () => void fetchComments());
-    realtimeClient.connect(commentsRoom);
+    realtimeClient.connect();
 
     const resourcesRoom = realtimeRooms.resources(communityId);
     const unsubSaves = realtimeClient.on(resourcesRoom, "save", (data) => {
@@ -280,7 +280,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
         save_count: record.event === "INSERT" ? r.save_count + 1 : Math.max(0, r.save_count - 1),
       }));
     });
-    realtimeClient.connect(resourcesRoom);
+    realtimeClient.connect();
 
     return () => {
       unsubComments();

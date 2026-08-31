@@ -235,7 +235,7 @@ export function ShowcaseDetailClient({
     if (!isVisible) return;
     const room = realtimeRooms.showcase(post.id);
     const unsub = realtimeClient.on(room, "comment", () => void fetchComments());
-    realtimeClient.connect(room);
+    realtimeClient.connect();
     return () => {
       unsub();
       realtimeClient.unsubscribe(room);

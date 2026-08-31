@@ -49,7 +49,7 @@ export function useSidebarTyping({
     for (const comm of subscribed) {
       const chatRoom = realtimeRooms.chat(comm.id);
       realtimeClient.subscribe(chatRoom);
-      realtimeClient.connect(chatRoom);
+      realtimeClient.connect();
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "typing", (data) => {

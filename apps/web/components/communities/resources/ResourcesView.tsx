@@ -104,7 +104,7 @@ export function ResourcesView({
       }),
     );
 
-    realtimeClient.connect(room);
+    realtimeClient.connect();
 
     return () => {
       window.clearTimeout(initialFetch);

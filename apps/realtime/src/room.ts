@@ -12,6 +12,8 @@ interface Attachment {
   userId?: string;
   /** Logical topics this socket has subscribed to (e.g. "chat", "typing", "threads"). */
   topics?: Set<string>;
+  /** Set to "userdo" for UserDO gateway connections so events include room name. */
+  role?: string;
 }
 
 const MEMBERS_KEY = "members";
@@ -24,17 +26,17 @@ const MAX_MESSAGE_BYTES = 8192;
  * Each client connects once via a single WebSocket and subscribes to the
  * logical topics it needs. Events are filtered per-socket by topic.
  *
- * Uses the WebSocket Hibernation API: `acceptWebSocket` lets the runtime evict
- * this object between messages without dropping connections. Identity and
- * presence live in storage so they survive eviction.
+ * Supports two connection types:
+ *   - Direct clients (role=undefined): receive events as before
+ *   - UserDO gateways (role=userdo): receive events with room name included,
+ *     then forward to their own connected clients
  *
  * Topic subscription model:
  *   - Client sends `{ t: "subscribe", topic: "chat" }` to receive chat events.
  *   - Client sends `{ t: "unsubscribe", topic: "typing" }` to stop typing events.
  *   - Presence (snapshots + deltas) is always sent to all sockets regardless
  *     of topic subscriptions (presence reflects who is in the room).
- *   - Server-side publishes (via POST /publish) also respect topic subscriptions:
- *     a publish to topic "chat" only reaches sockets subscribed to "chat".
+ *   - Server-side publishes (via POST /publish) also respect topic subscriptions.
  */
 export class Room extends DurableObject<Env> {
   async fetch(request: Request): Promise<Response> {
@@ -56,13 +58,14 @@ export class Room extends DurableObject<Env> {
     if (!userId) {
       return new Response("Unauthorized", { status: 401 });
     }
+    const role = request.headers.get("x-realtime-role") ?? undefined;
 
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
     // Start with no topic subscriptions — client must subscribe explicitly.
-    server.serializeAttachment({ userId, topics: new Set<string>() });
+    server.serializeAttachment({ userId, topics: new Set<string>(), role });
 
     const connectionId = crypto.randomUUID();
     void this.broadcastTo(server, {
@@ -77,7 +80,7 @@ export class Room extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== "string") return;
-    let msg: { t?: string; topic?: string; data?: unknown; user?: { id: string; name: string; avatar: string | null } };
+    let msg: { t?: string; topic?: string; data?: unknown; user?: { id: string; name: string; avatar: string | null }; userId?: string };
     try {
       msg = JSON.parse(message);
     } catch {
@@ -85,7 +88,8 @@ export class Room extends DurableObject<Env> {
       return;
     }
 
-    const { userId } = ws.deserializeAttachment();
+    const attachment = ws.deserializeAttachment() as Attachment;
+    const { userId, role } = attachment;
 
     if (msg.t === "join") {
       const user = msg.user;
@@ -93,19 +97,20 @@ export class Room extends DurableObject<Env> {
         this.reject(ws, "join identity mismatch");
         return;
       }
-      ws.serializeAttachment({ userId, topics: new Set<string>() });
+      ws.serializeAttachment({ userId, topics: new Set<string>(), role });
       await this.join(userId, user);
     } else if (msg.t === "subscribe" && msg.topic) {
-      const attachment = ws.deserializeAttachment() as Attachment;
-      if (!attachment.topics) attachment.topics = new Set();
-      attachment.topics.add(msg.topic);
-      ws.serializeAttachment(attachment);
+      const a = ws.deserializeAttachment() as Attachment;
+      if (!a.topics) a.topics = new Set();
+      a.topics.add(msg.topic);
+      ws.serializeAttachment(a);
     } else if (msg.t === "unsubscribe" && msg.topic) {
-      const attachment = ws.deserializeAttachment() as Attachment;
-      if (attachment.topics) attachment.topics.delete(msg.topic);
-      ws.serializeAttachment(attachment);
+      const a = ws.deserializeAttachment() as Attachment;
+      if (a.topics) a.topics.delete(msg.topic);
+      ws.serializeAttachment(a);
     } else if (msg.t === "publish") {
-      if (!userId || !msg.topic) {
+      const publisherId = msg.userId ?? userId;
+      if (!publisherId || !msg.topic) {
         this.reject(ws, "publish requires topic and identity");
         return;
       }
@@ -114,14 +119,12 @@ export class Room extends DurableObject<Env> {
         room: this.roomName(),
         topic: msg.topic,
         data: msg.data ?? null,
-        sender: userId,
+        sender: publisherId,
       });
       if (payload.length > MAX_MESSAGE_BYTES) {
         this.reject(ws, "message too large");
         return;
       }
-      // Broadcast with topic filtering. Exclude the sending socket so the
-      // same user's other tabs still receive the event.
       this.broadcastByTopic(payload, msg.topic, { ws });
     }
   }
@@ -150,7 +153,6 @@ export class Room extends DurableObject<Env> {
 
     if (isFirstConnection) {
       const userEntry = members[userId];
-      // Presence deltas are sent to ALL sockets (not topic-filtered).
       this.broadcastAll(JSON.stringify({
         t: "presence_delta",
         room: this.roomName(),
@@ -190,7 +192,6 @@ export class Room extends DurableObject<Env> {
       avatar: m.avatar,
       connections: m.connections,
     }));
-    // Presence snapshots are sent to ALL sockets (not topic-filtered).
     this.broadcastAll(JSON.stringify({ t: "presence", room: this.roomName(), users }));
   }
 
@@ -226,7 +227,6 @@ export class Room extends DurableObject<Env> {
     if (payload.length > MAX_MESSAGE_BYTES) {
       return new Response("Message too large", { status: 413 });
     }
-    // Server-side publishes also respect topic subscriptions.
     this.broadcastByTopic(payload, body.topic, { userId: body.exclude_user });
     return new Response("ok");
   }
@@ -245,7 +245,6 @@ export class Room extends DurableObject<Env> {
       const { userId } = attachment;
       if (exclude?.ws === ws) continue;
       if (exclude?.userId && userId === exclude.userId) continue;
-      // Only send to sockets that have subscribed to this topic.
       if (attachment.topics && !attachment.topics.has(topic)) continue;
       this.sendTo(ws, message);
     }

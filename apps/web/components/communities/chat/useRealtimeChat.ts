@@ -67,7 +67,7 @@ export function useRealtimeChat({
 
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
     realtimeClient.subscribe(chatRoom);
-    realtimeClient.connect(chatRoom);
+    realtimeClient.connect();
 
     const unsubscribes: Array<() => void> = [];
 

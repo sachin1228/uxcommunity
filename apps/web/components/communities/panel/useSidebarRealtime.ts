@@ -110,7 +110,7 @@ export function useSidebarRealtime({
       const cid = community.id;
       const chatRoom = realtimeRooms.chat(cid);
       realtimeClient.subscribe(chatRoom);
-      realtimeClient.connect(chatRoom);
+      realtimeClient.connect();
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "message", (data) => {

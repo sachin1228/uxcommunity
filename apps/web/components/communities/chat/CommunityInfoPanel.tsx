@@ -107,7 +107,7 @@ export function CommunityInfoPanel({
         currentUserId,
       );
     });
-    realtimeClient.connect(rulesRoom);
+    realtimeClient.connect();
 
     return () => {
       unsubRules();

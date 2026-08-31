@@ -332,7 +332,7 @@ export function ThreadDetailClient({
       if (record?.user_id === currentUserId) return;
       void fetchComments();
     });
-    realtimeClient.connect(commentsRoom);
+    realtimeClient.connect();
 
     const likesRoom = realtimeRooms.threads(communityId);
     const unsubLikes = realtimeClient.on(likesRoom, "like", (data) => {
@@ -354,7 +354,7 @@ export function ThreadDetailClient({
         (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, like_count: next.like_count } : next }),
       );
     });
-    realtimeClient.connect(likesRoom);
+    realtimeClient.connect();
 
     return () => {
       unsubComments();

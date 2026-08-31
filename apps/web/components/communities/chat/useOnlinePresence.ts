@@ -21,7 +21,7 @@ export function useOnlinePresence({
     const presenceRoom = realtimeRooms.presence(communityId);
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
     realtimeClient.subscribe(presenceRoom);
-    realtimeClient.connect(presenceRoom);
+    realtimeClient.connect();
 
     const unsubPresence = realtimeClient.onPresence(presenceRoom, (users) => {
       setOnlineCount(users.length);

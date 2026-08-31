@@ -154,7 +154,7 @@ export function ProfileThreads({
       );
     });
 
-    realtimeClient.connect(room);
+    realtimeClient.connect();
     return () => {
       unsubThread();
       unsubLike();

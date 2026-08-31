@@ -170,7 +170,7 @@ export function NotificationBell({ userId }: Props) {
       }),
     );
 
-    realtimeClient.connect(room);
+    realtimeClient.connect();
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());

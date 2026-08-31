@@ -1,20 +1,21 @@
 /**
- * Shared protocol types between the Cloudflare realtime service and the
- * client SDK (apps/web/lib/realtime/).
+ * Wire-protocol types for the Cloudflare realtime service.
  *
- * Wire format is JSON. One WebSocket = one room (Durable Object) identified
- * by the `?room=` query param on /ws. Clients can subscribe/unsubscribe to
- * logical topics within that room.
+ * All messages are JSON. The `room` field is required on every client→server
+ * message and included on every server→client event so the client can route
+ * to the correct handler.
+ *
+ * Connection model:
+ *   Client → UserDO (user:${userId}) → Community DOs (chat:${communityId}, etc.)
  */
 
-/** Server → client. Sent immediately after the socket is accepted. */
+// ── Server → Client ────────────────────────────────────────────────────────
+
 export interface HelloMessage {
   t: "hello";
-  room: string;
   connectionId: string;
 }
 
-/** Server → client. A published event for this room. */
 export interface EventMessage {
   t: "event";
   room: string;
@@ -23,7 +24,6 @@ export interface EventMessage {
   sender?: string;
 }
 
-/** Server → client. Presence snapshot (full list on join, deltas after). */
 export interface PresenceUser {
   id: string;
   name: string | null;
@@ -37,7 +37,6 @@ export interface PresenceMessage {
   users: PresenceUser[];
 }
 
-/** Server → client. Delta event when a user joins or leaves. */
 export interface PresenceDeltaMessage {
   t: "presence_delta";
   room: string;
@@ -45,33 +44,33 @@ export interface PresenceDeltaMessage {
   left?: { id: string };
 }
 
-/** Server → client. */
 export interface ErrorMessage {
   t: "error";
   message: string;
 }
 
-/** Client → server. Must be the first message; declares identity for the room. */
+// ── Client → Server ────────────────────────────────────────────────────────
+
 export interface JoinMessage {
   t: "join";
   user: { id: string; name: string; avatar: string | null };
 }
 
-/** Client → server. Subscribe to a logical topic within this room. */
 export interface SubscribeMessage {
   t: "subscribe";
+  room: string;
   topic: string;
 }
 
-/** Client → server. Unsubscribe from a logical topic within this room. */
 export interface UnsubscribeMessage {
   t: "unsubscribe";
+  room: string;
   topic: string;
 }
 
-/** Client → server. Low-trust publish (typing, presence heartbeat). Rebroadcast to other members of the room. */
 export interface PublishMessage {
   t: "publish";
+  room: string;
   topic: string;
   data: unknown;
 }

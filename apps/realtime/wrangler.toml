@@ -9,8 +9,15 @@ workers_dev = true
 #   REALTIME_PUBLISH_SECRET  — server-to-server secret for the /publish endpoint
 
 [durable_objects]
-bindings = [{ name = "ROOM", class_name = "Room" }]
+bindings = [
+  { name = "COMMUNITY_DO", class_name = "Room" },
+  { name = "USER_DO", class_name = "UserDO" },
+]
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["UserDO"]

@@ -74,7 +74,7 @@ export function EventsView({
     unsubscribes.push(realtimeClient.on(room, "like", () => void fetchEvents(true, true)));
     unsubscribes.push(realtimeClient.on(room, "save", () => void fetchEvents(true, true)));
 
-    realtimeClient.connect(room);
+    realtimeClient.connect();
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());

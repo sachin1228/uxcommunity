@@ -86,7 +86,7 @@ export function useTypingPresence({
     const chatRoom = realtimeRooms.chat(communityId);
     realtimeClient.init({ id: currentUserId, name: currentUserName, avatar: null });
     realtimeClient.subscribe(chatRoom);
-    realtimeClient.connect(chatRoom);
+    realtimeClient.connect();
     lastSentAtRef.current = 0;
 
     const unsub = realtimeClient.on(chatRoom, "typing", (data) => {

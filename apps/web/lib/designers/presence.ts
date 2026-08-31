@@ -91,7 +91,7 @@ export class StudioPresence {
   }
 
   connect() {
-    realtimeClient.connect(this.room);
+    realtimeClient.connect();
   }
 
   /** Composite identity for this tab: `userId:instanceId`. */

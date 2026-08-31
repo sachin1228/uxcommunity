@@ -112,7 +112,7 @@ export function ThreadsView({
       }),
     );
 
-    realtimeClient.connect(room);
+    realtimeClient.connect();
 
     return () => {
       window.clearTimeout(initialFetch);
