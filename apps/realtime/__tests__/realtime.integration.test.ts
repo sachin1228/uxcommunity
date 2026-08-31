@@ -516,11 +516,8 @@ describe("Authorization", () => {
 // ============================================================================
 
 describe("Unauthorized RPC", () => {
-  it("CommunityDO rejects subscribe with wrong RPC_SECRET", async () => {
-    // This tests the RPC authorization directly via the Worker's DO binding.
-    // In production, only UserDO (with the correct RPC_SECRET) can call these methods.
-    // We verify this by attempting to call via the HTTP publish endpoint with
-    // an invalid secret, which the Worker rejects.
+  it("CommunityDO rejects HTTP publish with wrong publish secret", async () => {
+    // The /publish endpoint checks x-realtime-publish-secret header.
     const res = await fetch(`${baseUrl}/publish`, {
       method: "POST",
       headers: {
@@ -531,20 +528,216 @@ describe("Unauthorized RPC", () => {
     });
     expect(res.status).toBe(403);
   });
+
+  it("external HTTP client cannot reach CommunityDO RPC methods", async () => {
+    // CommunityDO exposes RPC methods (subscribe, unsubscribe, publishMessage).
+    // These are only callable via DO stubs from other DOs.
+    // External HTTP fetch goes to Worker's fetch handler, which only exposes
+    // /ws and /publish. Any other path returns 404.
+    const res = await fetch(`${baseUrl}/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "attacker", room: "chat:x", topic: "chat" }),
+    });
+    expect(res.status).toBe(404);
+
+    const res2 = await fetch(`${baseUrl}/rpc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method: "subscribe", args: ["attacker", "chat:x", "chat", "wrong"] }),
+    });
+    expect(res2.status).toBe(404);
+  });
+
+  it("RPC_SECRET is never sent in WebSocket messages", async () => {
+    // Verify that the RPC secret is not exposed to clients.
+    // The only secrets used are SESSION_SECRET (JWT) and PUBLISH_SECRET (HTTP).
+    // RPC_SECRET is only used in DO-to-DO calls (user.ts → room.ts).
+    const token = await createToken("user_rpc_audit");
+    const { ws, messages, close } = connectWs("user:user_rpc_audit", token);
+    try {
+      await waitForOpen(ws);
+      ws.send(JSON.stringify({ t: "join", user: { id: "user_rpc_audit", name: "Audit", avatar: null } }));
+      await waitForMessage(messages, "hello");
+
+      // Collect all messages from server
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Verify no message contains RPC_SECRET
+      const rpcSecretLeaked = messages.some((m) =>
+        JSON.stringify(m).includes(RPC_SECRET)
+      );
+      expect(rpcSecretLeaked).toBe(false);
+
+      // Also check that subscribe/unsubscribe responses don't leak secrets
+      ws.send(JSON.stringify({ t: "subscribe", room: "chat:audit", topic: "chat" }));
+      await new Promise((r) => setTimeout(r, 500));
+
+      const rpcSecretAfterSub = messages.some((m) =>
+        JSON.stringify(m).includes(RPC_SECRET)
+      );
+      expect(rpcSecretAfterSub).toBe(false);
+    } finally { close(); }
+  });
 });
 
 // ============================================================================
-// TEST 12: MEMBERSHIP API OUTAGE (FAIL-CLOSED)
+// TEST 12: MEMBERSHIP AUTHORIZATION
 // ============================================================================
 
-describe("Membership API outage", () => {
+describe("Membership authorization", () => {
   it("subscribe is rejected when membership API is unavailable (fail-closed)", async () => {
-    // The membership API is not available in test environment (returns 404).
-    // With fail-closed authorization, this means subscribe via RPC is rejected.
-    // However, the HTTP publish path does not check membership (it checks publish secret).
-    // So we verify that direct publish still works.
+    // API_URL is set to http://localhost:3000 but no web app is running.
+    // With fail-closed authorization, subscribe via RPC is rejected.
+    // HTTP publish does not check membership (it checks publish secret).
     const res = await publish("chat:test_outage", "chat", { text: "test" });
     expect(res.ok).toBe(true);
+  });
+
+  it("subscribe is rejected when membership API returns 403 (non-member)", async () => {
+    const { createServer } = await import("http");
+    const { writeFileSync, readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+
+    // Start a mock membership API that returns 403
+    const mockApi = createServer((_req, res) => {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false }));
+    });
+    await new Promise<void>((resolve) => mockApi.listen(0, resolve));
+    const mockPort = (mockApi.address() as any).port;
+
+    // Write a temporary .dev.vars pointing API_URL to the mock
+    const devVarsPath = resolve(__dirname, "../.dev.vars");
+    const originalDevVars = readFileSync(devVarsPath, "utf-8");
+    const modifiedDevVars = originalDevVars.replace(
+      /^API_URL=.*$/m,
+      `API_URL=http://127.0.0.1:${mockPort}`,
+    );
+    writeFileSync(devVarsPath, modifiedDevVars, "utf-8");
+
+    // Start a fresh worker with the modified .dev.vars
+    const membershipWorker = await unstable_dev("src/index.ts", {
+      configPath: "wrangler.toml",
+      experimentalExcludeMiniflareV1: true,
+    });
+    const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
+
+    try {
+      const token = await createToken("user_nonmember");
+      const wsUrl = `${membershipUrl}/ws?room=user:user_nonmember&token=${token}`;
+      const ws = new WebSocket(wsUrl);
+      const messages: any[] = [];
+      ws.on("message", (data) => {
+        try { messages.push(JSON.parse(String(data))); } catch { /* ignore */ }
+      });
+      await waitForOpen(ws);
+
+      ws.send(JSON.stringify({
+        t: "join", user: { id: "user_nonmember", name: "NonMember", avatar: null },
+      }));
+      await waitForMessage(messages, "hello");
+
+      // Subscribe — mock returns 403, so subscribe is rejected
+      ws.send(JSON.stringify({
+        t: "subscribe", room: "chat:comm_nonmember", topic: "chat",
+      }));
+      await new Promise((r) => setTimeout(r, 2000));
+
+      // Publish directly (bypasses membership check via HTTP)
+      await fetch(`${membershipUrl}/publish`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-realtime-publish-secret": PUBLISH_SECRET,
+        },
+        body: JSON.stringify({ room: "chat:comm_nonmember", topic: "chat", data: { text: "should not arrive" } }),
+      });
+      await new Promise((r) => setTimeout(r, 1000));
+
+      const events = messages.filter((m) => m.t === "event");
+      expect(events.length).toBe(0);
+      try { ws.close(); } catch { /* ignore */ }
+    } finally {
+      await membershipWorker.stop();
+      mockApi.close();
+      writeFileSync(devVarsPath, originalDevVars, "utf-8");
+    }
+  });
+
+  it("subscribe succeeds when membership API returns 200 (member)", async () => {
+    const { createServer } = await import("http");
+    const { writeFileSync, readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+
+    // Start a mock membership API that returns 200 with valid auth
+    const mockApi = createServer((req, res) => {
+      const auth = req.headers.authorization;
+      if (!auth || !auth.startsWith("Bearer ")) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+        return;
+      }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+    });
+    await new Promise<void>((resolve) => mockApi.listen(0, resolve));
+    const mockPort = (mockApi.address() as any).port;
+
+    // Write a temporary .dev.vars pointing API_URL to the mock
+    const devVarsPath = resolve(__dirname, "../.dev.vars");
+    const originalDevVars = readFileSync(devVarsPath, "utf-8");
+    const modifiedDevVars = originalDevVars.replace(
+      /^API_URL=.*$/m,
+      `API_URL=http://127.0.0.1:${mockPort}`,
+    );
+    writeFileSync(devVarsPath, modifiedDevVars, "utf-8");
+
+    // Start a fresh worker with the modified .dev.vars
+    const membershipWorker = await unstable_dev("src/index.ts", {
+      configPath: "wrangler.toml",
+      experimentalExcludeMiniflareV1: true,
+    });
+    const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
+
+    try {
+      const token = await createToken("user_member");
+      const wsUrl = `${membershipUrl}/ws?room=user:user_member&token=${token}`;
+      const ws = new WebSocket(wsUrl);
+      const messages: any[] = [];
+      ws.on("message", (data) => {
+        try { messages.push(JSON.parse(String(data))); } catch { /* ignore */ }
+      });
+      await waitForOpen(ws);
+
+      ws.send(JSON.stringify({
+        t: "join", user: { id: "user_member", name: "Member", avatar: null },
+      }));
+      await waitForMessage(messages, "hello");
+
+      // Subscribe — mock returns 200, so subscribe succeeds
+      ws.send(JSON.stringify({
+        t: "subscribe", room: "chat:comm_member", topic: "chat",
+      }));
+      await new Promise((r) => setTimeout(r, 500));
+
+      // Publish — message SHOULD be delivered
+      await fetch(`${membershipUrl}/publish`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-realtime-publish-secret": PUBLISH_SECRET,
+        },
+        body: JSON.stringify({ room: "chat:comm_member", topic: "chat", data: { text: "member msg" } }),
+      });
+      const event = await waitForMessage(messages, "event", 5000);
+      expect(event.data.text).toBe("member msg");
+      try { ws.close(); } catch { /* ignore */ }
+    } finally {
+      await membershipWorker.stop();
+      mockApi.close();
+      writeFileSync(devVarsPath, originalDevVars, "utf-8");
+    }
   });
 });
 
@@ -731,6 +924,114 @@ describe("500 active subscribers", () => {
       for (const conn of conns) conn.close();
     }
   }, 60_000);
+});
+
+// ============================================================================
+// TEST 16B: FINAL RPC FAN-OUT — 500 × 10
+// ============================================================================
+
+describe("Fan-out: 500 × 10", () => {
+  it("5000/5000 delivered, 0 duplicates", async () => {
+    const N = 500;
+    const MESSAGES = 10;
+    const conns: Array<{ ws: WebSocket; messages: any[]; close: () => void }> = [];
+
+    try {
+      for (let i = 0; i < N; i++) {
+        const token = await createToken(`user_fo10_${i}`);
+        const conn = connectWs(`user:user_fo10_${i}`, token);
+        conns.push(conn);
+        await waitForOpen(conn.ws);
+        conn.ws.send(JSON.stringify({
+          t: "join", user: { id: `user_fo10_${i}`, name: `U${i}`, avatar: null },
+        }));
+        await waitForMessage(conn.messages, "hello");
+        conn.ws.send(JSON.stringify({
+          t: "subscribe", room: "chat:comm_fo10", topic: "chat",
+        }));
+      }
+
+      await new Promise((r) => setTimeout(r, 2000));
+
+      let totalDelivered = 0;
+      let totalDuplicates = 0;
+
+      for (let seq = 0; seq < MESSAGES; seq++) {
+        await publish("chat:comm_fo10", "chat", { seq });
+        await new Promise((r) => setTimeout(r, 1000));
+
+        for (const conn of conns) {
+          const count = conn.messages.filter(
+            (m) => m.t === "event" && m.data?.seq === seq
+          ).length;
+          if (count > 1) totalDuplicates += count - 1;
+          if (count >= 1) totalDelivered++;
+        }
+      }
+
+      console.log(`[FAN-OUT 500×10] delivered: ${totalDelivered}/${MESSAGES * N}, duplicates: ${totalDuplicates}`);
+      expect(totalDelivered).toBe(MESSAGES * N);
+      expect(totalDuplicates).toBe(0);
+    } finally {
+      for (const conn of conns) conn.close();
+    }
+  }, 120_000);
+});
+
+// ============================================================================
+// TEST 16C: FINAL RPC FAN-OUT — 500 × 100
+// ============================================================================
+
+describe("Fan-out: 500 × 100", () => {
+  it("50000/50000 delivered, 0 duplicates", async () => {
+    const N = 500;
+    const MESSAGES = 100;
+    const conns: Array<{ ws: WebSocket; messages: any[]; close: () => void }> = [];
+
+    try {
+      for (let i = 0; i < N; i++) {
+        const token = await createToken(`user_fo100_${i}`);
+        const conn = connectWs(`user:user_fo100_${i}`, token);
+        conns.push(conn);
+        await waitForOpen(conn.ws);
+        conn.ws.send(JSON.stringify({
+          t: "join", user: { id: `user_fo100_${i}`, name: `U${i}`, avatar: null },
+        }));
+        await waitForMessage(conn.messages, "hello");
+        conn.ws.send(JSON.stringify({
+          t: "subscribe", room: "chat:comm_fo100", topic: "chat",
+        }));
+      }
+
+      await new Promise((r) => setTimeout(r, 2000));
+
+      let totalDelivered = 0;
+      let totalDuplicates = 0;
+
+      for (let seq = 0; seq < MESSAGES; seq++) {
+        await publish("chat:comm_fo100", "chat", { seq });
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
+      await new Promise((r) => setTimeout(r, 10000));
+
+      for (const conn of conns) {
+        for (let seq = 0; seq < MESSAGES; seq++) {
+          const count = conn.messages.filter(
+            (m) => m.t === "event" && m.data?.seq === seq
+          ).length;
+          if (count > 1) totalDuplicates += count - 1;
+          if (count >= 1) totalDelivered++;
+        }
+      }
+
+      console.log(`[FAN-OUT 500×100] delivered: ${totalDelivered}/${MESSAGES * N}, duplicates: ${totalDuplicates}`);
+      expect(totalDelivered).toBe(MESSAGES * N);
+      expect(totalDuplicates).toBe(0);
+    } finally {
+      for (const conn of conns) conn.close();
+    }
+  }, 180_000);
 });
 
 // ============================================================================

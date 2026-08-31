@@ -295,21 +295,29 @@ export class Room extends DurableObject<Env> {
 
   // ── Membership authorization (fail-closed) ──────────────────────────
 
+  /** Cache TTL: re-check membership every 60 seconds. */
+  private static readonly MEMBERSHIP_CACHE_TTL_MS = 60_000;
+  private membershipCache = new Map<string, { ok: boolean; ts: number }>();
+
+  /**
+   * Verify the user is a member of this community via the internal API.
+   *
+   * Fail-closed: any error (network, timeout, malformed, non-200) → reject.
+   *
+   * If API_URL is not configured, the Worker-level JWT auth is the only
+   * gate. Set API_URL + API_SECRET in production to enable community-level
+   * membership checks.
+   */
   private async checkMembership(userId: string): Promise<boolean> {
-    // If API_URL is not configured, skip membership check.
-    // The Worker already verified the user via JWT before routing to this DO.
-    // In production, set API_URL to enable community-level membership checks.
     if (!this.env.API_URL) return true;
 
     const communityId = this.communityIdFromRoom();
+    const cacheKey = `${communityId}:${userId}`;
 
-    // Check cache first
-    const cacheKey = `auth:${userId}`;
-    try {
-      const cached = await this.ctx.storage.get<boolean>(cacheKey);
-      if (cached !== undefined) return cached;
-    } catch {
-      // Storage read failed — fall through to network check
+    // Check in-memory cache first (avoids repeated storage reads)
+    const cached = this.membershipCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < Room.MEMBERSHIP_CACHE_TTL_MS) {
+      return cached.ok;
     }
 
     // Check internal API (fail-closed)
@@ -324,15 +332,37 @@ export class Room extends DurableObject<Env> {
           signal: AbortSignal.timeout(3000),
         },
       );
-      const authorized = response.ok;
+
+      // Parse JSON response — treat any non-200 as rejection
+      let authorized = false;
+      if (response.ok) {
+        try {
+          const body = await response.json() as { ok?: boolean };
+          authorized = body.ok === true;
+        } catch {
+          // Malformed JSON → reject
+          authorized = false;
+        }
+      }
+
+      // Update in-memory cache
+      this.membershipCache.set(cacheKey, { ok: authorized, ts: Date.now() });
+
+      // Also persist to storage for hibernation survival
       try {
-        await this.ctx.storage.put(cacheKey, authorized);
+        await this.ctx.storage.put(`auth:${cacheKey}`, {
+          ok: authorized,
+          ts: Date.now(),
+        });
       } catch {
         // Storage write failed — not critical
       }
+
       return authorized;
     } catch {
-      // Network error or timeout → reject (fail-closed)
+      // Network error, timeout, or abort → reject (fail-closed)
+      // Clear stale cache on failure so next attempt re-checks
+      this.membershipCache.delete(cacheKey);
       return false;
     }
   }
