@@ -122,6 +122,7 @@ beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
     experimentalExcludeMiniflareV1: true,
+    vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
   });
   baseUrl = `http://127.0.0.1:${worker.port}`;
 }, 30_000);
@@ -620,6 +621,7 @@ describe("Membership authorization", () => {
     const membershipWorker = await unstable_dev("src/index.ts", {
       configPath: "wrangler.toml",
       experimentalExcludeMiniflareV1: true,
+      vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
     });
     const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
 
@@ -697,6 +699,7 @@ describe("Membership authorization", () => {
     const membershipWorker = await unstable_dev("src/index.ts", {
       configPath: "wrangler.toml",
       experimentalExcludeMiniflareV1: true,
+      vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
     });
     const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
 

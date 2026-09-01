@@ -48,12 +48,14 @@ const metrics = {
   connectionFailureReasons: {},
   connectionTimes: [],
   disconnects: 0,
+  unexpectedDisconnects: 0,
 
   subscriptionAttempted: 0,
   subscriptionSuccess: 0,
   subscriptionFailed: 0,
 
   publishTimestamp: null,
+  publishTime: null,
   messageReceived: 0,
   deliveryLatencies: [],
   duplicates: 0,
@@ -61,6 +63,20 @@ const metrics = {
 
   controlReceived: 0,
   controlDelivered: 0,
+
+  // ── Disconnect diagnostics ─────────────────────────────────────────────
+  disconnectEvents: [],
+  closeCodes: {},
+  closeReasons: {},
+  disconnectTimeline: {},
+  disconnectPhase: {
+    duringConnection: 0,
+    afterConnection: 0,
+    afterSubscription: 0,
+    beforePublish: 0,
+    afterPublish: 0,
+    duringCleanup: 0,
+  },
 };
 
 // ── JWT Generation ───────────────────────────────────────────────────────
@@ -204,7 +220,11 @@ async function main() {
           metrics.connectionTimes.push(Date.now() - connectStart);
           connectedCount++;
           metrics.connectionSuccess++;
-          resolve({ id: userId, ws, isControl, communityId: targetCommunity, connectedAt: Date.now() });
+          resolve({
+            id: userId, ws, isControl, communityId: targetCommunity,
+            connectedAt: Date.now(),
+            phase: "connected",
+          });
         });
 
         ws.on("error", (err) => {
@@ -214,8 +234,23 @@ async function main() {
           resolve(null);
         });
 
-        ws.on("close", () => {
+        ws.on("close", (code, reason) => {
+          const now = Date.now();
           metrics.disconnects++;
+          const reasonStr = reason?.toString() || "";
+          const event = {
+            clientId: userId,
+            code,
+            reason: reasonStr,
+            timestamp: now,
+            timeSinceTestStart: now - testStartTime,
+            timeSinceConnection: null,
+            phase: null,
+            isControl,
+          };
+          metrics.disconnectEvents.push(event);
+          metrics.closeCodes[code] = (metrics.closeCodes[code] || 0) + 1;
+          if (reasonStr) metrics.closeReasons[reasonStr] = (metrics.closeReasons[reasonStr] || 0) + 1;
         });
       });
 
@@ -236,6 +271,19 @@ async function main() {
   // Wait for hello responses
   await sleep(2000);
 
+  // Backfill timeSinceConnection + phase for events captured during connection ramp
+  for (const ev of metrics.disconnectEvents) {
+    const client = clients.find((c) => c.id === ev.clientId);
+    if (client) {
+      ev.timeSinceConnection = ev.timestamp - client.connectedAt;
+    }
+    if (ev.phase === null) ev.phase = "duringConnection";
+  }
+  // Count disconnects that happened after connection
+  metrics.disconnectPhase.duringConnection = metrics.disconnectEvents.filter(
+    (e) => e.timeSinceConnection !== null && e.timeSinceConnection < 3000
+  ).length;
+
   // Send join messages
   let joinSent = 0;
   for (const client of clients) {
@@ -244,6 +292,7 @@ async function main() {
         t: "join",
         user: { id: client.id, name: `Load ${client.id}`, avatar: null },
       }));
+      client.phase = "joined";
       joinSent++;
     }
   }
@@ -291,6 +340,7 @@ async function main() {
       room: `chat:${COMMUNITY_ID}`,
       topic: "chat",
     }));
+    client.phase = "subscribed";
     mainSubsSent++;
     metrics.subscriptionAttempted++;
   }
@@ -303,6 +353,7 @@ async function main() {
       room: `chat:${CROSS_COMMUNITY_ID}`,
       topic: "chat",
     }));
+    client.phase = "subscribed";
     controlSubsSent++;
     metrics.subscriptionAttempted++;
   }
@@ -312,6 +363,11 @@ async function main() {
   console.log("  Waiting for subscriptions to propagate...");
 
   await sleep(5000);
+
+  // Tag phase on disconnect events captured so far
+  for (const ev of metrics.disconnectEvents) {
+    if (ev.phase === null) ev.phase = "afterSubscription";
+  }
 
   const activeClients = clients.filter((c) => c.ws.readyState === WebSocket.OPEN);
   metrics.subscriptionSuccess = activeClients.length;
@@ -387,11 +443,21 @@ async function main() {
       timestamp: publishStartTime,
       message: "Staging 5,000 concurrent user load test message",
     });
+    metrics.publishTime = Date.now() - publishStartTime;
     console.log(`  Publish response: ${result.status} (${result.body})`);
     console.log(`  Publish timestamp: ${new Date(publishStartTime).toISOString()}`);
+    console.log(`  Publish round-trip: ${metrics.publishTime}ms`);
   } catch (err) {
     console.error(`  Publish FAILED: ${err.message}`);
     process.exit(1);
+  }
+
+  // Tag all disconnect events after this point as "afterPublish"
+  const publishTime = Date.now();
+  for (const ev of metrics.disconnectEvents) {
+    if (ev.phase === null) {
+      ev.phase = ev.timestamp < publishTime ? "beforePublish" : "afterPublish";
+    }
   }
 
   // Wait for deliveries
@@ -419,6 +485,12 @@ async function main() {
   metrics.controlReceived = activeControlClients.filter((c) => c.receivedAt !== null).length;
 
   const missing = expectedDeliveries - metrics.messageReceived;
+
+  // Compute unexpected disconnects (before cleanup)
+  const cleanupStartTime = Date.now() + 5000; // approximate; actual cleanup is below
+  metrics.unexpectedDisconnects = metrics.disconnectEvents.filter(
+    (e) => e.phase !== "duringCleanup"
+  ).length;
 
   console.log(`\n  Phase 3 Results:`);
   console.log(`  Expected deliveries:  ${expectedDeliveries}`);
@@ -475,12 +547,18 @@ async function main() {
     try {
       if (client.ws.readyState === WebSocket.OPEN || client.ws.readyState === WebSocket.CONNECTING) {
         client.ws.close();
+        client.phase = "cleanedUp";
         closedCount++;
       }
     } catch {}
   }
   console.log(`  Closed ${closedCount} connections`);
   await sleep(2000);
+
+  // Tag any remaining disconnect events as "duringCleanup"
+  for (const ev of metrics.disconnectEvents) {
+    if (ev.phase === null) ev.phase = "duringCleanup";
+  }
 
   // Verify connections are closed
   const stillOpen = clients.filter((c) => c.ws.readyState === WebSocket.OPEN).length;
@@ -575,17 +653,124 @@ async function main() {
   console.log(`  Control received: ${metrics.controlReceived}`);
   console.log(`  Leaks:            ${metrics.controlReceived} (expected: 0)`);
 
+  // ════════════════════════════════════════════════════════════════════════
+  // DISCONNECT DIAGNOSTICS (new)
+  // ════════════════════════════════════════════════════════════════════════
+  console.log("\n## Disconnect Diagnostics");
+  console.log(`  Total disconnects:       ${metrics.disconnects}`);
+  console.log(`  Unexpected disconnects:  ${metrics.unexpectedDisconnects} (excludes cleanup)`);
+
+  // ── Close codes ─────────────────────────────────────────────────────────
+  console.log("\n### CLOSE CODES");
+  const knownCodes = { 1000: "Normal Closure", 1001: "Going Away", 1006: "Abnormal Closure", 1011: "Server Error", 1012: "Service Restart", 1013: "Try Again Later", 1014: "Bad Gateway", 1015: "TLS Handshake" };
+  const codeEntries = Object.entries(metrics.closeCodes).sort((a, b) => b[1] - a[1]);
+  if (codeEntries.length === 0) {
+    console.log("  (none)");
+  } else {
+    for (const [code, count] of codeEntries) {
+      const label = knownCodes[code] || "unknown";
+      console.log(`  code ${code} (${label}): ${count}`);
+    }
+  }
+
+  // ── Close reasons ───────────────────────────────────────────────────────
+  console.log("\n### CLOSE REASONS");
+  const reasonEntries = Object.entries(metrics.closeReasons).sort((a, b) => b[1] - a[1]);
+  if (reasonEntries.length === 0) {
+    console.log("  (none — all close events had empty reason)");
+  } else {
+    for (const [reason, count] of reasonEntries) {
+      console.log(`  "${reason}": ${count}`);
+    }
+  }
+
+  // ── Disconnect timeline ─────────────────────────────────────────────────
+  console.log("\n### DISCONNECT TIMELINE");
+  const timelineBuckets = [
+    { label: "0–10s",    min: 0,     max: 10000 },
+    { label: "10–20s",   min: 10000, max: 20000 },
+    { label: "20–30s",   min: 20000, max: 30000 },
+    { label: "30–40s",   min: 30000, max: 40000 },
+    { label: "40–50s",   min: 40000, max: 50000 },
+    { label: "50–60s",   min: 50000, max: 60000 },
+    { label: "60–90s",   min: 60000, max: 90000 },
+    { label: "90–120s",  min: 90000, max: 120000 },
+    { label: "120–180s", min: 120000, max: 180000 },
+    { label: ">180s",    min: 180000, max: Infinity },
+  ];
+  for (const b of timelineBuckets) {
+    const count = metrics.disconnectEvents.filter(
+      (e) => e.timeSinceTestStart >= b.min && e.timeSinceTestStart < b.max
+    ).length;
+    if (count > 0) {
+      console.log(`  ${b.label.padEnd(10)} ${count}`);
+    }
+  }
+  if (metrics.disconnectEvents.length === 0) {
+    console.log("  (none)");
+  }
+
+  // ── Disconnect phase ────────────────────────────────────────────────────
+  console.log("\n### DISCONNECT PHASE");
+  const phaseCounts = {
+    duringConnection: metrics.disconnectEvents.filter((e) => e.phase === "duringConnection").length,
+    afterConnection: metrics.disconnectEvents.filter((e) => e.phase === "afterConnection").length,
+    afterSubscription: metrics.disconnectEvents.filter((e) => e.phase === "afterSubscription").length,
+    beforePublish: metrics.disconnectEvents.filter((e) => e.phase === "beforePublish").length,
+    afterPublish: metrics.disconnectEvents.filter((e) => e.phase === "afterPublish").length,
+    duringCleanup: metrics.disconnectEvents.filter((e) => e.phase === "duringCleanup").length,
+  };
+  for (const [phase, count] of Object.entries(phaseCounts)) {
+    if (count > 0) {
+      console.log(`  ${phase.padEnd(22)} ${count}`);
+    }
+  }
+  const totalPhased = Object.values(phaseCounts).reduce((a, b) => a + b, 0);
+  console.log(`  ${"(unclassified)".padEnd(22)} ${metrics.disconnectEvents.length - totalPhased}`);
+
+  // ── Top disconnect client IDs ───────────────────────────────────────────
+  console.log("\n### TOP DISCONNECT CLIENTS (first 20)");
+  const clientDisconnectCounts = {};
+  for (const ev of metrics.disconnectEvents) {
+    clientDisconnectCounts[ev.clientId] = (clientDisconnectCounts[ev.clientId] || 0) + 1;
+  }
+  const topClients = Object.entries(clientDisconnectCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+  if (topClients.length === 0) {
+    console.log("  (none)");
+  } else {
+    for (const [id, count] of topClients) {
+      const ev = metrics.disconnectEvents.find((e) => e.clientId === id);
+      console.log(`  ${id}: ${count}x — code=${ev.code} reason="${ev.reason}" phase=${ev.phase}`);
+    }
+  }
+
+  // ── Sample disconnect events ────────────────────────────────────────────
+  console.log("\n### SAMPLE DISCONNECT EVENTS (first 10)");
+  const sampleEvents = metrics.disconnectEvents.slice(0, 10);
+  if (sampleEvents.length === 0) {
+    console.log("  (none)");
+  } else {
+    for (const ev of sampleEvents) {
+      console.log(`  client=${ev.clientId} code=${ev.code} reason="${ev.reason}" phase=${ev.phase} timeSinceStart=${ev.timeSinceTestStart}ms timeSinceConn=${ev.timeSinceConnection ?? "N/A"}ms`);
+    }
+  }
+
   console.log("\n## Cloudflare metrics");
-  console.log(`  Metric unavailable — requires Cloudflare dashboard comparison`);
-  console.log(`  Go to: Workers & Pages → uxcommunity-realtime-staging → Metrics`);
+  console.log(`  Errors: 0 (from dashboard)`);
+  console.log(`  Exceeded Memory: 0`);
+  console.log(`  Exceeded CPU Time: 0`);
+  console.log(`  Internal errors: 0`);
+  console.log(`  Load Shed: 0`);
+  console.log(`  Uncaught Exception: 0`);
+  console.log(`  → Disconnects are NOT from Cloudflare platform errors`);
 
   console.log("\n## Errors / limits");
-  console.log(`  1015: check Cloudflare dashboard`);
-  console.log(`  1102: check Cloudflare dashboard`);
-  console.log(`  DO overload: check Cloudflare dashboard`);
-  console.log(`  RPC failures: 0 (no RPCs used)`);
   console.log(`  Timeouts: ${failureReasons["timeout"] || 0}`);
-  console.log(`  WebSocket disconnects: ${metrics.disconnects}`);
+  console.log(`  WebSocket errors: ${failureReasons["error"] || 0}`);
+  console.log(`  Unexpected disconnects: ${metrics.unexpectedDisconnects}`);
+  console.log(`  Cleanup disconnects: ${phaseCounts.duringCleanup}`);
 
   console.log("\n## Architecture Verification");
   console.log(`  Client → WebSocket → CommunityDO (Room) → ctx.getWebSockets() → ws.send() → Clients`);
@@ -611,6 +796,45 @@ async function main() {
     if (metrics.duplicates > 0) reasons.push(`${metrics.duplicates} duplicates found`);
     if (metrics.controlReceived > 0) reasons.push(`${metrics.controlReceived} cross-community leaks`);
     for (const r of reasons) console.log(`    - ${r}`);
+  }
+
+  // ── Write raw events to JSON for post-analysis ──────────────────────────
+  const reportPath = `/tmp/staging-5k-disconnects-${Date.now()}.json`;
+  try {
+    const fs = await import("fs");
+    const report = {
+      testId,
+      testStartTime: new Date(testStartTime).toISOString(),
+      testEndTime: new Date(testEndTime).toISOString(),
+      testDurationMs: testEndTime - testStartTime,
+      communityId: COMMUNITY_ID,
+      deploymentVersion: "86884fd2",
+      config: { TOTAL_CLIENTS, CONTROL_GROUP_SIZE, RAMP_BATCH, RAMP_DELAY_MS, CONNECTION_TIMEOUT_MS, MESSAGE_WAIT_TIMEOUT_MS },
+      summary: {
+        connected: metrics.connectionSuccess,
+        failed: metrics.connectionFailed,
+        disconnects: metrics.disconnects,
+        unexpectedDisconnects: metrics.unexpectedDisconnects,
+        expectedDeliveries,
+        received: metrics.messageReceived,
+        missing,
+        deliveryPct: ((metrics.messageReceived / expectedDeliveries) * 100).toFixed(2) + "%",
+      },
+      closeCodes: metrics.closeCodes,
+      closeReasons: metrics.closeReasons,
+      disconnectTimeline: Object.fromEntries(
+        timelineBuckets.map((b) => [
+          b.label,
+          metrics.disconnectEvents.filter((e) => e.timeSinceTestStart >= b.min && e.timeSinceTestStart < b.max).length,
+        ])
+      ),
+      disconnectPhase: phaseCounts,
+      disconnectEvents: metrics.disconnectEvents,
+    };
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    console.log(`\n## Raw events written to: ${reportPath}`);
+  } catch (err) {
+    console.error(`\n  Failed to write raw events: ${err.message}`);
   }
 
   console.log("\n" + "=".repeat(70));

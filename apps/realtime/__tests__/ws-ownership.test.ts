@@ -142,6 +142,7 @@ beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
     experimentalExcludeMiniflareV1: true,
+    vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
   });
   baseUrl = `http://127.0.0.1:${worker.port}`;
 }, 30_000);
@@ -669,4 +670,50 @@ describe("WebSocket ownership: proves zero UserDO RPCs", () => {
 
     for (const conn of conns) conn.close();
   });
+});
+
+// ============================================================================
+// TEST 13: STALE LEGACY sub: RECORDS DO NOT AFFECT DELIVERY
+// ============================================================================
+
+describe("WebSocket ownership: stale legacy sub: records", () => {
+  it("client A subscribes then disconnects; stale sub: record does not cause delivery to unrelated client B", async () => {
+    // Scenario: Client A subscribes to "chat" on community C, then disconnects.
+    // With the old code, a `sub:userA:chat` entry would remain in SQLite.
+    // With the new code, the entry is NOT deleted (we removed storage.delete).
+    // But it must NOT affect delivery to other clients or cause phantom subscriptions.
+    //
+    // Client B subscribes to a DIFFERENT topic "typing" on the same community.
+    // Publishing to "chat" must NOT reach client B, proving stale sub: records
+    // are harmless.
+
+    const comm = "chat:ws_stale_legacy_test";
+    const tokenA = await createToken("stale_a");
+    const tokenB = await createToken("stale_b");
+
+    // Client A: subscribe to "chat", then disconnect
+    const connA = connectCommunityWs(comm, tokenA);
+    await joinAndSubscribe(connA.ws, connA.messages, "stale_a", comm, "chat");
+    connA.close();
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Client B: subscribe to "typing" (different topic)
+    const tokenB2 = await createToken("stale_b2");
+    const connB = connectCommunityWs(comm, tokenB2);
+    await joinAndSubscribe(connB.ws, connB.messages, "stale_b2", comm, "typing");
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Publish to "chat"
+    await publish(comm, "chat", { text: "stale-test" });
+    await new Promise((r) => setTimeout(r, 2000));
+
+    // Client B must NOT have received the "chat" event (subscribed to "typing", not "chat")
+    const chatEventsB = connB.messages.filter(
+      (m) => m.t === "event" && m.topic === "chat" && m.data?.text === "stale-test"
+    );
+    expect(chatEventsB.length).toBe(0);
+
+    console.log("  [stale-legacy] client B received 0 chat events (correct — subscribed to typing only)");
+    connB.close();
+  }, 15_000);
 });

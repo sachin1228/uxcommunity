@@ -192,7 +192,6 @@ export class Room extends DurableObject<Env> {
         }
         if (!stillSubscribed) {
           this.removeFromTopicIndex(userId, topic);
-          await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
         }
       }
       this.wsTopics.delete(ws);
@@ -240,9 +239,6 @@ export class Room extends DurableObject<Env> {
     }
     topicSubs.add(userId);
 
-    // Persist to SQLite
-    await this.ctx.storage.put(`${SUB_KEY_PREFIX}${userId}:${topic}`, { userId, topic });
-
     // Update WebSocket attachment
     const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
     if (attachment) {
@@ -277,7 +273,6 @@ export class Room extends DurableObject<Env> {
     // Only remove from dual-index if no other socket has this topic
     if (!stillSubscribed) {
       this.removeFromTopicIndex(userId, topic);
-      await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
     }
 
     // Update WebSocket attachment
@@ -303,33 +298,11 @@ export class Room extends DurableObject<Env> {
     if (this.subscribersReconstructed) return;
     await this.ctx.blockConcurrencyWhile(async () => {
       if (this.subscribersReconstructed) return;
-      await this.reconstructSubscribers();
       await this.reconstructWebSockets();
+      this.rebuildUserScopedMaps();
       this.subscribersReconstructed = true;
       this.wsReconstructed = true;
     });
-  }
-
-  private async reconstructSubscribers(): Promise<void> {
-    const entries = await this.ctx.storage.list({ prefix: SUB_KEY_PREFIX });
-    for (const [key, value] of entries) {
-      const payload = value as { userId: string; topic: string } | undefined;
-      if (!payload?.userId || !payload?.topic) continue;
-
-      let userTopics = this.subscriptionsByUser.get(payload.userId);
-      if (!userTopics) {
-        userTopics = new Set();
-        this.subscriptionsByUser.set(payload.userId, userTopics);
-      }
-      userTopics.add(payload.topic);
-
-      let topicSubs = this.subscriptionsByTopic.get(payload.topic);
-      if (!topicSubs) {
-        topicSubs = new Set();
-        this.subscriptionsByTopic.set(payload.topic, topicSubs);
-      }
-      topicSubs.add(payload.userId);
-    }
   }
 
   private async reconstructWebSockets(): Promise<void> {
@@ -358,6 +331,41 @@ export class Room extends DurableObject<Env> {
         this.userSockets.set(userId, sockets);
       }
       sockets.add(ws);
+    }
+  }
+
+  /**
+   * Rebuild user-scoped dual-index maps from socket-scoped maps.
+   * Called after reconstructWebSockets() to ensure subscriptionsByUser
+   * and subscriptionsByTopic are consistent with connected WebSockets.
+   * Subscription state lives in WebSocket attachments — no per-subscribe
+   * storage writes needed.
+   */
+  private rebuildUserScopedMaps(): void {
+    this.subscriptionsByUser.clear();
+    this.subscriptionsByTopic.clear();
+
+    for (const [ws, userId] of this.wsToUser) {
+      const topics = this.wsTopics.get(ws);
+      if (!topics) continue;
+
+      let userTopics = this.subscriptionsByUser.get(userId);
+      if (!userTopics) {
+        userTopics = new Set();
+        this.subscriptionsByUser.set(userId, userTopics);
+      }
+      for (const topic of topics) {
+        userTopics.add(topic);
+      }
+
+      for (const topic of topics) {
+        let topicSubs = this.subscriptionsByTopic.get(topic);
+        if (!topicSubs) {
+          topicSubs = new Set();
+          this.subscriptionsByTopic.set(topic, topicSubs);
+        }
+        topicSubs.add(userId);
+      }
     }
   }
 
