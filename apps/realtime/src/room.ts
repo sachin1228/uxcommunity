@@ -289,10 +289,11 @@ export class Room extends DurableObject<Env> {
     // Check if THIS socket is subscribed to the topic
     const topics = this.wsTopics.get(ws);
     const hasTopic = topics?.has(topic) ?? false;
-    console.log(`[SRV-DIAG] PUBLISH userId=${userId} topic=${topic} hasTopic=${hasTopic} socketTopics=[${topics ? [...topics].join(",") : "NONE"}]`);
+    const eid = typeof data === "object" && data !== null ? (data as Record<string, unknown>).eid : undefined;
+    console.log(`[SRV-DIAG] PUBLISH userId=${userId} topic=${topic} hasTopic=${hasTopic} eid=${eid ?? "?"} socketTopics=[${topics ? [...topics].join(",") : "NONE"}]`);
 
     if (!hasTopic) {
-      console.log(`[SRV-DIAG] PUBLISH DROPPED userId=${userId} topic=${topic}`);
+      console.log(`[SRV-DIAG] PUBLISH_DROPPED userId=${userId} topic=${topic} eid=${eid ?? "?"}`);
       return;
     }
 
@@ -442,7 +443,8 @@ export class Room extends DurableObject<Env> {
         // WebSocket send failed — will be cleaned up on close
       }
     }
-    console.log(`[SRV-DIAG] BROADCAST topic=${topic} sent=${sent} skipped=${skipped} excludeUserId=${excludeUserId}`);
+    const eid = typeof data === "object" && data !== null ? (data as Record<string, unknown>).eid : undefined;
+    console.log(`[SRV-DIAG] BROADCAST topic=${topic} eid=${eid ?? "?"} sent=${sent} skipped=${skipped} excludeUserId=${excludeUserId}`);
   }
 
   // ── Index helpers ──────────────────────────────────────────────────

@@ -9,6 +9,10 @@ const TYPING_IDLE_MS = 1600;
 const TYPING_EXPIRY_MS = 3500;
 const TYPING_THROTTLE_MS = 1000;
 
+// ── DIAGNOSTIC: typing event ID counter ─────────────────────────────────
+let _typingSeq = 0;
+// ────────────────────────────────────────────────────────────────────────
+
 export interface TypingUser {
   id: string;
   name: string;
@@ -29,6 +33,7 @@ export function useTypingPresence({
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSentAtRef = useRef(0);
   const identityRef = useRef({ user_id: currentUserId, name: currentUserName });
+  const sessionRef = useRef(0);
 
   const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(new Map());
 
@@ -58,16 +63,22 @@ export function useTypingPresence({
     (typing: boolean) => {
       const chatRoom = realtimeRooms.chat(communityId);
       const now = Date.now();
-      if (typing && now - lastSentAtRef.current < TYPING_THROTTLE_MS) {
-        console.log(`[RT-DIAG] BROADCAST_THROTTLED typing=${typing} throttleRemaining=${TYPING_THROTTLE_MS - (now - lastSentAtRef.current)}ms`);
+      const elapsed = now - lastSentAtRef.current;
+      const throttled = typing && elapsed < TYPING_THROTTLE_MS;
+      const eventId = typing ? `e${++_typingSeq}` : undefined;
+
+      if (throttled) {
+        console.log(`[RT-DIAG] SEND_THROTTLED elapsed=${elapsed}ms throttle=${TYPING_THROTTLE_MS}ms`);
         return;
       }
+
       lastSentAtRef.current = typing ? now : 0;
-      console.log(`[RT-DIAG] BROADCAST_TYPING typing=${typing} room=${chatRoom} ts=${now}`);
+      console.log(`[RT-DIAG] SEND typing=${typing} eventId=${eventId ?? "none"} session=${sessionRef.current} lastSent=${lastSentAtRef.current === 0 ? "0" : "set"}`);
       realtimeClient.publish(chatRoom, "typing", {
         ...identityRef.current,
         typing,
         ts: now,
+        eid: eventId,
       });
     },
     [communityId],
@@ -110,13 +121,19 @@ export function useTypingPresence({
       const name = typeof payload?.name === "string" ? payload.name : "Someone";
       const typing = payload?.typing === true;
       const ts = typeof payload?.ts === "number" ? payload.ts : Date.now();
+      const eid = typeof payload?.eid === "string" ? payload.eid : "?";
       if (!userId || userId === currentUserId) return;
+      console.log(`[RT-DIAG] RECV typing=${typing} eid=${eid} from=${userId}(${name})`);
       if (typing) {
         typingMapRef.current.set(userId, { name, lastSeen: ts });
       } else {
         typingMapRef.current.delete(userId);
       }
-      flushTypingUsers();
+      const users = [...typingMapRef.current.entries()]
+        .map(([id, { name: n }]) => ({ id, name: n }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      console.log(`[RT-DIAG] STATE mapSize=${typingMapRef.current.size} users=[${users.map((u) => u.name).join(",")}]`);
+      setTypingUsers(users);
     });
 
     const expiryTimer = window.setInterval(flushTypingUsers, 1000);
@@ -147,9 +164,10 @@ export function useTypingPresence({
   // ── DIAGNOSTIC: log full state on visibility return ────────────────────
   useEffect(() => {
     if (isVisible) {
+      sessionRef.current += 1;
       const chatRoom = realtimeRooms.chat(communityId);
       const conn = (realtimeClient as unknown as { connections: Map<string, { ws: WebSocket | null; connected: boolean; pending: string[] }> }).connections.get(chatRoom);
-      console.log(`[RT-DIAG] VISIBILITY_RETURN room=${chatRoom} ws=${conn?.ws ? "exists" : "null"} readyState=${conn?.ws?.readyState} connected=${conn?.connected} pending=${conn?.pending?.length}`);
+      console.log(`[RT-DIAG] VISIBILITY_RETURN session=${sessionRef.current} room=${chatRoom} readyState=${conn?.ws?.readyState} connected=${conn?.connected} pending=${conn?.pending?.length} typingRef=${typingRef.current} lastSentAt=${lastSentAtRef.current}`);
     }
   }, [isVisible, communityId]);
 

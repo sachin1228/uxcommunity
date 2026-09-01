@@ -647,6 +647,7 @@ export function CommunityChat({
 
   const handleInputChange = useCallback(
     (value: string) => {
+      console.log(`[RT-DIAG] INPUT_CHANGE valueLength=${value.trim().length}`);
       setInput(value);
       setTyping(value.trim().length > 0);
     },
@@ -654,10 +655,12 @@ export function CommunityChat({
   );
 
   const handleInputBlur = useCallback(() => {
+    console.log(`[RT-DIAG] INPUT_BLUR`);
     setTyping(false);
   }, [setTyping]);
 
   const handleInputSend = useCallback(() => {
+    console.log(`[RT-DIAG] INPUT_SEND`);
     setTyping(false);
     void handleSend();
   }, [handleSend, setTyping]);

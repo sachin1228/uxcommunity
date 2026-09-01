@@ -241,7 +241,8 @@ class RealtimeClient {
         console.log(`[RT-DIAG] RECV hello socket=${socketId} connectionId=${msg.connectionId}`);
       } else if (msg.t === "event" && msg.topic && msg.room) {
         if (msg.topic === "typing") {
-          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${msg.room} sender=${msg.sender} data=${JSON.stringify(msg.data).substring(0, 80)}`);
+          const eid = typeof msg.data === "object" && msg.data !== null ? (msg.data as Record<string, unknown>).eid : undefined;
+          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${msg.room} sender=${msg.sender} eid=${eid ?? "?"}`);
         }
         this.dispatchToRoom(msg.room, msg.topic, msg.data, msg.sender);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
