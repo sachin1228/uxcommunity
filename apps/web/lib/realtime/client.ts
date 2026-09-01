@@ -38,19 +38,6 @@ const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
 
-// ── DIAGNOSTIC LOGGING (temporary) ────────────────────────────────────────
-let _socketSeq = 0;
-let _msgSeq = 0;
-function _sid(ws: WebSocket | null): string {
-  if (!ws) return "null";
-  // Use a non-enumerable tag we set at creation time
-  return (ws as unknown as { __diagId?: string }).__diagId ?? "unknown";
-}
-function _setSid(ws: WebSocket, id: string): void {
-  (ws as unknown as { __diagId: string }).__diagId = id;
-}
-// ──────────────────────────────────────────────────────────────────────────
-
 /** Community-scoped room prefixes that get their own WebSocket. */
 const COMMUNITY_ROOM_PREFIXES = ["chat:", "threads:", "events:", "resources:", "showcase:", "rules:", "thread-comments:", "resource-comments:"];
 
@@ -140,15 +127,11 @@ class RealtimeClient {
   }
 
   connect(): void {
-    console.log(`[RT-DIAG] CONNECT called`);
     // Connect all active connections
     for (const [room, conn] of this.connections) {
       conn.manuallyClosed = false;
       if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
-        console.log(`[RT-DIAG] CONNECT opening room=${room} socket=${_sid(conn.ws)}`);
         this.openConnection(conn);
-      } else {
-        console.log(`[RT-DIAG] CONNECT already open room=${room} socket=${_sid(conn.ws)} readyState=${conn.ws.readyState}`);
       }
     }
   }
@@ -189,13 +172,9 @@ class RealtimeClient {
       this.scheduleReconnect(conn);
       return;
     }
-    const socketId = `s${++_socketSeq}`;
-    _setSid(ws, socketId);
     conn.ws = ws;
-    console.log(`[RT-DIAG] OPEN socket=${socketId} room=${roomName} readyState=${ws.readyState} conn.connected=${conn.connected}`);
 
     ws.onopen = () => {
-      console.log(`[RT-DIAG] ONOPEN socket=${socketId} room=${roomName} readyState=${ws.readyState} pending=${conn!.pending.length}`);
       conn!.connected = true;
       conn!.reconnectAttempt = 0;
       this.emitGlobalStatus(true);
@@ -216,17 +195,19 @@ class RealtimeClient {
         }
       });
 
-      console.log(`[RT-DIAG] ONOPEN before-flush pending=${conn!.pending.length} socket=${socketId}`);
       this.resubscribeConnection(conn!);
-      console.log(`[RT-DIAG] ONOPEN after-resubscribe pending=${conn!.pending.length} socket=${socketId}`);
       for (const msg of conn!.pending.splice(0)) {
-        console.log(`[RT-DIAG] FLUSH socket=${socketId} msg=${msg.substring(0, 120)}`);
         ws.send(msg);
       }
-      console.log(`[RT-DIAG] ONOPEN done pending=${conn!.pending.length} socket=${socketId}`);
     };
 
     ws.onmessage = (event) => {
+      // Guard: if a newer socket has already replaced us (reconnect race),
+      // ignore frames from the stale socket so we don't dispatch to the wrong
+      // connection's room or double-handle events.
+      if (conn.ws !== ws) {
+        return;
+      }
       let msg: {
         t?: string;
         room?: string;
@@ -239,18 +220,14 @@ class RealtimeClient {
         message?: string;
         connectionId?: string;
       };
-      // Raw receipt log — fires for EVERY frame so delivery can be confirmed
-      // independently of message shape.
-      console.log(`[RT-DIAG] RECV_RAW socket=${socketId} room=${roomName} conn.ws===ws?${conn!.ws === ws} len=${String(event.data).length} head=${String(event.data).substring(0, 80)}`);
       try {
         msg = JSON.parse(String(event.data));
       } catch {
-        console.log(`[RT-DIAG] RECV_PARSE_FAIL socket=${socketId}`);
         return;
       }
 
       if (msg.t === "hello") {
-        console.log(`[RT-DIAG] RECV hello socket=${socketId} connectionId=${msg.connectionId}`);
+        // Connection established
       } else if (msg.t === "event" && msg.topic) {
         // A community socket serves exactly one room, so prefer the room this
         // connection was opened for whenever the server-supplied room name is
@@ -263,10 +240,6 @@ class RealtimeClient {
             : isCommunityRoom(roomName)
               ? roomName
               : serverRoom;
-        if (msg.topic === "typing") {
-          const eid = typeof msg.data === "object" && msg.data !== null ? (msg.data as Record<string, unknown>).eid : undefined;
-          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${serverRoom} target=${targetRoom} sender=${msg.sender} eid=${eid ?? "?"} hasRoomState=${targetRoom ? this.rooms.has(targetRoom) : false}`);
-        }
         if (targetRoom) {
           this.dispatchToRoom(targetRoom, msg.topic, msg.data, msg.sender);
         }
@@ -286,7 +259,9 @@ class RealtimeClient {
           updated = cached;
         }
         this.presenceCache.set(msg.room, updated);
-        this.emitRoomPresence(msg.room, updated);
+        if (this.rooms.has(msg.room)) {
+          this.emitRoomPresence(msg.room, updated);
+        }
         this.emitGlobalPresence(updated);
       } else if (msg.t === "error") {
         console.warn("[realtime]", msg.message);
@@ -294,10 +269,8 @@ class RealtimeClient {
     };
 
     ws.onclose = (ev) => {
-      console.log(`[RT-DIAG] ONCLOSE socket=${socketId} room=${roomName} conn.ws===ws?${conn!.ws === ws} code=${ev.code} reason=${ev.reason} conn.connected=${conn!.connected}`);
       // Guard: if a newer socket has already replaced us, ignore this stale close.
       if (conn!.ws !== ws) {
-        console.log(`[RT-DIAG] ONCLOSE STALE-GUARD socket=${socketId} (conn.ws=${_sid(conn!.ws)}) IGNORING`);
         return;
       }
       conn!.connected = false;
@@ -305,8 +278,8 @@ class RealtimeClient {
       if (!conn!.manuallyClosed) this.scheduleReconnect(conn!);
     };
 
-    ws.onerror = (ev) => {
-      console.log(`[RT-DIAG] ONERROR socket=${socketId} room=${roomName}`);
+    ws.onerror = () => {
+      // Errors are handled via onclose; nothing to do here.
     };
   }
 
@@ -331,11 +304,9 @@ class RealtimeClient {
     if (!state) return;
 
     const hasHandlers = state.topicRefs.size > 0;
-    console.log(`[RT-DIAG] RESUBSCRIBE room=${roomName} subscribeRefs=${state.subscribeRefs} hasHandlers=${hasHandlers} topics=[${[...state.topicRefs.keys()].join(",")}] socket=${_sid(conn.ws)}`);
     if (state.subscribeRefs > 0 || hasHandlers) {
       for (const [topic, refCount] of state.topicRefs) {
         if (refCount > 0) {
-          console.log(`[RT-DIAG] RESUBSCRIBE sending topic=${topic} refCount=${refCount} socket=${_sid(conn.ws)}`);
           this.sendToConnection(conn, { t: "subscribe", room: roomName, topic });
         }
       }
@@ -369,13 +340,11 @@ class RealtimeClient {
   subscribe(room: string): () => void {
     const state = this.getOrCreateRoom(room);
     state.subscribeRefs += 1;
-    console.log(`[RT-DIAG] SUBSCRIBE room=${room} subscribeRefs=${state.subscribeRefs}`);
     let released = false;
     return () => {
       if (released) return;
       released = true;
       state.subscribeRefs = Math.max(0, state.subscribeRefs - 1);
-      console.log(`[RT-DIAG] UNSUBSCRIBE room=${room} subscribeRefs=${state.subscribeRefs}`);
       this.maybeRemoveRoom(room);
     };
   }
@@ -415,24 +384,25 @@ class RealtimeClient {
   on(room: string, topic: string, handler: EventHandler): () => void {
     const state = this.getOrCreateRoom(room);
 
-    // Increment refcount
-    const prev = state.topicRefs.get(topic) ?? 0;
-    state.topicRefs.set(topic, prev + 1);
-
-    // Add handler
-    let topicSet = state.topicHandlers.get(topic);
-    if (!topicSet) {
-      topicSet = new Set();
-      state.topicHandlers.set(topic, topicSet);
+    // Track unique handlers per topic. The topic refcount (topicRefs) is
+    // incremented once per unique handler — re-registering the same closure
+    // (common under React Strict Mode's setup→cleanup→setup) must not inflate
+    // the count, otherwise a later cleanup that removes the shared handler
+    // would leave a stale refcount and the room would never be torn down.
+    let set = state.topicHandlers.get(topic);
+    if (!set) {
+      set = new Set<EventHandler>();
+      state.topicHandlers.set(topic, set);
     }
-    topicSet.add(handler);
-
-    console.log(`[RT-DIAG] ON room=${room} topic=${topic} prevRef=${prev} newRef=${prev + 1}`);
+    const wasEmpty = set.size === 0;
+    set.add(handler);
+    if (wasEmpty && set.size === 1) {
+      state.topicRefs.set(topic, 1);
+    }
 
     // If this is the first handler for this topic, send subscribe
-    if (prev === 0) {
+    if (wasEmpty) {
       const conn = this.getRoomConnection(room);
-      console.log(`[RT-DIAG] ON first-handler → sendSubscribe room=${room} topic=${topic} socket=${_sid(conn.ws)}`);
       this.sendToConnection(conn, { t: "subscribe", room, topic });
       // Ensure connection is open
       if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
@@ -441,22 +411,23 @@ class RealtimeClient {
     }
 
     // Return cleanup function
-    return () => {
-      topicSet!.delete(handler);
-      const current = state.topicRefs.get(topic) ?? 0;
-      if (current <= 1) {
-        // Last handler removed — unsubscribe from server
+    let released = false;
+    const cleanup = () => {
+      if (released) return;
+      released = true;
+      set!.delete(handler);
+      if (set!.size === 0) {
+        // Last handler removed — remove the topic and unsubscribe from server
         state.topicRefs.delete(topic);
         state.topicHandlers.delete(topic);
         const conn = this.getRoomConnection(room);
         if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
           this.sendToConnection(conn, { t: "unsubscribe", room, topic });
         }
-      } else {
-        state.topicRefs.set(topic, current - 1);
       }
       this.maybeRemoveRoom(room);
     };
+    return cleanup;
   }
 
   off(room: string, topic: string, handler: EventHandler): void {
@@ -468,6 +439,7 @@ class RealtimeClient {
 
   onPresence(room: string, handler: PresenceHandler): () => void {
     const state = this.getOrCreateRoom(room);
+    const wasEmpty = state.presenceHandlers.size === 0;
     state.presenceHandlers.add(handler);
 
     const cached = this.presenceCache.get(room);
@@ -475,7 +447,10 @@ class RealtimeClient {
       try { handler(cached); } catch { /* ignore */ }
     }
 
+    let released = false;
     return () => {
+      if (released) return;
+      released = true;
       state.presenceHandlers.delete(handler);
       this.maybeRemoveRoom(room);
     };
@@ -492,10 +467,6 @@ class RealtimeClient {
 
   publish(room: string, topic: string, data: unknown): void {
     const conn = this.getRoomConnection(room);
-    const state = this.rooms.get(room);
-    const typingSubscribed = state?.topicRefs.has("typing") ?? false;
-    const typingRefCount = state?.topicRefs.get("typing") ?? 0;
-    console.log(`[RT-DIAG] PUBLISH room=${room} topic=${topic} socket=${_sid(conn.ws)} readyState=${conn.ws?.readyState} conn.connected=${conn.connected} pending=${conn.pending.length} typingSubscribed=${typingSubscribed} typingRefCount=${typingRefCount} ws===conn.ws=true`);
     this.sendToConnection(conn, { t: "publish", room, topic, data });
   }
 
@@ -571,9 +542,17 @@ class RealtimeClient {
     const conn = this.connections.get(room);
     if (!conn) return;
 
-    // Check if any other rooms use this connection
-    for (const [r, c] of this.connections) {
-      if (c === conn && r !== room) return;
+    // A community connection serves exactly one room (the one it was opened
+    // for). Before tearing it down, make sure that room is genuinely no
+    // longer desired. If it still has live subscribers or handlers (e.g. a
+    // sibling hook re-subscribed, or React Strict Mode briefly dropped the
+    // refcount while another component still depends on it), do NOT close the
+    // socket — doing so would discard typing events that the server keeps
+    // delivering, which is the source of the "typing received on server but
+    // never on the receiver" bug.
+    const state = this.rooms.get(room);
+    if (state && (state.subscribeRefs > 0 || state.topicRefs.size > 0 || state.presenceHandlers.size > 0)) {
+      return;
     }
 
     // No other rooms — close and remove.
@@ -590,7 +569,6 @@ class RealtimeClient {
     conn.ws = null;
     conn.connected = false;
     if (ws) {
-      console.log(`[RT-DIAG] REMOVE_CONNECTION room=${room} socket=${_sid(ws)} readyState=${ws.readyState}`);
       try { ws.close(); } catch { /* ignore */ }
     }
     this.connections.delete(room);
@@ -598,17 +576,9 @@ class RealtimeClient {
 
   private sendToConnection(conn: ConnectionState, msg: unknown): void {
     const json = JSON.stringify(msg);
-    const isTyping = typeof msg === "object" && msg !== null && (msg as Record<string, unknown>).t === "publish" && (msg as Record<string, unknown>).topic === "typing";
-    const isSubscribe = typeof msg === "object" && msg !== null && (msg as Record<string, unknown>).t === "subscribe";
     if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-      if (isTyping || isSubscribe) {
-        console.log(`[RT-DIAG] SEND socket=${_sid(conn.ws)} readyState=${conn.ws.readyState} conn.connected=${conn.connected} msg=${json.substring(0, 150)}`);
-      }
       conn.ws.send(json);
     } else {
-      if (isTyping || isSubscribe) {
-        console.log(`[RT-DIAG] QUEUED socket=${_sid(conn.ws)} readyState=${conn.ws?.readyState} conn.connected=${conn.connected} pending=${conn.pending.length} msg=${json.substring(0, 150)}`);
-      }
       conn.pending.push(json);
     }
   }

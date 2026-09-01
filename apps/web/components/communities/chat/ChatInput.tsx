@@ -33,10 +33,6 @@ interface PickerPos {
   width: number;
 }
 
-// ── DIAGNOSTIC: mount/unmount counter ────────────────────────────────────
-let _chatInputCounter = 0;
-// ────────────────────────────────────────────────────────────────────────
-
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -48,17 +44,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     },
     ref
   ) {
-    const instanceId = useRef(++_chatInputCounter);
-
-    // ── DIAGNOSTIC: mount/unmount ──────────────────────────────────────
-    useEffect(() => {
-      console.log(`[RT-DIAG] MOUNT ChatInput instance=${instanceId.current}`);
-      return () => {
-        console.log(`[RT-DIAG] UNMOUNT ChatInput instance=${instanceId.current}`);
-      };
-    }, []);
-    // ────────────────────────────────────────────────────────────────────
-
     const fileInputRef       = useRef<HTMLInputElement>(null);
     const anchorRef          = useRef<HTMLDivElement>(null);   // the input box wrapper
     const portalPickerRef    = useRef<HTMLDivElement>(null);   // the portal div

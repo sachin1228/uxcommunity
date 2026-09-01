@@ -102,8 +102,6 @@ export class Room extends DurableObject<Env> {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    console.log(`[SRV-DIAG] UPGRADE userId=${userId} room=${this.roomName()}`);
-
     // Check membership before accepting connection.
     // Sub-entity rooms (thread-comments:*, resource-comments:*) don't carry a
     // community ID in the room name, so skip the check — authorization is
@@ -165,10 +163,6 @@ export class Room extends DurableObject<Env> {
     const userId = this.wsToUser.get(ws);
     if (!userId) return;
 
-    if (msg.t === "subscribe" || msg.t === "publish") {
-      console.log(`[SRV-DIAG] RECV userId=${userId} type=${msg.t} topic=${msg.topic}`);
-    }
-
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== userId) return;
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
@@ -189,7 +183,6 @@ export class Room extends DurableObject<Env> {
     // Remove this socket's subscriptions from the dual-index
     // Only remove from dual-index if NO OTHER socket of this user still has this topic
     const topics = this.wsTopics.get(ws);
-    console.log(`[SRV-DIAG] WS_CLOSE userId=${userId} socketTopics=[${topics ? [...topics].join(",") : "NONE"}]`);
     if (topics) {
       const otherSockets = this.userSockets.get(userId);
       for (const topic of topics) {
@@ -237,7 +230,6 @@ export class Room extends DurableObject<Env> {
       topics = new Set();
       this.wsTopics.set(ws, topics);
     }
-    const had = topics.has(topic);
     topics.add(topic);
 
     // Update dual index (user-scoped, for fan-out)
@@ -263,8 +255,6 @@ export class Room extends DurableObject<Env> {
       }
       ws.serializeAttachment(attachment);
     }
-
-    console.log(`[SRV-DIAG] SUBSCRIBE userId=${userId} topic=${topic} had=${had} socketTopics=[${[...topics].join(",")}]`);
   }
 
   private async handleWsUnsubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
@@ -304,14 +294,7 @@ export class Room extends DurableObject<Env> {
   private async handleWsPublish(ws: WebSocket, userId: string, topic: string, data: unknown): Promise<void> {
     // Check if THIS socket is subscribed to the topic
     const topics = this.wsTopics.get(ws);
-    const hasTopic = topics?.has(topic) ?? false;
-    const eid = typeof data === "object" && data !== null ? (data as Record<string, unknown>).eid : undefined;
-    console.log(`[SRV-DIAG] PUBLISH userId=${userId} topic=${topic} hasTopic=${hasTopic} eid=${eid ?? "?"} socketTopics=[${topics ? [...topics].join(",") : "NONE"}]`);
-
-    if (!hasTopic) {
-      console.log(`[SRV-DIAG] PUBLISH_DROPPED userId=${userId} topic=${topic} eid=${eid ?? "?"}`);
-      return;
-    }
+    if (!topics?.has(topic)) return;
 
     // Broadcast to all subscribers (sender excluded via broadcastByTopic)
     await this.broadcastByTopic(topic, data, userId, userId);
@@ -406,7 +389,6 @@ export class Room extends DurableObject<Env> {
       return new Response("Bad request", { status: 400 });
     }
 
-    console.log(`[SRV-DIAG] HTTP_PUBLISH topic=${body.topic} exclude_user=${body.exclude_user}`);
     await this.ensureSubscribers();
     await this.broadcastByTopic(body.topic, body.data, body.exclude_user);
 

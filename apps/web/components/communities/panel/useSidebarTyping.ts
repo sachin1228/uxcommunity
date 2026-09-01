@@ -31,8 +31,6 @@ export function useSidebarTyping({
     const subscribed = communities.slice(0, TYPING_CHANNEL_LIMIT);
     const unsubscribes: Array<() => void> = [];
 
-    console.log(`[RT-DIAG] SIDEBAR_TYPING_MOUNT communities=[${subscribed.map((c) => c.id.slice(0, 8)).join(",")}] count=${subscribed.length}`);
-
     const flush = () => {
       const now = Date.now();
       stateRef.current.forEach((userMap) => {
@@ -55,12 +53,6 @@ export function useSidebarTyping({
       const unsubRoom = realtimeClient.subscribe(chatRoom);
       realtimeClient.connect();
 
-      // ── DIAGNOSTIC: log refCount after subscription ────────────────
-      const roomState = (realtimeClient as unknown as { rooms: Map<string, { topicRefs: Map<string, number> }> }).rooms.get(chatRoom);
-      const typingRefCt = roomState?.topicRefs.get("typing") ?? 0;
-      console.log(`[RT-DIAG] SIDEBAR_SUBSCRIBE room=${chatRoom} topic=typing refCount=${typingRefCt}`);
-      // ───────────────────────────────────────────────────────────────
-
       unsubscribes.push(
         realtimeClient.on(chatRoom, "typing", (data) => {
           const payload = (data ?? {}) as Record<string, unknown>;
@@ -81,7 +73,6 @@ export function useSidebarTyping({
 
     const timer = window.setInterval(flush, 1000);
     return () => {
-      console.log(`[RT-DIAG] SIDEBAR_TYPING_UNMOUNT communities=[${subscribed.map((c) => c.id.slice(0, 8)).join(",")}]`);
       window.clearInterval(timer);
       stateRef.current.clear();
       unsubscribes.forEach((unsub) => unsub());
