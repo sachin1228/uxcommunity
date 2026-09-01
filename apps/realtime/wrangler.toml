@@ -29,4 +29,4 @@ tag = "v3"
 new_sqlite_classes = []
 
 [vars]
-USE_WEBSOCKET_OWNERSHIP = "false"
+USE_WEBSOCKET_OWNERSHIP = "true"
