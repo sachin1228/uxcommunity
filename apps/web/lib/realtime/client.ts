@@ -3,7 +3,13 @@
 /**
  * Singleton browser client for the Cloudflare realtime service.
  *
- * Architecture:
+ * Architecture (USE_WEBSOCKET_OWNERSHIP=true):
+ *   Component → realtimeClient (singleton) → N WebSockets → CommunityDOs
+ *   Each community-scoped room (chat:*, threads:*, etc.) gets its own
+ *   WebSocket directly to the CommunityDO. User-scoped rooms (notifications:*, profile:*)
+ *   still connect to UserDO.
+ *
+ * Architecture (USE_WEBSOCKET_OWNERSHIP=false, legacy):
  *   Component → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
  * Reference-counted subscriptions:
@@ -35,12 +41,21 @@ const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
 
-function buildWebSocketUrl(baseUrl: string, userId: string): string {
+/** Community-scoped room prefixes that get their own WebSocket. */
+const COMMUNITY_ROOM_PREFIXES = ["chat:", "threads:", "events:", "resources:", "showcase:", "rules:"];
+
+function isCommunityRoom(room: string): boolean {
+  return COMMUNITY_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));
+}
+
+function buildWebSocketUrl(baseUrl: string, room: string, token?: string): string {
   if (!baseUrl) {
-    return `/ws?room=user:${encodeURIComponent(userId)}`;
+    return `/ws?room=${encodeURIComponent(room)}`;
   }
   const wsBase = baseUrl.replace(/^http/, "ws");
-  return `${wsBase}/ws?room=user:${encodeURIComponent(userId)}`;
+  const params = new URLSearchParams({ room });
+  if (token) params.set("token", token);
+  return `${wsBase}/ws?${params.toString()}`;
 }
 
 interface RoomState {
@@ -54,11 +69,22 @@ interface RoomState {
   subscribed: boolean;
 }
 
+interface ConnectionState {
+  ws: WebSocket | null;
+  connected: boolean;
+  manuallyClosed: boolean;
+  reconnectAttempt: number;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+  pending: string[];
+  user: RealtimeUser | null;
+}
+
 /**
  * Singleton RealtimeClient — one per browser session.
  *
- * Maintains ONE WebSocket to the UserDO. Components subscribe to logical
- * rooms and topics; the UserDO handles routing to community DOs.
+ * Manages multiple WebSockets:
+ *   - One per active community (for community-scoped rooms)
+ *   - One for user-scoped rooms (notifications, profile, designers-studio)
  *
  * Reference-counted lifecycle:
  *   on(room, topic, handler)  → increments topic refcount, subscribes if first
@@ -71,16 +97,9 @@ interface RoomState {
  *   - subscribed === false (no subscribe() callers)
  */
 class RealtimeClient {
-  private ws: WebSocket | null = null;
-  private user: RealtimeUser | null = null;
-  private userId: string | null = null;
-  private manuallyClosed = false;
-  private connected = false;
-  private reconnectAttempt = 0;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private pending: string[] = [];
-
-  /** roomName → room state */
+  /** roomName → connection state (one WebSocket per community or user room) */
+  private connections = new Map<string, ConnectionState>();
+  /** roomName → room subscription state */
   private rooms = new Map<string, RoomState>();
 
   private globalEvents = new Map<string, Set<EventHandler>>();
@@ -88,42 +107,79 @@ class RealtimeClient {
   private globalStatusHandlers = new Set<StatusHandler>();
   private presenceCache = new Map<string, RealtimePresenceUser[]>();
 
+  private sessionToken: string | null = null;
+
   init(user: RealtimeUser): void {
-    if (!this.user) {
-      this.user = user;
-      this.userId = user.id;
+    // Store user on all connections
+    for (const [, conn] of this.connections) {
+      if (!conn.user) conn.user = user;
     }
+  }
+
+  /** Set the session JWT for authenticated WebSocket connections. */
+  setSessionToken(token: string): void {
+    this.sessionToken = token;
   }
 
   connect(): void {
-    this.manuallyClosed = false;
-    this.open();
+    // Connect all active connections
+    for (const [, conn] of this.connections) {
+      conn.manuallyClosed = false;
+      if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
+        this.openConnection(conn);
+      }
+    }
   }
 
-  private open(): void {
-    if (this.ws && this.ws.readyState < WebSocket.CLOSING) return;
-    if (!this.userId) return;
+  // ── Connection management ───────────────────────────────────────────
+
+  private getOrCreateConnection(room: string): ConnectionState {
+    let conn = this.connections.get(room);
+    if (!conn) {
+      conn = {
+        ws: null,
+        connected: false,
+        manuallyClosed: false,
+        reconnectAttempt: 0,
+        reconnectTimer: null,
+        pending: [],
+        user: null,
+      };
+      this.connections.set(room, conn);
+    }
+    return conn;
+  }
+
+  private openConnection(conn: ConnectionState): void {
+    if (conn.ws && conn.ws.readyState < WebSocket.CLOSING) return;
+
+    // Get the room name from one of the rooms using this connection
+    const roomName = this.getRoomForConnection(conn);
+    if (!roomName) return;
+
+    const url = buildWebSocketUrl(REALTIME_URL, roomName, this.sessionToken ?? undefined);
+    if (!url) return;
 
     let ws: WebSocket;
     try {
-      ws = new WebSocket(buildWebSocketUrl(REALTIME_URL, this.userId));
+      ws = new WebSocket(url);
     } catch {
-      this.scheduleReconnect();
+      this.scheduleReconnect(conn);
       return;
     }
-    this.ws = ws;
+    conn.ws = ws;
 
     ws.onopen = () => {
-      this.connected = true;
-      this.reconnectAttempt = 0;
+      conn!.connected = true;
+      conn!.reconnectAttempt = 0;
       this.emitGlobalStatus(true);
 
-      if (this.user) {
-        ws.send(JSON.stringify({ t: "join", user: this.user }));
+      if (conn!.user) {
+        ws.send(JSON.stringify({ t: "join", user: conn!.user }));
       }
 
-      for (const msg of this.pending.splice(0)) ws.send(msg);
-      this.resubscribeAll();
+      for (const msg of conn!.pending.splice(0)) ws.send(msg);
+      this.resubscribeConnection(conn!);
     };
 
     ws.onmessage = (event) => {
@@ -173,42 +229,59 @@ class RealtimeClient {
     };
 
     ws.onclose = () => {
-      this.connected = false;
+      conn!.connected = false;
       this.emitGlobalStatus(false);
-      if (!this.manuallyClosed) this.scheduleReconnect();
+      if (!conn!.manuallyClosed) this.scheduleReconnect(conn!);
     };
 
     ws.onerror = () => {};
   }
 
-  private scheduleReconnect(): void {
-    if (this.reconnectTimer !== null || this.manuallyClosed) return;
+  private scheduleReconnect(conn: ConnectionState): void {
+    if (conn.reconnectTimer !== null || conn.manuallyClosed) return;
     const delay = Math.min(
-      RECONNECT_BASE_MS * 2 ** this.reconnectAttempt,
+      RECONNECT_BASE_MS * 2 ** conn.reconnectAttempt,
       RECONNECT_MAX_MS,
     );
-    this.reconnectAttempt += 1;
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.open();
+    conn.reconnectAttempt += 1;
+    conn.reconnectTimer = setTimeout(() => {
+      conn.reconnectTimer = null;
+      this.openConnection(conn);
     }, delay);
   }
 
-  /**
-   * Resubscribe all rooms that have active handlers or are marked as subscribed.
-   * Called after WebSocket reconnect.
-   */
-  private resubscribeAll(): void {
-    for (const [roomName, state] of this.rooms) {
-      const hasHandlers = state.topicRefs.size > 0;
-      if (state.subscribed || hasHandlers) {
-        for (const [topic, refCount] of state.topicRefs) {
-          if (refCount > 0) {
-            this.sendTopicSubscribe(roomName, topic);
-          }
+  private resubscribeConnection(conn: ConnectionState): void {
+    const roomName = this.getRoomForConnection(conn);
+    if (!roomName) return;
+
+    const state = this.rooms.get(roomName);
+    if (!state) return;
+
+    const hasHandlers = state.topicRefs.size > 0;
+    if (state.subscribed || hasHandlers) {
+      for (const [topic, refCount] of state.topicRefs) {
+        if (refCount > 0) {
+          this.sendToConnection(conn, { t: "subscribe", room: roomName, topic });
         }
       }
     }
+  }
+
+  private getRoomForConnection(conn: ConnectionState): string | null {
+    for (const [room, c] of this.connections) {
+      if (c === conn) return room;
+    }
+    return null;
+  }
+
+  private getRoomConnection(room: string): ConnectionState {
+    // Community-scoped rooms get their own connection keyed by room name
+    // User-scoped rooms share a connection keyed by "user:${userId}"
+    if (isCommunityRoom(room)) {
+      return this.getOrCreateConnection(room);
+    }
+    // For non-community rooms, use a shared "user" connection
+    return this.getOrCreateConnection("user:global");
   }
 
   // ── Subscription management (reference-counted) ──────────────────────────
@@ -235,11 +308,11 @@ class RealtimeClient {
     const state = this.rooms.get(room);
     if (!state) return;
 
-    // Send unsubscribe for all topics with active handlers
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    const conn = this.getRoomConnection(room);
+    if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
       for (const [topic, refCount] of state.topicRefs) {
         if (refCount > 0) {
-          this.sendToWs({ t: "unsubscribe", room, topic });
+          this.sendToConnection(conn, { t: "unsubscribe", room, topic });
         }
       }
     }
@@ -250,6 +323,8 @@ class RealtimeClient {
     state.subscribed = false;
     this.rooms.delete(room);
     this.presenceCache.delete(room);
+
+    this.maybeRemoveConnection(room);
   }
 
   /**
@@ -274,7 +349,12 @@ class RealtimeClient {
 
     // If this is the first handler for this topic, send subscribe
     if (prev === 0) {
-      this.sendTopicSubscribe(room, topic);
+      const conn = this.getRoomConnection(room);
+      this.sendToConnection(conn, { t: "subscribe", room, topic });
+      // Ensure connection is open
+      if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
+        this.openConnection(conn);
+      }
     }
 
     // Return cleanup function
@@ -285,8 +365,9 @@ class RealtimeClient {
         // Last handler removed — unsubscribe from server
         state.topicRefs.delete(topic);
         state.topicHandlers.delete(topic);
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-          this.sendToWs({ t: "unsubscribe", room, topic });
+        const conn = this.getRoomConnection(room);
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          this.sendToConnection(conn, { t: "unsubscribe", room, topic });
         }
       } else {
         state.topicRefs.set(topic, current - 1);
@@ -327,23 +408,26 @@ class RealtimeClient {
   // ── Publishing ────────────────────────────────────────────────────────────
 
   publish(room: string, topic: string, data: unknown): void {
-    this.sendToWs({ t: "publish", room, topic, data });
+    const conn = this.getRoomConnection(room);
+    this.sendToConnection(conn, { t: "publish", room, topic, data });
   }
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   close(): void {
-    this.manuallyClosed = true;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
+    for (const [, conn] of this.connections) {
+      conn.manuallyClosed = true;
+      if (conn.reconnectTimer !== null) {
+        clearTimeout(conn.reconnectTimer);
+        conn.reconnectTimer = null;
+      }
+      conn.pending = [];
+      if (conn.ws) {
+        try { conn.ws.close(); } catch { /* ignore */ }
+        conn.ws = null;
+      }
+      conn.connected = false;
     }
-    this.pending = [];
-    if (this.ws) {
-      try { this.ws.close(); } catch { /* ignore */ }
-      this.ws = null;
-    }
-    this.connected = false;
     this.emitGlobalStatus(false);
   }
 
@@ -354,12 +438,14 @@ class RealtimeClient {
     this.globalEvents.clear();
     this.globalPresenceHandlers.clear();
     this.globalStatusHandlers.clear();
-    this.user = null;
-    this.userId = null;
+    this.connections.clear();
   }
 
   isConnected(): boolean {
-    return this.connected;
+    for (const [, conn] of this.connections) {
+      if (conn.connected) return true;
+    }
+    return false;
   }
 
   // ── Internal helpers ──────────────────────────────────────────────────────
@@ -389,19 +475,36 @@ class RealtimeClient {
     if (!state.subscribed && !hasHandlers && state.presenceHandlers.size === 0) {
       this.rooms.delete(room);
       this.presenceCache.delete(room);
+      this.maybeRemoveConnection(room);
     }
   }
 
-  private sendTopicSubscribe(room: string, topic: string): void {
-    this.sendToWs({ t: "subscribe", room, topic });
+  private maybeRemoveConnection(room: string): void {
+    if (!isCommunityRoom(room)) return;
+    const conn = this.connections.get(room);
+    if (!conn) return;
+
+    // Check if any other rooms use this connection
+    for (const [r, c] of this.connections) {
+      if (c === conn && r !== room) return;
+    }
+
+    // No other rooms — close and remove
+    if (conn.reconnectTimer !== null) {
+      clearTimeout(conn.reconnectTimer);
+    }
+    if (conn.ws) {
+      try { conn.ws.close(); } catch { /* ignore */ }
+    }
+    this.connections.delete(room);
   }
 
-  private sendToWs(msg: unknown): void {
+  private sendToConnection(conn: ConnectionState, msg: unknown): void {
     const json = JSON.stringify(msg);
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(json);
+    if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+      conn.ws.send(json);
     } else {
-      this.pending.push(json);
+      conn.pending.push(json);
     }
   }
 
@@ -456,6 +559,6 @@ class RealtimeClient {
 
 /**
  * Singleton RealtimeClient shared across the entire app.
- * One client = one WebSocket to UserDO = all logical room subscriptions.
+ * Manages multiple WebSockets — one per community + one for user rooms.
  */
 export const realtimeClient = new RealtimeClient();

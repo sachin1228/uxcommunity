@@ -11,4 +11,6 @@ export interface Env {
   API_URL: string;
   /** Internal API secret for membership checks. */
   API_SECRET: string;
+  /** Feature flag: "true" enables WebSocket ownership (CommunityDO owns connections). */
+  USE_WEBSOCKET_OWNERSHIP: string;
 }

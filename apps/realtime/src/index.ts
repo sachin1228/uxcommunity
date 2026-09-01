@@ -30,6 +30,20 @@ function parseCookies(header: string | null): Map<string, string> {
   return cookies;
 }
 
+/** Community-scoped room prefixes that route to CommunityDO for WebSocket ownership. */
+const COMMUNITY_ROOM_PREFIXES = [
+  "chat:",
+  "threads:",
+  "events:",
+  "resources:",
+  "showcase:",
+  "rules:",
+];
+
+function isCommunityRoom(room: string): boolean {
+  return COMMUNITY_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -65,11 +79,24 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Route based on room prefix:
-  //   user:${userId}  → UserDO  (client WebSocket gateway)
-  //   chat:${id} etc  → Room DO (community-scoped)
+  const useWebSocketOwnership = env.USE_WEBSOCKET_OWNERSHIP === "true";
+
+  // Route based on room prefix and feature flag:
+  //   user:${userId}        → UserDO  (always — client WebSocket gateway)
+  //   chat:${id} etc        → CommunityDO (new: WebSocket ownership)
+  //   notifications:${id}   → UserDO  (user-specific)
+  //   profile:${id}         → UserDO  (user-specific)
+  //   designers-studio      → UserDO  (global room)
   const isUserRoom = room.startsWith("user:");
-  const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
+  const isCommunity = isCommunityRoom(room);
+
+  let namespace: DurableObjectNamespace;
+  if (isUserRoom || (isCommunity && !useWebSocketOwnership)) {
+    namespace = env.USER_DO;
+  } else {
+    namespace = env.COMMUNITY_DO;
+  }
+
   const id = namespace.idFromName(room);
   const stub = namespace.get(id);
 

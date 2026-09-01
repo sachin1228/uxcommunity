@@ -3,11 +3,14 @@
 /**
  * Room subscription pool backed by the multiplexed RealtimeClient singleton.
  *
- * With UserDO gateway architecture, one WebSocket handles all rooms.
- * The pool is a thin reference-counting layer:
+ * With WebSocket-ownership architecture:
+ *   acquire(communityId) → creates a WebSocket to CommunityDO, subscribes to rooms
+ *   release(communityId) → decrements refcount, closes idle connections
  *
- *   acquire(communityId) → subscribes to the room, returns the singleton
- *   release(communityId) → decrements refcount, unsubscribes when zero
+ * Community-scoped rooms (chat:*, threads:*, events:*, resources:*, showcase:*, rules:*)
+ * each get their own WebSocket to the CommunityDO.
+ *
+ * User-scoped rooms (notifications:*, profile:*) share a connection to UserDO.
  */
 
 import { realtimeClient, type RealtimeUser } from "./client";
@@ -48,6 +51,8 @@ class RealtimePool {
       return realtimeClient;
     }
 
+    // Subscribe to the chat room for this community
+    // This will create a WebSocket to CommunityDO
     const room = realtimeRooms.chat(communityId);
     realtimeClient.subscribe(room);
     realtimeClient.connect();

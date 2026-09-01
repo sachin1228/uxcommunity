@@ -17,3 +17,6 @@ new_sqlite_classes = ["Room"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["UserDO"]
+
+[vars]
+USE_WEBSOCKET_OWNERSHIP = "false"
