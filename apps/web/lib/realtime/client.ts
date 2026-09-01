@@ -75,8 +75,13 @@ interface RoomState {
   /** Actual handler sets per topic. */
   topicHandlers: Map<string, Set<EventHandler>>;
   presenceHandlers: Set<PresenceHandler>;
-  /** Whether subscribe() was called for this room. */
-  subscribed: boolean;
+  /**
+   * Number of live subscribe() callers for this room. Several hooks
+   * (chat, typing, presence, sidebar) subscribe to the same room, so this
+   * must be a refcount — a boolean lets the first cleanup flip it off for
+   * everyone.
+   */
+  subscribeRefs: number;
 }
 
 interface ConnectionState {
@@ -118,9 +123,12 @@ class RealtimeClient {
   private presenceCache = new Map<string, RealtimePresenceUser[]>();
 
   private sessionToken: string | null = null;
+  /** Current user — applied to every connection, including ones created after init(). */
+  private user: RealtimeUser | null = null;
 
   init(user: RealtimeUser): void {
-    // Store user on all connections
+    this.user = user;
+    // Store user on all existing connections
     for (const [, conn] of this.connections) {
       if (!conn.user) conn.user = user;
     }
@@ -157,7 +165,7 @@ class RealtimeClient {
         reconnectAttempt: 0,
         reconnectTimer: null,
         pending: [],
-        user: null,
+        user: this.user,
       };
       this.connections.set(room, conn);
     }
@@ -231,20 +239,37 @@ class RealtimeClient {
         message?: string;
         connectionId?: string;
       };
+      // Raw receipt log — fires for EVERY frame so delivery can be confirmed
+      // independently of message shape.
+      console.log(`[RT-DIAG] RECV_RAW socket=${socketId} room=${roomName} conn.ws===ws?${conn!.ws === ws} len=${String(event.data).length} head=${String(event.data).substring(0, 80)}`);
       try {
         msg = JSON.parse(String(event.data));
       } catch {
+        console.log(`[RT-DIAG] RECV_PARSE_FAIL socket=${socketId}`);
         return;
       }
 
       if (msg.t === "hello") {
         console.log(`[RT-DIAG] RECV hello socket=${socketId} connectionId=${msg.connectionId}`);
-      } else if (msg.t === "event" && msg.topic && msg.room) {
+      } else if (msg.t === "event" && msg.topic) {
+        // A community socket serves exactly one room, so prefer the room this
+        // connection was opened for whenever the server-supplied room name is
+        // missing or does not match a room we track. User-scoped sockets
+        // ("user:global") multiplex several rooms and must use msg.room.
+        const serverRoom = msg.room;
+        const targetRoom =
+          serverRoom && this.rooms.has(serverRoom)
+            ? serverRoom
+            : isCommunityRoom(roomName)
+              ? roomName
+              : serverRoom;
         if (msg.topic === "typing") {
           const eid = typeof msg.data === "object" && msg.data !== null ? (msg.data as Record<string, unknown>).eid : undefined;
-          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${msg.room} sender=${msg.sender} eid=${eid ?? "?"}`);
+          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${serverRoom} target=${targetRoom} sender=${msg.sender} eid=${eid ?? "?"} hasRoomState=${targetRoom ? this.rooms.has(targetRoom) : false}`);
         }
-        this.dispatchToRoom(msg.room, msg.topic, msg.data, msg.sender);
+        if (targetRoom) {
+          this.dispatchToRoom(targetRoom, msg.topic, msg.data, msg.sender);
+        }
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
       } else if (msg.t === "presence" && msg.room) {
         this.presenceCache.set(msg.room, msg.users ?? []);
@@ -306,8 +331,8 @@ class RealtimeClient {
     if (!state) return;
 
     const hasHandlers = state.topicRefs.size > 0;
-    console.log(`[RT-DIAG] RESUBSCRIBE room=${roomName} subscribed=${state.subscribed} hasHandlers=${hasHandlers} topics=[${[...state.topicRefs.keys()].join(",")}] socket=${_sid(conn.ws)}`);
-    if (state.subscribed || hasHandlers) {
+    console.log(`[RT-DIAG] RESUBSCRIBE room=${roomName} subscribeRefs=${state.subscribeRefs} hasHandlers=${hasHandlers} topics=[${[...state.topicRefs.keys()].join(",")}] socket=${_sid(conn.ws)}`);
+    if (state.subscribeRefs > 0 || hasHandlers) {
       for (const [topic, refCount] of state.topicRefs) {
         if (refCount > 0) {
           console.log(`[RT-DIAG] RESUBSCRIBE sending topic=${topic} refCount=${refCount} socket=${_sid(conn.ws)}`);
@@ -343,11 +368,14 @@ class RealtimeClient {
    */
   subscribe(room: string): () => void {
     const state = this.getOrCreateRoom(room);
-    state.subscribed = true;
-    console.log(`[RT-DIAG] SUBSCRIBE room=${room}`);
+    state.subscribeRefs += 1;
+    console.log(`[RT-DIAG] SUBSCRIBE room=${room} subscribeRefs=${state.subscribeRefs}`);
+    let released = false;
     return () => {
-      state.subscribed = false;
-      console.log(`[RT-DIAG] UNSUBSCRIBE room=${room}`);
+      if (released) return;
+      released = true;
+      state.subscribeRefs = Math.max(0, state.subscribeRefs - 1);
+      console.log(`[RT-DIAG] UNSUBSCRIBE room=${room} subscribeRefs=${state.subscribeRefs}`);
       this.maybeRemoveRoom(room);
     };
   }
@@ -372,7 +400,7 @@ class RealtimeClient {
     state.topicRefs.clear();
     state.topicHandlers.clear();
     state.presenceHandlers.clear();
-    state.subscribed = false;
+    state.subscribeRefs = 0;
     this.rooms.delete(room);
     this.presenceCache.delete(room);
 
@@ -548,12 +576,22 @@ class RealtimeClient {
       if (c === conn && r !== room) return;
     }
 
-    // No other rooms — close and remove
+    // No other rooms — close and remove.
+    // Mark as manually closed and detach the socket so the pending onclose
+    // for this socket hits the stale guard instead of scheduling a reconnect
+    // on a connection that no longer exists in the map.
+    conn.manuallyClosed = true;
     if (conn.reconnectTimer !== null) {
       clearTimeout(conn.reconnectTimer);
+      conn.reconnectTimer = null;
     }
-    if (conn.ws) {
-      try { conn.ws.close(); } catch { /* ignore */ }
+    conn.pending = [];
+    const ws = conn.ws;
+    conn.ws = null;
+    conn.connected = false;
+    if (ws) {
+      console.log(`[RT-DIAG] REMOVE_CONNECTION room=${room} socket=${_sid(ws)} readyState=${ws.readyState}`);
+      try { ws.close(); } catch { /* ignore */ }
     }
     this.connections.delete(room);
   }

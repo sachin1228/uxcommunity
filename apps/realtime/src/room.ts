@@ -64,6 +64,20 @@ export class Room extends DurableObject<Env> {
   private wsTopics = new Map<WebSocket, Set<string>>();
   private userSockets = new Map<string, Set<WebSocket>>();
 
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Rebuild socket/topic maps BEFORE any handler runs after a hibernation
+    // wake. Without this, the first event delivered to a woken DO is often a
+    // `webSocketMessage` (e.g. a typing publish), and wsToUser/wsTopics are
+    // empty → the message is silently dropped and the sender is treated as
+    // unknown. blockConcurrencyWhile guarantees ordering for all handlers.
+    this.ctx.blockConcurrencyWhile(async () => {
+      await this.reconstructWebSockets();
+      this.rebuildUserScopedMaps();
+      this.subscribersReconstructed = true;
+    });
+  }
+
   // ── Fetch handler ──────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
@@ -133,6 +147,7 @@ export class Room extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (typeof message !== "string") return;
+    await this.ensureSubscribers();
 
     let msg: {
       t?: string;
@@ -167,6 +182,7 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    await this.ensureSubscribers();
     const userId = this.wsToUser.get(ws);
     if (!userId) return;
 
