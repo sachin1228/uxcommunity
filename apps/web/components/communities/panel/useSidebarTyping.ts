@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
@@ -19,10 +18,13 @@ export function useSidebarTyping({
   const [typingMap, setTypingMap] = useState<Map<string, string>>(new Map());
   const stateRef = useRef<Map<string, Map<string, { name: string; lastSeen: number }>>>(new Map());
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
-  const isVisible = useDocumentVisible();
 
+  // ── Sidebar typing subscriptions — live for the lifetime of the community
+  // list. Visibility does NOT tear them down. Only communityIds or userId
+  // changes do. This prevents race conditions with sibling hooks that share
+  // the same room/connection.
   useEffect(() => {
-    if (!communityIds || !isVisible) return;
+    if (!communityIds) return;
     stateRef.current.clear();
 
     realtimeClient.init({ id: userId, name: null, avatar: null });
@@ -77,7 +79,7 @@ export function useSidebarTyping({
       setTypingMap(new Map());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId, isVisible]);
+  }, [communityIds, userId]);
 
   return typingMap;
 }

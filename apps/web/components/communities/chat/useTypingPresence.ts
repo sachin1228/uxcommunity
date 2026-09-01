@@ -29,9 +29,13 @@ export function useTypingPresence({
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSentAtRef = useRef(0);
   const identityRef = useRef({ user_id: currentUserId, name: currentUserName });
-  identityRef.current = { user_id: currentUserId, name: currentUserName };
 
   const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(new Map());
+
+  // Keep identityRef in sync without writing during render (react-hooks/refs).
+  useEffect(() => {
+    identityRef.current = { user_id: currentUserId, name: currentUserName };
+  });
 
   const flushTypingUsers = useCallback(() => {
     const now = Date.now();
@@ -65,6 +69,13 @@ export function useTypingPresence({
     [communityId],
   );
 
+  const broadcastRef = useRef(broadcast);
+
+  // Keep broadcastRef in sync without writing during render (react-hooks/refs).
+  useEffect(() => {
+    broadcastRef.current = broadcast;
+  });
+
   const setTyping = useCallback(
     (typing: boolean) => {
       typingRef.current = typing;
@@ -80,9 +91,9 @@ export function useTypingPresence({
     [broadcast],
   );
 
+  // ── Typing subscription — lives for the lifetime of the community/user ──
+  // Visibility does NOT tear this down. Only communityId or user change does.
   useEffect(() => {
-    if (!isVisible) return;
-
     const chatRoom = realtimeRooms.chat(communityId);
     realtimeClient.init({ id: currentUserId, name: currentUserName, avatar: null });
     const unsubRoom = realtimeClient.subscribe(chatRoom);
@@ -116,7 +127,18 @@ export function useTypingPresence({
       unsubRoom();
       setTypingUsers([]);
     };
-  }, [communityId, currentUserId, currentUserName, flushTypingUsers, isVisible]);
+  }, [communityId, currentUserId, currentUserName, flushTypingUsers]);
+
+  // ── Visibility transition: send typing:false when becoming hidden ──────
+  // Separated from the subscription lifecycle so the subscription stays
+  // alive across visibility changes. This only controls outgoing events.
+  useEffect(() => {
+    if (!isVisible && typingRef.current) {
+      typingRef.current = false;
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      broadcastRef.current(false);
+    }
+  }, [isVisible]);
 
   return { typingUsers, setTyping };
 }

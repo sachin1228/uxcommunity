@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, MutableRefObject } from "react";
-import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
@@ -59,12 +58,14 @@ export function useRealtimeChat({
   }, [communityId, debouncedCatchUp]);
 
   // ── Realtime (Cloudflare multiplexed) ──────────────────────────────────────
-  const isVisible = useDocumentVisible();
+  // Visibility does NOT tear down the chat subscription. Catch-up on return
+  // from hidden is handled by the separate visibilitychange/focus listener
+  // below and the onStatus reconnect handler. Tearing down on hide caused
+  // race conditions with sibling hooks (typing, presence) that share the
+  // same room/connection.
   const chatRoom = realtimeRooms.chat(communityId);
 
   useEffect(() => {
-    if (!isVisible) return;
-
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
     const unsubRoom = realtimeClient.subscribe(chatRoom);
     realtimeClient.connect();
@@ -371,7 +372,7 @@ export function useRealtimeChat({
       unsubRoom();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, fetchMessages, isVisible]);
+  }, [communityId, fetchMessages]);
 
   // ── Tab visibility / window focus catch-up ────────────────────────────────
   useEffect(() => {
