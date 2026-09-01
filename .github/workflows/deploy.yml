@@ -59,10 +59,13 @@ jobs:
       # ── Realtime worker (the web app publishes to it) ─────────────────────
       - name: Deploy realtime worker
         working-directory: apps/realtime
+        run: npx wrangler deploy
+
+      - name: Set realtime worker secrets
+        working-directory: apps/realtime
         run: |
-          npx wrangler deploy
-          echo "${{ secrets.SESSION_SECRET }}" | npx wrangler secret put SESSION_SECRET
-          echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler secret put REALTIME_PUBLISH_SECRET
+          echo "${{ secrets.SESSION_SECRET }}" | npx wrangler versions secret put SESSION_SECRET
+          echo "${{ secrets.REALTIME_PUBLISH_SECRET }}" | npx wrangler versions secret put REALTIME_PUBLISH_SECRET
 
       # ── Web worker ─────────────────────────────────────────────────────────
       - name: Write build + runtime env files
