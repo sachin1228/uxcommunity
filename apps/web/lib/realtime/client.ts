@@ -12,8 +12,8 @@
  * Reference-counted subscriptions:
  *   Each room tracks:
  *     - topicRefs: refcount per topic (how many on() calls)
- *     - subscribed: whether subscribe() was called
- *   Room is only cleaned up when BOTH topicRefs reach 0 AND subscribed is false.
+ *     - subscribeRefs: number of live subscribe() callers (refcounted)
+ *   Room is only cleaned up when BOTH topicRefs reach 0 AND subscribeRefs is 0.
  *   This prevents one component's cleanup from killing another's subscriptions.
  */
 
@@ -109,7 +109,7 @@ interface ConnectionState {
  *
  * Room is only removed when BOTH:
  *   - All topic refcounts are 0 (no handlers)
- *   - subscribed === false (no subscribe() callers)
+ *   - subscribeRefs === 0 (no subscribe() callers)
  */
 class RealtimeClient {
   /** roomName → connection state (one WebSocket per community or user room) */
@@ -545,7 +545,7 @@ class RealtimeClient {
         topicRefs: new Map(),
         topicHandlers: new Map(),
         presenceHandlers: new Set(),
-        subscribed: false,
+        subscribeRefs: 0,
       };
       this.rooms.set(room, state);
     }
@@ -559,7 +559,7 @@ class RealtimeClient {
     const state = this.rooms.get(room);
     if (!state) return;
     const hasHandlers = state.topicRefs.size > 0;
-    if (!state.subscribed && !hasHandlers && state.presenceHandlers.size === 0) {
+    if (state.subscribeRefs === 0 && !hasHandlers && state.presenceHandlers.size === 0) {
       this.rooms.delete(room);
       this.presenceCache.delete(room);
       this.maybeRemoveConnection(room);
