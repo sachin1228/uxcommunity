@@ -26,7 +26,7 @@ const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
 
 /** Community-scoped room prefixes that get their own WebSocket. */
-const COMMUNITY_ROOM_PREFIXES = ['chat:', 'threads:', 'events:', 'resources:', 'showcase:', 'rules:'];
+const COMMUNITY_ROOM_PREFIXES = ['chat:', 'threads:', 'events:', 'resources:', 'showcase:', 'rules:', 'thread-comments:', 'resource-comments:'];
 
 function isCommunityRoom(room: string): boolean {
   return COMMUNITY_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));

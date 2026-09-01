@@ -38,6 +38,8 @@ const COMMUNITY_ROOM_PREFIXES = [
   "resources:",
   "showcase:",
   "rules:",
+  "thread-comments:",
+  "resource-comments:",
 ];
 
 function isCommunityRoom(room: string): boolean {
@@ -80,7 +82,6 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
   }
 
   const isUserRoom = room.startsWith("user:");
-  const isCommunity = isCommunityRoom(room);
 
   let namespace: DurableObjectNamespace;
   if (isUserRoom) {

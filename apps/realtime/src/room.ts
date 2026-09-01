@@ -88,10 +88,17 @@ export class Room extends DurableObject<Env> {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    // Check membership before accepting connection
-    const isMember = await this.checkMembership(userId);
-    if (!isMember) {
-      return new Response("Forbidden", { status: 403 });
+    // Check membership before accepting connection.
+    // Sub-entity rooms (thread-comments:*, resource-comments:*) don't carry a
+    // community ID in the room name, so skip the check — authorization is
+    // handled by the API routes that publish to these rooms.
+    const room = this.roomName();
+    const isSubEntityRoom = room.startsWith("thread-comments:") || room.startsWith("resource-comments:");
+    if (!isSubEntityRoom) {
+      const isMember = await this.checkMembership(userId);
+      if (!isMember) {
+        return new Response("Forbidden", { status: 403 });
+      }
     }
 
     await this.ensureSubscribers();
