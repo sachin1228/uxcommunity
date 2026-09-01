@@ -508,10 +508,11 @@ export class Room extends DurableObject<Env> {
       });
 
       for (const ws of websockets) {
-        const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
-        if (!attachment?.userId) continue;
-        if (excludeUserId && attachment.userId === excludeUserId) continue;
-        if (!attachment.topics.includes(topic)) continue;
+        const userId = this.wsToUser.get(ws);
+        if (!userId) continue;
+        if (excludeUserId && userId === excludeUserId) continue;
+        const topics = this.wsTopics.get(ws);
+        if (!topics?.has(topic)) continue;
 
         try {
           ws.send(eventMsg);
