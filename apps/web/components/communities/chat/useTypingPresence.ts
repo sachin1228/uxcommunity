@@ -58,8 +58,12 @@ export function useTypingPresence({
     (typing: boolean) => {
       const chatRoom = realtimeRooms.chat(communityId);
       const now = Date.now();
-      if (typing && now - lastSentAtRef.current < TYPING_THROTTLE_MS) return;
+      if (typing && now - lastSentAtRef.current < TYPING_THROTTLE_MS) {
+        console.log(`[RT-DIAG] BROADCAST_THROTTLED typing=${typing} throttleRemaining=${TYPING_THROTTLE_MS - (now - lastSentAtRef.current)}ms`);
+        return;
+      }
       lastSentAtRef.current = typing ? now : 0;
+      console.log(`[RT-DIAG] BROADCAST_TYPING typing=${typing} room=${chatRoom} ts=${now}`);
       realtimeClient.publish(chatRoom, "typing", {
         ...identityRef.current,
         typing,
@@ -139,6 +143,15 @@ export function useTypingPresence({
       broadcastRef.current(false);
     }
   }, [isVisible]);
+
+  // ── DIAGNOSTIC: log full state on visibility return ────────────────────
+  useEffect(() => {
+    if (isVisible) {
+      const chatRoom = realtimeRooms.chat(communityId);
+      const conn = (realtimeClient as unknown as { connections: Map<string, { ws: WebSocket | null; connected: boolean; pending: string[] }> }).connections.get(chatRoom);
+      console.log(`[RT-DIAG] VISIBILITY_RETURN room=${chatRoom} ws=${conn?.ws ? "exists" : "null"} readyState=${conn?.ws?.readyState} connected=${conn?.connected} pending=${conn?.pending?.length}`);
+    }
+  }, [isVisible, communityId]);
 
   return { typingUsers, setTyping };
 }

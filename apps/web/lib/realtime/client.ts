@@ -38,6 +38,19 @@ const REALTIME_URL = process.env.NEXT_PUBLIC_REALTIME_URL ?? "";
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 15_000;
 
+// ── DIAGNOSTIC LOGGING (temporary) ────────────────────────────────────────
+let _socketSeq = 0;
+let _msgSeq = 0;
+function _sid(ws: WebSocket | null): string {
+  if (!ws) return "null";
+  // Use a non-enumerable tag we set at creation time
+  return (ws as unknown as { __diagId?: string }).__diagId ?? "unknown";
+}
+function _setSid(ws: WebSocket, id: string): void {
+  (ws as unknown as { __diagId: string }).__diagId = id;
+}
+// ──────────────────────────────────────────────────────────────────────────
+
 /** Community-scoped room prefixes that get their own WebSocket. */
 const COMMUNITY_ROOM_PREFIXES = ["chat:", "threads:", "events:", "resources:", "showcase:", "rules:", "thread-comments:", "resource-comments:"];
 
@@ -119,11 +132,15 @@ class RealtimeClient {
   }
 
   connect(): void {
+    console.log(`[RT-DIAG] CONNECT called`);
     // Connect all active connections
-    for (const [, conn] of this.connections) {
+    for (const [room, conn] of this.connections) {
       conn.manuallyClosed = false;
       if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
+        console.log(`[RT-DIAG] CONNECT opening room=${room} socket=${_sid(conn.ws)}`);
         this.openConnection(conn);
+      } else {
+        console.log(`[RT-DIAG] CONNECT already open room=${room} socket=${_sid(conn.ws)} readyState=${conn.ws.readyState}`);
       }
     }
   }
@@ -164,9 +181,13 @@ class RealtimeClient {
       this.scheduleReconnect(conn);
       return;
     }
+    const socketId = `s${++_socketSeq}`;
+    _setSid(ws, socketId);
     conn.ws = ws;
+    console.log(`[RT-DIAG] OPEN socket=${socketId} room=${roomName} readyState=${ws.readyState} conn.connected=${conn.connected}`);
 
     ws.onopen = () => {
+      console.log(`[RT-DIAG] ONOPEN socket=${socketId} room=${roomName} readyState=${ws.readyState} pending=${conn!.pending.length}`);
       conn!.connected = true;
       conn!.reconnectAttempt = 0;
       this.emitGlobalStatus(true);
@@ -175,8 +196,26 @@ class RealtimeClient {
         ws.send(JSON.stringify({ t: "join", user: conn!.user }));
       }
 
-      for (const msg of conn!.pending.splice(0)) ws.send(msg);
+      // Clear stale typing events from the pending queue before flushing.
+      // Typing state is ephemeral — if the connection dropped while typing,
+      // we don't want to send a stale typing event on reconnect.
+      conn!.pending = conn!.pending.filter((msg) => {
+        try {
+          const parsed = JSON.parse(msg);
+          return !(parsed.t === "publish" && parsed.topic === "typing");
+        } catch {
+          return true;
+        }
+      });
+
+      console.log(`[RT-DIAG] ONOPEN before-flush pending=${conn!.pending.length} socket=${socketId}`);
       this.resubscribeConnection(conn!);
+      console.log(`[RT-DIAG] ONOPEN after-resubscribe pending=${conn!.pending.length} socket=${socketId}`);
+      for (const msg of conn!.pending.splice(0)) {
+        console.log(`[RT-DIAG] FLUSH socket=${socketId} msg=${msg.substring(0, 120)}`);
+        ws.send(msg);
+      }
+      console.log(`[RT-DIAG] ONOPEN done pending=${conn!.pending.length} socket=${socketId}`);
     };
 
     ws.onmessage = (event) => {
@@ -199,8 +238,11 @@ class RealtimeClient {
       }
 
       if (msg.t === "hello") {
-        // Connection established
+        console.log(`[RT-DIAG] RECV hello socket=${socketId} connectionId=${msg.connectionId}`);
       } else if (msg.t === "event" && msg.topic && msg.room) {
+        if (msg.topic === "typing") {
+          console.log(`[RT-DIAG] RECV typing socket=${socketId} room=${msg.room} sender=${msg.sender} data=${JSON.stringify(msg.data).substring(0, 80)}`);
+        }
         this.dispatchToRoom(msg.room, msg.topic, msg.data, msg.sender);
         this.dispatchGlobal(msg.topic, msg.data, msg.sender);
       } else if (msg.t === "presence" && msg.room) {
@@ -225,13 +267,21 @@ class RealtimeClient {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
+      console.log(`[RT-DIAG] ONCLOSE socket=${socketId} room=${roomName} conn.ws===ws?${conn!.ws === ws} code=${ev.code} reason=${ev.reason} conn.connected=${conn!.connected}`);
+      // Guard: if a newer socket has already replaced us, ignore this stale close.
+      if (conn!.ws !== ws) {
+        console.log(`[RT-DIAG] ONCLOSE STALE-GUARD socket=${socketId} (conn.ws=${_sid(conn!.ws)}) IGNORING`);
+        return;
+      }
       conn!.connected = false;
       this.emitGlobalStatus(false);
       if (!conn!.manuallyClosed) this.scheduleReconnect(conn!);
     };
 
-    ws.onerror = () => {};
+    ws.onerror = (ev) => {
+      console.log(`[RT-DIAG] ONERROR socket=${socketId} room=${roomName}`);
+    };
   }
 
   private scheduleReconnect(conn: ConnectionState): void {
@@ -255,9 +305,11 @@ class RealtimeClient {
     if (!state) return;
 
     const hasHandlers = state.topicRefs.size > 0;
+    console.log(`[RT-DIAG] RESUBSCRIBE room=${roomName} subscribed=${state.subscribed} hasHandlers=${hasHandlers} topics=[${[...state.topicRefs.keys()].join(",")}] socket=${_sid(conn.ws)}`);
     if (state.subscribed || hasHandlers) {
       for (const [topic, refCount] of state.topicRefs) {
         if (refCount > 0) {
+          console.log(`[RT-DIAG] RESUBSCRIBE sending topic=${topic} refCount=${refCount} socket=${_sid(conn.ws)}`);
           this.sendToConnection(conn, { t: "subscribe", room: roomName, topic });
         }
       }
@@ -291,8 +343,10 @@ class RealtimeClient {
   subscribe(room: string): () => void {
     const state = this.getOrCreateRoom(room);
     state.subscribed = true;
+    console.log(`[RT-DIAG] SUBSCRIBE room=${room}`);
     return () => {
       state.subscribed = false;
+      console.log(`[RT-DIAG] UNSUBSCRIBE room=${room}`);
       this.maybeRemoveRoom(room);
     };
   }
@@ -344,9 +398,12 @@ class RealtimeClient {
     }
     topicSet.add(handler);
 
+    console.log(`[RT-DIAG] ON room=${room} topic=${topic} prevRef=${prev} newRef=${prev + 1}`);
+
     // If this is the first handler for this topic, send subscribe
     if (prev === 0) {
       const conn = this.getRoomConnection(room);
+      console.log(`[RT-DIAG] ON first-handler → sendSubscribe room=${room} topic=${topic} socket=${_sid(conn.ws)}`);
       this.sendToConnection(conn, { t: "subscribe", room, topic });
       // Ensure connection is open
       if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
@@ -406,6 +463,10 @@ class RealtimeClient {
 
   publish(room: string, topic: string, data: unknown): void {
     const conn = this.getRoomConnection(room);
+    const state = this.rooms.get(room);
+    const typingSubscribed = state?.topicRefs.has("typing") ?? false;
+    const typingRefCount = state?.topicRefs.get("typing") ?? 0;
+    console.log(`[RT-DIAG] PUBLISH room=${room} topic=${topic} socket=${_sid(conn.ws)} readyState=${conn.ws?.readyState} conn.connected=${conn.connected} pending=${conn.pending.length} typingSubscribed=${typingSubscribed} typingRefCount=${typingRefCount} ws===conn.ws=true`);
     this.sendToConnection(conn, { t: "publish", room, topic, data });
   }
 
@@ -498,9 +559,17 @@ class RealtimeClient {
 
   private sendToConnection(conn: ConnectionState, msg: unknown): void {
     const json = JSON.stringify(msg);
+    const isTyping = typeof msg === "object" && msg !== null && (msg as Record<string, unknown>).t === "publish" && (msg as Record<string, unknown>).topic === "typing";
+    const isSubscribe = typeof msg === "object" && msg !== null && (msg as Record<string, unknown>).t === "subscribe";
     if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+      if (isTyping || isSubscribe) {
+        console.log(`[RT-DIAG] SEND socket=${_sid(conn.ws)} readyState=${conn.ws.readyState} conn.connected=${conn.connected} msg=${json.substring(0, 150)}`);
+      }
       conn.ws.send(json);
     } else {
+      if (isTyping || isSubscribe) {
+        console.log(`[RT-DIAG] QUEUED socket=${_sid(conn.ws)} readyState=${conn.ws?.readyState} conn.connected=${conn.connected} pending=${conn.pending.length} msg=${json.substring(0, 150)}`);
+      }
       conn.pending.push(json);
     }
   }

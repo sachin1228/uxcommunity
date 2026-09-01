@@ -214,6 +214,7 @@ export async function POST(
   // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
   after(async () => {
     try {
+      console.log(`[HTTP-DIAG] PUBLISH_MESSAGE communityId=${communityId} topic=message`);
       await publishChatEvent({
         communityId,
         topic: "message",
@@ -227,6 +228,7 @@ export async function POST(
           image_url: inserted.image_url ?? null,
         },
       });
+      console.log(`[HTTP-DIAG] PUBLISH_MESSAGE_DONE communityId=${communityId}`);
     } catch (err) {
       console.error("[POST message] realtime publish error:", err);
     }
