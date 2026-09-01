@@ -68,8 +68,12 @@ async function buildWebSocketUrl(room: string): Promise<string> {
 
 interface RoomState {
   room: string;
-  topics: Map<string, Set<EventHandler>>;
+  /** Reference count per topic — incremented by on(), decremented by returned cleanup. */
+  topicRefs: Map<string, number>;
+  /** Actual handler sets per topic. */
+  topicHandlers: Map<string, Set<EventHandler>>;
   presenceHandlers: Set<PresenceHandler>;
+  /** Whether subscribe() was called for this room. */
   subscribed: boolean;
 }
 
@@ -248,9 +252,12 @@ class RealtimeClient {
     const state = this.rooms.get(roomName);
     if (!state) return;
 
-    if (state.subscribed) {
-      for (const topic of state.topics.keys()) {
-        this.sendToConnection(conn, { t: 'subscribe', room: roomName, topic });
+    const hasHandlers = state.topicRefs.size > 0;
+    if (state.subscribed || hasHandlers) {
+      for (const [topic, refCount] of state.topicRefs) {
+        if (refCount > 0) {
+          this.sendToConnection(conn, { t: 'subscribe', room: roomName, topic });
+        }
       }
     }
   }
@@ -271,76 +278,115 @@ class RealtimeClient {
 
   // ── Subscription management ───────────────────────────────────────────────
 
+  private getOrCreateRoom(room: string): RoomState {
+    let state = this.rooms.get(room);
+    if (!state) {
+      state = {
+        room,
+        topicRefs: new Map(),
+        topicHandlers: new Map(),
+        presenceHandlers: new Set(),
+        subscribed: false,
+      };
+      this.rooms.set(room, state);
+    }
+    return state;
+  }
+
   subscribe(room: string): () => void {
     if (!this.rooms.has(room)) {
       this.rooms.set(room, {
         room,
-        topics: new Map(),
+        topicRefs: new Map(),
+        topicHandlers: new Map(),
         presenceHandlers: new Set(),
         subscribed: false,
       });
     }
     const state = this.rooms.get(room)!;
     state.subscribed = true;
-    return () => this.unsubscribe(room);
+    return () => {
+      state.subscribed = false;
+      this.maybeRemoveRoom(room);
+    };
   }
 
   unsubscribe(room: string): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    this.rooms.delete(room);
-    this.presenceCache.delete(room);
 
     const conn = this.getRoomConnection(room);
     if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
-      for (const topic of state.topics.keys()) {
-        this.sendToConnection(conn, { t: 'unsubscribe', room, topic });
+      for (const [topic, refCount] of state.topicRefs) {
+        if (refCount > 0) {
+          this.sendToConnection(conn, { t: 'unsubscribe', room, topic });
+        }
       }
     }
 
-    // Clean up connection if no rooms use it
+    state.topicRefs.clear();
+    state.topicHandlers.clear();
+    state.presenceHandlers.clear();
+    state.subscribed = false;
+    this.rooms.delete(room);
+    this.presenceCache.delete(room);
+
     this.maybeRemoveConnection(room);
   }
 
   on(room: string, topic: string, handler: EventHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.getOrCreateRoom(room);
 
-    let topicSet = state.topics.get(topic);
+    // Increment refcount
+    const prev = state.topicRefs.get(topic) ?? 0;
+    state.topicRefs.set(topic, prev + 1);
+
+    // Add handler
+    let topicSet = state.topicHandlers.get(topic);
     if (!topicSet) {
       topicSet = new Set();
-      state.topics.set(topic, topicSet);
+      state.topicHandlers.set(topic, topicSet);
     }
     topicSet.add(handler);
 
-    const conn = this.getRoomConnection(room);
-    this.sendToConnection(conn, { t: 'subscribe', room, topic });
-    // Ensure connection is open
-    if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
-      this.openConnection(conn);
+    // If this is the first handler for this topic, send subscribe
+    if (prev === 0) {
+      const conn = this.getRoomConnection(room);
+      this.sendToConnection(conn, { t: 'subscribe', room, topic });
+      // Ensure connection is open
+      if (!conn.ws || conn.ws.readyState >= WebSocket.CLOSING) {
+        this.openConnection(conn);
+      }
     }
 
+    // Return cleanup function
     return () => {
       topicSet!.delete(handler);
+      const current = state.topicRefs.get(topic) ?? 0;
+      if (current <= 1) {
+        // Last handler removed — unsubscribe from server
+        state.topicRefs.delete(topic);
+        state.topicHandlers.delete(topic);
+        const conn = this.getRoomConnection(room);
+        if (conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+          this.sendToConnection(conn, { t: 'unsubscribe', room, topic });
+        }
+      } else {
+        state.topicRefs.set(topic, current - 1);
+      }
+      this.maybeRemoveRoom(room);
     };
   }
 
   off(room: string, topic: string, handler: EventHandler): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    const topicSet = state.topics.get(topic);
+    const topicSet = state.topicHandlers.get(topic);
     if (topicSet) topicSet.delete(handler);
   }
 
   onPresence(room: string, handler: PresenceHandler): () => void {
-    let state = this.rooms.get(room);
-    if (!state) {
-      this.subscribe(room);
-      state = this.rooms.get(room)!;
-    }
+    const state = this.getOrCreateRoom(room);
     state.presenceHandlers.add(handler);
 
     const cached = this.presenceCache.get(room);
@@ -349,7 +395,8 @@ class RealtimeClient {
     }
 
     return () => {
-      state!.presenceHandlers.delete(handler);
+      state.presenceHandlers.delete(handler);
+      this.maybeRemoveRoom(room);
     };
   }
 
@@ -405,6 +452,20 @@ class RealtimeClient {
 
   // ── Internal helpers ──────────────────────────────────────────────────────
 
+  /**
+   * Remove a room from the map if it has no active handlers and is not subscribed.
+   */
+  private maybeRemoveRoom(room: string): void {
+    const state = this.rooms.get(room);
+    if (!state) return;
+    const hasHandlers = state.topicRefs.size > 0;
+    if (!state.subscribed && !hasHandlers && state.presenceHandlers.size === 0) {
+      this.rooms.delete(room);
+      this.presenceCache.delete(room);
+      this.maybeRemoveConnection(room);
+    }
+  }
+
   private maybeRemoveConnection(room: string): void {
     if (!isCommunityRoom(room)) return;
     const conn = this.connections.get(room);
@@ -437,7 +498,7 @@ class RealtimeClient {
   private dispatchToRoom(room: string, topic: string, data: unknown, sender?: string): void {
     const state = this.rooms.get(room);
     if (!state) return;
-    const handlers = state.topics.get(topic);
+    const handlers = state.topicHandlers.get(topic);
     if (!handlers) return;
     for (const handler of handlers) {
       try { handler(data, sender); } catch (error) {
