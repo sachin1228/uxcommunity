@@ -10,16 +10,25 @@ import type { PublishRequest } from "./types";
  *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
  *   0 RPCs for message delivery.
  *
- * Dual-index subscriber store:
- *   subscriptionsByUser:  userId → Set<topic>
- *   subscriptionsByTopic: topic → Set<userId>
+ * State scoping:
+ *   SOCKET-scoped (per individual WebSocket connection):
+ *     wsToUser[ws]   = userId
+ *     wsTopics[ws]    = Set<topics> this socket is subscribed to
+ *     userSockets[userId] = Set<WebSocket> all sockets for this user
  *
- * Both indices are kept in-memory for O(topic) broadcast lookup.
- * Persisted to SQLite for hibernation survival.
+ *   USER-scoped (for efficient fan-out, shared across all sockets of a user):
+ *     subscriptionsByUser[userId]  = Set<topics> (union of all socket subscriptions)
+ *     subscriptionsByTopic[topic]  = Set<userIds> subscribed to that topic
+ *
+ * Multi-device safety:
+ *   When the same user has multiple sockets, closing one socket only removes
+ *   topics from the dual-index if NO OTHER socket of that user still has
+ *   that topic. This prevents one tab's close from killing another tab's
+ *   subscriptions.
  *
  * WebSocket state (hibernation-safe):
  *   Each WebSocket attachment stores { userId, topics: string[] }.
- *   On wake, ctx.getWebSockets() + deserializeAttachment() rebuilds the maps.
+ *   On wake, ctx.getWebSockets() + deserializeAttachment() rebuilds all maps.
  *
  * Authorization:
  *   - WebSocket upgrade requires x-realtime-uid header (set by Worker after JWT auth)
@@ -51,8 +60,8 @@ const EPHEMERAL_TOPICS = new Set(["typing", "presence"]);
 
 export class Room extends DurableObject<Env> {
   /**
-   * Dual-index subscriber store.
-   * subscriptionsByUser[userId] = Set of topics the user is subscribed to.
+   * Dual-index subscriber store (USER-scoped, for efficient fan-out).
+   * subscriptionsByUser[userId] = Set of topics the user is subscribed to (across all sockets).
    * subscriptionsByTopic[topic] = Set of userIds subscribed to that topic.
    */
   private subscriptionsByUser = new Map<string, Set<string>>();
@@ -60,12 +69,14 @@ export class Room extends DurableObject<Env> {
   private subscribersReconstructed = false;
 
   /**
-   * WebSocket-ownership maps (rebuilt from ctx.getWebSockets() after hibernation).
-   * wsToUser[ws] = userId of the connected client.
-   * userTopics[userId] = Set<topics> the user is subscribed to on THIS connection.
+   * WebSocket-ownership maps (SOCKET-scoped, rebuilt after hibernation).
+   * wsToUser[ws]     = userId of the connected client.
+   * wsTopics[ws]     = Set<topics> this SPECIFIC socket is subscribed to.
+   * userSockets[userId] = Set<WebSocket> all active sockets for this user.
    */
   private wsToUser = new Map<WebSocket, string>();
-  private userTopics = new Map<string, Set<string>>();
+  private wsTopics = new Map<WebSocket, Set<string>>();
+  private userSockets = new Map<string, Set<WebSocket>>();
   private wsReconstructed = false;
 
   // ── Fetch handler ──────────────────────────────────────────────────
@@ -111,9 +122,17 @@ export class Room extends DurableObject<Env> {
     const attachment: WebSocketAttachment = { userId, topics: [] };
     server.serializeAttachment(attachment);
 
-    // Track in memory
+    // Track in memory — socket-scoped state
     this.wsToUser.set(server, userId);
-    this.userTopics.set(userId, new Set());
+    this.wsTopics.set(server, new Set());
+
+    // Track this socket under the user (for multi-device cleanup)
+    let sockets = this.userSockets.get(userId);
+    if (!sockets) {
+      sockets = new Set();
+      this.userSockets.set(userId, sockets);
+    }
+    sockets.add(server);
 
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -153,14 +172,39 @@ export class Room extends DurableObject<Env> {
     const userId = this.wsToUser.get(ws);
     if (!userId) return;
 
-    // Remove all subscriptions for this connection
-    const topics = this.userTopics.get(userId);
+    // Remove this socket's subscriptions from the dual-index
+    // Only remove from dual-index if NO OTHER socket of this user still has this topic
+    const topics = this.wsTopics.get(ws);
     if (topics) {
+      const otherSockets = this.userSockets.get(userId);
       for (const topic of topics) {
-        this.removeFromTopicIndex(userId, topic);
-        await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
+        // Check if any OTHER socket of this user still subscribes to this topic
+        let stillSubscribed = false;
+        if (otherSockets) {
+          for (const otherWs of otherSockets) {
+            if (otherWs === ws) continue;
+            const otherTopics = this.wsTopics.get(otherWs);
+            if (otherTopics?.has(topic)) {
+              stillSubscribed = true;
+              break;
+            }
+          }
+        }
+        if (!stillSubscribed) {
+          this.removeFromTopicIndex(userId, topic);
+          await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
+        }
       }
-      this.userTopics.delete(userId);
+      this.wsTopics.delete(ws);
+    }
+
+    // Remove this socket from the user's socket set
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      sockets.delete(ws);
+      if (sockets.size === 0) {
+        this.userSockets.delete(userId);
+      }
     }
 
     this.wsToUser.delete(ws);
@@ -173,15 +217,15 @@ export class Room extends DurableObject<Env> {
   // ── WebSocket message handlers ─────────────────────────────────────
 
   private async handleWsSubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
-    // Ensure user has a topic set
-    let topics = this.userTopics.get(userId);
+    // Add topic to this socket's topic set
+    let topics = this.wsTopics.get(ws);
     if (!topics) {
       topics = new Set();
-      this.userTopics.set(userId, topics);
+      this.wsTopics.set(ws, topics);
     }
     topics.add(topic);
 
-    // Update dual index
+    // Update dual index (user-scoped, for fan-out)
     let userTopics = this.subscriptionsByUser.get(userId);
     if (!userTopics) {
       userTopics = new Set();
@@ -210,20 +254,31 @@ export class Room extends DurableObject<Env> {
   }
 
   private async handleWsUnsubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
-    // Remove from user topics
-    const topics = this.userTopics.get(userId);
+    // Remove topic from this socket's topic set
+    const topics = this.wsTopics.get(ws);
     if (topics) {
       topics.delete(topic);
-      if (topics.size === 0) {
-        this.userTopics.delete(userId);
+    }
+
+    // Check if any OTHER socket of this user still has this topic
+    let stillSubscribed = false;
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      for (const otherWs of sockets) {
+        if (otherWs === ws) continue;
+        const otherTopics = this.wsTopics.get(otherWs);
+        if (otherTopics?.has(topic)) {
+          stillSubscribed = true;
+          break;
+        }
       }
     }
 
-    // Remove from dual index
-    this.removeFromTopicIndex(userId, topic);
-
-    // Remove from SQLite
-    await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
+    // Only remove from dual-index if no other socket has this topic
+    if (!stillSubscribed) {
+      this.removeFromTopicIndex(userId, topic);
+      await this.ctx.storage.delete(`${SUB_KEY_PREFIX}${userId}:${topic}`);
+    }
 
     // Update WebSocket attachment
     const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
@@ -234,8 +289,9 @@ export class Room extends DurableObject<Env> {
   }
 
   private async handleWsPublish(ws: WebSocket, userId: string, topic: string, data: unknown): Promise<void> {
-    const topics = this.userTopics.get(userId);
-    if (!topics || !topics.has(topic)) return;
+    // Check if THIS socket is subscribed to the topic
+    const topics = this.wsTopics.get(ws);
+    if (!topics?.has(topic)) return;
 
     // Broadcast to all subscribers (sender excluded via broadcastByTopic)
     await this.broadcastByTopic(topic, data, userId, userId);
@@ -281,17 +337,27 @@ export class Room extends DurableObject<Env> {
       const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
       if (!attachment?.userId) continue;
 
-      this.wsToUser.set(ws, attachment.userId);
+      const userId = attachment.userId;
 
-      // Rebuild userTopics from attachment
-      let topics = this.userTopics.get(attachment.userId);
+      // Rebuild socket-scoped state
+      this.wsToUser.set(ws, userId);
+
+      let topics = this.wsTopics.get(ws);
       if (!topics) {
         topics = new Set();
-        this.userTopics.set(attachment.userId, topics);
+        this.wsTopics.set(ws, topics);
       }
       for (const topic of attachment.topics) {
         topics.add(topic);
       }
+
+      // Rebuild user → sockets index
+      let sockets = this.userSockets.get(userId);
+      if (!sockets) {
+        sockets = new Set();
+        this.userSockets.set(userId, sockets);
+      }
+      sockets.add(ws);
     }
   }
 
