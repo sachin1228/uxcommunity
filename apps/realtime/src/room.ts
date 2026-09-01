@@ -4,9 +4,9 @@ import type { PublishRequest } from "./types";
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
- * topics (chat, typing, presence, threads, events, resources).
+ * topics (chat, typing, presence, threads, events, resources, showcase, rules).
  *
- * Architecture (WebSocket-ownership):
+ * Architecture (direct WebSocket ownership):
  *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
  *   0 RPCs for message delivery.
  *
@@ -32,7 +32,6 @@ import type { PublishRequest } from "./types";
  *
  * Authorization:
  *   - WebSocket upgrade requires x-realtime-uid header (set by Worker after JWT auth)
- *   - RPC methods verify caller via RPC_SECRET (defense-in-depth, legacy path)
  *   - Membership checked via internal API (fail-closed)
  *
  * Event classification:
@@ -40,23 +39,10 @@ import type { PublishRequest } from "./types";
  *   - DURABLE (chat, edit, delete, reaction): client recovers via DB
  */
 
-interface Member {
-  name: string | null;
-  avatar: string | null;
-  connections: number;
-}
-
 interface WebSocketAttachment {
   userId: string;
   topics: string[];
 }
-
-const MEMBERS_KEY = "members";
-const MAX_MESSAGE_BYTES = 8192;
-const SUB_KEY_PREFIX = "sub:";
-
-/** Events that are ephemeral — no retry on delivery failure. */
-const EPHEMERAL_TOPICS = new Set(["typing", "presence"]);
 
 export class Room extends DurableObject<Env> {
   /**
@@ -77,7 +63,6 @@ export class Room extends DurableObject<Env> {
   private wsToUser = new Map<WebSocket, string>();
   private wsTopics = new Map<WebSocket, Set<string>>();
   private userSockets = new Map<string, Set<WebSocket>>();
-  private wsReconstructed = false;
 
   // ── Fetch handler ──────────────────────────────────────────────────
 
@@ -87,7 +72,7 @@ export class Room extends DurableObject<Env> {
       return this.publish(request);
     }
 
-    // WebSocket upgrade (new architecture: CommunityDO owns connections)
+    // WebSocket upgrade — CommunityDO owns connections directly
     if (request.headers.get("Upgrade") === "websocket") {
       return this.upgrade(request);
     }
@@ -301,7 +286,6 @@ export class Room extends DurableObject<Env> {
       await this.reconstructWebSockets();
       this.rebuildUserScopedMaps();
       this.subscribersReconstructed = true;
-      this.wsReconstructed = true;
     });
   }
 
@@ -369,103 +353,6 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  // ── RPC: subscribe (legacy path, kept for feature flag) ─────────────
-
-  /**
-   * Called by UserDO via RPC when a user subscribes to a topic.
-   * Only used when USE_WEBSOCKET_OWNERSHIP is disabled.
-   */
-  async subscribe(
-    userId: string,
-    topics: string | string[],
-    rpcSecret?: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    if (rpcSecret !== this.env.RPC_SECRET) {
-      return { ok: false, error: "unauthorized" };
-    }
-
-    const isMember = await this.checkMembership(userId);
-    if (!isMember) {
-      return { ok: false, error: "not_member" };
-    }
-
-    await this.ensureSubscribers();
-
-    const topicList = Array.isArray(topics) ? topics : [topics];
-    for (const topic of topicList) {
-      let userTopics = this.subscriptionsByUser.get(userId);
-      if (!userTopics) {
-        userTopics = new Set();
-        this.subscriptionsByUser.set(userId, userTopics);
-      }
-      userTopics.add(topic);
-
-      let topicSubs = this.subscriptionsByTopic.get(topic);
-      if (!topicSubs) {
-        topicSubs = new Set();
-        this.subscriptionsByTopic.set(topic, topicSubs);
-      }
-      topicSubs.add(userId);
-
-      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
-      await this.ctx.storage.put(key, { userId, topic });
-    }
-
-    return { ok: true };
-  }
-
-  // ── RPC: unsubscribe (legacy path) ─────────────────────────────────
-
-  async unsubscribe(
-    userId: string,
-    topics: string | string[],
-    rpcSecret?: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    if (rpcSecret !== this.env.RPC_SECRET) {
-      return { ok: false, error: "unauthorized" };
-    }
-
-    await this.ensureSubscribers();
-
-    const topicList = Array.isArray(topics) ? topics : [topics];
-    for (const topic of topicList) {
-      const userTopics = this.subscriptionsByUser.get(userId);
-      if (userTopics) {
-        userTopics.delete(topic);
-        if (userTopics.size === 0) {
-          this.subscriptionsByUser.delete(userId);
-        }
-      }
-
-      const topicSubs = this.subscriptionsByTopic.get(topic);
-      if (topicSubs) {
-        topicSubs.delete(userId);
-        if (topicSubs.size === 0) {
-          this.subscriptionsByTopic.delete(topic);
-        }
-      }
-
-      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
-      await this.ctx.storage.delete(key);
-    }
-
-    return { ok: true };
-  }
-
-  // ── RPC: publish (legacy path) ─────────────────────────────────────
-
-  async publishMessage(
-    userId: string,
-    topic: string,
-    data: unknown,
-    rpcSecret?: string,
-  ): Promise<void> {
-    if (rpcSecret !== this.env.RPC_SECRET) return;
-
-    await this.ensureSubscribers();
-    await this.broadcastByTopic(topic, data, userId, userId);
-  }
-
   // ── HTTP publish (server-side) ───────────────────────────────────────
 
   private async publish(request: Request): Promise<Response> {
@@ -489,11 +376,8 @@ export class Room extends DurableObject<Env> {
 
   /**
    * Broadcast an event to all subscribers of a topic.
-   *
-   * When WebSocket-ownership is enabled, iterates ctx.getWebSockets() and
-   * sends directly via ws.send(). 0 RPC calls.
-   *
-   * When using the legacy RPC path, calls deliverToUser() per subscriber.
+   * Iterates ctx.getWebSockets() and sends directly via ws.send().
+   * 0 RPC calls.
    */
   private async broadcastByTopic(
     topic: string,
@@ -504,73 +388,25 @@ export class Room extends DurableObject<Env> {
     const topicSubs = this.subscriptionsByTopic.get(topic);
     if (!topicSubs || topicSubs.size === 0) return;
 
-    // WebSocket-ownership path: iterate connected WebSockets directly
-    const websockets = this.ctx.getWebSockets();
-    if (websockets.length > 0) {
-      const eventMsg = JSON.stringify({
-        t: "event",
-        room: this.roomName(),
-        topic,
-        data,
-        sender: senderUserId,
-      });
+    const eventMsg = JSON.stringify({
+      t: "event",
+      room: this.roomName(),
+      topic,
+      data,
+      sender: senderUserId,
+    });
 
-      for (const ws of websockets) {
-        const userId = this.wsToUser.get(ws);
-        if (!userId) continue;
-        if (excludeUserId && userId === excludeUserId) continue;
-        const topics = this.wsTopics.get(ws);
-        if (!topics?.has(topic)) continue;
-
-        try {
-          ws.send(eventMsg);
-        } catch {
-          // WebSocket send failed — will be cleaned up on close
-        }
-      }
-      return;
-    }
-
-    // Legacy RPC path (when no WebSockets are connected)
-    const isEphemeral = EPHEMERAL_TOPICS.has(topic);
-    const roomName = this.roomName();
-
-    const calls: Promise<void>[] = [];
-    for (const userId of topicSubs) {
+    for (const ws of this.ctx.getWebSockets()) {
+      const userId = this.wsToUser.get(ws);
+      if (!userId) continue;
       if (excludeUserId && userId === excludeUserId) continue;
+      const topics = this.wsTopics.get(ws);
+      if (!topics?.has(topic)) continue;
 
-      const call = this.deliverToUser(roomName, topic, data, userId, isEphemeral, senderUserId);
-      calls.push(call);
-    }
-
-    await Promise.allSettled(calls);
-  }
-
-  /**
-   * Deliver an event to a specific user via UserDO RPC.
-   * Legacy path — only used when no WebSocket connections are present.
-   */
-  private async deliverToUser(
-    room: string,
-    topic: string,
-    data: unknown,
-    userId: string,
-    isEphemeral: boolean,
-    senderUserId?: string,
-  ): Promise<void> {
-    const stub = this.env.USER_DO.get(this.env.USER_DO.idFromName(`user:${userId}`));
-
-    try {
-      await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
-    } catch (err) {
-      if (isEphemeral) {
-        return;
-      }
-      await new Promise((r) => setTimeout(r, 100));
       try {
-        await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
+        ws.send(eventMsg);
       } catch {
-        // Second failure: drop
+        // WebSocket send failed — will be cleaned up on close
       }
     }
   }

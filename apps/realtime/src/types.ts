@@ -5,12 +5,9 @@
  * message and included on every server→client event so the client can route
  * to the correct handler.
  *
- * Connection model (USE_WEBSOCKET_OWNERSHIP=true):
+ * Connection model:
  *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
  *   0 RPCs for message delivery.
- *
- * Connection model (USE_WEBSOCKET_OWNERSHIP=false, legacy):
- *   Client → UserDO (user:${userId}) → Community DOs
  */
 
 // ── Server → Client ────────────────────────────────────────────────────────

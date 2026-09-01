@@ -1,7 +1,7 @@
 /**
  * WebSocket Ownership Integration Tests
  *
- * Tests the new CommunityDO WebSocket-ownership architecture:
+ * Tests the CommunityDO direct WebSocket architecture:
  *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
  *   0 RPCs for message delivery.
  *
@@ -142,7 +142,7 @@ beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
     experimentalExcludeMiniflareV1: true,
-    vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
+
   });
   baseUrl = `http://127.0.0.1:${worker.port}`;
 }, 30_000);
@@ -640,16 +640,12 @@ describe("WebSocket ownership: scale tests", () => {
 
 describe("WebSocket ownership: proves zero UserDO RPCs", () => {
   it("broadcast uses ctx.getWebSockets(), not UserDO deliverEvent()", async () => {
-    // In the new architecture, CommunityDO iterates ctx.getWebSockets() directly.
-    // This is proven by the fact that all delivery happens within the same DO.
+    // CommunityDO iterates ctx.getWebSockets() directly.
     // There are no RPC calls to USER_DO — the broadcastByTopic method in room.ts
     // checks if websockets.length > 0 and uses ws.send() directly.
     //
-    // With the old architecture (RPC-based), each of these 50 subscribers would
-    // generate a stub.deliverEvent() call — 50 RPCs per message.
-    //
-    // With WebSocket ownership, there are 0 RPCs — all 50 ws.send() calls are
-    // local memory operations within the CommunityDO.
+    // Each of these 50 subscribers receives delivery via a local ws.send()
+    // call within the CommunityDO — 0 RPCs.
 
     const N = 50;
     const room = "chat:ws_comm_prove0rpc";
@@ -673,19 +669,17 @@ describe("WebSocket ownership: proves zero UserDO RPCs", () => {
 });
 
 // ============================================================================
-// TEST 13: STALE LEGACY sub: RECORDS DO NOT AFFECT DELIVERY
+// TEST 13: STALE sub: RECORDS DO NOT AFFECT DELIVERY
 // ============================================================================
 
-describe("WebSocket ownership: stale legacy sub: records", () => {
+describe("WebSocket ownership: stale sub: records", () => {
   it("client A subscribes then disconnects; stale sub: record does not cause delivery to unrelated client B", async () => {
     // Scenario: Client A subscribes to "chat" on community C, then disconnects.
-    // With the old code, a `sub:userA:chat` entry would remain in SQLite.
-    // With the new code, the entry is NOT deleted (we removed storage.delete).
-    // But it must NOT affect delivery to other clients or cause phantom subscriptions.
+    // Stale `sub:userA:chat` entries may remain in SQLite but must NOT affect
+    // delivery to other clients or cause phantom subscriptions.
     //
     // Client B subscribes to a DIFFERENT topic "typing" on the same community.
-    // Publishing to "chat" must NOT reach client B, proving stale sub: records
-    // are harmless.
+    // Publishing to "chat" must NOT reach client B.
 
     const comm = "chat:ws_stale_legacy_test";
     const tokenA = await createToken("stale_a");
@@ -713,7 +707,7 @@ describe("WebSocket ownership: stale legacy sub: records", () => {
     );
     expect(chatEventsB.length).toBe(0);
 
-    console.log("  [stale-legacy] client B received 0 chat events (correct — subscribed to typing only)");
+    console.log("  [stale-legacy] client B received 0 chat events (subscribed to typing only)");
     connB.close();
   }, 15_000);
 });

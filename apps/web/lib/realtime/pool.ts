@@ -3,7 +3,7 @@
 /**
  * Room subscription pool backed by the multiplexed RealtimeClient singleton.
  *
- * With WebSocket-ownership architecture:
+ * Architecture:
  *   acquire(communityId) → creates a WebSocket to CommunityDO, subscribes to rooms
  *   release(communityId) → decrements refcount, closes idle connections
  *

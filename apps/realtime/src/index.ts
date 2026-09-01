@@ -79,19 +79,11 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const useWebSocketOwnership = env.USE_WEBSOCKET_OWNERSHIP === "true";
-
-  // Route based on room prefix and feature flag:
-  //   user:${userId}        → UserDO  (always — client WebSocket gateway)
-  //   chat:${id} etc        → CommunityDO (new: WebSocket ownership)
-  //   notifications:${id}   → UserDO  (user-specific)
-  //   profile:${id}         → UserDO  (user-specific)
-  //   designers-studio      → UserDO  (global room)
   const isUserRoom = room.startsWith("user:");
   const isCommunity = isCommunityRoom(room);
 
   let namespace: DurableObjectNamespace;
-  if (isUserRoom || (isCommunity && !useWebSocketOwnership)) {
+  if (isUserRoom) {
     namespace = env.USER_DO;
   } else {
     namespace = env.COMMUNITY_DO;
@@ -148,8 +140,10 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
     const chunk = events.slice(i, i + CHUNK);
     await Promise.all(
       chunk.map(async (event) => {
-        const id = env.COMMUNITY_DO.idFromName(event.room);
-        const stub = env.COMMUNITY_DO.get(id);
+        const isUserRoom = event.room.startsWith("user:");
+        const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
+        const id = namespace.idFromName(event.room);
+        const stub = namespace.get(id);
         return stub.fetch(
           new Request(request.url, {
             method: "POST",

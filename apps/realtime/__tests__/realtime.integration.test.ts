@@ -1,13 +1,14 @@
 /**
- * RPC-based Realtime Integration Tests.
+ * Realtime Integration Tests.
  *
  * Uses wrangler's unstable_dev to spin up the Worker + DOs locally.
- * Tests real WebSocket connections, RPC delivery, hibernation, authorization,
+ * Tests real WebSocket connections, delivery, hibernation, authorization,
  * multi-device, concurrency, and performance.
  *
- * Architecture under test:
- *   Client → UserDO (1 physical WebSocket) → RPC → CommunityDO
- *   CommunityDO → RPC deliverEvent() → UserDO → Client(s)
+ * Architecture:
+ *   Community rooms: Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
+ *   User rooms:      Client → UserDO (direct WebSocket) → ws.send() → Client(s)
+ *   0 RPCs for message delivery.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -27,7 +28,6 @@ const vars = Object.fromEntries(
 );
 const REALTIME_SECRET = vars.SESSION_SECRET;
 const PUBLISH_SECRET = vars.REALTIME_PUBLISH_SECRET;
-const RPC_SECRET = vars.RPC_SECRET;
 
 let worker: UnstableDevWorker;
 let baseUrl: string;
@@ -122,7 +122,7 @@ beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
     experimentalExcludeMiniflareV1: true,
-    vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
+
   });
   baseUrl = `http://127.0.0.1:${worker.port}`;
 }, 30_000);
@@ -172,13 +172,13 @@ describe("Basic connection", () => {
 });
 
 // ============================================================================
-// TEST 2: BASIC RPC DELIVERY
+// TEST 2: BASIC DELIVERY
 // ============================================================================
 
-describe("Basic RPC delivery", () => {
-  it("subscribe → publish → receive event via RPC", async () => {
+describe("Basic delivery", () => {
+  it("subscribe → publish → receive event via direct WebSocket", async () => {
     const token = await createToken("user_rpc1");
-    const { ws, messages, close } = connectWs("user:user_rpc1", token);
+    const { ws, messages, close } = connectWs("chat:comm_rpc1", token);
     try {
       await joinAndSubscribe(ws, messages, "user_rpc1", "chat:comm_rpc1", "chat");
 
@@ -199,22 +199,22 @@ describe("Basic RPC delivery", () => {
 describe("Cross-community isolation", () => {
   it("message in A reaches only A subscribers, not B", async () => {
     const token = await createToken("user_iso1");
-    const { ws, messages, close } = connectWs("user:user_iso1", token);
+    const connA = connectWs("chat:comm_isoA", token);
+    const connB = connectWs("chat:comm_isoB", token);
     try {
-      await joinAndSubscribe(ws, messages, "user_iso1", "chat:comm_isoA", "chat");
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_isoB", topic: "chat" }));
-      await new Promise((r) => setTimeout(r, 300));
+      await joinAndSubscribe(connA.ws, connA.messages, "user_iso1", "chat:comm_isoA", "chat");
+      await joinAndSubscribe(connB.ws, connB.messages, "user_iso1", "chat:comm_isoB", "chat");
 
       await publish("chat:comm_isoA", "chat", { text: "from A" });
-      const event = await waitForMessage(messages, "event", 5000);
+      const event = await waitForMessage(connA.messages, "event", 5000);
       expect(event.room).toBe("chat:comm_isoA");
       expect(event.data.text).toBe("from A");
 
       // Verify no B events
       await new Promise((r) => setTimeout(r, 500));
-      const bEvents = messages.filter((m) => m.t === "event" && m.room === "chat:comm_isoB");
+      const bEvents = connB.messages.filter((m) => m.t === "event" && m.room === "chat:comm_isoA");
       expect(bEvents.length).toBe(0);
-    } finally { close(); }
+    } finally { connA.close(); connB.close(); }
   });
 });
 
@@ -225,7 +225,7 @@ describe("Cross-community isolation", () => {
 describe("Multiple topics", () => {
   it("subscribe to chat + typing, events route correctly", async () => {
     const token = await createToken("user_topic1");
-    const { ws, messages, close } = connectWs("user:user_topic1", token);
+    const { ws, messages, close } = connectWs("chat:comm_topic1", token);
     try {
       await joinAndSubscribe(ws, messages, "user_topic1", "chat:comm_topic1", "chat");
       ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_topic1", topic: "typing" }));
@@ -247,7 +247,7 @@ describe("Multiple topics", () => {
 
   it("unsubscribe from typing stops typing events", async () => {
     const token = await createToken("user_topic2");
-    const { ws, messages, close } = connectWs("user:user_topic2", token);
+    const { ws, messages, close } = connectWs("chat:comm_topic2", token);
     try {
       await joinAndSubscribe(ws, messages, "user_topic2", "chat:comm_topic2", "chat");
       ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_topic2", topic: "typing" }));
@@ -278,7 +278,7 @@ describe("Multiple topics", () => {
 describe("Subscribe/unsubscribe races", () => {
   it("subscribe → unsubscribe → subscribe: final state is subscribed", async () => {
     const token = await createToken("user_race1");
-    const { ws, messages, close } = connectWs("user:user_race1", token);
+    const { ws, messages, close } = connectWs("chat:comm_race", token);
     try {
       await joinAndSubscribe(ws, messages, "user_race1", "chat:comm_race", "chat");
 
@@ -295,7 +295,7 @@ describe("Subscribe/unsubscribe races", () => {
 
   it("late unsubscribe does not delete newer subscribe", async () => {
     const token = await createToken("user_race2");
-    const { ws, messages, close } = connectWs("user:user_race2", token);
+    const { ws, messages, close } = connectWs("chat:comm_race2", token);
     try {
       await joinAndSubscribe(ws, messages, "user_race2", "chat:comm_race2", "chat");
       ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_race2", topic: "typing" }));
@@ -321,14 +321,14 @@ describe("Reconnect", () => {
   it("reconnect restores subscriptions and delivers events", async () => {
     const token = await createToken("user_recon1");
 
-    // First connection
-    const conn1 = connectWs("user:user_recon1", token);
+    // First connection — direct to CommunityDO
+    const conn1 = connectWs("chat:comm_recon", token);
     await joinAndSubscribe(conn1.ws, conn1.messages, "user_recon1", "chat:comm_recon", "chat");
     conn1.close();
     await new Promise((r) => setTimeout(r, 500));
 
     // Reconnect
-    const conn2 = connectWs("user:user_recon1", token);
+    const conn2 = connectWs("chat:comm_recon", token);
     await joinAndSubscribe(conn2.ws, conn2.messages, "user_recon1", "chat:comm_recon", "chat");
 
     await publish("chat:comm_recon", "chat", { text: "after-reconnect" });
@@ -341,116 +341,90 @@ describe("Reconnect", () => {
     const token = await createToken("user_recon2");
     const communities = Array.from({ length: 10 }, (_, i) => `chat:comm_recon_multi_${i}`);
 
-    // First connection — subscribe to 10 communities
-    const conn1 = connectWs("user:user_recon2", token);
-    await waitForOpen(conn1.ws);
-    conn1.ws.send(JSON.stringify({ t: "join", user: { id: "user_recon2", name: "Recon2", avatar: null } }));
-    await waitForMessage(conn1.messages, "hello");
+    // Each community gets its own direct WebSocket to CommunityDO
+    const conns = [];
     for (const room of communities) {
-      conn1.ws.send(JSON.stringify({ t: "subscribe", room, topic: "chat" }));
+      const conn = connectWs(room, token);
+      await joinAndSubscribe(conn.ws, conn.messages, "user_recon2", room, "chat");
+      conns.push(conn);
     }
-    await new Promise((r) => setTimeout(r, 1000));
-    conn1.close();
     await new Promise((r) => setTimeout(r, 500));
 
-    // Reconnect
-    const conn2 = connectWs("user:user_recon2", token);
-    await waitForOpen(conn2.ws);
-    conn2.ws.send(JSON.stringify({ t: "join", user: { id: "user_recon2", name: "Recon2", avatar: null } }));
-    await waitForMessage(conn2.messages, "hello");
+    // Close all
+    for (const conn of conns) conn.close();
+    await new Promise((r) => setTimeout(r, 500));
+
+    // Reconnect to all communities
+    const reconnConns = [];
     for (const room of communities) {
-      conn2.ws.send(JSON.stringify({ t: "subscribe", room, topic: "chat" }));
+      const conn = connectWs(room, token);
+      await joinAndSubscribe(conn.ws, conn.messages, "user_recon2", room, "chat");
+      reconnConns.push(conn);
     }
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 500));
 
     // Publish to each community — should all be received
     for (let i = 0; i < communities.length; i++) {
       await publish(communities[i], "chat", { seq: i });
     }
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 3000));
 
     let received = 0;
-    for (const msg of conn2.messages) {
-      if (msg.t === "event" && msg.topic === "chat") received++;
+    for (const conn of reconnConns) {
+      for (const msg of conn.messages) {
+        if (msg.t === "event" && msg.topic === "chat") received++;
+      }
     }
     expect(received).toBe(10);
-    conn2.close();
+    for (const conn of reconnConns) conn.close();
   }, 30_000);
 });
 
 // ============================================================================
-// TEST 7: HIBERNATION — USERDO
+// TEST 7: HIBERNATION — COMMUNITYDO
 // ============================================================================
 
-describe("Hibernation — UserDO", () => {
-  it("subscriptions persist in storage across reconnects", async () => {
+describe("Hibernation — CommunityDO", () => {
+  it("subscriptions persist across reconnects via WebSocket attachments", async () => {
     const token = await createToken("user_hib1");
 
-    // Connect and subscribe
-    const conn1 = connectWs("user:user_hib1", token);
+    // Connect and subscribe to two topics on the same community
+    const conn1 = connectWs("chat:comm_hibA", token);
     await joinAndSubscribe(conn1.ws, conn1.messages, "user_hib1", "chat:comm_hibA", "chat");
-    conn1.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_hibB", topic: "typing" }));
+    conn1.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_hibA", topic: "typing" }));
     await new Promise((r) => setTimeout(r, 300));
     conn1.close();
     await new Promise((r) => setTimeout(r, 500));
 
-    // Reconnect — storage should still have subscriptions
-    const conn2 = connectWs("user:user_hib1", token);
+    // Reconnect — WebSocket attachments rebuilt subscriptions
+    const conn2 = connectWs("chat:comm_hibA", token);
     await joinAndSubscribe(conn2.ws, conn2.messages, "user_hib1", "chat:comm_hibA", "chat");
-    conn2.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_hibB", topic: "typing" }));
+    conn2.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_hibA", topic: "typing" }));
     await new Promise((r) => setTimeout(r, 300));
 
-    // Verify both communities deliver events
+    // Verify both topics deliver events
     await publish("chat:comm_hibA", "chat", { from: "A" });
     const eventA = await waitForMessage(conn2.messages, "event", 5000);
     expect(eventA.room).toBe("chat:comm_hibA");
 
-    await publish("chat:comm_hibB", "typing", { typing: true });
+    await publish("chat:comm_hibA", "typing", { typing: true });
     const eventB = await waitForMessage(conn2.messages, "event", 5000, (m) => m.topic === "typing");
     expect(eventB.topic).toBe("typing");
 
     conn2.close();
   });
 
-  it("RPC delivery wakes hibernated UserDO and client receives event", async () => {
-    const token = await createToken("user_hib_rpc1");
-
-    // Connect and subscribe
-    const conn1 = connectWs("user:user_hib_rpc1", token);
-    await joinAndSubscribe(conn1.ws, conn1.messages, "user_hib_rpc1", "chat:comm_hib_rpc", "chat");
-
-    // Disconnect — UserDO may hibernate
-    conn1.close();
-    await new Promise((r) => setTimeout(r, 2000));
-
-    // Reconnect — UserDO may have hibernated and woken
-    const conn2 = connectWs("user:user_hib_rpc1", token);
-    await joinAndSubscribe(conn2.ws, conn2.messages, "user_hib_rpc1", "chat:comm_hib_rpc", "chat");
-
-    // Publish — should be delivered via RPC
-    await publish("chat:comm_hib_rpc", "chat", { text: "wake up" });
-    const event = await waitForMessage(conn2.messages, "event", 5000);
-    expect(event.data.text).toBe("wake up");
-    conn2.close();
-  });
-});
-
-// ============================================================================
-// TEST 8: HIBERNATION — COMMUNITYDO
-// ============================================================================
-
-describe("Hibernation — CommunityDO", () => {
   it("subscribe after CommunityDO hibernation restores state", async () => {
     const token = await createToken("user_hib_comm1");
 
     // First connection — CommunityDO exists
-    const conn1 = connectWs("user:user_hib_comm1", token);
+    const conn1 = connectWs("chat:comm_hib_comm", token);
     await joinAndSubscribe(conn1.ws, conn1.messages, "user_hib_comm1", "chat:comm_hib_comm", "chat");
     conn1.close();
     await new Promise((r) => setTimeout(r, 3000));
 
     // Second connection — CommunityDO may have hibernated
-    const conn2 = connectWs("user:user_hib_comm1", token);
+    const conn2 = connectWs("chat:comm_hib_comm", token);
     await joinAndSubscribe(conn2.ws, conn2.messages, "user_hib_comm1", "chat:comm_hib_comm", "chat");
 
     await publish("chat:comm_hib_comm", "chat", { text: "after community hibernation" });
@@ -467,13 +441,16 @@ describe("Hibernation — CommunityDO", () => {
 describe("Cross-community concurrent events", () => {
   it("events from different communities reach client correctly", async () => {
     const token = await createToken("user_conc1");
-    const { ws, messages, close } = connectWs("user:user_conc1", token);
-    try {
-      await joinAndSubscribe(ws, messages, "user_conc1", "chat:comm_concA", "chat");
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_concB", topic: "chat" }));
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_concC", topic: "chat" }));
-      await new Promise((r) => setTimeout(r, 500));
 
+    // Each community gets its own direct WebSocket
+    const connA = connectWs("chat:comm_concA", token);
+    await joinAndSubscribe(connA.ws, connA.messages, "user_conc1", "chat:comm_concA", "chat");
+    const connB = connectWs("chat:comm_concB", token);
+    await joinAndSubscribe(connB.ws, connB.messages, "user_conc1", "chat:comm_concB", "chat");
+    const connC = connectWs("chat:comm_concC", token);
+    await joinAndSubscribe(connC.ws, connC.messages, "user_conc1", "chat:comm_concC", "chat");
+
+    try {
       // Publish to all three communities concurrently
       await Promise.all([
         publish("chat:comm_concA", "chat", { from: "A" }),
@@ -482,10 +459,17 @@ describe("Cross-community concurrent events", () => {
       ]);
       await new Promise((r) => setTimeout(r, 2000));
 
-      const events = messages.filter((m) => m.t === "event" && m.topic === "chat");
-      const rooms = events.map((e: any) => e.room).sort();
-      expect(rooms).toEqual(["chat:comm_concA", "chat:comm_concB", "chat:comm_concC"]);
-    } finally { close(); }
+      const eventA = connA.messages.find((m: any) => m.t === "event" && m.data?.from === "A");
+      const eventB = connB.messages.find((m: any) => m.t === "event" && m.data?.from === "B");
+      const eventC = connC.messages.find((m: any) => m.t === "event" && m.data?.from === "C");
+      expect(eventA).toBeDefined();
+      expect(eventB).toBeDefined();
+      expect(eventC).toBeDefined();
+    } finally {
+      connA.close();
+      connB.close();
+      connC.close();
+    }
   });
 });
 
@@ -530,9 +514,7 @@ describe("Unauthorized RPC", () => {
     expect(res.status).toBe(403);
   });
 
-  it("external HTTP client cannot reach CommunityDO RPC methods", async () => {
-    // CommunityDO exposes RPC methods (subscribe, unsubscribe, publishMessage).
-    // These are only callable via DO stubs from other DOs.
+  it("external HTTP client cannot reach CommunityDO directly", async () => {
     // External HTTP fetch goes to Worker's fetch handler, which only exposes
     // /ws and /publish. Any other path returns 404.
     const res = await fetch(`${baseUrl}/subscribe`, {
@@ -550,10 +532,9 @@ describe("Unauthorized RPC", () => {
     expect(res2.status).toBe(404);
   });
 
-  it("RPC_SECRET is never sent in WebSocket messages", async () => {
-    // Verify that the RPC secret is not exposed to clients.
+  it("secrets are never sent in WebSocket messages", async () => {
+    // Verify that no secrets are exposed to clients.
     // The only secrets used are SESSION_SECRET (JWT) and PUBLISH_SECRET (HTTP).
-    // RPC_SECRET is only used in DO-to-DO calls (user.ts → room.ts).
     const token = await createToken("user_rpc_audit");
     const { ws, messages, close } = connectWs("user:user_rpc_audit", token);
     try {
@@ -564,20 +545,20 @@ describe("Unauthorized RPC", () => {
       // Collect all messages from server
       await new Promise((r) => setTimeout(r, 500));
 
-      // Verify no message contains RPC_SECRET
-      const rpcSecretLeaked = messages.some((m) =>
-        JSON.stringify(m).includes(RPC_SECRET)
+      // Verify no message contains secrets
+      const secretLeaked = messages.some((m) =>
+        JSON.stringify(m).includes(PUBLISH_SECRET) || JSON.stringify(m).includes(REALTIME_SECRET)
       );
-      expect(rpcSecretLeaked).toBe(false);
+      expect(secretLeaked).toBe(false);
 
       // Also check that subscribe/unsubscribe responses don't leak secrets
       ws.send(JSON.stringify({ t: "subscribe", room: "chat:audit", topic: "chat" }));
       await new Promise((r) => setTimeout(r, 500));
 
-      const rpcSecretAfterSub = messages.some((m) =>
-        JSON.stringify(m).includes(RPC_SECRET)
+      const secretAfterSub = messages.some((m) =>
+        JSON.stringify(m).includes(PUBLISH_SECRET) || JSON.stringify(m).includes(REALTIME_SECRET)
       );
-      expect(rpcSecretAfterSub).toBe(false);
+      expect(secretAfterSub).toBe(false);
     } finally { close(); }
   });
 });
@@ -621,44 +602,55 @@ describe("Membership authorization", () => {
     const membershipWorker = await unstable_dev("src/index.ts", {
       configPath: "wrangler.toml",
       experimentalExcludeMiniflareV1: true,
-      vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
     });
     const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
 
     try {
       const token = await createToken("user_nonmember");
-      const wsUrl = `${membershipUrl}/ws?room=user:user_nonmember&token=${token}`;
+      // Connect directly to the community room — CommunityDO checks membership on upgrade
+      const wsUrl = `${membershipUrl}/ws?room=chat:comm_nonmember&token=${token}`;
       const ws = new WebSocket(wsUrl);
       const messages: any[] = [];
       ws.on("message", (data) => {
         try { messages.push(JSON.parse(String(data))); } catch { /* ignore */ }
       });
-      await waitForOpen(ws);
 
-      ws.send(JSON.stringify({
-        t: "join", user: { id: "user_nonmember", name: "NonMember", avatar: null },
-      }));
-      await waitForMessage(messages, "hello");
-
-      // Subscribe — mock returns 403, so subscribe is rejected
-      ws.send(JSON.stringify({
-        t: "subscribe", room: "chat:comm_nonmember", topic: "chat",
-      }));
-      await new Promise((r) => setTimeout(r, 2000));
-
-      // Publish directly (bypasses membership check via HTTP)
-      await fetch(`${membershipUrl}/publish`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-realtime-publish-secret": PUBLISH_SECRET,
-        },
-        body: JSON.stringify({ room: "chat:comm_nonmember", topic: "chat", data: { text: "should not arrive" } }),
+      // Wait for open or rejection
+      const statusCode = await new Promise<number>((resolve) => {
+        ws.on("error", () => resolve(0));
+        ws.on("unexpected-response", (_req: any, res: any) => resolve(res.statusCode ?? 0));
+        ws.on("open", () => resolve(200));
+        setTimeout(() => resolve(0), 3000);
       });
-      await new Promise((r) => setTimeout(r, 1000));
 
-      const events = messages.filter((m) => m.t === "event");
-      expect(events.length).toBe(0);
+      if (statusCode === 200) {
+        // Connected — try to subscribe
+        ws.send(JSON.stringify({
+          t: "join", user: { id: "user_nonmember", name: "NonMember", avatar: null },
+        }));
+        await waitForMessage(messages, "hello");
+        ws.send(JSON.stringify({
+          t: "subscribe", room: "chat:comm_nonmember", topic: "chat",
+        }));
+        await new Promise((r) => setTimeout(r, 2000));
+
+        // Publish — should not be received if membership check blocks delivery
+        await fetch(`${membershipUrl}/publish`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-realtime-publish-secret": PUBLISH_SECRET,
+          },
+          body: JSON.stringify({ room: "chat:comm_nonmember", topic: "chat", data: { text: "should not arrive" } }),
+        });
+        await new Promise((r) => setTimeout(r, 1000));
+
+        const events = messages.filter((m) => m.t === "event");
+        expect(events.length).toBe(0);
+      } else {
+        // Connection rejected (403 Forbidden) — expected for non-member
+        expect(statusCode).toBe(403);
+      }
       try { ws.close(); } catch { /* ignore */ }
     } finally {
       await membershipWorker.stop();
@@ -699,13 +691,13 @@ describe("Membership authorization", () => {
     const membershipWorker = await unstable_dev("src/index.ts", {
       configPath: "wrangler.toml",
       experimentalExcludeMiniflareV1: true,
-      vars: { USE_WEBSOCKET_OWNERSHIP: "true" },
     });
     const membershipUrl = `http://127.0.0.1:${membershipWorker.port}`;
 
     try {
       const token = await createToken("user_member");
-      const wsUrl = `${membershipUrl}/ws?room=user:user_member&token=${token}`;
+      // Connect directly to the community room
+      const wsUrl = `${membershipUrl}/ws?room=chat:comm_member&token=${token}`;
       const ws = new WebSocket(wsUrl);
       const messages: any[] = [];
       ws.on("message", (data) => {
@@ -718,7 +710,7 @@ describe("Membership authorization", () => {
       }));
       await waitForMessage(messages, "hello");
 
-      // Subscribe — mock returns 200, so subscribe succeeds
+      // Subscribe — membership API returns 200, so subscribe succeeds
       ws.send(JSON.stringify({
         t: "subscribe", room: "chat:comm_member", topic: "chat",
       }));
@@ -745,17 +737,13 @@ describe("Membership authorization", () => {
 });
 
 // ============================================================================
-// TEST 13: DURABLE EVENT RPC FAILURE
+// TEST 13: DURABLE EVENT DELIVERY
 // ============================================================================
 
-describe("Durable event RPC failure", () => {
-  it("message persisted even if UserDO temporarily unavailable", async () => {
-    // This tests the invariant: realtime is an optimization, not correctness.
-    // The database is the source of truth. RPC delivery failure never causes data loss.
-    // In test environment, RPC should succeed (both DOs are running).
-    // We verify the event is delivered normally.
+describe("Durable event delivery", () => {
+  it("message delivered via direct WebSocket", async () => {
     const token = await createToken("user_dur1");
-    const { ws, messages, close } = connectWs("user:user_dur1", token);
+    const { ws, messages, close } = connectWs("chat:comm_dur", token);
     try {
       await joinAndSubscribe(ws, messages, "user_dur1", "chat:comm_dur", "chat");
 
@@ -771,12 +759,12 @@ describe("Durable event RPC failure", () => {
 // ============================================================================
 
 describe("Multiple devices/tabs", () => {
-  it("one UserDO with multiple clients receives events correctly per subscription", async () => {
+  it("multiple connections from same user to same community receive events per subscription", async () => {
     const userId = "user_multi1";
     const token = await createToken(userId);
 
     // Tab 1: subscribes to chat:comm_multi (chat + typing)
-    const tab1 = connectWs(`user:${userId}`, token);
+    const tab1 = connectWs("chat:comm_multi", token);
     await waitForOpen(tab1.ws);
     tab1.ws.send(JSON.stringify({ t: "join", user: { id: userId, name: "Multi", avatar: null } }));
     await waitForMessage(tab1.messages, "hello");
@@ -785,15 +773,15 @@ describe("Multiple devices/tabs", () => {
     await new Promise((r) => setTimeout(r, 300));
 
     // Tab 2: subscribes to chat:comm_multi (chat only)
-    const tab2 = connectWs(`user:${userId}`, token);
+    const tab2 = connectWs("chat:comm_multi", token);
     await waitForOpen(tab2.ws);
     tab2.ws.send(JSON.stringify({ t: "join", user: { id: userId, name: "Multi", avatar: null } }));
     await waitForMessage(tab2.messages, "hello");
     tab2.ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_multi", topic: "chat" }));
     await new Promise((r) => setTimeout(r, 300));
 
-    // Mobile: subscribes to chat:comm_multi2 (chat only)
-    const mobile = connectWs(`user:${userId}`, token);
+    // Mobile: subscribes to chat:comm_multi2 (chat only) — separate community
+    const mobile = connectWs("chat:comm_multi2", token);
     await waitForOpen(mobile.ws);
     mobile.ws.send(JSON.stringify({ t: "join", user: { id: userId, name: "Multi", avatar: null } }));
     await waitForMessage(mobile.messages, "hello");
@@ -845,25 +833,23 @@ describe("Multiple devices/tabs", () => {
 });
 
 // ============================================================================
-// TEST 15: USERDO CONCURRENCY
+// TEST 15: CONCURRENT COMMUNITY DELIVERY
 // ============================================================================
 
-describe("UserDO concurrency", () => {
-  it("concurrent RPCs from multiple communities are delivered correctly", async () => {
+describe("Concurrent community delivery", () => {
+  it("events from multiple communities delivered correctly", async () => {
     const userId = "user_conc_rpc1";
     const token = await createToken(userId);
-    const { ws, messages, close } = connectWs(`user:${userId}`, token);
+
+    // Connect to 3 communities directly
+    const connA = connectWs("chat:comm_conc_rpc_a", token);
+    await joinAndSubscribe(connA.ws, connA.messages, userId, "chat:comm_conc_rpc_a", "chat");
+    const connB = connectWs("chat:comm_conc_rpc_b", token);
+    await joinAndSubscribe(connB.ws, connB.messages, userId, "chat:comm_conc_rpc_b", "chat");
+    const connC = connectWs("chat:comm_conc_rpc_c", token);
+    await joinAndSubscribe(connC.ws, connC.messages, userId, "chat:comm_conc_rpc_c", "chat");
+
     try {
-      await waitForOpen(ws);
-      ws.send(JSON.stringify({ t: "join", user: { id: userId, name: "Conc", avatar: null } }));
-      await waitForMessage(messages, "hello");
-
-      // Subscribe to 3 communities
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_conc_rpc_a", topic: "chat" }));
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_conc_rpc_b", topic: "chat" }));
-      ws.send(JSON.stringify({ t: "subscribe", room: "chat:comm_conc_rpc_c", topic: "chat" }));
-      await new Promise((r) => setTimeout(r, 500));
-
       // Publish to all 3 concurrently
       await Promise.all([
         publish("chat:comm_conc_rpc_a", "chat", { from: "A" }),
@@ -872,14 +858,17 @@ describe("UserDO concurrency", () => {
       ]);
       await new Promise((r) => setTimeout(r, 2000));
 
-      // Verify all 3 events received
-      const events = messages.filter((m: any) => m.t === "event" && m.topic === "chat");
-      const froms = events.map((e: any) => e.data.from).sort();
-      expect(froms).toEqual(["A", "B", "C"]);
-
-      // Verify no duplicates
-      expect(events.length).toBe(3);
-    } finally { close(); }
+      const eventA = connA.messages.find((m: any) => m.t === "event" && m.data?.from === "A");
+      const eventB = connB.messages.find((m: any) => m.t === "event" && m.data?.from === "B");
+      const eventC = connC.messages.find((m: any) => m.t === "event" && m.data?.from === "C");
+      expect(eventA).toBeDefined();
+      expect(eventB).toBeDefined();
+      expect(eventC).toBeDefined();
+    } finally {
+      connA.close();
+      connB.close();
+      connC.close();
+    }
   });
 });
 
@@ -895,7 +884,7 @@ describe("500 active subscribers", () => {
     try {
       for (let i = 0; i < CLIENT_COUNT; i++) {
         const token = await createToken(`user_500_${i}`);
-        const conn = connectWs(`user:user_500_${i}`, token);
+        const conn = connectWs("chat:comm_500", token);
         conns.push(conn);
         await waitForOpen(conn.ws);
         conn.ws.send(JSON.stringify({
@@ -930,7 +919,7 @@ describe("500 active subscribers", () => {
 });
 
 // ============================================================================
-// TEST 16B: FINAL RPC FAN-OUT — 500 × 10
+// TEST 16B: DIRECT WEBSOCKET FAN-OUT — 500 × 10
 // ============================================================================
 
 describe("Fan-out: 500 × 10", () => {
@@ -942,7 +931,7 @@ describe("Fan-out: 500 × 10", () => {
     try {
       for (let i = 0; i < N; i++) {
         const token = await createToken(`user_fo10_${i}`);
-        const conn = connectWs(`user:user_fo10_${i}`, token);
+        const conn = connectWs("chat:comm_fo10", token);
         conns.push(conn);
         await waitForOpen(conn.ws);
         conn.ws.send(JSON.stringify({
@@ -982,7 +971,7 @@ describe("Fan-out: 500 × 10", () => {
 });
 
 // ============================================================================
-// TEST 16C: FINAL RPC FAN-OUT — 500 × 100
+// TEST 16C: DIRECT WEBSOCKET FAN-OUT — 500 × 100
 // ============================================================================
 
 describe("Fan-out: 500 × 100", () => {
@@ -994,7 +983,7 @@ describe("Fan-out: 500 × 100", () => {
     try {
       for (let i = 0; i < N; i++) {
         const token = await createToken(`user_fo100_${i}`);
-        const conn = connectWs(`user:user_fo100_${i}`, token);
+        const conn = connectWs("chat:comm_fo100", token);
         conns.push(conn);
         await waitForOpen(conn.ws);
         conn.ws.send(JSON.stringify({

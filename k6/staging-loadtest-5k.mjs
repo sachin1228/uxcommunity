@@ -2,7 +2,7 @@
 /**
  * 5,000 Concurrent Client Staging Load Test
  * Branch: feat/community-do-websocket-ownership
- * Architecture: USE_WEBSOCKET_OWNERSHIP=true → CommunityDO owns WebSockets directly
+ * Architecture: CommunityDO owns WebSockets directly — 0 RPCs for delivery
  *
  * Usage:
  *   SESSION_SECRET=xxx REALTIME_PUBLISH_SECRET=xxx TEST_COMMUNITY_ID=uuid \
@@ -148,7 +148,7 @@ async function main() {
   console.log("=".repeat(70));
   console.log("  STAGING 5,000 CLIENT LOAD TEST");
   console.log("  Branch: feat/community-do-websocket-ownership");
-  console.log("  Architecture: USE_WEBSOCKET_OWNERSHIP=true");
+  console.log("  Architecture: CommunityDO direct WebSocket ownership");
   console.log("=".repeat(70));
   console.log(`  Target:          ${WS_BASE_URL}`);
   console.log(`  Community:       ${COMMUNITY_ID}`);
@@ -579,7 +579,7 @@ async function main() {
   console.log(`  Commit:                    e80565e`);
   console.log(`  Worker:                    uxcommunity-realtime-staging`);
   console.log(`  Staging URL:               ${WS_BASE_URL}`);
-  console.log(`  USE_WEBSOCKET_OWNERSHIP:   true`);
+  console.log(`  Architecture:              single (CommunityDO direct WebSocket ownership)`);
   console.log(`  Test duration:             ${testDuration}s`);
 
   console.log("\n## Connections");
@@ -642,8 +642,8 @@ async function main() {
   console.log(`  FanoutDO calls:              0 (expected: 0)`);
   console.log(`  Other per-recipient RPCs:     0 (expected: 0)`);
   console.log(`  Delivery path:  CommunityDO → ctx.getWebSockets() → ws.send() → Clients`);
-  console.log(`  PASS/FAIL: PASS (architecturally guaranteed by USE_WEBSOCKET_OWNERSHIP=true)`);
-  console.log(`  Evidence: With USE_WEBSOCKET_OWNERSHIP=true, the Worker entry (index.ts)`);
+  console.log(`  PASS/FAIL: PASS (architecturally guaranteed by direct WebSocket ownership)`);
+  console.log(`  Evidence: CommunityDO owns connections directly via ctx.getWebSockets()`);
   console.log(`    routes chat: rooms directly to COMMUNITY_DO (Room). CommunityDO holds`);
   console.log(`    WebSocket connections via ctx.get<WebSockets>() and delivers via`);
   console.log(`    ws.send(). UserDO is never called for community room delivery.`);

@@ -3,14 +3,11 @@
 /**
  * Singleton browser client for the Cloudflare realtime service.
  *
- * Architecture (USE_WEBSOCKET_OWNERSHIP=true):
+ * Architecture:
  *   Component → realtimeClient (singleton) → N WebSockets → CommunityDOs
  *   Each community-scoped room (chat:*, threads:*, etc.) gets its own
  *   WebSocket directly to the CommunityDO. User-scoped rooms (notifications:*, profile:*)
  *   still connect to UserDO.
- *
- * Architecture (USE_WEBSOCKET_OWNERSHIP=false, legacy):
- *   Component → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
  * Reference-counted subscriptions:
  *   Each room tracks:

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Smoke test for staging WebSocket ownership architecture.
+ * Smoke test for staging realtime service.
  * Tests: connect, join, subscribe, publish, receive.
- * USE_WEBSOCKET_OWNERSHIP=true → community rooms go directly to CommunityDO.
+ * Community rooms go directly to CommunityDO.
  */
 
 import { SignJWT } from "jose";
@@ -34,14 +34,14 @@ async function main() {
   const token = await createToken(userId);
   const room = `chat:${COMMUNITY_ID}`;
 
-  // With USE_WEBSOCKET_OWNERSHIP=true, community rooms go to CommunityDO directly
+  // Community rooms go to CommunityDO directly
   const wsUrl = `${WS_BASE}/ws?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
 
   console.log("=== SMOKE TEST ===");
   console.log(`  Staging URL:  ${WS_BASE}`);
   console.log(`  Room:         ${room}`);
   console.log(`  User:         ${userId}`);
-  console.log(`  Architecture: USE_WEBSOCKET_OWNERSHIP=true (CommunityDO direct)`);
+  console.log(`  Architecture: CommunityDO direct WebSocket ownership`);
   console.log("");
 
   // 1. CONNECT
@@ -136,7 +136,7 @@ async function main() {
   console.log("");
   console.log("=== ARCHITECTURE VERIFICATION ===");
   console.log(`  Connection was to room: ${room}`);
-  console.log(`  With USE_WEBSOCKET_OWNERSHIP=true, this connects DIRECTLY to CommunityDO`);
+  console.log(`  This connects DIRECTLY to CommunityDO`);
   console.log(`  CommunityDO owns the WebSocket connection`);
   console.log(`  Delivery happens via ctx.getWebSockets() → ws.send()`);
   console.log(`  UserDO is NOT in the community message-delivery path`);

@@ -6,12 +6,9 @@
  * each get their own WebSocket directly to the CommunityDO.
  * User-scoped rooms (notifications:*, profile:*) share a connection to UserDO.
  *
- * Architecture (USE_WEBSOCKET_OWNERSHIP=true):
+ * Architecture:
  *   Hook → realtimeClient (singleton) → N WebSockets → CommunityDOs
  *   0 RPCs for message delivery.
- *
- * Architecture (USE_WEBSOCKET_OWNERSHIP=false, legacy):
- *   Hook → realtimeClient (singleton) → 1 WebSocket → UserDO → Community DOs
  *
  * Authentication: passes the session JWT as a query parameter since React
  * Native's WebSocket API does not support custom headers.
