@@ -3,44 +3,20 @@ import type { Env } from "./env";
 
 /**
  * User Durable Object — ONE per user. Owns the single client WebSocket
- * and routes messages to community DOs via RPC.
+ * for user-scoped rooms (notifications, profile, designers-studio).
  *
- * Architecture (RPC-based):
- *   Client → UserDO (1 physical WebSocket) → RPC → CommunityDO
- *   CommunityDO → RPC deliverEvent() → UserDO → Client(s)
+ * Community-scoped rooms (chat, threads, events, resources, showcase, rules)
+ * are handled by CommunityDO directly — 0 RPCs.
  *
- * Hibernation-safe state model:
- *   Survives DO hibernation/eviction:
- *     WS attachments (via serializeAttachment/deserializeAttachment):
- *       Client WS: { userId: string }
- *     Persistent storage:
- *       community_subs:${userId}:${communityId}: { topics: string[], gen: number }
- *
- *   Lost on hibernation (rebuilt on wake):
- *     this.clients Map → rebuilt from ctx.getWebSockets() client attachments
- *
- * Race prevention:
- *   gen (generation) counter on subscriptions prevents stale unsubscribe from
- *   deleting a newer subscribe. Each subscribe increments gen; unsubscribe
- *   only deletes if gen matches.
- *
- * Multiple devices/tabs:
- *   One UserDO can have multiple client WebSocket connections (browser tabs,
- *   mobile devices). Each has its own subscriptions map. deliverEvent()
- *   iterates ALL clients but checks room+topic match per client.
+ * State model:
+ *   WebSocket attachment: { userId: string }
+ *   In-memory: topic subscriptions per WebSocket connection
  */
 
 interface ClientState {
   userId: string;
-  subscriptions: Map<string, SubscriptionEntry>;
+  subscriptions: Map<string, Set<string>>; // room → Set<topics>
 }
-
-interface SubscriptionEntry {
-  topics: Set<string>;
-  gen: number;
-}
-
-const COMMUNITY_SUB_KEY_PREFIX = "community_subs:";
 
 export class UserDO extends DurableObject<Env> {
   private clients = new Map<WebSocket, ClientState>();
@@ -49,6 +25,11 @@ export class UserDO extends DurableObject<Env> {
   // ── Fetch handler ────────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
+    // Server-side publish via HTTP POST
+    if (request.headers.get("x-realtime-publish-secret")) {
+      return this.publish(request);
+    }
+
     if (!this.reconstructed) {
       await this.ctx.blockConcurrencyWhile(() => this.reconstructState());
       this.reconstructed = true;
@@ -75,36 +56,6 @@ export class UserDO extends DurableObject<Env> {
         subscriptions: new Map(),
       });
     }
-
-    // Rebuild subscription state from storage
-    const userIds = new Set<string>();
-    for (const [, state] of this.clients) {
-      userIds.add(state.userId);
-    }
-
-    for (const userId of userIds) {
-      const keys = await this.findStorageKeys(`${COMMUNITY_SUB_KEY_PREFIX}${userId}:`);
-      for (const key of keys) {
-        const sub = await this.ctx.storage.get<{ topics: string[]; gen: number }>(key);
-        if (!sub || sub.topics.length === 0) continue;
-
-        const communityId = key.slice(`${COMMUNITY_SUB_KEY_PREFIX}${userId}:`.length);
-
-        for (const [, state] of this.clients) {
-          if (state.userId !== userId) continue;
-
-          state.subscriptions.set(communityId, {
-            topics: new Set(sub.topics),
-            gen: sub.gen ?? 0,
-          });
-        }
-      }
-    }
-  }
-
-  private async findStorageKeys(prefix: string): Promise<string[]> {
-    const result = await this.ctx.storage.list({ prefix });
-    return [...result.keys()].map(String);
   }
 
   // ── WebSocket lifecycle ───────────────────────────────────────────────
@@ -152,25 +103,15 @@ export class UserDO extends DurableObject<Env> {
       if (!msg.user || msg.user.id !== state.userId) return;
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
     } else if (msg.t === "subscribe" && msg.room && msg.topic) {
-      await this.handleSubscribe(state, msg.room, msg.topic);
+      this.handleSubscribe(state, msg.room, msg.topic);
     } else if (msg.t === "unsubscribe" && msg.room && msg.topic) {
-      await this.handleUnsubscribe(state, msg.room, msg.topic);
+      this.handleUnsubscribe(state, msg.room, msg.topic);
     } else if (msg.t === "publish" && msg.room && msg.topic) {
-      await this.handlePublish(state, msg.room, msg.topic, msg.data);
+      this.handlePublish(state, msg.room, msg.topic, msg.data);
     }
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
-    const state = this.clients.get(ws);
-    if (!state) return;
-
-    // Unsubscribe from all communities
-    for (const [communityId, entry] of state.subscriptions) {
-      for (const topic of entry.topics) {
-        this.callCommunityUnsubscribe(state.userId, communityId, topic);
-      }
-      await this.removeCommunitySub(state.userId, communityId);
-    }
     this.clients.delete(ws);
   }
 
@@ -178,168 +119,86 @@ export class UserDO extends DurableObject<Env> {
     await this.webSocketClose(ws);
   }
 
-  // ── Subscription routing (race-safe) ─────────────────────────────────
+  // ── HTTP publish (server-side) ───────────────────────────────────────
 
-  private async handleSubscribe(
-    state: ClientState,
-    room: string,
-    topic: string,
-  ): Promise<void> {
-    let entry = state.subscriptions.get(room);
-    if (!entry) {
-      entry = { topics: new Set(), gen: 0 };
-      state.subscriptions.set(room, entry);
+  private async publish(request: Request): Promise<Response> {
+    let body: { room?: string; topic?: string; data?: unknown; exclude_user?: string };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return new Response("Bad request", { status: 400 });
     }
-    entry.topics.add(topic);
-    entry.gen++;
+    if (!body.room || !body.topic) {
+      return new Response("Bad request", { status: 400 });
+    }
 
-    // Persist with generation counter
-    await this.ctx.storage.put(this.storageKey(state.userId, room), {
-      topics: [...entry.topics],
-      gen: entry.gen,
+    const eventMsg = JSON.stringify({
+      t: "event",
+      room: body.room,
+      topic: body.topic,
+      data: body.data,
+      sender: body.exclude_user,
     });
 
-    // Call CommunityDO RPC to subscribe
-    await this.callCommunitySubscribe(state.userId, room, [...entry.topics]);
-  }
-
-  private async handleUnsubscribe(
-    state: ClientState,
-    room: string,
-    topic: string,
-  ): Promise<void> {
-    const entry = state.subscriptions.get(room);
-    if (!entry) return;
-
-    entry.topics.delete(topic);
-    entry.gen++;
-
-    if (entry.topics.size === 0) {
-      state.subscriptions.delete(room);
-      await this.removeCommunitySub(state.userId, room);
-    } else {
-      await this.ctx.storage.put(this.storageKey(state.userId, room), {
-        topics: [...entry.topics],
-        gen: entry.gen,
-      });
-    }
-
-    // Call CommunityDO RPC to unsubscribe
-    await this.callCommunityUnsubscribe(state.userId, room, topic);
-  }
-
-  private async handlePublish(
-    state: ClientState,
-    room: string,
-    topic: string,
-    data: unknown,
-  ): Promise<void> {
-    const entry = state.subscriptions.get(room);
-    if (!entry || !entry.topics.has(topic)) return;
-
-    // Call CommunityDO RPC to publish
-    await this.callCommunityPublish(state.userId, room, topic, data);
-  }
-
-  // ── Community DO RPC calls ────────────────────────────────────────────
-
-  private getCommunityStub(roomName: string) {
-    return this.env.COMMUNITY_DO.get(this.env.COMMUNITY_DO.idFromName(roomName));
-  }
-
-  private async callCommunitySubscribe(
-    userId: string,
-    roomName: string,
-    topics: string[],
-  ): Promise<void> {
-    try {
-      const stub = this.getCommunityStub(roomName);
-      await stub.subscribe(userId, topics, this.env.RPC_SECRET);
-    } catch {
-      // RPC failed — community will re-subscribe on next client message
-    }
-  }
-
-  private async callCommunityUnsubscribe(
-    userId: string,
-    roomName: string,
-    topic: string,
-  ): Promise<void> {
-    try {
-      const stub = this.getCommunityStub(roomName);
-      await stub.unsubscribe(userId, topic, this.env.RPC_SECRET);
-    } catch {
-      // RPC failed — community will re-subscribe on next client message
-    }
-  }
-
-  private async callCommunityPublish(
-    userId: string,
-    roomName: string,
-    topic: string,
-    data: unknown,
-  ): Promise<void> {
-    try {
-      const stub = this.getCommunityStub(roomName);
-      await stub.publishMessage(userId, topic, data, this.env.RPC_SECRET);
-    } catch {
-      // RPC failed — client will retry or recover via DB
-    }
-  }
-
-  // ── RPC: deliverEvent (called by CommunityDO) ─────────────────────────
-
-  /**
-   * Called by CommunityDO via RPC to deliver an event to this user's clients.
-   *
-   * Uses the existing subscription state (room + topic) to determine which
-   * client sockets should receive the event. One user may have multiple
-   * browser tabs/devices — each is checked independently.
-   *
-   * Performance:
-   *   - Iterates all client sockets for this user
-   *   - Checks room+topic match per client (O(clients × 1) per event)
-   *   - Only sends to matching clients
-   */
-  async deliverEvent(
-    room: string,
-    topic: string,
-    data: unknown,
-    sender?: string,
-  ): Promise<void> {
-    if (!this.reconstructed) {
-      await this.ctx.blockConcurrencyWhile(() => {
-        if (!this.reconstructed) {
-          this.reconstructState();
-          this.reconstructed = true;
-        }
-      });
-    }
-
     for (const [ws, state] of this.clients) {
-      const entry = state.subscriptions.get(room);
-      if (!entry || entry.topics.size === 0) continue;
-      if (!entry.topics.has(topic)) continue;
-      if (sender && sender === state.userId) continue;
+      const topics = state.subscriptions.get(body.room);
+      if (!topics?.has(body.topic)) continue;
+      if (body.exclude_user && state.userId === body.exclude_user) continue;
 
-      this.sendToClient(ws, {
-        t: "event",
-        room,
-        topic,
-        data,
-        sender,
-      });
+      try {
+        ws.send(eventMsg);
+      } catch {
+        // WebSocket send failed — will be cleaned up on close
+      }
+    }
+
+    return new Response("ok");
+  }
+
+  // ── Subscription handling (user-scoped rooms) ─────────────────────────
+
+  private handleSubscribe(state: ClientState, room: string, topic: string): void {
+    let topics = state.subscriptions.get(room);
+    if (!topics) {
+      topics = new Set();
+      state.subscriptions.set(room, topics);
+    }
+    topics.add(topic);
+  }
+
+  private handleUnsubscribe(state: ClientState, room: string, topic: string): void {
+    const topics = state.subscriptions.get(room);
+    if (topics) {
+      topics.delete(topic);
+      if (topics.size === 0) {
+        state.subscriptions.delete(room);
+      }
     }
   }
 
-  // ── Storage helpers ──────────────────────────────────────────────────
+  private handlePublish(state: ClientState, room: string, topic: string, data: unknown): void {
+    const topics = state.subscriptions.get(room);
+    if (!topics?.has(topic)) return;
 
-  private storageKey(userId: string, communityId: string): string {
-    return `${COMMUNITY_SUB_KEY_PREFIX}${userId}:${communityId}`;
-  }
+    const eventMsg = JSON.stringify({
+      t: "event",
+      room,
+      topic,
+      data,
+      sender: state.userId,
+    });
 
-  private async removeCommunitySub(userId: string, communityId: string): Promise<void> {
-    await this.ctx.storage.delete(this.storageKey(userId, communityId));
+    for (const [clientWs, clientState] of this.clients) {
+      const clientTopics = clientState.subscriptions.get(room);
+      if (!clientTopics?.has(topic)) continue;
+      if (clientState.userId === state.userId) continue;
+
+      try {
+        clientWs.send(eventMsg);
+      } catch {
+        // WebSocket send failed — will be cleaned up on close
+      }
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────

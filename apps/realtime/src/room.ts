@@ -4,63 +4,284 @@ import type { PublishRequest } from "./types";
 
 /**
  * Community Durable Object — ONE per community. Handles all logical realtime
- * topics (chat, typing, presence, threads, events, resources).
+ * topics (chat, typing, presence, threads, events, resources, showcase, rules).
  *
- * Architecture (RPC-based):
- *   Client → UserDO → RPC subscribe/unsubscribe/publish → CommunityDO
- *   CommunityDO → RPC deliverEvent() → UserDO → Client(s)
+ * Architecture (direct WebSocket ownership):
+ *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
+ *   0 RPCs for message delivery.
  *
- * Dual-index subscriber store:
- *   subscriptionsByUser:  userId → Set<topic>
- *   subscriptionsByTopic: topic → Set<userId>
+ * State scoping:
+ *   SOCKET-scoped (per individual WebSocket connection):
+ *     wsToUser[ws]   = userId
+ *     wsTopics[ws]    = Set<topics> this socket is subscribed to
+ *     userSockets[userId] = Set<WebSocket> all sockets for this user
  *
- * Both indices are kept in-memory for O(topic) broadcast lookup.
- * Persisted to SQLite for hibernation survival.
+ *   USER-scoped (for efficient fan-out, shared across all sockets of a user):
+ *     subscriptionsByUser[userId]  = Set<topics> (union of all socket subscriptions)
+ *     subscriptionsByTopic[topic]  = Set<userIds> subscribed to that topic
  *
- * Storage key format: sub:${userId}:${topic}
- *   - One entry per user-topic pair
- *   - Enables efficient listing for unsubscribe and hibernation rebuild
+ * Multi-device safety:
+ *   When the same user has multiple sockets, closing one socket only removes
+ *   topics from the dual-index if NO OTHER socket of that user still has
+ *   that topic. This prevents one tab's close from killing another tab's
+ *   subscriptions.
+ *
+ * WebSocket state (hibernation-safe):
+ *   Each WebSocket attachment stores { userId, topics: string[] }.
+ *   On wake, ctx.getWebSockets() + deserializeAttachment() rebuilds all maps.
  *
  * Authorization:
- *   - RPC methods verify caller via RPC_SECRET (defense-in-depth)
+ *   - WebSocket upgrade requires x-realtime-uid header (set by Worker after JWT auth)
  *   - Membership checked via internal API (fail-closed)
  *
  * Event classification:
- *   - EPHEMERAL (typing, presence): drop on RPC failure, no retry
- *   - DURABLE (chat, edit, delete, reaction): 1 retry, client recovers via DB
+ *   - EPHEMERAL (typing, presence): drop on delivery failure, no retry
+ *   - DURABLE (chat, edit, delete, reaction): client recovers via DB
  */
 
-interface Member {
-  name: string | null;
-  avatar: string | null;
-  connections: number;
+interface WebSocketAttachment {
+  userId: string;
+  topics: string[];
 }
-
-const MEMBERS_KEY = "members";
-const MAX_MESSAGE_BYTES = 8192;
-const SUB_KEY_PREFIX = "sub:";
-
-/** Events that are ephemeral — no retry on RPC failure. */
-const EPHEMERAL_TOPICS = new Set(["typing", "presence"]);
 
 export class Room extends DurableObject<Env> {
   /**
-   * Dual-index subscriber store.
-   * subscriptionsByUser[userId] = Set of topics the user is subscribed to.
+   * Dual-index subscriber store (USER-scoped, for efficient fan-out).
+   * subscriptionsByUser[userId] = Set of topics the user is subscribed to (across all sockets).
    * subscriptionsByTopic[topic] = Set of userIds subscribed to that topic.
    */
   private subscriptionsByUser = new Map<string, Set<string>>();
   private subscriptionsByTopic = new Map<string, Set<string>>();
   private subscribersReconstructed = false;
 
-  // ── Fetch handler (HTTP only — no WebSocket upgrades) ────────────────
+  /**
+   * WebSocket-ownership maps (SOCKET-scoped, rebuilt after hibernation).
+   * wsToUser[ws]     = userId of the connected client.
+   * wsTopics[ws]     = Set<topics> this SPECIFIC socket is subscribed to.
+   * userSockets[userId] = Set<WebSocket> all active sockets for this user.
+   */
+  private wsToUser = new Map<WebSocket, string>();
+  private wsTopics = new Map<WebSocket, Set<string>>();
+  private userSockets = new Map<string, Set<WebSocket>>();
+
+  // ── Fetch handler ──────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
     }
+
+    // WebSocket upgrade — CommunityDO owns connections directly
+    if (request.headers.get("Upgrade") === "websocket") {
+      return this.upgrade(request);
+    }
+
     return new Response("Not found", { status: 404 });
+  }
+
+  // ── WebSocket lifecycle (hibernation-safe) ─────────────────────────
+
+  private async upgrade(request: Request): Promise<Response> {
+    const userId = request.headers.get("x-realtime-uid");
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    // Check membership before accepting connection.
+    // Sub-entity rooms (thread-comments:*, resource-comments:*) don't carry a
+    // community ID in the room name, so skip the check — authorization is
+    // handled by the API routes that publish to these rooms.
+    const room = this.roomName();
+    const isSubEntityRoom = room.startsWith("thread-comments:") || room.startsWith("resource-comments:");
+    if (!isSubEntityRoom) {
+      const isMember = await this.checkMembership(userId);
+      if (!isMember) {
+        return new Response("Forbidden", { status: 403 });
+      }
+    }
+
+    await this.ensureSubscribers();
+
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+
+    // Hibernation API: accept without keeping a reference
+    this.ctx.acceptWebSocket(server);
+
+    // Attach metadata to the WebSocket (survives hibernation)
+    const attachment: WebSocketAttachment = { userId, topics: [] };
+    server.serializeAttachment(attachment);
+
+    // Track in memory — socket-scoped state
+    this.wsToUser.set(server, userId);
+    this.wsTopics.set(server, new Set());
+
+    // Track this socket under the user (for multi-device cleanup)
+    let sockets = this.userSockets.get(userId);
+    if (!sockets) {
+      sockets = new Set();
+      this.userSockets.set(userId, sockets);
+    }
+    sockets.add(server);
+
+    return new Response(null, { status: 101, webSocket: client });
+  }
+
+  async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (typeof message !== "string") return;
+
+    let msg: {
+      t?: string;
+      room?: string;
+      topic?: string;
+      data?: unknown;
+      user?: { id: string; name: string; avatar: string | null };
+    };
+    try {
+      msg = JSON.parse(message);
+    } catch {
+      return;
+    }
+
+    const userId = this.wsToUser.get(ws);
+    if (!userId) return;
+
+    if (msg.t === "join") {
+      if (!msg.user || msg.user.id !== userId) return;
+      this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
+    } else if (msg.t === "subscribe" && msg.topic) {
+      await this.handleWsSubscribe(ws, userId, msg.topic);
+    } else if (msg.t === "unsubscribe" && msg.topic) {
+      await this.handleWsUnsubscribe(ws, userId, msg.topic);
+    } else if (msg.t === "publish" && msg.topic) {
+      await this.handleWsPublish(ws, userId, msg.topic, msg.data);
+    }
+  }
+
+  async webSocketClose(ws: WebSocket): Promise<void> {
+    const userId = this.wsToUser.get(ws);
+    if (!userId) return;
+
+    // Remove this socket's subscriptions from the dual-index
+    // Only remove from dual-index if NO OTHER socket of this user still has this topic
+    const topics = this.wsTopics.get(ws);
+    if (topics) {
+      const otherSockets = this.userSockets.get(userId);
+      for (const topic of topics) {
+        // Check if any OTHER socket of this user still subscribes to this topic
+        let stillSubscribed = false;
+        if (otherSockets) {
+          for (const otherWs of otherSockets) {
+            if (otherWs === ws) continue;
+            const otherTopics = this.wsTopics.get(otherWs);
+            if (otherTopics?.has(topic)) {
+              stillSubscribed = true;
+              break;
+            }
+          }
+        }
+        if (!stillSubscribed) {
+          this.removeFromTopicIndex(userId, topic);
+        }
+      }
+      this.wsTopics.delete(ws);
+    }
+
+    // Remove this socket from the user's socket set
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      sockets.delete(ws);
+      if (sockets.size === 0) {
+        this.userSockets.delete(userId);
+      }
+    }
+
+    this.wsToUser.delete(ws);
+  }
+
+  async webSocketError(ws: WebSocket): Promise<void> {
+    await this.webSocketClose(ws);
+  }
+
+  // ── WebSocket message handlers ─────────────────────────────────────
+
+  private async handleWsSubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
+    // Add topic to this socket's topic set
+    let topics = this.wsTopics.get(ws);
+    if (!topics) {
+      topics = new Set();
+      this.wsTopics.set(ws, topics);
+    }
+    topics.add(topic);
+
+    // Update dual index (user-scoped, for fan-out)
+    let userTopics = this.subscriptionsByUser.get(userId);
+    if (!userTopics) {
+      userTopics = new Set();
+      this.subscriptionsByUser.set(userId, userTopics);
+    }
+    userTopics.add(topic);
+
+    let topicSubs = this.subscriptionsByTopic.get(topic);
+    if (!topicSubs) {
+      topicSubs = new Set();
+      this.subscriptionsByTopic.set(topic, topicSubs);
+    }
+    topicSubs.add(userId);
+
+    // Update WebSocket attachment
+    const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+    if (attachment) {
+      if (!attachment.topics.includes(topic)) {
+        attachment.topics.push(topic);
+      }
+      ws.serializeAttachment(attachment);
+    }
+  }
+
+  private async handleWsUnsubscribe(ws: WebSocket, userId: string, topic: string): Promise<void> {
+    // Remove topic from this socket's topic set
+    const topics = this.wsTopics.get(ws);
+    if (topics) {
+      topics.delete(topic);
+    }
+
+    // Check if any OTHER socket of this user still has this topic
+    let stillSubscribed = false;
+    const sockets = this.userSockets.get(userId);
+    if (sockets) {
+      for (const otherWs of sockets) {
+        if (otherWs === ws) continue;
+        const otherTopics = this.wsTopics.get(otherWs);
+        if (otherTopics?.has(topic)) {
+          stillSubscribed = true;
+          break;
+        }
+      }
+    }
+
+    // Only remove from dual-index if no other socket has this topic
+    if (!stillSubscribed) {
+      this.removeFromTopicIndex(userId, topic);
+    }
+
+    // Update WebSocket attachment
+    const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+    if (attachment) {
+      attachment.topics = attachment.topics.filter((t) => t !== topic);
+      ws.serializeAttachment(attachment);
+    }
+  }
+
+  private async handleWsPublish(ws: WebSocket, userId: string, topic: string, data: unknown): Promise<void> {
+    // Check if THIS socket is subscribed to the topic
+    const topics = this.wsTopics.get(ws);
+    if (!topics?.has(topic)) return;
+
+    // Broadcast to all subscribers (sender excluded via broadcastByTopic)
+    await this.broadcastByTopic(topic, data, userId, userId);
   }
 
   // ── Subscriber index reconstruction after hibernation ────────────────
@@ -69,140 +290,74 @@ export class Room extends DurableObject<Env> {
     if (this.subscribersReconstructed) return;
     await this.ctx.blockConcurrencyWhile(async () => {
       if (this.subscribersReconstructed) return;
-      await this.reconstructSubscribers();
+      await this.reconstructWebSockets();
+      this.rebuildUserScopedMaps();
       this.subscribersReconstructed = true;
     });
   }
 
-  private async reconstructSubscribers(): Promise<void> {
-    const entries = await this.ctx.storage.list({ prefix: SUB_KEY_PREFIX });
-    for (const [key, value] of entries) {
-      const payload = value as { userId: string; topic: string } | undefined;
-      if (!payload?.userId || !payload?.topic) continue;
+  private async reconstructWebSockets(): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) {
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+      if (!attachment?.userId) continue;
 
-      let userTopics = this.subscriptionsByUser.get(payload.userId);
-      if (!userTopics) {
-        userTopics = new Set();
-        this.subscriptionsByUser.set(payload.userId, userTopics);
-      }
-      userTopics.add(payload.topic);
+      const userId = attachment.userId;
 
-      let topicSubs = this.subscriptionsByTopic.get(payload.topic);
-      if (!topicSubs) {
-        topicSubs = new Set();
-        this.subscriptionsByTopic.set(payload.topic, topicSubs);
+      // Rebuild socket-scoped state
+      this.wsToUser.set(ws, userId);
+
+      let topics = this.wsTopics.get(ws);
+      if (!topics) {
+        topics = new Set();
+        this.wsTopics.set(ws, topics);
       }
-      topicSubs.add(payload.userId);
+      for (const topic of attachment.topics) {
+        topics.add(topic);
+      }
+
+      // Rebuild user → sockets index
+      let sockets = this.userSockets.get(userId);
+      if (!sockets) {
+        sockets = new Set();
+        this.userSockets.set(userId, sockets);
+      }
+      sockets.add(ws);
     }
   }
 
-  // ── RPC: subscribe ───────────────────────────────────────────────────
-
   /**
-   * Called by UserDO via RPC when a user subscribes to a topic.
-   *
-   * Authorization: caller must provide matching RPC_SECRET.
-   * Membership: checked via internal API (fail-closed).
+   * Rebuild user-scoped dual-index maps from socket-scoped maps.
+   * Called after reconstructWebSockets() to ensure subscriptionsByUser
+   * and subscriptionsByTopic are consistent with connected WebSockets.
+   * Subscription state lives in WebSocket attachments — no per-subscribe
+   * storage writes needed.
    */
-  async subscribe(
-    userId: string,
-    topics: string | string[],
-    rpcSecret?: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    if (rpcSecret !== this.env.RPC_SECRET) {
-      return { ok: false, error: "unauthorized" };
-    }
+  private rebuildUserScopedMaps(): void {
+    this.subscriptionsByUser.clear();
+    this.subscriptionsByTopic.clear();
 
-    const isMember = await this.checkMembership(userId);
-    if (!isMember) {
-      return { ok: false, error: "not_member" };
-    }
+    for (const [ws, userId] of this.wsToUser) {
+      const topics = this.wsTopics.get(ws);
+      if (!topics) continue;
 
-    await this.ensureSubscribers();
-
-    const topicList = Array.isArray(topics) ? topics : [topics];
-    for (const topic of topicList) {
-      // Update dual index
       let userTopics = this.subscriptionsByUser.get(userId);
       if (!userTopics) {
         userTopics = new Set();
         this.subscriptionsByUser.set(userId, userTopics);
       }
-      userTopics.add(topic);
-
-      let topicSubs = this.subscriptionsByTopic.get(topic);
-      if (!topicSubs) {
-        topicSubs = new Set();
-        this.subscriptionsByTopic.set(topic, topicSubs);
+      for (const topic of topics) {
+        userTopics.add(topic);
       }
-      topicSubs.add(userId);
 
-      // Persist to SQLite
-      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
-      await this.ctx.storage.put(key, { userId, topic });
-    }
-
-    return { ok: true };
-  }
-
-  // ── RPC: unsubscribe ─────────────────────────────────────────────────
-
-  /**
-   * Called by UserDO via RPC when a user unsubscribes from a topic.
-   */
-  async unsubscribe(
-    userId: string,
-    topics: string | string[],
-    rpcSecret?: string,
-  ): Promise<{ ok: boolean; error?: string }> {
-    if (rpcSecret !== this.env.RPC_SECRET) {
-      return { ok: false, error: "unauthorized" };
-    }
-
-    await this.ensureSubscribers();
-
-    const topicList = Array.isArray(topics) ? topics : [topics];
-    for (const topic of topicList) {
-      // Update dual index
-      const userTopics = this.subscriptionsByUser.get(userId);
-      if (userTopics) {
-        userTopics.delete(topic);
-        if (userTopics.size === 0) {
-          this.subscriptionsByUser.delete(userId);
+      for (const topic of topics) {
+        let topicSubs = this.subscriptionsByTopic.get(topic);
+        if (!topicSubs) {
+          topicSubs = new Set();
+          this.subscriptionsByTopic.set(topic, topicSubs);
         }
+        topicSubs.add(userId);
       }
-
-      const topicSubs = this.subscriptionsByTopic.get(topic);
-      if (topicSubs) {
-        topicSubs.delete(userId);
-        if (topicSubs.size === 0) {
-          this.subscriptionsByTopic.delete(topic);
-        }
-      }
-
-      // Remove from SQLite
-      const key = `${SUB_KEY_PREFIX}${userId}:${topic}`;
-      await this.ctx.storage.delete(key);
     }
-
-    return { ok: true };
-  }
-
-  // ── RPC: publish (from UserDO client message) ────────────────────────
-
-  /**
-   * Called by UserDO via RPC when a user publishes a message.
-   */
-  async publishMessage(
-    userId: string,
-    topic: string,
-    data: unknown,
-    rpcSecret?: string,
-  ): Promise<void> {
-    if (rpcSecret !== this.env.RPC_SECRET) return;
-
-    await this.ensureSubscribers();
-    await this.broadcastByTopic(topic, data, userId, userId);
   }
 
   // ── HTTP publish (server-side) ───────────────────────────────────────
@@ -228,17 +383,8 @@ export class Room extends DurableObject<Env> {
 
   /**
    * Broadcast an event to all subscribers of a topic.
-   *
-   * Performance:
-   *   - Subscriber lookup: O(1) via subscriptionsByTopic.get(topic)
-   *   - Delivery: O(number of subscribers for that topic)
-   *
-   * For 500 active chat subscribers:
-   *   1 topic lookup + ~500 RPC deliveries (concurrent)
-   *
-   * Event classification:
-   *   - EPHEMERAL (typing, presence): no retry on RPC failure
-   *   - DURABLE (chat, edit, delete, reaction): 1 retry with 100ms backoff
+   * Iterates ctx.getWebSockets() and sends directly via ws.send().
+   * 0 RPC calls.
    */
   private async broadcastByTopic(
     topic: string,
@@ -249,46 +395,45 @@ export class Room extends DurableObject<Env> {
     const topicSubs = this.subscriptionsByTopic.get(topic);
     if (!topicSubs || topicSubs.size === 0) return;
 
-    const isEphemeral = EPHEMERAL_TOPICS.has(topic);
-    const roomName = this.roomName();
+    const eventMsg = JSON.stringify({
+      t: "event",
+      room: this.roomName(),
+      topic,
+      data,
+      sender: senderUserId,
+    });
 
-    const calls: Promise<void>[] = [];
-    for (const userId of topicSubs) {
+    for (const ws of this.ctx.getWebSockets()) {
+      const userId = this.wsToUser.get(ws);
+      if (!userId) continue;
       if (excludeUserId && userId === excludeUserId) continue;
+      const topics = this.wsTopics.get(ws);
+      if (!topics?.has(topic)) continue;
 
-      const call = this.deliverToUser(roomName, topic, data, userId, isEphemeral, senderUserId);
-      calls.push(call);
+      try {
+        ws.send(eventMsg);
+      } catch {
+        // WebSocket send failed — will be cleaned up on close
+      }
     }
-
-    await Promise.allSettled(calls);
   }
 
-  /**
-   * Deliver an event to a specific user via UserDO RPC.
-   * Ephemeral events: no retry.
-   * Durable events: 1 retry with 100ms backoff.
-   */
-  private async deliverToUser(
-    room: string,
-    topic: string,
-    data: unknown,
-    userId: string,
-    isEphemeral: boolean,
-    senderUserId?: string,
-  ): Promise<void> {
-    const stub = this.env.USER_DO.get(this.env.USER_DO.idFromName(`user:${userId}`));
+  // ── Index helpers ──────────────────────────────────────────────────
 
-    try {
-      await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
-    } catch (err) {
-      if (isEphemeral) {
-        return;
+  private removeFromTopicIndex(userId: string, topic: string): void {
+    const userTopics = this.subscriptionsByUser.get(userId);
+    if (userTopics) {
+      userTopics.delete(topic);
+      if (userTopics.size === 0) {
+        this.subscriptionsByUser.delete(userId);
       }
-      await new Promise((r) => setTimeout(r, 100));
-      try {
-        await stub.deliverEvent(room, topic, data, senderUserId ?? undefined);
-      } catch {
-        // Second failure: drop
+    }
+
+    const topicSubs = this.subscriptionsByTopic.get(topic);
+    if (topicSubs) {
+      topicSubs.delete(userId);
+      if (topicSubs.size === 0) {
+        this.subscriptionsByTopic.delete(topic);
       }
     }
   }
@@ -299,28 +444,17 @@ export class Room extends DurableObject<Env> {
   private static readonly MEMBERSHIP_CACHE_TTL_MS = 60_000;
   private membershipCache = new Map<string, { ok: boolean; ts: number }>();
 
-  /**
-   * Verify the user is a member of this community via the internal API.
-   *
-   * Fail-closed: any error (network, timeout, malformed, non-200) → reject.
-   *
-   * If API_URL is not configured, the Worker-level JWT auth is the only
-   * gate. Set API_URL + API_SECRET in production to enable community-level
-   * membership checks.
-   */
   private async checkMembership(userId: string): Promise<boolean> {
     if (!this.env.API_URL) return true;
 
     const communityId = this.communityIdFromRoom();
     const cacheKey = `${communityId}:${userId}`;
 
-    // Check in-memory cache first (avoids repeated storage reads)
     const cached = this.membershipCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < Room.MEMBERSHIP_CACHE_TTL_MS) {
       return cached.ok;
     }
 
-    // Check internal API (fail-closed)
     try {
       const response = await fetch(
         `${this.env.API_URL}/api/communities/${communityId}/members/${userId}/check`,
@@ -333,22 +467,18 @@ export class Room extends DurableObject<Env> {
         },
       );
 
-      // Parse JSON response — treat any non-200 as rejection
       let authorized = false;
       if (response.ok) {
         try {
           const body = await response.json() as { ok?: boolean };
           authorized = body.ok === true;
         } catch {
-          // Malformed JSON → reject
           authorized = false;
         }
       }
 
-      // Update in-memory cache
       this.membershipCache.set(cacheKey, { ok: authorized, ts: Date.now() });
 
-      // Also persist to storage for hibernation survival
       try {
         await this.ctx.storage.put(`auth:${cacheKey}`, {
           ok: authorized,
@@ -360,8 +490,6 @@ export class Room extends DurableObject<Env> {
 
       return authorized;
     } catch {
-      // Network error, timeout, or abort → reject (fail-closed)
-      // Clear stale cache on failure so next attempt re-checks
       this.membershipCache.delete(cacheKey);
       return false;
     }
@@ -377,5 +505,13 @@ export class Room extends DurableObject<Env> {
     const name = this.roomName();
     const idx = name.indexOf(":");
     return idx >= 0 ? name.slice(idx + 1) : name;
+  }
+
+  private sendToClient(ws: WebSocket, msg: unknown): void {
+    try {
+      ws.send(JSON.stringify(msg));
+    } catch {
+      /* ignore */
+    }
   }
 }

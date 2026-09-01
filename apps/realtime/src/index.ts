@@ -30,6 +30,22 @@ function parseCookies(header: string | null): Map<string, string> {
   return cookies;
 }
 
+/** Community-scoped room prefixes that route to CommunityDO for WebSocket ownership. */
+const COMMUNITY_ROOM_PREFIXES = [
+  "chat:",
+  "threads:",
+  "events:",
+  "resources:",
+  "showcase:",
+  "rules:",
+  "thread-comments:",
+  "resource-comments:",
+];
+
+function isCommunityRoom(room: string): boolean {
+  return COMMUNITY_ROOM_PREFIXES.some((prefix) => room.startsWith(prefix));
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -65,11 +81,15 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // Route based on room prefix:
-  //   user:${userId}  → UserDO  (client WebSocket gateway)
-  //   chat:${id} etc  → Room DO (community-scoped)
   const isUserRoom = room.startsWith("user:");
-  const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
+
+  let namespace: DurableObjectNamespace;
+  if (isUserRoom) {
+    namespace = env.USER_DO;
+  } else {
+    namespace = env.COMMUNITY_DO;
+  }
+
   const id = namespace.idFromName(room);
   const stub = namespace.get(id);
 
@@ -121,8 +141,10 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
     const chunk = events.slice(i, i + CHUNK);
     await Promise.all(
       chunk.map(async (event) => {
-        const id = env.COMMUNITY_DO.idFromName(event.room);
-        const stub = env.COMMUNITY_DO.get(id);
+        const isUserRoom = event.room.startsWith("user:");
+        const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
+        const id = namespace.idFromName(event.room);
+        const stub = namespace.get(id);
         return stub.fetch(
           new Request(request.url, {
             method: "POST",

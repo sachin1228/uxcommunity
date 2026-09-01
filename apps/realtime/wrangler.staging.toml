@@ -17,3 +17,7 @@ new_sqlite_classes = ["Room"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["UserDO"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = []

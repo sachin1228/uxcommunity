@@ -7,7 +7,6 @@ workers_dev = true
 # Secrets are injected via `wrangler secret put` in production:
 #   SESSION_SECRET           — shared with the web app (JWT signing secret)
 #   REALTIME_PUBLISH_SECRET  — server-to-server secret for the /publish endpoint
-#   RPC_SECRET               — defense-in-depth for DO-to-DO RPC calls
 #   API_SECRET               — internal API secret for membership checks
 
 [durable_objects]

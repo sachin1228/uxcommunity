@@ -6,7 +6,8 @@
  * to the correct handler.
  *
  * Connection model:
- *   Client → UserDO (user:${userId}) → Community DOs (chat:${communityId}, etc.)
+ *   Client → CommunityDO (direct WebSocket) → ws.send() → Client(s)
+ *   0 RPCs for message delivery.
  */
 
 // ── Server → Client ────────────────────────────────────────────────────────

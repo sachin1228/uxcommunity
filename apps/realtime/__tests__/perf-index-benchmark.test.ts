@@ -33,6 +33,7 @@ beforeAll(async () => {
   worker = await unstable_dev("src/index.ts", {
     configPath: "wrangler.toml",
     experimentalExcludeMiniflareV1: true,
+
   });
   baseUrl = `http://127.0.0.1:${worker.port}`;
 }, 30_000);
@@ -142,7 +143,7 @@ describe("Index benchmark: 10K subscriptions", () => {
 
     // Measure publish latency — the CommunityDO does:
     //   1. O(1) lookup: subscriptionsByTopic.get("chat") → Set of userIds
-    //   2. O(N) broadcast: iterate Set, call UserDO.deliverEvent() for each
+    //   2. O(N) broadcast: iterate ctx.getWebSockets(), send via ws.send() for each
     const publishTs = performance.now();
     const httpStart = performance.now();
     await fetch(`${baseUrl}/publish`, {
