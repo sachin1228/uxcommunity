@@ -8,11 +8,9 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 /**
  * Tracks how many members are currently online in a community.
  *
- * NOTE: The new Cloudflare DO architecture does not implement server-side
- * presence tracking for chat rooms. This hook returns the community member
- * count from the database as a fallback. To show true online counts, the
- * Room DO would need to track WebSocket connections and publish
- * presence_delta events.
+ * The Community Durable Object publishes a presence snapshot whenever a
+ * member joins or disconnects. Multiple tabs/devices belonging to the same
+ * member are folded into one online user by the server.
  */
 export function useOnlinePresence({
   communityId,
@@ -31,11 +29,11 @@ export function useOnlinePresence({
     realtimeClient.init({ id: currentUserId, name: null, avatar: null });
 
     const unsubRoom = realtimeClient.subscribe(chatRoom);
-    realtimeClient.connect();
-
     const unsubPresence = realtimeClient.onPresence(chatRoom, (users) => {
       setOnlineCount(users.length);
     });
+
+    realtimeClient.connect();
 
     return () => {
       unsubPresence();
