@@ -247,11 +247,26 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
               <button
                 key={emoji.codepoint}
                 onClick={() => onSelect(emoji.unicode)}
-                className="w-8 h-8 flex items-center justify-center rounded-md text-xl
+                className="w-8 h-8 flex items-center justify-center rounded-md
                   hover:bg-surface-raised active:scale-90 transition-all duration-100"
                 title={emoji.name}
               >
-                {emoji.unicode}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={emoji.svgUrl}
+                  alt={emoji.name}
+                  className="w-6 h-6"
+                  loading="lazy"
+                  onError={(e) => {
+                    // Fallback to emoji character if SVG fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const span = document.createElement('span');
+                    span.textContent = emoji.unicode;
+                    span.className = 'text-xl';
+                    target.parentElement?.appendChild(span);
+                  }}
+                />
               </button>
             ))}
           </div>

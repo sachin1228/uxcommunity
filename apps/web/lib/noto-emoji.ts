@@ -11,6 +11,7 @@ export interface NotoEmoji {
   category: string;
   tags: string[];
   lottieUrl: string;
+  svgUrl: string;
 }
 
 export interface EmojiCatalog {
@@ -20,6 +21,7 @@ export interface EmojiCatalog {
 
 const CATALOG_URL = "https://googlefonts.github.io/noto-emoji-animation/data/api.json";
 const LOTTIE_BASE = "https://fonts.gstatic.com/s/e/notoemoji/latest";
+const SVG_BASE = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/svg";
 
 // In-memory cache
 let catalogCache: EmojiCatalog | null = null;
@@ -70,6 +72,7 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
               category,
               tags: tags || [],
               lottieUrl: `${LOTTIE_BASE}/${codepoint}/lottie.json`,
+              svgUrl: `${SVG_BASE}/emoji_u${codepoint}.svg`,
             });
             
             categories.add(category);
