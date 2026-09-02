@@ -29,6 +29,8 @@ interface MessageBubbleProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
+  animate?: boolean;
 }
 
 const REACTIONS = [
@@ -525,30 +527,19 @@ function renderTextWithEmoji(text: string, key: string | number): React.ReactNod
  * Shows a WhatsApp-style link-preview card for the first URL found.
  * Only rendered for non-deleted, non-pending messages.
  */
-function MessageContent({
-  content,
-  isMe,
-  showPreview,
-}: {
-  content: string;
-  isMe: boolean;
-  showPreview: boolean;
-}) {
-  const previewUrl = showPreview ? extractFirstUrl(content) : null;
-
-  // Split text on URLs so we can wrap each URL in an <a>.
+/** Linkifies URLs and enlarges emoji inside a single whitespace-free chunk. */
+function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.ReactNode[] {
   const URL_RE = /https?:\/\/[^\s<>"'()[\]{}]+/gi;
   const parts: React.ReactNode[] = [];
   let last = 0;
   let m: RegExpExecArray | null;
   URL_RE.lastIndex = 0;
-  while ((m = URL_RE.exec(content)) !== null) {
+  while ((m = URL_RE.exec(chunk)) !== null) {
     const url = m[0].replace(/[.,;:!?)]+$/, "");
-    // Enlarge emoji in the plain-text segment before this URL.
-    if (m.index > last) parts.push(renderTextWithEmoji(content.slice(last, m.index), last));
+    if (m.index > last) parts.push(renderTextWithEmoji(chunk.slice(last, m.index), keyBase + last));
     parts.push(
       <a
-        key={m.index}
+        key={keyBase + m.index}
         href={url}
         target="_blank"
         rel="noopener noreferrer"
@@ -562,8 +553,51 @@ function MessageContent({
     );
     last = m.index + m[0].length;
   }
-  // Enlarge emoji in the trailing plain-text segment.
-  if (last < content.length) parts.push(renderTextWithEmoji(content.slice(last), last));
+  if (last < chunk.length) parts.push(renderTextWithEmoji(chunk.slice(last), keyBase + last));
+  return parts;
+}
+
+function MessageContent({
+  content,
+  isMe,
+  showPreview,
+  animate = false,
+}: {
+  content: string;
+  isMe: boolean;
+  showPreview: boolean;
+  /** When true, each word rises into place with a staggered delay. */
+  animate?: boolean;
+}) {
+  const previewUrl = showPreview ? extractFirstUrl(content) : null;
+
+  let parts: React.ReactNode[];
+
+  if (animate) {
+    // Split on whitespace (keeping the whitespace so pre-wrap newlines survive)
+    // and wrap every word in a span that carries its stagger index.
+    const tokens = content.split(/(\s+)/);
+    let wordIdx = 0;
+    let offset = 0;
+    parts = tokens.map((tok) => {
+      const key = offset;
+      offset += tok.length;
+      if (!tok) return null;
+      if (/^\s+$/.test(tok)) return tok;
+      const i = wordIdx++;
+      return (
+        <span
+          key={key}
+          className="chat-word-in"
+          style={{ "--i": i } as React.CSSProperties}
+        >
+          {renderRichChunk(tok, isMe, key)}
+        </span>
+      );
+    });
+  } else {
+    parts = renderRichChunk(content, isMe, 0);
+  }
 
   return (
     <>
@@ -650,6 +684,7 @@ export function MessageBubble({
   onEdit,
   onCopy,
   onDelete,
+  animate = false,
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -736,7 +771,10 @@ export function MessageBubble({
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
-              <div className="relative">
+              <div
+                className={`relative ${animate ? "chat-bubble-in" : ""}`}
+                data-side={isMe ? "right" : "left"}
+              >
                 <div className="flex flex-col items-start select-none">
                   <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
                   <div className="flex items-center gap-1 mt-0.5">
@@ -777,7 +815,12 @@ export function MessageBubble({
             /* ── Normal bubble ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
-              <div className="relative min-w-0">
+              {/* Entrance animation lives on this wrapper (not the bubble) so the
+                  bubble's own opacity classes for sending/failed states stay intact. */}
+              <div
+                className={`relative min-w-0 ${animate ? "chat-bubble-in" : ""}`}
+                data-side={isMe ? "right" : "left"}
+              >
                 <div
                   ref={bubbleRef}
                   className={`relative select-none transition-shadow duration-150 ${
@@ -824,6 +867,7 @@ export function MessageBubble({
                       content={msg.content}
                       isMe={isMe}
                       showPreview={msg.status !== "failed"}
+                      animate={animate}
                     />
                   )}
                   {!imageOnly && (
