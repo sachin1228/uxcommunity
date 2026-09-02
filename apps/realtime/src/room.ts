@@ -42,6 +42,8 @@ import type { PublishRequest } from "./types";
 interface WebSocketAttachment {
   userId: string;
   topics: string[];
+  name: string | null;
+  avatar: string | null;
 }
 
 export class Room extends DurableObject<Env> {
@@ -127,7 +129,12 @@ export class Room extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
 
     // Attach metadata to the WebSocket (survives hibernation)
-    const attachment: WebSocketAttachment = { userId, topics: [] };
+    const attachment: WebSocketAttachment = {
+      userId,
+      topics: [],
+      name: null,
+      avatar: null,
+    };
     server.serializeAttachment(attachment);
 
     // Track in memory — socket-scoped state
@@ -174,7 +181,16 @@ export class Room extends DurableObject<Env> {
 
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== userId) return;
+
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+      if (attachment) {
+        attachment.name = msg.user.name ?? null;
+        attachment.avatar = msg.user.avatar ?? null;
+        ws.serializeAttachment(attachment);
+      }
+
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
+      this.broadcastPresence();
     } else if (msg.t === "subscribe" && msg.topic) {
       await this.handleWsSubscribe(ws, userId, msg.topic);
     } else if (msg.t === "unsubscribe" && msg.topic) {
@@ -224,6 +240,7 @@ export class Room extends DurableObject<Env> {
     }
 
     this.wsToUser.delete(ws);
+    this.broadcastPresence();
   }
 
   async webSocketError(ws: WebSocket): Promise<void> {
@@ -445,7 +462,7 @@ export class Room extends DurableObject<Env> {
     return new Response("ok");
   }
 
-  // ── Broadcast with dual-index lookup ──────────────────────────────────
+  // ��─ Broadcast with dual-index lookup ──────────────────────────────────
 
   /**
    * Broadcast an event to all subscribers of a topic.
@@ -480,6 +497,50 @@ export class Room extends DurableObject<Env> {
         ws.send(eventMsg);
       } catch {
         // WebSocket send failed — will be cleaned up on close
+      }
+    }
+  }
+
+  // ── Presence ──────────────────────────────────────────────────────
+
+  /** Broadcast one entry per connected member, with tabs/devices folded into connections. */
+  private broadcastPresence(): void {
+    const users = new Map<
+      string,
+      { id: string; name: string | null; avatar: string | null; connections: number }
+    >();
+
+    for (const ws of this.ctx.getWebSockets()) {
+      const userId = this.wsToUser.get(ws);
+      if (!userId) continue;
+
+      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+      const current = users.get(userId);
+      if (current) {
+        current.connections += 1;
+        if (!current.name && attachment?.name) current.name = attachment.name;
+        if (!current.avatar && attachment?.avatar) current.avatar = attachment.avatar;
+      } else {
+        users.set(userId, {
+          id: userId,
+          name: attachment?.name ?? null,
+          avatar: attachment?.avatar ?? null,
+          connections: 1,
+        });
+      }
+    }
+
+    const message = JSON.stringify({
+      t: "presence",
+      room: this.roomName(),
+      users: [...users.values()],
+    });
+
+    for (const ws of this.ctx.getWebSockets()) {
+      try {
+        ws.send(message);
+      } catch {
+        // The close/error handler removes dead sockets and publishes a fresh snapshot.
       }
     }
   }
