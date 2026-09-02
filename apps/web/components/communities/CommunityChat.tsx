@@ -371,8 +371,6 @@ export function CommunityChat({
 
   // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
   const topSentinelRef   = useRef<HTMLDivElement>(null);
-  /** Captured scroll position just before we prepend older messages. */
-  const prependAnchorRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
   /** Always points to the latest load-older logic; never stale inside event handlers. */
   const loadOlderCallbackRef = useRef<(() => void) | null>(null);
 
@@ -381,28 +379,68 @@ export function CommunityChat({
     loadOlderCallbackRef.current = () => {
       const oldest = messages.find((m) => !m.id.startsWith("temp-"));
       if (!oldest || !hasMoreAbove || loadingOlder) return;
-      const container = scrollContainerRef.current;
-      if (container) {
-        prependAnchorRef.current = {
-          scrollHeight: container.scrollHeight,
-          scrollTop:    container.scrollTop,
-        };
-      }
       fetchOlderMessages(oldest.created_at);
     };
   });
 
-  // Restore scroll position after older messages are prepended, so the view
-  // doesn't jump to the top. Runs synchronously before the browser paints.
+  // ── Scroll preservation for changes above the viewport ────────────────────
+  // Anything that changes height *above* the messages the user is looking at
+  // (older pages being prepended, the load-older slot disappearing once the
+  // history is exhausted) must be compensated for so the visible messages stay
+  // exactly where they are — the way WhatsApp behaves.
+  //
+  // We snapshot the container's scrollHeight after every commit, and on the
+  // next commit compare the "top region" fingerprint (oldest real message id +
+  // whether the load-older slot is rendered). If it changed, the height delta
+  // is applied to scrollTop before the browser paints, so there is no visible
+  // jump. Browser scroll anchoring is disabled on the container so the two
+  // mechanisms can't fight each other.
+  const oldestRealMsgId = useMemo(
+    () => messages.find((m) => !m.id.startsWith("temp-"))?.id ?? null,
+    [messages],
+  );
+  const topRegionRef = useRef<{
+    oldestId: string | null;
+    hasMoreAbove: boolean;
+    scrollHeight: number;
+  } | null>(null);
+
+  // A community switch starts from a clean slate so the first paint of the new
+  // chat is never treated as a "prepend" onto the previous one. Declared before
+  // the compensation effect so it runs first within the same commit.
   useIsomorphicLayoutEffect(() => {
-    const anchor = prependAnchorRef.current;
-    if (!anchor) return;
-    prependAnchorRef.current = null;
+    topRegionRef.current = null;
+  }, [communityId]);
+
+  useIsomorphicLayoutEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
-    const delta = container.scrollHeight - anchor.scrollHeight;
-    if (delta > 0) container.scrollTop = anchor.scrollTop + delta;
-  }, [messages]);
+    const prev = topRegionRef.current;
+
+    if (container && prev) {
+      // Only compensate when the *top* of the list changed. A brand-new
+      // oldest id counts as a prepend only if the previous oldest message is
+      // still present (otherwise it's a community switch / full refetch, which
+      // is positioned by useScrollAndUnread).
+      const prepended =
+        prev.oldestId !== null &&
+        oldestRealMsgId !== prev.oldestId &&
+        messages.some((m) => m.id === prev.oldestId);
+      const slotToggled = prev.hasMoreAbove !== hasMoreAbove;
+
+      if (prepended || slotToggled) {
+        const delta = container.scrollHeight - prev.scrollHeight;
+        if (delta !== 0) container.scrollTop += delta;
+      }
+    }
+
+    topRegionRef.current = {
+      oldestId: oldestRealMsgId,
+      hasMoreAbove,
+      scrollHeight: container?.scrollHeight ?? 0,
+    };
+    // scrollContainerRef is a stable ref — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, hasMoreAbove, oldestRealMsgId]);
 
   // IntersectionObserver-based trigger: starts loading older messages before
   // the user reaches the top by using a 300 px rootMargin.  Including
@@ -857,6 +895,9 @@ export function CommunityChat({
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
+              // Scroll position above the viewport is preserved manually (see the
+              // top-region compensation effect); native anchoring would double-adjust.
+              overflowAnchor: "none",
             }}
           >
             <MessageList

@@ -145,17 +145,23 @@ export function MessageList({
       className="min-h-full flex flex-col justify-end py-4 space-y-1"
       style={{ visibility: initialPositionResolved ? "visible" : "hidden" }}
     >
-      {/* Top sentinel — observed by IntersectionObserver in CommunityChat to
-          load older messages when the user scrolls near the top.
-          Only rendered while there may be more messages above.              */}
+      {/* Load-older slot. A single fixed-height row that is present the whole
+          time there may be more messages above. It doubles as the
+          IntersectionObserver sentinel and hosts the spinner, which only
+          toggles visibility — never layout — so nothing below it moves when a
+          fetch starts or finishes. Removing the row (hasMoreAbove → false) is
+          compensated by the scroll-preservation effect in CommunityChat.     */}
       {hasMoreAbove && (
-        <div ref={topSentinelRef} className="h-1 shrink-0" aria-hidden />
-      )}
-
-      {/* Spinner shown while an older-page fetch is in flight */}
-      {loadingOlder && (
-        <div className="flex items-center justify-center py-3">
-          <Spinner size={18} />
+        <div
+          ref={topSentinelRef}
+          data-load-older-slot
+          className="flex h-10 shrink-0 items-center justify-center"
+          aria-hidden={!loadingOlder}
+          aria-busy={loadingOlder}
+        >
+          <div className={loadingOlder ? "visible" : "invisible"}>
+            <Spinner size={18} />
+          </div>
         </div>
       )}
 
