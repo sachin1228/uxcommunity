@@ -333,6 +333,11 @@ select:focus-visible {
   *::-webkit-scrollbar-thumb:hover { background: rgba(0 0 0 / 0.22); }
 }
 
+/* Scrollable but with no visible scrollbar. Used by the chat composer so the
+   <textarea> and its emoji mirror layer always share the exact same width. */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 /* ─── Chat bubble entrance ───────────────────────────────────────────── */
 /* Bubble pops in from its anchored corner, then each word rises into place
    in a staggered wave. Fill-mode "backwards" keeps the from-state during the
@@ -361,6 +366,17 @@ select:focus-visible {
   transform-origin: bottom left;
   animation: chat-word-in 440ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

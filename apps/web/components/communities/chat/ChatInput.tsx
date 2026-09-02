@@ -6,6 +6,7 @@ import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
+import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 
 interface ChatInputProps {
   input: string;
@@ -33,6 +34,63 @@ interface PickerPos {
   width: number;
 }
 
+/**
+ * Matches a full emoji grapheme cluster (base + skin tone + keycap + ZWJ
+ * sequences + variation selectors). Same pattern used by MessageBubble so
+ * the composer and the rendered message agree on what "one emoji" is.
+ */
+const EMOJI_CLUSTER =
+  /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
+
+/**
+ * One emoji inside the composer overlay.
+ *
+ * The native glyph is kept in the flow (transparent) so the overlay's line
+ * layout is byte-for-byte identical to the <textarea> underneath — that is
+ * what keeps the caret and wrapping aligned. The Noto SVG is then painted on
+ * top of that glyph. If the SVG fails to load we simply reveal the glyph.
+ */
+function OverlayEmoji({ emoji }: { emoji: string }) {
+  const [failed, setFailed] = useState(false);
+  const cp = emojiToCodepoint(emoji);
+
+  if (!cp || failed) return <span>{emoji}</span>;
+
+  return (
+    <span className="relative inline-block align-baseline">
+      <span aria-hidden style={{ color: "transparent" }}>{emoji}</span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={svgUrlForCodepoint(cp)}
+        alt=""
+        draggable={false}
+        onError={() => setFailed(true)}
+        className="absolute inset-0 h-full w-full object-contain select-none"
+        style={{ transform: "scale(1.15)" }}
+      />
+    </span>
+  );
+}
+
+/** Split text into plain spans + <OverlayEmoji> nodes. */
+function renderWithSvgEmoji(text: string): React.ReactNode {
+  if (!text) return null;
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  EMOJI_CLUSTER.lastIndex = 0;
+  while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(<OverlayEmoji key={`e${m.index}`} emoji={m[0]} />);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  // A trailing newline in a <textarea> creates an empty last line; a div
+  // with pre-wrap only does so if something follows it.
+  if (text.endsWith("\n")) parts.push("\u200B");
+  return parts;
+}
+
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -47,10 +105,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const fileInputRef       = useRef<HTMLInputElement>(null);
     const anchorRef          = useRef<HTMLDivElement>(null);   // the input box wrapper
     const portalPickerRef    = useRef<HTMLDivElement>(null);   // the portal div
+    const overlayRef         = useRef<HTMLDivElement>(null);   // the SVG overlay
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
     const canSend = !!input.trim() || !!pendingImagePreview;
+
+    // Keep the overlay scrolled in lock-step with the textarea
+    const syncScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+      if (overlayRef.current) {
+        overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+      }
+    }, []);
 
     // ── helpers ────────────────────────────────────────────────────────────
 
@@ -89,8 +155,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [linkPreviewUrl, dismissedUrl]);
 
-    // (click-outside is handled by the backdrop rendered in the portal)
-
     // Close picker on Escape
     useEffect(() => {
       if (!pickerOpen) return;
@@ -99,6 +163,28 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       };
       document.addEventListener("keydown", handler);
       return () => document.removeEventListener("keydown", handler);
+    }, [pickerOpen, closePicker]);
+
+    // Close picker when clicking anywhere outside the picker and emoji button
+    useEffect(() => {
+      if (!pickerOpen) return;
+      
+      const handleMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        
+        // Don't close if clicking inside the picker
+        if (portalPickerRef.current?.contains(target)) return;
+        
+        // Don't close if clicking the emoji toggle button
+        if (target.closest('[data-emoji-toggle]')) return;
+        
+        // Close for all other clicks
+        closePicker();
+      };
+
+      // Use mousedown for faster response than click
+      document.addEventListener("mousedown", handleMouseDown);
+      return () => document.removeEventListener("mousedown", handleMouseDown);
     }, [pickerOpen, closePicker]);
 
     // Re-measure on scroll or resize so the picker tracks the input
@@ -220,6 +306,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <div className="flex items-center">
                 <button
                   type="button"
+                  data-emoji-toggle
                   onClick={togglePicker}
                   disabled={sending}
                   className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
@@ -244,22 +331,52 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
               </div>
 
-              <textarea
-                ref={ref}
-                data-chat-input
-                value={input}
-                onChange={(e) => {
-                  onChange(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                }}
-                onKeyDown={onKeyDown}
-                onBlur={onBlur}
-                placeholder={placeholder}
-                rows={1}
-                className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
-                style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
-              />
+              {/*
+                Textarea + Noto SVG overlay.
+                The <textarea> is the real, focusable, accessible input and
+                owns the placeholder, caret, selection, IME and height. Its
+                text is painted transparent; the overlay (same font, size,
+                line-height, wrapping) mirrors the text and swaps emoji for
+                Noto SVGs. Only the textarea is in the flow, so it dictates
+                the wrapper height and the overlay simply fills it.
+              */}
+              <div className="flex-1 relative min-w-0">
+                <textarea
+                  ref={ref}
+                  data-chat-input
+                  value={input}
+                  onChange={(e) => {
+                    onChange(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  }}
+                  onScroll={syncScroll}
+                  onKeyDown={onKeyDown}
+                  onBlur={onBlur}
+                  placeholder={placeholder}
+                  rows={1}
+                  className="block w-full resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto scrollbar-none whitespace-pre-wrap break-words placeholder:text-foreground-muted"
+                  style={{
+                    lineHeight: "1.5",
+                    height: "24px",
+                    maxHeight: "120px",
+                    // Text is drawn by the overlay; placeholder color is set
+                    // separately via ::placeholder so it stays visible.
+                    color: "transparent",
+                    caretColor: "var(--color-foreground)",
+                  }}
+                />
+
+                {/* Mirror layer — visual only, never receives pointer events */}
+                <div
+                  ref={overlayRef}
+                  aria-hidden
+                  className="absolute inset-0 font-body text-[15px] text-foreground pointer-events-none overflow-hidden whitespace-pre-wrap break-words"
+                  style={{ lineHeight: "1.5" }}
+                >
+                  {renderWithSvgEmoji(input)}
+                </div>
+              </div>
 
               {canSend && (
                 <button
@@ -286,30 +403,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {/* Portal picker — rendered at document.body to escape all stacking contexts */}
         {pickerOpen && pickerPos && typeof document !== "undefined" &&
           createPortal(
-            <>
-              {/* Invisible backdrop — closes the picker on any outside click.
-                  Sits at z-9998, below the picker (z-9999), above everything else. */}
-              <div
-                style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-                onMouseDown={closePicker}
+            <div
+              ref={portalPickerRef}
+              style={{
+                position:  "fixed",
+                bottom:    pickerPos.bottom,
+                left:      pickerPos.left,
+                width:     340,
+                zIndex:    9999,
+                animation: "fadeSlideUp 150ms ease-out",
+              }}
+            >
+              <EmojiGifPicker
+                onEmojiSelect={handleEmojiSelect}
+                onGifSelect={handleGifSelect}
               />
-              <div
-                ref={portalPickerRef}
-                className="animate-in fade-in slide-in-from-bottom-2 duration-150"
-                style={{
-                  position:  "fixed",
-                  bottom:    pickerPos.bottom,
-                  left:      pickerPos.left,
-                  width:     pickerPos.width,
-                  zIndex:    9999,
-                }}
-              >
-                <EmojiGifPicker
-                  onEmojiSelect={handleEmojiSelect}
-                  onGifSelect={handleGifSelect}
-                />
-              </div>
-            </>,
+            </div>,
             document.body
           )
         }
