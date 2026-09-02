@@ -273,7 +273,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
           <div className="flex items-center justify-between">
             <h2
               id="sidebar-members-heading"
-              className="font-display text-base font-semibold text-foreground"
+              className="font-display text-[15px] font-semibold text-foreground"
             >
               Members{community ? ` (${memberCount})` : ""}
             </h2>
@@ -333,7 +333,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
         >
           <h2
             id="sidebar-about-heading"
-            className="font-display text-base font-semibold text-foreground"
+            className="font-display text-[15px] font-semibold text-foreground"
           >
             About
           </h2>
@@ -383,7 +383,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
         >
           <h2
             id="sidebar-rules-heading"
-            className="font-display text-base font-semibold text-foreground"
+            className="font-display text-[15px] font-semibold text-foreground"
           >
             Rules
           </h2>
