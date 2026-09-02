@@ -389,58 +389,93 @@ export function CommunityChat({
   // history is exhausted) must be compensated for so the visible messages stay
   // exactly where they are — the way WhatsApp behaves.
   //
-  // We snapshot the container's scrollHeight after every commit, and on the
-  // next commit compare the "top region" fingerprint (oldest real message id +
-  // whether the load-older slot is rendered). If it changed, the height delta
-  // is applied to scrollTop before the browser paints, so there is no visible
-  // jump. Browser scroll anchoring is disabled on the container so the two
-  // mechanisms can't fight each other.
+  // Implementation: we use the oldest *real* message as a scroll anchor. After
+  // every commit we record that element's offset from the top of the scroll
+  // content (independent of the current scrollTop). On the next commit, if the
+  // same element is still in the DOM, any change in that offset is exactly the
+  // amount of height that was inserted or removed above it — older messages,
+  // the load-older slot, a date pill that became a real boundary, a thread
+  // notification — so we add it to scrollTop before paint. Because we measure
+  // the anchor rather than the total scrollHeight, height changes *below* the
+  // anchor (images loading, reactions, thread events arriving) can never leak
+  // into the correction. Browser scroll anchoring is disabled on the container
+  // so the two mechanisms can't fight each other.
   const oldestRealMsgId = useMemo(
     () => messages.find((m) => !m.id.startsWith("temp-"))?.id ?? null,
     [messages],
   );
-  const topRegionRef = useRef<{
-    oldestId: string | null;
-    hasMoreAbove: boolean;
-    scrollHeight: number;
+  const scrollAnchorRef = useRef<{
+    id: string;
+    /** Anchor top relative to the scroll content origin (scrollTop-independent). */
+    offset: number;
   } | null>(null);
+
+  const measureAnchorOffset = (container: HTMLElement, id: string): number | null => {
+    const el = container.querySelector<HTMLElement>(
+      `[data-message-id="${id}"]`,
+    );
+    if (!el) return null;
+    return (
+      el.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop
+    );
+  };
 
   // A community switch starts from a clean slate so the first paint of the new
   // chat is never treated as a "prepend" onto the previous one. Declared before
   // the compensation effect so it runs first within the same commit.
   useIsomorphicLayoutEffect(() => {
-    topRegionRef.current = null;
+    scrollAnchorRef.current = null;
   }, [communityId]);
 
+  // No dependency array on purpose: any commit can change what sits above the
+  // anchor (messages, hasMoreAbove, threadEvents, unread divider…), and a
+  // single querySelector + two getBoundingClientRect calls per commit is cheap.
   useIsomorphicLayoutEffect(() => {
     const container = scrollContainerRef.current;
-    const prev = topRegionRef.current;
+    if (!container) return;
 
-    if (container && prev) {
-      // Only compensate when the *top* of the list changed. A brand-new
-      // oldest id counts as a prepend only if the previous oldest message is
-      // still present (otherwise it's a community switch / full refetch, which
-      // is positioned by useScrollAndUnread).
-      const prepended =
-        prev.oldestId !== null &&
-        oldestRealMsgId !== prev.oldestId &&
-        messages.some((m) => m.id === prev.oldestId);
-      const slotToggled = prev.hasMoreAbove !== hasMoreAbove;
-
-      if (prepended || slotToggled) {
-        const delta = container.scrollHeight - prev.scrollHeight;
-        if (delta !== 0) container.scrollTop += delta;
+    // While the initial position is still being resolved the list is hidden
+    // and useScrollAndUnread owns scrollTop — don't compete with it.
+    if (initialPositionResolved) {
+      const prev = scrollAnchorRef.current;
+      if (prev) {
+        const newOffset = measureAnchorOffset(container, prev.id);
+        if (newOffset !== null) {
+          const delta = newOffset - prev.offset;
+          if (delta !== 0) container.scrollTop += delta;
+        }
       }
     }
 
-    topRegionRef.current = {
-      oldestId: oldestRealMsgId,
-      hasMoreAbove,
-      scrollHeight: container?.scrollHeight ?? 0,
-    };
-    // scrollContainerRef is a stable ref — safe to omit from deps.
+    // Re-anchor on the (possibly new) oldest real message.
+    if (oldestRealMsgId) {
+      const offset = measureAnchorOffset(container, oldestRealMsgId);
+      scrollAnchorRef.current = offset === null ? null : { id: oldestRealMsgId, offset };
+    } else {
+      scrollAnchorRef.current = null;
+    }
+  });
+
+  // The anchor's stored offset must also track height changes that happen
+  // *without* a React commit (e.g. an avatar or image above it finishing its
+  // load). A ResizeObserver on the list content refreshes the snapshot so a
+  // later prepend never applies a stale delta.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    const content = container?.firstElementChild;
+    if (!container || !content || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const anchor = scrollAnchorRef.current;
+      if (!anchor) return;
+      const offset = measureAnchorOffset(container, anchor.id);
+      if (offset !== null) anchor.offset = offset;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, hasMoreAbove, oldestRealMsgId]);
+  }, [communityId, loading]);
 
   // IntersectionObserver-based trigger: starts loading older messages before
   // the user reaches the top by using a 300 px rootMargin.  Including
