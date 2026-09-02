@@ -99,19 +99,26 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       return () => document.removeEventListener("keydown", handler);
     }, [pickerOpen, closePicker]);
 
-    // Close picker when clicking outside
+    // Close picker when clicking anywhere outside the picker and emoji button
     useEffect(() => {
       if (!pickerOpen) return;
-      const handler = (e: MouseEvent) => {
-        const target = e.target as Node;
-        // Don't close if clicking inside the picker or the anchor button
+      
+      const handleMouseDown = (e: MouseEvent) => {
+        const target = e.target as HTMLElement;
+        
+        // Don't close if clicking inside the picker
         if (portalPickerRef.current?.contains(target)) return;
-        if (anchorRef.current?.contains(target)) return;
+        
+        // Don't close if clicking the emoji toggle button
+        if (target.closest('[data-emoji-toggle]')) return;
+        
+        // Close for all other clicks
         closePicker();
       };
-      // Use mousedown for faster response
-      document.addEventListener("mousedown", handler);
-      return () => document.removeEventListener("mousedown", handler);
+
+      // Use mousedown for faster response than click
+      document.addEventListener("mousedown", handleMouseDown);
+      return () => document.removeEventListener("mousedown", handleMouseDown);
     }, [pickerOpen, closePicker]);
 
     // Re-measure on scroll or resize so the picker tracks the input
@@ -233,6 +240,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <div className="flex items-center">
                 <button
                   type="button"
+                  data-emoji-toggle
                   onClick={togglePicker}
                   disabled={sending}
                   className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
