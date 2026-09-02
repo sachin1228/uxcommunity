@@ -379,6 +379,23 @@ select:focus-visible {
   }
 }
 
+@keyframes floatAcross {
+  0% {
+    opacity: 0;
+    transform: translate(-20vw, 60vh) rotate(-15deg) scale(0.5);
+  }
+  10% {
+    opacity: 0.7;
+  }
+  90% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(80vw, -20vh) rotate(15deg) scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

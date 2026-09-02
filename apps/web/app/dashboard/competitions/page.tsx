@@ -254,8 +254,33 @@ export default function CompetitionsPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col h-full relative overflow-hidden">
+      {/* ── Floating decorations ── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+        {[
+          { emoji: "🏆", left: "5%", delay: "0s", duration: "6s", size: "text-4xl" },
+          { emoji: "🎨", left: "15%", delay: "0.8s", duration: "7s", size: "text-3xl" },
+          { emoji: "🖥️", left: "30%", delay: "1.6s", duration: "5.5s", size: "text-5xl" },
+          { emoji: "🤖", left: "50%", delay: "0.4s", duration: "6.5s", size: "text-3xl" },
+          { emoji: "👤", left: "70%", delay: "2s", duration: "7.5s", size: "text-4xl" },
+          { emoji: "✨", left: "85%", delay: "1.2s", duration: "5s", size: "text-2xl" },
+          { emoji: "🎯", left: "40%", delay: "2.5s", duration: "6s", size: "text-3xl" },
+          { emoji: "🔥", left: "60%", delay: "0.6s", duration: "8s", size: "text-2xl" },
+        ].map((item, i) => (
+          <span
+            key={i}
+            className={`absolute bottom-0 ${item.size} opacity-0`}
+            style={{
+              left: item.left,
+              animation: `floatAcross ${item.duration} ${item.delay} ease-in-out infinite`,
+            }}
+          >
+            {item.emoji}
+          </span>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto relative z-10">
         {/* ── Title ── */}
         <div className="px-6 pt-6 pb-4">
           <div className="flex items-center gap-3 mb-1">
