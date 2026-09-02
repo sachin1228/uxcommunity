@@ -54,7 +54,7 @@ function activeTabFromPath(pathAndSearch: string): ChatTab {
   const searchMatch = pathAndSearch.match(/[?&]tab=([a-zA-Z]+)/);
   if (searchMatch?.[1]) {
     const tab = searchMatch[1] as ChatTab;
-    if (["chat", "showcase", "threads", "events", "resources", "members", "about"].includes(tab)) {
+    if (["chat", "showcase", "threads", "events", "resources", "members", "about", "custom"].includes(tab)) {
       return tab;
     }
   }
