@@ -16,7 +16,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { tab } = await searchParams;
   const initialTab: ChatTab =
-    tab === "showcase" || tab === "threads" || tab === "events" || tab === "resources" || tab === "members" || tab === "about" ? tab : "chat";
+    tab === "showcase" || tab === "threads" || tab === "events" || tab === "resources" || tab === "members" ? tab : "chat";
   const userId = (session as { userId: string }).userId;
 
   // Lightweight server snapshot: community read model + top members only, so

@@ -26,7 +26,6 @@ import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
 import { ChatInput } from "./chat/ChatInput";
-import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
 import { MessageList } from "./chat/MessageList";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
@@ -814,7 +813,7 @@ export function CommunityChat({
     : null);
 
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members", "about"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members"]).has(activeTab)
       ? "chat"
       : activeTab;
 
@@ -893,13 +892,7 @@ export function CommunityChat({
             onClose={handleCancelEdit}
           />
         )}
-        {renderedTab === "about" ? (
-          <CommunityInfoPanel
-            community={displayCommunity}
-            communityId={communityId}
-            currentUserId={currentUserId}
-          />
-        ) : renderedTab === "showcase" ? (
+        {renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "threads" ? (
           <ThreadsView
