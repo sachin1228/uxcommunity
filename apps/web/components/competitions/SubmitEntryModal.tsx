@@ -1,36 +1,43 @@
 "use client";
 
 import { useState } from "react";
-import { X, Upload, Link as LinkIcon, FileText, ImageIcon } from "lucide-react";
+import { X, Upload, Link as LinkIcon, FileText, ImageIcon, Palette, Monitor, Bot, User } from "lucide-react";
+
+type Category = "visual" | "uiux" | "ai" | "portfolio";
+
+const CATEGORIES: { id: Category; label: string; emoji: string; icon: React.ReactNode }[] = [
+  { id: "visual", label: "Visual Design", emoji: "🎨", icon: <Palette size={16} /> },
+  { id: "uiux", label: "UI/UX Design", emoji: "🖥️", icon: <Monitor size={16} /> },
+  { id: "ai", label: "AI Design", emoji: "🤖", icon: <Bot size={16} /> },
+  { id: "portfolio", label: "Portfolio", emoji: "👤", icon: <User size={16} /> },
+];
 
 interface Props {
   onClose: () => void;
-  onSubmit: (title: string, description: string, imageUrl: string, liveUrl?: string) => void;
-  competitionTitle: string;
+  onSubmit: (title: string, description: string, imageUrl: string, category: Category, liveUrl?: string) => void;
 }
 
-export function SubmitEntryModal({ onClose, onSubmit, competitionTitle }: Props) {
+export function SubmitEntryModal({ onClose, onSubmit }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [liveUrl, setLiveUrl] = useState("");
+  const [category, setCategory] = useState<Category | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !imageUrl.trim()) return;
+    if (!title.trim() || !imageUrl.trim() || !category) return;
 
     setIsSubmitting(true);
-    // Simulate API call
     setTimeout(() => {
-      onSubmit(title.trim(), description.trim(), imageUrl.trim(), liveUrl.trim() || undefined);
+      onSubmit(title.trim(), description.trim(), imageUrl.trim(), category, liveUrl.trim() || undefined);
       setIsSubmitting(false);
     }, 500);
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <button
         type="button"
         className="absolute inset-0 bg-background/80 backdrop-blur-sm"
@@ -38,18 +45,12 @@ export function SubmitEntryModal({ onClose, onSubmit, competitionTitle }: Props)
         aria-label="Close"
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/[0.1] bg-background shadow-2xl">
+      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-white/[0.1] bg-background shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-          <div>
-            <h2 className="font-display text-base font-semibold text-foreground">
-              Submit Entry
-            </h2>
-            <p className="font-body text-xs text-foreground-muted mt-0.5">
-              {competitionTitle}
-            </p>
-          </div>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] sticky top-0 bg-background z-10">
+          <h2 className="font-display text-base font-semibold text-foreground">
+            Submit Entry
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -61,6 +62,33 @@ export function SubmitEntryModal({ onClose, onSubmit, competitionTitle }: Props)
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Category Picker */}
+          <div>
+            <label className="font-body text-sm font-medium text-foreground mb-3 block">
+              Choose Category *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {CATEGORIES.map((cat) => {
+                const isSelected = category === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setCategory(cat.id)}
+                    className={`flex items-center gap-2.5 rounded-xl border p-3 font-body text-sm transition-all ${
+                      isSelected
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border bg-surface-raised text-foreground-muted hover:border-border-strong hover:text-foreground"
+                    }`}
+                  >
+                    {cat.icon}
+                    <span className="font-medium">{cat.emoji} {cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Title */}
           <div>
             <label className="flex items-center gap-2 font-body text-sm font-medium text-foreground mb-2">
@@ -111,7 +139,7 @@ export function SubmitEntryModal({ onClose, onSubmit, competitionTitle }: Props)
             </p>
           </div>
 
-          {/* Live URL (optional) */}
+          {/* Live URL */}
           <div>
             <label className="flex items-center gap-2 font-body text-sm font-medium text-foreground mb-2">
               <LinkIcon size={14} className="text-foreground-muted" />
@@ -140,7 +168,7 @@ export function SubmitEntryModal({ onClose, onSubmit, competitionTitle }: Props)
             </button>
             <button
               type="submit"
-              disabled={!title.trim() || !imageUrl.trim() || isSubmitting}
+              disabled={!title.trim() || !imageUrl.trim() || !category || isSubmitting}
               className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-white hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
