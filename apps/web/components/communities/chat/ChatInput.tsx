@@ -309,13 +309,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           createPortal(
             <div
               ref={portalPickerRef}
-              className="animate-in fade-in slide-in-from-bottom-2 duration-150"
               style={{
                 position:  "fixed",
                 bottom:    pickerPos.bottom,
                 left:      pickerPos.left,
                 width:     pickerPos.width,
                 zIndex:    9999,
+                animation: "fadeSlideUp 150ms ease-out",
               }}
             >
               <EmojiGifPicker
