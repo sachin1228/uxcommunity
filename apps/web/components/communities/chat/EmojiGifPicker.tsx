@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { Search, X } from "lucide-react";
-import { fetchEmojiCatalog, type NotoEmoji } from "@/lib/noto-emoji";
-import { NotoEmojiSvg } from "./NotoEmojiSvg";
+import type { EmojiClickData } from "emoji-picker-react";
+import { Theme } from "emoji-picker-react";
+
+const EmojiPickerReact = dynamic(() => import("emoji-picker-react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full">
+      <div className="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 type Tab = "emoji" | "gif" | "sticker";
 
@@ -113,156 +123,34 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
           </div>
         )}
       </div>
-    </div>
-  );
-}
 
-// ─── Noto Animated Emoji Grid ────────────────────────────────────────────────
-
-function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
-  const [query, setQuery] = useState("");
-  const [emojis, setEmojis] = useState<NotoEmoji[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  // Load catalog on mount
-  useEffect(() => {
-    const loadCatalog = async () => {
-      try {
-        const catalog = await fetchEmojiCatalog();
-        setEmojis(catalog.emojis);
-        setCategories(catalog.categories);
-        // Auto-select the first category (which is "Smileys and emotions")
-        if (catalog.categories.length > 0) {
-          setSelectedCategory(catalog.categories[0]);
-        }
-      } catch (error) {
-        console.error("Failed to load emoji catalog:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadCatalog();
-  }, []);
-
-  // Filter emojis based on query and category
-  const filteredEmojis = useMemo(() => {
-    let filtered = emojis;
-    
-    // Filter by category if no search query and category is selected
-    if (!query && selectedCategory) {
-      filtered = filtered.filter(e => e.category === selectedCategory);
-    }
-    
-    // Filter by search query
-    if (query) {
-      const lowerQuery = query.toLowerCase();
-      filtered = filtered.filter(e => 
-        e.name.toLowerCase().includes(lowerQuery) ||
-        e.category.toLowerCase().includes(lowerQuery) ||
-        e.tags.some(tag => tag.toLowerCase().includes(lowerQuery))
-      );
-    }
-    
-    return filtered;
-  }, [emojis, query, selectedCategory]);
-
-  const onQueryChange = (q: string) => {
-    setQuery(q);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      // Debounced search - no additional action needed as filtering is done via useMemo
-    }, 300);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="w-4 h-4 border-2 border-border border-t-accent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="px-2 pt-2 pb-1.5 shrink-0">
-        <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search size={12} className="text-foreground-muted shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => onQueryChange(e.target.value)}
-            placeholder="Search emoji…"
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-foreground-muted outline-none font-body min-w-0"
-          />
-          {query && (
-            <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
-              className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
-              <X size={11} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Category pills */}
-      {!query && categories.length > 0 && (
-        <div className="px-2 pb-1.5 shrink-0 overflow-x-auto">
-          <div className="flex gap-1.5">
-            {categories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium transition-colors
-                  ${selectedCategory === category
-                    ? "bg-accent text-accent-foreground"
-                    : "bg-surface-raised text-foreground-muted hover:text-foreground"
-                  }`}
-              >
-                {category}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Emoji grid */}
-      <div ref={gridRef} className="flex-1 overflow-y-auto px-2 pb-1">
-        {filteredEmojis.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <p className="text-xs text-foreground-muted">No emoji found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-8 gap-0.5">
-            {filteredEmojis.map((emoji) => (
-              <button
-                key={emoji.codepoint}
-                onClick={() => onSelect(emoji.unicode)}
-                className="w-8 h-8 flex items-center justify-center rounded-md
-                  hover:bg-surface-raised active:scale-90 transition-all duration-100"
-                title={emoji.name}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={emoji.svgUrl}
-                  alt={emoji.name}
-                  className="w-6 h-6"
-                  loading="lazy"
-                />
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="shrink-0 px-2.5 py-1 flex justify-end border-t border-border">
+        <span className="text-[9px] text-foreground-muted/40 font-mono">GIPHY</span>
       </div>
     </div>
   );
 }
+
+// ─── CSS var overrides so emoji-picker-react uses our design tokens ───────────
+
+const EPR_VARS: React.CSSProperties = {
+  ["--epr-bg-color" as string]:                  "var(--color-surface)",
+  ["--epr-category-label-bg-color" as string]:   "var(--color-surface)",
+  ["--epr-text-color" as string]:                "var(--color-foreground)",
+  ["--epr-search-input-bg-color" as string]:     "var(--color-surface-raised)",
+  ["--epr-search-border-color" as string]:       "var(--color-border)",
+  ["--epr-hover-bg-color" as string]:            "var(--color-surface-raised)",
+  ["--epr-focus-bg-color" as string]:            "var(--color-surface-raised)",
+  ["--epr-highlight-color" as string]:           "var(--color-accent)",
+  ["--epr-category-icon-active-color" as string]:"var(--color-accent)",
+  ["--epr-emoji-size" as string]:                "22px",
+  ["--epr-emoji-gap" as string]:                 "3px",
+  ["--epr-header-padding" as string]:            "4px 8px",
+  ["--epr-search-input-height" as string]:       "30px",
+  ["--epr-category-label-height" as string]:     "22px",
+  width:  "100%",
+  height: "100%",
+};
 
 // ─── Main picker ──────────────────────────────────────────────────────────────
 
@@ -276,7 +164,20 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
     >
       {/* ── Content ── */}
       <div className="flex-1 min-h-0">
-        {tab === "emoji" && <NotoEmojiGrid onSelect={onEmojiSelect} />}
+        {tab === "emoji" && (
+          <div style={EPR_VARS}>
+            <EmojiPickerReact
+              onEmojiClick={(d: EmojiClickData) => onEmojiSelect(d.emoji)}
+              theme={Theme.DARK}
+              searchPlaceholder="Search emoji…"
+              width="100%"
+              height="100%"
+              previewConfig={{ showPreview: false }}
+              lazyLoadEmojis
+              skinTonesDisabled
+            />
+          </div>
+        )}
         {tab === "gif"     && <GifGrid type="gif"     onSelect={onGifSelect} />}
         {tab === "sticker" && <GifGrid type="sticker" onSelect={onGifSelect} />}
       </div>
@@ -307,9 +208,9 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
                   ${active ? "text-accent" : "text-foreground-muted"}`}>
                   GIF
                 </span>
-              ) : t.icon ? (
-                <NotoEmojiSvg emoji={t.icon} size={16} />
-              ) : null}
+              ) : (
+                <span className="text-[14px] leading-none">{t.icon}</span>
+              )}
 
               {/* Label — hidden for GIF since the icon is already the label */}
               {t.id !== "gif" && (

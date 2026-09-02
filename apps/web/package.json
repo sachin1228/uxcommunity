@@ -22,6 +22,7 @@
     "@upstash/redis": "^1.38.0",
     "@uxcommunity/shared": "*",
     "bcryptjs": "^2.4.3",
+    "emoji-picker-react": "^4.19.1",
     "jose": "^5.9.6",
     "lottie-react": "^2.4.0",
     "lucide-react": "^0.400.0",

@@ -368,17 +368,6 @@ select:focus-visible {
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
 }
 
-@keyframes fadeSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

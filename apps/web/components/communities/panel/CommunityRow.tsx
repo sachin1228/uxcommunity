@@ -3,44 +3,14 @@
 import { useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
-import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
-import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = CachedSidebarCommunity;
 
 function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
   return String(n);
-}
-
-/** Render text with SVG emoji images for the sidebar preview. */
-function renderTextWithEmoji(text: string) {
-  if (!text) return text;
-  const parts: React.ReactNode[] = [];
-  const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
-  let lastIndex = 0;
-  let match;
-  while ((match = emojiRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex, match.index)}</span>);
-    }
-    const emoji = match[0];
-    const cp = emojiToCodepoint(emoji);
-    if (cp) {
-      parts.push(
-        <NotoEmojiSvg key={`e${match.index}`} emoji={emoji} size={13} className="align-middle" />
-      );
-    } else {
-      parts.push(<span key={`e${match.index}`}>{emoji}</span>);
-    }
-    lastIndex = match.index + emoji.length;
-  }
-  if (lastIndex < text.length) {
-    parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
-  }
-  return parts;
 }
 
 /** Absolute time — mirrors the mobile app: clock for today, "Yesterday",
@@ -162,7 +132,7 @@ export function CommunityRow({
               <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
                 {lastReaction.isOwn ? " reacted " : " reacted "}
-                <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
+                <span>{lastReaction.emoji}</span>
                 {" to: "}
                 <span>{lastReaction.messagePreview}</span>
               </p>
@@ -173,7 +143,7 @@ export function CommunityRow({
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}
-                {renderTextWithEmoji(preview.text)}
+                {preview.text}
               </p>
 
             ) : (
