@@ -256,8 +256,21 @@ export default function CompetitionsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
-        {/* ── Week Scrubber ── */}
+        {/* ── Title ── */}
         <div className="px-6 pt-6 pb-4">
+          <div className="flex items-center gap-3 mb-1">
+            <Trophy size={24} className="text-accent" />
+            <h1 className="font-display text-xl font-bold text-foreground">
+              Design Competitions
+            </h1>
+          </div>
+          <p className="font-body text-sm text-foreground-muted">
+            Submit your work, vote for your favorites, and compete to be the best each week.
+          </p>
+        </div>
+
+        {/* ── Week Scrubber ── */}
+        <div className="px-6 pb-4">
           <div className="relative flex items-center">
             {showLeftArrow && (
               <button
