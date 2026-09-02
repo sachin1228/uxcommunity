@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus, Trophy } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -70,10 +70,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
     !isMatch("/dashboard/communities", pathname) &&
     !isMatch("/dashboard/chat-with-designers", pathname) &&
     !isMatch("/dashboard/library", pathname) &&
-    !isMatch("/dashboard/jobs", pathname);
+    !isMatch("/dashboard/jobs", pathname) &&
+    !isMatch("/dashboard/competitions", pathname);
   const exploreActive = pathname === "/dashboard/communities";
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
+  const competitionsActive = isMatch("/dashboard/competitions", pathname);
   // Hidden: "Chat with designers" is no longer shown in the sidebar.
   // const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
@@ -160,6 +162,19 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Briefcase size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/dashboard/competitions"
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
+                competitionsActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
+              <Trophy size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Competitions</span>
             </Link>
           </li>
           <li>
