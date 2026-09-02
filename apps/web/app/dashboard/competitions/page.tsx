@@ -255,29 +255,114 @@ export default function CompetitionsPage() {
 
   return (
     <div className="flex flex-col h-full relative overflow-hidden">
-      {/* ── Floating decorations ── */}
+      {/* ── Floating decorative illustrations ── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
-        {[
-          { emoji: "🏆", left: "5%", delay: "0s", duration: "6s", size: "text-4xl" },
-          { emoji: "🎨", left: "15%", delay: "0.8s", duration: "7s", size: "text-3xl" },
-          { emoji: "🖥️", left: "30%", delay: "1.6s", duration: "5.5s", size: "text-5xl" },
-          { emoji: "🤖", left: "50%", delay: "0.4s", duration: "6.5s", size: "text-3xl" },
-          { emoji: "👤", left: "70%", delay: "2s", duration: "7.5s", size: "text-4xl" },
-          { emoji: "✨", left: "85%", delay: "1.2s", duration: "5s", size: "text-2xl" },
-          { emoji: "🎯", left: "40%", delay: "2.5s", duration: "6s", size: "text-3xl" },
-          { emoji: "🔥", left: "60%", delay: "0.6s", duration: "8s", size: "text-2xl" },
-        ].map((item, i) => (
-          <span
-            key={i}
-            className={`absolute bottom-0 ${item.size} opacity-0`}
-            style={{
-              left: item.left,
-              animation: `floatAcross ${item.duration} ${item.delay} ease-in-out infinite`,
-            }}
-          >
-            {item.emoji}
-          </span>
-        ))}
+        {/* Trophy */}
+        <svg
+          className="absolute"
+          style={{
+            width: "320px",
+            height: "320px",
+            left: "-5%",
+            bottom: "-10%",
+            opacity: 0,
+            animation: "floatAcross 12s 0s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path d="M100 20 C60 20 40 50 40 80 C40 110 60 130 80 140 L80 170 L120 170 L120 140 C140 130 160 110 160 80 C160 50 140 20 100 20Z" fill="var(--color-accent)" opacity="0.08"/>
+          <rect x="75" y="170" width="50" height="10" rx="2" fill="var(--color-accent)" opacity="0.06"/>
+          <rect x="65" y="178" width="70" height="8" rx="3" fill="var(--color-accent)" opacity="0.05"/>
+        </svg>
+
+        {/* Star / Sparkle */}
+        <svg
+          className="absolute"
+          style={{
+            width: "280px",
+            height: "280px",
+            right: "5%",
+            top: "10%",
+            opacity: 0,
+            animation: "floatAcross 14s 2s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path d="M100 10 L120 80 L190 80 L135 120 L155 190 L100 145 L45 190 L65 120 L10 80 L80 80Z" fill="var(--color-accent)" opacity="0.06"/>
+        </svg>
+
+        {/* Circle cluster */}
+        <svg
+          className="absolute"
+          style={{
+            width: "250px",
+            height: "250px",
+            left: "20%",
+            top: "30%",
+            opacity: 0,
+            animation: "floatAcross 11s 4s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <circle cx="100" cy="100" r="60" stroke="var(--color-accent)" strokeWidth="3" opacity="0.06"/>
+          <circle cx="100" cy="100" r="40" stroke="var(--color-accent)" strokeWidth="2" opacity="0.05"/>
+          <circle cx="100" cy="100" r="20" fill="var(--color-accent)" opacity="0.04"/>
+        </svg>
+
+        {/* Diamond / Rhombus */}
+        <svg
+          className="absolute"
+          style={{
+            width: "200px",
+            height: "200px",
+            right: "15%",
+            bottom: "5%",
+            opacity: 0,
+            animation: "floatAcross 13s 1s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path d="M100 20 L180 100 L100 180 L20 100Z" fill="var(--color-accent)" opacity="0.05"/>
+          <path d="M100 50 L150 100 L100 150 L50 100Z" stroke="var(--color-accent)" strokeWidth="2" opacity="0.06"/>
+        </svg>
+
+        {/* Hexagon */}
+        <svg
+          className="absolute"
+          style={{
+            width: "220px",
+            height: "220px",
+            left: "60%",
+            top: "5%",
+            opacity: 0,
+            animation: "floatAcross 15s 3s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path d="M100 10 L175 55 L175 145 L100 190 L25 145 L25 55Z" fill="var(--color-accent)" opacity="0.05"/>
+        </svg>
+
+        {/* Triangle */}
+        <svg
+          className="absolute"
+          style={{
+            width: "180px",
+            height: "180px",
+            left: "45%",
+            bottom: "15%",
+            opacity: 0,
+            animation: "floatAcross 10s 5s ease-in-out infinite",
+          }}
+          viewBox="0 0 200 200"
+          fill="none"
+        >
+          <path d="M100 20 L180 180 L20 180Z" fill="var(--color-accent)" opacity="0.05"/>
+        </svg>
       </div>
 
       <div className="flex-1 overflow-y-auto relative z-10">

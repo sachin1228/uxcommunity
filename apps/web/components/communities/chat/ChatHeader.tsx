@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BookMarked, Calendar, ChevronDown, Info, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, FolderGit2, Info, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -31,8 +31,8 @@ interface ChatHeaderProps {
   communityId?: string;
 }
 
-export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "about";
-const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "about"];
+export type ChatTab = "chat" | "showcase" | "threads" | "events" | "resources" | "members" | "about" | "custom";
+const DEFAULT_TABS: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members", "about", "custom"];
 
 type ConfirmAction = "leave" | "delete" | null;
 
@@ -171,7 +171,7 @@ export function ChatHeader({
   }
 
   const visibleTabs = community
-    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || tab === "about" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || tab === "about" || tab === "custom" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
     : DEFAULT_TABS;
 
   return (
@@ -297,6 +297,7 @@ export function ChatHeader({
                 ["events",    "Events",    Calendar],
                 ["members",   "Members",   Users],
                 ["about",     "About",     Info],
+                ["custom",    "Custom",    FolderGit2],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
                 <button
                   key={tab}
