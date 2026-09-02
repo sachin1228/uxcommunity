@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   Trophy,
   Palette,
@@ -12,189 +12,201 @@ import {
   ChevronUp,
   Plus,
   ExternalLink,
-  ChevronLeft,
+  Calendar,
   ChevronRight,
-  Star,
 } from "lucide-react";
 import { SubmitEntryModal } from "@/components/competitions/SubmitEntryModal";
 
 type Category = "visual" | "uiux" | "ai" | "portfolio";
-type TimePeriod = "weekly" | "monthly" | "yearly";
-type ViewFilter = "featured" | "all";
 
 interface Entry {
   id: string;
   title: string;
   description: string;
   authorName: string;
-  authorAvatar: string | null;
   imageUrl: string;
   liveUrl?: string;
   votes: number;
   hasVoted: boolean;
   category: Category;
-  isFeatured?: boolean;
 }
 
-interface WeekRange {
-  label: string;
-  shortLabel: string;
-  startDate: Date;
-  endDate: Date;
+interface WeekCompetition {
+  weekNumber: number;
+  category: Category;
+  title: string;
+  emoji: string;
+  description: string;
+  entries: Entry[];
+  startDate: string;
+  endDate: string;
+  status: "active" | "ended";
 }
 
-const CATEGORIES: Record<Category, { label: string; emoji: string; icon: React.ReactNode }> = {
-  visual: { label: "Visual Design", emoji: "🎨", icon: <Palette size={16} /> },
-  uiux: { label: "UI/UX Design", emoji: "🖥️", icon: <Monitor size={16} /> },
-  ai: { label: "AI Design", emoji: "🤖", icon: <Bot size={16} /> },
-  portfolio: { label: "Portfolio", emoji: "👤", icon: <User size={16} /> },
+const CATEGORIES: Record<Category, { label: string; emoji: string; icon: React.ReactNode; description: string }> = {
+  visual: { label: "Best Visual Design", emoji: "🎨", icon: <Palette size={20} />, description: "Posters, branding, illustrations, graphics, social designs" },
+  uiux: { label: "Best UI/UX Design", emoji: "🖥️", icon: <Monitor size={20} />, description: "Websites, apps, dashboards, landing pages, product concepts" },
+  ai: { label: "Best AI Design", emoji: "🤖", icon: <Bot size={20} />, description: "AI-generated/AI-assisted visual & UI design projects" },
+  portfolio: { label: "Best Portfolio", emoji: "👤", icon: <User size={20} />, description: "Personal design portfolios and showcases" },
 };
 
-function generateWeekRanges(): WeekRange[] {
-  const weeks: WeekRange[] = [];
-  const now = new Date(2026, 8, 2); // Sep 2, 2026 (Tue)
+const CATEGORY_ORDER: Category[] = ["visual", "uiux", "ai", "portfolio"];
 
-  // Go back 12 weeks
-  for (let i = 0; i < 12; i++) {
-    const end = new Date(now);
-    end.setDate(now.getDate() - (i * 7));
-    const start = new Date(end);
-    start.setDate(end.getDate() - 6);
+// Mock: current active week
+const CURRENT_WEEK = 12;
+const CURRENT_CATEGORY: Category = "visual";
 
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+// Mock: past weeks data
+const PAST_WEEKS: WeekCompetition[] = [
+  {
+    weekNumber: 11,
+    category: "portfolio",
+    title: "Best Portfolio",
+    emoji: "👤",
+    description: "Personal design portfolios and showcases",
+    startDate: "Aug 18, 2026",
+    endDate: "Aug 24, 2026",
+    status: "ended",
+    entries: [
+      { id: "p1", title: "Minimal Portfolio", description: "Clean, typography-focused portfolio", authorName: "Ana Costa", imageUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=300&fit=crop", votes: 89, hasVoted: false, category: "portfolio" },
+      { id: "p2", title: "Creative Agency Site", description: "Bold portfolio with immersive animations", authorName: "James Wu", imageUrl: "https://images.unsplash.com/photo-1467232004584-a241de8bcf5d?w=400&h=300&fit=crop", votes: 76, hasVoted: false, category: "portfolio" },
+      { id: "p3", title: "Designer Showcase", description: "Interactive portfolio with case studies", authorName: "Kim Lee", imageUrl: "https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=400&h=300&fit=crop", votes: 64, hasVoted: false, category: "portfolio" },
+    ],
+  },
+  {
+    weekNumber: 10,
+    category: "ai",
+    title: "Best AI Design",
+    emoji: "🤖",
+    description: "AI-generated/AI-assisted visual & UI design projects",
+    startDate: "Aug 11, 2026",
+    endDate: "Aug 17, 2026",
+    status: "ended",
+    entries: [
+      { id: "a1", title: "AI Art Collection", description: "Abstract artworks generated using Midjourney", authorName: "David Park", imageUrl: "https://images.unsplash.com/photo-1686191128892-3b3705bcf941?w=400&h=300&fit=crop", votes: 112, hasVoted: false, category: "ai" },
+      { id: "a2", title: "AI-Assisted Branding", description: "Brand identity created with AI tools", authorName: "Lisa Chang", imageUrl: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=400&h=300&fit=crop", votes: 95, hasVoted: false, category: "ai" },
+      { id: "a3", title: "Generative Patterns", description: "Textile patterns generated with AI", authorName: "Tom Harris", imageUrl: "https://images.unsplash.com/photo-1558591710-4b4a1ae0f04d?w=400&h=300&fit=crop", votes: 83, hasVoted: false, category: "ai" },
+    ],
+  },
+  {
+    weekNumber: 9,
+    category: "uiux",
+    title: "Best UI/UX Design",
+    emoji: "🖥️",
+    description: "Websites, apps, dashboards, landing pages, product concepts",
+    startDate: "Aug 4, 2026",
+    endDate: "Aug 10, 2026",
+    status: "ended",
+    entries: [
+      { id: "u1", title: "SaaS Dashboard", description: "Clean analytics dashboard with data viz", authorName: "Maya Patel", imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop", votes: 134, hasVoted: false, category: "uiux" },
+      { id: "u2", title: "Fitness App", description: "Mobile app with gamification elements", authorName: "Chris Lee", imageUrl: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop", votes: 118, hasVoted: false, category: "uiux" },
+      { id: "u3", title: "E-commerce Landing", description: "Modern landing page with smooth animations", authorName: "Emma Wilson", imageUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop", votes: 102, hasVoted: false, category: "uiux" },
+    ],
+  },
+];
 
-    weeks.push({
-      label: `${monthNames[start.getMonth()]} ${start.getDate()} — ${monthNames[end.getMonth()]} ${end.getDate()}`,
-      shortLabel: start.getMonth() === end.getMonth()
-        ? `${monthNames[start.getMonth()]} ${start.getDate()}—${end.getDate()}`
-        : `${monthNames[start.getMonth()]} ${start.getDate()}—${monthNames[end.getMonth()]} ${end.getDate()}`,
-      startDate: start,
-      endDate: end,
-    });
-  }
-  return weeks;
-}
+// Mock: current week entries
+const CURRENT_ENTRIES: Entry[] = [
+  { id: "1", title: "Neon Brand Identity", description: "A vibrant brand identity system with neon colors and modern typography for a tech startup.", authorName: "Sarah Chen", imageUrl: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=300&fit=crop", liveUrl: "https://example.com", votes: 42, hasVoted: false, category: "visual" },
+  { id: "2", title: "Minimalist Poster Series", description: "A series of minimalist posters exploring negative space and bold typography.", authorName: "Alex Rivera", imageUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400&h=300&fit=crop", votes: 38, hasVoted: true, category: "visual" },
+  { id: "3", title: "Retro Album Cover", description: "Vintage-inspired album cover design with bold colors and geometric shapes.", authorName: "Jordan Kim", imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=300&fit=crop", votes: 28, hasVoted: false, category: "visual" },
+  { id: "4", title: "Eco Packaging Design", description: "Sustainable packaging design for an organic skincare brand.", authorName: "Emma Wilson", imageUrl: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=300&fit=crop", votes: 25, hasVoted: false, category: "visual" },
+  { id: "5", title: "Abstract Art Collection", description: "A collection of abstract digital art pieces exploring color and form.", authorName: "Chris Lee", imageUrl: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=300&fit=crop", votes: 22, hasVoted: false, category: "visual" },
+];
 
-const WEEK_RANGES = generateWeekRanges();
-const CURRENT_WEEK_INDEX = 0;
-
-const MOCK_ENTRIES: Record<number, Entry[]> = {
-  0: [
-    { id: "1", title: "Neon Brand Identity", description: "A vibrant brand identity system with neon colors and modern typography.", authorName: "Sarah Chen", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=300&fit=crop", liveUrl: "https://example.com", votes: 42, hasVoted: false, category: "visual", isFeatured: true },
-    { id: "2", title: "Minimalist Poster Series", description: "A series of minimalist posters exploring negative space and bold typography.", authorName: "Alex Rivera", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?w=400&h=300&fit=crop", votes: 38, hasVoted: true, category: "visual", isFeatured: true },
-    { id: "3", title: "Retro Album Cover", description: "Vintage-inspired album cover design with bold colors and geometric shapes.", authorName: "Jordan Kim", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&h=300&fit=crop", votes: 28, hasVoted: false, category: "visual" },
-    { id: "4", title: "Eco Packaging Design", description: "Sustainable packaging design for an organic skincare brand.", authorName: "Emma Wilson", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=300&fit=crop", votes: 25, hasVoted: false, category: "visual" },
-    { id: "5", title: "Abstract Art Collection", description: "A collection of abstract digital art pieces exploring color and form.", authorName: "Chris Lee", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=400&h=300&fit=crop", votes: 22, hasVoted: false, category: "visual" },
-    { id: "6", title: "Geometric Patterns", description: "Bold geometric pattern system for a modern brand identity.", authorName: "Maya Patel", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?w=400&h=300&fit=crop", votes: 19, hasVoted: false, category: "visual" },
-  ],
-  1: [
-    { id: "w1-1", title: "SaaS Dashboard", description: "Clean analytics dashboard with data visualization.", authorName: "Maya Patel", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop", votes: 56, hasVoted: false, category: "uiux", isFeatured: true },
-    { id: "w1-2", title: "Fitness App Redesign", description: "Mobile fitness app with gamification elements.", authorName: "Chris Lee", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=400&h=300&fit=crop", votes: 45, hasVoted: false, category: "uiux" },
-    { id: "w1-3", title: "E-commerce Landing", description: "Modern product landing page with smooth animations.", authorName: "Emma Wilson", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop", votes: 33, hasVoted: false, category: "uiux" },
-  ],
-  2: [
-    { id: "w2-1", title: "AI Art Collection", description: "Abstract artworks generated using Midjourney.", authorName: "David Park", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1686191128892-3b3705bcf941?w=400&h=300&fit=crop", votes: 61, hasVoted: false, category: "ai", isFeatured: true },
-    { id: "w2-2", title: "AI-Assisted Branding", description: "Brand identity created with AI tools.", authorName: "Lisa Chang", authorAvatar: null, imageUrl: "https://images.unsplash.com/photo-1634986666676-ec8fd927c23d?w=400&h=300&fit=crop", votes: 47, hasVoted: false, category: "ai" },
-  ],
-};
-
-const CATEGORY_CYCLE: Category[] = ["visual", "uiux", "ai", "portfolio"];
-
-function EntryRow({ entry, onVote, rank }: { entry: Entry; onVote: (id: string) => void; rank: number }) {
-  const cat = CATEGORIES[entry.category];
+function WinnerBadge({ rank }: { rank: number }) {
+  const styles: Record<number, string> = {
+    1: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+    2: "bg-gray-300/10 text-gray-300 border-gray-400/20",
+    3: "bg-amber-700/10 text-amber-600 border-amber-700/20",
+  };
+  const labels: Record<number, string> = { 1: "🥇 1st", 2: "🥈 2nd", 3: "🥉 3rd" };
   return (
-    <div className="group flex items-center gap-4 py-4 border-b border-white/[0.06] last:border-b-0 hover:bg-surface-raised/50 transition-colors px-2 -mx-2 rounded-lg">
-      {/* Rank */}
-      <span className="w-8 text-center font-display text-sm font-semibold text-foreground-muted">
-        {rank}
-      </span>
+    <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-body text-[11px] font-semibold ${styles[rank]}`}>
+      {labels[rank]}
+    </span>
+  );
+}
 
-      {/* Thumbnail */}
-      <div className="h-16 w-16 rounded-lg overflow-hidden bg-surface shrink-0">
-        <img src={entry.imageUrl} alt={entry.title} className="h-full w-full object-cover" />
+function EntryCard({ entry, onVote, rank }: { entry: Entry; onVote: (id: string) => void; rank?: number }) {
+  return (
+    <div className="group flex flex-col rounded-xl border border-white/[0.08] bg-surface-raised overflow-hidden transition-all hover:border-white/[0.18] hover:shadow-lg">
+      <div className="relative aspect-[4/3] overflow-hidden bg-surface">
+        <img src={entry.imageUrl} alt={entry.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+        {rank !== undefined && <div className="absolute top-3 left-3"><WinnerBadge rank={rank} /></div>}
+        {entry.liveUrl && (
+          <a href={entry.liveUrl} target="_blank" rel="noopener noreferrer"
+            className="absolute top-3 right-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm"
+            onClick={(e) => e.stopPropagation()}>
+            <ExternalLink size={14} />
+          </a>
+        )}
       </div>
-
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-0.5">
-          <h3 className="font-display text-sm font-semibold text-foreground truncate group-hover:text-accent transition-colors">
-            {entry.title}
-          </h3>
-          {entry.isFeatured && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2 py-0.5 font-body text-[10px] font-medium text-accent">
-              <Star size={10} fill="currentColor" />
-              Featured
-            </span>
-          )}
-        </div>
-        <p className="font-body text-xs text-foreground-muted line-clamp-1">{entry.description}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="font-body text-[11px] text-foreground-muted">{entry.authorName}</span>
-          <span className="font-body text-[11px] text-foreground-muted">·</span>
-          <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-            {cat.emoji} {cat.label}
-          </span>
+      <div className="flex flex-col flex-1 p-4">
+        <h3 className="font-display text-sm font-semibold text-foreground mb-1 line-clamp-1">{entry.title}</h3>
+        <p className="font-body text-xs text-foreground-muted leading-relaxed mb-3 flex-1 line-clamp-2">{entry.description}</p>
+        <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-full bg-surface flex items-center justify-center text-[10px] font-semibold text-foreground-muted">
+              {entry.authorName.charAt(0)}
+            </div>
+            <span className="font-body text-xs text-foreground-muted">{entry.authorName}</span>
+          </div>
+          <button
+            onClick={() => onVote(entry.id)}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1 font-body text-xs font-medium transition-colors ${
+              entry.hasVoted
+                ? "border-accent/40 bg-accent/10 text-accent"
+                : "border-border text-foreground-muted hover:border-border-strong hover:text-foreground"
+            }`}
+          >
+            <ChevronUp size={14} className={entry.hasVoted ? "text-accent" : ""} />
+            {entry.votes}
+          </button>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Vote button */}
-      <button
-        onClick={() => onVote(entry.id)}
-        className={`flex flex-col items-center gap-0.5 rounded-xl border px-4 py-2 font-body text-sm font-medium transition-all shrink-0 ${
-          entry.hasVoted
-            ? "border-accent/40 bg-accent/10 text-accent"
-            : "border-border text-foreground-muted hover:border-border-strong hover:text-foreground hover:bg-surface-raised"
-        }`}
-      >
-        <ChevronUp size={16} className={entry.hasVoted ? "text-accent" : ""} />
-        {entry.votes}
-      </button>
+function PastWinners({ week }: { week: WeekCompetition }) {
+  const cat = CATEGORIES[week.category];
+  const winners = [...week.entries].sort((a, b) => b.votes - a.votes).slice(0, 3);
+
+  return (
+    <div className="rounded-xl border border-white/[0.06] bg-surface-raised/50 p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-lg">{week.emoji}</span>
+        <div>
+          <p className="font-display text-sm font-semibold text-foreground">Week {week.weekNumber}: {cat.label}</p>
+          <p className="font-body text-[11px] text-foreground-muted">{week.startDate} — {week.endDate}</p>
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">
+        {winners.map((entry, i) => (
+          <div key={entry.id} className="flex items-center gap-3 rounded-lg bg-surface px-3 py-2">
+            <WinnerBadge rank={i + 1} />
+            <div className="h-8 w-8 rounded-md overflow-hidden bg-surface-raised shrink-0">
+              <img src={entry.imageUrl} alt="" className="h-full w-full object-cover" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-body text-xs font-medium text-foreground truncate">{entry.title}</p>
+              <p className="font-body text-[10px] text-foreground-muted">{entry.authorName} · {entry.votes} votes</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 export default function CompetitionsPage() {
-  const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK_INDEX);
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("weekly");
-  const [viewFilter, setViewFilter] = useState<ViewFilter>("all");
-  const [entries, setEntries] = useState<Entry[]>(MOCK_ENTRIES[0] || []);
+  const [entries, setEntries] = useState<Entry[]>(CURRENT_ENTRIES);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(true);
 
-  const currentWeek = WEEK_RANGES[selectedWeek];
-  const currentCategory = CATEGORY_CYCLE[selectedWeek % 4];
-
-  useEffect(() => {
-    setEntries(MOCK_ENTRIES[selectedWeek] || []);
-  }, [selectedWeek]);
-
-  const filteredEntries = useMemo(() => {
-    const sorted = [...entries].sort((a, b) => b.votes - a.votes);
-    if (viewFilter === "featured") return sorted.filter((e) => e.isFeatured);
-    return sorted;
-  }, [entries, viewFilter]);
-
-  const handleScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-    setShowLeftArrow(scrollLeft > 10);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  };
-
-  useEffect(() => {
-    handleScroll();
-  }, []);
-
-  function scrollWeeks(direction: "left" | "right") {
-    if (!scrollRef.current) return;
-    const scrollAmount = 200;
-    scrollRef.current.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-  }
+  const cat = CATEGORIES[CURRENT_CATEGORY];
+  const sorted = [...entries].sort((a, b) => b.votes - a.votes);
+  const totalVotes = entries.reduce((sum, e) => sum + e.votes, 0);
 
   function handleVote(entryId: string) {
     setEntries((prev) =>
@@ -212,155 +224,113 @@ export default function CompetitionsPage() {
       title,
       description,
       authorName: "You",
-      authorAvatar: null,
       imageUrl,
       liveUrl,
       votes: 0,
       hasVoted: false,
-      category: currentCategory,
+      category: CURRENT_CATEGORY,
     };
     setEntries((prev) => [newEntry, ...prev]);
     setShowSubmitModal(false);
   }
 
-  const formatFullDate = (d: Date) => {
-    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  };
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 pt-6 pb-8">
-          {/* ── Title ── */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white">
-              <Trophy size={20} />
-            </div>
-            <div>
-              <h1 className="font-display text-xl font-bold text-foreground">
-                Best of UX Community
-              </h1>
-              <p className="font-body text-sm text-foreground-muted">
-                Week of {formatFullDate(currentWeek.startDate)}
-              </p>
-            </div>
-          </div>
-
-          {/* ── Tabs Row: Period tabs (left) + Filter tabs (right) ── */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-1">
-              {(["weekly", "monthly", "yearly"] as TimePeriod[]).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setTimePeriod(period)}
-                  className={`px-3 py-1.5 font-body text-sm font-medium capitalize transition-colors border-b-2 ${
-                    timePeriod === period
-                      ? "text-accent border-accent"
-                      : "text-foreground-muted border-transparent hover:text-foreground"
-                  }`}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 text-sm">
-                <button
-                  onClick={() => setViewFilter("featured")}
-                  className={`font-body font-medium transition-colors ${
-                    viewFilter === "featured" ? "text-accent" : "text-foreground-muted hover:text-foreground"
-                  }`}
-                >
-                  Featured
-                </button>
-                <span className="text-foreground-muted/40">|</span>
-                <button
-                  onClick={() => setViewFilter("all")}
-                  className={`font-body font-medium transition-colors ${
-                    viewFilter === "all" ? "text-accent" : "text-foreground-muted hover:text-foreground"
-                  }`}
-                >
-                  All
-                </button>
+        {/* ── Active Competition Hero ── */}
+        <div className="px-6 pt-6 pb-6">
+          <div className="rounded-2xl border border-white/[0.08] bg-surface-raised overflow-hidden">
+            {/* Banner */}
+            <div className="relative px-6 pt-6 pb-8 bg-gradient-to-br from-accent/20 via-accent/5 to-transparent">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-body text-[11px] font-semibold text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Now
+                </span>
+                <span className="font-body text-xs text-foreground-muted">Week {CURRENT_WEEK}</span>
               </div>
+
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-surface text-foreground">
+                  {cat.icon}
+                </div>
+                <div>
+                  <h1 className="font-display text-xl font-semibold text-foreground">
+                    {cat.emoji} {cat.label}
+                  </h1>
+                  <p className="font-body text-sm text-foreground-muted">{cat.description}</p>
+                </div>
+              </div>
+
+              {/* Stats row */}
+              <div className="flex items-center gap-5 mt-4">
+                <div className="flex items-center gap-1.5">
+                  <Users size={14} className="text-foreground-muted" />
+                  <span className="font-body text-sm text-foreground-muted">{entries.length} entries</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Trophy size={14} className="text-foreground-muted" />
+                  <span className="font-body text-sm text-foreground-muted">{totalVotes} votes</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock size={14} className="text-foreground-muted" />
+                  <span className="font-body text-sm text-foreground-muted">Ends in 3 days</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit CTA */}
+            <div className="px-6 py-4 border-t border-white/[0.06] flex items-center justify-between">
+              <p className="font-body text-sm text-foreground-muted">
+                Submit your {cat.label.toLowerCase()} work before time runs out
+              </p>
               <button
                 onClick={() => setShowSubmitModal(true)}
-                className="flex items-center gap-1.5 rounded-full bg-accent px-4 py-1.5 font-body text-sm font-medium text-white hover:bg-accent/90 transition-colors"
+                className="flex items-center gap-2 rounded-full bg-accent px-5 py-2 font-body text-sm font-medium text-white hover:bg-accent/90 transition-colors"
               >
-                <Plus size={14} />
-                Submit
+                <Plus size={16} />
+                Submit Entry
               </button>
             </div>
           </div>
+        </div>
 
-          {/* ── Week Scrubber ── */}
-          <div className="relative mb-6">
-            {/* Left arrow */}
-            {showLeftArrow && (
-              <button
-                onClick={() => scrollWeeks("left")}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background border border-border shadow-md text-foreground-muted hover:text-foreground transition-colors -ml-1"
-              >
-                <ChevronLeft size={16} />
-              </button>
-            )}
-
-            {/* Scrollable week list */}
-            <div
-              ref={scrollRef}
-              onScroll={handleScroll}
-              className="flex gap-2 overflow-x-auto scrollbar-hide py-2 px-1"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-            >
-              {WEEK_RANGES.map((week, i) => {
-                const isActive = i === selectedWeek;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedWeek(i)}
-                    className={`shrink-0 rounded-full px-4 py-2 font-body text-sm font-medium transition-all whitespace-nowrap ${
-                      isActive
-                        ? "bg-accent/10 border border-accent/30 text-accent"
-                        : "border border-white/[0.06] text-foreground-muted hover:border-white/[0.12] hover:text-foreground"
-                    }`}
-                  >
-                    {week.shortLabel}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Right arrow */}
-            {showRightArrow && (
-              <button
-                onClick={() => scrollWeeks("right")}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background border border-border shadow-md text-foreground-muted hover:text-foreground transition-colors -mr-1"
-              >
-                <ChevronRight size={16} />
-              </button>
-            )}
+        {/* ── Entries Grid ── */}
+        <div className="px-6 pb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-display text-base font-semibold text-foreground">
+              All Entries
+            </h2>
+            <span className="font-body text-xs text-foreground-muted">Sorted by votes</span>
           </div>
 
-          {/* ── Entries List ── */}
-          <div>
-            {filteredEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-white/[0.1]">
-                <Trophy size={40} className="text-foreground-muted opacity-40 mb-3" />
-                <p className="font-body text-sm text-foreground-muted mb-2">
-                  {viewFilter === "featured" ? "No featured entries this week" : "No entries yet"}
-                </p>
-                <button onClick={() => setShowSubmitModal(true)} className="font-body text-sm text-accent hover:underline">
-                  Be the first to submit
-                </button>
-              </div>
-            ) : (
-              <div className="divide-y divide-white/[0.06]">
-                {filteredEntries.map((entry, i) => (
-                  <EntryRow key={entry.id} entry={entry} onVote={handleVote} rank={i + 1} />
-                ))}
-              </div>
-            )}
+          {sorted.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-white/[0.1]">
+              <Trophy size={40} className="text-foreground-muted opacity-40 mb-3" />
+              <p className="font-body text-sm text-foreground-muted mb-2">No entries yet</p>
+              <button onClick={() => setShowSubmitModal(true)} className="font-body text-sm text-accent hover:underline">
+                Be the first to submit
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sorted.map((entry, i) => (
+                <EntryCard key={entry.id} entry={entry} onVote={handleVote} rank={i < 3 ? i + 1 : undefined} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Past Winners ── */}
+        <div className="px-6 pb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar size={16} className="text-foreground-muted" />
+            <h2 className="font-display text-base font-semibold text-foreground">Past Winners</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {PAST_WEEKS.map((week) => (
+              <PastWinners key={week.weekNumber} week={week} />
+            ))}
           </div>
         </div>
       </div>
@@ -370,7 +340,7 @@ export default function CompetitionsPage() {
         <SubmitEntryModal
           onClose={() => setShowSubmitModal(false)}
           onSubmit={handleSubmit}
-          competitionTitle={`Best of UX Community — ${currentWeek.shortLabel}`}
+          competitionTitle={`${cat.emoji} ${cat.label} — Week ${CURRENT_WEEK}`}
         />
       )}
     </div>
