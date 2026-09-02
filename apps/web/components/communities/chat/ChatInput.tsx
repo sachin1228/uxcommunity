@@ -313,7 +313,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 position:  "fixed",
                 bottom:    pickerPos.bottom,
                 left:      pickerPos.left,
-                width:     pickerPos.width,
+                width:     340,
                 zIndex:    9999,
                 animation: "fadeSlideUp 150ms ease-out",
               }}
