@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, memo } from "react";
-import Lottie from "lottie-react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
+import Lottie, { type LottieRefCurrentProps } from "lottie-react";
 import { emojiToCodepoint, getEmojiWebpUrl } from "@/lib/noto-emoji";
 
 interface AnimatedEmojiProps {
@@ -22,7 +22,7 @@ const lottieCache = new Map<string, unknown>();
 
 /**
  * Renders an animated Noto emoji using Lottie animations.
- * Falls back to PNG if Lottie fails to load.
+ * Falls back to WebP if Lottie fails to load.
  */
 export const AnimatedEmoji = memo(function AnimatedEmoji({
   emoji,
@@ -36,75 +36,71 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
+  const lottieRef = useRef<LottieRefCurrentProps>(null);
 
   const codepoint = emojiToCodepoint(emoji);
 
-  // Load animation data
-  const loadAnimation = useCallback(async () => {
-    if (!codepoint || disableAnimation) return;
+  // Load WebP for initial state (always load this)
+  useEffect(() => {
+    if (!codepoint) return;
     
-    // Check cache first
-    if (lottieCache.has(codepoint)) {
-      setAnimationData(lottieCache.get(codepoint));
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Lottie animation: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      lottieCache.set(codepoint, data);
-      setAnimationData(data);
-    } catch (err) {
-      console.warn(`Failed to load Lottie animation for ${emoji}:`, err);
-      setError(true);
-      // Fallback to WebP
+    const loadWebp = async () => {
       try {
         const url = await getEmojiWebpUrl(emoji);
         if (url) setWebpUrl(url);
       } catch {
-        // WebP fallback also failed
+        // WebP load failed
       }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [codepoint, emoji, disableAnimation]);
+    };
 
-  // Load WebP for fallback or initial state
-  const loadWebp = useCallback(async () => {
-    if (!codepoint) return;
-    
-    try {
-      const url = await getEmojiWebpUrl(emoji);
-      if (url) setWebpUrl(url);
-    } catch {
-      // WebP load failed
-    }
+    loadWebp();
   }, [codepoint, emoji]);
 
+  // Load animation data only when NOT hoverOnly (or when hovered in hoverOnly mode)
   useEffect(() => {
-    loadWebp();
-    
-    if (!hoverOnly || disableAnimation) {
-      loadAnimation();
-    }
-  }, [loadWebp, loadAnimation, hoverOnly, disableAnimation]);
+    if (disableAnimation || (hoverOnly && !isHovered)) return;
+    if (!codepoint) return;
+
+    const loadAnimation = async () => {
+      // Check cache first
+      if (lottieCache.has(codepoint)) {
+        setAnimationData(lottieCache.get(codepoint));
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Lottie animation: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        lottieCache.set(codepoint, data);
+        setAnimationData(data);
+      } catch (err) {
+        console.warn(`Failed to load Lottie animation for ${emoji}:`, err);
+        setError(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadAnimation();
+  }, [codepoint, emoji, disableAnimation, hoverOnly, isHovered]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
-    if (hoverOnly && !animationData && !isLoading) {
-      loadAnimation();
-    }
   };
 
   const handleMouseLeave = () => {
     setIsHovered(false);
+    // Stop animation when leaving
+    if (lottieRef.current) {
+      lottieRef.current.stop();
+    }
   };
 
   // Show loading state
@@ -133,8 +129,8 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
     );
   }
 
-  // Show Lottie animation if available and not in hover-only mode (or if hovered)
-  if (animationData && (!hoverOnly || isHovered)) {
+  // Show Lottie animation ONLY when hovered and animation is loaded
+  if (animationData && isHovered && !disableAnimation) {
     return (
       <span
         className={`inline-flex items-center justify-center ${className}`}
@@ -143,16 +139,17 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
         onMouseLeave={handleMouseLeave}
       >
         <Lottie
+          lottieRef={lottieRef}
           animationData={animationData}
           style={{ width: size, height: size }}
-          loop={isHovered}
-          autoplay={isHovered}
+          loop
+          autoplay
         />
       </span>
     );
   }
 
-  // Show WebP fallback if available
+  // Show WebP (default state)
   if (webpUrl) {
     return (
       <span
