@@ -112,10 +112,6 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
           </div>
         )}
       </div>
-
-      <div className="shrink-0 px-2.5 py-1 flex justify-end border-t border-border">
-        <span className="text-[9px] text-foreground-muted/40 font-mono">GIPHY</span>
-      </div>
     </div>
   );
 }
@@ -262,11 +258,6 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Branding */}
-      <div className="shrink-0 px-2.5 py-1 flex justify-end border-t border-border">
-        <span className="text-[9px] text-foreground-muted/40 font-mono">NOTO EMOJI</span>
       </div>
     </div>
   );
