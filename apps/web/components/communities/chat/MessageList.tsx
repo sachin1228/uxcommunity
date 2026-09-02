@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useMemo } from "react";
+import { RefObject, useMemo, useRef } from "react";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 import { MessageBubble } from "./MessageBubble";
@@ -126,6 +126,54 @@ export function MessageList({
     );
     return result;
   }, [grouped, threadEvents]);
+
+  // ── Entrance-animation eligibility ────────────────────────────────────
+  // Only messages that arrive *live* (sent by me or pushed via realtime after
+  // the list has settled) get the pop-in + word-wave animation. History on
+  // first paint and older pages prepended by scroll-up must render static.
+  const seenRef = useRef<{ communityId: string; byId: Map<string, CachedMessage>; maxTs: number } | null>(null);
+  const animateIdsRef = useRef<Set<string>>(new Set());
+
+  const allMessages = useMemo(() => grouped.flatMap((g) => g.messages), [grouped]);
+  const settled = !loading && initialPositionResolved;
+
+  useMemo(() => {
+    if (!settled) {
+      // Still resolving the initial window — reset so the first settled render seeds silently.
+      seenRef.current = null;
+      animateIdsRef.current.clear();
+      return;
+    }
+
+    const prev = seenRef.current;
+    const byId = new Map<string, CachedMessage>();
+    let maxTs = 0;
+    for (const m of allMessages) {
+      byId.set(m.id, m);
+      const ts = new Date(m.created_at).getTime();
+      if (ts > maxTs) maxTs = ts;
+    }
+
+    if (prev && prev.communityId === communityId) {
+      const prevTemps = [...prev.byId.values()].filter((m) => m.id.startsWith("temp-"));
+      for (const m of allMessages) {
+        if (prev.byId.has(m.id)) continue;
+        // Optimistic bubble already animated; its server-confirmed twin must not replay.
+        const isSwap = prevTemps.some(
+          (t) => t.user_id === m.user_id && (t.content ?? "") === (m.content ?? ""),
+        );
+        if (isSwap) continue;
+        // Prepended history (load-older) is strictly older than anything we knew about.
+        if (new Date(m.created_at).getTime() < prev.maxTs) continue;
+        animateIdsRef.current.add(m.id);
+      }
+    } else {
+      // First settled render for this community (or a community switch): seed without animating.
+      animateIdsRef.current.clear();
+    }
+
+    seenRef.current = { communityId, byId, maxTs };
+  }, [allMessages, settled, communityId]);
 
   if (loading) {
     return (
@@ -262,6 +310,7 @@ export function MessageList({
                   onEdit={onEdit}
                   onCopy={onCopy}
                   onDelete={onDelete}
+                  animate={animateIdsRef.current.has(msg.id)}
                 />
               );
             })}
