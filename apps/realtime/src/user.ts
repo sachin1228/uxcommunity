@@ -18,21 +18,33 @@ interface ClientState {
   subscriptions: Map<string, Set<string>>; // room → Set<topics>
 }
 
+/** Persisted on the WebSocket so subscriptions survive hibernation. */
+interface UserAttachment {
+  userId: string;
+  /** room → topics */
+  subs?: Record<string, string[]>;
+}
+
 export class UserDO extends DurableObject<Env> {
   private clients = new Map<WebSocket, ClientState>();
   private reconstructed = false;
 
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Heartbeat auto-response — answered by the runtime without waking the DO.
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+    // Rebuild client state before the first event (often a webSocketMessage).
+    this.ctx.blockConcurrencyWhile(async () => this.ensureReconstructed());
+  }
+
   // ── Fetch handler ────────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
+    this.ensureReconstructed();
+
     // Server-side publish via HTTP POST
     if (request.headers.get("x-realtime-publish-secret")) {
       return this.publish(request);
-    }
-
-    if (!this.reconstructed) {
-      await this.ctx.blockConcurrencyWhile(() => this.reconstructState());
-      this.reconstructed = true;
     }
 
     if (request.headers.get("Upgrade") === "websocket") {
@@ -43,18 +55,44 @@ export class UserDO extends DurableObject<Env> {
 
   // ── Hibernation-safe state reconstruction ──────────────────────────────
 
-  private async reconstructState(): Promise<void> {
+  private ensureReconstructed(): void {
+    if (this.reconstructed) return;
     for (const ws of this.ctx.getWebSockets()) {
-      const attachment = ws.deserializeAttachment() as
-        | { userId?: string }
-        | undefined;
+      this.adoptSocket(ws);
+    }
+    this.reconstructed = true;
+  }
 
-      if (!attachment?.userId) continue;
+  private adoptSocket(ws: WebSocket): ClientState | null {
+    let attachment: UserAttachment | undefined;
+    try {
+      attachment = ws.deserializeAttachment() as UserAttachment | undefined;
+    } catch {
+      return null;
+    }
+    if (!attachment?.userId) return null;
 
-      this.clients.set(ws, {
-        userId: attachment.userId,
-        subscriptions: new Map(),
-      });
+    const subscriptions = new Map<string, Set<string>>();
+    for (const [room, topics] of Object.entries(attachment.subs ?? {})) {
+      subscriptions.set(room, new Set(topics));
+    }
+
+    const state: ClientState = { userId: attachment.userId, subscriptions };
+    this.clients.set(ws, state);
+    return state;
+  }
+
+  private persist(ws: WebSocket, state: ClientState): void {
+    const subs: Record<string, string[]> = {};
+    for (const [room, topics] of state.subscriptions) {
+      subs[room] = [...topics];
+    }
+    const attachment: UserAttachment = { userId: state.userId, subs };
+    try {
+      ws.serializeAttachment(attachment);
+    } catch {
+      // Attachment too large or socket gone — in-memory state still works
+      // until the next hibernation.
     }
   }
 
@@ -70,7 +108,8 @@ export class UserDO extends DurableObject<Env> {
     const client = pair[0];
     const server = pair[1];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ userId });
+    const attachment: UserAttachment = { userId, subs: {} };
+    server.serializeAttachment(attachment);
 
     this.clients.set(server, {
       userId,
@@ -96,22 +135,30 @@ export class UserDO extends DurableObject<Env> {
       return;
     }
 
-    const state = this.clients.get(ws);
-    if (!state) return;
+    this.ensureReconstructed();
+    let state = this.clients.get(ws);
+    if (!state) {
+      // Not tracked (post-hibernation edge) — recover from the attachment.
+      state = this.adoptSocket(ws) ?? undefined;
+      if (!state) return;
+    }
 
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== state.userId) return;
       this.sendToClient(ws, { t: "hello", connectionId: crypto.randomUUID() });
     } else if (msg.t === "subscribe" && msg.room && msg.topic) {
       this.handleSubscribe(state, msg.room, msg.topic);
+      this.persist(ws, state);
     } else if (msg.t === "unsubscribe" && msg.room && msg.topic) {
       this.handleUnsubscribe(state, msg.room, msg.topic);
+      this.persist(ws, state);
     } else if (msg.t === "publish" && msg.room && msg.topic) {
       this.handlePublish(state, msg.room, msg.topic, msg.data);
     }
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    this.ensureReconstructed();
     this.clients.delete(ws);
   }
 
