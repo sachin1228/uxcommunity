@@ -56,14 +56,11 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
           if (codepoint) {
             const category = iconCategories?.[0] || "Other";
             
-            // Convert codepoint to unicode character
-            let unicode = "";
-            try {
-              unicode = String.fromCodePoint(parseInt(codepoint, 16));
-            } catch {
-              // Skip if codepoint is invalid
-              continue;
-            }
+            // Codepoints may be sequences like "2764_fe0f_200d_1f525"
+            // (heart on fire). Decode *every* part so the inserted character
+            // is the full emoji, not just its first component.
+            const unicode = codepointToEmoji(codepoint);
+            if (!unicode) continue;
             
             emojis.push({
               codepoint,
@@ -72,7 +69,7 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
               category,
               tags: tags || [],
               lottieUrl: `${LOTTIE_BASE}/${codepoint}/lottie.json`,
-              svgUrl: `${SVG_BASE}/emoji_u${codepoint}.svg`,
+              svgUrl: svgUrlForCodepoint(codepoint),
             });
             
             categories.add(category);
@@ -110,7 +107,8 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
  */
 export async function getEmojiByCodepoint(codepoint: string): Promise<NotoEmoji | undefined> {
   const catalog = await fetchEmojiCatalog();
-  return catalog.emojis.find(e => e.codepoint === codepoint);
+  const wanted = stripVS16(codepoint);
+  return catalog.emojis.find(e => stripVS16(e.codepoint) === wanted);
 }
 
 /**
@@ -135,22 +133,48 @@ export async function getEmojiByCategory(category: string): Promise<NotoEmoji[]>
   return catalog.emojis.filter(emoji => emoji.category === category);
 }
 
+/** Variation selector-16 — present in many emoji, absent from Noto asset names. */
+const VS16 = "fe0f";
+
+/** Remove every fe0f part from a "_"-joined codepoint key. */
+function stripVS16(codepoint: string): string {
+  return codepoint.split("_").filter((p) => p !== VS16).join("_");
+}
+
 /**
- * Convert a Unicode emoji character to its codepoint string
+ * Convert an emoji (single character *or* a full sequence such as a
+ * skin-toned hand or a ZWJ family) to the Noto asset key, e.g.
+ *   "❤️‍🔥" -> "2764_200d_1f525"
+ *   "👍🏽"  -> "1f44d_1f3fd"
+ *
+ * The result is safe for both the Lottie CDN and the SVG repo: neither
+ * requires the fe0f selector and the SVG repo 404s when it is present.
  */
 export function emojiToCodepoint(emoji: string): string | null {
-  // Handle ZWJ sequences - take the first character
-  const codePoints = Array.from(emoji);
-  if (codePoints.length === 0) return null;
-  
-  // Get the first code point (main emoji)
-  const firstChar = codePoints[0];
-  const codePoint = firstChar.codePointAt(0);
-  
-  if (!codePoint) return null;
-  
-  // Convert to hex string without leading zeros
-  return codePoint.toString(16).toLowerCase();
+  const parts: string[] = [];
+  for (const ch of emoji) {
+    const cp = ch.codePointAt(0);
+    if (!cp) continue;
+    const hex = cp.toString(16).toLowerCase();
+    if (hex === VS16) continue;
+    parts.push(hex);
+  }
+  return parts.length ? parts.join("_") : null;
+}
+
+/**
+ * Convert a catalog codepoint string ("2764_fe0f_200d_1f525") back into the
+ * emoji character it represents. Returns "" if it cannot be decoded.
+ */
+export function codepointToEmoji(codepoint: string): string {
+  try {
+    return codepoint
+      .split("_")
+      .map((hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .join("");
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -165,8 +189,9 @@ export async function getEmojiLottieUrl(emoji: string): Promise<string | null> {
 }
 
 /**
- * Get SVG URL for a codepoint (synchronous)
+ * Get SVG URL for a codepoint (synchronous).
+ * Noto SVG filenames never include the fe0f selector, so strip it.
  */
 export function svgUrlForCodepoint(codepoint: string): string {
-  return `${SVG_BASE}/emoji_u${codepoint}.svg`;
+  return `${SVG_BASE}/emoji_u${stripVS16(codepoint)}.svg`;
 }
