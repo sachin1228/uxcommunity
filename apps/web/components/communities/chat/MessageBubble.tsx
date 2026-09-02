@@ -602,13 +602,13 @@ function MessageContent({
 
   return (
     <>
-      <p
+      <div
         className={`font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words ${
           isMe ? "text-accent-foreground" : "text-foreground"
         }`}
       >
         {parts}
-      </p>
+      </div>
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );
