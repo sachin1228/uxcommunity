@@ -3,6 +3,7 @@
 import { useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
+import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = CachedSidebarCommunity;
@@ -132,7 +133,7 @@ export function CommunityRow({
               <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
                 {lastReaction.isOwn ? " reacted " : " reacted "}
-                <span>{lastReaction.emoji}</span>
+                <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
                 {" to: "}
                 <span>{lastReaction.messagePreview}</span>
               </p>

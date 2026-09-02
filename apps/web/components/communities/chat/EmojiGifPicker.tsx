@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Search, X } from "lucide-react";
 import { fetchEmojiCatalog, type NotoEmoji } from "@/lib/noto-emoji";
+import { NotoEmojiSvg } from "./NotoEmojiSvg";
 
 type Tab = "emoji" | "gif" | "sticker";
 
@@ -306,9 +307,9 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
                   ${active ? "text-accent" : "text-foreground-muted"}`}>
                   GIF
                 </span>
-              ) : (
-                <span className="text-[14px] leading-none">{t.icon}</span>
-              )}
+              ) : t.icon ? (
+                <NotoEmojiSvg emoji={t.icon} size={16} />
+              ) : null}
 
               {/* Label — hidden for GIF since the icon is already the label */}
               {t.id !== "gif" && (
