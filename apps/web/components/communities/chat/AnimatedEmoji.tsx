@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, memo } from "react";
-import Lottie, { type LottieRefCurrentProps } from "lottie-react";
-import { emojiToCodepoint, getEmojiWebpUrl } from "@/lib/noto-emoji";
+import { useState, useEffect, useCallback, memo } from "react";
+import Lottie from "lottie-react";
+import { emojiToCodepoint } from "@/lib/noto-emoji";
 
 interface AnimatedEmojiProps {
   /** The emoji character to render */
@@ -13,16 +13,18 @@ interface AnimatedEmojiProps {
   className?: string;
   /** Whether to play animation on hover only */
   hoverOnly?: boolean;
-  /** Whether to disable animation (show static WebP) */
+  /** Whether to disable animation (show static emoji) */
   disableAnimation?: boolean;
 }
 
-// Cache for Lottie animation data
+// Cache for Lottie animation data (shared across all instances)
 const lottieCache = new Map<string, unknown>();
+// Track failed codepoints to avoid retrying
+const failedCodepoints = new Set<string>();
 
 /**
  * Renders an animated Noto emoji using Lottie animations.
- * Falls back to WebP if Lottie fails to load.
+ * Lottie JSON (~37KB) is 10x smaller than animated WebP (~369KB).
  */
 export const AnimatedEmoji = memo(function AnimatedEmoji({
   emoji,
@@ -32,64 +34,48 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   disableAnimation = false,
 }: AnimatedEmojiProps) {
   const [animationData, setAnimationData] = useState<unknown | null>(null);
-  const [webpUrl, setWebpUrl] = useState<string | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const lottieRef = useRef<LottieRefCurrentProps>(null);
 
   const codepoint = emojiToCodepoint(emoji);
 
-  // Load WebP for initial state (always load this)
+  // Load animation data
   useEffect(() => {
-    if (!codepoint) return;
+    if (!codepoint || disableAnimation) return;
+    if (failedCodepoints.has(codepoint)) return;
     
-    const loadWebp = async () => {
-      try {
-        const url = await getEmojiWebpUrl(emoji);
-        if (url) setWebpUrl(url);
-      } catch {
-        // WebP load failed
-      }
-    };
+    // Check cache first
+    if (lottieCache.has(codepoint)) {
+      setAnimationData(lottieCache.get(codepoint));
+      return;
+    }
 
-    loadWebp();
-  }, [codepoint, emoji]);
-
-  // Load animation data only when NOT hoverOnly (or when hovered in hoverOnly mode)
-  useEffect(() => {
-    if (disableAnimation || (hoverOnly && !isHovered)) return;
-    if (!codepoint) return;
+    // Don't fetch if hoverOnly and not hovered
+    if (hoverOnly && !isHovered) return;
 
     const loadAnimation = async () => {
-      // Check cache first
-      if (lottieCache.has(codepoint)) {
-        setAnimationData(lottieCache.get(codepoint));
-        return;
-      }
-
       setIsLoading(true);
       try {
         const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
         const response = await fetch(url);
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch Lottie animation: ${response.status}`);
+          failedCodepoints.add(codepoint);
+          return;
         }
         
         const data = await response.json();
         lottieCache.set(codepoint, data);
         setAnimationData(data);
-      } catch (err) {
-        console.warn(`Failed to load Lottie animation for ${emoji}:`, err);
-        setError(true);
+      } catch {
+        failedCodepoints.add(codepoint);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadAnimation();
-  }, [codepoint, emoji, disableAnimation, hoverOnly, isHovered]);
+  }, [codepoint, disableAnimation, hoverOnly, isHovered]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -97,40 +83,10 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    // Stop animation when leaving
-    if (lottieRef.current) {
-      lottieRef.current.stop();
-    }
   };
 
-  // Show loading state
-  if (isLoading && !animationData && !webpUrl) {
-    return (
-      <span
-        className={`inline-flex items-center justify-center ${className}`}
-        style={{ width: size, height: size }}
-      >
-        <span className="text-foreground-muted animate-pulse" style={{ fontSize: size * 0.8 }}>
-          {emoji}
-        </span>
-      </span>
-    );
-  }
-
-  // Show error state - just render the emoji text
-  if (error && !animationData && !webpUrl) {
-    return (
-      <span
-        className={`inline-flex items-center justify-center ${className}`}
-        style={{ width: size, height: size }}
-      >
-        <span style={{ fontSize: size * 0.8 }}>{emoji}</span>
-      </span>
-    );
-  }
-
-  // Show Lottie animation ONLY when hovered and animation is loaded
-  if (animationData && isHovered && !disableAnimation) {
+  // Show Lottie animation if loaded
+  if (animationData) {
     return (
       <span
         className={`inline-flex items-center justify-center ${className}`}
@@ -139,45 +95,24 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
         onMouseLeave={handleMouseLeave}
       >
         <Lottie
-          lottieRef={lottieRef}
           animationData={animationData}
           style={{ width: size, height: size }}
-          loop
-          autoplay
+          loop={hoverOnly ? isHovered : true}
+          autoplay={hoverOnly ? isHovered : true}
         />
       </span>
     );
   }
 
-  // Show WebP (default state)
-  if (webpUrl) {
-    return (
-      <span
-        className={`inline-flex items-center justify-center ${className}`}
-        style={{ width: size, height: size }}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={webpUrl}
-          alt={emoji}
-          style={{ width: size, height: size }}
-          loading="lazy"
-        />
-      </span>
-    );
-  }
-
-  // Final fallback - just render the emoji text
+  // Fallback to emoji character (no image fetching needed)
   return (
     <span
       className={`inline-flex items-center justify-center ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, fontSize: size * 0.8 }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <span style={{ fontSize: size * 0.8 }}>{emoji}</span>
+      {emoji}
     </span>
   );
 });

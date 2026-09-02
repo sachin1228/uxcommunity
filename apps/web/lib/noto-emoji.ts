@@ -11,8 +11,6 @@ export interface NotoEmoji {
   category: string;
   tags: string[];
   lottieUrl: string;
-  webpUrl: string;
-  gifUrl: string;
 }
 
 export interface EmojiCatalog {
@@ -22,7 +20,6 @@ export interface EmojiCatalog {
 
 const CATALOG_URL = "https://googlefonts.github.io/noto-emoji-animation/data/api.json";
 const LOTTIE_BASE = "https://fonts.gstatic.com/s/e/notoemoji/latest";
-const IMAGE_BASE = "https://fonts.gstatic.com/s/e/notoemoji/latest";
 
 // In-memory cache
 let catalogCache: EmojiCatalog | null = null;
@@ -73,8 +70,6 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
               category,
               tags: tags || [],
               lottieUrl: `${LOTTIE_BASE}/${codepoint}/lottie.json`,
-              webpUrl: `${IMAGE_BASE}/${codepoint}/512.webp`,
-              gifUrl: `${IMAGE_BASE}/${codepoint}/512.gif`,
             });
             
             categories.add(category);
@@ -164,26 +159,4 @@ export async function getEmojiLottieUrl(emoji: string): Promise<string | null> {
   
   const emojiData = await getEmojiByCodepoint(codepoint);
   return emojiData?.lottieUrl ?? null;
-}
-
-/**
- * Get the WebP URL for an emoji character (for fallback/preview)
- */
-export async function getEmojiWebpUrl(emoji: string): Promise<string | null> {
-  const codepoint = emojiToCodepoint(emoji);
-  if (!codepoint) return null;
-  
-  const emojiData = await getEmojiByCodepoint(codepoint);
-  return emojiData?.webpUrl ?? null;
-}
-
-/**
- * Get the GIF URL for an emoji character (for fallback/preview)
- */
-export async function getEmojiGifUrl(emoji: string): Promise<string | null> {
-  const codepoint = emojiToCodepoint(emoji);
-  if (!codepoint) return null;
-  
-  const emojiData = await getEmojiByCodepoint(codepoint);
-  return emojiData?.gifUrl ?? null;
 }
