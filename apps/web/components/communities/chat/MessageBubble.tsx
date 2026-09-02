@@ -132,7 +132,7 @@ function BubbleImage({
     >
       <div
         className={standalone
-          ? `relative overflow-hidden ${isFirstInGroup ? "rounded-tl-none" : "rounded-[10px]"} border-2 ${
+          ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
                 : "border-border bg-surface-raised"
@@ -611,14 +611,17 @@ function DeletedBubble({
 }) {
   return (
     <div
-      className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
         }`}
     >
       {isFirstInGroup && (
-        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
+        <MessageBubbleTail
+          side={isMe ? "right" : "left"}
+          className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
+        />
       )}
       <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
@@ -653,11 +656,13 @@ export function MessageBubble({
   const [nearBubble, setNearBubble] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  /** Show three-dot button when mouse is within 40 px of the bubble's right edge. */
+  /** Show three-dot button when mouse is within the bubble area. */
   function handleRowMouseMove(e: React.MouseEvent) {
     if (!bubbleRef.current) return;
     const r = bubbleRef.current.getBoundingClientRect();
-    const withinX = e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
+    const withinX = isMe
+      ? e.clientX >= r.left - 150 && e.clientX <= r.left + 150
+      : e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
     const withinY = e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
     setNearBubble(withinX && withinY);
   }
@@ -687,7 +692,7 @@ export function MessageBubble({
     onDelete(msg.id);
   };
 
-  // ── Unified Slack-style layout: all messages left-aligned with avatar ──
+  // ── Unified layout: own messages right-aligned, others left-aligned ──
   const showHeader = !isSameAuthor || isFirstUnread;
 
   return (
@@ -702,18 +707,20 @@ export function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex w-full items-start justify-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
-          isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"
-        }`}
+        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
+          isMe ? "justify-end" : "justify-start"
+        } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
         onMouseMove={handleRowMouseMove}
         onMouseLeave={() => setNearBubble(false)}
       >
-        {/* Avatar column — always on the left */}
-        <div className="w-7 shrink-0 mt-0.5">
-          {showHeader && sender && (
-            <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
-          )}
-        </div>
+        {/* Avatar column — hidden for own messages */}
+        {!isMe && (
+          <div className="w-7 shrink-0 mt-0.5">
+            {showHeader && sender && (
+              <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
+            )}
+          </div>
+        )}
 
         {/* Content column */}
         <div className="min-w-0 max-w-[65%]">
@@ -728,7 +735,7 @@ export function MessageBubble({
             <DeletedBubble isMe={isMe} createdAt={msg.created_at} isFirstInGroup={isFirstInGroup} />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
-            <div className="flex items-center gap-1">
+            <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               <div className="relative">
                 <div className="flex flex-col items-start select-none">
                   <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
@@ -768,7 +775,7 @@ export function MessageBubble({
             </div>
           ) : (
             /* ── Normal bubble ── */
-            <div className="flex items-center gap-1">
+            <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
               <div className="relative min-w-0">
                 <div
@@ -778,7 +785,7 @@ export function MessageBubble({
                   } ${
                     imageOnly
                       ? "flex flex-col items-start"
-                      : `relative rounded-[10px] ${isFirstInGroup ? "rounded-tl-none" : ""} px-3 pt-2 pb-1.5 shadow-sm ${
+                      : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
                             ? msg.status === "sending"
                               ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
@@ -791,6 +798,7 @@ export function MessageBubble({
                 >
                   {isFirstInGroup && (
                     <MessageBubbleTail
+                      side={isMe ? "right" : "left"}
                       className={isMe
                         ? msg.status === "failed"
                           ? "text-red-500/80"
