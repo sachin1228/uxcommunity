@@ -80,9 +80,16 @@ export async function fetchEmojiCatalog(): Promise<EmojiCatalog> {
         }
       }
       
+      // Sort categories with "Smileys and emotions" first, then alphabetically
+      const sortedCategories = Array.from(categories).sort((a, b) => {
+        if (a === "Smileys and emotions") return -1;
+        if (b === "Smileys and emotions") return 1;
+        return a.localeCompare(b);
+      });
+      
       catalogCache = {
         emojis,
-        categories: Array.from(categories).sort(),
+        categories: sortedCategories,
       };
       
       return catalogCache;
