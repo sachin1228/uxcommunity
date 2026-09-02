@@ -265,9 +265,9 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
   return (
     <aside
       aria-label="Community details"
-      className="hidden xl:flex w-80 shrink-0 flex-col overflow-y-auto p-3 pl-0"
+      className="hidden h-full w-80 shrink-0 flex-col overflow-y-auto p-3 pl-0 xl:flex"
     >
-      <div className="rounded-2xl border border-border bg-background">
+      <div className="min-h-full rounded-2xl border border-border bg-background">
         {/* ── Members ─────────────────────────────────────────────────── */}
         <section aria-labelledby="sidebar-members-heading" className="px-5 py-5">
           <div className="flex items-center justify-between">
