@@ -602,7 +602,7 @@ function MessageContent({
   return (
     <>
       <p
-        className={`font-body text-sm whitespace-pre-wrap break-words ${
+        className={`font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words ${
           isMe ? "text-accent-foreground" : "text-foreground"
         }`}
       >
