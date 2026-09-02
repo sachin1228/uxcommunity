@@ -18,7 +18,7 @@ export default async function CommunitiesLayout({
   const userId = (session as { userId: string }).userId;
 
   return (
-    <div className="flex flex-row h-full overflow-hidden">
+    <div className="flex flex-row h-full overflow-hidden bg-background">
       <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
         {children}
       </div>
