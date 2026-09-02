@@ -1,11 +1,12 @@
 "use client";
 
-import { forwardRef, useRef, useState, useEffect, useCallback } from "react";
+import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
+import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 
 interface ChatInputProps {
   input: string;
@@ -50,9 +51,51 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
+    const [focused, setFocused]         = useState(false);
     const canSend = !!input.trim() || !!pendingImagePreview;
 
     // ── helpers ────────────────────────────────────────────────────────────
+
+    /** Render text with SVG emoji images for the overlay. */
+    const renderWithSvgEmoji = useCallback((text: string) => {
+      if (!text) return null;
+      const parts: React.ReactNode[] = [];
+      // Match emoji characters (including multi-byte sequences)
+      const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
+      let lastIndex = 0;
+      let match;
+      while ((match = emojiRegex.exec(text)) !== null) {
+        // Add text before emoji
+        if (match.index > lastIndex) {
+          parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex, match.index)}</span>);
+        }
+        // Add SVG emoji
+        const emoji = match[0];
+        const cp = emojiToCodepoint(emoji);
+        if (cp) {
+          const url = svgUrlForCodepoint(cp);
+          parts.push(
+            <img
+              key={`e${match.index}`}
+              src={url}
+              alt={emoji}
+              draggable={false}
+              className="inline-block align-middle mx-px"
+              style={{ width: "1.2em", height: "1.2em", marginTop: "-0.1em" }}
+            />
+          );
+        } else {
+          // Fallback to text if no codepoint
+          parts.push(<span key={`e${match.index}`}>{emoji}</span>);
+        }
+        lastIndex = match.index + emoji.length;
+      }
+      // Add remaining text
+      if (lastIndex < text.length) {
+        parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
+      }
+      return parts;
+    }, []);
 
     /** Measure the anchor (input box) and compute where the portal should sit. */
     const measureAndSetPos = useCallback(() => {
@@ -265,22 +308,51 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
               </div>
 
-              <textarea
-                ref={ref}
-                data-chat-input
-                value={input}
-                onChange={(e) => {
-                  onChange(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                }}
-                onKeyDown={onKeyDown}
-                onBlur={onBlur}
-                placeholder={placeholder}
-                rows={1}
-                className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
-                style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
-              />
+              {/* Textarea with SVG emoji overlay */}
+              <div className="flex-1 relative min-h-[24px]" style={{ maxHeight: "120px" }}>
+                {/* Placeholder */}
+                {input.length === 0 && !focused && (
+                  <div className="absolute inset-0 flex items-center pointer-events-none font-body text-[15px] text-foreground-muted">
+                    {placeholder}
+                  </div>
+                )}
+
+                {/* SVG emoji overlay — sits on top of textarea */}
+                <div
+                  aria-hidden
+                  className="absolute inset-0 flex-1 resize-none bg-transparent font-body text-[15px] text-foreground outline-none overflow-y-auto whitespace-pre-wrap break-words pointer-events-none"
+                  style={{ lineHeight: "1.5", minHeight: "24px", maxHeight: "120px" }}
+                >
+                  {renderWithSvgEmoji(input)}
+                  {/* Add a trailing space so cursor renders at end */}
+                  {input.length > 0 && input.endsWith("\n") ? " " : ""}
+                </div>
+
+                {/* Actual textarea — transparent text, handles all input */}
+                <textarea
+                  ref={ref}
+                  data-chat-input
+                  value={input}
+                  onChange={(e) => {
+                    onChange(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                  }}
+                  onKeyDown={onKeyDown}
+                  onBlur={onBlur}
+                  onFocus={() => setFocused(true)}
+                  placeholder=""
+                  rows={1}
+                  className="absolute inset-0 flex-1 resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto"
+                  style={{
+                    lineHeight: "1.5",
+                    height: "24px",
+                    maxHeight: "120px",
+                    color: "transparent",
+                    caretColor: "currentColor",
+                  }}
+                />
+              </div>
 
               {canSend && (
                 <button

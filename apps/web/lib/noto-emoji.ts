@@ -163,3 +163,10 @@ export async function getEmojiLottieUrl(emoji: string): Promise<string | null> {
   const emojiData = await getEmojiByCodepoint(codepoint);
   return emojiData?.lottieUrl ?? null;
 }
+
+/**
+ * Get SVG URL for a codepoint (synchronous)
+ */
+export function svgUrlForCodepoint(codepoint: string): string {
+  return `${SVG_BASE}/emoji_u${codepoint}.svg`;
+}
