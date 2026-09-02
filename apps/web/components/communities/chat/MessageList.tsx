@@ -194,19 +194,29 @@ export function MessageList({
       )}
 
       {/* Date-grouped timeline (messages + thread notifications merged) */}
-      {mergedGroups.map((group) => {
+      {mergedGroups.map((group, groupIdx) => {
         // Track the previous timeline item so isSameAuthor works correctly
         // even when thread notifications appear between messages.
         let prevItem: TimelineItem | null = null;
 
+        // The pill above the *oldest loaded* group is only a guess while more
+        // history may exist above: the real day boundary could be thousands of
+        // messages further up. Rendering it would make it "float" to the top of
+        // every newly-prepended chunk (and shift layout each time). Show it only
+        // once we know it's a genuine boundary — i.e. there is a different-day
+        // group before it, or we've reached the true start of the history.
+        const showDateDivider = groupIdx > 0 || !hasMoreAbove;
+
         return (
           <div key={group.date}>
             {/* Date divider */}
-            <div className="flex items-center justify-center py-3 px-5">
-              <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
-                {group.date}
-              </span>
-            </div>
+            {showDateDivider && (
+              <div className="flex items-center justify-center py-3 px-5">
+                <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                  {group.date}
+                </span>
+              </div>
+            )}
 
             {group.items.map((item) => {
               if (item.kind === "thread") {
