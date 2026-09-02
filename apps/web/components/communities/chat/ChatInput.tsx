@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { forwardRef, useRef, useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
@@ -48,11 +48,20 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const fileInputRef       = useRef<HTMLInputElement>(null);
     const anchorRef          = useRef<HTMLDivElement>(null);   // the input box wrapper
     const portalPickerRef    = useRef<HTMLDivElement>(null);   // the portal div
+    const overlayRef         = useRef<HTMLDivElement>(null);   // the SVG overlay
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
     const [focused, setFocused]         = useState(false);
     const canSend = !!input.trim() || !!pendingImagePreview;
+
+    // Sync textarea scroll to overlay
+    const syncScroll = useCallback(() => {
+      const textarea = ref as React.RefObject<HTMLTextAreaElement>;
+      if (textarea.current && overlayRef.current) {
+        overlayRef.current.scrollTop = textarea.current.scrollTop;
+      }
+    }, [ref]);
 
     // ── helpers ────────────────────────────────────────────────────────────
 
@@ -309,7 +318,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               </div>
 
               {/* Textarea with SVG emoji overlay */}
-              <div className="flex-1 relative min-h-[24px]" style={{ maxHeight: "120px" }}>
+              <div className="flex-1 relative min-h-[24px] max-h-[120px]">
                 {/* Placeholder */}
                 {input.length === 0 && !focused && (
                   <div className="absolute inset-0 flex items-center pointer-events-none font-body text-[15px] text-foreground-muted">
@@ -317,18 +326,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   </div>
                 )}
 
-                {/* SVG emoji overlay — sits on top of textarea */}
-                <div
-                  aria-hidden
-                  className="absolute inset-0 flex-1 resize-none bg-transparent font-body text-[15px] text-foreground outline-none overflow-y-auto whitespace-pre-wrap break-words pointer-events-none"
-                  style={{ lineHeight: "1.5", minHeight: "24px", maxHeight: "120px" }}
-                >
-                  {renderWithSvgEmoji(input)}
-                  {/* Add a trailing space so cursor renders at end */}
-                  {input.length > 0 && input.endsWith("\n") ? " " : ""}
-                </div>
-
-                {/* Actual textarea — transparent text, handles all input */}
+                {/* Actual textarea — controls container height, text is invisible */}
                 <textarea
                   ref={ref}
                   data-chat-input
@@ -338,12 +336,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                   }}
+                  onScroll={syncScroll}
                   onKeyDown={onKeyDown}
                   onBlur={onBlur}
                   onFocus={() => setFocused(true)}
                   placeholder=""
                   rows={1}
-                  className="absolute inset-0 flex-1 resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto"
+                  className="relative z-10 w-full resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto"
                   style={{
                     lineHeight: "1.5",
                     height: "24px",
@@ -352,6 +351,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     caretColor: "currentColor",
                   }}
                 />
+
+                {/* SVG emoji overlay — sits on top, invisible to pointer */}
+                <div
+                  ref={overlayRef}
+                  aria-hidden
+                  className="absolute inset-0 z-20 w-full font-body text-[15px] text-foreground pointer-events-none overflow-y-auto whitespace-pre-wrap break-words"
+                  style={{ lineHeight: "1.5" }}
+                >
+                  {renderWithSvgEmoji(input)}
+                </div>
               </div>
 
               {canSend && (
