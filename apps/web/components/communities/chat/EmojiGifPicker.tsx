@@ -257,15 +257,6 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
                   alt={emoji.name}
                   className="w-6 h-6"
                   loading="lazy"
-                  onError={(e) => {
-                    // Fallback to emoji character if SVG fails to load
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                    const span = document.createElement('span');
-                    span.textContent = emoji.unicode;
-                    span.className = 'text-xl';
-                    target.parentElement?.appendChild(span);
-                  }}
                 />
               </button>
             ))}
