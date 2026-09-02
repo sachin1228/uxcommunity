@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, memo } from "react";
 import Lottie from "lottie-react";
-import { emojiToCodepoint, getEmojiPngUrl } from "@/lib/noto-emoji";
+import { emojiToCodepoint, getEmojiWebpUrl } from "@/lib/noto-emoji";
 
 interface AnimatedEmojiProps {
   /** The emoji character to render */
@@ -13,7 +13,7 @@ interface AnimatedEmojiProps {
   className?: string;
   /** Whether to play animation on hover only */
   hoverOnly?: boolean;
-  /** Whether to disable animation (show static PNG) */
+  /** Whether to disable animation (show static WebP) */
   disableAnimation?: boolean;
 }
 
@@ -32,7 +32,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   disableAnimation = false,
 }: AnimatedEmojiProps) {
   const [animationData, setAnimationData] = useState<unknown | null>(null);
-  const [pngUrl, setPngUrl] = useState<string | null>(null);
+  const [webpUrl, setWebpUrl] = useState<string | null>(null);
   const [isHovered, setIsHovered] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -64,37 +64,37 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
     } catch (err) {
       console.warn(`Failed to load Lottie animation for ${emoji}:`, err);
       setError(true);
-      // Fallback to PNG
+      // Fallback to WebP
       try {
-        const url = await getEmojiPngUrl(emoji);
-        if (url) setPngUrl(url);
+        const url = await getEmojiWebpUrl(emoji);
+        if (url) setWebpUrl(url);
       } catch {
-        // PNG fallback also failed
+        // WebP fallback also failed
       }
     } finally {
       setIsLoading(false);
     }
   }, [codepoint, emoji, disableAnimation]);
 
-  // Load PNG for fallback or initial state
-  const loadPng = useCallback(async () => {
+  // Load WebP for fallback or initial state
+  const loadWebp = useCallback(async () => {
     if (!codepoint) return;
     
     try {
-      const url = await getEmojiPngUrl(emoji);
-      if (url) setPngUrl(url);
+      const url = await getEmojiWebpUrl(emoji);
+      if (url) setWebpUrl(url);
     } catch {
-      // PNG load failed
+      // WebP load failed
     }
   }, [codepoint, emoji]);
 
   useEffect(() => {
-    loadPng();
+    loadWebp();
     
     if (!hoverOnly || disableAnimation) {
       loadAnimation();
     }
-  }, [loadPng, loadAnimation, hoverOnly, disableAnimation]);
+  }, [loadWebp, loadAnimation, hoverOnly, disableAnimation]);
 
   const handleMouseEnter = () => {
     setIsHovered(true);
@@ -108,7 +108,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   };
 
   // Show loading state
-  if (isLoading && !animationData && !pngUrl) {
+  if (isLoading && !animationData && !webpUrl) {
     return (
       <span
         className={`inline-flex items-center justify-center ${className}`}
@@ -122,7 +122,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   }
 
   // Show error state - just render the emoji text
-  if (error && !animationData && !pngUrl) {
+  if (error && !animationData && !webpUrl) {
     return (
       <span
         className={`inline-flex items-center justify-center ${className}`}
@@ -152,8 +152,8 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
     );
   }
 
-  // Show PNG fallback if available
-  if (pngUrl) {
+  // Show WebP fallback if available
+  if (webpUrl) {
     return (
       <span
         className={`inline-flex items-center justify-center ${className}`}
@@ -163,7 +163,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={pngUrl}
+          src={webpUrl}
           alt={emoji}
           style={{ width: size, height: size }}
           loading="lazy"
