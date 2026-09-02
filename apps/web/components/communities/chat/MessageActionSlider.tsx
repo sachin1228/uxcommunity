@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { Reply, Copy } from "lucide-react";
 import type { CachedMessage, MessageReaction } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { AnimatedEmoji } from "./AnimatedEmoji";
 
 interface MessageActionSliderProps {
   message: CachedMessage | null;
@@ -162,12 +163,12 @@ export function MessageActionSlider({
                 <button
                   key={label}
                   onClick={() => handleReaction(emoji)}
-                  className={`${isActive ? activeBg : bg} w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-lg
+                  className={`${isActive ? activeBg : bg} w-12 h-12 rounded-full flex items-center justify-center shadow-lg
                     active:scale-90 hover:scale-110 transition-transform duration-150
                     ${isActive ? "ring-2 ring-white/60 ring-offset-2 ring-offset-[#111113]" : ""}`}
                   aria-label={`${isActive ? "Remove" : "Add"} ${label} reaction`}
                 >
-                  {emoji}
+                  <AnimatedEmoji emoji={emoji} size={28} />
                 </button>
               );
             })}

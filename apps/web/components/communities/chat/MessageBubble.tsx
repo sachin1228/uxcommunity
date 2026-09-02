@@ -5,6 +5,7 @@ import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreH
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
+import { AnimatedEmoji } from "./AnimatedEmoji";
 
 import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
@@ -100,7 +101,7 @@ function ReactionPills({
                 : "bg-[#2a2a2a] border border-black text-foreground hover:bg-[#333]"
               }`}
           >
-            {emoji}
+            <AnimatedEmoji emoji={emoji} size={14} />
             {user_ids.length > 1 && (
               <span className="text-[10px] opacity-70">{user_ids.length}</span>
             )}
@@ -349,7 +350,7 @@ function MessageHoverActions({
                       setPickerOpen(false);
                     }}
                     className={`
-                      w-8 h-8 rounded-full flex items-center justify-center text-base
+                      w-8 h-8 rounded-full flex items-center justify-center
                       transition-transform duration-100 hover:scale-125 active:scale-90
                       ${isActive
                         ? `${bg} ring-2 ring-white/50 ring-offset-1 ring-offset-[#1c1c1e]`
@@ -359,7 +360,7 @@ function MessageHoverActions({
                     aria-label={`${isActive ? "Remove" : "Add"} ${label} reaction`}
                     title={label}
                   >
-                    {emoji}
+                    <AnimatedEmoji emoji={emoji} size={20} />
                   </button>
                 );
               })}
@@ -505,12 +506,12 @@ function renderTextWithEmoji(text: string, key: string | number): React.ReactNod
   while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
     if (m.index > last) segments.push(text.slice(last, m.index));
     segments.push(
-      <span
+      <AnimatedEmoji
         key={`e-${m.index}`}
-        style={{ fontSize: "1.35em", lineHeight: 1, verticalAlign: "-0.15em", display: "inline-block" }}
-      >
-        {m[0]}
-      </span>,
+        emoji={m[0]}
+        size={20}
+        className="inline-block align-middle mx-0.5"
+      />,
     );
     last = m.index + m[0].length;
   }
@@ -776,7 +777,7 @@ export function MessageBubble({
                 data-side={isMe ? "right" : "left"}
               >
                 <div className="flex flex-col items-start select-none">
-                  <span style={{ fontSize: EMOJI_MESSAGE_SIZE, lineHeight: 1.1 }}>{msg.content}</span>
+                  <AnimatedEmoji emoji={msg.content} size={EMOJI_MESSAGE_SIZE} />
                   <div className="flex items-center gap-1 mt-0.5">
                     {msg.edited_at && (
                       <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
