@@ -277,15 +277,13 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
             >
               Members{community ? ` (${memberCount})` : ""}
             </h2>
-            {onlineCount > 0 && (
-              <span
-                className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted"
-                aria-label={`${onlineCount} online`}
-              >
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
-                {onlineCount} online
-              </span>
-            )}
+            <span
+              className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted"
+              aria-label={`${onlineCount} online`}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
+              {onlineCount} online
+            </span>
           </div>
 
           <div className="mt-4 flex items-center">
