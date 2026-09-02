@@ -54,7 +54,7 @@ function activeTabFromPath(pathAndSearch: string): ChatTab {
   const searchMatch = pathAndSearch.match(/[?&]tab=([a-zA-Z]+)/);
   if (searchMatch?.[1]) {
     const tab = searchMatch[1] as ChatTab;
-    if (["chat", "showcase", "threads", "events", "resources", "members", "about"].includes(tab)) {
+    if (["chat", "showcase", "threads", "events", "resources", "members"].includes(tab)) {
       return tab;
     }
   }
@@ -94,7 +94,7 @@ export default function CommunityPageLoading() {
   const activeTab: ChatTab = communityId ? activeTabFromPath(pathname) : "chat";
 
   // Only the chat tab gets the full Lottie + input loading UI.
-  // All other tabs (showcase, threads, events, resources, members, about)
+  // All other tabs (showcase, threads, events, resources, members)
   // and detail pages (sub-routes like /threads/[id]) get a simple spinner.
   const showChatLoading =
     activeTab === "chat" &&
