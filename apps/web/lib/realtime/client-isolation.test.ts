@@ -113,37 +113,32 @@ test("two instances' user:global connections are independent", () => {
 // TEST 2: init() identity handling
 // ══════════════════════════════════════════════════════════════════════════
 
-test("FINDING: init() before on() does NOT set conn.user (connection created later)", () => {
+test("init() before on() persists the user onto connections created later", () => {
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
 
   // on() creates the connection AFTER init()
   const unsub = clientA.on("notifications:user-a", "updates", () => {});
 
-  // conn.user is null because init() ran before the connection existed
-  assert.strictEqual(
+  assert.deepStrictEqual(
     getUserOnConnection(clientA, "user:global"),
-    null,
-    "init() before on() leaves conn.user null (connection didn't exist yet)",
+    { id: "user-a", name: "Alice", avatar: null },
+    "connections created after init() must carry the user so they send `join`",
   );
 
   unsub();
 });
 
-test("FINDING: second init() wins if it runs after connection is created", () => {
-  // First init — no connections exist
+test("first init() identity sticks on an existing connection; later init() does not overwrite it", () => {
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
-
-  // on() creates the connection with user: null
   const unsub = clientA.on("notifications:user-a", "updates", () => {});
 
-  // Second init — connection exists, sets user
+  // Second init — connection already has a user, so it is left untouched
   clientA.init({ id: "user-c", name: "Charlie", avatar: null });
 
-  // The second init wins because the connection was created between the two calls
   assert.deepStrictEqual(
     getUserOnConnection(clientA, "user:global"),
-    { id: "user-c", name: "Charlie", avatar: null },
-    "second init() wins when called after connection creation",
+    { id: "user-a", name: "Alice", avatar: null },
+    "existing connection keeps its original identity",
   );
 
   unsub();
@@ -174,18 +169,15 @@ test("destroy() clears all connections, allowing fresh init with new user", () =
   clientA.destroy();
   assert.strictEqual(getConnectionCount(clientA), 0);
 
-  // Re-init with different user — fresh connection
-  // Note: init() before on() doesn't set user (connection doesn't exist yet)
-  // The user is set by the on() call's getOrCreateConnection + subsequent init
+  // Re-init with different user — fresh connection carries the new identity
   clientA.init({ id: "user-b", name: "Bob", avatar: null });
   const unsub2 = clientA.on("notifications:user-b", "updates", () => {});
 
   assert.strictEqual(getConnectionCount(clientA), 1);
-  // conn.user is null because init() ran before on() created the connection
-  assert.strictEqual(
+  assert.deepStrictEqual(
     getUserOnConnection(clientA, "user:global"),
-    null,
-    "init() before on() leaves conn.user null (FINDING)",
+    { id: "user-b", name: "Bob", avatar: null },
+    "fresh connection after destroy() uses the latest init() identity",
   );
 
   unsub();
@@ -306,6 +298,61 @@ test("User A: Community A → conn-A, Community B → conn-B, user:global → co
 
   unsubCommB();
   unsubNotif();
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// TEST 6: subscribe() is reference-counted (regression: tab-hide teardown)
+// ══════════════════════════════════════════════════════════════════════════
+
+test("one hook releasing subscribe() does not tear down a room another hook still holds", () => {
+  // Simulates useTypingPresence + useRealtimeChat + useSidebarRealtime all
+  // holding chat:community-a. Typing hook is visibility-gated and releases
+  // first; the socket must survive for the others.
+  const releaseTyping = clientA.subscribe("chat:community-a");
+  const releaseChat = clientA.subscribe("chat:community-a");
+  const releaseSidebar = clientA.subscribe("chat:community-a");
+  const unsubTyping = clientA.on("chat:community-a", "typing", () => {});
+
+  assert.strictEqual(getConnectionCount(clientA), 1);
+
+  // Tab hidden → typing hook cleans up
+  unsubTyping();
+  releaseTyping();
+  assert.strictEqual(getConnectionCount(clientA), 1, "room still held by chat + sidebar");
+
+  // Releasing twice is idempotent — must not steal another hook's ref
+  releaseTyping();
+  releaseChat();
+  assert.strictEqual(getConnectionCount(clientA), 1, "room still held by sidebar");
+
+  releaseSidebar();
+  assert.strictEqual(getConnectionCount(clientA), 0, "last holder released → connection removed");
+});
+
+test("removing a community connection marks it manuallyClosed so a late onclose cannot reconnect", () => {
+  const unsub = clientA.on("chat:community-a", "chat", () => {});
+  const conn = (clientA.connections as Map<string, any>).get("chat:community-a");
+  assert.ok(conn);
+
+  unsub();
+
+  assert.strictEqual(conn.manuallyClosed, true);
+  assert.strictEqual(conn.reconnectTimer, null);
+  assert.strictEqual(conn.ws, null);
+  assert.strictEqual(getConnectionCount(clientA), 0);
+});
+
+test("re-subscribing after teardown creates a fresh connection carrying the user", () => {
+  clientA.init({ id: "user-a", name: "Alice", avatar: null });
+  const unsub1 = clientA.on("chat:community-a", "typing", () => {});
+  unsub1();
+  assert.strictEqual(getConnectionCount(clientA), 0);
+
+  const unsub2 = clientA.on("chat:community-a", "typing", () => {});
+  assert.strictEqual(getConnectionCount(clientA), 1);
+  assert.deepStrictEqual(getUserOnConnection(clientA, "chat:community-a"), { id: "user-a", name: "Alice", avatar: null });
+  assert.strictEqual(isManuallyClosed(clientA, "chat:community-a"), false);
+  unsub2();
 });
 
 test("multiple community connections are fully independent", () => {

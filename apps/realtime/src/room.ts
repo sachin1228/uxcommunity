@@ -64,6 +64,22 @@ export class Room extends DurableObject<Env> {
   private wsTopics = new Map<WebSocket, Set<string>>();
   private userSockets = new Map<string, Set<WebSocket>>();
 
+  /** In-flight reconstruction, shared so concurrent callers await the same work. */
+  private reconstructPromise: Promise<void> | null = null;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+
+    // Heartbeats: the client sends "ping" and the runtime answers "pong"
+    // WITHOUT waking a hibernated DO, so idle sockets stay provably alive.
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
+
+    // After hibernation the first event is frequently a webSocketMessage (e.g.
+    // a typing publish), not a fetch. Rebuild socket/user maps up front so that
+    // frame is not silently dropped because wsToUser is empty.
+    this.ctx.blockConcurrencyWhile(() => this.ensureSubscribers());
+  }
+
   // ── Fetch handler ──────────────────────────────────────────────────
 
   async fetch(request: Request): Promise<Response> {
@@ -145,8 +161,16 @@ export class Room extends DurableObject<Env> {
       return;
     }
 
-    const userId = this.wsToUser.get(ws);
-    if (!userId) return;
+    // Guard: make sure socket maps are populated (post-hibernation wake).
+    await this.ensureSubscribers();
+
+    let userId: string | undefined = this.wsToUser.get(ws);
+    if (!userId) {
+      // Socket accepted but not tracked (e.g. reconstructed set changed).
+      // Fall back to the attachment so the frame is never silently dropped.
+      userId = this.adoptSocket(ws) ?? undefined;
+      if (!userId) return;
+    }
 
     if (msg.t === "join") {
       if (!msg.user || msg.user.id !== userId) return;
@@ -161,6 +185,7 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketClose(ws: WebSocket): Promise<void> {
+    await this.ensureSubscribers();
     const userId = this.wsToUser.get(ws);
     if (!userId) return;
 
@@ -286,43 +311,84 @@ export class Room extends DurableObject<Env> {
 
   // ── Subscriber index reconstruction after hibernation ────────────────
 
-  private async ensureSubscribers(): Promise<void> {
-    if (this.subscribersReconstructed) return;
-    await this.ctx.blockConcurrencyWhile(async () => {
-      if (this.subscribersReconstructed) return;
-      await this.reconstructWebSockets();
-      this.rebuildUserScopedMaps();
-      this.subscribersReconstructed = true;
-    });
+  /**
+   * Idempotent: rebuilds socket + user maps from hibernated attachments once.
+   * The constructor wraps the first call in blockConcurrencyWhile; later
+   * callers (message/close/publish/upgrade) just await the shared promise.
+   */
+  private ensureSubscribers(): Promise<void> {
+    if (this.subscribersReconstructed) return Promise.resolve();
+    if (!this.reconstructPromise) {
+      this.reconstructPromise = (async () => {
+        this.reconstructWebSockets();
+        this.rebuildUserScopedMaps();
+        this.subscribersReconstructed = true;
+      })().finally(() => {
+        this.reconstructPromise = null;
+      });
+    }
+    return this.reconstructPromise;
   }
 
-  private async reconstructWebSockets(): Promise<void> {
+  private reconstructWebSockets(): void {
     for (const ws of this.ctx.getWebSockets()) {
-      const attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
-      if (!attachment?.userId) continue;
-
-      const userId = attachment.userId;
-
-      // Rebuild socket-scoped state
-      this.wsToUser.set(ws, userId);
-
-      let topics = this.wsTopics.get(ws);
-      if (!topics) {
-        topics = new Set();
-        this.wsTopics.set(ws, topics);
-      }
-      for (const topic of attachment.topics) {
-        topics.add(topic);
-      }
-
-      // Rebuild user → sockets index
-      let sockets = this.userSockets.get(userId);
-      if (!sockets) {
-        sockets = new Set();
-        this.userSockets.set(userId, sockets);
-      }
-      sockets.add(ws);
+      this.adoptSocket(ws);
     }
+  }
+
+  /**
+   * Register a single accepted socket in the socket-scoped and user-scoped
+   * maps using its hibernation attachment. Returns the userId, or null if the
+   * socket carries no usable attachment.
+   */
+  private adoptSocket(ws: WebSocket): string | null {
+    let attachment: WebSocketAttachment | undefined;
+    try {
+      attachment = ws.deserializeAttachment() as WebSocketAttachment | undefined;
+    } catch {
+      return null;
+    }
+    if (!attachment?.userId) return null;
+
+    const userId = attachment.userId;
+
+    // Rebuild socket-scoped state
+    this.wsToUser.set(ws, userId);
+
+    let topics = this.wsTopics.get(ws);
+    if (!topics) {
+      topics = new Set();
+      this.wsTopics.set(ws, topics);
+    }
+    for (const topic of attachment.topics ?? []) {
+      topics.add(topic);
+    }
+
+    // Rebuild user → sockets index
+    let sockets = this.userSockets.get(userId);
+    if (!sockets) {
+      sockets = new Set();
+      this.userSockets.set(userId, sockets);
+    }
+    sockets.add(ws);
+
+    // Keep the user-scoped dual index in sync for fan-out
+    let userTopics = this.subscriptionsByUser.get(userId);
+    if (!userTopics) {
+      userTopics = new Set();
+      this.subscriptionsByUser.set(userId, userTopics);
+    }
+    for (const topic of topics) {
+      userTopics.add(topic);
+      let topicSubs = this.subscriptionsByTopic.get(topic);
+      if (!topicSubs) {
+        topicSubs = new Set();
+        this.subscriptionsByTopic.set(topic, topicSubs);
+      }
+      topicSubs.add(userId);
+    }
+
+    return userId;
   }
 
   /**
