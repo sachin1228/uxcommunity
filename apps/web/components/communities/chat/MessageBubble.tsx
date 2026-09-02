@@ -213,10 +213,7 @@ function DeleteConfirmDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
-      >
-      {standalone && isFirstInGroup && (
-        <MessageBubbleTail className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"} />
-      )}
+    >
       <div
         className="bg-[#1c1c1e] border border-white/[0.08] rounded-2xl shadow-2xl w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
