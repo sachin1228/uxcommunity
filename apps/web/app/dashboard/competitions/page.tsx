@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import {
   Trophy,
   Palette,
@@ -13,6 +13,7 @@ import {
   Plus,
   ExternalLink,
   Calendar,
+  ChevronLeft,
   ChevronRight,
 } from "lucide-react";
 import { SubmitEntryModal } from "@/components/competitions/SubmitEntryModal";
@@ -53,7 +54,7 @@ const CATEGORIES: Record<Category, { label: string; emoji: string; icon: React.R
 const CATEGORY_ORDER: Category[] = ["visual", "uiux", "ai", "portfolio"];
 
 // Mock: current active week
-const CURRENT_WEEK = 12;
+const CURRENT_WEEK = 36;
 const CURRENT_CATEGORY: Category = "visual";
 
 // Mock: past weeks data
@@ -203,10 +204,28 @@ function PastWinners({ week }: { week: WeekCompetition }) {
 export default function CompetitionsPage() {
   const [entries, setEntries] = useState<Entry[]>(CURRENT_ENTRIES);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState(CURRENT_WEEK);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
 
   const cat = CATEGORIES[CURRENT_CATEGORY];
   const sorted = [...entries].sort((a, b) => b.votes - a.votes);
   const totalVotes = entries.reduce((sum, e) => sum + e.votes, 0);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setShowLeftArrow(scrollLeft > 10);
+    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
+  };
+
+  useEffect(() => { handleScroll(); }, []);
+
+  function scrollWeeks(direction: "left" | "right") {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollBy({ left: direction === "left" ? -120 : 120, behavior: "smooth" });
+  }
 
   function handleVote(entryId: string) {
     setEntries((prev) =>
@@ -237,6 +256,57 @@ export default function CompetitionsPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto">
+        {/* ── Week Scrubber ── */}
+        <div className="px-6 pt-6 pb-4">
+          <div className="relative flex items-center">
+            {showLeftArrow && (
+              <button
+                onClick={() => scrollWeeks("left")}
+                className="absolute left-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background text-foreground-muted hover:text-foreground transition-colors"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex gap-3 overflow-x-auto mx-auto"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              {[34, 35, 36, 37, 38].map((week) => {
+                const isActive = week === selectedWeek;
+                const isFuture = week > CURRENT_WEEK;
+                return (
+                  <button
+                    key={week}
+                    onClick={() => !isFuture && setSelectedWeek(week)}
+                    disabled={isFuture}
+                    className={`shrink-0 rounded-full px-5 py-2 font-body text-sm font-semibold transition-all whitespace-nowrap ${
+                      isActive
+                        ? "bg-foreground text-background"
+                        : isFuture
+                        ? "text-foreground-muted/40 cursor-default"
+                        : "text-foreground-muted hover:text-foreground"
+                    }`}
+                  >
+                    Week {week}
+                  </button>
+                );
+              })}
+            </div>
+
+            {showRightArrow && (
+              <button
+                onClick={() => scrollWeeks("right")}
+                className="absolute right-0 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-background text-foreground-muted hover:text-foreground transition-colors"
+              >
+                <ChevronRight size={18} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* ── Active Competition Hero ── */}
         <div className="px-6 pt-6 pb-6">
           <div className="rounded-2xl border border-white/[0.08] bg-surface-raised overflow-hidden">
