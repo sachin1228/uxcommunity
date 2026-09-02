@@ -127,7 +127,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
   const [query, setQuery] = useState("");
   const [emojis, setEmojis] = useState<NotoEmoji[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("Smileys & People");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -140,6 +140,10 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
         const catalog = await fetchEmojiCatalog();
         setEmojis(catalog.emojis);
         setCategories(catalog.categories);
+        // Auto-select the first category (which is "Smileys and emotions")
+        if (catalog.categories.length > 0) {
+          setSelectedCategory(catalog.categories[0]);
+        }
       } catch (error) {
         console.error("Failed to load emoji catalog:", error);
       } finally {
@@ -154,7 +158,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
   const filteredEmojis = useMemo(() => {
     let filtered = emojis;
     
-    // Filter by category if no search query
+    // Filter by category if no search query and category is selected
     if (!query && selectedCategory) {
       filtered = filtered.filter(e => e.category === selectedCategory);
     }
