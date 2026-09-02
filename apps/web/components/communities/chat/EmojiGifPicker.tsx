@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Search, X } from "lucide-react";
 import { fetchEmojiCatalog, type NotoEmoji } from "@/lib/noto-emoji";
-import { AnimatedEmoji } from "./AnimatedEmoji";
 
 type Tab = "emoji" | "gif" | "sticker";
 
@@ -248,16 +247,11 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
               <button
                 key={emoji.codepoint}
                 onClick={() => onSelect(emoji.unicode)}
-                className="w-8 h-8 flex items-center justify-center rounded-md
+                className="w-8 h-8 flex items-center justify-center rounded-md text-xl
                   hover:bg-surface-raised active:scale-90 transition-all duration-100"
                 title={emoji.name}
               >
-                <AnimatedEmoji
-                  emoji={emoji.unicode}
-                  size={22}
-                  hoverOnly
-                  className="pointer-events-none"
-                />
+                {emoji.unicode}
               </button>
             ))}
           </div>
