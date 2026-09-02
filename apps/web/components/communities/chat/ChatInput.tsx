@@ -6,7 +6,6 @@ import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
-import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 
 interface ChatInputProps {
   input: string;
@@ -48,63 +47,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const fileInputRef       = useRef<HTMLInputElement>(null);
     const anchorRef          = useRef<HTMLDivElement>(null);   // the input box wrapper
     const portalPickerRef    = useRef<HTMLDivElement>(null);   // the portal div
-    const overlayRef         = useRef<HTMLDivElement>(null);   // the SVG overlay
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
-    const [focused, setFocused]         = useState(false);
     const canSend = !!input.trim() || !!pendingImagePreview;
 
-    // Sync textarea scroll to overlay
-    const syncScroll = useCallback(() => {
-      const textarea = ref as React.RefObject<HTMLTextAreaElement>;
-      if (textarea.current && overlayRef.current) {
-        overlayRef.current.scrollTop = textarea.current.scrollTop;
-      }
-    }, [ref]);
-
     // ── helpers ────────────────────────────────────────────────────────────
-
-    /** Render text with SVG emoji images for the overlay. */
-    const renderWithSvgEmoji = useCallback((text: string) => {
-      if (!text) return null;
-      const parts: React.ReactNode[] = [];
-      // Match emoji characters (including multi-byte sequences)
-      const emojiRegex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu;
-      let lastIndex = 0;
-      let match;
-      while ((match = emojiRegex.exec(text)) !== null) {
-        // Add text before emoji
-        if (match.index > lastIndex) {
-          parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex, match.index)}</span>);
-        }
-        // Add SVG emoji
-        const emoji = match[0];
-        const cp = emojiToCodepoint(emoji);
-        if (cp) {
-          const url = svgUrlForCodepoint(cp);
-          parts.push(
-            <img
-              key={`e${match.index}`}
-              src={url}
-              alt={emoji}
-              draggable={false}
-              className="inline-block align-middle mx-px"
-              style={{ width: "1.2em", height: "1.2em", marginTop: "-0.1em" }}
-            />
-          );
-        } else {
-          // Fallback to text if no codepoint
-          parts.push(<span key={`e${match.index}`}>{emoji}</span>);
-        }
-        lastIndex = match.index + emoji.length;
-      }
-      // Add remaining text
-      if (lastIndex < text.length) {
-        parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
-      }
-      return parts;
-    }, []);
 
     /** Measure the anchor (input box) and compute where the portal should sit. */
     const measureAndSetPos = useCallback(() => {
@@ -141,6 +89,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       }
     }, [linkPreviewUrl, dismissedUrl]);
 
+    // (click-outside is handled by the backdrop rendered in the portal)
+
     // Close picker on Escape
     useEffect(() => {
       if (!pickerOpen) return;
@@ -149,28 +99,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       };
       document.addEventListener("keydown", handler);
       return () => document.removeEventListener("keydown", handler);
-    }, [pickerOpen, closePicker]);
-
-    // Close picker when clicking anywhere outside the picker and emoji button
-    useEffect(() => {
-      if (!pickerOpen) return;
-      
-      const handleMouseDown = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        
-        // Don't close if clicking inside the picker
-        if (portalPickerRef.current?.contains(target)) return;
-        
-        // Don't close if clicking the emoji toggle button
-        if (target.closest('[data-emoji-toggle]')) return;
-        
-        // Close for all other clicks
-        closePicker();
-      };
-
-      // Use mousedown for faster response than click
-      document.addEventListener("mousedown", handleMouseDown);
-      return () => document.removeEventListener("mousedown", handleMouseDown);
     }, [pickerOpen, closePicker]);
 
     // Re-measure on scroll or resize so the picker tracks the input
@@ -292,7 +220,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <div className="flex items-center">
                 <button
                   type="button"
-                  data-emoji-toggle
                   onClick={togglePicker}
                   disabled={sending}
                   className={`shrink-0 h-9 w-9 flex items-center justify-center rounded-full transition-colors disabled:opacity-40 disabled:cursor-not-allowed
@@ -317,51 +244,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
               </div>
 
-              {/* Textarea with SVG emoji overlay */}
-              <div className="flex-1 relative min-h-[24px] max-h-[120px]">
-                {/* Placeholder */}
-                {input.length === 0 && !focused && (
-                  <div className="absolute inset-0 flex items-center pointer-events-none font-body text-[15px] text-foreground-muted">
-                    {placeholder}
-                  </div>
-                )}
-
-                {/* Actual textarea — controls container height, text is invisible */}
-                <textarea
-                  ref={ref}
-                  data-chat-input
-                  value={input}
-                  onChange={(e) => {
-                    onChange(e.target.value);
-                    e.target.style.height = "auto";
-                    e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-                  }}
-                  onScroll={syncScroll}
-                  onKeyDown={onKeyDown}
-                  onBlur={onBlur}
-                  onFocus={() => setFocused(true)}
-                  placeholder=""
-                  rows={1}
-                  className="relative z-10 w-full resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto"
-                  style={{
-                    lineHeight: "1.5",
-                    height: "24px",
-                    maxHeight: "120px",
-                    color: "transparent",
-                    caretColor: "currentColor",
-                  }}
-                />
-
-                {/* SVG emoji overlay — sits on top, invisible to pointer */}
-                <div
-                  ref={overlayRef}
-                  aria-hidden
-                  className="absolute inset-0 z-20 w-full font-body text-[15px] text-foreground pointer-events-none overflow-y-auto whitespace-pre-wrap break-words"
-                  style={{ lineHeight: "1.5" }}
-                >
-                  {renderWithSvgEmoji(input)}
-                </div>
-              </div>
+              <textarea
+                ref={ref}
+                data-chat-input
+                value={input}
+                onChange={(e) => {
+                  onChange(e.target.value);
+                  e.target.style.height = "auto";
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                }}
+                onKeyDown={onKeyDown}
+                onBlur={onBlur}
+                placeholder={placeholder}
+                rows={1}
+                className="flex-1 resize-none bg-transparent font-body text-[15px] text-foreground placeholder:text-foreground-muted outline-none overflow-y-auto"
+                style={{ lineHeight: "1.5", height: "24px", maxHeight: "120px" }}
+              />
 
               {canSend && (
                 <button
@@ -388,22 +286,30 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         {/* Portal picker — rendered at document.body to escape all stacking contexts */}
         {pickerOpen && pickerPos && typeof document !== "undefined" &&
           createPortal(
-            <div
-              ref={portalPickerRef}
-              style={{
-                position:  "fixed",
-                bottom:    pickerPos.bottom,
-                left:      pickerPos.left,
-                width:     340,
-                zIndex:    9999,
-                animation: "fadeSlideUp 150ms ease-out",
-              }}
-            >
-              <EmojiGifPicker
-                onEmojiSelect={handleEmojiSelect}
-                onGifSelect={handleGifSelect}
+            <>
+              {/* Invisible backdrop — closes the picker on any outside click.
+                  Sits at z-9998, below the picker (z-9999), above everything else. */}
+              <div
+                style={{ position: "fixed", inset: 0, zIndex: 9998 }}
+                onMouseDown={closePicker}
               />
-            </div>,
+              <div
+                ref={portalPickerRef}
+                className="animate-in fade-in slide-in-from-bottom-2 duration-150"
+                style={{
+                  position:  "fixed",
+                  bottom:    pickerPos.bottom,
+                  left:      pickerPos.left,
+                  width:     pickerPos.width,
+                  zIndex:    9999,
+                }}
+              >
+                <EmojiGifPicker
+                  onEmojiSelect={handleEmojiSelect}
+                  onGifSelect={handleGifSelect}
+                />
+              </div>
+            </>,
             document.body
           )
         }
