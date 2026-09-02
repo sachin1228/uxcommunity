@@ -291,7 +291,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   Sits at z-9998, below the picker (z-9999), above everything else. */}
               <div
                 style={{ position: "fixed", inset: 0, zIndex: 9998 }}
-                onMouseDown={closePicker}
+                onClick={closePicker}
               />
               <div
                 ref={portalPickerRef}
