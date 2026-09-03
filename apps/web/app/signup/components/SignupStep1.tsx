@@ -77,7 +77,7 @@ export function SignupStep1({
               </span>
               <input type="text" value={state.first_name}
                 onChange={(e) => onChange({ first_name: e.target.value })}
-                placeholder="Jordan" className={inputClass} autoComplete="given-name" required />
+                placeholder="Enter your name" className={inputClass} autoComplete="given-name" required />
               <FieldError errors={fieldErrors} field="first_name" />
             </label>
             <label className="flex flex-col gap-1.5">
@@ -86,7 +86,7 @@ export function SignupStep1({
               </span>
               <input type="text" value={state.last_name}
                 onChange={(e) => onChange({ last_name: e.target.value })}
-                placeholder="Lee" className={inputClass} autoComplete="family-name" required />
+                placeholder="Enter your surname" className={inputClass} autoComplete="family-name" required />
               <FieldError errors={fieldErrors} field="last_name" />
             </label>
           </div>
