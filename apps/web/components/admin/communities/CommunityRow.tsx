@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight, Users, MessageSquare } from "lucide-react";
+import { ChevronRight, Users, MessageSquare, Sparkles } from "lucide-react";
 import { CommunityIcon } from "@/components/communities/CommunityIcon";
 import { TYPE_LABELS, TYPE_COLORS } from "./communityTypes";
 
@@ -10,6 +10,8 @@ export interface CommunityListItem {
   name: string;
   type: string;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
   /** Set when a member created the community — null for app-created ones. */
   owner_id: string | null;
   is_active: boolean;
@@ -43,16 +45,26 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Name + avatar */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          {c.image_url && !imgFailed ? (
-            <img
-              src={c.image_url}
-              alt={c.name}
-              className="h-8 w-8 rounded-full object-cover shrink-0"
-              onError={() => setImgFailed(true)}
-            />
-          ) : (
-            <CommunityIcon size={32} className="bg-surface-raised" />
-          )}
+          <div className="relative shrink-0">
+            {c.image_url && !imgFailed ? (
+              <img
+                src={c.image_url}
+                alt={c.name}
+                className="h-8 w-8 rounded-full object-cover"
+                onError={() => setImgFailed(true)}
+              />
+            ) : (
+              <CommunityIcon size={32} className="bg-surface-raised" />
+            )}
+            {c.lottie_url && (
+              <span
+                title="Animated display picture (Lottie)"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
+              >
+                <Sparkles size={9} />
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="font-body text-sm text-foreground">{c.name}</span>
             {!c.is_active && (

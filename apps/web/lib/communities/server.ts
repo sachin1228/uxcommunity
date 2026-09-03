@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { resolveCommunityDp } from "./dp";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -52,7 +52,7 @@ export async function fetchCommunityMetaSSR(
     { data: currentUser },
   ] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id, lottie_url, lottie_format").eq("id", communityId).maybeSingle(),
     db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
     db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
@@ -60,13 +60,14 @@ export async function fetchCommunityMetaSSR(
 
   if (!membership || !community) return null;
 
-  const masterImgMap = TABLE_LOOKUP[community.type as string]
-    ? await getMasterImageMap(community.type as string)
-    : ({} as Record<string, string | null>);
-
-  const resolvedImageUrl: string | null =
-    (community.reference_id ? masterImgMap[community.reference_id] : undefined) ??
-    (community as any).image_url ?? null;
+  const dp = await resolveCommunityDp({
+    type: community.type,
+    reference_id: community.reference_id,
+    image_url: (community as any).image_url ?? null,
+    lottie_url: (community as any).lottie_url ?? null,
+    lottie_format: (community as any).lottie_format ?? null,
+    embedLottie: true,
+  });
 
   // Top members for the info panel.
   const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
@@ -107,7 +108,10 @@ export async function fetchCommunityMetaSSR(
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
-      member_count: memberCount ?? 0, image_url: resolvedImageUrl,
+      member_count: memberCount ?? 0, image_url: dp.image_url,
+      lottie_url: dp.lottie_url,
+      lottie_format: dp.lottie_format,
+      lottie_data: dp.lottie_data,
       description: (community as any).description ?? null,
       created_at: (community as any).created_at ?? undefined,
       owner_id: (community as any).owner_id ?? null,

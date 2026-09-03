@@ -19,9 +19,14 @@ export interface Community {
   name: string;
   type: string;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   description: string | null;
   reference_id: string;
   reference_name: string | null;
+  /** Set when a member created the community — app-created ones have null. */
+  owner_id?: string | null;
   is_active: boolean;
   member_count: number;
   message_count: number;
