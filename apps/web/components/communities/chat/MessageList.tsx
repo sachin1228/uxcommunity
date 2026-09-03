@@ -8,7 +8,7 @@ import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { fmtDate } from "./chatUtils";
-import { CommunityIcon } from "../CommunityIcon";
+import { CommunityDp } from "../CommunityDp";
 import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
@@ -18,6 +18,9 @@ interface Community {
   name: string;
   type: string;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
 }
 
 interface DateGroup {
@@ -233,18 +236,15 @@ export const MessageList = memo(function MessageList({
           but no chat messages while the thread fetch is still in flight.     */}
       {mergedGroups.length === 0 && threadsReady && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
-          <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
-            {displayCommunity?.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={displayCommunity.image_url}
-                alt={displayCommunity.name}
-                className="h-12 w-12 rounded-full object-cover"
-              />
-            ) : (
-              <CommunityIcon size={48} className="bg-surface-raised" />
-            )}
-          </div>
+          <CommunityDp
+            imageUrl={displayCommunity?.image_url ?? null}
+            lottieUrl={displayCommunity?.lottie_url}
+            lottieFormat={displayCommunity?.lottie_format}
+            lottieData={displayCommunity?.lottie_data}
+            name={displayCommunity?.name ?? ""}
+            size={48}
+            className="bg-surface-raised"
+          />
           <p className="font-body text-sm text-foreground-muted text-center">
             Welcome to{" "}
             <span className="font-medium text-foreground">
