@@ -1,61 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+
+export type WelcomeStepStatus = "pending" | "active" | "done";
+
+export interface WelcomeStep {
+  id: string;
+  label: string;
+  status: WelcomeStepStatus;
+}
 
 interface SignupWelcomeProps {
   phase: "loading" | "ready" | "error";
   firstName?: string;
   joinedCommunities?: number;
   errorMessage?: string | null;
+  /** Real progress (0-100) derived from completed server-side steps. */
+  percent?: number;
+  /** Real step states driven by each request finishing. */
+  steps?: WelcomeStep[];
   onGoToDashboard: () => void;
   onRetry: () => void;
   onClose: () => void;
 }
-
-const STEPS = [
-  { at: 10, label: "Creating your account" },
-  { at: 30, label: "Adding your profile details" },
-  { at: 55, label: "Joining your communities" },
-  { at: 80, label: "Preparing your dashboard" },
-];
 
 const RING_SIZE = 132;
 const RING_STROKE = 6;
 const RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-function currentStepIndex(progress: number): number {
-  let index = -1;
-  for (let i = 0; i < STEPS.length; i++) {
-    if (progress >= STEPS[i].at) index = i;
-  }
-  return index;
-}
-
-// Fake but believable progress: it rushes through the early steps, then
-// crawls toward 92% while the real setup request is still in flight.
-function LoadingPhase({ firstName }: { firstName?: string }) {
-  const [progress, setProgress] = useState(4);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 92) return prev;
-        const remaining = 92 - prev;
-        const step = Math.max(
-          1,
-          Math.min(7, Math.round(remaining / 14) + (Math.random() > 0.7 ? 2 : 0))
-        );
-        return Math.min(92, prev + step);
-      });
-    }, 130);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const stepIndex = currentStepIndex(progress);
-  const dashOffset = CIRCUMFERENCE * (1 - progress / 100);
+// Presentational only — percent and step states are updated by the parent as
+// each real server step (picture upload → account creation → community
+// auto-join) completes. Nothing here is simulated.
+function LoadingPhase({
+  firstName,
+  percent,
+  steps,
+}: {
+  firstName?: string;
+  percent: number;
+  steps: WelcomeStep[];
+}) {
+  const dashOffset = CIRCUMFERENCE * (1 - percent / 100);
 
   return (
     <div className="flex w-full max-w-sm flex-col items-center animate-in fade-in duration-300">
@@ -79,12 +66,12 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={dashOffset}
-            className="transition-[stroke-dashoffset] duration-200 ease-out"
+            className="transition-[stroke-dashoffset] duration-300 ease-out"
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="font-display text-2xl font-semibold text-foreground tabular-nums">
-            {Math.round(progress)}%
+            {Math.round(percent)}%
           </span>
         </div>
       </div>
@@ -93,49 +80,49 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
         Welcome{firstName ? `, ${firstName}` : ""}!
       </h1>
       <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">
-        Setting everything up for you — this will only take a moment.
+        Setting up your account — this is happening live, step by step.
       </p>
 
       <ul className="mt-8 w-full space-y-3">
-        {STEPS.map((step, i) => {
-          const done = progress >= step.at;
-          const active = i === stepIndex && progress < 92;
-          return (
-            <li
-              key={step.label}
-              className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
-                done ? "border-border/60 bg-surface" : "border-transparent bg-transparent"
+        {steps.map((step) => (
+          <li
+            key={step.id}
+            className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
+              step.status === "done"
+                ? "border-border/60 bg-surface"
+                : "border-transparent bg-transparent"
+            }`}
+          >
+            {step.status === "done" ? (
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </span>
+            ) : step.status === "active" ? (
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <Spinner className="h-4 w-4" />
+              </span>
+            ) : (
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                <span className="h-2 w-2 rounded-full bg-foreground-subtle/50" />
+              </span>
+            )}
+            <span
+              className={`font-body text-sm transition-colors ${
+                step.status === "done" || step.status === "active"
+                  ? "text-foreground"
+                  : "text-foreground-subtle"
               }`}
             >
-              {done ? (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-              ) : active ? (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                  <Spinner className="h-4 w-4" />
-                </span>
-              ) : (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                  <span className="h-2 w-2 rounded-full bg-foreground-subtle/50" />
-                </span>
-              )}
-              <span
-                className={`font-body text-sm transition-colors ${
-                  done || active ? "text-foreground" : "text-foreground-subtle"
-                }`}
-              >
-                {step.label}
-              </span>
-            </li>
-          );
-        })}
+              {step.label}
+            </span>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -248,6 +235,8 @@ export function SignupWelcome({
   firstName,
   joinedCommunities,
   errorMessage,
+  percent,
+  steps,
   onGoToDashboard,
   onRetry,
   onClose,
@@ -260,7 +249,9 @@ export function SignupWelcome({
         wordmarkClassName="text-lg"
       />
 
-      {phase === "loading" && <LoadingPhase firstName={firstName} />}
+      {phase === "loading" && (
+        <LoadingPhase firstName={firstName} percent={percent ?? 0} steps={steps ?? []} />
+      )}
       {phase === "ready" && (
         <ReadyPhase
           firstName={firstName}
