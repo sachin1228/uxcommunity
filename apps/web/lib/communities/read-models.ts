@@ -4,6 +4,11 @@ import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import {
+  ALL_COMMUNITY_PERMISSIONS,
+  NO_COMMUNITY_PERMISSIONS,
+  type CommunityPermissions,
+} from "./manager-role";
+import {
   getExperienceLevelNameMap,
   getMasterNameMap,
   TABLE_LOOKUP,
@@ -55,6 +60,29 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
 
   if (!membership) return { ok: false, status: 403, error: "Not a member of this community." };
   if (communityError || !community) return { ok: false, status: 404, error: "Community not found." };
+
+  // Resolve the caller's community role + effective permissions (owners hold
+  // every capability; platform-appointed admins hold their configured grants).
+  const isOwner = community.owner_id === userId || membership.role === "owner";
+  const currentUserRole = isOwner ? "owner" : (membership.role === "admin" ? "admin" : "member");
+  let currentUserPermissions: CommunityPermissions = NO_COMMUNITY_PERMISSIONS;
+  if (currentUserRole === "admin") {
+    const { data: perms } = await db
+      .from("community_admin_permissions")
+      .select("can_edit_settings, can_manage_members, can_delete_messages")
+      .eq("community_id", communityId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    currentUserPermissions = perms
+      ? {
+          can_edit_settings: perms.can_edit_settings,
+          can_manage_members: perms.can_manage_members,
+          can_delete_messages: perms.can_delete_messages,
+        }
+      : ALL_COMMUNITY_PERMISSIONS;
+  } else if (currentUserRole === "owner") {
+    currentUserPermissions = ALL_COMMUNITY_PERMISSIONS;
+  }
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
   const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
@@ -110,9 +138,12 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,
+        current_user_role: currentUserRole,
+        current_user_permissions: currentUserPermissions,
       },
       members,
-      current_user_role: membership.role ?? "member",
+      current_user_role: currentUserRole,
+      current_user_permissions: currentUserPermissions,
     },
   };
 });

@@ -827,6 +827,15 @@ export function CommunityChat({
       : activeTab;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+  const myRole = (displayCommunity as any)?.current_user_role ?? (isOwner ? "owner" : null);
+  const myPerms = (displayCommunity as any)?.current_user_permissions;
+  // Platform-appointed admins of app-created communities get the same
+  // management UI as a private-group creator, scoped by their grants.
+  const isAdminWith = (permission: "can_edit_settings" | "can_manage_members" | "can_delete_messages") =>
+    myRole === "admin" && Boolean(myPerms?.[permission]);
+  const canOpenSettings = isOwner || isAdminWith("can_edit_settings");
+  const canManageMembers = isOwner || isAdminWith("can_manage_members");
+  const canModerateMessages = isOwner || isAdminWith("can_delete_messages");
 
   // Stable header callbacks — inline arrows would recreate every render and
   // defeat the memoized ChatHeader's bail-out on keystrokes.
@@ -853,7 +862,8 @@ export function CommunityChat({
           onTabChange={handleHeaderTabChange}
           onlineCount={onlineCount}
           currentUserId={currentUserId}
-          onSettingsClick={isOwner ? handleSettingsClick : undefined}
+          onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
+          canOpenSettings={canOpenSettings}
           communityId={communityId}
         />
 
@@ -868,6 +878,7 @@ export function CommunityChat({
             <CommunitySettingsView
               communityId={communityId}
               community={displayCommunity as any}
+              isOwner={isOwner}
               onClose={() => setShowSettings(false)}
               onSaved={(updated) => {
                 setCommunity((prev) => prev ? { ...prev, ...updated } : prev);
@@ -926,6 +937,7 @@ export function CommunityChat({
             communityId={communityId}
             currentUserId={currentUserId}
             isOwner={isOwner}
+            canManageMembers={canManageMembers}
             isPrivate={displayCommunity?.is_private ?? false}
           />
         ) : (
@@ -962,6 +974,7 @@ export function CommunityChat({
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
+              canModerateMessages={canModerateMessages}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}

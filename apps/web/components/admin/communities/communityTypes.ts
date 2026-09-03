@@ -5,6 +5,8 @@ export interface CommunityMember {
   name: string;
   email: string;
   joined_at: string;
+  /** "owner" | "admin" | "member" (defaults to member when absent). */
+  role?: string;
 }
 
 export interface CommunityMessage {
@@ -12,6 +14,15 @@ export interface CommunityMessage {
   content: string;
   created_at: string;
   user_name: string;
+}
+
+/** Row shape returned by the paginated member search API. */
+export interface CommunityMemberSearchResult {
+  user_id: string;
+  name: string;
+  email: string;
+  joined_at: string;
+  role: string;
 }
 
 export interface Community {
@@ -27,6 +38,8 @@ export interface Community {
   reference_name: string | null;
   /** Set when a member created the community — app-created ones have null. */
   owner_id?: string | null;
+  /** Communities the platform auto-created (no member owner) — where admins apply. */
+  is_app_created?: boolean;
   is_active: boolean;
   member_count: number;
   message_count: number;
@@ -34,6 +47,66 @@ export interface Community {
   updated_at: string;
   members: CommunityMember[];
   messages: CommunityMessage[];
+}
+
+// ─── Community admin permissions ────────────────────────────────────────────
+
+export interface CommunityPermissionFlags {
+  can_edit_settings: boolean;
+  can_manage_members: boolean;
+  can_delete_messages: boolean;
+}
+
+export type CommunityPermissionKey = keyof CommunityPermissionFlags;
+
+export const ALL_PERMISSIONS: CommunityPermissionFlags = {
+  can_edit_settings: true,
+  can_manage_members: true,
+  can_delete_messages: true,
+};
+
+export const PERMISSION_OPTIONS: Array<{
+  key: CommunityPermissionKey;
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "can_edit_settings",
+    label: "Edit community settings",
+    description: "Rename the community and update its photo, description, rules and tabs (the gear in the app).",
+  },
+  {
+    key: "can_manage_members",
+    label: "Manage members",
+    description: "Remove members and accept / decline join requests.",
+  },
+  {
+    key: "can_delete_messages",
+    label: "Moderate chat messages",
+    description: "Delete any member's messages in the community chat.",
+  },
+];
+
+export interface CommunityAdmin {
+  user_id: string;
+  name: string;
+  email: string;
+  joined_at: string;
+  permissions: CommunityPermissionFlags;
+  granted_at: string;
+  updated_at: string | null;
+}
+
+export interface CommunityActivityEntry {
+  id: string;
+  community_id: string;
+  actor_id: string | null;
+  actor_role: "owner" | "admin" | "platform";
+  actor_name: string | null;
+  action: string;
+  target_user_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }
 
 export const TYPE_LABELS: Record<string, string> = {

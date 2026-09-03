@@ -35,6 +35,8 @@ interface Community {
 interface CommunitySettingsViewProps {
   communityId: string;
   community: Community;
+  /** Owner sees privacy/delete controls; admins manage the community basics only. */
+  isOwner?: boolean;
   onClose: () => void;
   onSaved: (updated: Partial<Community>) => void;
   onDeleted: () => void;
@@ -62,6 +64,7 @@ function slugify(s: string) {
 export function CommunitySettingsView({
   communityId,
   community,
+  isOwner = true,
   onClose,
   onSaved,
   onDeleted,
@@ -357,7 +360,18 @@ export function CommunitySettingsView({
             </div>
           </section>
 
-          {/* Privacy */}
+          {!isOwner && (
+            <div className="rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
+              <p className="font-body text-xs text-foreground leading-relaxed">
+                You are managing <span className="font-medium text-foreground">{community.name}</span> as a{" "}
+                <span className="font-medium text-accent">community admin</span>. Privacy, invite-only access
+                and deletion are controlled by the platform.
+              </p>
+            </div>
+          )}
+
+          {/* Privacy — owner only */}
+          {isOwner && (
           <section>
             <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-4">
               Privacy
@@ -392,6 +406,7 @@ export function CommunitySettingsView({
               })}
             </div>
           </section>
+          )}
 
           {/* Tabs */}
           <section>
@@ -562,7 +577,8 @@ export function CommunitySettingsView({
             </div>
           </section>
 
-          {/* Danger Zone */}
+          {/* Danger Zone — owner only */}
+          {isOwner && (
           <section>
             <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-red-500/70 mb-3">
               Danger Zone
@@ -623,6 +639,7 @@ export function CommunitySettingsView({
               )}
             </div>
           </section>
+          )}
 
         </div>
       </div>

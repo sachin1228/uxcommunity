@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
 
 /**
  * GET /api/communities/[id]/requests
- * List pending join requests. Owner only.
+ * List pending join requests. Owner or admin with "manage members".
  */
 export async function GET(
   _req: NextRequest,
@@ -16,16 +17,15 @@ export async function GET(
   const { id: communityId } = await params;
   const db = createServiceClient();
 
-  // Verify caller is the owner
-  const { data: community } = await db
-    .from("communities")
-    .select("owner_id")
-    .eq("id", communityId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Verify caller is a manager with member-management rights
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
+  if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  const canDecideRequests =
+    managerStatus.isOwner ||
+    (managerStatus.role === "admin" && managerStatus.permissions.can_manage_members);
+  if (!canDecideRequests) {
+    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  }
 
   const { data: requests, error } = await db
     .from("community_join_requests")

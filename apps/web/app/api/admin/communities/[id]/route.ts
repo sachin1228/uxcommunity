@@ -54,7 +54,7 @@ export async function GET(
     db.from("community_messages").select("*", { count: "exact", head: true }).eq("community_id", id),
     db
       .from("community_members")
-      .select("user_id, joined_at")
+      .select("user_id, joined_at, role")
       .eq("community_id", id)
       .order("joined_at", { ascending: false })
       .limit(20),
@@ -85,6 +85,7 @@ export async function GET(
     name:      userMap[m.user_id]?.name  ?? "Unknown",
     email:     userMap[m.user_id]?.email ?? "",
     joined_at: m.joined_at,
+    role:      m.role ?? "member",
   }));
 
   const messages = (msgRows ?? []).map((m) => ({
@@ -106,6 +107,7 @@ export async function GET(
       message_count: message_count ?? 0,
       members,
       messages,
+      is_app_created: community.owner_id == null,
     },
   });
 }
