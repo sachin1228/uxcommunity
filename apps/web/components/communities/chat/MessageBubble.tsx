@@ -611,7 +611,7 @@ function MessageContent({
   return (
     <>
       <div
-        className={`font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words ${
+        className={`chat-message-text font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
           isMe ? "text-accent-foreground" : "text-foreground"
         }`}
       >

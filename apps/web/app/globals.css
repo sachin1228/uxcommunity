@@ -368,6 +368,14 @@ select:focus-visible {
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
 }
 
+/* Message text is selectable; give the highlight enough contrast to read
+   on both the blue (own) and raised (other) bubble backgrounds. */
+.chat-message-text::selection,
+.chat-message-text *::selection {
+  background: rgba(255, 255, 255, 0.35);
+  color: inherit;
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;
