@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { resolveCommunityDp } from "@/lib/communities/dp";
 
 /** Admin-only: returns all communities with member + message counts.
- *  image_url is read directly from the communities table — it is populated
- *  at upsert time by the auto-join flow and is the single source of truth.
+ *  For app-created communities the display picture (image + lottie) is
+ *  resolved from the master data row at read time — the same convention the
+ *  app uses everywhere — falling back to the stored communities columns.
  */
 export async function GET() {
   try { await requireSession("admin"); } catch (e) { return e as Response; }
@@ -13,7 +15,7 @@ export async function GET() {
 
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at")
+    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at, lottie_url, lottie_format")
     .order("type")
     .order("name");
 
@@ -21,6 +23,22 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
   }
   if (!communities?.length) return NextResponse.json({ communities: [] });
+
+  // Resolve the display picture per community (image + lottie from master).
+  // The animation payload is embedded so table rows can play it inline — R2
+  // URLs are not browser-fetchable.
+  const dps = await Promise.all(
+    communities.map((c) =>
+      resolveCommunityDp({
+        type: c.type,
+        reference_id: c.reference_id,
+        image_url: c.image_url ?? null,
+        lottie_url: c.lottie_url ?? null,
+        lottie_format: c.lottie_format ?? null,
+        embedLottie: true,
+      })
+    )
+  );
 
   // Member + message counts in parallel
   const [memberCounts, messageCounts] = await Promise.all([
@@ -47,11 +65,14 @@ export async function GET() {
   const memberCountMap  = Object.fromEntries(memberCounts.map((r)  => [r.id, r.count]));
   const messageCountMap = Object.fromEntries(messageCounts.map((r) => [r.id, r.count]));
 
-  const result = communities.map((c) => ({
+  const result = communities.map((c, i) => ({
     id:            c.id,
     name:          c.name,
     type:          c.type,
-    image_url:     c.image_url ?? null,
+    image_url:     dps[i].image_url,
+    lottie_url:    dps[i].lottie_url,
+    lottie_format: dps[i].lottie_format,
+    lottie_data:   dps[i].lottie_data,
     reference_id:  c.reference_id,
     // Set when a member created the community (type "user"); null for the
     // communities the uxcommunity app creates itself (general/city/sector/...).

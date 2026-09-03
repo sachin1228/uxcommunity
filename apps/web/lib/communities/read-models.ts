@@ -5,10 +5,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import {
   getExperienceLevelNameMap,
-  getMasterImageMap,
   getMasterNameMap,
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
+import { resolveCommunityDp } from "./dp";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -50,15 +50,22 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   const db = createServiceClient();
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     db.from("community_members").select("joined_at, role").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token").eq("id", communityId).eq("is_active", true).maybeSingle(),
+    db.from("communities").select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format").eq("id", communityId).eq("is_active", true).maybeSingle(),
   ]);
 
   if (!membership) return { ok: false, status: 403, error: "Not a member of this community." };
   if (communityError || !community) return { ok: false, status: 404, error: "Community not found." };
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [masterImageMap, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
-    hasMasterData ? getMasterImageMap(community.type) : Promise.resolve({} as Record<string, string | null>),
+  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
+    resolveCommunityDp({
+      type: community.type,
+      reference_id: community.reference_id,
+      image_url: community.image_url ?? null,
+      lottie_url: community.lottie_url ?? null,
+      lottie_format: community.lottie_format ?? null,
+      embedLottie: true,
+    }),
     hasMasterData ? getMasterNameMap(community.type) : Promise.resolve({} as Record<string, string>),
     getExperienceLevelNameMap(),
     db.from("community_members").select("user_id, joined_at, role", { count: "exact" }).eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
@@ -96,7 +103,10 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     data: {
       community: {
         ...community,
-        image_url: (community.reference_id ? masterImageMap[community.reference_id] : undefined) ?? community.image_url ?? null,
+        image_url: dp.image_url,
+        lottie_url: dp.lottie_url,
+        lottie_format: dp.lottie_format,
+        lottie_data: dp.lottie_data,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,

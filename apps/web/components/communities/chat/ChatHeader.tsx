@@ -7,7 +7,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
-import { CommunityIcon } from "../CommunityIcon";
+import { CommunityDp } from "../CommunityDp";
 
 interface Community {
   id: string;
@@ -15,6 +15,9 @@ interface Community {
   type: string;
   member_count: number;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   is_private?: boolean;
   enabled_tabs?: string[];
   owner_id?: string | null;
@@ -195,19 +198,15 @@ export const ChatHeader = memo(function ChatHeader({
           <>
             <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-3">
-                <div className="relative h-11 w-11 rounded-full bg-surface-raised overflow-hidden shrink-0">
-                  <CommunityIcon size={44} className="bg-surface-raised" />
-                  {community.image_url && (
-                    <img
-                      src={community.image_url}
-                      alt={community.name}
-                      className="absolute inset-0 h-11 w-11 rounded-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  )}
-                </div>
+                <CommunityDp
+                  imageUrl={community.image_url}
+                  lottieUrl={community.lottie_url}
+                  lottieFormat={community.lottie_format}
+                  lottieData={community.lottie_data}
+                  name={community.name}
+                  size={44}
+                  className="bg-surface-raised"
+                />
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">

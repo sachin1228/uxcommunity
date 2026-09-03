@@ -130,6 +130,9 @@ export const CommunityRow = memo(function CommunityRow({
           imageUrl={c.image_url}
           name={c.name}
           type={c.type}
+          lottieUrl={c.lottie_url}
+          lottieFormat={c.lottie_format}
+          lottieData={c.lottie_data}
         />
 
         <div className="flex-1 min-w-0">
