@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { CommunityIcon } from "./CommunityIcon";
 
@@ -25,11 +25,7 @@ export interface CommunityDpProps {
   size?: number;
   /** Extra classes for the circular container (background, etc.). */
   className?: string;
-  /** Gap between animation replays in ms (default 10s). */
-  replayDelayMs?: number;
 }
-
-const DEFAULT_REPLAY_DELAY_MS = 10_000;
 
 function decodeBase64(data: string): ArrayBuffer {
   const binary = atob(data);
@@ -41,10 +37,10 @@ function decodeBase64(data: string): ArrayBuffer {
 }
 
 /**
- * Community display picture: plays the Lottie animation once, waits
- * `replayDelayMs` (10s), then replays — with a static image (or the fallback
- * icon) when no animation is set. Used everywhere a community DP renders so
- * an admin-replaced picture propagates across the whole app.
+ * Community display picture: loops the Lottie animation indefinitely, with a
+ * static image (or the fallback icon) when no animation is set. Used
+ * everywhere a community DP renders so an admin-replaced picture propagates
+ * across the whole app.
  */
 export function CommunityDp({
   imageUrl,
@@ -54,14 +50,8 @@ export function CommunityDp({
   name,
   size = 40,
   className = "bg-surface-raised",
-  replayDelayMs = DEFAULT_REPLAY_DELAY_MS,
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
-  // Remount key for the lottie-react player — replays the animation.
-  const [playId, setPlayId] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dotLottieRef = useRef<{ play?: () => void; removeEventListener?: (e: string, fn: () => void) => void } | null>(null);
-  const replayDelayRef = useRef(replayDelayMs);
   // dotLottie's built-in resolution is capped at ~1.75x on 2x screens, which
   // makes the canvas look soft when the browser stretches it to full Retina
   // sharpness. Render at the display's real pixel ratio instead (capped at 2x
@@ -73,10 +63,6 @@ export function CommunityDp({
       ? 1
       : Math.min(window.devicePixelRatio || 1, 2)
   );
-
-  useEffect(() => {
-    replayDelayRef.current = replayDelayMs;
-  }, [replayDelayMs]);
 
   const hasJsonLottie =
     Boolean(lottieUrl) &&
@@ -94,30 +80,6 @@ export function CommunityDp({
     [lottieData]
   );
 
-  const scheduleReplay = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setPlayId((p) => p + 1), replayDelayRef.current);
-  }, []);
-
-  // dotLottie player: play once, then replay after the delay. The instance
-  // persists across renders, so we attach the listener a single time.
-  const handleDotLottieRef = useCallback((instance: unknown) => {
-    const lottie = instance as { play?: () => void; addEventListener?: (e: string, fn: () => void) => void } | null;
-    if (!lottie) return;
-    dotLottieRef.current = lottie;
-    lottie.addEventListener?.("complete", () => {
-      const delay = replayDelayRef.current;
-      setTimeout(() => lottie.play?.(), delay);
-    });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      dotLottieRef.current = null;
-    };
-  }, []);
-
   return (
     <div
       className={`flex items-center justify-center rounded-full overflow-hidden shrink-0 select-none ${className}`}
@@ -125,20 +87,17 @@ export function CommunityDp({
     >
       {hasJsonLottie ? (
         <Lottie
-          key={playId}
           animationData={lottieData as object}
-          loop={false}
+          loop
           autoplay
-          onComplete={scheduleReplay}
           style={{ width: size, height: size }}
         />
       ) : hasDotLottie && dotLottieBuffer ? (
         <DotLottieReact
           data={dotLottieBuffer}
           renderConfig={{ devicePixelRatio: dpr }}
-          loop={false}
+          loop
           autoplay
-          dotLottieRefCallback={handleDotLottieRef}
           style={{ width: size, height: size }}
         />
       ) : imageUrl && !imgFailed ? (

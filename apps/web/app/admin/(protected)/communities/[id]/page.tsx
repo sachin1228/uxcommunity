@@ -280,8 +280,8 @@ export default function CommunityDetailPage() {
             )}
           </div>
           <p className="font-body text-xs text-foreground-muted mb-4">
-            Replace with a static image or a Lottie animation (.lottie or .json) that plays once
-            every 10 seconds. The change applies everywhere in the app and syncs to master data.
+            Replace with a static image or a Lottie animation (.lottie or .json) that plays
+            continuously. The change applies everywhere in the app and syncs to master data.
           </p>
           <div className="flex items-center gap-4">
             <CommunityDp
