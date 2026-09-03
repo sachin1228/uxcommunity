@@ -38,7 +38,10 @@ alter table public.experience_levels
     check (lottie_format is null or lottie_format in ('json', 'dotlottie'));
 
 -- Explore-communities RPC: include the lottie DP so dashboard cards can
--- render the animated display picture too.
+-- render the animated display picture too. The return row type gains two
+-- columns, so the function must be dropped before it can be recreated.
+drop function if exists public.get_all_communities(uuid);
+
 create or replace function public.get_all_communities(p_user_id uuid)
 returns table (
   id uuid,
