@@ -1,100 +1,61 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-
-export type WelcomeStepStatus = "pending" | "active" | "done";
-
-export interface WelcomeStep {
-  id: string;
-  label: string;
-  status: WelcomeStepStatus;
-}
 
 interface SignupWelcomeProps {
   phase: "loading" | "ready" | "error";
   firstName?: string;
   joinedCommunities?: number;
   errorMessage?: string | null;
-  /** Real progress (0-100) derived from completed server-side steps. */
-  percent?: number;
-  /** Real step states driven by each request finishing. */
-  steps?: WelcomeStep[];
-  /** Fired once the ring finishes filling to 100% after the last real step. */
-  onFinished?: () => void;
   onGoToDashboard: () => void;
   onRetry: () => void;
   onClose: () => void;
 }
+
+const STEPS = [
+  { at: 10, label: "Creating your account" },
+  { at: 30, label: "Adding your profile details" },
+  { at: 55, label: "Joining your communities" },
+  { at: 80, label: "Preparing your dashboard" },
+];
 
 const RING_SIZE = 132;
 const RING_STROKE = 6;
 const RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-// Percent and step states are updated by the parent as each real server step
-// (picture upload → account creation → community auto-join) completes. The
-// ring value below is the only thing "animated": it eases up to each real
-// target slowly so the journey feels deliberate instead of jumpy.
-function LoadingPhase({
-  firstName,
-  percent,
-  steps,
-  onFinished,
-}: {
-  firstName?: string;
-  percent: number;
-  steps: WelcomeStep[];
-  onFinished?: () => void;
-}) {
-  const [display, setDisplay] = useState(0);
-  const displayRef = useRef(0);
-  const finishedRef = useRef(false);
-  const onFinishedRef = useRef(onFinished);
+function currentStepIndex(progress: number): number {
+  let index = -1;
+  for (let i = 0; i < STEPS.length; i++) {
+    if (progress >= STEPS[i].at) index = i;
+  }
+  return index;
+}
+
+// Fake but believable progress: it rushes through the early steps, then
+// crawls toward 92% while the real setup request is still in flight.
+function LoadingPhase({ firstName }: { firstName?: string }) {
+  const [progress, setProgress] = useState(4);
 
   useEffect(() => {
-    onFinishedRef.current = onFinished;
-  }, [onFinished]);
+    const timer = window.setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 92) return prev;
+        const remaining = 92 - prev;
+        const step = Math.max(
+          1,
+          Math.min(7, Math.round(remaining / 14) + (Math.random() > 0.7 ? 2 : 0))
+        );
+        return Math.min(92, prev + step);
+      });
+    }, 130);
+    return () => window.clearInterval(timer);
+  }, []);
 
-  // Ease the shown ring value up to the real target percent. Each real step
-  // jumps the target; this effect turns that jump into a slow, smooth fill.
-  useEffect(() => {
-    const target = percent;
-    if (displayRef.current >= target) return;
-    const from = displayRef.current;
-    const start = performance.now();
-    // Roughly 35ms per point, clamped to feel calm on small jumps.
-    const duration = Math.min(1900, Math.max(900, (target - from) * 35));
-    let raf = 0;
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      const value = from + (target - from) * eased;
-      displayRef.current = value;
-      setDisplay(value);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [percent]);
-
-  // When the final real step is done, wait for the ring to visually complete
-  // before handing over to the celebration screen.
-  useEffect(() => {
-    if (percent < 100 || finishedRef.current) return;
-    if (!steps.length || !steps.every((s) => s.status === "done")) return;
-    finishedRef.current = true;
-    const interval = window.setInterval(() => {
-      if (displayRef.current >= 99) {
-        window.clearInterval(interval);
-        window.setTimeout(() => onFinishedRef.current?.(), 350);
-      }
-    }, 80);
-    return () => window.clearInterval(interval);
-  }, [percent, steps]);
-
-  const dashOffset = CIRCUMFERENCE * (1 - display / 100);
+  const stepIndex = currentStepIndex(progress);
+  const dashOffset = CIRCUMFERENCE * (1 - progress / 100);
 
   return (
     <div className="flex w-full max-w-sm flex-col items-center animate-in fade-in duration-300">
@@ -118,12 +79,12 @@ function LoadingPhase({
             strokeLinecap="round"
             strokeDasharray={CIRCUMFERENCE}
             strokeDashoffset={dashOffset}
-            className="transition-[stroke-dashoffset] duration-300 ease-out"
+            className="transition-[stroke-dashoffset] duration-200 ease-out"
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="font-display text-2xl font-semibold text-foreground tabular-nums">
-            {Math.round(display)}%
+            {Math.round(progress)}%
           </span>
         </div>
       </div>
@@ -132,49 +93,49 @@ function LoadingPhase({
         Welcome{firstName ? `, ${firstName}` : ""}!
       </h1>
       <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">
-        Setting up your account — this is happening live, step by step.
+        Setting everything up for you — this will only take a moment.
       </p>
 
       <ul className="mt-8 w-full space-y-3">
-        {steps.map((step) => (
-          <li
-            key={step.id}
-            className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
-              step.status === "done"
-                ? "border-border/60 bg-surface"
-                : "border-transparent bg-transparent"
-            }`}
-          >
-            {step.status === "done" ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    fillRule="evenodd"
-                    d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </span>
-            ) : step.status === "active" ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                <Spinner className="h-4 w-4" />
-              </span>
-            ) : (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                <span className="h-2 w-2 rounded-full bg-foreground-subtle/50" />
-              </span>
-            )}
-            <span
-              className={`font-body text-sm transition-colors ${
-                step.status === "done" || step.status === "active"
-                  ? "text-foreground"
-                  : "text-foreground-subtle"
+        {STEPS.map((step, i) => {
+          const done = progress >= step.at;
+          const active = i === stepIndex && progress < 92;
+          return (
+            <li
+              key={step.label}
+              className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
+                done ? "border-border/60 bg-surface" : "border-transparent bg-transparent"
               }`}
             >
-              {step.label}
-            </span>
-          </li>
-        ))}
+              {done ? (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                  <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </span>
+              ) : active ? (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  <Spinner className="h-4 w-4" />
+                </span>
+              ) : (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  <span className="h-2 w-2 rounded-full bg-foreground-subtle/50" />
+                </span>
+              )}
+              <span
+                className={`font-body text-sm transition-colors ${
+                  done || active ? "text-foreground" : "text-foreground-subtle"
+                }`}
+              >
+                {step.label}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -287,9 +248,6 @@ export function SignupWelcome({
   firstName,
   joinedCommunities,
   errorMessage,
-  percent,
-  steps,
-  onFinished,
   onGoToDashboard,
   onRetry,
   onClose,
@@ -302,14 +260,7 @@ export function SignupWelcome({
         wordmarkClassName="text-lg"
       />
 
-      {phase === "loading" && (
-        <LoadingPhase
-          firstName={firstName}
-          percent={percent ?? 0}
-          steps={steps ?? []}
-          onFinished={onFinished}
-        />
-      )}
+      {phase === "loading" && <LoadingPhase firstName={firstName} />}
       {phase === "ready" && (
         <ReadyPhase
           firstName={firstName}

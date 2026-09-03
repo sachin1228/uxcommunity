@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
@@ -25,14 +25,8 @@ interface TokenState {
 
 type Step = 1 | 2 | 3 | 4 | "done";
 
-type WelcomeStep = {
-  id: string;
-  label: string;
-  status: "pending" | "active" | "done";
-};
-
 type WelcomeState =
-  | { phase: "loading"; percent: number; steps: WelcomeStep[] }
+  | { phase: "loading" }
   | { phase: "ready"; joinedCommunities: number }
   | { phase: "error"; message: string }
   | null;
@@ -51,10 +45,6 @@ function splitFullName(fullName: string): { first_name: string; last_name: strin
 /** Combines first/last name inputs into the single `name` the API stores. */
 function joinNameParts(firstName: string, lastName: string): string {
   return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function SignupInner() {
@@ -102,51 +92,9 @@ function SignupInner() {
   const [step4Loading, setStep4Loading] = useState(false);
   const [step4Error, setStep4Error] = useState<string | null>(null);
 
-  // Signup-completion overlay. Progress is real: each step below only marks
-  // itself done (and advances the percentage) after its server request — and
-  // the database write behind it — has actually succeeded.
+  // Signup-completion overlay: account setup runs in the background behind a
+  // welcome animation, then hands off to the dashboard with a button.
   const [welcome, setWelcome] = useState<WelcomeState>(null);
-  // Holds the real joined-community count until the loading ring finishes.
-  const joinedRef = useRef(0);
-
-  function buildSteps(withPicture: boolean): WelcomeStep[] {
-    const steps: WelcomeStep[] = [];
-    if (withPicture) {
-      steps.push({
-        id: "picture",
-        label: "Uploading your profile picture",
-        status: "pending",
-      });
-    }
-    steps.push({ id: "account", label: "Creating your account", status: "pending" });
-    steps.push({ id: "communities", label: "Joining your communities", status: "pending" });
-    return steps;
-  }
-
-  function percentOf(steps: WelcomeStep[]): number {
-    if (!steps.length) return 0;
-    const done = steps.filter((s) => s.status === "done").length;
-    return Math.round((done / steps.length) * 100);
-  }
-
-  function updateWelcomeStep(id: string, status: WelcomeStep["status"]) {
-    setWelcome((w) => {
-      if (!w || w.phase !== "loading") return w;
-      const steps = w.steps.map((s) => (s.id === id ? { ...s, status } : s));
-      return { ...w, steps, percent: percentOf(steps) };
-    });
-  }
-
-  async function stepErrorMessage(res: Response, fallback: string): Promise<string> {
-    try {
-      const data = await res.json();
-      if (data?.error) return String(data.error);
-      if (data?.issues) return fallback;
-    } catch {
-      // fall through
-    }
-    return fallback;
-  }
 
   // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
@@ -283,80 +231,60 @@ function SignupInner() {
   }
 
   async function handleStep4() {
-    // Hand the user straight to the welcome overlay. The steps below run one by
-    // one, and each one only ticks over once its real server work is done.
-    const steps = buildSteps(Boolean(uploadedBlob));
-    setWelcome({ phase: "loading", percent: 0, steps });
+    // Hand the user straight to the welcome overlay — the account + community
+    // setup below runs in the background while they watch the animation.
+    setWelcome({ phase: "loading" });
     setStep4Error(null);
-    // Let the overlay paint its first frame before starting the first request.
+    // Let the overlay paint its first frame before starting the request.
     await new Promise((resolve) => setTimeout(resolve, 80));
     setStep4Loading(true);
     try {
-      let avatarUrl: string | null = null;
+      const payload = {
+        identity: step1Identity(),
+        profile: step2,
+        interest_ids: selectedInterestIds,
+        ...(token ? { token } : {}),
+        ...(uploadedBlob ? { avatar_source: "upload" as const } : {}),
+      };
 
-      for (const step of steps) {
-        updateWelcomeStep(step.id, "active");
-        const startedAt = Date.now();
-
-        if (step.id === "picture") {
-          const fd = new FormData();
-          fd.append("file", uploadedBlob!, "profile-picture.jpg");
-          const res = await fetch("/api/signup/picture", { method: "POST", body: fd });
-          if (!res.ok) {
-            throw new Error(await stepErrorMessage(res, "Uploading your profile picture failed."));
-          }
-          const data = await res.json().catch(() => null);
-          avatarUrl = data?.avatar_url ?? null;
-          if (!avatarUrl) throw new Error("Uploading your profile picture failed.");
-        } else if (step.id === "account") {
-          const payload = {
-            identity: step1Identity(),
-            profile: step2,
-            interest_ids: selectedInterestIds,
-            ...(token ? { token } : {}),
-            ...(avatarUrl ? { avatar_url: avatarUrl, avatar_source: "upload" as const } : {}),
-          };
-          const res = await fetch("/api/signup/avatar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            throw new Error(await stepErrorMessage(res, "Creating your account failed."));
-          }
-        } else if (step.id === "communities") {
-          const res = await fetch("/api/communities/auto-join", { method: "POST" });
-          if (!res.ok) {
-            throw new Error(await stepErrorMessage(res, "Joining your communities failed."));
-          }
-          const data = await res.json().catch(() => null);
-          joinedRef.current = Array.isArray(data?.joined) ? data.joined.length : 0;
-        }
-
-        // Presentation pacing only: keep the spinner on the step for a moment so
-        // each real completion can be read before it checks off, and let the
-        // check breathe before the next step starts.
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < 550) await sleep(550 - elapsed);
-        updateWelcomeStep(step.id, "done");
-        await sleep(250);
+      let res: Response;
+      if (uploadedBlob) {
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify(payload));
+        fd.append("file", uploadedBlob, "profile-picture.jpg");
+        res = await fetch("/api/signup/avatar", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/signup/avatar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
 
-      // The loading ring fills to 100% on its own (slow, eased), then
-      // SignupWelcome fires onFinished → handleWelcomeFinished.
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Failed to complete signup. Please try again.";
-      setWelcome({ phase: "error", message });
+      const data = await res.json();
+      if (!res.ok) {
+        const message =
+          data.error ??
+          (data.issues ? "Please review your details and try again." : "Failed to complete signup.");
+        setWelcome({ phase: "error", message });
+        return;
+      }
+      // Communities are auto-joined server-side during /api/signup/avatar, so the
+      // sidebar shows the full list (General + city + sector + interests) the first
+      // time the dashboard loads.
+      setWelcome({
+        phase: "ready",
+        joinedCommunities:
+          typeof data.joined_communities === "number" ? data.joined_communities : 0,
+      });
+    } catch {
+      setWelcome({
+        phase: "error",
+        message: "Network error. Please try again.",
+      });
     } finally {
       setStep4Loading(false);
     }
-  }
-
-  function handleWelcomeFinished() {
-    setWelcome({ phase: "ready", joinedCommunities: joinedRef.current });
   }
 
   function goToDashboard() {
@@ -456,10 +384,7 @@ function SignupInner() {
           firstName={step1.first_name.trim()}
           joinedCommunities={welcome.phase === "ready" ? welcome.joinedCommunities : 0}
           errorMessage={welcome.phase === "error" ? welcome.message : null}
-          percent={welcome.phase === "loading" ? welcome.percent : 0}
-          steps={welcome.phase === "loading" ? welcome.steps : []}
           onGoToDashboard={goToDashboard}
-          onFinished={handleWelcomeFinished}
           onRetry={() => void handleStep4()}
           onClose={() => setWelcome(null)}
         />
