@@ -47,3 +47,41 @@ test("completion rejects mismatched passwords", () => {
     false
   );
 });
+
+test("completion requires both a name and a surname", () => {
+  assert.equal(
+    completeSignupSchema.safeParse({
+      ...completePayload,
+      identity: { ...completePayload.identity, name: "Sachin" },
+    }).success,
+    false
+  );
+  assert.equal(
+    completeSignupSchema.safeParse({
+      ...completePayload,
+      identity: { ...completePayload.identity, name: "Sachin Patil" },
+    }).success,
+    true
+  );
+});
+
+test("completion allows at most five interests", () => {
+  const interestIds = [
+    "44444444-4444-4444-8444-444444444441",
+    "44444444-4444-4444-8444-444444444442",
+    "44444444-4444-4444-8444-444444444443",
+    "44444444-4444-4444-8444-444444444444",
+    "44444444-4444-4444-8444-444444444445",
+  ];
+  assert.equal(
+    completeSignupSchema.safeParse({ ...completePayload, interest_ids: interestIds }).success,
+    true
+  );
+  assert.equal(
+    completeSignupSchema.safeParse({
+      ...completePayload,
+      interest_ids: [...interestIds, "44444444-4444-4444-8444-444444444446"],
+    }).success,
+    false
+  );
+});

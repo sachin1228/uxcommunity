@@ -1,6 +1,7 @@
 "use client";
 
 import { Spinner } from "@/components/ui/Spinner";
+import { MAX_DESIGN_INTERESTS } from "@/lib/interests";
 import { InterestsMultiSelect } from "./InterestsMultiSelect";
 
 interface InterestOption { id: string; name: string; image_url?: string | null }
@@ -29,7 +30,7 @@ export function SignupStep3({
       </h2>
       <p className="font-body text-sm text-foreground-muted mb-1">Step 3 of 4</p>
       <p className="font-body text-xs text-foreground-muted mb-7">
-        Pick the topics you care about most. You can always update these later.
+        Pick up to {MAX_DESIGN_INTERESTS} topics you care about most. You can always update these later.
       </p>
 
       {error && (

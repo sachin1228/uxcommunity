@@ -15,9 +15,19 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+// Name is collected as two separate mandatory inputs (name + surname) and
+// combined before it reaches the API, so a valid name always has two words.
+const nameWithSurname = z
+  .string()
+  .min(2, "Name must be at least 2 characters")
+  .max(100)
+  .refine((v) => v.trim().split(/\s+/).length >= 2, {
+    message: "Please enter both your name and surname.",
+  });
+
 export const signupStep1Schema = z
   .object({
-    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    name: nameWithSurname,
     email: z.string().email("Please enter a valid email address"),
     password: z
       .string()
@@ -35,7 +45,7 @@ export const signupStep1Schema = z
 // Schema for the direct signup flow (no invitation token required)
 export const directSignupStep1Schema = z
   .object({
-    name: z.string().min(2, "Name must be at least 2 characters").max(100),
+    name: nameWithSurname,
     email: z.string().email("Please enter a valid email address"),
     password: z
       .string()
@@ -59,9 +69,11 @@ export const signupStep2Schema = z.object({
 export const completeSignupSchema = z.object({
   identity: directSignupStep1Schema,
   profile: signupStep2Schema,
-  interest_ids: z.array(z.string().uuid()).max(100),
+  interest_ids: z.array(z.string().uuid()).max(5, "You can select up to 5 topics."),
   token: z.string().min(1).optional(),
   avatar_source: z.literal("upload").optional(),
+  // Picture pre-uploaded via /api/signup/picture (moderated + on R2).
+  avatar_url: z.string().url().optional(),
 });
 
 export const masterDataSchema = z.object({

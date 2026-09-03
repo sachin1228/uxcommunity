@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 
@@ -24,7 +25,9 @@ export default async function DashboardLayout({
       .maybeSingle(),
     db
       .from("designer_profiles")
-      .select("avatar_url")
+      .select(
+        "avatar_url, city_id, sector_id, experience_level, communities_auto_joined"
+      )
       .eq("user_id", session.userId!)
       .maybeSingle(),
   ]);
@@ -35,6 +38,28 @@ export default async function DashboardLayout({
     (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null;
   const initial = name.charAt(0).toUpperCase();
   const userId = session.userId!;
+
+  // One-time repair for members whose profile communities were never joined at
+  // signup (accounts created before auto-join ran server-side). Once the flag is
+  // set, memberships are left alone so leaving a community still sticks.
+  const profileRow = profile as {
+    avatar_url?: string | null;
+    city_id?: string | null;
+    sector_id?: string | null;
+    experience_level?: string | null;
+    communities_auto_joined?: boolean | null;
+  } | null;
+  const autoJoined = Boolean(profileRow?.communities_auto_joined);
+  const hasProfilePicks = Boolean(
+    profileRow?.city_id || profileRow?.sector_id || profileRow?.experience_level
+  );
+  if (!autoJoined && hasProfilePicks) {
+    try {
+      await autoJoinCommunities(userId);
+    } catch (error) {
+      console.error("[dashboard layout] auto-join repair failed:", error);
+    }
+  }
 
   const sidebarUser = { name, email, avatarUrl, initial };
 

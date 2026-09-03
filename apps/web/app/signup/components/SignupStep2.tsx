@@ -50,12 +50,13 @@ export function SignupStep2({
           <span className="font-body text-xs font-medium text-foreground">
             City <span className="text-red-400">*</span>
           </span>
+          {/* "Other" is a real row in the cities master data — selecting it must not
+              create a dedicated community; those members belong to General. */}
           <SearchableSelect
             options={cities.map((c) => ({ value: c.id, label: c.name, imageUrl: c.image_url }))}
             value={state.city_id}
             onChange={(v) => onChange({ city_id: v })}
             placeholder="Select a city"
-            allowOther otherLabel="Other"
           />
         </div>
 
@@ -68,7 +69,6 @@ export function SignupStep2({
             value={state.sector_id}
             onChange={(v) => onChange({ sector_id: v })}
             placeholder="Select a sector"
-            allowOther otherLabel="Other"
           />
         </div>
 

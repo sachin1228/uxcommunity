@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Step1State {
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
   confirm_password: string;
@@ -27,6 +28,22 @@ function FieldError({ errors, field }: { errors: Record<string, string[]>; field
 const inputClass =
   "w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:ring-2 focus:ring-accent/20";
 
+function EyeOpen() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+    </svg>
+  );
+}
+
+function EyeOff() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
+    </svg>
+  );
+}
+
 export function SignupStep1({
   state,
   onChange,
@@ -37,17 +54,6 @@ export function SignupStep1({
 }: SignupStep1Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm,  setShowConfirm]  = useState(false);
-
-  const EyeOpen = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-    </svg>
-  );
-  const EyeOff = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>
-    </svg>
-  );
 
   return (
     <div className="p-8">
@@ -63,24 +69,45 @@ export function SignupStep1({
           </div>
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Full Name</span>
-          <input type="text" value={state.name}
-            onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="Jordan Lee" className={inputClass} autoComplete="name" required />
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs font-medium text-foreground">
+                Name <span className="text-red-400">*</span>
+              </span>
+              <input type="text" value={state.first_name}
+                onChange={(e) => onChange({ first_name: e.target.value })}
+                placeholder="Enter your name" className={inputClass} autoComplete="given-name" required />
+              <FieldError errors={fieldErrors} field="first_name" />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs font-medium text-foreground">
+                Surname <span className="text-red-400">*</span>
+              </span>
+              <input type="text" value={state.last_name}
+                onChange={(e) => onChange({ last_name: e.target.value })}
+                placeholder="Enter your surname" className={inputClass} autoComplete="family-name" required />
+              <FieldError errors={fieldErrors} field="last_name" />
+            </label>
+          </div>
+          {/* Server-side validation runs on the combined name built from both parts. */}
           <FieldError errors={fieldErrors} field="name" />
-        </label>
+        </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Email</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Email <span className="text-red-400">*</span>
+          </span>
           <input type="email" value={state.email}
             onChange={(e) => onChange({ email: e.target.value })}
-            placeholder="you@studio.com" className={inputClass} autoComplete="username" required />
+            placeholder="you@gmail.com" className={inputClass} autoComplete="username" required />
           <FieldError errors={fieldErrors} field="email" />
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Password</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Password <span className="text-red-400">*</span>
+          </span>
           <div className="relative">
             <input type={showPassword ? "text" : "password"} value={state.password}
               onChange={(e) => onChange({ password: e.target.value })}
@@ -96,7 +123,9 @@ export function SignupStep1({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Confirm Password</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Confirm Password <span className="text-red-400">*</span>
+          </span>
           <div className="relative">
             <input type={showConfirm ? "text" : "password"} value={state.confirm_password}
               onChange={(e) => onChange({ confirm_password: e.target.value })}

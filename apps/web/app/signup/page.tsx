@@ -9,6 +9,7 @@ import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
 import { SignupStep4 } from "./components/SignupStep4";
+import { SignupWelcome } from "./components/SignupWelcome";
 
 // Re-exported so profile page can import it from here (backward compat)
 export { INTEREST_EMOJIS } from "@/lib/interests";
@@ -23,6 +24,28 @@ interface TokenState {
 }
 
 type Step = 1 | 2 | 3 | 4 | "done";
+
+type WelcomeState =
+  | { phase: "loading" }
+  | { phase: "ready"; joinedCommunities: number }
+  | { phase: "error"; message: string }
+  | null;
+
+/** Splits an existing full name (e.g. from an approved application) into first/last parts. */
+function splitFullName(fullName: string): { first_name: string; last_name: string } {
+  const trimmed = fullName.trim();
+  const space = trimmed.indexOf(" ");
+  if (space === -1) return { first_name: trimmed, last_name: "" };
+  return {
+    first_name: trimmed.slice(0, space).trim(),
+    last_name: trimmed.slice(space).trim(),
+  };
+}
+
+/** Combines first/last name inputs into the single `name` the API stores. */
+function joinNameParts(firstName: string, lastName: string): string {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+}
 
 function SignupInner() {
   const router = useRouter();
@@ -40,7 +63,7 @@ function SignupInner() {
 
   // Step 1
   const [step1, setStep1] = useState({
-    name: "", email: "", password: "", confirm_password: "",
+    first_name: "", last_name: "", email: "", password: "", confirm_password: "",
   });
   const [step1Loading,     setStep1Loading]     = useState(false);
   const [step1Error,       setStep1Error]       = useState<string | null>(null);
@@ -69,6 +92,10 @@ function SignupInner() {
   const [step4Loading, setStep4Loading] = useState(false);
   const [step4Error, setStep4Error] = useState<string | null>(null);
 
+  // Signup-completion overlay: account setup runs in the background behind a
+  // welcome animation, then hands off to the dashboard with a button.
+  const [welcome, setWelcome] = useState<WelcomeState>(null);
+
   // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
     if (directMode) return;
@@ -77,7 +104,8 @@ function SignupInner() {
       .then((d) => {
         if (d.valid) {
           setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail });
-          setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", name: d.applicantName ?? "" }));
+          const { first_name, last_name } = splitFullName(d.applicantName ?? "");
+          setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", first_name, last_name }));
           setStep(1);
         } else {
           setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
@@ -107,6 +135,16 @@ function SignupInner() {
 
   // ── Step handlers ─────────────────────────────────────────────────────────
 
+  // First/last name live in separate inputs but the API stores one combined `name`.
+  function step1Identity() {
+    return {
+      name: joinNameParts(step1.first_name, step1.last_name),
+      email: step1.email,
+      password: step1.password,
+      confirm_password: step1.confirm_password,
+    };
+  }
+
   async function handleStep1(e: React.FormEvent) {
     e.preventDefault();
     setStep1Loading(true);
@@ -115,7 +153,15 @@ function SignupInner() {
     try {
       // Direct-signup mode uses a separate endpoint that doesn't require a token
       const endpoint = directMode ? "/api/signup/direct" : "/api/signup/complete";
-      const body = directMode ? step1 : { ...step1, token };
+      const issues: Record<string, string[]> = {};
+      if (!step1.first_name.trim()) issues.first_name = ["Name is required."];
+      if (!step1.last_name.trim())  issues.last_name  = ["Surname is required."];
+      if (Object.keys(issues).length) {
+        setStep1FieldErrors(issues);
+        return;
+      }
+      const identity = step1Identity();
+      const body = directMode ? identity : { ...identity, token };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -185,11 +231,16 @@ function SignupInner() {
   }
 
   async function handleStep4() {
-    setStep4Loading(true);
+    // Hand the user straight to the welcome overlay — the account + community
+    // setup below runs in the background while they watch the animation.
+    setWelcome({ phase: "loading" });
     setStep4Error(null);
+    // Let the overlay paint its first frame before starting the request.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    setStep4Loading(true);
     try {
       const payload = {
-        identity: step1,
+        identity: step1Identity(),
         profile: step2,
         interest_ids: selectedInterestIds,
         ...(token ? { token } : {}),
@@ -212,21 +263,32 @@ function SignupInner() {
 
       const data = await res.json();
       if (!res.ok) {
-        setStep4Error(data.error ?? "Failed to complete signup.");
+        const message =
+          data.error ??
+          (data.issues ? "Please review your details and try again." : "Failed to complete signup.");
+        setWelcome({ phase: "error", message });
         return;
       }
-      try {
-        await Promise.race([
-          fetch("/api/communities/auto-join", { method: "POST" }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
-        ]);
-      } catch { /* Non-fatal */ }
-      router.push("/dashboard");
+      // Communities are auto-joined server-side during /api/signup/avatar, so the
+      // sidebar shows the full list (General + city + sector + interests) the first
+      // time the dashboard loads.
+      setWelcome({
+        phase: "ready",
+        joinedCommunities:
+          typeof data.joined_communities === "number" ? data.joined_communities : 0,
+      });
     } catch {
-      setStep4Error("Network error. Please try again.");
+      setWelcome({
+        phase: "error",
+        message: "Network error. Please try again.",
+      });
     } finally {
       setStep4Loading(false);
     }
+  }
+
+  function goToDashboard() {
+    router.push("/dashboard");
   }
 
   return (
@@ -315,6 +377,18 @@ function SignupInner() {
         )}
 
       </div>
+
+      {welcome && (
+        <SignupWelcome
+          phase={welcome.phase}
+          firstName={step1.first_name.trim()}
+          joinedCommunities={welcome.phase === "ready" ? welcome.joinedCommunities : 0}
+          errorMessage={welcome.phase === "error" ? welcome.message : null}
+          onGoToDashboard={goToDashboard}
+          onRetry={() => void handleStep4()}
+          onClose={() => setWelcome(null)}
+        />
+      )}
     </main>
   );
 }
