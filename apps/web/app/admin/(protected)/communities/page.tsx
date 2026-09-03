@@ -135,35 +135,43 @@ export default function AdminCommunitiesPage() {
 
       {/* Origin + type filters */}
       <div className="flex flex-col gap-2">
-        {/* Main tabs — origin of the community (GitHub-style tab containers) */}
-        <div className="flex items-end gap-1 border-b border-border px-2 pt-2 overflow-x-auto">
-          {MAIN_TABS.map((tab) => {
-            const isActive = mainTab === tab.value;
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.value}
-                onClick={() => { setMainTab(tab.value); setTypeTab("all"); }}
-                className={`relative flex items-center gap-1.5 rounded-t-md border px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
-                  isActive
-                    ? "border-border border-b-0 bg-background text-foreground -mb-px"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                <Icon size={13} />
-                {tab.label}
-                <span
-                  className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+        {/* Main tabs — origin of the community (GitHub-style tab containers). The
+            divider line sits on a layer BEHIND the tabs, so the active tab's opaque
+            background covers it — the active tab has no visible bottom border. */}
+        <div className="relative">
+          <div className="relative z-10 flex items-end gap-1 overflow-x-auto">
+            {MAIN_TABS.map((tab) => {
+              const isActive = mainTab === tab.value;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => { setMainTab(tab.value); setTypeTab("all"); }}
+                  className={`relative flex items-center gap-1.5 rounded-t-md border px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
                     isActive
-                      ? "bg-accent/15 text-accent"
-                      : "bg-surface-raised text-foreground-muted"
+                      ? "border-border border-b-0 bg-background text-foreground"
+                      : "border-transparent text-foreground-muted hover:text-foreground"
                   }`}
                 >
-                  {countByMainTab(tab.value)}
-                </span>
-              </button>
-            );
-          })}
+                  <Icon size={13} />
+                  {tab.label}
+                  <span
+                    className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+                      isActive
+                        ? "bg-accent/15 text-accent"
+                        : "bg-surface-raised text-foreground-muted"
+                    }`}
+                  >
+                    {countByMainTab(tab.value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
+            aria-hidden="true"
+          />
         </div>
 
         {/* Type sub-tabs (under App-created: All + community types; under
