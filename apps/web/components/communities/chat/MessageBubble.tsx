@@ -824,8 +824,8 @@ export function MessageBubble({
             /* ── Normal bubble ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
-              {/* Entrance animation lives on this wrapper (not the bubble) so the
-                  bubble's own opacity classes for sending/failed states stay intact. */}
+                  {/* Entrance animation lives on this wrapper (not the bubble) so the
+                      bubble's own state classes (e.g. failed) stay intact. */}
               <div
                 className={`relative min-w-0 ${animate ? "chat-bubble-in" : ""}`}
                 data-side={isMe ? "right" : "left"}
@@ -839,9 +839,7 @@ export function MessageBubble({
                       ? "flex flex-col items-start"
                       : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
-                            ? msg.status === "sending"
-                              ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
-                              : msg.status === "failed"
+                            ? msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
                             : "bg-surface-raised"
