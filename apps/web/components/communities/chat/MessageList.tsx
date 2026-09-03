@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useMemo, useRef } from "react";
+import { RefObject, memo, useMemo, useRef } from "react";
 // Disabled for now: chat loading uses the plain Spinner below.
 // import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
@@ -65,7 +65,14 @@ interface MessageListProps {
   onDelete: (msgId: string) => void;
 }
 
-export function MessageList({
+/**
+ * Memoized so typing in the chat input (a CommunityChat state change) doesn't
+ * re-render the whole list: `grouped`, `threadEvents`, the refs, and every
+ * handler are referentially stable between keystrokes, so the message map is
+ * skipped entirely — unchanged bubbles already bail out individually via
+ * MessageBubble's memo.
+ */
+export const MessageList = memo(function MessageList({
   grouped,
   threadEvents,
   currentUserId,
@@ -329,4 +336,4 @@ export function MessageList({
       <div ref={bottomRef} />
     </div>
   );
-}
+});

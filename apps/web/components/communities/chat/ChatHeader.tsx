@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -104,7 +104,12 @@ function ConfirmDialog({
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-export function ChatHeader({
+/**
+ * Memoized so typing in the chat input doesn't re-render the header — all
+ * props are referentially stable between keystrokes (see the stabilized
+ * callbacks in CommunityChat).
+ */
+export const ChatHeader = memo(function ChatHeader({
   community,
   activeTab,
   onTabChange,
@@ -335,4 +340,4 @@ export function ChatHeader({
       </div>
     </>
   );
-}
+});
