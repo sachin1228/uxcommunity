@@ -1,7 +1,8 @@
 "use client";
 
 import { RefObject, useMemo, useRef } from "react";
-import { LottieLoader } from "@/components/ui/LottieLoader";
+// Disabled for now: chat loading uses the plain Spinner below.
+// import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
@@ -177,13 +178,20 @@ export function MessageList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div
+        className="flex h-full items-center justify-center"
+        role="status"
+        aria-label="Loading messages"
+      >
+        {/* Disabled temporarily. Re-enable this block to restore the chat Lottie.
         <LottieLoader
           communityId={communityId}
           communityType={displayCommunity?.type ?? ""}
           size={200}
           showFallback={false}
-        />
+        /> */}
+        <Spinner size={28} />
+        <span className="sr-only">Loading messages</span>
       </div>
     );
   }

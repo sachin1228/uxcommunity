@@ -27,7 +27,8 @@ import {
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { ChatHeader, type ChatTab } from "@/components/communities/chat/ChatHeader";
 import { ChatInput } from "@/components/communities/chat/ChatInput";
-import { LottieLoader } from "@/components/ui/LottieLoader";
+// Disabled for now: chat loading uses the plain Spinner below.
+// import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 
 function communityIdFromPath(pathname: string): string | null {
@@ -166,7 +167,12 @@ export default function CommunityPageLoading() {
               backgroundSize: "24px 24px",
             }}
           >
-            <div className="flex items-center justify-center h-full">
+            <div
+              className="flex h-full items-center justify-center"
+              role="status"
+              aria-label="Loading messages"
+            >
+              {/* Disabled temporarily. Re-enable this block to restore the chat Lottie.
               {communityId && (
                 <LottieLoader
                   communityId={communityId}
@@ -174,7 +180,9 @@ export default function CommunityPageLoading() {
                   size={200}
                   showFallback={false}
                 />
-              )}
+              )} */}
+              <Spinner size={28} />
+              <span className="sr-only">Loading messages</span>
             </div>
           </div>
 
