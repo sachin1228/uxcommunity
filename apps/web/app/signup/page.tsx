@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
@@ -53,6 +53,10 @@ function joinNameParts(firstName: string, lastName: string): string {
   return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function SignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -102,6 +106,8 @@ function SignupInner() {
   // itself done (and advances the percentage) after its server request — and
   // the database write behind it — has actually succeeded.
   const [welcome, setWelcome] = useState<WelcomeState>(null);
+  // Holds the real joined-community count until the loading ring finishes.
+  const joinedRef = useRef(0);
 
   function buildSteps(withPicture: boolean): WelcomeStep[] {
     const steps: WelcomeStep[] = [];
@@ -287,10 +293,10 @@ function SignupInner() {
     setStep4Loading(true);
     try {
       let avatarUrl: string | null = null;
-      let joinedCommunities = 0;
 
       for (const step of steps) {
         updateWelcomeStep(step.id, "active");
+        const startedAt = Date.now();
 
         if (step.id === "picture") {
           const fd = new FormData();
@@ -324,13 +330,20 @@ function SignupInner() {
             throw new Error(await stepErrorMessage(res, "Joining your communities failed."));
           }
           const data = await res.json().catch(() => null);
-          joinedCommunities = Array.isArray(data?.joined) ? data.joined.length : 0;
+          joinedRef.current = Array.isArray(data?.joined) ? data.joined.length : 0;
         }
 
+        // Presentation pacing only: keep the spinner on the step for a moment so
+        // each real completion can be read before it checks off, and let the
+        // check breathe before the next step starts.
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < 550) await sleep(550 - elapsed);
         updateWelcomeStep(step.id, "done");
+        await sleep(250);
       }
 
-      setWelcome({ phase: "ready", joinedCommunities });
+      // The loading ring fills to 100% on its own (slow, eased), then
+      // SignupWelcome fires onFinished → handleWelcomeFinished.
     } catch (error) {
       const message =
         error instanceof Error && error.message
@@ -340,6 +353,10 @@ function SignupInner() {
     } finally {
       setStep4Loading(false);
     }
+  }
+
+  function handleWelcomeFinished() {
+    setWelcome({ phase: "ready", joinedCommunities: joinedRef.current });
   }
 
   function goToDashboard() {
@@ -442,6 +459,7 @@ function SignupInner() {
           percent={welcome.phase === "loading" ? welcome.percent : 0}
           steps={welcome.phase === "loading" ? welcome.steps : []}
           onGoToDashboard={goToDashboard}
+          onFinished={handleWelcomeFinished}
           onRetry={() => void handleStep4()}
           onClose={() => setWelcome(null)}
         />

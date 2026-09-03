@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 
@@ -20,6 +21,8 @@ interface SignupWelcomeProps {
   percent?: number;
   /** Real step states driven by each request finishing. */
   steps?: WelcomeStep[];
+  /** Fired once the ring finishes filling to 100% after the last real step. */
+  onFinished?: () => void;
   onGoToDashboard: () => void;
   onRetry: () => void;
   onClose: () => void;
@@ -30,19 +33,68 @@ const RING_STROKE = 6;
 const RADIUS = (RING_SIZE - RING_STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
-// Presentational only — percent and step states are updated by the parent as
-// each real server step (picture upload → account creation → community
-// auto-join) completes. Nothing here is simulated.
+// Percent and step states are updated by the parent as each real server step
+// (picture upload → account creation → community auto-join) completes. The
+// ring value below is the only thing "animated": it eases up to each real
+// target slowly so the journey feels deliberate instead of jumpy.
 function LoadingPhase({
   firstName,
   percent,
   steps,
+  onFinished,
 }: {
   firstName?: string;
   percent: number;
   steps: WelcomeStep[];
+  onFinished?: () => void;
 }) {
-  const dashOffset = CIRCUMFERENCE * (1 - percent / 100);
+  const [display, setDisplay] = useState(0);
+  const displayRef = useRef(0);
+  const finishedRef = useRef(false);
+  const onFinishedRef = useRef(onFinished);
+
+  useEffect(() => {
+    onFinishedRef.current = onFinished;
+  }, [onFinished]);
+
+  // Ease the shown ring value up to the real target percent. Each real step
+  // jumps the target; this effect turns that jump into a slow, smooth fill.
+  useEffect(() => {
+    const target = percent;
+    if (displayRef.current >= target) return;
+    const from = displayRef.current;
+    const start = performance.now();
+    // Roughly 35ms per point, clamped to feel calm on small jumps.
+    const duration = Math.min(1900, Math.max(900, (target - from) * 35));
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      const value = from + (target - from) * eased;
+      displayRef.current = value;
+      setDisplay(value);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [percent]);
+
+  // When the final real step is done, wait for the ring to visually complete
+  // before handing over to the celebration screen.
+  useEffect(() => {
+    if (percent < 100 || finishedRef.current) return;
+    if (!steps.length || !steps.every((s) => s.status === "done")) return;
+    finishedRef.current = true;
+    const interval = window.setInterval(() => {
+      if (displayRef.current >= 99) {
+        window.clearInterval(interval);
+        window.setTimeout(() => onFinishedRef.current?.(), 350);
+      }
+    }, 80);
+    return () => window.clearInterval(interval);
+  }, [percent, steps]);
+
+  const dashOffset = CIRCUMFERENCE * (1 - display / 100);
 
   return (
     <div className="flex w-full max-w-sm flex-col items-center animate-in fade-in duration-300">
@@ -71,7 +123,7 @@ function LoadingPhase({
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="font-display text-2xl font-semibold text-foreground tabular-nums">
-            {Math.round(percent)}%
+            {Math.round(display)}%
           </span>
         </div>
       </div>
@@ -237,6 +289,7 @@ export function SignupWelcome({
   errorMessage,
   percent,
   steps,
+  onFinished,
   onGoToDashboard,
   onRetry,
   onClose,
@@ -250,7 +303,12 @@ export function SignupWelcome({
       />
 
       {phase === "loading" && (
-        <LoadingPhase firstName={firstName} percent={percent ?? 0} steps={steps ?? []} />
+        <LoadingPhase
+          firstName={firstName}
+          percent={percent ?? 0}
+          steps={steps ?? []}
+          onFinished={onFinished}
+        />
       )}
       {phase === "ready" && (
         <ReadyPhase
