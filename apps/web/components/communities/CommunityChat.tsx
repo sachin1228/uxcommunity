@@ -799,18 +799,24 @@ export function CommunityChat({
   const sidebarEntry = hasMounted
     ? sidebarStore.data?.communities.find((c) => c.id === communityId)
     : undefined;
-  const displayCommunity = community ?? (sidebarEntry
-    ? {
-        id: communityId,
-        name: sidebarEntry.name,
-        type: sidebarEntry.type,
-        member_count: sidebarEntry.member_count,
-        image_url: sidebarEntry.image_url,
-        is_private: sidebarEntry.is_private,
-        enabled_tabs: sidebarEntry.enabled_tabs,
-        owner_id: sidebarEntry.owner_id,
-      }
-    : null);
+  // Memoized so the header's `community` prop keeps a stable reference across
+  // keystroke re-renders (while meta is loading the sidebar fallback object
+  // would otherwise be a fresh literal every render).
+  const displayCommunity = useMemo(
+    () => community ?? (sidebarEntry
+      ? {
+          id: communityId,
+          name: sidebarEntry.name,
+          type: sidebarEntry.type,
+          member_count: sidebarEntry.member_count,
+          image_url: sidebarEntry.image_url,
+          is_private: sidebarEntry.is_private,
+          enabled_tabs: sidebarEntry.enabled_tabs,
+          owner_id: sidebarEntry.owner_id,
+        }
+      : null),
+    [community, sidebarEntry, communityId],
+  );
 
   const renderedTab: ChatTab = displayCommunity &&
     !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members"]).has(activeTab)
@@ -818,6 +824,14 @@ export function CommunityChat({
       : activeTab;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+
+  // Stable header callbacks — inline arrows would recreate every render and
+  // defeat the memoized ChatHeader's bail-out on keystrokes.
+  const handleHeaderTabChange = useCallback((tab: ChatTab) => {
+    setShowSettings(false);
+    handleTabChange(tab);
+  }, [handleTabChange]);
+  const handleSettingsClick = useCallback(() => setShowSettings(true), []);
 
   if (!loading && !displayCommunity) {
     return (
@@ -833,10 +847,10 @@ export function CommunityChat({
         <ChatHeader
           community={displayCommunity}
           activeTab={renderedTab}
-          onTabChange={(tab) => { setShowSettings(false); handleTabChange(tab); }}
+          onTabChange={handleHeaderTabChange}
           onlineCount={onlineCount}
           currentUserId={currentUserId}
-          onSettingsClick={isOwner ? () => setShowSettings(true) : undefined}
+          onSettingsClick={isOwner ? handleSettingsClick : undefined}
           communityId={communityId}
         />
 

@@ -196,7 +196,7 @@ export default function CommunityPageLoading() {
                 input=""
                 sending={false}
                 error={null}
-                placeholder={`Message ${community?.name ?? ""}…`}
+                placeholder="Type a message…"
                 replyTo={null}
                 pendingImagePreview={null}
                 linkPreviewUrl={null}

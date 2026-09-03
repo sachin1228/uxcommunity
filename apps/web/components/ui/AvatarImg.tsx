@@ -62,6 +62,8 @@ export function AvatarImg({
       alt={`${name}'s profile picture`}
       width={size}
       height={size}
+      loading="lazy"
+      decoding="async"
       className={className}
       onError={() => setFailedUrl(url)}
     />
