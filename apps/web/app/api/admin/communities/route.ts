@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id, is_active, created_at")
+    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at")
     .order("type")
     .order("name");
 
@@ -53,6 +53,9 @@ export async function GET() {
     type:          c.type,
     image_url:     c.image_url ?? null,
     reference_id:  c.reference_id,
+    // Set when a member created the community (type "user"); null for the
+    // communities the uxcommunity app creates itself (general/city/sector/...).
+    owner_id:      c.owner_id ?? null,
     is_active:     c.is_active ?? true,
     created_at:    c.created_at,
     member_count:  memberCountMap[c.id]  ?? 0,

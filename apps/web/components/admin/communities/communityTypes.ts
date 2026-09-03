@@ -37,6 +37,7 @@ export const TYPE_LABELS: Record<string, string> = {
   interest:         "Interest",
   experience_level: "Experience",
   general:          "General",
+  user:             "Member",
 };
 
 /** Includes border colour — used in the detail page type badge. */
@@ -55,6 +56,7 @@ export const TYPE_COLORS: Record<string, string> = {
   interest:         "bg-pink-500/10 text-pink-400",
   experience_level: "bg-green-500/10 text-green-400",
   general:          "bg-cyan-500/10 text-cyan-400",
+  user:             "bg-amber-500/10 text-amber-400",
 };
 
 export function fmtDateTime(iso: string) {

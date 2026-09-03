@@ -1,27 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Trash2 } from "lucide-react";
+import { Search, Trash2, Sparkles, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow, type CommunityListItem } from "@/components/admin/communities/CommunityRow";
 
-const TABS = [
-  { label: "All",        value: "all"              },
-  { label: "General",    value: "general"          },
-  { label: "Industry",   value: "sector"           },
-  { label: "Interest",   value: "interest"         },
-  { label: "Experience", value: "experience_level" },
-  { label: "City",       value: "city"             },
+// Main origin tabs: communities the uxcommunity app creates itself vs the
+// personal/public communities members create.
+const MAIN_TABS = [
+  { label: "App-created", value: "app", icon: Sparkles },
+  { label: "Member-created", value: "member", icon: Users },
 ] as const;
 
-type TabValue = typeof TABS[number]["value"];
+type MainTabValue = typeof MAIN_TABS[number]["value"];
+
+// Type sub-tabs (shown below the origin tabs, always the same row).
+const TYPE_TABS = [
+  { label: "All", value: "all" },
+  { label: "General", value: "general" },
+  { label: "Industry", value: "sector" },
+  { label: "Interest", value: "interest" },
+  { label: "Experience", value: "experience_level" },
+  { label: "City", value: "city" },
+] as const;
+
+type TypeTabValue = typeof TYPE_TABS[number]["value"];
 
 export default function AdminCommunitiesPage() {
   const router = useRouter();
   const [communities, setCommunities] = useState<CommunityListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabValue>("all");
+  const [mainTab, setMainTab] = useState<MainTabValue>("app");
+  const [typeTab, setTypeTab] = useState<TypeTabValue>("all");
   const [search, setSearch] = useState("");
 
   // Reset all chat state
@@ -60,17 +71,31 @@ export default function AdminCommunitiesPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = communities
-    .filter((c) => activeTab === "all" || c.type === activeTab)
+  const appCreated = useMemo(
+    () => communities.filter((c) => c.owner_id == null),
+    [communities]
+  );
+  const memberCreated = useMemo(
+    () => communities.filter((c) => c.owner_id != null),
+    [communities]
+  );
+
+  const baseCommunities = mainTab === "app" ? appCreated : memberCreated;
+
+  const filtered = baseCommunities
+    .filter((c) => typeTab === "all" || c.type === typeTab)
     .filter((c) => {
       const q = search.trim().toLowerCase();
       return q ? c.name.toLowerCase().includes(q) : true;
     });
 
-  const countByTab = (tab: TabValue) =>
-    tab === "all"
-      ? communities.length
-      : communities.filter((c) => c.type === tab).length;
+  const countByMainTab = (tab: MainTabValue) =>
+    tab === "app" ? appCreated.length : memberCreated.length;
+
+  const countByTypeTab = (tab: TypeTabValue) => {
+    if (tab === "all") return baseCommunities.length;
+    return baseCommunities.filter((c) => c.type === tab).length;
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -108,35 +133,80 @@ export default function AdminCommunitiesPage() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-border overflow-x-auto pb-0">
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.value;
-          const count = countByTab(tab.value);
-          return (
-            <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={`relative flex items-center gap-1.5 px-3 pb-2.5 font-body text-xs whitespace-nowrap transition-colors ${
-                isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-              <span
-                className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
-                  isActive
-                    ? "bg-accent/15 text-accent"
-                    : "bg-surface-raised text-foreground-muted"
+      {/* Origin + type filters */}
+      <div className="flex flex-col gap-2">
+        {/* Main tabs — origin of the community (GitHub-style tab containers). The
+            divider line sits on a layer BEHIND the tabs, so the active tab's opaque
+            background covers it — the active tab has no visible bottom border. */}
+        <div className="relative">
+          <div className="relative z-10 flex items-end gap-1 overflow-x-auto">
+            {MAIN_TABS.map((tab) => {
+              const isActive = mainTab === tab.value;
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => { setMainTab(tab.value); setTypeTab("all"); }}
+                  // border-b-0 on both states keeps every tab the same height, so
+                  // switching the active tab never shifts the row.
+                  className={`relative flex items-center gap-1.5 rounded-t-md border border-b-0 px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
+                    isActive
+                      ? "border-border bg-background text-foreground"
+                      : "border-transparent text-foreground-muted hover:text-foreground"
+                  }`}
+                >
+                  <Icon size={13} />
+                  {tab.label}
+                  <span
+                    className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+                      isActive
+                        ? "bg-accent/15 text-accent"
+                        : "bg-surface-raised text-foreground-muted"
+                    }`}
+                  >
+                    {countByMainTab(tab.value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-border"
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* Type sub-tabs — always the same row, so switching the main origin tab
+            never changes the buttons below it. Counts are scoped to the active
+            origin (member-created communities have no type, so those read 0). */}
+        <div className="flex gap-1 border-b border-border overflow-x-auto pb-0">
+          {TYPE_TABS.map((tab) => {
+            const isActive = typeTab === tab.value;
+            return (
+              <button
+                key={tab.value}
+                onClick={() => setTypeTab(tab.value)}
+                className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-2 font-body text-xs whitespace-nowrap transition-colors ${
+                  isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
                 }`}
               >
-                {count}
-              </span>
-              {isActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t-full" />
-              )}
-            </button>
-          );
-        })}
+                {tab.label}
+                <span
+                  className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
+                    isActive
+                      ? "bg-accent/15 text-accent"
+                      : "bg-surface-raised text-foreground-muted"
+                  }`}
+                >
+                  {countByTypeTab(tab.value)}
+                </span>
+                {isActive && (
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Search */}
