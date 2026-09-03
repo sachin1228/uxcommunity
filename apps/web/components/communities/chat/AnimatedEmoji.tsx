@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, memo } from "react";
+import { memo } from "react";
+// import { useState, useEffect } from "react"; // Commented out - activate later if needed
 // import Lottie from "lottie-react"; // Commented out - activate later if needed
 import { emojiToCodepoint } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
@@ -16,10 +17,10 @@ interface AnimatedEmojiProps {
   hoverOnly?: boolean;
 }
 
-// Cache for Lottie animation data (shared across all instances)
-const lottieCache = new Map<string, unknown>();
-// Track failed codepoints to avoid retrying
-const failedCodepoints = new Set<string>();
+// Cache for Lottie animation data (shared across all instances) - commented out
+// const lottieCache = new Map<string, unknown>();
+// Track failed codepoints to avoid retrying - commented out
+// const failedCodepoints = new Set<string>();
 
 /**
  * Renders an animated Noto emoji using Lottie animations.
@@ -31,65 +32,59 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
   className = "",
   hoverOnly = false,
 }: AnimatedEmojiProps) {
-  const [animationData, setAnimationData] = useState<unknown | null>(null);
-  const [isHovered, setIsHovered] = useState(false);
+  // Lottie commented out - just show SVG directly
+  // const [animationData, setAnimationData] = useState<unknown | null>(null);
+  // const [isHovered, setIsHovered] = useState(false);
 
   const codepoint = emojiToCodepoint(emoji);
 
-  // Load animation data
-  useEffect(() => {
-    if (!codepoint) return;
-    if (failedCodepoints.has(codepoint)) return;
+  // Lottie fetch commented out - activate later if needed
+  // useEffect(() => {
+  //   if (!codepoint) return;
+  //   if (failedCodepoints.has(codepoint)) return;
+  //   if (lottieCache.has(codepoint)) {
+  //     setAnimationData(lottieCache.get(codepoint));
+  //     return;
+  //   }
+  //   if (hoverOnly && !isHovered) return;
+  //   const loadAnimation = async () => {
+  //     try {
+  //       const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
+  //       const response = await fetch(url);
+  //       if (!response.ok) {
+  //         failedCodepoints.add(codepoint);
+  //         return;
+  //       }
+  //       const data = await response.json();
+  //       lottieCache.set(codepoint, data);
+  //       setAnimationData(data);
+  //     } catch {
+  //       failedCodepoints.add(codepoint);
+  //     }
+  //   };
+  //   loadAnimation();
+  // }, [codepoint, hoverOnly, isHovered]);
 
-    // Check cache first
-    if (lottieCache.has(codepoint)) {
-      setAnimationData(lottieCache.get(codepoint));
-      return;
-    }
+  // Lottie commented out - show SVG directly
+  // if (animationData) {
+  //   return (
+  //     <span
+  //       className={`inline-flex items-center justify-center ${className}`}
+  //       style={{ width: size, height: size }}
+  //       onMouseEnter={() => setIsHovered(true)}
+  //       onMouseLeave={() => setIsHovered(false)}
+  //     >
+  //       <Lottie
+  //         animationData={animationData}
+  //         style={{ width: size, height: size }}
+  //         loop={hoverOnly ? isHovered : true}
+  //         autoplay={hoverOnly ? isHovered : true}
+  //       />
+  //     </span>
+  //   );
+  // }
 
-    // Don't fetch if hoverOnly and not hovered
-    if (hoverOnly && !isHovered) return;
-
-    const loadAnimation = async () => {
-      try {
-        const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
-        const response = await fetch(url);
-
-        if (!response.ok) {
-          failedCodepoints.add(codepoint);
-          return;
-        }
-
-        const data = await response.json();
-        lottieCache.set(codepoint, data);
-        setAnimationData(data);
-      } catch {
-        failedCodepoints.add(codepoint);
-      }
-    };
-
-    loadAnimation();
-  }, [codepoint, hoverOnly, isHovered]);
-
-  // Show loader if animation data is loading (Lottie commented out)
-  if (animationData) {
-    return (
-      <span
-        className={`inline-flex items-center justify-center ${className}`}
-        style={{ width: size, height: size }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        {/* Simple loader - replace with Lottie later if needed */}
-        <div
-          className="animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"
-          style={{ width: size * 0.6, height: size * 0.6 }}
-        />
-      </span>
-    );
-  }
-
-  // Fallback to SVG image (not system font)
+  // SVG image (not system font)
   return (
     <NotoEmojiSvg
       emoji={emoji}
