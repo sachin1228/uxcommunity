@@ -142,11 +142,14 @@ function SignupInner() {
     try {
       // Direct-signup mode uses a separate endpoint that doesn't require a token
       const endpoint = directMode ? "/api/signup/direct" : "/api/signup/complete";
-      const identity = step1Identity();
-      if (identity.name.length < 2) {
-        setStep1FieldErrors({ name: ["Please enter your first and last name."] });
+      const issues: Record<string, string[]> = {};
+      if (!step1.first_name.trim()) issues.first_name = ["Name is required."];
+      if (!step1.last_name.trim())  issues.last_name  = ["Surname is required."];
+      if (Object.keys(issues).length) {
+        setStep1FieldErrors(issues);
         return;
       }
+      const identity = step1Identity();
       const body = directMode ? identity : { ...identity, token };
       const res = await fetch(endpoint, {
         method: "POST",
