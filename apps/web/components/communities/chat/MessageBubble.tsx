@@ -700,14 +700,22 @@ export function MessageBubble({
   const [nearBubble, setNearBubble] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  /** Show three-dot button when mouse is within the bubble area. */
+  /**
+   * Show three-dot button when the mouse is anywhere over the bubble (with a
+   * small margin), plus a bit of runway on the reaction-button side so the
+   * dots stay visible while moving between the bubble and the emoji button.
+   * Using the full bubble rect (not just a fixed band near one edge) means
+   * wide, multi-line bubbles behave the same as short ones.
+   */
   function handleRowMouseMove(e: React.MouseEvent) {
     if (!bubbleRef.current) return;
     const r = bubbleRef.current.getBoundingClientRect();
-    const withinX = isMe
-      ? e.clientX >= r.left - 150 && e.clientX <= r.left + 150
-      : e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
-    const withinY = e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
+    const PAD = 8;
+    const REACH = 48; // room for the reaction button beside the bubble
+    const minX = isMe ? r.left - REACH : r.left - PAD;
+    const maxX = isMe ? r.right + PAD : r.right + REACH;
+    const withinX = e.clientX >= minX && e.clientX <= maxX;
+    const withinY = e.clientY >= r.top - PAD && e.clientY <= r.bottom + PAD;
     setNearBubble(withinX && withinY);
   }
 
