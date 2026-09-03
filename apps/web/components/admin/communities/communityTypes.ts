@@ -16,6 +16,15 @@ export interface CommunityMessage {
   user_name: string;
 }
 
+/** Row shape returned by the paginated member search API. */
+export interface CommunityMemberSearchResult {
+  user_id: string;
+  name: string;
+  email: string;
+  joined_at: string;
+  role: string;
+}
+
 export interface Community {
   id: string;
   name: string;

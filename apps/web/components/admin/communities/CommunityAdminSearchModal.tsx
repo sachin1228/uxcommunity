@@ -3,15 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { CommunityAdmin, ALL_PERMISSIONS } from "./communityTypes";
-
-interface MemberRow {
-  user_id: string;
-  name: string;
-  email: string;
-  joined_at: string;
-  role: string;
-}
+import {
+  CommunityAdmin,
+  ALL_PERMISSIONS,
+  type CommunityMemberSearchResult as MemberRow,
+} from "./communityTypes";
 
 interface Props {
   communityId: string;
