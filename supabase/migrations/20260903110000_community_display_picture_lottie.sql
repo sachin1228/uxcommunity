@@ -40,6 +40,7 @@ alter table public.experience_levels
 -- Explore-communities RPC: include the lottie DP so dashboard cards can
 -- render the animated display picture too. The return row type gains two
 -- columns, so the function must be dropped before it can be recreated.
+-- (Company references were removed in 20260827000000; kept company-free.)
 drop function if exists public.get_all_communities(uuid);
 
 create or replace function public.get_all_communities(p_user_id uuid)
@@ -65,7 +66,6 @@ as $$
     select
       dp.city_id,
       dp.sector_id,
-      dp.company_id,
       el.id as experience_level_id
     from public.designer_profiles as dp
     left join public.experience_levels as el
@@ -90,7 +90,6 @@ as $$
         when 'city' then city.image_url
         when 'sector' then sector.image_url
         when 'interest' then interest.image_url
-        when 'company' then company.image_url
         when 'experience_level' then experience.image_url
       end,
       c.image_url
@@ -100,7 +99,6 @@ as $$
         when 'city' then city.lottie_url
         when 'sector' then sector.lottie_url
         when 'interest' then interest.lottie_url
-        when 'company' then company.lottie_url
         when 'experience_level' then experience.lottie_url
       end,
       c.lottie_url
@@ -110,7 +108,6 @@ as $$
         when 'city' then city.lottie_format
         when 'sector' then sector.lottie_format
         when 'interest' then interest.lottie_format
-        when 'company' then company.lottie_format
         when 'experience_level' then experience.lottie_format
       end,
       c.lottie_format
@@ -121,7 +118,6 @@ as $$
     members.joined,
     case
       when c.type in ('interest', 'general', 'user') then true
-      when c.type = 'company' then profile.company_id = c.reference_id
       when c.type = 'sector' then profile.sector_id = c.reference_id
       when c.type = 'city' then profile.city_id = c.reference_id
       when c.type = 'experience_level' then profile.experience_level_id = c.reference_id
@@ -136,8 +132,6 @@ as $$
     on c.type = 'sector' and sector.id = c.reference_id
   left join public.design_interests as interest
     on c.type = 'interest' and interest.id = c.reference_id
-  left join public.companies as company
-    on c.type = 'company' and company.id = c.reference_id
   left join public.experience_levels as experience
     on c.type = 'experience_level' and experience.id = c.reference_id
   where c.is_active = true
@@ -145,9 +139,14 @@ as $$
       when 'city' then city.id is not null
       when 'sector' then sector.id is not null
       when 'interest' then interest.id is not null
-      when 'company' then company.id is not null
       when 'experience_level' then experience.id is not null
       else true
     end
   order by c.name;
 $$;
+
+comment on function public.get_all_communities(uuid) is
+  'Returns the response-ready active community explore list in one query.';
+
+revoke all on function public.get_all_communities(uuid) from public, anon, authenticated;
+grant execute on function public.get_all_communities(uuid) to service_role;
