@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { MAX_DESIGN_INTERESTS } from "@/lib/interests";
 
 export async function POST(request: NextRequest) {
   let session: Awaited<ReturnType<typeof requireSession>>;
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest) {
   const { interest_ids } = body as { interest_ids?: string[] };
   if (!Array.isArray(interest_ids)) {
     return NextResponse.json({ error: "interest_ids must be an array." }, { status: 422 });
+  }
+  if (interest_ids.length > MAX_DESIGN_INTERESTS) {
+    return NextResponse.json(
+      { error: `You can select up to ${MAX_DESIGN_INTERESTS} topics.` },
+      { status: 422 }
+    );
   }
 
   const db = createServiceClient();

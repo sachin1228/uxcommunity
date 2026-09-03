@@ -1,137 +1,17 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { autoJoinCommunities } from "@/lib/communities/auto-join";
 
 export async function POST() {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
   const userId = session.userId!;
 
-  const db = createServiceClient();
-
-  // ── 1. Load full profile ─────────────────────────────────────
-  const { data: profile } = await db
-    .from("designer_profiles")
-    .select(`
-      city_id, sector_id, experience_level,
-      cities(name, image_url),
-      design_sectors(name, image_url)
-    `)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  // ── 2. Load interests ────────────────────────────────────────
-  const { data: interests } = await db
-    .from("user_interests")
-    .select("interest_id, design_interests(name, image_url)")
-    .eq("user_id", userId);
-
-  type CommunitySpec = {
-    type: "city" | "sector" | "interest" | "experience_level";
-    reference_id: string;
-    name: string;
-    image_url: string | null;
-  };
-  const specs: CommunitySpec[] = [];
-
-  if (profile?.city_id) {
-    const city = profile.cities as unknown as { name: string; image_url: string | null } | null;
-    specs.push({
-      type: "city",
-      reference_id: profile.city_id,
-      name: `${city?.name ?? "Unknown City"} Designers`,
-      image_url: city?.image_url ?? null,
-    });
+  try {
+    const joined = await autoJoinCommunities(userId);
+    return NextResponse.json({ joined });
+  } catch (error) {
+    console.error("[auto-join] failed:", error);
+    return NextResponse.json({ error: "Failed to auto-join communities." }, { status: 500 });
   }
-
-  if (profile?.sector_id) {
-    const sector = profile.design_sectors as unknown as { name: string; image_url: string | null } | null;
-    specs.push({
-      type: "sector",
-      reference_id: profile.sector_id,
-      name: `${sector?.name ?? "Unknown Sector"} Community`,
-      image_url: sector?.image_url ?? null,
-    });
-  }
-
-  if (profile?.experience_level) {
-    // Look up the experience level by slug — use the admin-managed `name` directly
-    const { data: expLevel } = await db
-      .from("experience_levels")
-      .select("id, name, image_url")
-      .eq("slug", profile.experience_level)
-      .maybeSingle();
-
-    if (expLevel) {
-      specs.push({
-        type: "experience_level",
-        reference_id: expLevel.id,
-        name: expLevel.name,
-        image_url: expLevel.image_url ?? null,
-      });
-    }
-  }
-
-  for (const row of interests ?? []) {
-    const interest = row.design_interests as unknown as { name: string; image_url: string | null } | null;
-    if (row.interest_id && interest?.name) {
-      specs.push({
-        type: "interest",
-        reference_id: row.interest_id,
-        name: interest.name,
-        image_url: interest.image_url ?? null,
-      });
-    }
-  }
-
-  // ── 3. Always join the default general community ─────────────
-  const joinedCommunities: string[] = [];
-
-  const { data: generalCommunity } = await db
-    .from("communities")
-    .select("id")
-    .eq("type", "general")
-    .maybeSingle();
-
-  if (generalCommunity) {
-    await db
-      .from("community_members")
-      .upsert(
-        { community_id: generalCommunity.id, user_id: userId },
-        { onConflict: "community_id,user_id", ignoreDuplicates: true }
-      );
-    joinedCommunities.push(generalCommunity.id);
-  }
-
-  if (!specs.length) return NextResponse.json({ joined: joinedCommunities });
-
-  // ── 4. Upsert each profile-based community ───────────────────
-  for (const spec of specs) {
-    const { data: community, error } = await db
-      .from("communities")
-      .upsert(
-        {
-          type: spec.type,
-          reference_id: spec.reference_id,
-          name: spec.name,
-          image_url: spec.image_url,
-        },
-        { onConflict: "type,reference_id", ignoreDuplicates: false }
-      )
-      .select("id")
-      .single();
-
-    if (error || !community) continue;
-
-    await db
-      .from("community_members")
-      .upsert(
-        { community_id: community.id, user_id: userId },
-        { onConflict: "community_id,user_id", ignoreDuplicates: true }
-      );
-
-    joinedCommunities.push(community.id);
-  }
-
-  return NextResponse.json({ joined: joinedCommunities });
 }

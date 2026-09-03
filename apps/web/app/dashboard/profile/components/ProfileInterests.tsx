@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Pencil, ChevronDown, X, Check } from "lucide-react";
-import { INTEREST_EMOJIS } from "@/lib/interests";
+import { INTEREST_EMOJIS, MAX_DESIGN_INTERESTS } from "@/lib/interests";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
@@ -38,12 +38,15 @@ export function ProfileInterests({
 
   const selectedInterests = allInterests.filter((i) => interestIds.includes(i.id));
 
+  const atLimit = interestIds.length >= MAX_DESIGN_INTERESTS;
+
   function toggle(id: string) {
-    onChange(
-      interestIds.includes(id)
-        ? interestIds.filter((x) => x !== id)
-        : [...interestIds, id]
-    );
+    if (interestIds.includes(id)) {
+      onChange(interestIds.filter((x) => x !== id));
+      return;
+    }
+    if (atLimit) return; // the notice inside the menu explains why
+    onChange([...interestIds, id]);
   }
 
   return (
@@ -99,6 +102,7 @@ export function ProfileInterests({
                   key={interest.id}
                   type="button"
                   onClick={() => toggle(interest.id)}
+                  aria-pressed={selected}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.08] transition-colors"
                 >
                   <span className="text-base leading-none shrink-0">
@@ -106,16 +110,26 @@ export function ProfileInterests({
                   </span>
                   <span className="flex-1 font-body text-sm text-foreground">{interest.name}</span>
                   <span
-                    className={`h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors ${
-                      selected ? "bg-accent" : "border border-border"
+                    className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border shrink-0 transition-colors ${
+                      selected
+                        ? "border-accent bg-accent"
+                        : "border-border bg-transparent"
                     }`}
+                    aria-hidden="true"
                   >
-                    {selected && <Check size={10} className="text-white" />}
+                    {selected && <Check size={11} className="text-accent-foreground" strokeWidth={3} />}
                   </span>
                 </button>
               );
             })}
           </div>
+          {atLimit && (
+            <div className="border-t border-border bg-accent/5 px-4 py-2">
+              <p className="font-body text-xs text-foreground-muted">
+                Maximum of {MAX_DESIGN_INTERESTS} topics selected — remove one to pick another.
+              </p>
+            </div>
+          )}
         </DropdownMenu>
       </div>
     </div>

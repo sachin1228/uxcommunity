@@ -24,6 +24,22 @@ interface TokenState {
 
 type Step = 1 | 2 | 3 | 4 | "done";
 
+/** Splits an existing full name (e.g. from an approved application) into first/last parts. */
+function splitFullName(fullName: string): { first_name: string; last_name: string } {
+  const trimmed = fullName.trim();
+  const space = trimmed.indexOf(" ");
+  if (space === -1) return { first_name: trimmed, last_name: "" };
+  return {
+    first_name: trimmed.slice(0, space).trim(),
+    last_name: trimmed.slice(space).trim(),
+  };
+}
+
+/** Combines first/last name inputs into the single `name` the API stores. */
+function joinNameParts(firstName: string, lastName: string): string {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+}
+
 function SignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -40,7 +56,7 @@ function SignupInner() {
 
   // Step 1
   const [step1, setStep1] = useState({
-    name: "", email: "", password: "", confirm_password: "",
+    first_name: "", last_name: "", email: "", password: "", confirm_password: "",
   });
   const [step1Loading,     setStep1Loading]     = useState(false);
   const [step1Error,       setStep1Error]       = useState<string | null>(null);
@@ -77,7 +93,8 @@ function SignupInner() {
       .then((d) => {
         if (d.valid) {
           setTokenState({ status: "valid", applicationId: d.applicationId, applicantEmail: d.applicantEmail });
-          setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", name: d.applicantName ?? "" }));
+          const { first_name, last_name } = splitFullName(d.applicantName ?? "");
+          setStep1((p) => ({ ...p, email: d.applicantEmail ?? "", first_name, last_name }));
           setStep(1);
         } else {
           setTokenState({ status: "invalid", error: d.error ?? "Invalid invitation link." });
@@ -107,6 +124,16 @@ function SignupInner() {
 
   // ── Step handlers ─────────────────────────────────────────────────────────
 
+  // First/last name live in separate inputs but the API stores one combined `name`.
+  function step1Identity() {
+    return {
+      name: joinNameParts(step1.first_name, step1.last_name),
+      email: step1.email,
+      password: step1.password,
+      confirm_password: step1.confirm_password,
+    };
+  }
+
   async function handleStep1(e: React.FormEvent) {
     e.preventDefault();
     setStep1Loading(true);
@@ -115,7 +142,12 @@ function SignupInner() {
     try {
       // Direct-signup mode uses a separate endpoint that doesn't require a token
       const endpoint = directMode ? "/api/signup/direct" : "/api/signup/complete";
-      const body = directMode ? step1 : { ...step1, token };
+      const identity = step1Identity();
+      if (identity.name.length < 2) {
+        setStep1FieldErrors({ name: ["Please enter your first and last name."] });
+        return;
+      }
+      const body = directMode ? identity : { ...identity, token };
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -189,7 +221,7 @@ function SignupInner() {
     setStep4Error(null);
     try {
       const payload = {
-        identity: step1,
+        identity: step1Identity(),
         profile: step2,
         interest_ids: selectedInterestIds,
         ...(token ? { token } : {}),
@@ -215,12 +247,9 @@ function SignupInner() {
         setStep4Error(data.error ?? "Failed to complete signup.");
         return;
       }
-      try {
-        await Promise.race([
-          fetch("/api/communities/auto-join", { method: "POST" }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4000)),
-        ]);
-      } catch { /* Non-fatal */ }
+      // Communities are auto-joined server-side during /api/signup/avatar, so the
+      // sidebar shows the full list (General + city + sector + interests) the first
+      // time the dashboard loads.
       router.push("/dashboard");
     } catch {
       setStep4Error("Network error. Please try again.");

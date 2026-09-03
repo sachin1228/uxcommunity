@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface Step1State {
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   password: string;
   confirm_password: string;
@@ -63,13 +64,24 @@ export function SignupStep1({
           </div>
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Full Name</span>
-          <input type="text" value={state.name}
-            onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="Jordan Lee" className={inputClass} autoComplete="name" required />
+        <div className="flex flex-col gap-1.5">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs font-medium text-foreground">First Name</span>
+              <input type="text" value={state.first_name}
+                onChange={(e) => onChange({ first_name: e.target.value })}
+                placeholder="Jordan" className={inputClass} autoComplete="given-name" required />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className="font-body text-xs font-medium text-foreground">Last Name</span>
+              <input type="text" value={state.last_name}
+                onChange={(e) => onChange({ last_name: e.target.value })}
+                placeholder="Lee" className={inputClass} autoComplete="family-name" required />
+            </label>
+          </div>
+          {/* Server-side validation runs on the combined name built from both parts. */}
           <FieldError errors={fieldErrors} field="name" />
-        </label>
+        </div>
 
         <label className="flex flex-col gap-1.5">
           <span className="font-body text-xs font-medium text-foreground">Email</span>

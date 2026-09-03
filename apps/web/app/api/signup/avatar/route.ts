@@ -13,6 +13,7 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { completeSignupSchema } from "@/lib/validations";
+import { autoJoinCommunities } from "@/lib/communities/auto-join";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -144,6 +145,17 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = data[0].user_id as string;
+
+  // Join every profile-based community (General + city + sector + interests)
+  // server-side so the sidebar shows the full list the first time the dashboard
+  // loads. Non-fatal if it fails — the dashboard layout retries exactly once via
+  // the designer_profiles.communities_auto_joined flag.
+  try {
+    await autoJoinCommunities(userId);
+  } catch (autoJoinError) {
+    console.error("[signup/avatar] auto-join error:", autoJoinError);
+  }
+
   if (token) {
     try {
       await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
