@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
+// import dynamic from "next/dynamic"; // Commented out - activate later if needed
 import { Spinner } from "@/components/ui/Spinner";
 
 // Lazy-load lottie-react so it's excluded from the main bundle.
 // It only renders after animationData is ready, so both the library
 // and the animation JSON load in parallel — no added latency.
-const Lottie = dynamic(() => import("lottie-react"), { ssr: false });
+// const Lottie = dynamic(() => import("lottie-react"), { ssr: false }); // Commented out - activate later if needed
 
 interface LottieSettingRow {
   id: string;
@@ -142,14 +142,10 @@ export function LottieLoader({
   }
 
   if (animationData) {
+    // Lottie commented out - show spinner instead
     return (
-      <div style={{ width: size, height: size }}>
-        <Lottie
-          animationData={animationData}
-          loop
-          autoplay
-          style={{ width: size, height: size }}
-        />
+      <div style={{ width: size, height: size }} className="flex items-center justify-center">
+        <Spinner className="h-5 w-5 text-foreground-muted" />
       </div>
     );
   }
