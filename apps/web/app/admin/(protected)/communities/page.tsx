@@ -15,7 +15,7 @@ const MAIN_TABS = [
 
 type MainTabValue = typeof MAIN_TABS[number]["value"];
 
-// Type sub-tabs (shown under App-created).
+// Type sub-tabs (shown below the origin tabs, always the same row).
 const TYPE_TABS = [
   { label: "All", value: "all" },
   { label: "General", value: "general" },
@@ -147,9 +147,11 @@ export default function AdminCommunitiesPage() {
                 <button
                   key={tab.value}
                   onClick={() => { setMainTab(tab.value); setTypeTab("all"); }}
-                  className={`relative flex items-center gap-1.5 rounded-t-md border px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
+                  // border-b-0 on both states keeps every tab the same height, so
+                  // switching the active tab never shifts the row.
+                  className={`relative flex items-center gap-1.5 rounded-t-md border border-b-0 px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
                     isActive
-                      ? "border-border border-b-0 bg-background text-foreground"
+                      ? "border-border bg-background text-foreground"
                       : "border-transparent text-foreground-muted hover:text-foreground"
                   }`}
                 >
@@ -174,10 +176,11 @@ export default function AdminCommunitiesPage() {
           />
         </div>
 
-        {/* Type sub-tabs (under App-created: All + community types; under
-            Member-created there is only the list). */}
+        {/* Type sub-tabs — always the same row, so switching the main origin tab
+            never changes the buttons below it. Counts are scoped to the active
+            origin (member-created communities have no type, so those read 0). */}
         <div className="flex gap-1 border-b border-border overflow-x-auto pb-0">
-          {(mainTab === "app" ? TYPE_TABS : [{ label: "All", value: "all" } as const]).map((tab) => {
+          {TYPE_TABS.map((tab) => {
             const isActive = typeTab === tab.value;
             return (
               <button
