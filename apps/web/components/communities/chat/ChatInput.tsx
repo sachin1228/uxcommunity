@@ -389,7 +389,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 <button
                   onClick={() => { closePicker(); onSend(); }}
                   disabled={sending}
-                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white hover:bg-[var(--ds-blue-800)] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
                   title="Send"
                 >
