@@ -300,8 +300,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               </div>
             )}
 
-            {/* Input row */}
-            <div className="flex items-center gap-2 min-h-[52px]">
+            {/*
+              Input row. Buttons are bottom-aligned (items-end) so that when
+              the textarea grows to multiple lines they stay pinned next to
+              the last line, like WhatsApp, instead of floating mid-height.
+              Vertical padding + the small bottom margins on the textarea and
+              send button keep everything visually centered on a single line.
+            */}
+            <div className="flex items-end gap-2 py-2">
               {/* Emoji + Image picker buttons */}
               <div className="flex items-center">
                 <button
@@ -340,7 +346,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 Noto SVGs. Only the textarea is in the flow, so it dictates
                 the wrapper height and the overlay simply fills it.
               */}
-              <div className="flex-1 relative min-w-0">
+              {/* mb-1.5 = (36px button − 24px line) / 2 → centered when single-line */}
+              <div className="flex-1 relative min-w-0 mb-1.5">
                 <textarea
                   ref={ref}
                   data-chat-input
@@ -382,7 +389,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 <button
                   onClick={() => { closePicker(); onSend(); }}
                   disabled={sending}
-                  className="shrink-0 h-8 w-8 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-accent text-accent-foreground hover:bg-accent-hover transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
                   title="Send"
                 >
