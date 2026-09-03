@@ -318,8 +318,16 @@ function MessageHoverActions({
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
 
-  // No actions on deleted or still-sending messages
-  if (isDeleted || msg.status === "sending") return null;
+  // No actions on deleted messages
+  if (isDeleted) return null;
+
+  // While sending, render an invisible spacer that matches the reaction
+  // button's footprint so the bubble's available width doesn't change (and
+  // the text doesn't re-wrap) the moment the message flips to "sent".
+  if (msg.status === "sending") {
+    if (insideBubble || !showReaction) return null;
+    return <div aria-hidden className="w-7 h-7 shrink-0" />;
+  }
 
   return (
     <div
