@@ -912,14 +912,14 @@ export function CommunityChat({
             isPrivate={displayCommunity?.is_private ?? false}
           />
         ) : (
-          <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-hidden relative">
-          {/* Scrollable message area — full height, padded at bottom so messages
-              don't hide behind the floating input bar.                           */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Scrollable message body — a flex sibling of the footer (WhatsApp
+              pattern). It owns the scroll; the footer below is static, so
+              messages can never flow underneath the input.                     */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="absolute inset-0 overflow-y-auto bg-background pb-24"
+            className="relative flex-1 min-h-0 overflow-y-auto bg-background"
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
@@ -956,9 +956,9 @@ export function CommunityChat({
             />
           </div>
 
-          {/* Floating input — sits above the scroll area */}
-          <div className="absolute bottom-0 left-0 right-0 z-10">
-            {/* Scroll-to-bottom button — always above the input box */}
+          {/* Static footer — separate from the scroll body, never overlapped */}
+          <footer className="relative shrink-0 z-10 bg-background">
+            {/* Scroll-to-bottom button — floats just above the footer edge */}
             {showScrollToBottom && (
               <button
                 onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
@@ -969,7 +969,7 @@ export function CommunityChat({
               </button>
             )}
             <TypingIndicator users={typingUsers} />
-            <div className="bg-[color-mix(in_srgb,var(--background)_90%,transparent)] backdrop-blur-sm">
+            <div>
               <ChatInput
                 ref={inputRef}
                 input={input}
@@ -990,10 +990,8 @@ export function CommunityChat({
                 onGifSelect={handleGifSend}
               />
             </div>
+          </footer>
           </div>
-
-        </div>
-        </div>
         )}
       </div>
     </div>
