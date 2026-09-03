@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, memo } from "react";
-import Lottie from "lottie-react";
+// import Lottie from "lottie-react"; // Commented out - activate later if needed
 import { emojiToCodepoint } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
 
@@ -71,7 +71,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
     loadAnimation();
   }, [codepoint, hoverOnly, isHovered]);
 
-  // Show Lottie animation if loaded
+  // Show loader if animation data is loading (Lottie commented out)
   if (animationData) {
     return (
       <span
@@ -80,11 +80,10 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <Lottie
-          animationData={animationData}
-          style={{ width: size, height: size }}
-          loop={hoverOnly ? isHovered : true}
-          autoplay={hoverOnly ? isHovered : true}
+        {/* Simple loader - replace with Lottie later if needed */}
+        <div
+          className="animate-spin rounded-full border-2 border-gray-300 border-t-gray-600"
+          style={{ width: size * 0.6, height: size * 0.6 }}
         />
       </span>
     );
