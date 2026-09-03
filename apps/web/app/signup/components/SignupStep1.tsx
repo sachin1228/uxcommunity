@@ -95,15 +95,19 @@ export function SignupStep1({
         </div>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Email</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Email <span className="text-red-400">*</span>
+          </span>
           <input type="email" value={state.email}
             onChange={(e) => onChange({ email: e.target.value })}
-            placeholder="you@studio.com" className={inputClass} autoComplete="username" required />
+            placeholder="you@gmail.com" className={inputClass} autoComplete="username" required />
           <FieldError errors={fieldErrors} field="email" />
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Password</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Password <span className="text-red-400">*</span>
+          </span>
           <div className="relative">
             <input type={showPassword ? "text" : "password"} value={state.password}
               onChange={(e) => onChange({ password: e.target.value })}
@@ -119,7 +123,9 @@ export function SignupStep1({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="font-body text-xs font-medium text-foreground">Confirm Password</span>
+          <span className="font-body text-xs font-medium text-foreground">
+            Confirm Password <span className="text-red-400">*</span>
+          </span>
           <div className="relative">
             <input type={showConfirm ? "text" : "password"} value={state.confirm_password}
               onChange={(e) => onChange({ confirm_password: e.target.value })}
