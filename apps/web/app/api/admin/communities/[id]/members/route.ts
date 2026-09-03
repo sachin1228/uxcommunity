@@ -45,12 +45,18 @@ export async function GET(
   }
 
   if (search) {
-    const allIds = memberRows.map((m) => m.user_id);
-    const { data: nameRows } = await db
+    // Communities can have hundreds of members — passing every member's id to
+    // a single `.in()` filter blows past PostgREST's URL length limit and the
+    // request fails. Search the users table first (bounded), then intersect
+    // with this community's memberships.
+    const { data: nameRows, error: nameErr } = await db
       .from("users")
       .select("id")
-      .in("id", allIds)
-      .ilike("name", `%${search}%`);
+      .ilike("name", `%${search}%`)
+      .limit(500);
+    if (nameErr) {
+      return NextResponse.json({ error: "Failed to search members." }, { status: 500 });
+    }
     const matched = new Set((nameRows ?? []).map((u) => u.id));
     memberRows = memberRows.filter((m) => matched.has(m.user_id));
   }
