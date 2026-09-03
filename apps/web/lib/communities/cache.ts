@@ -62,6 +62,9 @@ export interface CachedMeta {
     type: string;
     member_count: number;
     image_url: string | null;
+    lottie_url?: string | null;
+    lottie_format?: "json" | "dotlottie" | null;
+    lottie_data?: unknown;
     is_private?: boolean;
     enabled_tabs?: string[];
     owner_id?: string | null;
@@ -101,6 +104,9 @@ export interface CachedSidebarCommunity {
   name: string;
   type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   reference_name?: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
@@ -148,6 +154,9 @@ export interface CachedExploreCommunity {
   name: string;
   type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   description: string | null;
   is_private?: boolean;
   member_count: number;

@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
+import { getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { resolveCommunityDp } from "@/lib/communities/dp";
 
 // ── GET /api/admin/communities/[id] ─────────────────────────────────────────
 export async function GET(
@@ -20,7 +15,7 @@ export async function GET(
 
   const { data: community, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at")
+    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at, lottie_url, lottie_format")
     .eq("id", id)
     .maybeSingle();
 
@@ -28,17 +23,25 @@ export async function GET(
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
 
-  // Resolve reference entity name + image from master table
-  let reference_name: string | null = null;
-  const lookup = TABLE_LOOKUP[community.type];
-  if (lookup && community.reference_id) {
-    const { data: refRow } = await db
-      .from(lookup.table as any)
-      .select("name")
-      .eq(lookup.idCol, community.reference_id)
-      .maybeSingle();
-    reference_name = (refRow as any)?.name ?? null;
-  }
+  // Resolve the display picture (image + lottie, embedded for the preview)
+  // and the master reference name — cached, matching the app-wide convention.
+  const [dp, masterNameMap] = await Promise.all([
+    resolveCommunityDp({
+      type: community.type,
+      reference_id: community.reference_id,
+      image_url: community.image_url ?? null,
+      lottie_url: community.lottie_url ?? null,
+      lottie_format: community.lottie_format ?? null,
+      embedLottie: true,
+    }),
+    TABLE_LOOKUP[community.type]
+      ? getMasterNameMap(community.type)
+      : Promise.resolve({} as Record<string, string>),
+  ]);
+  const reference_name =
+    community.reference_id && TABLE_LOOKUP[community.type]
+      ? (masterNameMap[community.reference_id] ?? null)
+      : null;
 
   // Counts + members + messages in parallel
   const [
@@ -95,6 +98,10 @@ export async function GET(
   return NextResponse.json({
     community: {
       ...community,
+      image_url: dp.image_url,
+      lottie_url: dp.lottie_url,
+      lottie_format: dp.lottie_format,
+      lottie_data: dp.lottie_data,
       reference_name,
       member_count:  member_count  ?? 0,
       message_count: message_count ?? 0,

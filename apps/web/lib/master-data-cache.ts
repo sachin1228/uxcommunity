@@ -45,6 +45,30 @@ export const getMasterImageMap = unstable_cache(
 );
 
 /**
+ * Returns a map of { referenceId → { lottie_url, lottie_format } } for a
+ * master data table. Mirrors getMasterImageMap — 1 hour, same tag — so the
+ * animated community display picture stays in sync with master data.
+ */
+export const getMasterLottieMap = unstable_cache(
+  async (type: string): Promise<Record<string, { lottie_url: string | null; lottie_format: string | null } | null>> => {
+    const lookup = TABLE_LOOKUP[type];
+    if (!lookup) return {};
+    const db = createServiceClient();
+    const { data: rows } = await db
+      .from(lookup.table as any)
+      .select(`${lookup.idCol}, lottie_url, lottie_format`);
+    return Object.fromEntries(
+      (rows ?? []).map((r: any) => [
+        r[lookup.idCol],
+        r.lottie_url ? { lottie_url: r.lottie_url, lottie_format: r.lottie_format ?? null } : null,
+      ])
+    ) as Record<string, { lottie_url: string | null; lottie_format: string | null } | null>;
+  },
+  ["master-lottie-map"],
+  { revalidate: 3600, tags: ["master-images"] }
+);
+
+/**
  * Returns a map of { referenceId → name } for a master data table.
  * Cached alongside image maps — 1 hour, same tag.
  */
