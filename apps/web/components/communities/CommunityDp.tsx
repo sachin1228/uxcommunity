@@ -31,11 +31,13 @@ export interface CommunityDpProps {
 
 const DEFAULT_REPLAY_DELAY_MS = 10_000;
 
-function decodeBase64(data: string): Uint8Array {
+function decodeBase64(data: string): ArrayBuffer {
   const binary = atob(data);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+  // ArrayBuffer (not a view) — dotLottie-web routes ArrayBuffers to its
+  // binary .lottie loader, while plain objects/views go down the JSON path.
+  return bytes.buffer;
 }
 
 /**
