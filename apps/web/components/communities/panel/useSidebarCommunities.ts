@@ -194,7 +194,12 @@ export function useSidebarCommunities(userId: string) {
   const typingMap = useSidebarTyping({ communities, userId });
 
   // ── Navigation handler ────────────────────────────────────────────────────
-  function handleNavigate(id: string) {
+  // useCallback keeps the identity stable across renders so the memoized
+  // CommunityRow rows don't re-render on unrelated state churn (typing
+  // indicators, message previews, unread badges). The guarded router is
+  // recreated on navigation — the only time the rows legitimately need a
+  // refresh anyway.
+  const handleNavigate = useCallback((id: string) => {
     // Read the pre-zero snapshot first; the optimistic badge clearing below
     // would otherwise make the manager think there is nothing to mark read.
     const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
@@ -240,7 +245,7 @@ export function useSidebarCommunities(userId: string) {
     });
 
     router.push(`/dashboard/communities/${id}`);
-  }
+  }, [router]);
 
   return {
     communities: communities.filter((c) => !c.is_archived),

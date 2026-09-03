@@ -59,6 +59,14 @@ export function useSendMessage({
   // locked until the request fully settles (success or failure).
   const sendLockRef = useRef(false);
 
+  // Mirror of `sending` kept in a ref so handleRetrySend's guard can read it
+  // without depending on the state value (which would recreate the callback on
+  // every send and defeat MessageBubble's memoization).
+  const sendingRef = useRef(sending);
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
+
   // Stores retry data (file + content + replyTo) keyed by tempId so failed
   // messages can be retried without losing the original payload.
   const failedRetryDataRef = useRef<Map<string, RetryData>>(new Map());
@@ -460,7 +468,7 @@ export function useSendMessage({
    */
   const handleRetrySend = useCallback(async (failedTempId: string) => {
     const retryData = failedRetryDataRef.current.get(failedTempId);
-    if (!retryData || sending || sendLockRef.current) return;
+    if (!retryData || sendingRef.current || sendLockRef.current) return;
 
     sendLockRef.current = true;
 
@@ -493,7 +501,7 @@ export function useSendMessage({
       sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, sending, setMessages]);
+  }, [communityId, setMessages]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;

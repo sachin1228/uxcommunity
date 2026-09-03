@@ -243,8 +243,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   c={c}
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
-                  onClick={() => handleNavigate(c.id)}
-                  onHover={() => prefetchCommunity(c.id)}
+                  onClick={handleNavigate}
+                  onHover={prefetchCommunity}
                 />
               ))}
             </ul>

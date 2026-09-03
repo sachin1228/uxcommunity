@@ -126,8 +126,8 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                   c={c}
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
-                  onClick={() => handleNavigate(c.id)}
-                  onHover={() => prefetchCommunity(c.id)}
+                  onClick={handleNavigate}
+                  onHover={prefetchCommunity}
                 />
               ))}
             </ul>

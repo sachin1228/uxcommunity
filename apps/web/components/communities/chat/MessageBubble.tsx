@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useRef, useEffect } from "react";
+import { Fragment, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
@@ -677,7 +677,13 @@ function DeletedBubble({
   );
 }
 
-export function MessageBubble({
+/**
+ * Memoized so a parent re-render (typing in the input, the 1s typing-indicator
+ * tick, presence updates) doesn't re-render every bubble in the chat — the
+ * handlers are useCallback-stable and message objects are referentially
+ * stable, so unchanged bubbles bail out of reconciliation entirely.
+ */
+export const MessageBubble = memo(function MessageBubble({
   msg,
   isMe,
   isSameAuthor,
@@ -949,4 +955,4 @@ export function MessageBubble({
       </div>
     </Fragment>
   );
-}
+});
