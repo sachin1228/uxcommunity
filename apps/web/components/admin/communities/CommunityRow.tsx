@@ -10,6 +10,8 @@ export interface CommunityListItem {
   name: string;
   type: string;
   image_url: string | null;
+  /** Set when a member created the community — null for app-created ones. */
+  owner_id: string | null;
   is_active: boolean;
   member_count: number;
   message_count: number;

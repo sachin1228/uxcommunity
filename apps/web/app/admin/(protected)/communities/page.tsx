@@ -7,12 +7,16 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow, type CommunityListItem } from "@/components/admin/communities/CommunityRow";
 
 const TABS = [
-  { label: "All",        value: "all"              },
-  { label: "General",    value: "general"          },
-  { label: "Industry",   value: "sector"           },
-  { label: "Interest",   value: "interest"         },
+  { label: "All", value: "all" },
+  // Main origin filters: communities the uxcommunity app created itself vs
+  // communities members created (personal or public).
+  { label: "App-created", value: "app_created" },
+  { label: "Member-created", value: "member_created" },
+  { label: "General", value: "general" },
+  { label: "Industry", value: "sector" },
+  { label: "Interest", value: "interest" },
   { label: "Experience", value: "experience_level" },
-  { label: "City",       value: "city"             },
+  { label: "City", value: "city" },
 ] as const;
 
 type TabValue = typeof TABS[number]["value"];
@@ -61,16 +65,22 @@ export default function AdminCommunitiesPage() {
   }, []);
 
   const filtered = communities
-    .filter((c) => activeTab === "all" || c.type === activeTab)
+    .filter((c) => {
+      if (activeTab === "app_created") return c.owner_id == null;
+      if (activeTab === "member_created") return c.owner_id != null;
+      return activeTab === "all" || c.type === activeTab;
+    })
     .filter((c) => {
       const q = search.trim().toLowerCase();
       return q ? c.name.toLowerCase().includes(q) : true;
     });
 
-  const countByTab = (tab: TabValue) =>
-    tab === "all"
-      ? communities.length
-      : communities.filter((c) => c.type === tab).length;
+  const countByTab = (tab: TabValue) => {
+    if (tab === "all") return communities.length;
+    if (tab === "app_created") return communities.filter((c) => c.owner_id == null).length;
+    if (tab === "member_created") return communities.filter((c) => c.owner_id != null).length;
+    return communities.filter((c) => c.type === tab).length;
+  };
 
   return (
     <div className="flex flex-col gap-6">
