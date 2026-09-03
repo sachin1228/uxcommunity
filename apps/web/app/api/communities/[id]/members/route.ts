@@ -208,7 +208,13 @@ export async function DELETE(
     }
   }
 
-  // 3. Remove membership
+  // 3. Remove membership (plus any admin permission grants)
+  await db
+    .from("community_admin_permissions")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", userId);
+
   const { error } = await db
     .from("community_members")
     .delete()

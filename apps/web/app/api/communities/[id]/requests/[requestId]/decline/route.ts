@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 
 /**
  * POST /api/communities/[id]/requests/[requestId]/decline
- * Decline a pending join request. Owner only.
+ * Decline a pending join request. Owner or admin with "manage members".
  */
 export async function POST(
   _req: NextRequest,
@@ -16,19 +17,18 @@ export async function POST(
   const { id: communityId, requestId } = await params;
   const db = createServiceClient();
 
-  const { data: community } = await db
-    .from("communities")
-    .select("owner_id")
-    .eq("id", communityId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
+  if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  const canDecideRequests =
+    managerStatus.isOwner ||
+    (managerStatus.role === "admin" && managerStatus.permissions.can_manage_members);
+  if (!canDecideRequests) {
+    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  }
 
   const { data: request } = await db
     .from("community_join_requests")
-    .select("id, status")
+    .select("id, user_id, status")
     .eq("id", requestId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -40,6 +40,21 @@ export async function POST(
     .from("community_join_requests")
     .update({ status: "declined", decided_at: new Date().toISOString(), decided_by: userId })
     .eq("id", requestId);
+
+  // Audit trail
+  const [{ data: actor }, { data: targetUser }] = await Promise.all([
+    db.from("users").select("name").eq("id", userId).maybeSingle(),
+    db.from("users").select("name").eq("id", request.user_id).maybeSingle(),
+  ]);
+  await logCommunityActivity(db, {
+    communityId,
+    actorId: userId,
+    actorRole: managerStatus.isOwner ? "owner" : "admin",
+    actorName: actor?.name ?? null,
+    action: "join_request_declined",
+    targetUserId: request.user_id,
+    details: { member_name: targetUser?.name ?? null },
+  });
 
   return NextResponse.json({ success: true });
 }

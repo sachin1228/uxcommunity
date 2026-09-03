@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 import { publishChatEvent } from "@/lib/realtime/server";
 import { moderateWithLocalTextRules } from "@/lib/moderation/text-rules";
 import { moderationFailureResponse } from "@/lib/moderation/http";
@@ -124,7 +125,18 @@ export async function DELETE(
   };
 
   if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
-  if (msg.user_id !== userId) return NextResponse.json({ error: "You can only delete your own messages." }, { status: 403 });
+
+  // Anyone may delete their own message; owners and admins holding the
+  // "delete messages" permission may moderate any member's message.
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
+  if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  const isOwn = msg.user_id === userId;
+  const canModerate =
+    managerStatus.role === "owner" ||
+    (managerStatus.role === "admin" && managerStatus.permissions.can_delete_messages);
+  if (!isOwn && !canModerate) {
+    return NextResponse.json({ error: "You can only delete your own messages." }, { status: 403 });
+  }
 
   const deletedAt = new Date().toISOString();
 
@@ -143,6 +155,20 @@ export async function DELETE(
   if (error) {
     console.error("[DELETE message]", error);
     return NextResponse.json({ error: "Failed to delete message." }, { status: 500 });
+  }
+
+  // Audit trail for moderation deletions of other members' messages.
+  if (!isOwn && canModerate) {
+    const { data: actor } = await db.from("users").select("name").eq("id", userId).maybeSingle();
+    await logCommunityActivity(db, {
+      communityId,
+      actorId: userId,
+      actorRole: managerStatus.role === "owner" ? "owner" : "admin",
+      actorName: actor?.name ?? null,
+      action: "message_deleted",
+      targetUserId: msg.user_id,
+      details: { message_id: msgId },
+    });
   }
 
   // Broadcast the soft-delete to the community chat room.

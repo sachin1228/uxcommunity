@@ -30,6 +30,8 @@ interface MessageBubbleProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Moderator (owner/admin with delete permission) may delete other members' messages. */
+  canModerate?: boolean;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
   animate?: boolean;
 }
@@ -271,6 +273,7 @@ function MessageHoverActions({
   showMenu = true,
   insideBubble = false,
   dotsVisible = false,
+  canModerate = false,
 }: {
   msg: CachedMessage;
   isMe: boolean;
@@ -288,6 +291,8 @@ function MessageHoverActions({
   insideBubble?: boolean;
   /** Controls three-dot button visibility when insideBubble=true (proximity-based). */
   dotsVisible?: boolean;
+  /** Moderator may delete other members' messages. */
+  canModerate?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -473,7 +478,7 @@ function MessageHoverActions({
             </button>
           )}
 
-          {isMe && (
+          {(isMe || canModerate) && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
               <button
@@ -486,7 +491,7 @@ function MessageHoverActions({
                 role="menuitem"
               >
                 <Trash2 size={14} className="shrink-0" />
-                <span>Delete</span>
+                <span>{isMe ? "Delete" : "Delete for everyone"}</span>
               </button>
             </>
           )}
@@ -699,6 +704,7 @@ export const MessageBubble = memo(function MessageBubble({
   onEdit,
   onCopy,
   onDelete,
+  canModerate = false,
   animate = false,
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -832,6 +838,7 @@ export const MessageBubble = memo(function MessageBubble({
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
+                canModerate={canModerate}
               />
             </div>
           ) : (
@@ -929,6 +936,7 @@ export const MessageBubble = memo(function MessageBubble({
                     showReaction={false}
                     insideBubble
                     dotsVisible={nearBubble}
+                    canModerate={canModerate}
                   />
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
@@ -947,6 +955,7 @@ export const MessageBubble = memo(function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 showMenu={false}
+                canModerate={canModerate}
               />
             </div>
           )}

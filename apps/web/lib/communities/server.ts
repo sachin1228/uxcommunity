@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { loadCommunityManagerStatus } from "./manager-role";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -104,6 +105,10 @@ export async function fetchCommunityMetaSSR(
     };
   });
 
+  // Role + effective permissions let the chat chrome show owner-style
+  // settings/membership controls for platform-appointed community admins.
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
+
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
@@ -113,6 +118,8 @@ export async function fetchCommunityMetaSSR(
       owner_id: (community as any).owner_id ?? null,
       is_private: (community as any).is_private ?? false,
       enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "events", "resources"],
+      current_user_role: managerStatus?.role ?? "member",
+      current_user_permissions: managerStatus?.permissions ?? null,
     },
     members,
     fetchedAt: Date.now(),

@@ -27,6 +27,8 @@ interface ChatHeaderProps {
   onlineCount?: number;
   currentUserId?: string;
   onSettingsClick?: () => void;
+  /** Owner or admin with "edit community settings" permission. */
+  canOpenSettings?: boolean;
   /** Used to resolve the community Lottie while meta is still loading. */
   communityId?: string;
 }
@@ -116,6 +118,7 @@ export const ChatHeader = memo(function ChatHeader({
   onlineCount = 0,
   currentUserId,
   onSettingsClick,
+  canOpenSettings = false,
   communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
@@ -232,8 +235,8 @@ export const ChatHeader = memo(function ChatHeader({
                 </div>
               </div>
               <div ref={menuRef} className="relative flex items-center gap-2">
-                {/* Settings button — community owner only */}
-                {currentUserId && community?.owner_id === currentUserId && onSettingsClick && (
+                {/* Settings button — community owner or admin with settings permission */}
+                {currentUserId && canOpenSettings && onSettingsClick && (
                   <button
                     type="button"
                     onClick={onSettingsClick}

@@ -55,6 +55,8 @@ interface MessageListProps {
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
+  /** Moderator (owner/admin with delete permission) may delete other members' messages. */
+  canModerateMessages?: boolean;
   onReplyClick: (replyId: string) => void;
   onCancelSend: (msgId: string) => void;
   onRetrySend: (msgId: string) => void;
@@ -89,6 +91,7 @@ export const MessageList = memo(function MessageList({
   displayCommunity,
   communityId,
   highlightedMsgId,
+  canModerateMessages = false,
   onReplyClick,
   onCancelSend,
   onRetrySend,
@@ -325,6 +328,7 @@ export const MessageList = memo(function MessageList({
                   onEdit={onEdit}
                   onCopy={onCopy}
                   onDelete={onDelete}
+                  canModerate={canModerateMessages && !isMe}
                   animate={animateIdsRef.current.has(msg.id)}
                 />
               );

@@ -44,9 +44,21 @@ export function CommunityMembersList({ members, memberCount }: Props) {
                 </button>
                 <p className="font-body text-[11px] text-foreground-muted">{m.email}</p>
               </div>
-              <span className="font-body text-[11px] text-foreground-muted">
-                Joined {fmtDate(m.joined_at)}
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                {m.role === "admin" && (
+                  <span className="inline-flex items-center rounded-full bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 font-body text-[10px] font-semibold text-amber-500">
+                    Admin
+                  </span>
+                )}
+                {m.role === "owner" && (
+                  <span className="inline-flex items-center rounded-full bg-accent/10 border border-accent/20 px-2 py-0.5 font-body text-[10px] font-semibold text-accent">
+                    Owner
+                  </span>
+                )}
+                <span className="font-body text-[11px] text-foreground-muted">
+                  Joined {fmtDate(m.joined_at)}
+                </span>
+              </div>
             </div>
           ))}
         </div>

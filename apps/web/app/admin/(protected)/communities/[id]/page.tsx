@@ -7,6 +7,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CommunityActionsPanel } from "@/components/admin/communities/CommunityActionsPanel";
 import { CommunityMembersList } from "@/components/admin/communities/CommunityMembersList";
 import { CommunityMessagesList } from "@/components/admin/communities/CommunityMessagesList";
+import { CommunityAdminsPanel } from "@/components/admin/communities/CommunityAdminsPanel";
+import { CommunityActivityPanel } from "@/components/admin/communities/CommunityActivityPanel";
 import { CommunityIcon } from "@/components/communities/CommunityIcon";
 import {
   TYPE_LABELS,
@@ -302,6 +304,18 @@ export default function CommunityDetailPage() {
         members={community.members}
         memberCount={community.member_count}
       />
+
+      {/* Admins + activity — app-created communities only. Member-created
+          communities are run by their member owner in the app. */}
+      {(community.is_app_created ?? community.owner_id == null) && (
+        <>
+          <CommunityAdminsPanel
+            communityId={id}
+            communityName={community.name}
+          />
+          <CommunityActivityPanel communityId={id} />
+        </>
+      )}
 
       {/* Rules */}
       <CommunityRulesPanel communityId={id} />

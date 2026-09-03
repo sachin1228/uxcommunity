@@ -48,6 +48,13 @@ export interface CachedThreadEvent {
   users: { name: string; avatar_url: string | null } | null;
 }
 
+/** Effective community-management grants for the current user. */
+export interface ClientCommunityPermissions {
+  can_edit_settings?: boolean;
+  can_manage_members?: boolean;
+  can_delete_messages?: boolean;
+}
+
 export interface CachedMeta {
   community: {
     id: string;
@@ -61,6 +68,10 @@ export interface CachedMeta {
     invite_token?: string | null;
     description?: string | null;
     created_at?: string;
+    /** "owner" | "admin" | "member" — the current user's role in this community. */
+    current_user_role?: string | null;
+    /** Effective permission grants (owners: everything; admins: configured toggles). */
+    current_user_permissions?: ClientCommunityPermissions | null;
   };
   members: {
     user_id: string;

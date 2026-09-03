@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
@@ -34,7 +35,9 @@ export async function GET(
 }
 
 // ── PATCH /api/communities/[id] ─────────────────────────────────────────────
-// Update name, description, privacy, tabs, rules. Owner only.
+// Update name, description, privacy, tabs, rules.
+// Allowed for the owner, and for platform-appointed community admins who hold
+// the "edit community settings" permission (privacy is owner-only).
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -45,15 +48,25 @@ export async function PATCH(
   const { id } = await params;
   const db = createServiceClient();
 
-  const { data: community } = await db
-    .from("communities")
-    .select("id, owner_id")
-    .eq("id", id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const managerStatus = await loadCommunityManagerStatus(db, id, userId);
+  if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  if (!managerStatus.canManage) {
+    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  }
+  if (managerStatus.role === "admin" && !managerStatus.permissions.can_edit_settings) {
+    return NextResponse.json(
+      { error: "You don't have permission to edit community settings." },
+      { status: 403 },
+    );
+  }
+  const isOwner = managerStatus.isOwner;
 
-  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (community.owner_id !== userId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
+  // Snapshot the current values so the activity trail records what changed.
+  const { data: before } = await db
+    .from("communities")
+    .select("name, description, image_url, is_private, enabled_tabs")
+    .eq("id", id)
+    .maybeSingle();
 
   // Accept FormData (multipart, used when image may be included)
   let formData: FormData;
@@ -64,23 +77,28 @@ export async function PATCH(
     return typeof v === "string" ? v.trim() : null;
   };
 
+  const changed: string[] = [];
   const updates: Record<string, unknown> = {};
 
   const name = getString("name");
   if (name !== null) {
     if (name.length < 1 || name.length > 80) return NextResponse.json({ error: "Name must be 1–80 characters." }, { status: 422 });
     updates.name = name;
+    if (name !== before?.name) changed.push("name");
   }
 
   const description = getString("description");
   if (description !== null) {
     if (description.length > 500) return NextResponse.json({ error: "Description must be 500 characters or less." }, { status: 422 });
     updates.description = description || null;
+    if ((description || null) !== (before?.description ?? null)) changed.push("description");
   }
 
   const isPrivateStr = getString("is_private");
-  if (isPrivateStr !== null) {
+  // Privacy can only be toggled by the owner.
+  if (isPrivateStr !== null && isOwner) {
     updates.is_private = isPrivateStr === "true";
+    if (updates.is_private !== before?.is_private) changed.push("privacy");
   }
 
   const tabsStr = getString("tabs");
@@ -88,7 +106,11 @@ export async function PATCH(
     try {
       const parsed = JSON.parse(tabsStr);
       if (Array.isArray(parsed)) {
-        updates.enabled_tabs = Array.from(new Set(["chat", ...(parsed as string[]).filter((t) => VALID_TABS.has(t))]));
+        const tabs = Array.from(new Set(["chat", ...(parsed as string[]).filter((t) => VALID_TABS.has(t))]));
+        const sameTabs =
+          (before?.enabled_tabs ?? []).slice().sort().join(",") === tabs.slice().sort().join(",");
+        updates.enabled_tabs = tabs;
+        if (!sameTabs) changed.push("tabs");
       }
     } catch { /* ignore */ }
   }
@@ -119,9 +141,11 @@ export async function PATCH(
       return NextResponse.json({ error: "Community picture upload failed." }, { status: 500 });
     }
     updates.image_url = imageUrlResult;
+    if (imageUrlResult !== before?.image_url) changed.push("photo");
   } else if (removeImage) {
     imageUrlResult = null;
     updates.image_url = null;
+    if (before?.image_url) changed.push("photo");
   }
 
   if (Object.keys(updates).length > 0) {
@@ -148,6 +172,9 @@ export async function PATCH(
           .order("order_index", { ascending: true })) as unknown as {
           data: Array<{ id: string; community_id: string; rule_text: string; order_index: number }> | null;
         };
+
+        const prevText = (previousRules ?? []).map((rule) => rule.rule_text);
+        if (prevText.join("\n") !== rules.join("\n")) changed.push("rules");
 
         await db.from("community_rules").delete().eq("community_id", id);
         if (rules.length) {
@@ -178,6 +205,19 @@ export async function PATCH(
         ]);
       }
     } catch { /* ignore */ }
+  }
+
+  // Audit trail — snapshot the actor name so the trail survives renames.
+  if (changed.length > 0) {
+    const { data: actor } = await db.from("users").select("name").eq("id", userId).maybeSingle();
+    await logCommunityActivity(db, {
+      communityId: id,
+      actorId: userId,
+      actorRole: isOwner ? "owner" : "admin",
+      actorName: actor?.name ?? null,
+      action: "community_settings_updated",
+      details: { changed },
+    });
   }
 
   return NextResponse.json({ success: true, ...(imageUrlResult !== undefined ? { image_url: imageUrlResult } : {}) });
