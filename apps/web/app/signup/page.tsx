@@ -9,6 +9,7 @@ import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
 import { SignupStep4 } from "./components/SignupStep4";
+import { SignupWelcome } from "./components/SignupWelcome";
 
 // Re-exported so profile page can import it from here (backward compat)
 export { INTEREST_EMOJIS } from "@/lib/interests";
@@ -23,6 +24,12 @@ interface TokenState {
 }
 
 type Step = 1 | 2 | 3 | 4 | "done";
+
+type WelcomeState =
+  | { phase: "loading" }
+  | { phase: "ready"; joinedCommunities: number }
+  | { phase: "error"; message: string }
+  | null;
 
 /** Splits an existing full name (e.g. from an approved application) into first/last parts. */
 function splitFullName(fullName: string): { first_name: string; last_name: string } {
@@ -84,6 +91,10 @@ function SignupInner() {
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
   const [step4Loading, setStep4Loading] = useState(false);
   const [step4Error, setStep4Error] = useState<string | null>(null);
+
+  // Signup-completion overlay: account setup runs in the background behind a
+  // welcome animation, then hands off to the dashboard with a button.
+  const [welcome, setWelcome] = useState<WelcomeState>(null);
 
   // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
@@ -220,8 +231,13 @@ function SignupInner() {
   }
 
   async function handleStep4() {
-    setStep4Loading(true);
+    // Hand the user straight to the welcome overlay — the account + community
+    // setup below runs in the background while they watch the animation.
+    setWelcome({ phase: "loading" });
     setStep4Error(null);
+    // Let the overlay paint its first frame before starting the request.
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    setStep4Loading(true);
     try {
       const payload = {
         identity: step1Identity(),
@@ -247,18 +263,32 @@ function SignupInner() {
 
       const data = await res.json();
       if (!res.ok) {
-        setStep4Error(data.error ?? "Failed to complete signup.");
+        const message =
+          data.error ??
+          (data.issues ? "Please review your details and try again." : "Failed to complete signup.");
+        setWelcome({ phase: "error", message });
         return;
       }
       // Communities are auto-joined server-side during /api/signup/avatar, so the
       // sidebar shows the full list (General + city + sector + interests) the first
       // time the dashboard loads.
-      router.push("/dashboard");
+      setWelcome({
+        phase: "ready",
+        joinedCommunities:
+          typeof data.joined_communities === "number" ? data.joined_communities : 0,
+      });
     } catch {
-      setStep4Error("Network error. Please try again.");
+      setWelcome({
+        phase: "error",
+        message: "Network error. Please try again.",
+      });
     } finally {
       setStep4Loading(false);
     }
+  }
+
+  function goToDashboard() {
+    router.push("/dashboard");
   }
 
   return (
@@ -347,6 +377,18 @@ function SignupInner() {
         )}
 
       </div>
+
+      {welcome && (
+        <SignupWelcome
+          phase={welcome.phase}
+          firstName={step1.first_name.trim()}
+          joinedCommunities={welcome.phase === "ready" ? welcome.joinedCommunities : 0}
+          errorMessage={welcome.phase === "error" ? welcome.message : null}
+          onGoToDashboard={goToDashboard}
+          onRetry={() => void handleStep4()}
+          onClose={() => setWelcome(null)}
+        />
+      )}
     </main>
   );
 }

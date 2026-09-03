@@ -150,8 +150,10 @@ export async function POST(request: NextRequest) {
   // server-side so the sidebar shows the full list the first time the dashboard
   // loads. Non-fatal if it fails — the dashboard layout retries exactly once via
   // the designer_profiles.communities_auto_joined flag.
+  let joinedCommunities = 0;
   try {
-    await autoJoinCommunities(userId);
+    const joined = await autoJoinCommunities(userId);
+    joinedCommunities = joined.length;
   } catch (autoJoinError) {
     console.error("[signup/avatar] auto-join error:", autoJoinError);
   }
@@ -169,7 +171,12 @@ export async function POST(request: NextRequest) {
     email: identity.email.toLowerCase(),
     role: "user",
   });
-  const response = NextResponse.json({ success: true, userId, avatar_url: profilePictureUrl });
+  const response = NextResponse.json({
+    success: true,
+    userId,
+    avatar_url: profilePictureUrl,
+    joined_communities: joinedCommunities,
+  });
   setSessionCookie(response, sessionToken, request.nextUrl.hostname);
   return response;
 }
