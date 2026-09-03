@@ -9,7 +9,7 @@ import { contentHash } from "@/lib/moderation/normalize";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = await rateLimit(`signup:${ip}`, 5, 3600);
+  const rl = await rateLimit(`signup:step1:complete:${ip}`, 20, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
