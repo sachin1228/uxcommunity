@@ -25,6 +25,8 @@ export async function GET() {
   if (!communities?.length) return NextResponse.json({ communities: [] });
 
   // Resolve the display picture per community (image + lottie from master).
+  // The animation payload is embedded so table rows can play it inline — R2
+  // URLs are not browser-fetchable.
   const dps = await Promise.all(
     communities.map((c) =>
       resolveCommunityDp({
@@ -33,6 +35,7 @@ export async function GET() {
         image_url: c.image_url ?? null,
         lottie_url: c.lottie_url ?? null,
         lottie_format: c.lottie_format ?? null,
+        embedLottie: true,
       })
     )
   );
@@ -69,6 +72,7 @@ export async function GET() {
     image_url:     dps[i].image_url,
     lottie_url:    dps[i].lottie_url,
     lottie_format: dps[i].lottie_format,
+    lottie_data:   dps[i].lottie_data,
     reference_id:  c.reference_id,
     // Set when a member created the community (type "user"); null for the
     // communities the uxcommunity app creates itself (general/city/sector/...).

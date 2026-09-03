@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { CommunityIcon } from "./CommunityIcon";
 
@@ -62,6 +62,17 @@ export function CommunityDp({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dotLottieRef = useRef<{ play?: () => void; removeEventListener?: (e: string, fn: () => void) => void } | null>(null);
   const replayDelayRef = useRef(replayDelayMs);
+  // dotLottie's built-in resolution is capped at ~1.75x on 2x screens, which
+  // makes the canvas look soft when the browser stretches it to full Retina
+  // sharpness. Render at the display's real pixel ratio instead (capped at 2x
+  // — crisp small avatars without 4K backing stores). The dotLottie player is
+  // client-only (dynamic, ssr:false), so reading window here never reaches the
+  // server HTML and cannot cause a hydration mismatch.
+  const [dpr] = useState(() =>
+    typeof window === "undefined"
+      ? 1
+      : Math.min(window.devicePixelRatio || 1, 2)
+  );
 
   useEffect(() => {
     replayDelayRef.current = replayDelayMs;
@@ -76,6 +87,12 @@ export function CommunityDp({
     Boolean(lottieUrl) &&
     lottieFormat === "dotlottie" &&
     typeof lottieData === "string";
+
+  // Decode once per payload instead of on every render (some files are big).
+  const dotLottieBuffer = useMemo(
+    () => (typeof lottieData === "string" ? decodeBase64(lottieData) : null),
+    [lottieData]
+  );
 
   const scheduleReplay = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -115,9 +132,10 @@ export function CommunityDp({
           onComplete={scheduleReplay}
           style={{ width: size, height: size }}
         />
-      ) : hasDotLottie ? (
+      ) : hasDotLottie && dotLottieBuffer ? (
         <DotLottieReact
-          data={decodeBase64(lottieData as string)}
+          data={dotLottieBuffer}
+          renderConfig={{ devicePixelRatio: dpr }}
           loop={false}
           autoplay
           dotLottieRefCallback={handleDotLottieRef}

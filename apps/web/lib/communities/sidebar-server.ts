@@ -87,6 +87,18 @@ export async function getSidebarCommunities(userId: string) {
     }
   }));
 
+  // Communities without a master row (general / member-created) use the lottie
+  // stored on the community row itself — include it so it gets embedded too.
+  for (const community of communities ?? []) {
+    if (!lotties[community.id] && community.lottie_url && community.lottie_format) {
+      lotties[community.id] = {
+        url: community.lottie_url,
+        format: community.lottie_format as LottieFormat,
+        data: null,
+      };
+    }
+  }
+
   // Embed animation payloads (R2 is not browser-fetchable) — cached per URL.
   await Promise.all(
     Object.entries(lotties).map(async ([id, l]) => {
