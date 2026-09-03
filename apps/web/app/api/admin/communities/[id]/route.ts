@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-
-const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
-  city:             { table: "cities",            idCol: "id" },
-  sector:           { table: "design_sectors",    idCol: "id" },
-  interest:         { table: "design_interests",  idCol: "id" },
-  experience_level: { table: "experience_levels", idCol: "id" },
-};
+import {
+  getMasterImageMap,
+  getMasterNameMap,
+  TABLE_LOOKUP,
+} from "@/lib/master-data-cache";
 
 // ── GET /api/admin/communities/[id] ─────────────────────────────────────────
 export async function GET(
@@ -28,16 +26,19 @@ export async function GET(
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
 
-  // Resolve reference entity name + image from master table
+  // Resolve reference entity name + image from the master table (cached),
+  // matching the app-wide convention — the image shown is always the current
+  // master image, even when the stored copy predates an admin update.
   let reference_name: string | null = null;
+  let image_url: string | null = community.image_url ?? null;
   const lookup = TABLE_LOOKUP[community.type];
   if (lookup && community.reference_id) {
-    const { data: refRow } = await db
-      .from(lookup.table as any)
-      .select("name")
-      .eq(lookup.idCol, community.reference_id)
-      .maybeSingle();
-    reference_name = (refRow as any)?.name ?? null;
+    const [imageMap, nameMap] = await Promise.all([
+      getMasterImageMap(community.type),
+      getMasterNameMap(community.type),
+    ]);
+    image_url = imageMap[community.reference_id] ?? image_url;
+    reference_name = nameMap[community.reference_id] ?? null;
   }
 
   // Counts + members + messages in parallel
@@ -94,6 +95,7 @@ export async function GET(
   return NextResponse.json({
     community: {
       ...community,
+      image_url,
       reference_name,
       member_count:  member_count  ?? 0,
       message_count: message_count ?? 0,

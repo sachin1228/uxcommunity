@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { getMasterImageMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 
 /** Admin-only: returns all communities with member + message counts.
- *  image_url is read directly from the communities table — it is populated
- *  at upsert time by the auto-join flow and is the single source of truth.
+ *  For app-created communities the image is resolved from the master data
+ *  row (city/sector/interest/experience level) at read time — the same
+ *  convention the app uses everywhere — falling back to the stored
+ *  communities.image_url (populated at upsert time) when there is no master
+ *  row. This keeps the table in sync when a master image is updated.
  */
 export async function GET() {
   try { await requireSession("admin"); } catch (e) { return e as Response; }
@@ -21,6 +25,18 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
   }
   if (!communities?.length) return NextResponse.json({ communities: [] });
+
+  // Master-data image maps per type, fetched in parallel. Only the types the
+  // app creates itself (owner_id IS NULL) have master rows to resolve.
+  const appTypes = [
+    ...new Set(communities.filter((c) => !c.owner_id).map((c) => c.type)),
+  ].filter((t) => TABLE_LOOKUP[t]);
+  const imageMapByType: Record<string, Record<string, string | null>> = {};
+  await Promise.all(
+    appTypes.map(async (type) => {
+      imageMapByType[type] = await getMasterImageMap(type);
+    })
+  );
 
   // Member + message counts in parallel
   const [memberCounts, messageCounts] = await Promise.all([
@@ -51,7 +67,7 @@ export async function GET() {
     id:            c.id,
     name:          c.name,
     type:          c.type,
-    image_url:     c.image_url ?? null,
+    image_url:     (c.reference_id ? imageMapByType[c.type]?.[c.reference_id] : undefined) ?? c.image_url ?? null,
     reference_id:  c.reference_id,
     // Set when a member created the community (type "user"); null for the
     // communities the uxcommunity app creates itself (general/city/sector/...).
