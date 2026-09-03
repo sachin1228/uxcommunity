@@ -318,8 +318,16 @@ function MessageHoverActions({
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
 
-  // No actions on deleted or still-sending messages
-  if (isDeleted || msg.status === "sending") return null;
+  // No actions on deleted messages
+  if (isDeleted) return null;
+
+  // While sending, render an invisible spacer that matches the reaction
+  // button's footprint so the bubble's available width doesn't change (and
+  // the text doesn't re-wrap) the moment the message flips to "sent".
+  if (msg.status === "sending") {
+    if (insideBubble || !showReaction) return null;
+    return <div aria-hidden className="w-7 h-7 shrink-0" />;
+  }
 
   return (
     <div
@@ -603,7 +611,7 @@ function MessageContent({
   return (
     <>
       <div
-        className={`font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words ${
+        className={`chat-message-text font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
           isMe ? "text-accent-foreground" : "text-foreground"
         }`}
       >
@@ -692,14 +700,22 @@ export function MessageBubble({
   const [nearBubble, setNearBubble] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  /** Show three-dot button when mouse is within the bubble area. */
+  /**
+   * Show three-dot button when the mouse is anywhere over the bubble (with a
+   * small margin), plus a bit of runway on the reaction-button side so the
+   * dots stay visible while moving between the bubble and the emoji button.
+   * Using the full bubble rect (not just a fixed band near one edge) means
+   * wide, multi-line bubbles behave the same as short ones.
+   */
   function handleRowMouseMove(e: React.MouseEvent) {
     if (!bubbleRef.current) return;
     const r = bubbleRef.current.getBoundingClientRect();
-    const withinX = isMe
-      ? e.clientX >= r.left - 150 && e.clientX <= r.left + 150
-      : e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
-    const withinY = e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
+    const PAD = 8;
+    const REACH = 48; // room for the reaction button beside the bubble
+    const minX = isMe ? r.left - REACH : r.left - PAD;
+    const maxX = isMe ? r.right + PAD : r.right + REACH;
+    const withinX = e.clientX >= minX && e.clientX <= maxX;
+    const withinY = e.clientY >= r.top - PAD && e.clientY <= r.bottom + PAD;
     setNearBubble(withinX && withinY);
   }
 
@@ -816,8 +832,8 @@ export function MessageBubble({
             /* ── Normal bubble ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
-              {/* Entrance animation lives on this wrapper (not the bubble) so the
-                  bubble's own opacity classes for sending/failed states stay intact. */}
+                  {/* Entrance animation lives on this wrapper (not the bubble) so the
+                      bubble's own state classes (e.g. failed) stay intact. */}
               <div
                 className={`relative min-w-0 ${animate ? "chat-bubble-in" : ""}`}
                 data-side={isMe ? "right" : "left"}
@@ -831,9 +847,7 @@ export function MessageBubble({
                       ? "flex flex-col items-start"
                       : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
-                            ? msg.status === "sending"
-                              ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
-                              : msg.status === "failed"
+                            ? msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
                             : "bg-surface-raised"
