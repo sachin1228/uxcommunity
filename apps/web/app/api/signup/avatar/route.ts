@@ -32,7 +32,7 @@ function safeSignupError(error: { code?: string; message?: string }) {
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rateLimitResult = await rateLimit(`signup:finalize:${ip}`, 10, 3600);
+  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600);
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

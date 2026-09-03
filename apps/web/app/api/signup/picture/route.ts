@@ -21,7 +21,7 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
  */
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = await rateLimit(`signup:picture:${ip}`, 10, 3600);
+  const rl = await rateLimit(`signup:picture:v2:${ip}`, 20, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
