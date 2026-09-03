@@ -18,12 +18,15 @@ export function useSidebarTyping({
 }): Map<string, string> {
   const [typingMap, setTypingMap] = useState<Map<string, string>>(new Map());
   const stateRef = useRef<Map<string, Map<string, { name: string; lastSeen: number }>>>(new Map());
+  /** Last value handed to setTypingMap, so unchanged 1s flushes skip the setState. */
+  const lastTypingMapRef = useRef<Map<string, string>>(new Map());
   const communityIds = [...communities].map((c) => c.id).sort().join(",");
   const isVisible = useDocumentVisible();
 
   useEffect(() => {
     if (!communityIds || !isVisible) return;
     stateRef.current.clear();
+    lastTypingMapRef.current = new Map();
 
     realtimeClient.init({ id: userId, name: null, avatar: null });
     const subscribed = communities.slice(0, TYPING_CHANNEL_LIMIT);
@@ -43,6 +46,15 @@ export function useSidebarTyping({
         const text = names.length === 1 ? `${names[0]} is typing…` : names.length === 2 ? `${names[0]} & ${names[1]} are typing…` : "Several people are typing…";
         next.set(commId, text);
       });
+      // Skip the setState when nothing changed so idle ticks don't re-render
+      // the whole sidebar (CommunityRow is memoized; a fresh Map here would
+      // still flow through React state and bust every row's bail-out).
+      const prev = lastTypingMapRef.current;
+      const unchanged =
+        prev.size === next.size &&
+        [...prev.entries()].every(([key, value]) => next.get(key) === value);
+      if (unchanged) return;
+      lastTypingMapRef.current = next;
       setTypingMap(next);
     };
 
@@ -73,6 +85,7 @@ export function useSidebarTyping({
     return () => {
       window.clearInterval(timer);
       stateRef.current.clear();
+      lastTypingMapRef.current = new Map();
       unsubscribes.forEach((unsub) => unsub());
       setTypingMap(new Map());
     };

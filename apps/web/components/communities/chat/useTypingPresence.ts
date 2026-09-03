@@ -32,22 +32,29 @@ export function useTypingPresence({
   identityRef.current = { user_id: currentUserId, name: currentUserName };
 
   const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(new Map());
+  /** Last value handed to setTypingUsers, so unchanged flushes skip the setState. */
+  const lastTypingUsersRef = useRef<TypingUser[]>([]);
 
   const flushTypingUsers = useCallback(() => {
     const now = Date.now();
-    let changed = false;
     for (const [id, entry] of typingMapRef.current.entries()) {
       if (now - entry.lastSeen > TYPING_EXPIRY_MS) {
         typingMapRef.current.delete(id);
-        changed = true;
       }
     }
-    if (changed || true) {
-      const users = [...typingMapRef.current.entries()]
-        .map(([id, { name }]) => ({ id, name }))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      setTypingUsers(users);
-    }
+    const users = [...typingMapRef.current.entries()]
+      .map(([id, { name }]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const prev = lastTypingUsersRef.current;
+    const unchanged =
+      users.length === prev.length &&
+      users.every((user, i) => {
+        const existing = prev[i];
+        return existing && existing.id === user.id && existing.name === user.name;
+      });
+    if (unchanged) return;
+    lastTypingUsersRef.current = users;
+    setTypingUsers(users);
   }, []);
 
   const broadcast = useCallback(
@@ -112,6 +119,7 @@ export function useTypingPresence({
       lastSentAtRef.current = 0;
       window.clearInterval(expiryTimer);
       typingMapRef.current.clear();
+      lastTypingUsersRef.current = [];
       unsub();
       unsubRoom();
       setTypingUsers([]);
