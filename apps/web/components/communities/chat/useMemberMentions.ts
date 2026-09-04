@@ -236,6 +236,10 @@ export function useMemberMentions({
    */
   const close = useCallback(() => {
     resetForScopeChange();
+    // Nothing is open — bail so callers that run from effects (tab switch,
+    // blur, send) can't set fresh [] identities and re-trigger themselves in
+    // an update loop via the memoized API object.
+    if (ctxRef.current === null) return;
     seqRef.current += 1;
     ctxRef.current = null;
     setCtx(null);
