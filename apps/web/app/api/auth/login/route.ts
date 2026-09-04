@@ -12,7 +12,7 @@ type LoginUserRow = {
   email: string;
   password_hash: string;
   is_blocked: boolean;
-  designer_profiles: Array<{ id: string; avatar_url: string | null }> | null;
+  designer_profiles: { id: string; avatar_url: string | null } | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -80,19 +80,20 @@ export async function POST(request: NextRequest) {
   const db = createServiceClient();
 
   // Single round trip: the users row plus its (1:1) designer profile, embedded
-  // through the foreign key. Previously this was two sequential Supabase REST
-  // queries — one for users by email, then one for designer_profiles by the
-  // resulting user_id. A missing profile is only acted on AFTER a successful
-  // password check below, so the response does not leak which emails exist.
+  // through the FK. The !user_id hint is REQUIRED: in this schema PostgREST can
+  // resolve more than one path between users and designer_profiles, and an
+  // unhinted embed silently picks one that returns no rows. A missing profile
+  // is only acted on AFTER a successful password check below, so the response
+  // does not leak which emails exist.
   const { data: rawUser } = await db
     .from("users")
     .select(
-      "id, name, email, password_hash, is_blocked, designer_profiles(id, avatar_url)"
+      "id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)"
     )
     .eq("email", normalizedEmail)
     .maybeSingle();
   const row = rawUser as unknown as LoginUserRow | null;
-  const profile = row?.designer_profiles?.[0] ?? null;
+  const profile = row?.designer_profiles ?? null;
 
   if (!row) {
     // Generic error — do NOT reveal whether the email exists.
