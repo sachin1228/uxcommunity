@@ -159,7 +159,7 @@ function BubbleImage({
         }}
         className={`block max-w-full object-cover ${
           standalone ? "" : "rounded-xl"
-        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-zoom-in hover:opacity-80 transition-opacity" : ""}`}
+        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
         draggable={false}
