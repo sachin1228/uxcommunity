@@ -128,7 +128,7 @@ export default function ToolsPage() {
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
-            <ArrowRightLeft size={18} className="text-accent" />
+            <ArrowRightLeft strokeWidth={2.5} size={18} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
@@ -147,12 +147,12 @@ export default function ToolsPage() {
             >
               {migrateStatus === "running" ? (
                 <>
-                  <RefreshCw size={13} className="animate-spin" />
+                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
                   Migrating…
                 </>
               ) : (
                 <>
-                  <ArrowRightLeft size={13} />
+                  <ArrowRightLeft strokeWidth={2.5} size={13} />
                   {migrateStatus === "done" ? "Run again" : "Run migration"}
                 </>
               )}
@@ -163,9 +163,9 @@ export default function ToolsPage() {
         {migrateStatus === "done" && migrateSummary && (
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
-              <Stat icon={<CheckCircle2 size={13} className="text-green-400" />} value={migrateSummary.migrated} label="migrated" />
-              <Stat icon={<SkipForward  size={13} className="text-foreground-muted" />} value={migrateSummary.skipped}  label="skipped"  />
-              <Stat icon={<AlertCircle  size={13} className="text-red-400" />}   value={migrateSummary.failed}   label="failed"   />
+              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={migrateSummary.migrated} label="migrated" />
+              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-foreground-muted" />} value={migrateSummary.skipped}  label="skipped"  />
+              <Stat icon={<AlertCircle strokeWidth={2.5}  size={13} className="text-red-400" />}   value={migrateSummary.failed}   label="failed"   />
             </div>
             {migrateSummary.total === 0 && (
               <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
@@ -191,7 +191,7 @@ export default function ToolsPage() {
       <div className="rounded-xl border border-border bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-            <ImageDown size={18} className="text-accent" />
+            <ImageDown strokeWidth={2.5} size={18} className="text-accent" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
@@ -210,12 +210,12 @@ export default function ToolsPage() {
             >
               {recompressStatus === "running" ? (
                 <>
-                  <RefreshCw size={13} className="animate-spin" />
+                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
                   Processing…
                 </>
               ) : (
                 <>
-                  <ImageDown size={13} />
+                  <ImageDown strokeWidth={2.5} size={13} />
                   {recompressStatus === "done" ? "Run again" : "Run recompression"}
                 </>
               )}
@@ -226,9 +226,9 @@ export default function ToolsPage() {
         {recompressStatus === "done" && recompressSummary && (
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
-              <Stat icon={<CheckCircle2 size={13} className="text-green-400" />} value={recompressSummary.compressed} label="compressed" />
-              <Stat icon={<SkipForward  size={13} className="text-foreground-muted" />} value={recompressSummary.skipped}    label="skipped"    />
-              <Stat icon={<AlertCircle  size={13} className="text-red-400" />}   value={recompressSummary.failed}     label="failed"     />
+              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={recompressSummary.compressed} label="compressed" />
+              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-foreground-muted" />} value={recompressSummary.skipped}    label="skipped"    />
+              <Stat icon={<AlertCircle strokeWidth={2.5}  size={13} className="text-red-400" />}   value={recompressSummary.failed}     label="failed"     />
             </div>
             {recompressSummary.total === 0 && (
               <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
@@ -254,7 +254,7 @@ export default function ToolsPage() {
       <div className="rounded-xl border border-red-500/20 bg-surface p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
-            <Trash2 size={18} className="text-red-400" />
+            <Trash2 strokeWidth={2.5} size={18} className="text-red-400" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
@@ -273,12 +273,12 @@ export default function ToolsPage() {
             >
               {purgeStatus === "running" ? (
                 <>
-                  <RefreshCw size={13} className="animate-spin" />
+                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
                   Deleting…
                 </>
               ) : (
                 <>
-                  <Trash2 size={13} />
+                  <Trash2 strokeWidth={2.5} size={13} />
                   {purgeStatus === "done" ? "Run again" : "Delete Supabase files"}
                 </>
               )}
@@ -289,8 +289,8 @@ export default function ToolsPage() {
         {purgeStatus === "done" && purgeSummary && (
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
-              <Stat icon={<Trash2      size={13} className="text-red-400" />}          value={purgeSummary.totalDeleted} label="deleted" />
-              <Stat icon={<AlertCircle size={13} className="text-foreground-muted" />} value={purgeSummary.totalFailed}  label="failed"  />
+              <Stat icon={<Trash2 strokeWidth={2.5}      size={13} className="text-red-400" />}          value={purgeSummary.totalDeleted} label="deleted" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={purgeSummary.totalFailed}  label="failed"  />
             </div>
             {purgeSummary.results.length === 0 && (
               <p className="font-body text-xs text-foreground-muted">No buckets found in Supabase Storage.</p>
@@ -301,8 +301,8 @@ export default function ToolsPage() {
                   <div key={i} className="flex items-start gap-2 px-3 py-2">
                     <span className="mt-0.5">
                       {r.failed > 0
-                        ? <AlertCircle size={12} className="text-red-400 shrink-0" />
-                        : <CheckCircle2 size={12} className="text-green-400 shrink-0" />}
+                        ? <AlertCircle strokeWidth={2.5} size={12} className="text-red-400 shrink-0" />
+                        : <CheckCircle2 strokeWidth={2.5} size={12} className="text-green-400 shrink-0" />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-[11px] text-foreground">
@@ -352,10 +352,10 @@ function ResultRow({
   const isSkipped = result.status === "skipped";
 
   const icon = isSuccess
-    ? <CheckCircle2 size={12} className="text-green-400 shrink-0" />
+    ? <CheckCircle2 strokeWidth={2.5} size={12} className="text-green-400 shrink-0" />
     : isSkipped
-    ? <SkipForward  size={12} className="text-foreground-muted shrink-0" />
-    : <AlertCircle  size={12} className="text-red-400 shrink-0" />;
+    ? <SkipForward strokeWidth={2.5}  size={12} className="text-foreground-muted shrink-0" />
+    : <AlertCircle strokeWidth={2.5}  size={12} className="text-red-400 shrink-0" />;
 
   return (
     <div className="flex items-start gap-2 px-3 py-2">

@@ -56,7 +56,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <LayoutList size={16} className={active("/admin") ? "text-accent" : ""} />
+        <LayoutList strokeWidth={2.5} size={16} className={active("/admin") ? "text-accent" : ""} />
         Applications
       </Link>
 
@@ -70,7 +70,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Clapperboard size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
+        <Clapperboard strokeWidth={2.5} size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
         Lottie Animations
       </Link>
 
@@ -84,7 +84,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <MessagesSquare size={16} className={active("/admin/communities") ? "text-accent" : ""} />
+        <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-accent" : ""} />
         Communities
       </Link>
 
@@ -98,7 +98,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <ShieldCheck size={16} className={active("/admin/moderation") ? "text-accent" : ""} />
+        <ShieldCheck strokeWidth={2.5} size={16} className={active("/admin/moderation") ? "text-accent" : ""} />
         Moderation
       </Link>
 
@@ -112,7 +112,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Wrench size={16} className={active("/admin/tools") ? "text-accent" : ""} />
+        <Wrench strokeWidth={2.5} size={16} className={active("/admin/tools") ? "text-accent" : ""} />
         Tools
       </Link>
 
@@ -126,7 +126,7 @@ export function AdminSidebar() {
             : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
         }`}
       >
-        <Gauge size={16} className={active("/admin/load-test") ? "text-accent" : ""} />
+        <Gauge strokeWidth={2.5} size={16} className={active("/admin/load-test") ? "text-accent" : ""} />
         Load Test
       </Link>
 
@@ -140,7 +140,7 @@ export function AdminSidebar() {
               : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
           }`}
         >
-          <Database size={16} className={masterGroupActive ? "text-accent" : ""} />
+          <Database strokeWidth={2.5} size={16} className={masterGroupActive ? "text-accent" : ""} />
           <span className="flex-1 text-left">Master Data</span>
           <ChevronDown
             size={14}

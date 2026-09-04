@@ -58,7 +58,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
             : "text-foreground-muted hover:text-foreground bg-surface-raised hover:bg-surface-raised-hover"
         }`}
       >
-        <Search size={13} />
+        <Search strokeWidth={2.5} size={13} />
         Explore Communities
       </button>
 
@@ -82,7 +82,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                 aria-label="Create community"
                 title="Create community"
               >
-                <Plus size={12} strokeWidth={2.4} />
+                <Plus size={12} strokeWidth={2.5} />
               </button>
             </div>
             <div className="px-4 py-10 text-center">
@@ -98,7 +98,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                 onClick={() => setCreateOpen(true)}
                 className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 font-body text-xs font-medium text-black transition-colors hover:bg-[#cccccc]"
               >
-                <Plus size={12} />
+                <Plus strokeWidth={2.5} size={12} />
                 Create Community
               </button>
             </div>
@@ -116,7 +116,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
                 aria-label="Create community"
                 title="Create community"
               >
-                <Plus size={12} strokeWidth={2.4} />
+                <Plus size={12} strokeWidth={2.5} />
               </button>
             </div>
             <ul className="space-y-0.5">

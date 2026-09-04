@@ -210,7 +210,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         onClick={() => router.push(listPath)}
         className="mb-6 flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors"
       >
-        <ArrowLeft size={13} />
+        <ArrowLeft strokeWidth={2.5} size={13} />
         Back to {entity.toLowerCase()}s
       </button>
 
@@ -222,7 +222,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-xl object-cover border border-border" />
           ) : (
             <div className="h-16 w-16 rounded-xl border border-dashed border-border bg-surface-raised flex items-center justify-center">
-              <ImagePlus size={20} className="text-foreground-muted" />
+              <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
             </div>
           )}
         </div>
@@ -238,10 +238,10 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 className="rounded-lg border border-accent bg-surface px-3 py-2 font-display text-xl font-semibold text-foreground outline-none focus:ring-1 focus:ring-accent/30 flex-1 min-w-0"
               />
               <button onClick={handleEditSave} disabled={editLoading} className="text-green-400 hover:text-green-300 transition-colors shrink-0" aria-label="Save">
-                {editLoading ? <Spinner className="h-4 w-4" /> : <Check size={18} />}
+                {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={18} />}
               </button>
               <button onClick={() => { setEditing(false); setEditError(null); }} className="text-foreground-muted hover:text-foreground transition-colors shrink-0" aria-label="Cancel">
-                <X size={18} />
+                <X strokeWidth={2.5} size={18} />
               </button>
             </div>
           ) : (
@@ -289,7 +289,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             onClick={() => { setEditing(true); setEditName(item.name); }}
             className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <Pencil size={12} /> Edit
+            <Pencil strokeWidth={2.5} size={12} /> Edit
           </button>
         </div>
 
@@ -312,7 +312,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                   onClick={() => imageInputRef.current?.click()}
                   className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                 >
-                  <Upload size={12} />
+                  <Upload strokeWidth={2.5} size={12} />
                   {item.image_url ? "Replace" : "Upload"}
                 </button>
                 {item.image_url && (
@@ -350,7 +350,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                   : "border-green-500/30 text-green-400 hover:bg-green-500/10"
               }`}
             >
-              {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
+              {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight strokeWidth={2.5} size={14} /> : <ToggleLeft strokeWidth={2.5} size={14} />}
               {item.is_active ? "Deactivate" : "Activate"}
             </button>
           </div>
@@ -369,7 +369,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
               onClick={() => setConfirmDelete(true)}
               className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
             >
-              <Trash2 size={12} /> Delete
+              <Trash2 strokeWidth={2.5} size={12} /> Delete
             </button>
           </div>
         )}
@@ -398,7 +398,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 disabled={deleteLoading}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-red-600 py-2 font-body text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
               >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 size={12} />}
+                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete
               </button>
             </div>

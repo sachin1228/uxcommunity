@@ -72,7 +72,7 @@ export function Modal({
                 className="flex-shrink-0 text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Close"
               >
-                <X size={18} />
+                <X strokeWidth={2.5} size={18} />
               </button>
             )}
           </div>
@@ -83,7 +83,7 @@ export function Modal({
             className="absolute right-4 top-4 text-foreground-muted hover:text-foreground transition-colors"
             aria-label="Close"
           >
-            <X size={18} />
+            <X strokeWidth={2.5} size={18} />
           </button>
         )}
         {children}

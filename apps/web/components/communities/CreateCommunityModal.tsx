@@ -89,7 +89,7 @@ function RuleRow({
         className="h-9 w-9 shrink-0 rounded-lg border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
         aria-label="Remove rule"
       >
-        <X size={14} className="mx-auto" />
+        <X strokeWidth={2.5} size={14} className="mx-auto" />
       </button>
     </div>
   );
@@ -188,7 +188,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
       {created ? (
         <div className="text-center">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <Check size={24} />
+            <Check strokeWidth={2.5} size={24} />
           </div>
           <h2 className="font-display text-xl font-semibold text-foreground">
             {created.is_private ? "Invite your first members" : "Your community is live"}
@@ -293,7 +293,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       <span className={`absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full border ${
                         active ? "border-accent bg-accent text-accent-foreground" : "border-border"
                       }`}>
-                        {active && <Check size={10} />}
+                        {active && <Check strokeWidth={2.5} size={10} />}
                       </span>
                       {required && (
                         <span className="mt-2 inline-block rounded-full bg-surface px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-foreground-muted">
@@ -319,7 +319,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   {imagePreview ? (
                     <img src={imagePreview} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <ImagePlus size={20} />
+                    <ImagePlus strokeWidth={2.5} size={20} />
                   )}
                 </button>
                 <div className="min-w-0">
@@ -354,7 +354,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                     disabled={rules.length >= 8}
                     className="inline-flex items-center gap-1 font-body text-xs text-accent disabled:opacity-50"
                   >
-                    <Plus size={12} /> Add rule
+                    <Plus strokeWidth={2.5} size={12} /> Add rule
                   </button>
                 </div>
                 <div className="space-y-2">

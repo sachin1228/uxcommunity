@@ -184,7 +184,7 @@ export function MessageActionSlider({
                 onClose();
               }}
             >
-              <Reply size={18} className="text-foreground-muted shrink-0" />
+              <Reply strokeWidth={2.5} size={18} className="text-foreground-muted shrink-0" />
               <span className="font-body text-sm text-foreground">Reply</span>
             </button>
 
@@ -196,7 +196,7 @@ export function MessageActionSlider({
                 onClose();
               }}
             >
-              <Copy size={18} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={18} className="text-foreground-muted shrink-0" />
               <span className="font-body text-sm text-foreground">Copy</span>
             </button>
           </div>

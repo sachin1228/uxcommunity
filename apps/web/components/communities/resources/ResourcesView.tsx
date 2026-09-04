@@ -192,7 +192,7 @@ export function ResourcesView({
             onClick={() => setShowCreateModal(true)}
             className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            <Plus size={14} /> Share Resource
+            <Plus strokeWidth={2.5} size={14} /> Share Resource
           </button>
         </div>
 
@@ -251,7 +251,7 @@ export function ResourcesView({
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
             <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
@@ -259,7 +259,7 @@ export function ResourcesView({
           </div>
         ) : filtered.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>

@@ -142,7 +142,7 @@ export const CommunityRow = memo(function CommunityRow({
               {c.name}
             </span>
             {c.is_private && (
-              <Lock size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
+              <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
             )}
             {c.last_message && !typingText && (
               <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">

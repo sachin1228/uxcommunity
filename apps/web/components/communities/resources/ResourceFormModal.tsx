@@ -179,7 +179,7 @@ export function ResourceFormModal({
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X size={20} />
+            <X strokeWidth={2.5} size={20} />
           </button>
         </div>
 
@@ -258,7 +258,7 @@ export function ResourceFormModal({
           {/* Figma detection banner */}
           {figmaLink && (
             <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
-              <Check size={14} aria-hidden="true" />
+              <Check strokeWidth={2.5} size={14} aria-hidden="true" />
               <span className="font-body text-xs font-medium">
                 {figmaLink.kind === "prototype" ? "Figma prototype detected — interactive preview enabled" : "Figma file detected"}
               </span>
@@ -290,7 +290,7 @@ export function ResourceFormModal({
           {/* Share publicly */}
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2.5">
-              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
               <span>
                 <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
                 <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
@@ -318,7 +318,7 @@ export function ResourceFormModal({
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
           </button>
         </div>

@@ -122,7 +122,7 @@ function CommentNode({
     <div className={isReply ? "pl-8" : ""}>
       {isReply && (
         <div className="mb-1 flex items-center gap-1">
-          <CornerDownRight size={11} className="text-foreground-subtle/40 shrink-0" />
+          <CornerDownRight strokeWidth={2.5} size={11} className="text-foreground-subtle/40 shrink-0" />
         </div>
       )}
 
@@ -151,7 +151,7 @@ function CommentNode({
                   className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
                   aria-label="Comment options"
                 >
-                  <MoreHorizontal size={13} />
+                  <MoreHorizontal strokeWidth={2.5} size={13} />
                 </button>
                 {menuOpen && (
                   <div className="absolute right-0 top-6 z-30 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -161,7 +161,7 @@ function CommentNode({
                       disabled={deleting}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
-                      {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 size={11} />}
+                      {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   </div>
@@ -195,7 +195,7 @@ function CommentNode({
               onClick={() => { setReplyOpen((p) => !p); setReplyError(null); }}
               className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
             >
-              <CornerDownRight size={11} />
+              <CornerDownRight strokeWidth={2.5} size={11} />
               Reply
             </button>
           )}
@@ -231,7 +231,7 @@ function CommentNode({
                     disabled={!replyText.trim() || replyPosting}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {replyPosting ? <Spinner size={11} className="text-white" /> : <Send size={11} />}
+                    {replyPosting ? <Spinner size={11} className="text-white" /> : <Send strokeWidth={2.5} size={11} />}
                     {replyPosting ? "Posting…" : "Post"}
                   </button>
                 </div>
@@ -406,8 +406,8 @@ export function EventDetailClient({
         <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
           <div className="flex border-b border-border">
             {([
-              { id: "discussion" as const, label: "Discussion", icon: <MessageSquare size={14} />, count: topLevelCount },
-              { id: "attendees" as const, label: "Attendees", icon: <Users size={14} />, count: event.rsvp_count },
+              { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
+              { id: "attendees" as const, label: "Attendees", icon: <Users strokeWidth={2.5} size={14} />, count: event.rsvp_count },
             ]).map((tab) => (
               <button
                 key={tab.id}
@@ -457,7 +457,7 @@ export function EventDetailClient({
                     disabled={!canPost}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {posting ? <Spinner size={13} className="text-white" /> : <Send size={13} />}
+                    {posting ? <Spinner size={13} className="text-white" /> : <Send strokeWidth={2.5} size={13} />}
                     {posting ? "Posting…" : "Post"}
                   </button>
                 </div>
@@ -480,7 +480,7 @@ export function EventDetailClient({
                 </div>
               ) : rootComments.length === 0 ? (
                 <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <MessageSquare size={22} className={communityFeedLayout.emptyIcon} />
+                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
                   <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
                 </div>
               ) : (
@@ -524,7 +524,7 @@ export function EventDetailClient({
             <div className="mt-5">
               {rsvps.length === 0 ? (
                 <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <Users size={22} className={communityFeedLayout.emptyIcon} />
+                  <Users strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
                   <p className={communityFeedLayout.emptyDescription}>No attendees yet. Be the first to join!</p>
                 </div>
               ) : (

@@ -36,7 +36,7 @@ function ImageGrid({
       className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
       aria-label="Remove image"
     >
-      <X size={12} />
+      <X strokeWidth={2.5} size={12} />
     </button>
   );
 
@@ -258,7 +258,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             Edit Thread
           </h2>
           <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X size={20} />
+            <X strokeWidth={2.5} size={20} />
           </button>
         </div>
 
@@ -338,10 +338,10 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             <div className="space-y-1.5">
               {nonImages.map((att) => (
                 <div key={att.url} className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 font-body text-xs text-foreground-muted">
-                  <Paperclip size={13} />
+                  <Paperclip strokeWidth={2.5} size={13} />
                   <span className="min-w-0 flex-1 truncate">{att.name}</span>
                   <button type="button" onClick={() => setAttachments((c) => c.filter((a) => a.url !== att.url))} aria-label={`Remove ${att.name}`}>
-                    <X size={13} />
+                    <X strokeWidth={2.5} size={13} />
                   </button>
                 </div>
               ))}
@@ -356,7 +356,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                   <LinkIcon size={11} />
                   <span className="max-w-[220px] truncate">{link}</span>
                   <button type="button" onClick={() => setLinks((c) => c.filter((l) => l !== link))} aria-label={`Remove ${link}`}>
-                    <X size={10} />
+                    <X strokeWidth={2.5} size={10} />
                   </button>
                 </div>
               ))}
@@ -415,11 +415,11 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                     onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); setTags((c) => c.filter((t) => t !== tag)); } }}
                     className="cursor-pointer"
                   >
-                    <X size={10} />
+                    <X strokeWidth={2.5} size={10} />
                   </span>
                 </span>
               ))}
-              <ChevronDown size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
+              <ChevronDown strokeWidth={2.5} size={14} className={`ml-auto shrink-0 text-foreground-subtle transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
             </button>
             {tagDropdownOpen && (
               <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
@@ -436,7 +436,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                       className={`flex w-full items-center gap-2.5 px-3 py-2 font-body text-sm transition-colors ${selected ? "bg-accent/10 text-accent" : maxed ? "cursor-not-allowed text-foreground-subtle opacity-40" : "text-foreground hover:bg-surface-raised"}`}
                     >
                       <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-accent bg-accent" : "border-border"}`}>
-                        {selected && <Check size={10} className="text-accent-foreground" />}
+                        {selected && <Check strokeWidth={2.5} size={10} className="text-accent-foreground" />}
                       </span>
                       {tag}
                     </button>
@@ -460,7 +460,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
 
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2.5">
-              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
               <span>
                 <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
                 <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>

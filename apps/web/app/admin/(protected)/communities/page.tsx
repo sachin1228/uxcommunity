@@ -113,7 +113,7 @@ export default function AdminCommunitiesPage() {
           onClick={() => { setShowResetConfirm(true); setResetResult(null); setResetError(null); }}
           className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
         >
-          <Trash2 size={12} />
+          <Trash2 strokeWidth={2.5} size={12} />
           Reset all chat
         </button>
       </div>
@@ -289,7 +289,7 @@ export default function AdminCommunitiesPage() {
                 disabled={resetLoading}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-red-600 py-2 font-body text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
               >
-                {resetLoading ? <Spinner className="h-3 w-3" /> : <Trash2 size={12} />}
+                {resetLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete all
               </button>
             </div>

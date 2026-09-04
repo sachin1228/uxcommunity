@@ -142,7 +142,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border shrink-0">
           <div>
             <h2 className="font-display text-base font-semibold text-foreground leading-none flex items-center gap-2">
-              <ShieldCheck size={16} className="text-accent" /> Add community admin
+              <ShieldCheck strokeWidth={2.5} size={16} className="text-accent" /> Add community admin
             </h2>
             <p className="font-body text-[11px] text-foreground-muted mt-1">
               Pick a member of <span className="font-medium text-foreground">{communityName}</span> to promote.
@@ -154,14 +154,14 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
             className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
             aria-label="Close"
           >
-            <X size={15} />
+            <X strokeWidth={2.5} size={15} />
           </button>
         </div>
 
         {/* Search */}
         <div className="px-5 py-3 shrink-0">
           <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+            <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
             <input
               ref={inputRef}
               type="text"

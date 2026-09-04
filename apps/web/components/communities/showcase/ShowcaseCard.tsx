@@ -110,7 +110,7 @@ export function ShowcaseCard({
 
         {post.allow_replies !== false && (
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <MessageCircle size={20} />
+          <MessageCircle strokeWidth={2.5} size={20} />
           {post.comment_count}
         </span>
         )}

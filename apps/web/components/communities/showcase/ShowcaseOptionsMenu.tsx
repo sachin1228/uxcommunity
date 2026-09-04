@@ -48,7 +48,7 @@ export function ShowcaseOptionsMenu({
         onClick={() => setOpen((value) => !value)}
         className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal strokeWidth={2.5} size={16} />
       </button>
       {open && (
         <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -63,7 +63,7 @@ export function ShowcaseOptionsMenu({
       className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
 
           >
-            <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
+            <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}
           </button>
           {canManage && (
@@ -76,7 +76,7 @@ export function ShowcaseOptionsMenu({
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
               >
-                <Pencil size={12} />
+                <Pencil strokeWidth={2.5} size={12} />
                 Edit
               </button>
               <button
@@ -87,7 +87,7 @@ export function ShowcaseOptionsMenu({
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
               >
-                <Trash2 size={12} />
+                <Trash2 strokeWidth={2.5} size={12} />
                 Delete
               </button>
             </>

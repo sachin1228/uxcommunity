@@ -308,7 +308,7 @@ export function ThreadCard({
               aria-label="Thread options"
               className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
             >
-              <MoreHorizontal size={15} />
+              <MoreHorizontal strokeWidth={2.5} size={15} />
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -321,7 +321,7 @@ export function ThreadCard({
                   aria-pressed={displayedSaved}
                   className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                 >
-                  <Bookmark size={11} fill={displayedSaved ? "currentColor" : "none"} />
+                  <Bookmark strokeWidth={2.5} size={11} fill={displayedSaved ? "currentColor" : "none"} />
                   {displayedSaved ? "Unsave" : "Save"}
                 </button>
                 {isOwner ? (
@@ -331,7 +331,7 @@ export function ThreadCard({
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                     >
-                      <Pencil size={11} /> Edit
+                      <Pencil strokeWidth={2.5} size={11} /> Edit
                     </button>
                     <button
                       type="button"
@@ -339,7 +339,7 @@ export function ThreadCard({
                       disabled={deleting}
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
-                      <Trash2 size={11} />
+                      <Trash2 strokeWidth={2.5} size={11} />
                       {deleting ? "Deleting…" : "Delete"}
                     </button>
                   </>
@@ -355,7 +355,7 @@ export function ThreadCard({
                     disabled={reported}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
                   >
-                    <Flag size={11} />
+                    <Flag strokeWidth={2.5} size={11} />
                     {reported ? "Reported" : "Report"}
                   </button>
                 )}
@@ -387,7 +387,7 @@ export function ThreadCard({
                 isDetail ? (
                   <a key={att.url} href={att.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
-                    <Paperclip size={12} />
+                    <Paperclip strokeWidth={2.5} size={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
                     <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
                   </a>
@@ -396,7 +396,7 @@ export function ThreadCard({
                     onClick={(e) => { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); }}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); } }}
                     className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
-                    <Paperclip size={12} />
+                    <Paperclip strokeWidth={2.5} size={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
                     <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
                   </div>
@@ -530,7 +530,7 @@ export function ThreadCard({
 
             {/* Comments */}
             <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
-              <MessageCircle size={20} strokeWidth={2} />
+              <MessageCircle size={20} strokeWidth={2.5} />
               {thread.comment_count}
             </span>
           </div>

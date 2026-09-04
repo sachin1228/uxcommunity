@@ -84,9 +84,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mb-3 flex justify-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-xs text-foreground-muted">
             {community.is_private ? (
-              <><Lock size={11} /> Private community</>
+              <><Lock strokeWidth={2.5} size={11} /> Private community</>
             ) : (
-              <><Globe2 size={11} /> Public community</>
+              <><Globe2 strokeWidth={2.5} size={11} /> Public community</>
             )}
           </span>
         </div>
@@ -103,7 +103,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
         {/* Member count */}
         <p className="mt-3 flex items-center justify-center gap-1.5 font-body text-xs text-foreground-subtle">
-          <Users size={12} />
+          <Users strokeWidth={2.5} size={12} />
           {community.member_count.toLocaleString()} member{community.member_count !== 1 ? "s" : ""}
         </p>
 
@@ -111,14 +111,14 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         <div className="mt-7">
           {status === "joined" && (
             <div className="flex items-center justify-center gap-2 rounded-xl bg-accent/10 py-3 text-accent">
-              <Check size={16} />
+              <Check strokeWidth={2.5} size={16} />
               <span className="font-body text-sm font-medium">Joined! Redirecting…</span>
             </div>
           )}
 
           {status === "requested" && (
             <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-              <Check size={18} className="mx-auto mb-2 text-accent" />
+              <Check strokeWidth={2.5} size={18} className="mx-auto mb-2 text-accent" />
               <p className="font-body text-sm font-semibold text-foreground">Request sent</p>
               <p className="mt-1 font-body text-xs text-foreground-muted">
                 The community owner will review your request.
@@ -136,9 +136,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
                 {status === "loading" ? (
                   <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
                 ) : community.is_private ? (
-                  <><Lock size={14} /> Request to join</>
+                  <><Lock strokeWidth={2.5} size={14} /> Request to join</>
                 ) : (
-                  <><MessageSquare size={14} /> Join community</>
+                  <><MessageSquare strokeWidth={2.5} size={14} /> Join community</>
                 )}
               </button>
 

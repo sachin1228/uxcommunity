@@ -89,7 +89,7 @@ export default function ApplyPage() {
 //           href="/login"
 //           className="mb-6 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
 //         >
-//           <ArrowLeft size={14} />
+//           <ArrowLeft strokeWidth={2.5} size={14} />
 //           Back to login
 //         </Link>
 //

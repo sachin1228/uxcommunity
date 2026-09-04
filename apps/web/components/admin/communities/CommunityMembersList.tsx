@@ -146,7 +146,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Clear search"
               >
-                <X size={12} />
+                <X strokeWidth={2.5} size={12} />
               </button>
             )}
           </div>
@@ -175,7 +175,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                   onClick={() => router.push(`/admin/users/${m.user_id}`)}
                   className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink size={10} className="text-foreground-muted" />
+                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
                 </button>
                 <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
               </div>
@@ -202,7 +202,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                   onClick={() => router.push(`/admin/users/${m.id}`)}
                   className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink size={10} className="text-foreground-muted" />
+                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
                 </button>
                 <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
               </div>

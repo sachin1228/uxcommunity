@@ -238,7 +238,7 @@ export default function CommunityDetailPage() {
         onClick={() => router.push("/admin/communities")}
         className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
       >
-        <ArrowLeft size={13} /> Communities
+        <ArrowLeft strokeWidth={2.5} size={13} /> Communities
       </button>
 
       {/* Hero */}
@@ -280,13 +280,13 @@ export default function CommunityDetailPage() {
                   disabled={editLoading}
                   className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
                 >
-                  {editLoading ? <Spinner className="h-4 w-4" /> : <Check size={15} />}
+                  {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={15} />}
                 </button>
                 <button
                   onClick={() => { setEditing(false); setEditError(null); }}
                   className="p-1 text-foreground-muted hover:text-foreground"
                 >
-                  <X size={15} />
+                  <X strokeWidth={2.5} size={15} />
                 </button>
               </div>
             ) : (
@@ -299,7 +299,7 @@ export default function CommunityDetailPage() {
                   className="shrink-0 p-1 text-foreground-muted hover:text-foreground transition-colors"
                   title="Rename community"
                 >
-                  <Pencil size={13} />
+                  <Pencil strokeWidth={2.5} size={13} />
                 </button>
               </div>
             )}
@@ -409,13 +409,13 @@ export default function CommunityDetailPage() {
                         disabled={editDescLoading}
                         className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                       >
-                        {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check size={11} />} Save
+                        {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
                       </button>
                       <button
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
                         className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
                       >
-                        <X size={11} /> Cancel
+                        <X strokeWidth={2.5} size={11} /> Cancel
                       </button>
                     </div>
                   </div>
@@ -429,7 +429,7 @@ export default function CommunityDetailPage() {
                       className="shrink-0 p-1 text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
                       title="Edit description"
                     >
-                      <Pencil size={11} />
+                      <Pencil strokeWidth={2.5} size={11} />
                     </button>
                   </div>
                 )}
@@ -466,7 +466,7 @@ export default function CommunityDetailPage() {
                   <h2 className="font-display text-sm font-semibold text-foreground">Display picture</h2>
                   {community.lottie_url && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent px-2 py-0.5 font-body text-[10px] font-medium">
-                      <Clapperboard size={10} /> Animated
+                      <Clapperboard strokeWidth={2.5} size={10} /> Animated
                     </span>
                   )}
                 </div>
@@ -491,7 +491,7 @@ export default function CommunityDetailPage() {
                         disabled={dpBusy !== null}
                         className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                       >
-                        <ImagePlus size={13} />
+                        <ImagePlus strokeWidth={2.5} size={13} />
                         {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
                       </button>
                       <button
@@ -500,7 +500,7 @@ export default function CommunityDetailPage() {
                         disabled={dpBusy !== null}
                         className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
                       >
-                        <Clapperboard size={13} />
+                        <Clapperboard strokeWidth={2.5} size={13} />
                         {dpBusy === "lottie" ? <Spinner className="h-3 w-3" /> : "Upload Lottie"}
                       </button>
                       {community.lottie_url && (
@@ -510,7 +510,7 @@ export default function CommunityDetailPage() {
                           disabled={dpBusy !== null}
                           className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
                         >
-                          <Eraser size={13} />
+                          <Eraser strokeWidth={2.5} size={13} />
                           {dpBusy === "remove" ? <Spinner className="h-3 w-3" /> : "Remove animation"}
                         </button>
                       )}

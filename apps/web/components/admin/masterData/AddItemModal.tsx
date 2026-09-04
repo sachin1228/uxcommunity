@@ -88,7 +88,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
           <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors">
-            <X size={16} />
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -152,7 +152,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-accent/5 py-5 transition-colors"
               >
-                <ImagePlus size={20} className="text-foreground-muted" />
+                <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
                 <span className="font-body text-xs text-foreground-muted">Click to upload</span>
                 <span className="font-body text-[10px] text-foreground-muted">
                   PNG, JPG, WebP, SVG · max 5 MB
@@ -179,7 +179,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               {addLoading || imageUploading ? (
                 <Spinner className="h-3 w-3 text-white" />
               ) : (
-                <Plus size={13} />
+                <Plus strokeWidth={2.5} size={13} />
               )}
               {imageUploading ? "Uploading…" : `Add ${entity}`}
             </button>

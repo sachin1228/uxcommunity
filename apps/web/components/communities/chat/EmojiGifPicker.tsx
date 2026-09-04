@@ -71,7 +71,7 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search size={12} className="text-foreground-muted shrink-0" />
+          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -83,7 +83,7 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
-              <X size={11} />
+              <X strokeWidth={2.5} size={11} />
             </button>
           )}
         </div>
@@ -193,7 +193,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search size={12} className="text-foreground-muted shrink-0" />
+          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -205,7 +205,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
               className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
-              <X size={11} />
+              <X strokeWidth={2.5} size={11} />
             </button>
           )}
         </div>

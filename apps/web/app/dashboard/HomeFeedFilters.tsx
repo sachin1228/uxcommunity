@@ -35,7 +35,7 @@ export function HomeFeedFilters() {
             className="inline-flex size-8 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground-muted shadow-sm transition-shadow hover:shadow-md"
             aria-label="More feed filters"
           >
-            <SlidersHorizontal size={16} />
+            <SlidersHorizontal strokeWidth={2.5} size={16} />
           </span>
         </div>
       </div>

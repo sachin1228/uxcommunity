@@ -30,5 +30,5 @@ const iconMap: Record<ResourceType, LucideIcon> = {
 
 export function ResourceTypeIcon({ type, size = 14, className }: { type: ResourceType; size?: number; className?: string }) {
   const Icon = iconMap[type] ?? Package;
-  return <Icon size={size} className={className} />;
+  return <Icon size={size} strokeWidth={2.5} className={className} />;
 }

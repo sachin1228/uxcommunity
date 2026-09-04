@@ -170,7 +170,7 @@ function BubbleImage({
             {fmtTime(createdAt)}
           </span>
           {isMe && (
-            <CheckCheck size={11} className="text-white/90" />
+            <CheckCheck strokeWidth={2.5} size={11} className="text-white/90" />
           )}
         </div>
       )}
@@ -183,7 +183,7 @@ function BubbleImage({
               className="absolute inset-0 flex items-center justify-center text-white"
               aria-label="Cancel upload"
             >
-              <X size={14} />
+              <X strokeWidth={2.5} size={14} />
             </button>
           </div>
         </div>
@@ -203,7 +203,7 @@ function RetryIndicator({ onRetry }: { onRetry: () => void }) {
         aria-label="Retry sending"
         title="Tap to retry"
       >
-        <RefreshCw size={13} />
+        <RefreshCw strokeWidth={2.5} size={13} />
       </button>
       <span className="font-body text-[9px] text-red-400 leading-none">Retry</span>
     </div>
@@ -402,7 +402,7 @@ function MessageHoverActions({
             aria-label="React to message"
             title="React"
           >
-            <Smile size={14} />
+            <Smile strokeWidth={2.5} size={14} />
           </button>
         </div>
       )}
@@ -454,7 +454,7 @@ function MessageHoverActions({
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
             role="menuitem"
           >
-            <Reply size={14} className="text-foreground-muted shrink-0" />
+            <Reply strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
             <span>Reply</span>
           </button>
 
@@ -468,7 +468,7 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Copy size={14} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
               <span>Copy</span>
             </button>
           )}
@@ -483,7 +483,7 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Pencil size={14} className="text-foreground-muted shrink-0" />
+              <Pencil strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
               <span>Edit</span>
             </button>
           )}
@@ -500,7 +500,7 @@ function MessageHoverActions({
                 className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition-colors"
                 role="menuitem"
               >
-                <Trash2 size={14} className="shrink-0" />
+                <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
                 <span>{isMe ? "Delete" : "Delete for everyone"}</span>
               </button>
             </>
@@ -736,7 +736,7 @@ function DeletedBubble({
           className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
         />
       )}
-      <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
@@ -889,10 +889,10 @@ export const MessageBubble = memo(function MessageBubble({
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
-                      <Clock size={10} className="text-foreground-muted/60 animate-pulse" />
+                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck size={11} className="text-foreground-muted/70" />
+                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -988,10 +988,10 @@ export const MessageBubble = memo(function MessageBubble({
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock size={10} className="text-accent-foreground opacity-60 animate-pulse" />
+                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck size={11} className="text-accent-foreground opacity-70" />
+                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>
