@@ -1,13 +1,14 @@
 "use client";
 
-import { LoggingOutScreen, useLogout } from "@/components/ui/LoggingOutScreen";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { useLogout } from "@/components/ui/useLogout";
 
 export function LogoutButton() {
   const { loggingOut, handleLogout } = useLogout();
 
   return (
     <>
-      {loggingOut && <LoggingOutScreen />}
+      {loggingOut && <BrandedLoadingScreen label="Logging out" />}
       <button
         onClick={handleLogout}
         disabled={loggingOut}

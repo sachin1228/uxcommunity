@@ -5,7 +5,8 @@ import { LogOut, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
-import { LoggingOutScreen, useLogout } from "@/components/ui/LoggingOutScreen";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { useLogout } from "@/components/ui/useLogout";
 
 interface Props {
   name: string;
@@ -21,7 +22,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
 
   return (
     <div className="relative">
-      {loggingOut && <LoggingOutScreen />}
+      {loggingOut && <BrandedLoadingScreen label="Logging out" />}
 
       {/* Avatar trigger */}
       <button
