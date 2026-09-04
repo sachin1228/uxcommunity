@@ -287,7 +287,7 @@ export const MessageList = memo(function MessageList({
               </div>
             )}
 
-            {group.items.map((item) => {
+            {group.items.map((item, itemIdx) => {
               if (item.kind === "thread") {
                 // Thread notifications break the "same author" run for messages.
                 prevItem = null;
@@ -304,9 +304,25 @@ export const MessageList = memo(function MessageList({
               // message item
               const msg = item.msg;
               const isMe = msg.user_id === currentUserId;
+              // The message at the very top of the loaded window is the avatar
+              // equivalent of the oldest date group's pill: while more history
+              // may exist above, whether it *starts* an author run is only a
+              // guess — the run could continue into the unloaded messages above.
+              // Rendering the group header (dp + name + bubble tail) there would
+              // make it "float": every time an older page is prepended and the
+              // run extends further up, the header jumps to the earlier message
+              // and every row below reflows (layout shift). So while history may
+              // exist above we render the topmost message as a plain
+              // continuation, and only give it a header once the real
+              // predecessor is loaded — either hasMoreAbove turns false (the
+              // true start of the history) or a genuine different-author /
+              // thread item now actually precedes it.
+              const isWindowTopMessage =
+                groupIdx === 0 && itemIdx === 0 && item.kind === "message";
               const isSameAuthor =
-                prevItem?.kind === "message" &&
-                prevItem.msg.user_id === msg.user_id;
+                (isWindowTopMessage && hasMoreAbove) ||
+                (prevItem?.kind === "message" &&
+                  prevItem.msg.user_id === msg.user_id);
               prevItem = item;
               const isFirstUnread = firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
               const dividerNode = isFirstUnread ? (
