@@ -1,12 +1,29 @@
 "use client";
 
-import { forwardRef, useRef, useState, useEffect, useCallback } from "react";
+import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
+import { MentionSuggestions } from "./MentionSuggestions";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
+import type { MessageMention } from "@/lib/communities/cache";
+import {
+  splitContentByMentions,
+  type MentionCandidate,
+} from "@/lib/communities/mentions";
+
+/** Visual state of the member @mention popover, owned by the parent hook. */
+export interface MentionPickerState {
+  open: boolean;
+  loading: boolean;
+  query: string;
+  options: MentionCandidate[];
+  activeIndex: number;
+  onPick: (option: MentionCandidate) => void;
+  onHover: (index: number) => void;
+}
 
 interface ChatInputProps {
   input: string;
@@ -26,6 +43,15 @@ interface ChatInputProps {
   onBlur?: () => void;
   onEmojiSelect: (emoji: string) => void;
   onGifSelect: (url: string) => void;
+  /** Member @mention popover state — when present with open=true, renders the popover. */
+  mention?: MentionPickerState | null;
+  /** Reports textarea value + caret after typing/selection so the parent can
+   * track the in-progress @query token. */
+  onComposerActivity?: (value: string, caret: number) => void;
+  /** Resolves the *picked* mentions in a text so the composer overlay can
+   * tint their `@Name` tokens blue — only members actually picked from the
+   * popover get colored, hand-typed @words stay plain. */
+  resolveMentions?: (content: string) => MessageMention[];
 }
 
 interface PickerPos {
@@ -91,6 +117,39 @@ function renderWithSvgEmoji(text: string): React.ReactNode {
   return parts;
 }
 
+/**
+ * Mirror text for the composer overlay. Picked mentions (resolved via the
+ * composer's registry) are wrapped in color-only spans, so the overlay's
+ * line layout stays byte-for-byte identical to the transparent <textarea>
+ * underneath while the @Name reads in the app's blue.
+ */
+function renderComposerOverlay(
+  text: string,
+  resolveMentions?: (content: string) => MessageMention[],
+): React.ReactNode {
+  if (!resolveMentions) return renderWithSvgEmoji(text);
+  const mentions = resolveMentions(text);
+  const segments = mentions?.length
+    ? splitContentByMentions(text, mentions)
+    : null;
+  if (!segments) return renderWithSvgEmoji(text);
+
+  const parts: React.ReactNode[] = [];
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    if (segment.mention) {
+      parts.push(
+        <span key={i} className="text-[var(--ds-blue-700)]">
+          {segment.text}
+        </span>,
+      );
+    } else if (segment.text) {
+      parts.push(<span key={i}>{renderWithSvgEmoji(segment.text)}</span>);
+    }
+  }
+  return parts;
+}
+
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
   function ChatInput(
     {
@@ -99,6 +158,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onChange, onKeyDown, onSend, onCancelReply,
       onImageSelect, onImageRemove, onBlur,
       onEmojiSelect, onGifSelect,
+      mention, onComposerActivity, resolveMentions,
     },
     ref
   ) {
@@ -110,6 +170,14 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
     const canSend = !!input.trim() || !!pendingImagePreview;
+
+    // Mirror content for the visual overlay (plain text + emoji SVGs + blue
+    // mention tokens). Color spans never change layout, so the overlay stays
+    // aligned with the transparent textarea text.
+    const overlayContent = useMemo(
+      () => renderComposerOverlay(input, resolveMentions),
+      [input, resolveMentions],
+    );
 
     // Keep the overlay scrolled in lock-step with the textarea
     const syncScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -264,7 +332,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         )}
 
         {/* Input box — used as the measurement anchor for the portal picker */}
-        <div ref={anchorRef}>
+        <div ref={anchorRef} className="relative">
+          {/* Mention popover — floats above the composer while an @token is typed */}
+          {mention?.open && (
+            <MentionSuggestions
+              query={mention.query}
+              loading={mention.loading}
+              options={mention.options}
+              activeIndex={mention.activeIndex}
+              onPick={mention.onPick}
+              onHover={mention.onHover}
+            />
+          )}
           <div className="flex flex-col bg-surface-raised rounded-2xl shadow-md px-[5px] pl-[5px] pr-[8px]">
             {/* Hidden file input */}
             <input
@@ -356,6 +435,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onChange(e.target.value);
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                    // After the value update the caret is at the end of what
+                    // was just typed — re-evaluate the @query token.
+                    onComposerActivity?.(e.target.value, e.target.selectionStart);
+                  }}
+                  onKeyUp={(e) => {
+                    // Arrow/Home/End/Backspace moves and IME commits don't fire
+                    // onChange; still track the caret for the mention token.
+                    onComposerActivity?.(e.currentTarget.value, e.currentTarget.selectionStart);
+                  }}
+                  onMouseUp={(e) => {
+                    onComposerActivity?.(e.currentTarget.value, e.currentTarget.selectionStart);
                   }}
                   onScroll={syncScroll}
                   onKeyDown={onKeyDown}
@@ -381,7 +471,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   className="absolute inset-0 font-body text-[15px] text-foreground pointer-events-none overflow-hidden whitespace-pre-wrap break-words"
                   style={{ lineHeight: "1.5" }}
                 >
-                  {renderWithSvgEmoji(input)}
+                  {overlayContent}
                 </div>
               </div>
 

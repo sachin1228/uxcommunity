@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  AtSign,
   Bell,
   CalendarDays,
   CheckCheck,
@@ -30,7 +31,8 @@ type NotificationType =
   | "event_comment"
   | "event_reply"
   | "event_rsvp"
-  | "event_save";
+  | "event_save"
+  | "chat_mention";
 
 interface NotificationItem {
   id: string;
@@ -50,6 +52,7 @@ interface Props {
 const MAX_ITEMS = 30;
 
 function iconFor(type: NotificationType) {
+  if (type === "chat_mention") return AtSign;
   if (type.includes("event")) return CalendarDays;
   if (type.includes("resource")) return FileText;
   if (type.includes("comment") || type.includes("reply")) return MessageCircle;
@@ -217,7 +220,7 @@ export function NotificationBell({ userId }: Props) {
         <Bell size={22} className="mx-auto mb-2 text-foreground-muted opacity-50" />
         <p className="font-body text-sm font-medium text-foreground">No notifications yet</p>
         <p className="mt-1 font-body text-xs text-foreground-muted">
-          Threads, resources, events, and replies will appear here.
+          Threads, resources, events, replies, and @mentions will appear here.
         </p>
       </div>
     ),

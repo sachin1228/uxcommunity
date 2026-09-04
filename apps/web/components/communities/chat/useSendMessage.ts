@@ -7,7 +7,7 @@ import {
   restoreSidebarEntry,
   sidebarStore,
 } from "@/lib/communities/cache";
-import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressChatImageClient, compressedFile } from "@/lib/image-client";
 
@@ -24,6 +24,8 @@ interface UseSendMessageOptions {
   onClearReply: () => void;
   /** Ref to the bottom sentinel — scrolled into view instantly on every send. */
   scrollToBottomRef: React.RefObject<HTMLDivElement>;
+  /** Resolves the members @mentioned in the final text (composer registry). */
+  resolveMentions?: (content: string) => MessageMention[];
 }
 
 type RetryData = {
@@ -42,7 +44,19 @@ export function useSendMessage({
   replyTo,
   onClearReply,
   scrollToBottomRef,
+  resolveMentions,
 }: UseSendMessageOptions) {
+  // Stable-ish helper: mentions only exist while there is text to mention in.
+  const mentionResolverRef = useRef(resolveMentions);
+  useEffect(() => {
+    mentionResolverRef.current = resolveMentions;
+  }, [resolveMentions]);
+  const resolveMentionsFor = (content: string): MessageMention[] => {
+    const trimmed = content.trim();
+    return trimmed && mentionResolverRef.current
+      ? mentionResolverRef.current(trimmed)
+      : [];
+  };
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,6 +197,8 @@ export function useSendMessage({
       replyTo: msgReplyTo,
     });
 
+    const mentions = resolveMentionsFor(content);
+
     const optimistic: Message = {
       id: tempId,
       content,
@@ -193,6 +209,7 @@ export function useSendMessage({
       reactions: [],
       reply_to: msgReplyTo ?? null,
       image_url: imagePreviewUrl,
+      mentions,
     };
 
     setMessages((prev) => {
@@ -308,6 +325,7 @@ export function useSendMessage({
             content,
             reply_to_id: msgReplyTo?.id ?? null,
             image_url: uploadedImageUrl,
+            mentions: mentions.map((m) => ({ user_id: m.user_id })),
           }),
           signal: abortController.signal,
         }),
@@ -533,6 +551,7 @@ export function useSendMessage({
       reactions: [],
       reply_to: null,
       image_url: gifUrl,
+      mentions: [],
     };
 
     setMessages((prev) => {
@@ -575,7 +594,7 @@ export function useSendMessage({
       const res = await dedupeFetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "", image_url: gifUrl }),
+        body: JSON.stringify({ content: "", image_url: gifUrl, mentions: [] }),
       });
 
       const data = await res.json().catch(() => ({}));

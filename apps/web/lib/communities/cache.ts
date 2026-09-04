@@ -9,6 +9,9 @@ import {
   patchCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
+import type { MessageMention } from "./mentions";
+
+export type { MessageMention } from "./mentions";
 
 export interface MessageReaction {
   emoji: string;
@@ -34,6 +37,8 @@ export interface CachedMessage {
   image_url?: string | null;
   deleted_at?: string | null;
   edited_at?: string | null;
+  /** Members @mentioned in this message — `@Name` tokens in `content`. */
+  mentions?: MessageMention[];
 }
 
 /** A thread-created event shown inline in the chat timeline. */

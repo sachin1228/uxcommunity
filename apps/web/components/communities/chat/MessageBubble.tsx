@@ -1,15 +1,16 @@
 "use client";
 
-import { Fragment, useState, useRef, useEffect, memo } from "react";
+import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 
-import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
@@ -326,12 +327,12 @@ function MessageHoverActions({
   // No actions on deleted messages
   if (isDeleted) return null;
 
-  // While sending, render an invisible spacer that matches the reaction
-  // button's footprint so the bubble's available width doesn't change (and
-  // the text doesn't re-wrap) the moment the message flips to "sent".
+  // The actions pop in beside the bubble on hover WITHOUT reserving layout
+  // space when hidden — an in-flow opacity-0 cluster left a permanent empty
+  // strip next to short messages. Sending bubbles get the same zero-width
+  // treatment so their text never re-wraps as the status flips.
   if (msg.status === "sending") {
-    if (insideBubble || !showReaction) return null;
-    return <div aria-hidden className="w-7 h-7 shrink-0" />;
+    return null;
   }
 
   return (
@@ -339,7 +340,7 @@ function MessageHoverActions({
       className={
         insideBubble
           ? "contents"
-          : "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150"
+          : "hidden group-hover:flex items-center gap-0.5 shrink-0"
       }
     >
       {/* Emoji reaction button — only for non-deleted messages */}
@@ -571,13 +572,29 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
   return parts;
 }
 
+/** Highlighted chip for a `@Name` mention inside a message bubble. */
+function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
+  return (
+    <span
+      className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
+        isMe
+          ? "bg-black/25 text-accent-foreground"
+          : "bg-accent/15 text-accent"
+      }`}
+    >
+      {text}</span>
+  );
+}
+
 function MessageContent({
   content,
+  mentions,
   isMe,
   showPreview,
   animate = false,
 }: {
   content: string;
+  mentions: MessageMention[];
   isMe: boolean;
   showPreview: boolean;
   /** When true, each word rises into place with a staggered delay. */
@@ -585,32 +602,71 @@ function MessageContent({
 }) {
   const previewUrl = showPreview ? extractFirstUrl(content) : null;
 
+  // Mentions are matched against the raw text first (longest name wins), so
+  // exactly the stored mentions become chips and everything else — including
+  // hand-typed @words that were never picked — renders as plain text.
+  const segments = useMemo(
+    () => splitContentByMentions(content, mentions ?? []),
+    [content, mentions],
+  );
+
   let parts: React.ReactNode[];
 
   if (animate) {
-    // Split on whitespace (keeping the whitespace so pre-wrap newlines survive)
-    // and wrap every word in a span that carries its stagger index.
-    const tokens = content.split(/(\s+)/);
+    // Split each plain-text segment on whitespace (keeping the whitespace so
+    // pre-wrap newlines survive) and wrap every word in a span that carries
+    // its stagger index. Mention chips are whole tokens with a single index.
     let wordIdx = 0;
-    let offset = 0;
-    parts = tokens.map((tok) => {
-      const key = offset;
-      offset += tok.length;
-      if (!tok) return null;
-      if (/^\s+$/.test(tok)) return tok;
-      const i = wordIdx++;
-      return (
-        <span
-          key={key}
-          className="chat-word-in"
-          style={{ "--i": i } as React.CSSProperties}
-        >
-          {renderRichChunk(tok, isMe, key)}
-        </span>
-      );
-    });
+    let keyIdx = 0;
+    parts = [];
+    for (const segment of segments) {
+      if (segment.mention) {
+        const i = wordIdx++;
+        const key = keyIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            <MentionChip text={segment.text} isMe={isMe} />
+          </span>,
+        );
+        continue;
+      }
+      const tokens = segment.text.split(/(\s+)/);
+      for (const tok of tokens) {
+        const key = keyIdx++;
+        if (!tok) continue;
+        if (/^\s+$/.test(tok)) {
+          parts.push(tok);
+          continue;
+        }
+        const i = wordIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            {renderRichChunk(tok, isMe, key)}
+          </span>,
+        );
+      }
+    }
   } else {
-    parts = renderRichChunk(content, isMe, 0);
+    parts = [];
+    let keyIdx = 0;
+    for (const segment of segments) {
+      if (segment.mention) {
+        parts.push(
+          <MentionChip key={keyIdx++} text={segment.text} isMe={isMe} />,
+        );
+      } else if (segment.text) {
+        parts.push(...renderRichChunk(segment.text, isMe, keyIdx));
+        keyIdx += segment.text.length;
+      }
+    }
   }
 
   return (
@@ -748,7 +804,15 @@ export const MessageBubble = memo(function MessageBubble({
     !!msg.content &&
     isEmojiOnly(msg.content);
 
-  const rowHighlight = highlighted ? "bg-black/60" : "";
+  // Inline style: Tailwind does not emit color-mix() for arbitrary CSS-var
+  // utilities with an opacity modifier (bg-[var(--x)]/25 never compiles), so
+  // the translucent blue row flash is applied directly.
+  const rowHighlightStyle: React.CSSProperties | undefined = highlighted
+    ? {
+        backgroundColor:
+          "color-mix(in srgb, var(--ds-blue-700) 25%, transparent)",
+      }
+    : undefined;
   const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
@@ -771,7 +835,8 @@ export const MessageBubble = memo(function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
+        style={rowHighlightStyle}
+        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
           isMe ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
         onMouseMove={handleRowMouseMove}
@@ -893,6 +958,7 @@ export const MessageBubble = memo(function MessageBubble({
                   {msg.content && (
                     <MessageContent
                       content={msg.content}
+                      mentions={msg.mentions ?? []}
                       isMe={isMe}
                       showPreview={msg.status !== "failed"}
                       animate={animate}

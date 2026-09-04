@@ -5,7 +5,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedThreadEvent, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 
@@ -82,6 +82,7 @@ export function useRealtimeChat({
           created_at: string;
           reply_to_id: string | null;
           image_url: string | null;
+          mentions?: MessageMention[];
         };
 
         if (initialScrollDoneRef.current) {
@@ -139,6 +140,7 @@ export function useRealtimeChat({
             reactions: [],
             reply_to: replyTo,
             image_url: newRow.image_url ?? null,
+            mentions: newRow.mentions ?? [],
           };
           const next = [...withoutTemp, incoming].sort(
             (a, b) =>
