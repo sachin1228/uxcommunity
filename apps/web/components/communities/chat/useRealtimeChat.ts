@@ -139,7 +139,16 @@ export function useRealtimeChat({
             status: "sent",
             reactions: [],
             reply_to: replyTo,
-            image_url: newRow.image_url ?? null,
+            // When this echo replaces the sender's own optimistic bubble, keep
+            // showing the blob URL that is already on screen — swapping straight
+            // to the uploaded network URL before it has loaded collapses the
+            // bubble into a blank frame for a split second. The POST-response
+            // merge (which preloads the uploaded image first) swaps it over
+            // seamlessly. Non-blob temps (e.g. GIF URLs) match the DB URL, so
+            // they fall through to the real value either way.
+            image_url: matchedTemp?.image_url?.startsWith("blob:")
+              ? matchedTemp.image_url
+              : newRow.image_url ?? null,
             mentions: newRow.mentions ?? [],
           };
           const next = [...withoutTemp, incoming].sort(

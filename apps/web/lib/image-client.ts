@@ -83,3 +83,19 @@ export function compressedFile(compressed: ClientCompressedImage, original: File
   const name = original.name.replace(/\.[^./]+$/, "") || "image";
   return new File([compressed.blob], `${name}.webp`, { type: compressed.contentType });
 }
+
+/**
+ * Warm the browser cache for an image URL. Resolves once the image has been
+ * fetched and decoded (or failed), so the caller can swap an `<img>` src from
+ * a local blob URL to the uploaded network URL without the blank-frame flash
+ * that happens while the bytes are still in flight. Resolves on error too — a
+ * dead URL must never hang the caller.
+ */
+export function preloadImage(url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = () => resolve();
+    img.src = url;
+  });
+}

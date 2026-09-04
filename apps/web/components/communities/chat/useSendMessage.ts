@@ -9,7 +9,7 @@ import {
 } from "@/lib/communities/cache";
 import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
-import { compressChatImageClient, compressedFile } from "@/lib/image-client";
+import { compressChatImageClient, compressedFile, preloadImage } from "@/lib/image-client";
 
 type Message = CachedMessage;
 
@@ -317,6 +317,15 @@ export function useSendMessage({
         uploadedImageUrl = uploadedUrl;
       }
 
+      // Warm the browser cache for the uploaded image while the message POST is
+      // in flight. The optimistic bubble is showing the local blob URL — swapping
+      // the <img> src to the network URL before it has loaded collapses the
+      // bubble into a blank frame for a split second. Preloading (and awaiting it
+      // before the merge below) makes the blob → network transition seamless.
+      const imagePreload = uploadedImageUrl
+        ? preloadImage(uploadedImageUrl)
+        : null;
+
       const res = await measureClient("message_create_request", () =>
         dedupeFetch(`/api/communities/${communityId}/messages`, {
           method: "POST",
@@ -342,23 +351,31 @@ export function useSendMessage({
           throw new Error("Server returned success without a message.");
         }
 
+        // Ensure the uploaded image is decoded before swapping it into the
+        // message, so the blob → network URL transition never flashes an empty
+        // bubble. (Preload resolves on failure too, so this can't hang.)
+        if (imagePreload) await imagePreload;
+
         setMessages((prev) => {
           // The server returns a bare insert (users: null, reply_to: null) to
           // avoid expensive post-insert DB fetches. Merge it over the optimistic
           // message so we preserve the sender's name/avatar and reply preview
-          // that the client already had.
+          // that the client already had. When Realtime beat the API response,
+          // the real entry already carries those fields (and the blob URL) —
+          // merge on top of it instead of the removed optimistic bubble.
           const optimistic = prev.find((m) => m.id === tempId);
+          const existing   = prev.find((m) => m.id === message.id);
 
           const merged: Message = {
-            ...(optimistic ?? {}),
+            ...(existing ?? optimistic ?? {}),
             ...message,
-            users:     message.users    ?? optimistic?.users    ?? null,
-            reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
-            image_url: message.image_url ?? optimistic?.image_url ?? null,
+            users:     message.users    ?? existing?.users    ?? optimistic?.users    ?? null,
+            reply_to:  message.reply_to ?? existing?.reply_to ?? optimistic?.reply_to ?? null,
+            image_url: message.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
             status: "sent" as const,
           };
 
-          if (prev.some((m) => m.id === message.id)) {
+          if (existing) {
             // Realtime beat the API response — update the existing real entry.
             const next = prev
               .filter((m) => m.id !== tempId)
