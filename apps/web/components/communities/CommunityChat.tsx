@@ -28,6 +28,7 @@ import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { ChatInput } from "./chat/ChatInput";
 import type { MentionCandidate } from "@/lib/communities/mentions";
 import { MessageList } from "./chat/MessageList";
+import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
 import type { CommunityThread } from "./threads/types";
@@ -760,7 +761,51 @@ export function CommunityChat({
     }
   }, [flashMessage, visiblePendingMentions]);
 
-  // ── Realtime subscription ──���──���───────────────────────────────────────────
+  // ── Image viewer (lightbox) ───────────────────────────────────────────────
+  // Every non-deleted image in the loaded chat window, in timeline order, so
+  // the viewer can page back/forward between all of them (arrows, keyboard,
+  // thumbnail strip) just like WhatsApp.
+  const chatImages = useMemo<LightboxImage[]>(
+    () =>
+      messages
+        .filter((m) => m.image_url && !m.deleted_at)
+        .map((m) => ({
+          url:        m.image_url!,
+          content:    m.content || null,
+          user_name:  m.users?.name ?? null,
+          avatar_url: m.users?.avatar_url ?? null,
+          created_at: m.created_at,
+        })),
+    [messages],
+  );
+  const [lightboxState, setLightboxState] = useState<{
+    communityId: string;
+    index: number;
+  } | null>(null);
+  // Derived during render: the viewer is effectively closed once the
+  // community changes since it was opened (no effect needed).
+  const lightbox =
+    lightboxState && lightboxState.communityId === communityId
+      ? lightboxState
+      : null;
+
+  // Keep a ref to the latest image list so the click handler stays referentially
+  // stable — MessageBubble/MessageList are memoized and must not re-render on
+  // every message change just because the handler identity changed.
+  const chatImagesRef = useRef(chatImages);
+  useEffect(() => {
+    chatImagesRef.current = chatImages;
+  }, [chatImages]);
+
+  const handleImageClick = useCallback(
+    (url: string) => {
+      const i = chatImagesRef.current.findIndex((img) => img.url === url);
+      if (i >= 0) setLightboxState({ communityId, index: i });
+    },
+    [communityId],
+  );
+
+  // ── Realtime subscription ──────────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     currentUserId,
@@ -1250,6 +1295,7 @@ export function CommunityChat({
               onEdit={handleEdit}
               onCopy={handleCopy}
               onDelete={handleDelete}
+              onImageClick={handleImageClick}
             />
           </div>
 
@@ -1319,6 +1365,16 @@ export function CommunityChat({
           </div>
         )}
       </div>
+
+      {/* Full-screen image viewer — click any chat image to open it */}
+      {lightbox && chatImages[lightbox.index] && (
+        <ImageLightbox
+          images={chatImages}
+          index={lightbox.index}
+          onClose={() => setLightboxState(null)}
+          onNavigate={(i) => setLightboxState({ communityId, index: i })}
+        />
+      )}
     </div>
   );
 }

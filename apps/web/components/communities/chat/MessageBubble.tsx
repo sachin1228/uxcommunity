@@ -31,6 +31,8 @@ interface MessageBubbleProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Opens the full-screen image viewer for a chat image URL. */
+  onImageClick: (url: string) => void;
   /** Moderator (owner/admin with delete permission) may delete other members' messages. */
   canModerate?: boolean;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
@@ -117,7 +119,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup, onClick,
 }: {
   url: string;
   isMe: boolean;
@@ -127,6 +129,8 @@ function BubbleImage({
   createdAt?: string;
   status?: CachedMessage["status"];
   isFirstInGroup?: boolean;
+  /** Opens the image in the full-screen viewer. */
+  onClick?: () => void;
 }) {
   return (
     <div
@@ -149,11 +153,16 @@ function BubbleImage({
       <img
         src={url}
         alt="Image"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
         className={`block max-w-full object-cover ${
           standalone ? "" : "rounded-xl"
-        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""}`}
+        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-zoom-in hover:opacity-80 transition-opacity" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
+        draggable={false}
       />
       {standalone && createdAt && !uploading && status !== "failed" && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5">
@@ -760,6 +769,7 @@ export const MessageBubble = memo(function MessageBubble({
   onEdit,
   onCopy,
   onDelete,
+  onImageClick,
   canModerate = false,
   animate = false,
 }: MessageBubbleProps) {
@@ -953,6 +963,7 @@ export const MessageBubble = memo(function MessageBubble({
                       status={msg.status}
                       isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
+                      onClick={() => onImageClick(imageUrl)}
                     />
                   )}
                   {msg.content && (
