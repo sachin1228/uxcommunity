@@ -178,7 +178,7 @@ export async function POST(
         data: Array<{ id: string; name: string }> | null;
         error: unknown;
       };
-      const nameById = new Map((nameRows ?? []).map((u) => [u.id, u.name]));
+      const nameById = new Map((nameRows ?? []).map((u) => [u.id, u.name.trim()]));
       mentions = validIds
         .filter((id) => nameById.has(id))
         .map((id) => ({ user_id: id, name: nameById.get(id) as string }));

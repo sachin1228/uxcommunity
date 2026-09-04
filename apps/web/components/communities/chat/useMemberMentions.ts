@@ -253,7 +253,9 @@ export function useMemberMentions({
       resetForScopeChange();
       const context = ctxRef.current;
       const textarea = composerTextarea();
-      if (!context || !textarea || !candidate?.name) return;
+      // Trim: legacy member names may carry stray whitespace.
+      const name = candidate?.name?.trim();
+      if (!context || !textarea || !name) return;
 
       const value = textarea.value;
       // Replace exactly the typed "@query" token (ctx was computed from this
@@ -262,11 +264,11 @@ export function useMemberMentions({
       const end = Math.min(Math.max(caret, context.start), value.length);
       const start = Math.min(context.start, end);
 
-      const insertion = `@${candidate.name} `;
+      const insertion = `@${name} `;
       const next = value.slice(0, start) + insertion + value.slice(end);
-      registryRef.current.set(candidate.name.toLowerCase(), {
+      registryRef.current.set(name.toLowerCase(), {
         user_id: candidate.user_id,
-        name: candidate.name,
+        name,
       });
       close();
       onCommitText(next, start + insertion.length);

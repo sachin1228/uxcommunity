@@ -126,3 +126,38 @@ test("splitContentByMentions returns a single segment for no mentions", () => {
   ]);
   assert.deepEqual(splitContentByMentions("", []), []);
 });
+
+test("legacy names with stray whitespace never leak into the pill", () => {
+  // Accounts created before the name/surname split can have padded names that
+  // were baked into old message content: "@sachin   hi man".
+  const mention = { user_id: "u9", name: "sachin   " };
+  const segments = splitContentByMentions("@sachin   hi man", [mention]);
+  assert.deepEqual(segments, [
+    { text: "@sachin", mention: { user_id: "u9", name: "sachin" } },
+    { text: " hi man", mention: null },
+  ]);
+});
+
+test("spaces after a mention collapse to one; line breaks survive", () => {
+  const mention = { user_id: "u9", name: "sachin" };
+  assert.deepEqual(splitContentByMentions("@sachin      hi", [mention]), [
+    { text: "@sachin", mention },
+    { text: " hi", mention: null },
+  ]);
+  // Spaces before a newline are dropped entirely (no empty pill, no wide gap).
+  assert.deepEqual(splitContentByMentions("@sachin   \nhi", [mention]), [
+    { text: "@sachin", mention },
+    { text: "\nhi", mention: null },
+  ]);
+  // Trailing spaces at the end of the message disappear.
+  assert.deepEqual(splitContentByMentions("@sachin   ", [mention]), [
+    { text: "@sachin", mention },
+  ]);
+});
+
+test("resolveMentionsFromText resolves padded registry names and trims them", () => {
+  const resolved = resolveMentionsFromText("cc @sachin   hi", [
+    { user_id: "u9", name: "sachin   " },
+  ]);
+  assert.deepEqual(resolved, [{ user_id: "u9", name: "sachin" }]);
+});

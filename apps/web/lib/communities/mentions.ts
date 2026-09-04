@@ -117,9 +117,11 @@ export function resolveMentionsFromText(
     if (!mention?.user_id || !mention?.name || seen.has(mention.user_id)) {
       continue;
     }
-    if (findMentionOccurrence(content, `@${mention.name}`) !== -1) {
+    // Trim: legacy account names (pre name/surname split) can carry stray
+    // whitespace, and @Name in the text should still resolve to them.
+    if (findMentionOccurrence(content, `@${mention.name.trim()}`) !== -1) {
       seen.add(mention.user_id);
-      resolved.push(mention);
+      resolved.push({ ...mention, name: mention.name.trim() });
     }
   }
   return resolved;
@@ -143,10 +145,11 @@ export function splitContentByMentions(
   const candidates: MessageMention[] = [];
   const seen = new Set<string>();
   for (const mention of mentions) {
-    if (!mention?.user_id || !mention?.name) continue;
+    const name = mention?.name?.trim();
+    if (!mention?.user_id || !name) continue;
     if (seen.has(mention.user_id)) continue;
     seen.add(mention.user_id);
-    candidates.push(mention);
+    candidates.push({ ...mention, name });
   }
   candidates.sort((a, b) => b.name.length - a.name.length);
   if (candidates.length === 0) return content ? [{ text: content, mention: null }] : [];
@@ -171,7 +174,22 @@ export function splitContentByMentions(
       if (matched) {
         const end = index + 1 + matched.name.length;
         segments.push({ text: content.slice(index, end), mention: matched });
-        index = end;
+        // Legacy account names (created before the name/surname split) can
+        // carry trailing whitespace that was baked into the message content.
+        // Never paint that inside the pill, and collapse any duplicate spaces
+        // right after the mention down to a single space. Spaces before a
+        // newline (or the end of the text) are dropped entirely.
+        let after = end;
+        while (after < content.length && content[after] === " ") after += 1;
+        if (after > end) {
+          const next = content[after];
+          index =
+            next === undefined || next === "\n" || next === "\r"
+              ? after
+              : after - 1;
+        } else {
+          index = end;
+        }
         continue;
       }
     }
