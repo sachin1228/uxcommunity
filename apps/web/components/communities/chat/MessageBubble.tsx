@@ -1,15 +1,16 @@
 "use client";
 
-import { Fragment, useState, useRef, useEffect, memo } from "react";
+import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 
-import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
@@ -571,13 +572,30 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
   return parts;
 }
 
+/** Highlighted chip for a `@Name` mention inside a message bubble. */
+function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
+  return (
+    <span
+      className={`inline-block max-w-full rounded-[5px] px-[3px] font-semibold break-normal ${
+        isMe
+          ? "bg-black/25 text-accent-foreground"
+          : "bg-accent/15 text-accent"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
 function MessageContent({
   content,
+  mentions,
   isMe,
   showPreview,
   animate = false,
 }: {
   content: string;
+  mentions: MessageMention[];
   isMe: boolean;
   showPreview: boolean;
   /** When true, each word rises into place with a staggered delay. */
@@ -585,32 +603,71 @@ function MessageContent({
 }) {
   const previewUrl = showPreview ? extractFirstUrl(content) : null;
 
+  // Mentions are matched against the raw text first (longest name wins), so
+  // exactly the stored mentions become chips and everything else — including
+  // hand-typed @words that were never picked — renders as plain text.
+  const segments = useMemo(
+    () => splitContentByMentions(content, mentions ?? []),
+    [content, mentions],
+  );
+
   let parts: React.ReactNode[];
 
   if (animate) {
-    // Split on whitespace (keeping the whitespace so pre-wrap newlines survive)
-    // and wrap every word in a span that carries its stagger index.
-    const tokens = content.split(/(\s+)/);
+    // Split each plain-text segment on whitespace (keeping the whitespace so
+    // pre-wrap newlines survive) and wrap every word in a span that carries
+    // its stagger index. Mention chips are whole tokens with a single index.
     let wordIdx = 0;
-    let offset = 0;
-    parts = tokens.map((tok) => {
-      const key = offset;
-      offset += tok.length;
-      if (!tok) return null;
-      if (/^\s+$/.test(tok)) return tok;
-      const i = wordIdx++;
-      return (
-        <span
-          key={key}
-          className="chat-word-in"
-          style={{ "--i": i } as React.CSSProperties}
-        >
-          {renderRichChunk(tok, isMe, key)}
-        </span>
-      );
-    });
+    let keyIdx = 0;
+    parts = [];
+    for (const segment of segments) {
+      if (segment.mention) {
+        const i = wordIdx++;
+        const key = keyIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            <MentionChip text={segment.text} isMe={isMe} />
+          </span>,
+        );
+        continue;
+      }
+      const tokens = segment.text.split(/(\s+)/);
+      for (const tok of tokens) {
+        const key = keyIdx++;
+        if (!tok) continue;
+        if (/^\s+$/.test(tok)) {
+          parts.push(tok);
+          continue;
+        }
+        const i = wordIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            {renderRichChunk(tok, isMe, key)}
+          </span>,
+        );
+      }
+    }
   } else {
-    parts = renderRichChunk(content, isMe, 0);
+    parts = [];
+    let keyIdx = 0;
+    for (const segment of segments) {
+      if (segment.mention) {
+        parts.push(
+          <MentionChip key={keyIdx++} text={segment.text} isMe={isMe} />,
+        );
+      } else if (segment.text) {
+        parts.push(...renderRichChunk(segment.text, isMe, keyIdx));
+        keyIdx += segment.text.length;
+      }
+    }
   }
 
   return (
@@ -893,6 +950,7 @@ export const MessageBubble = memo(function MessageBubble({
                   {msg.content && (
                     <MessageContent
                       content={msg.content}
+                      mentions={msg.mentions ?? []}
                       isMe={isMe}
                       showPreview={msg.status !== "failed"}
                       animate={animate}

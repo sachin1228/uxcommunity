@@ -15,9 +15,15 @@ export type NotificationType =
   | "event_comment"
   | "event_reply"
   | "event_rsvp"
-  | "event_save";
+  | "event_save"
+  | "chat_mention";
 
-export type NotificationEntityType = "community" | "thread" | "resource" | "event";
+export type NotificationEntityType =
+  | "community"
+  | "thread"
+  | "resource"
+  | "event"
+  | "message";
 
 interface NotificationInput {
   userId: string;

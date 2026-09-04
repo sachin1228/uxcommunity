@@ -15,7 +15,7 @@ import {
   msgFetchedAt,
   patchSidebarMessageContent,
 } from "@/lib/communities/cache";
-import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import {
   clearReactionIntentsForCommunity,
   ReactionIntentCoordinator,
@@ -26,6 +26,7 @@ import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
 import { ChatInput } from "./chat/ChatInput";
+import type { MentionCandidate } from "@/lib/communities/mentions";
 import { MessageList } from "./chat/MessageList";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
@@ -42,6 +43,7 @@ import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
 import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
+import { useMemberMentions } from "./chat/useMemberMentions";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import {
@@ -579,6 +581,55 @@ export function CommunityChat({
     highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
   }, [scrollContainerRef]);
 
+  // ── Scroll to #msg-<id> (deep links from mention notifications) ───────────
+  const [urlHash, setUrlHash] = useState<string>(() =>
+    typeof window === "undefined" ? "" : window.location.hash,
+  );
+  useEffect(() => {
+    const apply = () => setUrlHash(window.location.hash);
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, []);
+
+  useEffect(() => {
+    const match = /^#msg-(\w+)$/.exec(urlHash);
+    if (!match) return;
+    const messageId = match[1];
+    // The list is hidden until the initial scroll position resolves; only
+    // then may we look for the bubble (a fetch may still need to land).
+    if (!initialPositionResolved) return;
+
+    let attempts = 0;
+    const clearHash = () => {
+      const url = new URL(window.location.href);
+      url.hash = "";
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    };
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      const container = scrollContainerRef.current;
+      const el = container?.querySelector<HTMLElement>(
+        `[data-message-id="${messageId}"]`,
+      );
+      if (el) {
+        window.clearInterval(timer);
+        el.scrollIntoView({ behavior: "instant", block: "center" });
+        if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+        setHighlightedMsgId(messageId);
+        highlightTimerRef.current = setTimeout(
+          () => setHighlightedMsgId(null),
+          2000,
+        );
+        clearHash();
+      } else if (attempts > 30) {
+        // The message isn't in the loaded window — leave the hash in place so
+        // a reload can still try to land on it.
+        window.clearInterval(timer);
+      }
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [urlHash, communityId, initialPositionResolved, scrollContainerRef]);
+
   // ── Realtime subscription ──���──���───────────────────────────────────────────
   useRealtimeChat({
     communityId,
@@ -595,6 +646,16 @@ export function CommunityChat({
   });
 
   // ── Input + send ──────────────────────────────────────────────────────────
+  // Mention resolution is wired through a ref: useSendMessage is created first
+  // (it owns inputRef/setInput), and the @mention composer hook below assigns
+  // its resolver right after. Sends only happen from user events, by which
+  // time the ref always points at the current resolver.
+  const mentionResolverRef = useRef<((content: string) => MessageMention[]) | null>(null);
+  const resolveMentionsForSend = useCallback(
+    (content: string) => mentionResolverRef.current?.(content) ?? [],
+    [],
+  );
+
   const {
     input,
     setInput,
@@ -620,7 +681,37 @@ export function CommunityChat({
     replyTo,
     onClearReply: handleClearReply,
     scrollToBottomRef: bottomRef,
+    resolveMentions: resolveMentionsForSend,
   });
+
+  // ── Member @mentions (autocomplete + registry) ────────────────────────────
+  const commitMentionText = useCallback(
+    (text: string, caret: number) => {
+      setInput(text);
+      setTyping(text.trim().length > 0);
+      // Restore focus + caret after React re-renders the textarea value.
+      requestAnimationFrame(() => {
+        const ta = inputRef.current;
+        if (!ta) return;
+        ta.focus();
+        ta.setSelectionRange(caret, caret);
+        ta.style.height = "auto";
+        ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
+      });
+    },
+    [inputRef, setInput, setTyping],
+  );
+
+  const memberMentions = useMemberMentions({
+    communityId,
+    currentUserId,
+    onCommitText: commitMentionText,
+  });
+  // Publishes the composer's resolver to the send path once the hook exists.
+  // Sends only happen from user events, which always run after this effect.
+  useEffect(() => {
+    mentionResolverRef.current = memberMentions.resolveMentionsForContent;
+  }, [memberMentions]);
 
   const handleEdit = useCallback((msg: CachedMessage) => {
     setEditingMessage(msg);
@@ -727,18 +818,64 @@ export function CommunityChat({
 
   const handleInputBlur = useCallback(() => {
     setTyping(false);
-  }, [setTyping]);
+    // Clicking away (or into the emoji/image picker) dismisses the @mention
+    // popover so it never floats over unrelated UI.
+    memberMentions.close();
+  }, [memberMentions, setTyping]);
 
   const handleInputSend = useCallback(() => {
     setTyping(false);
+    // Clicking send while an @token is open must not leave the popover
+    // floating over the cleared composer.
+    memberMentions.close();
     void handleSend();
-  }, [handleSend, setTyping]);
+  }, [handleSend, memberMentions, setTyping]);
+
+  // Leaving the chat tab unmounts the composer — make sure no stale @mention
+  // popover survives a tab round-trip.
+  useEffect(() => {
+    if (activeTab !== "chat") memberMentions.close();
+  }, [activeTab, memberMentions]);
+
+  const handleMentionPick = useCallback(
+    (option: MentionCandidate) => memberMentions.pick(option),
+    [memberMentions],
+  );
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        handleKeyDown(event);
+        return;
+      }
+      // While the mention popover is open, arrow keys navigate it, Enter
+      // picks the highlighted member (or closes when nothing matches) and
+      // Escape dismisses it — none of them should send the message.
+      if (memberMentions.isOpen) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          memberMentions.move(1);
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          memberMentions.move(-1);
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (!memberMentions.selectActive()) memberMentions.close();
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          memberMentions.close();
+          return;
+        }
+      }
       handleKeyDown(event);
     },
-    [handleKeyDown],
+    [handleKeyDown, memberMentions],
   );
 
   // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
@@ -1018,6 +1155,16 @@ export function CommunityChat({
                 onImageRemove={handleImageClear}
                 onEmojiSelect={handleEmojiSelect}
                 onGifSelect={handleGifSend}
+                onComposerActivity={memberMentions.syncFromTextarea}
+                mention={{
+                  open: memberMentions.isOpen,
+                  loading: memberMentions.loading,
+                  query: memberMentions.query,
+                  options: memberMentions.options,
+                  activeIndex: memberMentions.activeIndex,
+                  onPick: handleMentionPick,
+                  onHover: (index) => memberMentions.hover(index),
+                }}
               />
             </div>
           </footer>

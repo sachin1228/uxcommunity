@@ -10,6 +10,8 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { publishChatEvent } from "@/lib/realtime/server";
 import { createServerTimer } from "@/lib/server-timing";
+import { createNotification } from "@/lib/notifications";
+import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
 
 export async function GET(
   req: NextRequest,
@@ -99,17 +101,30 @@ export async function POST(
   let content: string;
   let reply_to_id: string | null = null;
   let image_url: string | null = null;
+  let mentionUserIds: string[] = [];
   try {
-    const body  = await req.json();
+    const body = await req.json();
     content     = (body.content ?? "").trim();
     reply_to_id = body.reply_to_id ?? null;
     image_url   = body.image_url   ?? null;
+    // Mentions are sent as opaque member ids picked from the client roster;
+    // names are resolved server-side below so storage never trusts the client.
+    if (Array.isArray(body.mentions)) {
+      const ids = (body.mentions as Array<{ user_id?: unknown }>)
+        .filter((m) => m && typeof m.user_id === "string")
+        .map((m) => m.user_id as string)
+        .filter((id: string) => id && id !== userId);
+      mentionUserIds = [...new Set(ids)].slice(0, MENTION_MAX_PER_MESSAGE);
+    }
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
   if (!content && !image_url) return NextResponse.json({ error: "Message cannot be empty." }, { status: 422 });
   if (content.length > 2000)  return NextResponse.json({ error: "Message too long." },        { status: 422 });
+
+  // Mentions only make sense when there is text to mention someone in.
+  if (!content) mentionUserIds = [];
 
   // ── Phase 1: synchronous local-rules check (<1 ms) ───────────────────────
   // This is the only blocking moderation gate. It catches clear-cut violations
@@ -139,11 +154,42 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
+  // ── Resolve mentions: only members of this community, names from the DB ──
+  let mentions: Array<{ user_id: string; name: string }> = [];
+  if (mentionUserIds.length) {
+    const { data: memberRows, error: memberErr } = (await db
+      .from("community_members")
+      .select("user_id")
+      .eq("community_id", communityId)
+      .in("user_id", mentionUserIds)) as unknown as {
+      data: Array<{ user_id: string }> | null;
+      error: unknown;
+    };
+    if (memberErr) {
+      return NextResponse.json({ error: "Failed to validate mentions." }, { status: 500 });
+    }
+    const memberIds = new Set((memberRows ?? []).map((m) => m.user_id));
+    const validIds = mentionUserIds.filter((id) => memberIds.has(id));
+    if (validIds.length) {
+      const { data: nameRows } = (await db
+        .from("users")
+        .select("id, name")
+        .in("id", validIds)) as unknown as {
+        data: Array<{ id: string; name: string }> | null;
+        error: unknown;
+      };
+      const nameById = new Map((nameRows ?? []).map((u) => [u.id, u.name]));
+      mentions = validIds
+        .filter((id) => nameById.has(id))
+        .map((id) => ({ user_id: id, name: nameById.get(id) as string }));
+    }
+  }
+
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
-      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url })
-      .select("id, content, created_at, user_id, reply_to_id, image_url")
+      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url, mentions })
+      .select("id, content, created_at, user_id, reply_to_id, image_url, mentions")
       .single(),
   )) as unknown as {
     data: {
@@ -153,6 +199,7 @@ export async function POST(
       user_id: string;
       reply_to_id: string | null;
       image_url: string | null;
+      mentions: Array<{ user_id: string; name: string }>;
     } | null;
     error: unknown;
   };
@@ -208,7 +255,56 @@ export async function POST(
     });
   }
 
-  // ── Phase 3: realtime publish after the response is sent ──────────────────
+  // ── Phase 3: mention notifications after the response is sent ─────────────
+  // One bell row per mentioned member (self is already excluded during body
+  // parsing). Reuses createNotification so per-entity dedupe + realtime bell
+  // updates behave exactly like the other notification types.
+  if (mentions.length) {
+    const captured = {
+      communityId,
+      messageId: inserted.id,
+      content: content || "",
+      mentions,
+    };
+    after(async () => {
+      try {
+        const notificationDb = createServiceClient();
+        const [{ data: actor }, { data: community }] = (await Promise.all([
+          notificationDb.from("users").select("name").eq("id", userId).maybeSingle(),
+          notificationDb.from("communities").select("name").eq("id", communityId).maybeSingle(),
+        ])) as unknown as [
+          { data: { name: string } | null; error: unknown },
+          { data: { name: string } | null; error: unknown },
+        ];
+        const actorName = actor?.name ?? "Someone";
+        const communityName = community?.name ?? "community";
+        const bodyPreview = captured.content
+          ? captured.content.replace(/\s+/g, " ").trim().slice(0, 160)
+          : null;
+        for (const mention of captured.mentions) {
+          try {
+            await createNotification(notificationDb, {
+              userId: mention.user_id,
+              actorId: userId,
+              communityId: captured.communityId,
+              type: "chat_mention",
+              entityType: "message",
+              entityId: captured.messageId,
+              title: `${actorName} mentioned you in ${communityName}`,
+              body: bodyPreview,
+              href: `/dashboard/communities/${captured.communityId}#msg-${captured.messageId}`,
+            });
+          } catch (err) {
+            console.error("[POST message] mention notification failed:", err);
+          }
+        }
+      } catch (err) {
+        console.error("[POST message] mention notification delivery failed:", err);
+      }
+    });
+  }
+
+  // ── Phase 4: realtime publish after the response is sent ──────────────────
   // Publish ONE event to the community chat room. Connected clients receive it
   // directly. Sidebar state is derived client-side from chat events.
   // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
@@ -225,6 +321,7 @@ export async function POST(
           created_at: inserted.created_at,
           reply_to_id: inserted.reply_to_id ?? null,
           image_url: inserted.image_url ?? null,
+          mentions: inserted.mentions ?? [],
         },
       });
     } catch (err) {
@@ -232,7 +329,9 @@ export async function POST(
     }
   });
 
-  timer.finish({ query_count: reply_to_id ? 2 : 1 });
+  timer.finish({
+    query_count: 1 + (reply_to_id ? 1 : 0) + (mentionUserIds.length ? 2 : 0),
+  });
 
   // Return only the inserted row. The client already has the sender's own
   // name/avatar (passed as props) and the reply preview (passed in the
@@ -246,6 +345,7 @@ export async function POST(
         reactions: [],
         reply_to:  null,
         image_url: inserted.image_url ?? null,
+        mentions:  inserted.mentions ?? [],
       },
     },
     { status: 201 }

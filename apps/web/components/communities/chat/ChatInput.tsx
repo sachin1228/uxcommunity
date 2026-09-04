@@ -6,7 +6,20 @@ import { X, ImageIcon, Smile, Link } from "lucide-react";
 import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
+import { MentionSuggestions } from "./MentionSuggestions";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
+import type { MentionCandidate } from "@/lib/communities/mentions";
+
+/** Visual state of the member @mention popover, owned by the parent hook. */
+export interface MentionPickerState {
+  open: boolean;
+  loading: boolean;
+  query: string;
+  options: MentionCandidate[];
+  activeIndex: number;
+  onPick: (option: MentionCandidate) => void;
+  onHover: (index: number) => void;
+}
 
 interface ChatInputProps {
   input: string;
@@ -26,6 +39,11 @@ interface ChatInputProps {
   onBlur?: () => void;
   onEmojiSelect: (emoji: string) => void;
   onGifSelect: (url: string) => void;
+  /** Member @mention popover state — when present with open=true, renders the popover. */
+  mention?: MentionPickerState | null;
+  /** Reports textarea value + caret after typing/selection so the parent can
+   * track the in-progress @query token. */
+  onComposerActivity?: (value: string, caret: number) => void;
 }
 
 interface PickerPos {
@@ -99,6 +117,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onChange, onKeyDown, onSend, onCancelReply,
       onImageSelect, onImageRemove, onBlur,
       onEmojiSelect, onGifSelect,
+      mention, onComposerActivity,
     },
     ref
   ) {
@@ -264,7 +283,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         )}
 
         {/* Input box — used as the measurement anchor for the portal picker */}
-        <div ref={anchorRef}>
+        <div ref={anchorRef} className="relative">
+          {/* Mention popover — floats above the composer while an @token is typed */}
+          {mention?.open && (
+            <MentionSuggestions
+              query={mention.query}
+              loading={mention.loading}
+              options={mention.options}
+              activeIndex={mention.activeIndex}
+              onPick={mention.onPick}
+              onHover={mention.onHover}
+            />
+          )}
           <div className="flex flex-col bg-surface-raised rounded-2xl shadow-md px-[5px] pl-[5px] pr-[8px]">
             {/* Hidden file input */}
             <input
@@ -356,6 +386,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     onChange(e.target.value);
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+                    // After the value update the caret is at the end of what
+                    // was just typed — re-evaluate the @query token.
+                    onComposerActivity?.(e.target.value, e.target.selectionStart);
+                  }}
+                  onKeyUp={(e) => {
+                    // Arrow/Home/End/Backspace moves and IME commits don't fire
+                    // onChange; still track the caret for the mention token.
+                    onComposerActivity?.(e.currentTarget.value, e.currentTarget.selectionStart);
+                  }}
+                  onMouseUp={(e) => {
+                    onComposerActivity?.(e.currentTarget.value, e.currentTarget.selectionStart);
                   }}
                   onScroll={syncScroll}
                   onKeyDown={onKeyDown}
