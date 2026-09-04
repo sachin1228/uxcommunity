@@ -582,11 +582,9 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
           : "bg-accent/15 text-accent"
       }`}
     >
-      {text}    </span>
+      {text}</span>
   );
 }
-
-
 
 function MessageContent({
   content,
