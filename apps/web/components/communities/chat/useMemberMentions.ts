@@ -228,12 +228,15 @@ export function useMemberMentions({
   // ── Selection ──────────────────────────────────────────────────────────────
   /**
    * Dismisses the popover (blur, Esc, send, tab switch). Bumps the seq so an
-   * in-flight roster/search response can't repopulate a closed popover.
+   * in-flight roster/search response can't repopulate a closed popover, and
+   * remembers the current token as "dismissed": syncFromTextarea only reopens
+   * when the trigger text actually changes, so the keyup/click re-sync that
+   * follows Esc/blur can't instantly resurrect the popover. Typing more of the
+   * name, deleting back into the @, or starting a new @ reopens it.
    */
   const close = useCallback(() => {
     resetForScopeChange();
     seqRef.current += 1;
-    ctxTokenRef.current = "";
     ctxRef.current = null;
     setCtx(null);
     setOptions([]);
