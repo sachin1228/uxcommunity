@@ -271,9 +271,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     }
   }
 
-  // Subtle top-left sheen, matching the admin community hero card.
+  // Solid card fill plus a subtle top-left sheen, matching the admin
+  // community hero card.
   const cardClassName =
-    "overflow-hidden rounded-xl border border-border bg-[radial-gradient(120%_160%_at_0%_0%,rgba(255,255,255,0.07),transparent_55%)] [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+    "overflow-hidden rounded-xl border border-border bg-background bg-[radial-gradient(120%_160%_at_0%_0%,rgba(255,255,255,0.07),transparent_55%)] [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
 
   return (
     <>
