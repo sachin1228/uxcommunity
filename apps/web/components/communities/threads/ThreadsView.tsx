@@ -22,6 +22,7 @@ import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
 import { Spinner } from "@/components/ui/Spinner";
+import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const THREADS_STALE_MS = 60_000;
@@ -196,14 +197,10 @@ export function ThreadsView({
               <span className="block">a question.</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-          >
+          <GradientButton onClick={() => setShowCreateModal(true)}>
             <Plus strokeWidth={2.5} size={14} />
             Create Thread
-          </button>
+          </GradientButton>
         </div>
 
         {!loading && threads.length > 0 && (

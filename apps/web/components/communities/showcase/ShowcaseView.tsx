@@ -18,6 +18,7 @@ import {
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
+import { GradientButton } from "@/components/ui/GradientButton";
 import {
   SHOWCASE_CATEGORIES,
   type ShowcaseCategory,
@@ -147,14 +148,10 @@ export function ShowcaseView({
               feedback from fellow designers.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-          >
+          <GradientButton onClick={() => setCreating(true)}>
             <Plus strokeWidth={2.5} size={14} />
             Share your work
-          </button>
+          </GradientButton>
         </div>
         {!loading && posts.length > 0 && (
           <div
