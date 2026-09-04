@@ -11,6 +11,7 @@ import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
 import { communityFeedLayout } from "../feed-layout";
 import { Spinner } from "@/components/ui/Spinner";
+import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 
@@ -164,13 +165,9 @@ export function EventsView({
               <span className="block">get-togethers.</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-          >
+          <GradientButton onClick={() => setShowCreateModal(true)}>
             <Plus strokeWidth={2.5} size={14} /> Create Event
-          </button>
+          </GradientButton>
         </div>
 
         {!loading && events.length > 0 && (
