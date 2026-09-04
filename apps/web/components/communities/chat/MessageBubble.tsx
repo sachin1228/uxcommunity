@@ -576,16 +576,17 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
 function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   return (
     <span
-      className={`inline-block max-w-full rounded-[5px] px-[3px] font-semibold break-normal ${
+      className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
         isMe
           ? "bg-black/25 text-accent-foreground"
           : "bg-accent/15 text-accent"
       }`}
     >
-      {text}
-    </span>
+      {text}    </span>
   );
 }
+
+
 
 function MessageContent({
   content,

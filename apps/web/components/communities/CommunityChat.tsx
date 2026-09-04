@@ -1156,6 +1156,7 @@ export function CommunityChat({
                 onEmojiSelect={handleEmojiSelect}
                 onGifSelect={handleGifSend}
                 onComposerActivity={memberMentions.syncFromTextarea}
+                resolveMentions={memberMentions.resolveMentionsForContent}
                 mention={{
                   open: memberMentions.isOpen,
                   loading: memberMentions.loading,
