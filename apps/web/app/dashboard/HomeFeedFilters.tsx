@@ -7,7 +7,7 @@ const FILTERS = ["Newest", "Trending", "Following"] as const;
 export function HomeFeedFilters() {
   return (
     <section className="my-2" aria-label="Feed filters">
-      <div className="flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-3 md:px-5 md:py-4">
+      <div className="flex items-center justify-center rounded-xl px-4 py-3 md:px-5 md:py-4">
         <div className="flex items-center gap-2">
           <div
             className="flex items-center gap-1 rounded-full bg-surface-raised p-1"
