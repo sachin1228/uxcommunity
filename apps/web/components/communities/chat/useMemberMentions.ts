@@ -226,6 +226,21 @@ export function useMemberMentions({
   }, [ctx, communityId, currentUserId, ensureRoster]);
 
   // ── Selection ──────────────────────────────────────────────────────────────
+  /**
+   * Dismisses the popover (blur, Esc, send, tab switch). Bumps the seq so an
+   * in-flight roster/search response can't repopulate a closed popover.
+   */
+  const close = useCallback(() => {
+    resetForScopeChange();
+    seqRef.current += 1;
+    ctxTokenRef.current = "";
+    ctxRef.current = null;
+    setCtx(null);
+    setOptions([]);
+    setLoading(false);
+    setActiveIndex(0);
+  }, [resetForScopeChange]);
+
   const pick = useCallback(
     (candidate: MentionCandidate) => {
       resetForScopeChange();
@@ -249,7 +264,7 @@ export function useMemberMentions({
       close();
       onCommitText(next, start + insertion.length);
     },
-    [onCommitText, resetForScopeChange],
+    [close, onCommitText, resetForScopeChange],
   );
 
   const move = useCallback((delta: -1 | 1) => {
@@ -313,6 +328,7 @@ export function useMemberMentions({
       move,
       hover,
       selectActive,
+      close,
       resolveMentionsForContent,
     ],
   );
