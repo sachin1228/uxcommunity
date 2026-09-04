@@ -327,12 +327,12 @@ function MessageHoverActions({
   // No actions on deleted messages
   if (isDeleted) return null;
 
-  // The actions pop in beside the bubble on hover WITHOUT reserving layout
-  // space when hidden — an in-flow opacity-0 cluster left a permanent empty
-  // strip next to short messages. Sending bubbles get the same zero-width
-  // treatment so their text never re-wraps as the status flips.
+  // While sending, render an invisible spacer that matches the reaction
+  // button's footprint so the bubble's available width doesn't change (and
+  // the text doesn't re-wrap) the moment the message flips to "sent".
   if (msg.status === "sending") {
-    return null;
+    if (insideBubble || !showReaction) return null;
+    return <div aria-hidden className="w-7 h-7 shrink-0" />;
   }
 
   return (
@@ -340,7 +340,7 @@ function MessageHoverActions({
       className={
         insideBubble
           ? "contents"
-          : "hidden group-hover:flex items-center gap-0.5 shrink-0"
+          : "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150"
       }
     >
       {/* Emoji reaction button — only for non-deleted messages */}
