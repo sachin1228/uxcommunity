@@ -806,7 +806,15 @@ export const MessageBubble = memo(function MessageBubble({
     !!msg.content &&
     isEmojiOnly(msg.content);
 
-  const rowHighlight = highlighted ? "bg-[var(--ds-blue-700)]/25" : "";
+  // Inline style: Tailwind does not emit color-mix() for arbitrary CSS-var
+  // utilities with an opacity modifier (bg-[var(--x)]/25 never compiles), so
+  // the translucent blue row flash is applied directly.
+  const rowHighlightStyle: React.CSSProperties | undefined = highlighted
+    ? {
+        backgroundColor:
+          "color-mix(in srgb, var(--ds-blue-700) 25%, transparent)",
+      }
+    : undefined;
   const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
@@ -829,7 +837,8 @@ export const MessageBubble = memo(function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
+        style={rowHighlightStyle}
+        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
           isMe ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
         onMouseMove={handleRowMouseMove}
