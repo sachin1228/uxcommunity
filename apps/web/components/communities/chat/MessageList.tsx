@@ -68,6 +68,8 @@ interface MessageListProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Opens the full-screen image viewer for a chat image URL. */
+  onImageClick: (url: string) => void;
 }
 
 /**
@@ -103,6 +105,7 @@ export const MessageList = memo(function MessageList({
   onEdit,
   onCopy,
   onDelete,
+  onImageClick,
 }: MessageListProps) {
   // Merge messages + thread events into date-grouped timeline items.
   const mergedGroups = useMemo<MergedGroup[]>(() => {
@@ -328,6 +331,7 @@ export const MessageList = memo(function MessageList({
                   onEdit={onEdit}
                   onCopy={onCopy}
                   onDelete={onDelete}
+                  onImageClick={onImageClick}
                   canModerate={canModerateMessages && !isMe}
                   animate={animateIdsRef.current.has(msg.id)}
                 />
