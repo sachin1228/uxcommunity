@@ -360,8 +360,8 @@ export function ResourceCard({
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
               <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-white"}`}>{resource.save_count}</span>
+                <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-[var(--ds-blue-700)] text-[var(--ds-blue-700)]" : "fill-none text-white"}`} />
+                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>

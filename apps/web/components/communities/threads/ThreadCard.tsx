@@ -515,13 +515,13 @@ export function ThreadCard({
                 strokeWidth={2}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
-                    ? "fill-red-500 text-red-500"
+                    ? "fill-[var(--ds-blue-700)] text-[var(--ds-blue-700)]"
                     : "fill-none text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-semibold tabular-nums ${
-                  thread.user_liked ? "text-red-500" : "text-white"
+                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-white"
                 }`}
               >
                 {thread.like_count}

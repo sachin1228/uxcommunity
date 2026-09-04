@@ -334,8 +334,8 @@ export function EventCard({
           aria-pressed={event.user_liked}
           className="group/like flex shrink-0 items-center gap-2"
         >
-          <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
+          <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-[var(--ds-blue-700)] text-[var(--ds-blue-700)]" : "fill-none text-foreground"}`} />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground"}`}>{event.like_count}</span>
         </button>
 
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">

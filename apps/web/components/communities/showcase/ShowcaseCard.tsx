@@ -101,7 +101,7 @@ export function ShowcaseCard({
             size={20}
             strokeWidth={2}
             fill={post.user_liked ? "currentColor" : "none"}
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-red-500" : "text-foreground"}`}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground"}`}
           />
           <span className="font-body text-sm font-semibold text-foreground">
             {post.like_count}
