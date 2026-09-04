@@ -582,22 +582,34 @@ export function CommunityChat({
   }, [scrollContainerRef]);
 
   // ── Scroll to #msg-<id> (deep links from mention notifications) ───────────
+  // The URL hash is the only channel between the NotificationBell (dashboard
+  // shell) and this page, so it is tracked through every route to it: Next
+  // <Link> updates the hash with history.pushState — which does NOT fire a
+  // hashchange event — so a light interval is the reliable catch-all (manual
+  // edits and back/forward fire hashchange/popstate and update instantly).
   const [urlHash, setUrlHash] = useState<string>(() =>
     typeof window === "undefined" ? "" : window.location.hash,
   );
   useEffect(() => {
     const apply = () => setUrlHash(window.location.hash);
     window.addEventListener("hashchange", apply);
-    return () => window.removeEventListener("hashchange", apply);
+    window.addEventListener("popstate", apply);
+    const timer = window.setInterval(apply, 400);
+    return () => {
+      window.removeEventListener("hashchange", apply);
+      window.removeEventListener("popstate", apply);
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
     const match = /^#msg-(\w+)$/.exec(urlHash);
     if (!match) return;
     const messageId = match[1];
-    // The list is hidden until the initial scroll position resolves; only
-    // then may we look for the bubble (a fetch may still need to land).
-    if (!initialPositionResolved) return;
+    // The list is hidden until the initial scroll position resolves, and the
+    // first message page may still be loading. Both flipping false re-runs
+    // this effect with a fresh retry budget.
+    if (loading || !initialPositionResolved) return;
 
     let attempts = 0;
     const clearHash = () => {
@@ -615,20 +627,23 @@ export function CommunityChat({
         window.clearInterval(timer);
         el.scrollIntoView({ behavior: "instant", block: "center" });
         if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+        // Same row treatment as clicking a quoted reply: flash the full-width
+        // bg-black/60 band behind the bubble for ~2s.
         setHighlightedMsgId(messageId);
         highlightTimerRef.current = setTimeout(
           () => setHighlightedMsgId(null),
           2000,
         );
         clearHash();
-      } else if (attempts > 30) {
-        // The message isn't in the loaded window — leave the hash in place so
-        // a reload can still try to land on it.
+      } else if (attempts > 75) {
+        // ~15s without the message: it isn't in the loaded window. Leave the
+        // hash in place so a reload (or a later effect re-run) can still try
+        // to land on it.
         window.clearInterval(timer);
       }
     }, 200);
     return () => window.clearInterval(timer);
-  }, [urlHash, communityId, initialPositionResolved, scrollContainerRef]);
+  }, [urlHash, communityId, loading, initialPositionResolved, scrollContainerRef]);
 
   // ── Realtime subscription ──���──���───────────────────────────────────────────
   useRealtimeChat({
