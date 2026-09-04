@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
@@ -12,6 +11,7 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const passwordHash = await bcrypt.hash(identity.password, 12);
+  const passwordHash = await hashPassword(identity.password);
   const { data, error } = await db.rpc("complete_signup", {
     p_name: identity.name,
     p_email: identity.email.toLowerCase(),

@@ -4,21 +4,19 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { loginSchema } from "@/lib/validations";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
+
+type LoginUserRow = {
+  id: string;
+  name: string | null;
+  email: string;
+  password_hash: string;
+  is_blocked: boolean;
+  designer_profiles: { id: string; avatar_url: string | null } | null;
+};
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-
-  // IP-level gate
-  const rlIp = await rateLimit(`login:ip:${ip}`, 10, 900); // 10 per 15 min per IP
-  if (!rlIp.success) {
-    return NextResponse.json(
-      { error: "Too many login attempts. Please try again later." },
-      {
-        status: 429,
-        headers: { "Retry-After": String(Math.ceil((rlIp.resetAt - Date.now()) / 1000)) },
-      }
-    );
-  }
 
   let body: unknown;
   try {
@@ -36,9 +34,24 @@ export async function POST(request: NextRequest) {
   }
 
   const { email, password } = parsed.data;
+  const normalizedEmail = email.toLowerCase();
 
-  // Per-account gate: prevents distributed brute-force (many IPs, one target)
-  const rlEmail = await rateLimit(`login:email:${email.toLowerCase()}`, 20, 900); // 20 per 15 min per account
+  // IP-level gate (10 per 15 min per IP) and per-account gate (20 per 15 min
+  // per account) run concurrently — both were previously awaited sequentially,
+  // adding one extra external Redis round trip to every login attempt.
+  const [rlIp, rlEmail] = await Promise.all([
+    rateLimit(`login:ip:${ip}`, 10, 900),
+    rateLimit(`login:email:${normalizedEmail}`, 20, 900),
+  ]);
+  if (!rlIp.success) {
+    return NextResponse.json(
+      { error: "Too many login attempts. Please try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil((rlIp.resetAt - Date.now()) / 1000)) },
+      }
+    );
+  }
   if (!rlEmail.success) {
     return NextResponse.json(
       { error: "Too many login attempts. Please try again later." },
@@ -66,22 +79,31 @@ export async function POST(request: NextRequest) {
 
   const db = createServiceClient();
 
-  const { data: user } = await db
+  // Single round trip: the users row plus its (1:1) designer profile, embedded
+  // through the FK. The !user_id hint is REQUIRED: in this schema PostgREST can
+  // resolve more than one path between users and designer_profiles, and an
+  // unhinted embed silently picks one that returns no rows. A missing profile
+  // is only acted on AFTER a successful password check below, so the response
+  // does not leak which emails exist.
+  const { data: rawUser } = await db
     .from("users")
-    .select("id, name, email, password_hash, application_id, is_blocked")
-    .eq("email", email.toLowerCase())
+    .select(
+      "id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)"
+    )
+    .eq("email", normalizedEmail)
     .maybeSingle();
+  const row = rawUser as unknown as LoginUserRow | null;
+  const profile = row?.designer_profiles ?? null;
 
-  if (!user) {
-    // Generic error — do NOT query the applications table here, that
-    // would reveal whether the email was used to apply (user enumeration).
+  if (!row) {
+    // Generic error — do NOT reveal whether the email exists.
     return NextResponse.json(
       { error: "Invalid email or password." },
       { status: 401 }
     );
   }
 
-  const passwordMatch = await bcrypt.compare(password, user.password_hash);
+  const passwordMatch = await bcrypt.compare(password, row.password_hash);
   if (!passwordMatch) {
     return NextResponse.json(
       { error: "Invalid email or password." },
@@ -89,18 +111,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (user.is_blocked) {
+  if (row.is_blocked) {
     return NextResponse.json(
       { error: "Your account has been suspended. Please contact support." },
       { status: 403 }
     );
   }
-
-  const { data: profile } = await db
-    .from("designer_profiles")
-    .select("id, avatar_url")
-    .eq("user_id", user.id)
-    .maybeSingle();
 
   if (!profile || !profile.avatar_url) {
     return NextResponse.json(
@@ -113,13 +129,27 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Rehash-on-login: hashes created at the old cost 12 make every login pay
+  // ~350ms of pure-JS bcrypt CPU. On a successful login, downgrade the stored
+  // hash to the current cost so the NEXT login is ~4x cheaper. New signups and
+  // resets already hash at the current cost.
+  if (needsPasswordRehash(row.password_hash)) {
+    try {
+      const upgradedHash = await hashPassword(password);
+      await db.from("users").update({ password_hash: upgradedHash }).eq("id", row.id);
+    } catch (err) {
+      // Non-fatal: the login itself succeeded; the hash is just upgraded next time.
+      console.error("[login] password rehash failed:", err);
+    }
+  }
+
   const token = await createSession({
-    userId: user.id,
-    email: user.email,
+    userId: row.id,
+    email: row.email,
     role: "user",
   });
 
-  const response = NextResponse.json({ success: true, name: user.name });
+  const response = NextResponse.json({ success: true, name: row.name });
   setSessionCookie(response, token, request.nextUrl.hostname);
   return response;
 }
