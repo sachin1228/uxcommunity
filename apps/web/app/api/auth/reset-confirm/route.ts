@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { hashPassword } from "@/lib/auth/password";
 import { z } from "zod";
 
 const schema = z
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await hashPassword(password);
 
   const { error: updateError } = await db
     .from("users")
