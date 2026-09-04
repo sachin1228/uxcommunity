@@ -215,13 +215,13 @@ export const ChatHeader = memo(function ChatHeader({
                     <span className="inline-flex items-center gap-1.5">
                       {community.name}
                       {community.is_private && (
-                        <Lock size={13} className="text-foreground-muted" aria-label="Private community" />
+                        <Lock strokeWidth={2.5} size={13} className="text-foreground-muted" aria-label="Private community" />
                       )}
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
                     <span className="inline-flex items-center gap-1">
-                      <Users size={10} /> {community.member_count} member
+                      <Users strokeWidth={2.5} size={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
                     </span>
                     {onlineCount > 0 && (
@@ -243,7 +243,7 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-label="Community settings"
                     title="Community settings"
                   >
-                    <Settings size={15} />
+                    <Settings strokeWidth={2.5} size={15} />
                   </button>
                 )}
                 <div className="relative">
@@ -254,7 +254,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
                     className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    Joined <ChevronDown size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
+                    Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
                   </button>
                   {openMenu === "joined" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -278,7 +278,7 @@ export const ChatHeader = memo(function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal strokeWidth={2.5} size={16} />
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -317,7 +317,7 @@ export const ChatHeader = memo(function ChatHeader({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon size={14} aria-hidden="true" />
+                    <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
                   </span>
                 </button>

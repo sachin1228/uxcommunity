@@ -20,7 +20,7 @@ export function InviteLinkBox({ inviteLink }: Props) {
   return (
     <div className="rounded-md border border-border bg-surface p-3">
       <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-        <Link size={12} /> Invitation Link
+        <Link strokeWidth={2.5} size={12} /> Invitation Link
       </p>
       <div className="flex items-center gap-2">
         <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-2.5 py-1.5 flex-1 truncate select-all">
@@ -31,9 +31,9 @@ export function InviteLinkBox({ inviteLink }: Props) {
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
         >
           {copied ? (
-            <CheckCheck size={12} className="text-green-400" />
+            <CheckCheck strokeWidth={2.5} size={12} className="text-green-400" />
           ) : (
-            <Copy size={12} />
+            <Copy strokeWidth={2.5} size={12} />
           )}
           {copied ? "Copied!" : "Copy"}
         </button>

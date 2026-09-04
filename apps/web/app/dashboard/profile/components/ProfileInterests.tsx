@@ -67,7 +67,7 @@ export function ProfileInterests({
             >
               <span>{INTEREST_EMOJIS[interest.name] ?? "🎨"}</span>
               {interest.name}
-              <X size={10} className="opacity-50 group-hover:opacity-100" />
+              <X strokeWidth={2.5} size={10} className="opacity-50 group-hover:opacity-100" />
             </button>
           ))
         )}
@@ -81,9 +81,9 @@ export function ProfileInterests({
           onClick={() => setOpen((v) => !v)}
           className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-accent/40 bg-surface-raised px-4 py-2 font-body text-sm text-foreground-muted hover:text-foreground transition-all"
         >
-          <Pencil size={12} />
+          <Pencil strokeWidth={2.5} size={12} />
           Edit interests
-          <ChevronDown size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          <ChevronDown strokeWidth={2.5} size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
         </button>
 
         {/* Portal dropdown — always above other content */}
@@ -117,7 +117,7 @@ export function ProfileInterests({
                     }`}
                     aria-hidden="true"
                   >
-                    {selected && <Check size={11} className="text-accent-foreground" strokeWidth={3} />}
+                    {selected && <Check size={11} className="text-accent-foreground" strokeWidth={2.5} />}
                   </span>
                 </button>
               );

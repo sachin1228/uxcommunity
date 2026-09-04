@@ -20,7 +20,7 @@ export function ApproveRejectButtons({ actionLoading, onApprove, onReject }: Pro
         {actionLoading === "approve" ? (
           <Spinner className="h-3 w-3" />
         ) : (
-          <Check size={13} />
+          <Check strokeWidth={2.5} size={13} />
         )}
         Approve &amp; Send Invite
       </button>
@@ -32,7 +32,7 @@ export function ApproveRejectButtons({ actionLoading, onApprove, onReject }: Pro
         {actionLoading === "reject" ? (
           <Spinner className="h-3 w-3" />
         ) : (
-          <X size={13} />
+          <X strokeWidth={2.5} size={13} />
         )}
         Reject
       </button>

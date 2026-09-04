@@ -124,7 +124,7 @@ export function CreateEventModal({
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X size={20} />
+            <X strokeWidth={2.5} size={20} />
           </button>
         </div>
 
@@ -144,7 +144,7 @@ export function CreateEventModal({
                   className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                   aria-label="Remove cover image"
                 >
-                  <X size={12} />
+                  <X strokeWidth={2.5} size={12} />
                 </button>
               </div>
             ) : (
@@ -154,7 +154,7 @@ export function CreateEventModal({
                 onClick={() => imageInputRef.current?.click()}
                 className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-raised text-foreground-muted hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {imageUploading ? <Spinner size={20} /> : <ImagePlus size={20} />}
+                {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
                 <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
                 <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
               </button>
@@ -199,7 +199,7 @@ export function CreateEventModal({
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Calendar size={11} /> Start date <span className="text-accent">*</span>
+                <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
               </span>
               <input
                 type="date"
@@ -210,7 +210,7 @@ export function CreateEventModal({
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Clock size={11} /> Start time <span className="text-accent">*</span>
+                <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
               </span>
               <input
                 type="time"
@@ -250,7 +250,7 @@ export function CreateEventModal({
           {/* Online toggle */}
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2">
-              <Video size={15} className="text-foreground-muted" />
+              <Video strokeWidth={2.5} size={15} className="text-foreground-muted" />
               <span>
                 <span className="block font-body text-sm font-medium text-foreground">Online event</span>
                 <span className="block font-body text-xs text-foreground-muted">Happening virtually via a meeting link.</span>
@@ -271,7 +271,7 @@ export function CreateEventModal({
           {isOnline ? (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input
                 type="url"
@@ -284,7 +284,7 @@ export function CreateEventModal({
           ) : (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input
                 value={location}
@@ -298,7 +298,7 @@ export function CreateEventModal({
           {/* Max attendees */}
           <label className="block">
             <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional — leave blank for unlimited)</span>
+              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional — leave blank for unlimited)</span>
             </span>
             <input
               type="number"
@@ -343,7 +343,7 @@ export function CreateEventModal({
             disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? "Creating…" : "Create Event"}
           </button>
         </div>

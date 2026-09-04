@@ -71,11 +71,11 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
         >
           {isFullscreen ? (
             <>
-              Exit full screen <Minimize2 size={12} />
+              Exit full screen <Minimize2 strokeWidth={2.5} size={12} />
             </>
           ) : (
             <>
-              View full screen <Maximize2 size={12} />
+              View full screen <Maximize2 strokeWidth={2.5} size={12} />
             </>
           )}
         </button>

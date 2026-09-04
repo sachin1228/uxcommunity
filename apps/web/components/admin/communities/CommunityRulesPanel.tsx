@@ -134,7 +134,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
             onClick={() => { setAdding(true); setNewText(""); setAddError(null); }}
             className="flex items-center gap-1 font-body text-xs text-accent hover:text-accent/80 transition-colors"
           >
-            <Plus size={13} /> Add rule
+            <Plus strokeWidth={2.5} size={13} /> Add rule
           </button>
         )}
       </div>
@@ -179,13 +179,13 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                     disabled={editLoading}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
                   >
-                    {editLoading ? <Spinner className="h-3 w-3" /> : <Check size={11} />} Save
+                    {editLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
                   </button>
                   <button
                     onClick={() => { setEditingId(null); setEditError(null); }}
                     className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
                   >
-                    <X size={11} /> Cancel
+                    <X strokeWidth={2.5} size={11} /> Cancel
                   </button>
                 </div>
               </div>
@@ -201,7 +201,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                     className="p-0.5 text-foreground-muted hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move up"
                   >
-                    <ChevronUp size={12} />
+                    <ChevronUp strokeWidth={2.5} size={12} />
                   </button>
                   <button
                     onClick={() => handleMove(rule.id, "down")}
@@ -209,14 +209,14 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                     className="p-0.5 text-foreground-muted hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move down"
                   >
-                    <ChevronDown size={12} />
+                    <ChevronDown strokeWidth={2.5} size={12} />
                   </button>
                   <button
                     onClick={() => { setEditText(rule.rule_text); setEditingId(rule.id); setEditError(null); }}
                     className="p-0.5 text-foreground-muted hover:text-foreground transition-colors"
                     title="Edit"
                   >
-                    <Pencil size={12} />
+                    <Pencil strokeWidth={2.5} size={12} />
                   </button>
                   <button
                     onClick={() => handleDelete(rule.id)}
@@ -224,7 +224,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                     className="p-0.5 text-foreground-muted hover:text-red-400 disabled:opacity-50 transition-colors"
                     title="Delete"
                   >
-                    {deletingId === rule.id ? <Spinner className="h-3 w-3" /> : <Trash2 size={12} />}
+                    {deletingId === rule.id ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                   </button>
                 </div>
               </>
@@ -259,13 +259,13 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
               disabled={addLoading || !newText.trim()}
               className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
             >
-              {addLoading ? <Spinner className="h-3 w-3" /> : <Plus size={11} />} Add rule
+              {addLoading ? <Spinner className="h-3 w-3" /> : <Plus strokeWidth={2.5} size={11} />} Add rule
             </button>
             <button
               onClick={() => { setAdding(false); setAddError(null); setNewText(""); }}
               className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
             >
-              <X size={11} /> Cancel
+              <X strokeWidth={2.5} size={11} /> Cancel
             </button>
           </div>
         </div>

@@ -345,12 +345,12 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
               <div className="mt-4 flex flex-col gap-2">
                 {type === "city" && referenceName && (
                   <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
-                    <MapPin size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                    <MapPin strokeWidth={2.5} size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
                     {referenceName}
                   </div>
                 )}
                 <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
-                  <Calendar size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                  <Calendar strokeWidth={2.5} size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
                   Created {fmtCreatedAt(community.created_at)}
                 </div>
               </div>

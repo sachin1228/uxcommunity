@@ -82,9 +82,9 @@ export function CommunityActionsPanel({
             {toggleLoading ? (
               <Spinner className="h-3.5 w-3.5" />
             ) : isActive ? (
-              <ToggleRight size={14} className="text-green-400" />
+              <ToggleRight strokeWidth={2.5} size={14} className="text-green-400" />
             ) : (
-              <ToggleLeft size={14} className="text-foreground-muted" />
+              <ToggleLeft strokeWidth={2.5} size={14} className="text-foreground-muted" />
             )}
             {isActive ? "Deactivate" : "Activate"}
           </button>
@@ -102,7 +102,7 @@ export function CommunityActionsPanel({
             onClick={() => setConfirmDelete(true)}
             className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            <Trash2 size={12} /> Delete
+            <Trash2 strokeWidth={2.5} size={12} /> Delete
           </button>
         </div>
       </div>
@@ -142,7 +142,7 @@ export function CommunityActionsPanel({
                 disabled={deleteLoading}
                 className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-red-600 py-2 font-body text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
               >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 size={12} />}
+                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete
               </button>
             </div>

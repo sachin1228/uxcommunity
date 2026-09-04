@@ -217,7 +217,7 @@ export function NotificationBell({ userId }: Props) {
   const emptyState = useMemo(
     () => (
       <div className="px-5 py-10 text-center">
-        <Bell size={22} className="mx-auto mb-2 text-foreground-muted opacity-50" />
+        <Bell strokeWidth={2.5} size={22} className="mx-auto mb-2 text-foreground-muted opacity-50" />
         <p className="font-body text-sm font-medium text-foreground">No notifications yet</p>
         <p className="mt-1 font-body text-xs text-foreground-muted">
           Threads, resources, events, replies, and @mentions will appear here.
@@ -237,7 +237,7 @@ export function NotificationBell({ userId }: Props) {
         onClick={() => setOpen((value) => !value)}
         className="relative h-8 w-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
       >
-        <Bell size={16} strokeWidth={1.8} />
+        <Bell size={16} strokeWidth={2.5} />
         {hasUnread && (
           <span className="absolute -right-1 -top-1 min-w-4 h-4 rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-4 text-white">
             {visibleCount}
@@ -265,7 +265,7 @@ export function NotificationBell({ userId }: Props) {
             disabled={!hasUnread}
             className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-body text-[11px] text-foreground-muted hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
           >
-            <CheckCheck size={13} />
+            <CheckCheck strokeWidth={2.5} size={13} />
             Mark read
           </button>
         </div>
@@ -297,7 +297,7 @@ export function NotificationBell({ userId }: Props) {
                           unread ? "bg-accent-soft text-accent" : "bg-background-subtle text-foreground-muted"
                         }`}
                       >
-                        <Icon size={15} />
+                        <Icon size={15} strokeWidth={2.5} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-start gap-2">

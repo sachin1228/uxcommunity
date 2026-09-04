@@ -103,7 +103,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             onClick={onClose}
             className="text-foreground-muted hover:text-foreground transition-colors mt-0.5"
           >
-            <X size={16} />
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -115,7 +115,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <ExternalLink size={12} /> LinkedIn
+            <ExternalLink strokeWidth={2.5} size={12} /> LinkedIn
           </a>
           <a
             href={app.portfolio_url}
@@ -123,7 +123,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           >
-            <ExternalLink size={12} /> Portfolio
+            <ExternalLink strokeWidth={2.5} size={12} /> Portfolio
           </a>
         </div>
 

@@ -145,7 +145,7 @@ export function MasterDataPage({
             onClick={() => setModalOpen(true)}
             className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
           >
-            <Plus size={13} />
+            <Plus strokeWidth={2.5} size={13} />
             Add {entity}
           </button>
         )}
@@ -196,7 +196,7 @@ export function MasterDataPage({
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <X size={12} />
+            <X strokeWidth={2.5} size={12} />
           </button>
         )}
       </div>
@@ -217,7 +217,7 @@ export function MasterDataPage({
                 onClick={() => setModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
               >
-                <Plus size={13} />Add your first {entity.toLowerCase()}
+                <Plus strokeWidth={2.5} size={13} />Add your first {entity.toLowerCase()}
               </button>
             )}
           </div>
@@ -258,7 +258,7 @@ export function MasterDataPage({
                       />
                     ) : (
                       <div className="h-6 w-6 rounded border border-border bg-surface-raised flex items-center justify-center">
-                        <ImagePlus size={11} className="text-foreground-muted" />
+                        <ImagePlus strokeWidth={2.5} size={11} className="text-foreground-muted" />
                       </div>
                     )}
                   </td>
@@ -285,7 +285,7 @@ export function MasterDataPage({
                     </span>
                   </td>
                   <td className="px-4 py-2.5 w-6">
-                    <ChevronRight size={13} className="text-foreground-muted" />
+                    <ChevronRight strokeWidth={2.5} size={13} className="text-foreground-muted" />
                   </td>
                 </tr>
               ))}

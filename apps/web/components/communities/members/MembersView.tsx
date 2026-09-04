@@ -242,7 +242,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       {/* Search */}
       <div className="px-5 py-3 shrink-0">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+          <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -287,7 +287,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Check size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
+                        <Check strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
                       </button>
                       <button
                         type="button"
@@ -295,7 +295,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <X size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
+                        <X strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
                       </button>
                     </div>
                   </li>
@@ -313,7 +313,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
-            <Users size={32} className="opacity-30" />
+            <Users strokeWidth={2.5} size={32} className="opacity-30" />
             <p className="font-body text-sm">
               {debouncedQ ? "No members match your search." : "No members yet."}
             </p>
@@ -371,7 +371,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                           aria-label="Member options"
                         >
-                          <MoreHorizontal size={14} />
+                          <MoreHorizontal strokeWidth={2.5} size={14} />
                         </button>
                         {openMenuFor === member.user_id && (
                           <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">

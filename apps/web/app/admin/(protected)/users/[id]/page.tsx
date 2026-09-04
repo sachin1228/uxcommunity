@@ -115,7 +115,7 @@ export default function UserDetailPage() {
         onClick={() => router.push("/admin/users")}
         className="mb-6 flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground transition-colors"
       >
-        <ArrowLeft size={14} />
+        <ArrowLeft strokeWidth={2.5} size={14} />
         Back to users
       </button>
 
@@ -163,9 +163,9 @@ export default function UserDetailPage() {
             {actionLoading === "block" ? (
               <Spinner className="h-3.5 w-3.5" />
             ) : user.is_blocked ? (
-              <ShieldCheck size={14} />
+              <ShieldCheck strokeWidth={2.5} size={14} />
             ) : (
-              <ShieldOff size={14} />
+              <ShieldOff strokeWidth={2.5} size={14} />
             )}
             {user.is_blocked ? "Unblock" : "Block"}
           </button>
@@ -175,7 +175,7 @@ export default function UserDetailPage() {
             disabled={!!actionLoading}
             className="flex items-center gap-2 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-sm text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
           >
-            <Trash2 size={14} />
+            <Trash2 strokeWidth={2.5} size={14} />
             Delete
           </button>
         </div>
@@ -185,7 +185,7 @@ export default function UserDetailPage() {
       <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised">
-            <Users size={16} className="text-foreground-muted" />
+            <Users strokeWidth={2.5} size={16} className="text-foreground-muted" />
           </span>
           <div>
             <p className="font-body text-sm font-medium text-foreground">

@@ -172,11 +172,11 @@ export default function ModerationPage() {
                       )}
                       {event.user_id && (
                         <button title="Permanent ban" onClick={() => updateEvent(event.id, { ban_user: true, moderator_notes: "Permanent ban from moderation queue." })} className="rounded-md border border-border p-1.5 text-foreground-muted hover:text-red-400">
-                          <ShieldAlert size={14} />
+                          <ShieldAlert strokeWidth={2.5} size={14} />
                         </button>
                       )}
                       <button title="Delete event" onClick={() => deleteEvent(event.id)} className="rounded-md border border-border p-1.5 text-foreground-muted hover:text-red-400">
-                        <Trash2 size={14} />
+                        <Trash2 strokeWidth={2.5} size={14} />
                       </button>
                     </div>
                   </td>
@@ -192,10 +192,10 @@ export default function ModerationPage() {
           <p className="font-body text-xs text-foreground-muted">Page {page} of {totalPages}</p>
           <div className="flex gap-1.5">
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground disabled:opacity-40">
-              <ChevronLeft size={13} /> Prev
+              <ChevronLeft strokeWidth={2.5} size={13} /> Prev
             </button>
             <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground disabled:opacity-40">
-              Next <ChevronRight size={13} />
+              Next <ChevronRight strokeWidth={2.5} size={13} />
             </button>
           </div>
         </div>

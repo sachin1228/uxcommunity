@@ -74,7 +74,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors"
           >
-            <UserCircle size={14} />
+            <UserCircle strokeWidth={2.5} size={14} />
             My Profile
           </Link>
           <button
@@ -82,7 +82,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
             disabled={loggingOut}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
           >
-            <LogOut size={14} />
+            <LogOut strokeWidth={2.5} size={14} />
             {loggingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>

@@ -29,10 +29,10 @@ type SavedItem =
   | { type: "resource"; data: ProfileResource };
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "threads",   label: "Threads",   icon: <MessageSquareText size={13} /> },
-  { id: "events",    label: "Events",    icon: <CalendarDays size={13} /> },
-  { id: "resources", label: "Resources", icon: <BookMarked size={13} /> },
-  { id: "saved",     label: "Saved",     icon: <Bookmark size={13} /> },
+  { id: "threads",   label: "Threads",   icon: <MessageSquareText strokeWidth={2.5} size={13} /> },
+  { id: "events",    label: "Events",    icon: <CalendarDays strokeWidth={2.5} size={13} /> },
+  { id: "resources", label: "Resources", icon: <BookMarked strokeWidth={2.5} size={13} /> },
+  { id: "saved",     label: "Saved",     icon: <Bookmark strokeWidth={2.5} size={13} /> },
 ];
 
 function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
@@ -295,7 +295,7 @@ export function ProfileThreads({
         {activeTab === "threads" && (
           threads.length === 0 ? (
             <EmptyState
-              icon={<MessageSquareText size={24} />}
+              icon={<MessageSquareText strokeWidth={2.5} size={24} />}
               message="Threads you create will appear here."
             />
           ) : (
@@ -324,7 +324,7 @@ export function ProfileThreads({
             <LoadingState />
           ) : events.length === 0 ? (
             <EmptyState
-              icon={<CalendarDays size={24} />}
+              icon={<CalendarDays strokeWidth={2.5} size={24} />}
               message="Events you create in communities will appear here."
             />
           ) : (
@@ -354,7 +354,7 @@ export function ProfileThreads({
             <LoadingState />
           ) : resources.length === 0 ? (
             <EmptyState
-              icon={<BookMarked size={24} />}
+              icon={<BookMarked strokeWidth={2.5} size={24} />}
               message="Resources you share in communities will appear here."
             />
           ) : (
@@ -381,7 +381,7 @@ export function ProfileThreads({
             <LoadingState />
           ) : savedItems.length === 0 ? (
             <EmptyState
-              icon={<Bookmark size={24} />}
+              icon={<Bookmark strokeWidth={2.5} size={24} />}
               message="Events, resources, and threads you save will appear here."
             />
           ) : (

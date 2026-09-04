@@ -72,31 +72,31 @@ export function EventOptionsMenu({
         aria-expanded={open}
         className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal strokeWidth={2.5} size={16} />
       </button>
       {open && (
         <div className="absolute right-0 top-9 z-30 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           <button type="button" onClick={() => run(onSave)} disabled={saving} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-            <Bookmark size={12} fill={saved ? "currentColor" : "none"} />
+            <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
             {saving ? "Saving…" : saved ? "Unsave" : "Save"}
           </button>
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-            <Share2 size={12} /> {shared ? "Copied!" : "Share"}
+            <Share2 strokeWidth={2.5} size={12} /> {shared ? "Copied!" : "Share"}
           </button>
           {isOwner && !past && onEdit && onDelete && (
             <>
               <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil size={12} /> Edit
+                <Pencil strokeWidth={2.5} size={12} /> Edit
               </button>
               <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                {deleting ? <Spinner size={12} className="text-red-400" /> : <Trash2 size={12} />}
+                {deleting ? <Spinner size={12} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 {deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           )}
           {onReport && (
             <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag size={12} /> {reported ? "Reported" : "Report"}
+              <Flag strokeWidth={2.5} size={12} /> {reported ? "Reported" : "Report"}
             </button>
           )}
         </div>

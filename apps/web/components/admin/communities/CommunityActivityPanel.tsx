@@ -64,7 +64,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
     <div className="rounded-xl border border-border bg-surface overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h2 className="font-body text-xs font-semibold text-foreground flex items-center gap-1.5">
-          <Activity size={13} className="text-accent" />
+          <Activity strokeWidth={2.5} size={13} className="text-accent" />
           {adminId ? "Admin activity" : "Management activity"}
         </h2>
         <p className="font-body text-[11px] text-foreground-muted mt-0.5">
@@ -99,7 +99,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
         <p className="px-5 py-4 font-body text-xs text-red-400">{error}</p>
       ) : visible.length === 0 ? (
         <div className="px-5 py-6 flex items-center gap-3">
-          <ShieldCheck size={16} className="text-foreground-muted/50 shrink-0" />
+          <ShieldCheck strokeWidth={2.5} size={16} className="text-foreground-muted/50 shrink-0" />
           <p className="font-body text-xs text-foreground-muted">
             No management activity recorded yet. Changes made by community admins and the platform will show up here.
           </p>

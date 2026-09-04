@@ -99,7 +99,7 @@ export function ShowcaseCard({
         >
           <Heart
             size={20}
-            strokeWidth={2}
+            strokeWidth={2.5}
             fill={post.user_liked ? "currentColor" : "none"}
             className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-red-500" : "text-foreground"}`}
           />
@@ -110,7 +110,7 @@ export function ShowcaseCard({
 
         {post.allow_replies !== false && (
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <MessageCircle size={20} />
+          <MessageCircle strokeWidth={2.5} size={20} />
           {post.comment_count}
         </span>
         )}

@@ -201,7 +201,7 @@ export function ThreadsView({
             onClick={() => setShowCreateModal(true)}
             className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            <Plus size={14} />
+            <Plus strokeWidth={2.5} size={14} />
             Create Thread
           </button>
         </div>
@@ -228,7 +228,7 @@ export function ThreadsView({
                   aria-pressed={filter === item.value}
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  <Icon size={14} aria-hidden="true" />
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
                 </button>
               );
@@ -258,7 +258,7 @@ export function ThreadsView({
       {!loading && threads.length === 0 && (
         <div className={communityFeedLayout.content}>
           <div className={communityFeedLayout.emptyState}>
-            <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+            <MessageSquarePlus strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No threads yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Be the first person to start a discussion.</p>
           </div>
@@ -269,7 +269,7 @@ export function ThreadsView({
         <div className={communityFeedLayout.content}>
           {filteredThreads.length === 0 ? (
             <div className={communityFeedLayout.emptyState}>
-              <MessageSquarePlus size={24} className={communityFeedLayout.emptyIcon} />
+              <MessageSquarePlus strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
               <h3 className={communityFeedLayout.emptyTitle}>No threads in this category</h3>
               <p className={communityFeedLayout.emptyDescription}>Try a different filter or start a new thread.</p>
             </div>

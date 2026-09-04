@@ -79,7 +79,7 @@ export default function UsersPage() {
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <X size={12} />
+            <X strokeWidth={2.5} size={12} />
           </button>
         )}
       </div>
@@ -190,14 +190,14 @@ export default function UsersPage() {
               disabled={page === 1}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              <ChevronLeft size={13} /> Prev
+              <ChevronLeft strokeWidth={2.5} size={13} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
               className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
             >
-              Next <ChevronRight size={13} />
+              Next <ChevronRight strokeWidth={2.5} size={13} />
             </button>
           </div>
         </div>

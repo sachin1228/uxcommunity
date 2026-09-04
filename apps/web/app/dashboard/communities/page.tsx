@@ -111,7 +111,7 @@ function CommunityCard({
                 onMouseLeave={hideTip}
                 className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
-                <Lock size={10} />
+                <Lock strokeWidth={2.5} size={10} />
                 Join
               </button>
               {tipPos && typeof document !== "undefined" && createPortal(

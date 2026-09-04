@@ -15,7 +15,7 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
     <div className="flex flex-col gap-3">
       <div>
         <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
-          <FileText size={12} /> Internal Review Notes
+          <FileText strokeWidth={2.5} size={12} /> Internal Review Notes
         </p>
         <textarea
           value={notes}

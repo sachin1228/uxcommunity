@@ -95,7 +95,7 @@ export function ThreadNotificationBubble({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <CatIcon size={22} strokeWidth={1.5} className="text-foreground-muted" />
+                <CatIcon size={22} strokeWidth={2.5} className="text-foreground-muted" />
               )}
             </div>
 

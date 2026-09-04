@@ -34,9 +34,9 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
       <div className="flex items-center gap-3 min-w-0">
         <div className="h-9 w-9 shrink-0 rounded-lg bg-surface-raised flex items-center justify-center">
           {setting ? (
-            <Film size={16} className="text-accent" />
+            <Film strokeWidth={2.5} size={16} className="text-accent" />
           ) : (
-            <Clapperboard size={16} className="text-foreground-muted" />
+            <Clapperboard strokeWidth={2.5} size={16} className="text-foreground-muted" />
           )}
         </div>
         <div className="min-w-0">
@@ -59,7 +59,7 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
             title="Remove animation"
             className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
           >
-            {deleting ? <Spinner className="h-3 w-3" /> : <Trash2 size={13} />}
+            {deleting ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={13} />}
           </button>
         )}
         <input
@@ -77,7 +77,7 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
           disabled={uploading || deleting}
           className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
         >
-          {uploading ? <Spinner className="h-3 w-3" /> : <Upload size={12} />}
+          {uploading ? <Spinner className="h-3 w-3" /> : <Upload strokeWidth={2.5} size={12} />}
           {setting ? "Replace" : "Upload"}
         </button>
       </div>

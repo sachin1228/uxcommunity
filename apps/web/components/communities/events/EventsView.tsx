@@ -169,7 +169,7 @@ export function EventsView({
             onClick={() => setShowCreateModal(true)}
             className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
           >
-            <Plus size={14} /> Create Event
+            <Plus strokeWidth={2.5} size={14} /> Create Event
           </button>
         </div>
 
@@ -188,7 +188,7 @@ export function EventsView({
                   aria-pressed={filter === item.value}
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  <Icon size={14} aria-hidden="true" />
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label} ({item.count})
                 </button>
               );
@@ -212,13 +212,13 @@ export function EventsView({
           </div>
         ) : events.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarX2 size={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No events yet</h3>
             <p className={communityFeedLayout.emptyDescription}>Create the first event for your community.</p>
           </div>
         ) : (filter === "upcoming" && upcoming.length === 0) || (filter === "past" && past.length === 0) ? (
           <div className={communityFeedLayout.emptyState}>
-            <CalendarX2 size={24} className={communityFeedLayout.emptyIcon} />
+            <CalendarX2 strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No {filter} events</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different event filter.</p>
           </div>

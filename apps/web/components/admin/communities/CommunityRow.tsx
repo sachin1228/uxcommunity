@@ -58,7 +58,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
                 title="Animated display picture (Lottie)"
                 className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
               >
-                <Sparkles size={9} />
+                <Sparkles strokeWidth={2.5} size={9} />
               </span>
             )}
           </div>
@@ -87,7 +87,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Members */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <Users size={11} />
+          <Users strokeWidth={2.5} size={11} />
           {c.member_count.toLocaleString()}
         </span>
       </td>
@@ -95,7 +95,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Messages */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <MessageSquare size={11} />
+          <MessageSquare strokeWidth={2.5} size={11} />
           {c.message_count.toLocaleString()}
         </span>
       </td>
@@ -120,7 +120,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
 
       {/* Chevron */}
       <td className="px-4 py-3 text-right">
-        <ChevronRight size={14} className="text-foreground-muted ml-auto" />
+        <ChevronRight strokeWidth={2.5} size={14} className="text-foreground-muted ml-auto" />
       </td>
     </tr>
   );

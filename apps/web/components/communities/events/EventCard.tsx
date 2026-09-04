@@ -213,21 +213,21 @@ export function EventCard({
 
           <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2">
             <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-              <Calendar size={13} className="shrink-0 text-accent" aria-hidden="true" />
+              <Calendar strokeWidth={2.5} size={13} className="shrink-0 text-accent" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {event.is_online ? (
               <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <Video size={12} className="shrink-0" aria-hidden="true" />
+                <Video strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
                 {isDetail && event.meet_link ? (
                   <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-                    Online (Google Meet) <ExternalLink size={12} />
+                    Online (Google Meet) <ExternalLink strokeWidth={2.5} size={12} />
                   </a>
                 ) : event.meet_link ? "Online (Google Meet)" : "Online"}
               </span>
             ) : event.location ? (
               <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <MapPin size={12} className="shrink-0" aria-hidden="true" />
+                <MapPin strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
                 <span className="truncate">{event.location}</span>
               </span>
             ) : null}
@@ -247,7 +247,7 @@ export function EventCard({
                   disabled={rsvpPending || full}
                   className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
                 >
-                  <UserPlus size={14} aria-hidden="true" />
+                  <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
                 </button>
               ) : (
@@ -272,7 +272,7 @@ export function EventCard({
                   disabled={rsvpPending || full}
                   className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
                 >
-                  <UserPlus size={14} aria-hidden="true" />
+                  <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
                 </button>
               ) : (
@@ -334,12 +334,12 @@ export function EventCard({
           aria-pressed={event.user_liked}
           className="group/like flex shrink-0 items-center gap-2"
         >
-          <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
+          <Heart size={20} strokeWidth={2.5} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
           <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
         </button>
 
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <MessageCircle size={20} />
+          <MessageCircle strokeWidth={2.5} size={20} />
           {event.comment_count ?? 0}
         </span>
 
