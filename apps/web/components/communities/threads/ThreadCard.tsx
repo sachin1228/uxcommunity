@@ -512,7 +512,7 @@ export function ThreadCard({
             >
               <Heart
                 size={20}
-                strokeWidth={2}
+                strokeWidth={2.5}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
                     ? "fill-red-500 text-red-500"

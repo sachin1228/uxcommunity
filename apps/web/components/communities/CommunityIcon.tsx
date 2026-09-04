@@ -25,7 +25,7 @@ export function CommunityIcon({
     >
       <Users
         size={iconSize ?? Math.round(size * 0.5)}
-        strokeWidth={1.8}
+        strokeWidth={2.5}
         className="text-foreground-muted"
       />
     </div>
