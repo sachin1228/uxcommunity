@@ -806,7 +806,7 @@ export const MessageBubble = memo(function MessageBubble({
     !!msg.content &&
     isEmojiOnly(msg.content);
 
-  const rowHighlight = highlighted ? "bg-black/60" : "";
+  const rowHighlight = highlighted ? "bg-[var(--ds-blue-700)]/25" : "";
   const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
