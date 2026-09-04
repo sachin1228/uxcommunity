@@ -317,7 +317,7 @@ export const ChatHeader = memo(function ChatHeader({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon size={14} aria-hidden="true" />
+                    <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
                   </span>
                 </button>

@@ -352,7 +352,7 @@ export default function CommunityDetailPage() {
                 isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
               }`}
             >
-              <Icon size={13} />
+              <Icon size={13} strokeWidth={2.5} />
               {t.label}
               {t.count != null && (
                 <span

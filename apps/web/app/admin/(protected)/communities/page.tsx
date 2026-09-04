@@ -155,7 +155,7 @@ export default function AdminCommunitiesPage() {
                       : "border-transparent text-foreground-muted hover:text-foreground"
                   }`}
                 >
-                  <Icon size={13} />
+                  <Icon size={13} strokeWidth={2.5} />
                   {tab.label}
                   <span
                     className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${

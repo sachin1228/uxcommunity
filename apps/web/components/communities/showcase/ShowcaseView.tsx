@@ -183,7 +183,7 @@ export function ShowcaseView({
                       : "border-border text-foreground-muted"
                   }`}
                 >
-                  <Icon size={14} />
+                  <Icon size={14} strokeWidth={2.5} />
                   {item.label}
                 </button>
               );

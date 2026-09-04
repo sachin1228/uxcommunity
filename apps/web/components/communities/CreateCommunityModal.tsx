@@ -255,7 +255,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                         active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
                       }`}
                     >
-                      <Icon size={18} className={active ? "text-accent" : "text-foreground-muted"} />
+                      <Icon size={18} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
                       <span className="min-w-0">
                         <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
                         <span className="block font-body text-xs text-foreground-muted">{copy}</span>
@@ -286,7 +286,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       } ${required ? "cursor-default" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon size={16} className={active ? "text-accent" : "text-foreground-muted"} />
+                        <Icon size={16} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
                         <span className="font-body text-sm font-semibold text-foreground">{label}</span>
                       </div>
                       <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">{copy}</p>

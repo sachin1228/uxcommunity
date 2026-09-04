@@ -175,7 +175,7 @@ export function LottieAnimationsPage() {
         <div className="space-y-2">
           {TYPE_CONFIG.map(({ key, label, Icon }) => (
             <div key={key} className="flex items-center gap-2">
-              <Icon size={13} className="text-foreground-muted shrink-0" />
+              <Icon size={13} strokeWidth={2.5} className="text-foreground-muted shrink-0" />
               <div className="flex-1">
                 <AnimationSlot
                   label={label}

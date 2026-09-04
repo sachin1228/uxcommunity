@@ -161,7 +161,7 @@ export function AdminSidebar() {
                     : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
                 }`}
               >
-                <Icon size={15} className={active(href) ? "text-accent" : ""} />
+                <Icon size={15} strokeWidth={2.5} className={active(href) ? "text-accent" : ""} />
                 {label}
               </Link>
             ))}

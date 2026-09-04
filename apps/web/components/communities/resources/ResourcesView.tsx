@@ -224,7 +224,7 @@ export function ResourcesView({
                   aria-pressed={filter === item.value}
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  <Icon size={14} aria-hidden="true" />
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
                   <span className="font-mono text-[10px]">{count}</span>
                 </button>
