@@ -387,6 +387,14 @@ select:focus-visible {
   }
 }
 
+/* ─── Logging-out screen loader ──────────────────────────────────────── */
+/* Dots arranged in a ring fade in sequence so the pulse travels around the
+   circle — the Vercel-style loader on the full-screen "Logging out" state. */
+@keyframes logging-dot {
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
