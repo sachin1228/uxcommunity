@@ -88,10 +88,64 @@ async function listFolderKeys(
   return keys;
 }
 
+async function findSupabaseStorageReferences(db: ReturnType<typeof createServiceClient>): Promise<string[]> {
+  const references: string[] = [];
+  const columns = [
+    ["designer_profiles", "avatar_url"],
+    ["communities", "image_url"],
+    ["communities", "lottie_url"],
+    ["cities", "image_url"],
+    ["cities", "lottie_url"],
+    ["design_sectors", "image_url"],
+    ["design_sectors", "lottie_url"],
+    ["design_interests", "image_url"],
+    ["design_interests", "lottie_url"],
+    ["experience_levels", "image_url"],
+    ["experience_levels", "lottie_url"],
+    ["community_messages", "image_url"],
+    ["community_events", "cover_image_url"],
+    ["community_showcase_posts", "image_url"],
+  ] as const;
+
+  for (const [table, column] of columns) {
+    const { data, error } = await db.from(table).select(`id, ${column}`).not(column, "is", null);
+    if (error) throw new Error(`Reference check failed for ${table}.${column}: ${error.message}`);
+    for (const row of data ?? []) {
+      if (typeof row?.[column] === "string" && row[column].includes("/storage/v1/object/")) {
+        references.push(`${table}.${column}:${row.id}`);
+      }
+    }
+  }
+
+  const { data: threads, error: threadError } = await db.from("community_threads").select("id, attachments").not("attachments", "is", null);
+  if (threadError) throw new Error(`Reference check failed for community_threads.attachments: ${threadError.message}`);
+  for (const row of threads ?? []) {
+    const attachments = Array.isArray(row?.attachments) ? row.attachments : [];
+    if (attachments.some((attachment) => attachment && typeof attachment === "object" && typeof attachment.url === "string" && attachment.url.includes("/storage/v1/object/"))) {
+      references.push(`community_threads.attachments:${row.id}`);
+    }
+  }
+
+  return references;
+}
+
 export async function POST() {
   try { await requireSession("admin"); } catch (e) { return e as Response; }
 
   const db = createServiceClient();
+
+  let supabaseReferences: string[];
+  try {
+    supabaseReferences = await findSupabaseStorageReferences(db);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to verify database image references." }, { status: 500 });
+  }
+  if (supabaseReferences.length > 0) {
+    return NextResponse.json({
+      error: "Supabase Storage still contains files referenced by the database. Migration must finish before purge.",
+      references: supabaseReferences,
+    }, { status: 409 });
+  }
 
   // List all buckets
   const { data: buckets, error: bucketsErr } = await db.storage.listBuckets();
