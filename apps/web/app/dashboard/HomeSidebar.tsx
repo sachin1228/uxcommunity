@@ -22,7 +22,7 @@ export function HomeSidebar() {
   return (
     <aside
       aria-label="Homepage sidebar"
-      className="hidden w-64 shrink-0 flex-col gap-4 xl:flex"
+      className="hidden w-64 shrink-0 flex-col gap-4 pt-8 xl:flex"
     >
       <section className="rounded-xl border border-border bg-surface p-4">
         <h2 className="font-body text-xs font-semibold uppercase tracking-widest text-foreground-muted">
