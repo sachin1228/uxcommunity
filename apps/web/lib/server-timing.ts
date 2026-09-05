@@ -3,13 +3,6 @@ type TimingDetails = Record<string, number>
 const encoder = new TextEncoder()
 const round = (value: number) => Math.round(value * 100) / 100
 
-/**
- * In development, only print the [server-timing] log for requests that exceed
- * this duration. Fast requests otherwise spam the dev terminal; slow ones still
- * surface so perf regressions stay visible. Production telemetry is unaffected.
- */
-const DEV_LOG_THRESHOLD_MS = 250
-
 export function estimateJsonBytes(value: unknown) {
   try {
     return encoder.encode(JSON.stringify(value)).byteLength
@@ -18,7 +11,7 @@ export function estimateJsonBytes(value: unknown) {
   }
 }
 
-export function createServerTimer(label: string) {
+export function createServerTimer(_label: string) {
   const startedAt = performance.now()
   let checkpointAt = startedAt
   const details: TimingDetails = {}
@@ -47,21 +40,6 @@ export function createServerTimer(label: string) {
 
       Object.assign(details, extra)
       details.total = round(performance.now() - startedAt)
-
-      if (process.env.NODE_ENV === "development") {
-        if (details.total >= DEV_LOG_THRESHOLD_MS) {
-          console.debug(`[server-timing] ${label}`, details)
-        }
-        return
-      }
-
-      if (process.env.NODE_ENV === "production") {
-        console.info(JSON.stringify({
-          event: "performance.server",
-          route: label,
-          metrics: details,
-        }))
-      }
     },
   }
 }

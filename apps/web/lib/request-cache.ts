@@ -41,7 +41,6 @@ const cacheTelemetry: Record<CacheEvent, number> = {
   revalidate: 0,
   invalidate: 0,
 }
-let telemetryEvents = 0
 
 export function getRequestCacheTelemetry() {
   const requests = cacheTelemetry.hit + cacheTelemetry.miss + cacheTelemetry.revalidate
@@ -54,22 +53,6 @@ export function getRequestCacheTelemetry() {
 
 function log(event: CacheEvent, key: string) {
   cacheTelemetry[event] += 1
-  telemetryEvents += 1
-
-  if (process.env.NODE_ENV === "development") {
-    const endpoint = key.slice(key.indexOf(":") + 1)
-    if (event === "hit") console.debug(`CACHE HIT: ${endpoint}`)
-    else if (event === "miss" || event === "revalidate") console.debug(`CACHE MISS: ${endpoint}`)
-    else console.debug(`[request-cache] ${event}`, key)
-    return
-  }
-
-  if (process.env.NODE_ENV === "production" && telemetryEvents % 20 === 0) {
-    console.info(JSON.stringify({
-      event: "performance.request_cache",
-      metrics: getRequestCacheTelemetry(),
-    }))
-  }
 }
 
 export function canonicalRequestKey(url: string, userId = activeUserId ?? "anonymous") {
@@ -162,9 +145,6 @@ export async function fetchJsonCached<T>(
   }
 
   if (!loggedLookup) log(cached ? "revalidate" : "miss", key)
-  if (process.env.NODE_ENV === "development") {
-    console.debug(`NETWORK REQUEST: ${url}`)
-  }
   const request = fetch(url, { cache: "no-store" })
     .then(async (response) => {
       const body = await response.json().catch(() => null)

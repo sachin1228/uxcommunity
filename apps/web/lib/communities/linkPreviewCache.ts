@@ -51,13 +51,6 @@ const cache = new Map<string, LinkPreviewCacheEntry>();
 // url (normalized) → in-flight promise shared by all callers
 const inFlight = new Map<string, Promise<LinkPreviewData | null>>();
 
-/** Development-only logs in the requested `[LINK PREVIEW …]` format. */
-function devLog(tag: "LINK PREVIEW CACHE" | "LINK PREVIEW NETWORK", fields: Record<string, string>) {
-  if (process.env.NODE_ENV !== "development") return;
-  console.debug(`\n[${tag}]`);
-  for (const [key, value] of Object.entries(fields)) console.debug(`${key}: ${value}`);
-}
-
 function trimCache() {
   while (cache.size > LINK_PREVIEW_CACHE_MAX) {
     const oldest = cache.keys().next().value;
@@ -97,40 +90,20 @@ export async function fetchLinkPreview(rawUrl: string): Promise<LinkPreviewResul
 
   // Fresh metadata — serve from cache, no network.
   if (entry && entry.status === "ok" && now - entry.fetchedAt < LINK_PREVIEW_STALE_MS) {
-    devLog("LINK PREVIEW CACHE", {
-      url: key,
-      source: "cache",
-      age: `${Math.max(0, Math.round((now - entry.fetchedAt) / 1000))}s`,
-    });
     return { data: entry.data, source: "cache", fromExistingRequest: false };
   }
 
   // Recently failed — don't retry inside the failure window.
   if (entry && entry.status === "error" && now - entry.fetchedAt < LINK_PREVIEW_FAILURE_RETRY_MS) {
-    devLog("LINK PREVIEW CACHE", {
-      url: key,
-      source: "error",
-      age: `${Math.max(0, Math.round((now - entry.fetchedAt) / 1000))}s`,
-    });
     return { data: null, source: "error", fromExistingRequest: false };
   }
 
   // Another component is already fetching — join its request.
   const pending = inFlight.get(key);
   if (pending) {
-    devLog("LINK PREVIEW CACHE", {
-      url: key,
-      source: "in-flight",
-      note: "loading from existing request",
-    });
     const data = await pending;
     return { data, source: "in-flight", fromExistingRequest: true };
   }
-
-  devLog("LINK PREVIEW NETWORK", {
-    url: key,
-    reason: entry ? "stale" : "miss",
-  });
 
   const request = fetchPreviewFromNetwork(key, requestUrl);
   inFlight.set(key, request);
