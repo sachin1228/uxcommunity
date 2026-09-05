@@ -3,7 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 import { extensionForMime } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -151,6 +151,19 @@ export async function PATCH(
   if (Object.keys(updates).length > 0) {
     const { error } = await db.from("communities").update(updates).eq("id", id);
     if (error) return NextResponse.json({ error: "Failed to update community." }, { status: 500 });
+
+    const previousUrl = before?.image_url ?? null;
+    const nextUrl = updates.image_url ?? before?.image_url ?? null;
+    if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
+      const previousKey = parseR2Key(previousUrl);
+      if (previousKey) {
+        try {
+          await deleteFromR2(previousKey);
+        } catch (cleanupError) {
+          console.error("[community settings] previous image cleanup failed:", cleanupError);
+        }
+      }
+    }
   }
 
   // Update rules if provided

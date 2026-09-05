@@ -117,11 +117,11 @@ export async function DELETE(
   // Fetch message and verify ownership
   const { data: msg } = (await db
     .from("community_messages")
-    .select("id, user_id, created_at")
+    .select("id, user_id, created_at, image_url")
     .eq("id", msgId)
     .eq("community_id", communityId)
     .maybeSingle()) as unknown as {
-    data: { id: string; user_id: string; created_at: string } | null;
+    data: { id: string; user_id: string; created_at: string; image_url: string | null } | null;
   };
 
   if (!msg) return NextResponse.json({ error: "Message not found." }, { status: 404 });
@@ -151,6 +151,19 @@ export async function DELETE(
     })
     .eq("id", msgId)
     .eq("community_id", communityId);
+
+  if (msg.image_url) {
+    const previousKey = msg.image_url.includes("r2") || msg.image_url.includes("cloudflarestorage")
+      ? new URL(msg.image_url).pathname.replace(/^\//, "")
+      : null;
+    if (previousKey) {
+      try {
+        await import("@/lib/r2").then(({ deleteFromR2 }) => deleteFromR2(previousKey));
+      } catch (cleanupError) {
+        console.error("[DELETE message] image cleanup error:", cleanupError);
+      }
+    }
+  }
 
   if (error) {
     console.error("[DELETE message]", error);

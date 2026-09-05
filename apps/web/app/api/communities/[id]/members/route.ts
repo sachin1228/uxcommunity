@@ -11,6 +11,12 @@ function cleanDesignation(name: string): string {
 
 const PAGE_SIZE = 30;
 
+function memberRoleRank(role: string | null | undefined): number {
+  if (role === "owner") return 0;
+  if (role === "admin") return 1;
+  return 2;
+}
+
 /**
  * GET /api/communities/[id]/members?page=0&search=...
  *
@@ -73,6 +79,8 @@ export async function GET(
     filteredUserIds = (nameRows ?? []).map((u) => u.id);
     memberRows = memberRows.filter((m) => filteredUserIds.includes(m.user_id));
   }
+
+  memberRows.sort((a, b) => memberRoleRank(a.role) - memberRoleRank(b.role));
 
   const total      = memberRows.length;
   const from       = page * PAGE_SIZE;

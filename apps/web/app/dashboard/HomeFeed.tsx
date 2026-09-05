@@ -251,7 +251,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     );
   }
 
-  if (!items.length) {
+  const now = new Date();
+  const visibleItems = items.filter((item) =>
+    item._type !== "event" || new Date(item.end_date ?? item.event_date) >= now,
+  );
+
+  if (!visibleItems.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>
@@ -272,7 +277,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     | { kind: "resources"; items: FeedResource[] };
 
   const groups: Group[] = [];
-  for (const item of items) {
+  for (const item of visibleItems) {
     if (item._type === "resource") {
       const last = groups[groups.length - 1];
       if (last?.kind === "resources") last.items.push(item);

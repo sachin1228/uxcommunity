@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extensionForMime } from "@/lib/image-utils";
-import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -92,14 +92,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to save profile picture." }, { status: 500 });
   }
 
-  const previousKey = currentProfile.avatar_url
-    ? parseR2Key(currentProfile.avatar_url)
-    : null;
-  if (previousKey && previousKey !== key) {
-    try {
-      await deleteFromR2(previousKey);
-    } catch (cleanupError) {
-      console.error("[profile/avatar] previous upload cleanup error:", cleanupError);
+  if (shouldDeletePreviousR2Asset(currentProfile.avatar_url, publicUrl) && currentProfile.avatar_url) {
+    const previousKey = parseR2Key(currentProfile.avatar_url);
+    if (previousKey) {
+      try {
+        await deleteFromR2(previousKey);
+      } catch (cleanupError) {
+        console.error("[profile/avatar] previous upload cleanup error:", cleanupError);
+      }
     }
   }
 
