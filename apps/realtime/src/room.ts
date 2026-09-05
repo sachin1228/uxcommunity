@@ -583,6 +583,21 @@ export class Room extends DurableObject<Env> {
     }
 
     try {
+      const stored = await this.ctx.storage.get<{ ok: boolean; ts: number }>(`auth:${cacheKey}`);
+      if (
+        stored &&
+        typeof stored.ok === "boolean" &&
+        typeof stored.ts === "number" &&
+        Date.now() - stored.ts < Room.MEMBERSHIP_CACHE_TTL_MS
+      ) {
+        this.membershipCache.set(cacheKey, stored);
+        return stored.ok;
+      }
+    } catch {
+      // Storage read failed — fall through to the authoritative API check.
+    }
+
+    try {
       const response = await fetch(
         `${this.env.API_URL}/api/communities/${communityId}/members/${userId}/check`,
         {
