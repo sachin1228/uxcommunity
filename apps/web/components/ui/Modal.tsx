@@ -17,6 +17,21 @@ interface ModalProps {
   panelClassName?: string;
 }
 
+interface ModalPortalProps {
+  children: React.ReactNode;
+}
+
+export function ModalPortal({ children }: ModalPortalProps) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
+  if (!mounted) return null;
+  return createPortal(children, document.body);
+}
+
 export function Modal({
   open,
   onClose,
@@ -26,12 +41,6 @@ export function Modal({
   hideCloseButton = false,
   panelClassName,
 }: ModalProps) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
-
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -49,9 +58,10 @@ export function Modal({
     };
   }, [open, handleKeyDown]);
 
-  if (!mounted || !open) return null;
+  if (!open) return null;
 
-  return createPortal(
+  return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       aria-modal="true"
@@ -95,7 +105,7 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>,
-    document.body,
+    </div>
+    </ModalPortal>
   );
 }

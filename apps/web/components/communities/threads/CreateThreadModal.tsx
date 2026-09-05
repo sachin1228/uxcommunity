@@ -6,6 +6,7 @@ import {
   Paperclip, X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types";
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
@@ -255,8 +256,9 @@ export function CreateThreadModal({
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-thread-title"
@@ -448,5 +450,6 @@ export function CreateThreadModal({
         </div>
       </form>
     </div>
+    </ModalPortal>
   );
 }

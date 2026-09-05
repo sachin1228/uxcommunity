@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -118,8 +119,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-event-title"
@@ -310,5 +312,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
         </div>
       </form>
     </div>
+    </ModalPortal>
   );
 }
