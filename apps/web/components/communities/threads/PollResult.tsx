@@ -95,20 +95,20 @@ export function ThreadPollResult({
                       <Check strokeWidth={3} size={12} />
                     </span>
                   ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-subtle">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-muted">
                       {letter}
                     </span>
                   )}
                   <span
                     className={`min-w-0 flex-1 whitespace-pre-wrap break-words font-body text-sm leading-snug ${
-                      isSelected ? "font-medium text-foreground" : "text-foreground-muted"
+                      isSelected ? "font-medium text-foreground" : "text-foreground"
                     }`}
                   >
                     {option}
                   </span>
                   <span
                     className={`shrink-0 font-body text-xs tabular-nums ${
-                      isSelected ? "font-medium text-foreground" : "text-foreground-subtle"
+                      isSelected ? "font-medium text-foreground" : "text-foreground-muted"
                     }`}
                   >
                     {percents[index]}%
@@ -120,7 +120,7 @@ export function ThreadPollResult({
                 >
                   <span
                     className={`block h-full rounded-full transition-all duration-300 ${
-                      isSelected ? "bg-accent" : "bg-accent/25"
+                      isSelected ? "bg-accent" : "bg-foreground-muted"
                     }`}
                     style={{ width: `${percents[index]}%` }}
                   />
@@ -173,10 +173,10 @@ export function ThreadPollResult({
         </div>
       ))}
 
-      <p role="status" className="mt-3 font-body text-[11px] text-foreground-subtle">
+      <p role="status" className="mt-3 font-body text-[11px] tabular-nums text-foreground-subtle">
         {hasVoted
           ? `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"} · You voted for ${options[selected ?? 0] ?? "an option"}`
-          : `${options.length} options · Tap an option to vote`}
+          : `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"}`}
       </p>
     </div>
   );
