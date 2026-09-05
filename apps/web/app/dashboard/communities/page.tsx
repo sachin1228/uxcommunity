@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Check, Lock } from "lucide-react";
-import { CommunityIcon } from "@/components/communities/CommunityIcon";
+import { CommunityDp } from "@/components/communities/CommunityDp";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
@@ -40,7 +40,6 @@ function CommunityCard({
   joining: boolean;
 }) {
   const router              = useGuardedRouter();
-  const [imgErr, setImgErr] = useState(false);
   const locked              = !c.can_join && !c.joined;
   const lockBtnRef          = useRef<HTMLButtonElement>(null);
   const [tipPos, setTipPos] = useState<{ top: number; right: number } | null>(null);
@@ -72,18 +71,15 @@ function CommunityCard({
         {/* Avatar + name/count — faded when locked, but keeps action at full opacity */}
         <div className={`flex items-center gap-2.5 flex-1 min-w-0 ${locked ? "opacity-50" : ""}`}>
           {/* Avatar */}
-          <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-surface flex items-center justify-center text-base select-none">
-            {c.image_url && !imgErr ? (
-              <img
-                src={c.image_url}
-                alt={c.name}
-                className="h-9 w-9 object-cover"
-                onError={() => setImgErr(true)}
-              />
-            ) : (
-              <CommunityIcon size={36} className="bg-surface" />
-            )}
-          </div>
+          <CommunityDp
+            imageUrl={c.image_url}
+            lottieUrl={c.lottie_url}
+            lottieFormat={c.lottie_format}
+            lottieData={c.lottie_data}
+            name={c.name}
+            size={36}
+            className="bg-surface"
+          />
 
           {/* Name + member count */}
           <div className="min-w-0 flex-1">
@@ -115,7 +111,7 @@ function CommunityCard({
                 onMouseLeave={hideTip}
                 className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
               >
-                <Lock size={10} />
+                <Lock strokeWidth={2.5} size={10} />
                 Join
               </button>
               {tipPos && typeof document !== "undefined" && createPortal(
@@ -201,7 +197,10 @@ export default function CommunitiesIndexPage() {
     if (exploreStore.data) setLoading(false);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const t = setTimeout(load, 0);
+    return () => clearTimeout(t);
+  }, [load]);
 
   async function handleJoin(communityId: string) {
     if (joiningId) return;

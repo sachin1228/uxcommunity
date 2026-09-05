@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 
 /**
  * Strip year-range suffixes and singularize experience level names for display.
@@ -78,8 +79,9 @@ export async function GET(
 /**
  * DELETE /api/communities/[id]/members/[userId]
  *
- * Owner removes a specific member from the community.
- * The owner cannot remove themselves (use leave instead).
+ * Owner (or a community admin holding the "manage members" permission) removes
+ * a member from the community. Admins may remove regular members only; the
+ * owner may remove anyone except themselves (use leave instead).
  */
 export async function DELETE(
   _req: NextRequest,
@@ -91,17 +93,50 @@ export async function DELETE(
   const { id: communityId, userId: targetUserId } = await params;
   const db = createServiceClient();
 
-  // Verify caller is the owner
-  const { data: community } = await db
-    .from("communities")
-    .select("owner_id")
-    .eq("id", communityId)
-    .eq("is_active", true)
-    .maybeSingle();
+  const managerStatus = await loadCommunityManagerStatus(db, communityId, callerId);
+  if (!managerStatus) return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  const isOwner = managerStatus.isOwner;
+  const isAdmin =
+    managerStatus.role === "admin" && managerStatus.permissions.can_manage_members;
+  if (!isOwner && !isAdmin) {
+    return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
+  }
+  if (targetUserId === callerId) {
+    return NextResponse.json(
+      { error: isOwner ? "Owner cannot remove themselves." : "Admins cannot remove themselves." },
+      { status: 400 },
+    );
+  }
 
-  if (!community) return NextResponse.json({ error: "Community not found." }, { status: 404 });
-  if (community.owner_id !== callerId) return NextResponse.json({ error: "Owner only." }, { status: 403 });
-  if (targetUserId === callerId) return NextResponse.json({ error: "Owner cannot remove themselves." }, { status: 400 });
+  // Target member (role + display name) — used for protection + audit trail.
+  const [{ data: targetMembership }, { data: targetUser }] = await Promise.all([
+    db
+      .from("community_members")
+      .select("role")
+      .eq("community_id", communityId)
+      .eq("user_id", targetUserId)
+      .maybeSingle(),
+    db.from("users").select("name").eq("id", targetUserId).maybeSingle(),
+  ]);
+  if (!targetMembership) return NextResponse.json({ error: "Member not found." }, { status: 404 });
+
+  const targetRole = targetMembership.role ?? "member";
+  if (targetRole === "owner") {
+    return NextResponse.json({ error: "Owners cannot be removed." }, { status: 400 });
+  }
+  if (!isOwner && targetRole === "admin") {
+    return NextResponse.json(
+      { error: "Only the owner can remove another admin." },
+      { status: 403 },
+    );
+  }
+
+  // Remove membership + any admin permission grants in one go.
+  await db
+    .from("community_admin_permissions")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", targetUserId);
 
   const { error } = await db
     .from("community_members")
@@ -110,5 +145,15 @@ export async function DELETE(
     .eq("user_id", targetUserId);
 
   if (error) return NextResponse.json({ error: "Failed to remove member." }, { status: 500 });
+
+  await logCommunityActivity(db, {
+    communityId,
+    actorId: callerId,
+    actorRole: isOwner ? "owner" : "admin",
+    action: "member_removed",
+    targetUserId,
+    details: { member_name: targetUser?.name ?? null },
+  });
+
   return NextResponse.json({ success: true });
 }

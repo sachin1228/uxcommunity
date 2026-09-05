@@ -111,7 +111,7 @@ function CommentBox({
           disabled={saving || !body.trim()}
           className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {saving ? <Spinner size={12} className="text-white" /> : <Send size={12} />}
+          {saving ? <Spinner size={12} className="text-white" /> : <Send strokeWidth={2.5} size={12} />}
           {saving ? "Posting…" : "Post"}
         </button>
       </div>
@@ -183,7 +183,7 @@ function CommentRow({
                 className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
                 aria-label="Comment options"
               >
-                <MoreHorizontal size={13} />
+                <MoreHorizontal strokeWidth={2.5} size={13} />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-6 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
@@ -193,7 +193,7 @@ function CommentRow({
                     disabled={deleting}
                     className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                   >
-                    <Trash2 size={11} /> Delete
+                    <Trash2 strokeWidth={2.5} size={11} /> Delete
                   </button>
                 </div>
               )}
@@ -207,7 +207,7 @@ function CommentRow({
             onClick={() => setReplying((p) => !p)}
             className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
           >
-            <CornerDownRight size={11} /> Reply
+            <CornerDownRight strokeWidth={2.5} size={11} /> Reply
           </button>
         )}
         {replying && (
@@ -385,7 +385,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
 
             {comments.length === 0 && (
               <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-                <MessageSquare size={22} className={communityFeedLayout.emptyIcon} />
+                <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
                 <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
               </div>
             )}

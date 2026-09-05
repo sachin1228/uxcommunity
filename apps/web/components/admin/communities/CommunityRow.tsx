@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronRight, Users, MessageSquare } from "lucide-react";
-import { CommunityIcon } from "@/components/communities/CommunityIcon";
+import { ChevronRight, Users, MessageSquare, Sparkles } from "lucide-react";
+import { CommunityDp } from "@/components/communities/CommunityDp";
 import { TYPE_LABELS, TYPE_COLORS } from "./communityTypes";
 
 export interface CommunityListItem {
@@ -10,6 +9,11 @@ export interface CommunityListItem {
   name: string;
   type: string;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
+  /** Set when a member created the community — null for app-created ones. */
+  owner_id: string | null;
   is_active: boolean;
   member_count: number;
   message_count: number;
@@ -29,8 +33,6 @@ interface Props {
 }
 
 export function CommunityRow({ community: c, isLast, onClick }: Props) {
-  const [imgFailed, setImgFailed] = useState(false);
-
   return (
     <tr
       onClick={onClick}
@@ -41,16 +43,25 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Name + avatar */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          {c.image_url && !imgFailed ? (
-            <img
-              src={c.image_url}
-              alt={c.name}
-              className="h-8 w-8 rounded-full object-cover shrink-0"
-              onError={() => setImgFailed(true)}
+          <div className="relative shrink-0">
+            <CommunityDp
+              imageUrl={c.image_url}
+              lottieUrl={c.lottie_url}
+              lottieFormat={c.lottie_format}
+              lottieData={c.lottie_data}
+              name={c.name}
+              size={32}
+              className="bg-surface-raised"
             />
-          ) : (
-            <CommunityIcon size={32} className="bg-surface-raised" />
-          )}
+            {c.lottie_url && (
+              <span
+                title="Animated display picture (Lottie)"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
+              >
+                <Sparkles strokeWidth={2.5} size={9} />
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <span className="font-body text-sm text-foreground">{c.name}</span>
             {!c.is_active && (
@@ -76,7 +87,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Members */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <Users size={11} />
+          <Users strokeWidth={2.5} size={11} />
           {c.member_count.toLocaleString()}
         </span>
       </td>
@@ -84,7 +95,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       {/* Messages */}
       <td className="px-4 py-3 text-right">
         <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
-          <MessageSquare size={11} />
+          <MessageSquare strokeWidth={2.5} size={11} />
           {c.message_count.toLocaleString()}
         </span>
       </td>
@@ -109,7 +120,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
 
       {/* Chevron */}
       <td className="px-4 py-3 text-right">
-        <ChevronRight size={14} className="text-foreground-muted ml-auto" />
+        <ChevronRight strokeWidth={2.5} size={14} className="text-foreground-muted ml-auto" />
       </td>
     </tr>
   );

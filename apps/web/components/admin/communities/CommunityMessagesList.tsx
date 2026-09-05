@@ -99,7 +99,7 @@ export function CommunityMessagesList({
                     className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-foreground-muted hover:text-red-400 rounded"
                     title="Delete message"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 strokeWidth={2.5} size={12} />
                   </button>
                 )}
               </div>

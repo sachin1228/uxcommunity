@@ -18,6 +18,7 @@ import {
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
+import { GradientButton } from "@/components/ui/GradientButton";
 import {
   SHOWCASE_CATEGORIES,
   type ShowcaseCategory,
@@ -147,14 +148,10 @@ export function ShowcaseView({
               feedback from fellow designers.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-          >
-            <Plus size={14} />
+          <GradientButton onClick={() => setCreating(true)}>
+            <Plus strokeWidth={2.5} size={14} />
             Share your work
-          </button>
+          </GradientButton>
         </div>
         {!loading && posts.length > 0 && (
           <div
@@ -183,7 +180,7 @@ export function ShowcaseView({
                       : "border-border text-foreground-muted"
                   }`}
                 >
-                  <Icon size={14} />
+                  <Icon size={14} strokeWidth={2.5} />
                   {item.label}
                 </button>
               );
@@ -224,7 +221,7 @@ export function ShowcaseView({
           </p>
         ) : !visible.length ? (
           <div className={communityFeedLayout.emptyState}>
-            <Image size={24} className={communityFeedLayout.emptyIcon} />
+            <Image strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>
               No showcase posts yet
             </h3>

@@ -11,6 +11,12 @@ function cleanDesignation(name: string): string {
 
 const PAGE_SIZE = 30;
 
+function memberRoleRank(role: string | null | undefined): number {
+  if (role === "owner") return 0;
+  if (role === "admin") return 1;
+  return 2;
+}
+
 /**
  * GET /api/communities/[id]/members?page=0&search=...
  *
@@ -57,16 +63,24 @@ export async function GET(
   const allUserIds = memberRows.map((m) => m.user_id);
 
   // If searching, fetch names first so we can filter by name server-side.
+  // Communities can have hundreds of members — passing every member's id to a
+  // single `.in()` filter blows past PostgREST's URL length limit, so search
+  // the users table first (bounded) and intersect with memberships.
   let filteredUserIds = allUserIds;
   if (search) {
-    const { data: nameRows } = await db
+    const { data: nameRows, error: nameErr } = await db
       .from("users")
       .select("id, name")
-      .in("id", allUserIds)
-      .ilike("name", `%${search}%`);
+      .ilike("name", `%${search}%`)
+      .limit(500);
+    if (nameErr) {
+      return NextResponse.json({ error: "Failed to search members." }, { status: 500 });
+    }
     filteredUserIds = (nameRows ?? []).map((u) => u.id);
     memberRows = memberRows.filter((m) => filteredUserIds.includes(m.user_id));
   }
+
+  memberRows.sort((a, b) => memberRoleRank(a.role) - memberRoleRank(b.role));
 
   const total      = memberRows.length;
   const from       = page * PAGE_SIZE;
@@ -208,7 +222,13 @@ export async function DELETE(
     }
   }
 
-  // 3. Remove membership
+  // 3. Remove membership (plus any admin permission grants)
+  await db
+    .from("community_admin_permissions")
+    .delete()
+    .eq("community_id", communityId)
+    .eq("user_id", userId);
+
   const { error } = await db
     .from("community_members")
     .delete()

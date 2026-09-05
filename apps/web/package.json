@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1092.0",
+    "@jsquash/webp": "^1.5.0",
+    "@lottiefiles/dotlottie-react": "^0.19.16",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
     "@types/three": "^0.185.4",

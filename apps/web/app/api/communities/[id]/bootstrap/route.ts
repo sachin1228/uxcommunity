@@ -87,12 +87,17 @@ export async function GET(_request: NextRequest, context: Params) {
     );
   }
 
-  const community = data.community as { current_user_role?: string } | undefined;
+  const community = data.community as {
+    current_user_role?: string;
+    current_user_permissions?: Record<string, boolean>;
+  } | undefined;
+  const role = community?.current_user_role ?? "member";
   const body = {
     ...data,
     permissions: {
-      role: community?.current_user_role ?? "member",
-      can_manage: community?.current_user_role === "owner" || community?.current_user_role === "admin",
+      role,
+      can_manage: role === "owner" || role === "admin",
+      ...(community?.current_user_permissions ?? {}),
     },
     unreadCount: 0,
     failures,
@@ -100,15 +105,6 @@ export async function GET(_request: NextRequest, context: Params) {
   const totalDuration = performance.now() - startedAt;
   const responseBytes = estimateJsonBytes(body);
   timings.push(`total;dur=${totalDuration.toFixed(1)}`);
-  console.info(JSON.stringify({
-    event: "performance.community_bootstrap",
-    community_id: communityId,
-    duration_ms: Math.round(totalDuration),
-    response_bytes: responseBytes,
-    returned_counts: {
-      messages: ((data.messages as { messages?: unknown[] } | undefined)?.messages ?? []).length,
-    },
-  }));
 
   return NextResponse.json(body, {
     headers: {

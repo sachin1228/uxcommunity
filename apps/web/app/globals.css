@@ -130,6 +130,14 @@
   --radius-xl:   12px;
   --radius-full: 9999px;
 
+  /* Home-feed filter switcher — light mirror of the reference palette. */
+  --filter-track:        #ECECF1;
+  --filter-pill:         #FFFFFF;
+  --filter-text-active:  #0A0A0A;
+  --filter-text-muted:   #6E6E78;
+  --filter-glow:         rgb(10 10 10 / 0.12);
+  --filter-focus:        #0A0A0A;
+
   --grid-line-color: rgba(0, 0, 0, 0.06);
   --grid-dot-color:  rgba(0, 0, 0, 0.12);
   --grid-size:       28px;
@@ -271,6 +279,14 @@
     --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
     --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
 
+    /* Home-feed filter switcher — reference palette (dark). */
+    --filter-track:        #161618;
+    --filter-pill:         #28282c;
+    --filter-text-active:  #FFFFFF;
+    --filter-text-muted:   #7c7c82;
+    --filter-glow:         rgb(255 255 255 / 0.18);
+    --filter-focus:        #FFFFFF;
+
     --grid-line-color: rgba(255, 255, 255, 0.04);
     --grid-dot-color:  rgba(255, 255, 255, 0.08);
   }
@@ -289,6 +305,49 @@ body {
   font-family: var(--font-display), Geist, ui-sans-serif, system-ui, sans-serif;
   background-color: var(--color-background);
   color: var(--color-foreground);
+}
+
+/* ─── Home-feed filter switcher ──────────────────────────────────────── */
+/* Fluid segmented control (Newest / Trending / Following). Colors come
+   from the reference palette above and flip with the OS color scheme. */
+@layer components {
+  .fb-filter-track {
+    background-color: var(--filter-track);
+  }
+
+  .fb-filter-pill {
+    background-color: var(--filter-pill);
+  }
+
+  .fb-filter-glow {
+    background-color: var(--filter-glow);
+  }
+
+  .fb-filter-text-active {
+    color: var(--filter-text-active);
+  }
+
+  .fb-filter-text-muted {
+    color: var(--filter-text-muted);
+  }
+
+  .fb-filter-text-muted:hover {
+    color: var(--filter-text-active);
+  }
+
+  .fb-filter-button:focus-visible {
+    outline: 2px solid var(--filter-focus);
+    outline-offset: 2px;
+  }
+
+  .fb-filter-chip {
+    background-color: var(--filter-track);
+    color: var(--filter-text-muted);
+  }
+
+  .fb-filter-chip:hover {
+    color: var(--filter-text-active);
+  }
 }
 
 /* ─── Grid theme utilities ───────────────────────────────────────────── */
@@ -368,6 +427,14 @@ select:focus-visible {
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
 }
 
+/* Message text is selectable; give the highlight enough contrast to read
+   on both the blue (own) and raised (other) bubble backgrounds. */
+.chat-message-text::selection,
+.chat-message-text *::selection {
+  background: rgba(255, 255, 255, 0.35);
+  color: inherit;
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;
@@ -394,6 +461,12 @@ select:focus-visible {
     opacity: 0;
     transform: translate(80vw, -20vh) rotate(15deg) scale(1);
   }
+/* ─── Logging-out screen loader ──────────────────────────────────────── */
+/* Dots arranged in a ring fade in sequence so the pulse travels around the
+   circle — the Vercel-style loader on the full-screen "Logging out" state. */
+@keyframes logging-dot {
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

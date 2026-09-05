@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback } from "react";
+import { memo, useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -83,12 +83,19 @@ interface CommunityRowProps {
   active: boolean;
   /** If set, shown instead of the last-message preview. */
   typingText?: string;
-  onClick: () => void;
-  /** Called on hover to prefetch bootstrap data for instant navigation. */
-  onHover?: () => void;
+  /** Called with the community id on click. */
+  onClick: (communityId: string) => void;
+  /** Called with the community id on hover to prefetch bootstrap data. */
+  onHover?: (communityId: string) => void;
 }
 
-export function CommunityRow({
+/**
+ * Memoized so typing-indicator flushes, message previews, or unread-badge
+ * changes for ONE community don't re-render every row in the sidebar — the
+ * community object, typingText string, and callbacks are all referentially
+ * stable between updates, so untouched rows bail out of reconciliation.
+ */
+export const CommunityRow = memo(function CommunityRow({
   c,
   active,
   typingText,
@@ -102,16 +109,16 @@ export function CommunityRow({
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleMouseEnter = useCallback(() => {
     if (hoverTimerRef.current) return;
-    onHover?.();
+    onHover?.(c.id);
     hoverTimerRef.current = setTimeout(() => {
       hoverTimerRef.current = null;
     }, 2000); // max 1 prefetch per 2s per row
-  }, [onHover]);
+  }, [onHover, c.id]);
 
   return (
     <li>
       <button
-        onClick={onClick}
+        onClick={() => onClick(c.id)}
         onMouseEnter={handleMouseEnter}
         className={`flex w-full items-start gap-[11px] rounded-lg px-[9px] py-[9px] text-left transition-colors ${
           active
@@ -123,6 +130,9 @@ export function CommunityRow({
           imageUrl={c.image_url}
           name={c.name}
           type={c.type}
+          lottieUrl={c.lottie_url}
+          lottieFormat={c.lottie_format}
+          lottieData={c.lottie_data}
         />
 
         <div className="flex-1 min-w-0">
@@ -132,7 +142,7 @@ export function CommunityRow({
               {c.name}
             </span>
             {c.is_private && (
-              <Lock size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
+              <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
             )}
             {c.last_message && !typingText && (
               <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
@@ -193,4 +203,4 @@ export function CommunityRow({
       </button>
     </li>
   );
-}
+});

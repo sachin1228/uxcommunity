@@ -5,7 +5,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedMessage, CachedThreadEvent, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedThreadEvent, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 
@@ -82,6 +82,7 @@ export function useRealtimeChat({
           created_at: string;
           reply_to_id: string | null;
           image_url: string | null;
+          mentions?: MessageMention[];
         };
 
         if (initialScrollDoneRef.current) {
@@ -138,7 +139,17 @@ export function useRealtimeChat({
             status: "sent",
             reactions: [],
             reply_to: replyTo,
-            image_url: newRow.image_url ?? null,
+            // When this echo replaces the sender's own optimistic bubble, keep
+            // showing the blob URL that is already on screen — swapping straight
+            // to the uploaded network URL before it has loaded collapses the
+            // bubble into a blank frame for a split second. The POST-response
+            // merge (which preloads the uploaded image first) swaps it over
+            // seamlessly. Non-blob temps (e.g. GIF URLs) match the DB URL, so
+            // they fall through to the real value either way.
+            image_url: matchedTemp?.image_url?.startsWith("blob:")
+              ? matchedTemp.image_url
+              : newRow.image_url ?? null,
+            mentions: newRow.mentions ?? [],
           };
           const next = [...withoutTemp, incoming].sort(
             (a, b) =>

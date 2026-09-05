@@ -54,7 +54,7 @@ export function ProfileCard({
             onClick={onOpenAvatarPicker}
             className="flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 font-body text-[10px] text-foreground-muted hover:text-accent hover:border-accent/40 transition-all whitespace-nowrap"
           >
-            <Camera size={9} />
+            <Camera strokeWidth={2.5} size={9} />
             Change photo
           </button>
         </div>
@@ -70,14 +70,14 @@ export function ProfileCard({
           <div className="flex gap-5">
             <div className="min-w-0">
               <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                <Mail size={9} /> Email
+                <Mail strokeWidth={2.5} size={9} /> Email
               </p>
               <p className="font-body text-xs text-foreground-subtle truncate">{email}</p>
             </div>
             {memberSince && (
               <div className="shrink-0">
                 <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                  <Calendar size={9} /> Since
+                  <Calendar strokeWidth={2.5} size={9} /> Since
                 </p>
                 <p className="font-body text-xs text-foreground-subtle">{memberSince}</p>
               </div>
@@ -89,7 +89,7 @@ export function ProfileCard({
         <div className="flex flex-col justify-center gap-3 px-5 py-4 w-64 shrink-0">
           <div>
             <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Linkedin size={9} /> LinkedIn
+              <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
             </label>
             <input
               type="url"
@@ -101,7 +101,7 @@ export function ProfileCard({
           </div>
           <div>
             <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Globe size={9} /> Portfolio
+              <Globe strokeWidth={2.5} size={9} /> Portfolio
             </label>
             <input
               type="url"
@@ -121,21 +121,21 @@ export function ProfileCard({
         </span>
         {city && (
           <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <MapPin size={10} className="text-accent shrink-0" />{city}
+            <MapPin strokeWidth={2.5} size={10} className="text-accent shrink-0" />{city}
           </span>
         )}
         {sector && (
           <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <Layers size={10} className="text-accent shrink-0" />{sector}
+            <Layers strokeWidth={2.5} size={10} className="text-accent shrink-0" />{sector}
           </span>
         )}
         {experienceLevel && (
           <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground capitalize">
-            <Star size={10} className="text-accent shrink-0" />{experienceLevel.replace(/_/g, " ")}
+            <Star strokeWidth={2.5} size={10} className="text-accent shrink-0" />{experienceLevel.replace(/_/g, " ")}
           </span>
         )}
         <span className="flex items-center gap-1 font-body text-[10px] text-foreground-subtle ml-auto shrink-0">
-          <Lock size={9} /> Not editable here
+          <Lock strokeWidth={2.5} size={9} /> Not editable here
         </span>
       </div>
     </div>

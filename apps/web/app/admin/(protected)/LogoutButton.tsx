@@ -1,29 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { useLogout } from "@/components/ui/useLogout";
 
 export function LogoutButton() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleLogout() {
-    setLoading(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      router.replace("/login");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { loggingOut, handleLogout } = useLogout();
 
   return (
-    <button
-      onClick={handleLogout}
-      disabled={loading}
-      className="rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-60"
-    >
-      {loading ? "…" : "Sign out"}
-    </button>
+    <>
+      {loggingOut && <BrandedLoadingScreen label="Logging out" />}
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-60"
+      >
+        {loggingOut ? "…" : "Sign out"}
+      </button>
+    </>
   );
 }

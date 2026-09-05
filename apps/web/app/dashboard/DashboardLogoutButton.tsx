@@ -1,33 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { useLogout } from "@/components/ui/useLogout";
 
 export function DashboardLogoutButton() {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-
-  async function handleLogout() {
-    setLoading(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      // Clear all module-level caches so the next user who logs in on this
-      // tab never sees data belonging to the current user.
-      const { clearAllUserCaches } = await import("@/lib/communities/cache");
-      clearAllUserCaches();
-      router.replace("/login");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { loggingOut, handleLogout } = useLogout();
 
   return (
-    <button
-      onClick={handleLogout}
-      disabled={loading}
-      className="rounded-md px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-60"
-    >
-      {loading ? "…" : "Sign out"}
-    </button>
+    <>
+      {loggingOut && <BrandedLoadingScreen label="Logging out" />}
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="rounded-md px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-60"
+      >
+        {loggingOut ? "…" : "Sign out"}
+      </button>
+    </>
   );
 }

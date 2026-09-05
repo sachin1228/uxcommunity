@@ -313,7 +313,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
                     : "Turn on microphone to talk"
             }
           >
-            {micState === "on" ? <Mic size={17} /> : <MicOff size={17} />}
+            {micState === "on" ? <Mic strokeWidth={2.5} size={17} /> : <MicOff strokeWidth={2.5} size={17} />}
           </button>
           <button
             type="button"
@@ -324,7 +324,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             aria-label={muted ? "Unmute voice" : "Mute voice"}
             title={muted ? "Unmute voice" : "Mute voice"}
           >
-            {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
+            {muted ? <VolumeX strokeWidth={2.5} size={17} /> : <Volume2 strokeWidth={2.5} size={17} />}
           </button>
         </div>
       )}

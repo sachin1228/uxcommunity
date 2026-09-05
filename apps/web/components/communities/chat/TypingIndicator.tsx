@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { TypingUser } from "./useTypingPresence";
 import { ChatAvatar } from "./ChatAvatar";
 
@@ -9,7 +10,11 @@ function typingLabel(users: TypingUser[]) {
   return `${users[0].name} and ${users.length - 1} others are typing...`;
 }
 
-export function TypingIndicator({ users }: { users: TypingUser[] }) {
+/**
+ * Memoized: `users` is a referentially stable state slice between flushes, so
+ * typing in the chat input doesn't re-render the indicator.
+ */
+export const TypingIndicator = memo(function TypingIndicator({ users }: { users: TypingUser[] }) {
   if (users.length === 0) return null;
 
   const multiple = users.length > 1;
@@ -48,4 +53,4 @@ export function TypingIndicator({ users }: { users: TypingUser[] }) {
       )}
     </div>
   );
-}
+});

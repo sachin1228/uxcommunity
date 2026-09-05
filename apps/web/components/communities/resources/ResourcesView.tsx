@@ -27,6 +27,7 @@ import { ResourceFormModal } from "./ResourceFormModal";
 import { ResourceCard } from "./ResourceCard";
 import { communityFeedLayout } from "../feed-layout";
 import { Spinner } from "@/components/ui/Spinner";
+import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
 const RESOURCES_STALE_MS = 60_000;
@@ -187,13 +188,9 @@ export function ResourcesView({
               <span className="block">community.</span>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowCreateModal(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-          >
-            <Plus size={14} /> Share Resource
-          </button>
+          <GradientButton onClick={() => setShowCreateModal(true)}>
+            <Plus strokeWidth={2.5} size={14} /> Share Resource
+          </GradientButton>
         </div>
 
         {!loading && resources.length > 0 && (
@@ -224,7 +221,7 @@ export function ResourcesView({
                   aria-pressed={filter === item.value}
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
                 >
-                  <Icon size={14} aria-hidden="true" />
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
                   <span className="font-mono text-[10px]">{count}</span>
                 </button>
@@ -251,7 +248,7 @@ export function ResourcesView({
           </div>
         ) : resources.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources yet</h3>
             <p className={communityFeedLayout.emptyDescription}>
               Be the first to share a Figma file, article, tool, or anything useful.
@@ -259,7 +256,7 @@ export function ResourcesView({
           </div>
         ) : filtered.length === 0 ? (
           <div className={communityFeedLayout.emptyState}>
-            <BookMarked size={24} className={communityFeedLayout.emptyIcon} />
+            <BookMarked strokeWidth={2.5} size={24} className={communityFeedLayout.emptyIcon} />
             <h3 className={communityFeedLayout.emptyTitle}>No resources in this category</h3>
             <p className={communityFeedLayout.emptyDescription}>Try a different filter or share one yourself.</p>
           </div>

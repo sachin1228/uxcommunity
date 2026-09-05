@@ -22,7 +22,7 @@ import {
 } from "@/lib/request-cache";
 import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manager";
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
-import { useSidebarRealtime } from "./useSidebarRealtime";
+import { useSidebarRealtime, SIDEBAR_REALTIME_LIMIT } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
 
 type Community = CachedSidebarCommunity;
@@ -98,6 +98,19 @@ export function useSidebarCommunities(userId: string) {
   // only after a real absence — rapid alt-tabbing no longer issues a refetch
   // per focus event.
   useHiddenCatchUp(() => void load(true));
+
+  // While there are more communities than the realtime cap keeps live, poll
+  // the sidebar on the request cache's stale window so communities outside
+  // the live socket set still get fresh previews and unread counts. Users at
+  // or under the cap keep every community live via realtime and never poll.
+  const overRealtimeLimit = communities.length > SIDEBAR_REALTIME_LIMIT;
+  useEffect(() => {
+    if (!overRealtimeLimit) return;
+    const timer = window.setInterval(() => {
+      void load();
+    }, SIDEBAR_STALE_MS);
+    return () => window.clearInterval(timer);
+  }, [overRealtimeLimit, load]);
 
   // Re-fetch whenever a join/leave/archive action fires the sidebar-changed event
   useEffect(() => {
@@ -194,7 +207,12 @@ export function useSidebarCommunities(userId: string) {
   const typingMap = useSidebarTyping({ communities, userId });
 
   // ── Navigation handler ────────────────────────────────────────────────────
-  function handleNavigate(id: string) {
+  // useCallback keeps the identity stable across renders so the memoized
+  // CommunityRow rows don't re-render on unrelated state churn (typing
+  // indicators, message previews, unread badges). The guarded router is
+  // recreated on navigation — the only time the rows legitimately need a
+  // refresh anyway.
+  const handleNavigate = useCallback((id: string) => {
     // Read the pre-zero snapshot first; the optimistic badge clearing below
     // would otherwise make the manager think there is nothing to mark read.
     const snapshot = sidebarStore.data?.communities.find((c) => c.id === id);
@@ -240,7 +258,7 @@ export function useSidebarCommunities(userId: string) {
     });
 
     router.push(`/dashboard/communities/${id}`);
-  }
+  }, [router]);
 
   return {
     communities: communities.filter((c) => !c.is_archived),

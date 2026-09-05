@@ -35,6 +35,21 @@ interface HomeFeedProps {
   refreshToken?: number;
 }
 
+/**
+ * Absolute 64px sheen band pinned to the top of a feed card, mirroring the
+ * admin community hero card's h-16 radial-gradient banner. Rendered behind
+ * the card's content (negative z within the card's stacking context) so the
+ * author row reads clearly over the glow.
+ */
+function CardSheen() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute left-0 top-0 -z-10 h-16 w-full bg-[radial-gradient(120%_160%_at_0%_0%,rgba(255,255,255,0.07),transparent_55%)]"
+    />
+  );
+}
+
 export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   initRequestCache(currentUserId);
   const cached = getCachedRequest<{ items?: FeedItem[] }>("/api/home/feed", currentUserId);
@@ -236,7 +251,12 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     );
   }
 
-  if (!items.length) {
+  const now = new Date();
+  const visibleItems = items.filter((item) =>
+    item._type !== "event" || new Date(item.end_date ?? item.event_date) >= now,
+  );
+
+  if (!visibleItems.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>
@@ -257,7 +277,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     | { kind: "resources"; items: FeedResource[] };
 
   const groups: Group[] = [];
-  for (const item of items) {
+  for (const item of visibleItems) {
     if (item._type === "resource") {
       const last = groups[groups.length - 1];
       if (last?.kind === "resources") last.items.push(item);
@@ -272,7 +292,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }
 
   const cardClassName =
-    "overflow-hidden rounded-xl border border-border [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+    "relative z-0 overflow-hidden rounded-xl border border-border bg-background [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
 
   return (
     <>
@@ -281,6 +301,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "thread") {
           return (
             <li key={`thread-${group.item.id}`} className={cardClassName}>
+              <CardSheen />
               <ThreadCard
                 thread={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
@@ -301,6 +322,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "event") {
           return (
             <li key={`event-${group.item.id}`} className={cardClassName}>
+              <CardSheen />
               <EventCard
                 event={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 rsvps={group.item.rsvps}
@@ -322,6 +344,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         if (group.kind === "showcase") {
           return (
             <li key={`showcase-${group.item.id}`} className={cardClassName}>
+              <CardSheen />
               <ShowcaseCard
                 post={{ ...group.item, community_id: group.item.community_id ?? "" }}
                 currentUserId={currentUserId}
@@ -352,6 +375,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
             key={`resource-${resource.id}`}
             className={`${cardClassName} ${communityFeedLayout.gutters} py-6`}
           >
+            <CardSheen />
             <ResourceCard
               resource={{ ...resource, community_id: resource.community_id ?? "" }}
               currentUserId={currentUserId}

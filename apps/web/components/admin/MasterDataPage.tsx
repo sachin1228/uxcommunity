@@ -108,7 +108,17 @@ export function MasterDataPage({
     setLoading(false);
   }, [apiBase, responseKey]);
 
-  useEffect(() => { load(); }, [load]);
+  // Defer past the effect's synchronous frame — load() setStates on its
+  // cache-hit path, and running it directly would trip the hooks linter.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      await load();
+    })();
+    return () => { cancelled = true; };
+  }, [load]);
 
   const tabItems = useMemo(
     () => items.filter((i) => (activeTab === "active" ? i.is_active : !i.is_active)),
@@ -135,7 +145,7 @@ export function MasterDataPage({
             onClick={() => setModalOpen(true)}
             className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
           >
-            <Plus size={13} />
+            <Plus strokeWidth={2.5} size={13} />
             Add {entity}
           </button>
         )}
@@ -186,7 +196,7 @@ export function MasterDataPage({
             onClick={() => setSearch("")}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
           >
-            <X size={12} />
+            <X strokeWidth={2.5} size={12} />
           </button>
         )}
       </div>
@@ -207,7 +217,7 @@ export function MasterDataPage({
                 onClick={() => setModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
               >
-                <Plus size={13} />Add your first {entity.toLowerCase()}
+                <Plus strokeWidth={2.5} size={13} />Add your first {entity.toLowerCase()}
               </button>
             )}
           </div>
@@ -219,7 +229,9 @@ export function MasterDataPage({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider w-8" />
+                {/* 24px thumbnail + 32px horizontal cell padding — locking this
+                    column wide enough keeps the table from squeezing the image. */}
+                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider w-14" />
                 <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Name</th>
                 <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Status</th>
                 <th className="px-4 py-2 w-6" />
@@ -236,14 +248,17 @@ export function MasterDataPage({
                 >
                   <td className="px-4 py-2">
                     {item.image_url ? (
+                      // Master-data images are dark tiles with a light icon in the
+                      // center — the bordered chip keeps them visible against the
+                      // dark table background at a small size.
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        className="h-6 w-6 rounded object-cover"
+                        className="h-6 w-6 rounded border border-border bg-surface-raised object-cover"
                       />
                     ) : (
-                      <div className="h-6 w-6 rounded bg-surface-raised flex items-center justify-center">
-                        <ImagePlus size={11} className="text-foreground-muted" />
+                      <div className="h-6 w-6 rounded border border-border bg-surface-raised flex items-center justify-center">
+                        <ImagePlus strokeWidth={2.5} size={11} className="text-foreground-muted" />
                       </div>
                     )}
                   </td>
@@ -270,7 +285,7 @@ export function MasterDataPage({
                     </span>
                   </td>
                   <td className="px-4 py-2.5 w-6">
-                    <ChevronRight size={13} className="text-foreground-muted" />
+                    <ChevronRight strokeWidth={2.5} size={13} className="text-foreground-muted" />
                   </td>
                 </tr>
               ))}

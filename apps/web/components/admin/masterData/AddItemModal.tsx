@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { compressImage } from "@/lib/compressImage";
+import { ModalPortal } from "@/components/ui/Modal";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface Props {
   entity: string;
@@ -33,12 +34,14 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
   async function uploadImage(file: File): Promise<string | null> {
     setImageUploading(true);
     try {
+      // Raster images are compressed to WebP client-side (SVGs pass through —
+      // they are vector files that compression would not help).
       let uploadFile: File | Blob = file;
       if (file.type !== "image/svg+xml") {
-        try { uploadFile = await compressImage(file); } catch { /* fall back to original */ }
+        try { uploadFile = compressedFile(await compressImage(file), file); } catch { /* fall back to original */ }
       }
       const fd = new FormData();
-      fd.append("file", uploadFile, file.name);
+      fd.append("file", uploadFile, uploadFile instanceof File ? uploadFile.name : file.name);
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) { setAddError(data.error ?? "Image upload failed."); return null; }
@@ -79,8 +82,9 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -88,7 +92,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
           <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors">
-            <X size={16} />
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -152,7 +156,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                 onClick={() => fileInputRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-accent/5 py-5 transition-colors"
               >
-                <ImagePlus size={20} className="text-foreground-muted" />
+                <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
                 <span className="font-body text-xs text-foreground-muted">Click to upload</span>
                 <span className="font-body text-[10px] text-foreground-muted">
                   PNG, JPG, WebP, SVG · max 5 MB
@@ -179,7 +183,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               {addLoading || imageUploading ? (
                 <Spinner className="h-3 w-3 text-white" />
               ) : (
-                <Plus size={13} />
+                <Plus strokeWidth={2.5} size={13} />
               )}
               {imageUploading ? "Uploading…" : `Add ${entity}`}
             </button>
@@ -187,5 +191,6 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

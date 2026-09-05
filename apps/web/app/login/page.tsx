@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,10 +35,14 @@ export default function LoginPage() {
       if (!res.ok) {
         setError(data.error ?? "Login failed. Please try again.");
         setShowApplyLink(!!data.showApplyLink);
+        // Dismiss the full-screen state so the inline error is visible.
+        setLoading(false);
         return;
       }
       setShowApplyLink(false);
 
+      // Leave the full-screen "Logging in" state up until the navigation
+      // unmounts this page — no flash back to the form mid-redirect.
       if (data.redirect) {
         router.push(data.redirect);
         return;
@@ -46,13 +51,14 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch {
       setError("Network error. Please check your connection.");
-    } finally {
       setLoading(false);
     }
   }
 
   return (
     <main className="grid min-h-screen place-items-center bg-background px-6 py-12">
+      {loading && <BrandedLoadingScreen label="Logging in" />}
+
       <BrandLogo
         className="fixed left-6 top-6 z-20"
         iconClassName="h-8 w-8"
@@ -122,7 +128,7 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle transition-colors hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? <EyeOff strokeWidth={2.5} size={16} /> : <Eye strokeWidth={2.5} size={16} />}
                 </button>
               </div>
             </div>

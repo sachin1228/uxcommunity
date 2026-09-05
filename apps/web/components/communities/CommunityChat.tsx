@@ -3,7 +3,7 @@
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { ChevronDown } from "lucide-react";
+import { AtSign, ChevronDown } from "lucide-react";
 import {
   applyReactionDelete,
   applyReactionInsert,
@@ -15,7 +15,7 @@ import {
   msgFetchedAt,
   patchSidebarMessageContent,
 } from "@/lib/communities/cache";
-import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import {
   clearReactionIntentsForCommunity,
   ReactionIntentCoordinator,
@@ -26,8 +26,9 @@ import { fmtDate } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
 import { ChatInput } from "./chat/ChatInput";
-import { CommunityInfoPanel } from "./chat/CommunityInfoPanel";
+import type { MentionCandidate } from "@/lib/communities/mentions";
 import { MessageList } from "./chat/MessageList";
+import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
 import { ThreadsView } from "./threads/ThreadsView";
 import type { CommunityThread } from "./threads/types";
@@ -43,15 +44,38 @@ import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
 import { useTypingPresence } from "./chat/useTypingPresence";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
+import { useMemberMentions } from "./chat/useMemberMentions";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import {
   fetchAndHydrateCommunityBootstrap,
+  fetchJsonCached,
+  getCachedRequest,
   initRequestCache,
   setCachedRequest,
   type CommunityBootstrap,
 } from "@/lib/request-cache";
+import { realtimeClient } from "@/lib/realtime/client";
+import { realtimeRooms } from "@/lib/realtime/rooms";
 import type { SSRCommunitySections } from "@/lib/communities/server";
+
+/** Server notification rows relevant to seeding the pending-mention pill. */
+interface MentionNotificationRow {
+  id: string;
+  type: string;
+  href: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+/** Pull { communityId, messageId } out of a chat_mention notification href. */
+function mentionTargetFromHref(
+  href: string,
+): { communityId: string; messageId: string } | null {
+  const match =
+    /^\/dashboard\/communities\/([\w-]+)#msg-([\w-]+)$/.exec(href);
+  return match ? { communityId: match[1], messageId: match[2] } : null;
+}
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -214,6 +238,40 @@ export function CommunityChat({
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Messages that mentioned the user and are awaiting a jump — newest first.
+   * Entries are tagged with their community so the queue survives community
+   * switches within the session (each chat shows only its own entries). */
+  const [pendingMentions, setPendingMentions] = useState<
+    Array<{ communityId: string; messageId: string; createdAt: string }>
+  >([]);
+
+  const addPendingMention = useCallback(
+    (targetCommunityId: string, messageId: string, createdAt?: string) => {
+      setPendingMentions((prev) => {
+        if (
+          prev.some(
+            (m) =>
+              m.communityId === targetCommunityId && m.messageId === messageId,
+          )
+        ) {
+          return prev;
+        }
+        const next = [
+          ...prev,
+          {
+            communityId: targetCommunityId,
+            messageId,
+            createdAt: createdAt ?? new Date().toISOString(),
+          },
+        ];
+        next.sort((a, b) =>
+          a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
+        );
+        return next;
+      });
+    },
+    [],
+  );
 
   // ── Reply state ───────────────────────────────────────────────────────────
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
@@ -568,19 +626,186 @@ export function CommunityChat({
     initialLastReadAtFromSSR: initialLastReadAt,
   });
 
-  // ── Scroll-to-reply handler (needs scrollContainerRef from above) ─────────
-  const handleReplyClick = useCallback((replyId: string) => {
-    const el = scrollContainerRef.current?.querySelector<HTMLElement>(
-      `[data-message-id="${replyId}"]`
-    );
-    if (!el) return;
-    el.scrollIntoView({ behavior: "instant", block: "center" });
-    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
-    setHighlightedMsgId(replyId);
-    highlightTimerRef.current = setTimeout(() => setHighlightedMsgId(null), 1500);
-  }, [scrollContainerRef]);
+  // ── Row focus flash — shared by reply clicks and @ pill jumps ────────────
+  const flashMessage = useCallback(
+    (messageId: string, durationMs: number): boolean => {
+      const el = scrollContainerRef.current?.querySelector<HTMLElement>(
+        `[data-message-id="${messageId}"]`,
+      );
+      if (!el) return false;
+      el.scrollIntoView({ behavior: "instant", block: "center" });
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+      setHighlightedMsgId(messageId);
+      highlightTimerRef.current = setTimeout(
+        () => setHighlightedMsgId(null),
+        durationMs,
+      );
+      return true;
+    },
+    [scrollContainerRef],
+  );
 
-  // ── Realtime subscription ──���──���───────────────────────────────────────────
+  // ── Scroll-to-reply handler (needs scrollContainerRef from above) ─────────
+  const handleReplyClick = useCallback(
+    (replyId: string) => {
+      flashMessage(replyId, 1500);
+    },
+    [flashMessage],
+  );
+
+  // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
+  // The pill lists messages that mentioned the user and are still awaiting a
+  // jump. It is fed by three channels:
+  //   1. the #msg-<id> hash the bell navigates with (land WITHOUT auto-scroll;
+  //      the user taps the @ pill when ready),
+  //   2. unread chat_mention notifications for the current user,
+  //   3. live chat_mention notifications while the chat is open.
+  //
+  // The URL hash is the only channel between the NotificationBell (dashboard
+  // shell) and this page, so it is tracked through every route to it: Next
+  // <Link> updates the hash with history.pushState — which does NOT fire a
+  // hashchange event — so a light interval is the reliable catch-all (manual
+  // edits and back/forward fire hashchange/popstate and update instantly).
+  useEffect(() => {
+    const consumeHash = () => {
+      const match = /^#msg-([\w-]+)$/.exec(window.location.hash);
+      if (!match) return;
+      addPendingMention(communityId, match[1]);
+      const url = new URL(window.location.href);
+      url.hash = "";
+      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+    };
+    window.addEventListener("hashchange", consumeHash);
+    window.addEventListener("popstate", consumeHash);
+    const timer = window.setInterval(consumeHash, 400);
+    return () => {
+      window.removeEventListener("hashchange", consumeHash);
+      window.removeEventListener("popstate", consumeHash);
+      window.clearInterval(timer);
+    };
+  }, [addPendingMention, communityId]);
+
+  // Seed: unread chat_mention notifications (cached list first — paints
+  // instantly — then a fresh read catches stragglers in the background).
+  useEffect(() => {
+    let cancelled = false;
+    const apply = (items?: MentionNotificationRow[]) => {
+      if (!items || cancelled) return;
+      for (const item of items) {
+        if (item.type !== "chat_mention" || item.read_at) continue;
+        const target = mentionTargetFromHref(item.href);
+        if (target) addPendingMention(target.communityId, target.messageId, item.created_at);
+      }
+    };
+    // A macrotask keeps the cached seed out of the effect body proper.
+    const seedTimer = window.setTimeout(() => {
+      apply(
+        getCachedRequest<{ notifications?: MentionNotificationRow[] }>(
+          "/api/notifications",
+          currentUserId,
+        )?.notifications,
+      );
+    }, 0);
+    void fetchJsonCached<{ notifications?: MentionNotificationRow[] }>(
+      "/api/notifications",
+      { staleMs: 30_000 },
+      currentUserId,
+    )
+      .then((data) => apply(data?.notifications))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      window.clearTimeout(seedTimer);
+    };
+  }, [addPendingMention, currentUserId]);
+
+  // Live mentions: the server publishes a chat_mention notification row the
+  // moment someone mentions the user, so the pill grows without a refetch.
+  useEffect(() => {
+    const room = realtimeRooms.notifications(currentUserId);
+    const unsubRoom = realtimeClient.subscribe(room);
+    const unsub = realtimeClient.on(room, "insert", (data) => {
+      const next = data as MentionNotificationRow;
+      if (!next || next.type !== "chat_mention") return;
+      const target = mentionTargetFromHref(next.href);
+      if (target) addPendingMention(target.communityId, target.messageId, next.created_at);
+    });
+    return () => {
+      unsub();
+      unsubRoom();
+    };
+  }, [addPendingMention, currentUserId]);
+
+  /** Mentions awaiting a jump inside THIS community — newest first. */
+  const visiblePendingMentions = useMemo(
+    () => pendingMentions.filter((m) => m.communityId === communityId),
+    [communityId, pendingMentions],
+  );
+
+  /** Jump to the newest pending mention (newest → oldest on repeated taps). */
+  const jumpToPendingMention = useCallback(() => {
+    const target = visiblePendingMentions[0];
+    if (!target) return;
+    // Only consume when the row is actually in the loaded window — otherwise
+    // the pill stays so the user can tap again after the message loads.
+    if (flashMessage(target.messageId, 2000)) {
+      setPendingMentions((prev) =>
+        prev.filter(
+          (m) =>
+            !(
+              m.communityId === target.communityId &&
+              m.messageId === target.messageId
+            ),
+        ),
+      );
+    }
+  }, [flashMessage, visiblePendingMentions]);
+
+  // ── Image viewer (lightbox) ───────────────────────────────────────────────
+  // Every non-deleted image in the loaded chat window, in timeline order, so
+  // the viewer can page back/forward between all of them (arrows, keyboard,
+  // thumbnail strip) just like WhatsApp.
+  const chatImages = useMemo<LightboxImage[]>(
+    () =>
+      messages
+        .filter((m) => m.image_url && !m.deleted_at)
+        .map((m) => ({
+          url:        m.image_url!,
+          content:    m.content || null,
+          user_name:  m.users?.name ?? null,
+          avatar_url: m.users?.avatar_url ?? null,
+          created_at: m.created_at,
+        })),
+    [messages],
+  );
+  const [lightboxState, setLightboxState] = useState<{
+    communityId: string;
+    index: number;
+  } | null>(null);
+  // Derived during render: the viewer is effectively closed once the
+  // community changes since it was opened (no effect needed).
+  const lightbox =
+    lightboxState && lightboxState.communityId === communityId
+      ? lightboxState
+      : null;
+
+  // Keep a ref to the latest image list so the click handler stays referentially
+  // stable — MessageBubble/MessageList are memoized and must not re-render on
+  // every message change just because the handler identity changed.
+  const chatImagesRef = useRef(chatImages);
+  useEffect(() => {
+    chatImagesRef.current = chatImages;
+  }, [chatImages]);
+
+  const handleImageClick = useCallback(
+    (url: string) => {
+      const i = chatImagesRef.current.findIndex((img) => img.url === url);
+      if (i >= 0) setLightboxState({ communityId, index: i });
+    },
+    [communityId],
+  );
+
+  // ── Realtime subscription ──────────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     currentUserId,
@@ -596,6 +821,16 @@ export function CommunityChat({
   });
 
   // ── Input + send ──────────────────────────────────────────────────────────
+  // Mention resolution is wired through a ref: useSendMessage is created first
+  // (it owns inputRef/setInput), and the @mention composer hook below assigns
+  // its resolver right after. Sends only happen from user events, by which
+  // time the ref always points at the current resolver.
+  const mentionResolverRef = useRef<((content: string) => MessageMention[]) | null>(null);
+  const resolveMentionsForSend = useCallback(
+    (content: string) => mentionResolverRef.current?.(content) ?? [],
+    [],
+  );
+
   const {
     input,
     setInput,
@@ -621,7 +856,37 @@ export function CommunityChat({
     replyTo,
     onClearReply: handleClearReply,
     scrollToBottomRef: bottomRef,
+    resolveMentions: resolveMentionsForSend,
   });
+
+  // ── Member @mentions (autocomplete + registry) ────────────────────────────
+  const commitMentionText = useCallback(
+    (text: string, caret: number) => {
+      setInput(text);
+      setTyping(text.trim().length > 0);
+      // Restore focus + caret after React re-renders the textarea value.
+      requestAnimationFrame(() => {
+        const ta = inputRef.current;
+        if (!ta) return;
+        ta.focus();
+        ta.setSelectionRange(caret, caret);
+        ta.style.height = "auto";
+        ta.style.height = `${Math.min(ta.scrollHeight, 120)}px`;
+      });
+    },
+    [inputRef, setInput, setTyping],
+  );
+
+  const memberMentions = useMemberMentions({
+    communityId,
+    currentUserId,
+    onCommitText: commitMentionText,
+  });
+  // Publishes the composer's resolver to the send path once the hook exists.
+  // Sends only happen from user events, which always run after this effect.
+  useEffect(() => {
+    mentionResolverRef.current = memberMentions.resolveMentionsForContent;
+  }, [memberMentions]);
 
   const handleEdit = useCallback((msg: CachedMessage) => {
     setEditingMessage(msg);
@@ -728,18 +993,64 @@ export function CommunityChat({
 
   const handleInputBlur = useCallback(() => {
     setTyping(false);
-  }, [setTyping]);
+    // Clicking away (or into the emoji/image picker) dismisses the @mention
+    // popover so it never floats over unrelated UI.
+    memberMentions.close();
+  }, [memberMentions, setTyping]);
 
   const handleInputSend = useCallback(() => {
     setTyping(false);
+    // Clicking send while an @token is open must not leave the popover
+    // floating over the cleared composer.
+    memberMentions.close();
     void handleSend();
-  }, [handleSend, setTyping]);
+  }, [handleSend, memberMentions, setTyping]);
+
+  // Leaving the chat tab unmounts the composer — make sure no stale @mention
+  // popover survives a tab round-trip.
+  useEffect(() => {
+    if (activeTab !== "chat") memberMentions.close();
+  }, [activeTab, memberMentions]);
+
+  const handleMentionPick = useCallback(
+    (option: MentionCandidate) => memberMentions.pick(option),
+    [memberMentions],
+  );
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.nativeEvent.isComposing || event.keyCode === 229) {
+        handleKeyDown(event);
+        return;
+      }
+      // While the mention popover is open, arrow keys navigate it, Enter
+      // picks the highlighted member (or closes when nothing matches) and
+      // Escape dismisses it — none of them should send the message.
+      if (memberMentions.isOpen) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          memberMentions.move(1);
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          memberMentions.move(-1);
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (!memberMentions.selectActive()) memberMentions.close();
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          memberMentions.close();
+          return;
+        }
+      }
       handleKeyDown(event);
     },
-    [handleKeyDown],
+    [handleKeyDown, memberMentions],
   );
 
   // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
@@ -800,25 +1111,51 @@ export function CommunityChat({
   const sidebarEntry = hasMounted
     ? sidebarStore.data?.communities.find((c) => c.id === communityId)
     : undefined;
-  const displayCommunity = community ?? (sidebarEntry
-    ? {
-        id: communityId,
-        name: sidebarEntry.name,
-        type: sidebarEntry.type,
-        member_count: sidebarEntry.member_count,
-        image_url: sidebarEntry.image_url,
-        is_private: sidebarEntry.is_private,
-        enabled_tabs: sidebarEntry.enabled_tabs,
-        owner_id: sidebarEntry.owner_id,
-      }
-    : null);
+  // Memoized so the header's `community` prop keeps a stable reference across
+  // keystroke re-renders (while meta is loading the sidebar fallback object
+  // would otherwise be a fresh literal every render).
+  const displayCommunity = useMemo(
+    () => community ?? (sidebarEntry
+      ? {
+          id: communityId,
+          name: sidebarEntry.name,
+          type: sidebarEntry.type,
+          member_count: sidebarEntry.member_count,
+          image_url: sidebarEntry.image_url,
+          lottie_url: sidebarEntry.lottie_url,
+          lottie_format: sidebarEntry.lottie_format,
+          lottie_data: sidebarEntry.lottie_data,
+          is_private: sidebarEntry.is_private,
+          enabled_tabs: sidebarEntry.enabled_tabs,
+          owner_id: sidebarEntry.owner_id,
+        }
+      : null),
+    [community, sidebarEntry, communityId],
+  );
 
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members", "about"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members"]).has(activeTab)
       ? "chat"
       : activeTab;
 
   const isOwner = !!(displayCommunity?.owner_id && displayCommunity.owner_id === currentUserId);
+  const myRole = (displayCommunity as any)?.current_user_role ?? (isOwner ? "owner" : null);
+  const myPerms = (displayCommunity as any)?.current_user_permissions;
+  // Platform-appointed admins of app-created communities get the same
+  // management UI as a private-group creator, scoped by their grants.
+  const isAdminWith = (permission: "can_edit_settings" | "can_manage_members" | "can_delete_messages") =>
+    myRole === "admin" && Boolean(myPerms?.[permission]);
+  const canOpenSettings = isOwner || isAdminWith("can_edit_settings");
+  const canManageMembers = isOwner || isAdminWith("can_manage_members");
+  const canModerateMessages = isOwner || isAdminWith("can_delete_messages");
+
+  // Stable header callbacks — inline arrows would recreate every render and
+  // defeat the memoized ChatHeader's bail-out on keystrokes.
+  const handleHeaderTabChange = useCallback((tab: ChatTab) => {
+    setShowSettings(false);
+    handleTabChange(tab);
+  }, [handleTabChange]);
+  const handleSettingsClick = useCallback(() => setShowSettings(true), []);
 
   if (!loading && !displayCommunity) {
     return (
@@ -834,10 +1171,11 @@ export function CommunityChat({
         <ChatHeader
           community={displayCommunity}
           activeTab={renderedTab}
-          onTabChange={(tab) => { setShowSettings(false); handleTabChange(tab); }}
+          onTabChange={handleHeaderTabChange}
           onlineCount={onlineCount}
           currentUserId={currentUserId}
-          onSettingsClick={isOwner ? () => setShowSettings(true) : undefined}
+          onSettingsClick={canOpenSettings ? handleSettingsClick : undefined}
+          canOpenSettings={canOpenSettings}
           communityId={communityId}
         />
 
@@ -852,6 +1190,7 @@ export function CommunityChat({
             <CommunitySettingsView
               communityId={communityId}
               community={displayCommunity as any}
+              isOwner={isOwner}
               onClose={() => setShowSettings(false)}
               onSaved={(updated) => {
                 setCommunity((prev) => prev ? { ...prev, ...updated } : prev);
@@ -893,13 +1232,7 @@ export function CommunityChat({
             onClose={handleCancelEdit}
           />
         )}
-        {renderedTab === "about" ? (
-          <CommunityInfoPanel
-            community={displayCommunity}
-            communityId={communityId}
-            currentUserId={currentUserId}
-          />
-        ) : renderedTab === "showcase" ? (
+        {renderedTab === "showcase" ? (
           <ShowcaseView communityId={communityId} currentUserId={currentUserId} />
         ) : renderedTab === "threads" ? (
           <ThreadsView
@@ -916,17 +1249,18 @@ export function CommunityChat({
             communityId={communityId}
             currentUserId={currentUserId}
             isOwner={isOwner}
+            canManageMembers={canManageMembers}
             isPrivate={displayCommunity?.is_private ?? false}
           />
         ) : (
-          <div className="flex-1 flex overflow-hidden">
-          <div className="flex-1 overflow-hidden relative">
-          {/* Scrollable message area — full height, padded at bottom so messages
-              don't hide behind the floating input bar.                           */}
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Scrollable message body — a flex sibling of the footer (WhatsApp
+              pattern). It owns the scroll; the footer below is static, so
+              messages can never flow underneath the input.                     */}
           <div
             ref={scrollContainerRef}
             data-chat-scroll-container
-            className="absolute inset-0 overflow-y-auto bg-background pb-24"
+            className="relative flex-1 min-h-0 overflow-y-auto bg-background"
             style={{
               backgroundImage: "radial-gradient(circle,rgba(255,255,255,0.03) 1px,transparent 1px)",
               backgroundSize: "24px 24px",
@@ -952,6 +1286,7 @@ export function CommunityChat({
               displayCommunity={displayCommunity}
               communityId={communityId}
               highlightedMsgId={highlightedMsgId}
+              canModerateMessages={canModerateMessages}
               onReplyClick={handleReplyClick}
               onCancelSend={handleCancelSend}
               onRetrySend={handleRetrySend}
@@ -960,23 +1295,41 @@ export function CommunityChat({
               onEdit={handleEdit}
               onCopy={handleCopy}
               onDelete={handleDelete}
+              onImageClick={handleImageClick}
             />
           </div>
 
-          {/* Floating input — sits above the scroll area */}
-          <div className="absolute bottom-0 left-0 right-0 z-10">
-            {/* Scroll-to-bottom button — always above the input box */}
+          {/* Static footer — separate from the scroll body, never overlapped */}
+          <footer className="relative shrink-0 z-10 bg-background">
+            {/* @ pill — jump to messages where the user was mentioned */}
+            {visiblePendingMentions.length > 0 && (
+              <button
+                type="button"
+                onClick={jumpToPendingMention}
+                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white shadow-lg hover:bg-[var(--ds-blue-800)] transition-colors"
+                aria-label={`${visiblePendingMentions.length} pending mention${visiblePendingMentions.length === 1 ? "" : "s"} — jump to message`}
+                title="Jump to the message where you were mentioned"
+              >
+                <AtSign strokeWidth={2.5} size={15} />
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--ds-blue-900)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
+                  {visiblePendingMentions.length > 9
+                    ? "9+"
+                    : visiblePendingMentions.length}
+                </span>
+              </button>
+            )}
+            {/* Scroll-to-bottom button — floats just above the footer edge */}
             {showScrollToBottom && (
               <button
                 onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
                 className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
                 aria-label="Scroll to bottom"
               >
-                <ChevronDown size={16} />
+                <ChevronDown strokeWidth={2.5} size={16} />
               </button>
             )}
             <TypingIndicator users={typingUsers} />
-            <div className="bg-[color-mix(in_srgb,var(--background)_90%,transparent)] backdrop-blur-sm">
+            <div>
               <ChatInput
                 ref={inputRef}
                 input={input}
@@ -995,14 +1348,33 @@ export function CommunityChat({
                 onImageRemove={handleImageClear}
                 onEmojiSelect={handleEmojiSelect}
                 onGifSelect={handleGifSend}
+                onComposerActivity={memberMentions.syncFromTextarea}
+                resolveMentions={memberMentions.resolveMentionsForContent}
+                mention={{
+                  open: memberMentions.isOpen,
+                  loading: memberMentions.loading,
+                  query: memberMentions.query,
+                  options: memberMentions.options,
+                  activeIndex: memberMentions.activeIndex,
+                  onPick: handleMentionPick,
+                  onHover: (index) => memberMentions.hover(index),
+                }}
               />
             </div>
+          </footer>
           </div>
-
-        </div>
-        </div>
         )}
       </div>
+
+      {/* Full-screen image viewer — click any chat image to open it */}
+      {lightbox && chatImages[lightbox.index] && (
+        <ImageLightbox
+          images={chatImages}
+          index={lightbox.index}
+          onClose={() => setLightboxState(null)}
+          onNavigate={(i) => setLightboxState({ communityId, index: i })}
+        />
+      )}
     </div>
   );
 }

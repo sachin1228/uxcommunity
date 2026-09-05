@@ -27,5 +27,5 @@ export function CategoryIcon({
   className?: string;
 }) {
   const Icon = CATEGORY_ICONS[category];
-  return <Icon size={size} className={className} />;
+  return <Icon size={size} strokeWidth={2.5} className={className} />;
 }

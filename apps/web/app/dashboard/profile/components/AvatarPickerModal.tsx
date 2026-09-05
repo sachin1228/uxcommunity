@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Upload, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 
 interface AvatarPickerModalProps {
   uploadPreview: string | null;
@@ -26,8 +27,9 @@ export function AvatarPickerModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -48,7 +50,7 @@ export function AvatarPickerModal({
             aria-label="Close profile picture dialog"
             className="text-foreground-muted transition-colors hover:text-foreground"
           >
-            <X aria-hidden="true" />
+            <X strokeWidth={2.5} aria-hidden="true" />
           </button>
         </div>
 
@@ -93,7 +95,7 @@ export function AvatarPickerModal({
               onClick={() => fileInputRef.current?.click()}
               className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent/50 hover:text-foreground"
             >
-              <Upload aria-hidden="true" />
+              <Upload strokeWidth={2.5} aria-hidden="true" />
               <span className="font-body text-sm font-medium">Upload a profile picture</span>
               <span className="font-body text-xs text-foreground-subtle">JPEG, PNG or WebP · max 5 MB</span>
             </button>
@@ -120,5 +122,6 @@ export function AvatarPickerModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

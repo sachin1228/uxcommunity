@@ -18,6 +18,25 @@ interface Options {
   setCommunities: React.Dispatch<React.SetStateAction<CachedSidebarCommunity[]>>;
 }
 
+/**
+ * Maximum number of community chat-room WebSockets the sidebar keeps open.
+ * Each community room gets its own socket in realtimeClient, so users with
+ * many communities would otherwise hold one connection per community. Only
+ * the most recently active communities stay live; the rest are caught up by
+ * the periodic sidebar refetch in useSidebarCommunities, which polls only
+ * while the list is over this limit.
+ */
+export const SIDEBAR_REALTIME_LIMIT = 15;
+
+/** Mirrors GlobalSidebar's display order: most recent activity first. */
+function sortByRecentActivity(a: CachedSidebarCommunity, b: CachedSidebarCommunity): number {
+  const ta = [a.last_message?.created_at, a.joined_at].filter(Boolean).sort().at(-1) ?? "";
+  const tb = [b.last_message?.created_at, b.joined_at].filter(Boolean).sort().at(-1) ?? "";
+  if (tb > ta) return 1;
+  if (ta > tb) return -1;
+  return a.name.localeCompare(b.name);
+}
+
 function applyUpdate(
   prev: CachedSidebarCommunity[],
   communityId: string,
@@ -43,12 +62,20 @@ export function useSidebarRealtime({
   activeCommunityIdRef,
   setCommunities,
 }: Options) {
-  const communityIds = [...communities].map((c) => c.id).sort().join(",");
+  // The live subscription set: the most recently active communities, bounded
+  // so the sidebar doesn't hold one WebSocket per community. The dep is the
+  // sorted id list of THIS set, so resubscription only happens when a
+  // community enters or leaves the top-N — preview/message updates within the
+  // set never tear the sockets down.
+  const subscribed = [...communities]
+    .sort(sortByRecentActivity)
+    .slice(0, SIDEBAR_REALTIME_LIMIT);
+  const subscribedIds = subscribed.map((c) => c.id).sort().join(",");
   const communitiesRef = useRef(communities);
   useEffect(() => { communitiesRef.current = communities; }, [communities]);
 
   useEffect(() => {
-    if (!communities.length) return;
+    if (!subscribed.length) return;
 
     realtimeClient.init({ id: userId, name: null, avatar: null });
     const unsubscribes: Array<() => void> = [];
@@ -106,7 +133,7 @@ export function useSidebarRealtime({
         .catch(() => {});
     }
 
-    for (const community of communities) {
+    for (const community of subscribed) {
       const cid = community.id;
       const chatRoom = realtimeRooms.chat(cid);
       const unsubRoom = realtimeClient.subscribe(chatRoom);
@@ -228,5 +255,5 @@ export function useSidebarRealtime({
 
     return () => { unsubscribes.forEach((unsub) => unsub()); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityIds, userId]);
+  }, [subscribedIds, userId]);
 }

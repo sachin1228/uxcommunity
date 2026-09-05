@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { BookMarked, Calendar, ChevronDown, FolderGit2, Info, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
-import { CommunityIcon } from "../CommunityIcon";
+import { ModalPortal } from "@/components/ui/Modal";
+import { CommunityDp } from "../CommunityDp";
 
 interface Community {
   id: string;
@@ -15,6 +16,9 @@ interface Community {
   type: string;
   member_count: number;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   is_private?: boolean;
   enabled_tabs?: string[];
   owner_id?: string | null;
@@ -27,6 +31,8 @@ interface ChatHeaderProps {
   onlineCount?: number;
   currentUserId?: string;
   onSettingsClick?: () => void;
+  /** Owner or admin with "edit community settings" permission. */
+  canOpenSettings?: boolean;
   /** Used to resolve the community Lottie while meta is still loading. */
   communityId?: string;
 }
@@ -72,8 +78,9 @@ function ConfirmDialog({
 
   return (
     // Backdrop
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className="w-full max-w-xs rounded-2xl border border-white/[0.08] bg-surface-raised shadow-2xl p-5 animate-in zoom-in-95 fade-in duration-150 mx-4">
@@ -100,17 +107,24 @@ function ConfirmDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-export function ChatHeader({
+/**
+ * Memoized so typing in the chat input doesn't re-render the header — all
+ * props are referentially stable between keystrokes (see the stabilized
+ * callbacks in CommunityChat).
+ */
+export const ChatHeader = memo(function ChatHeader({
   community,
   activeTab,
   onTabChange,
   onlineCount = 0,
   currentUserId,
   onSettingsClick,
+  canOpenSettings = false,
   communityId,
 }: ChatHeaderProps) {
   const router = useGuardedRouter();
@@ -190,31 +204,27 @@ export function ChatHeader({
           <>
             <div className="flex items-center justify-between pb-3">
               <div className="flex items-center gap-3">
-                <div className="relative h-11 w-11 rounded-full bg-surface-raised overflow-hidden shrink-0">
-                  <CommunityIcon size={44} className="bg-surface-raised" />
-                  {community.image_url && (
-                    <img
-                      src={community.image_url}
-                      alt={community.name}
-                      className="absolute inset-0 h-11 w-11 rounded-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  )}
-                </div>
+                <CommunityDp
+                  imageUrl={community.image_url}
+                  lottieUrl={community.lottie_url}
+                  lottieFormat={community.lottie_format}
+                  lottieData={community.lottie_data}
+                  name={community.name}
+                  size={44}
+                  className="bg-surface-raised"
+                />
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">
                       {community.name}
                       {community.is_private && (
-                        <Lock size={13} className="text-foreground-muted" aria-label="Private community" />
+                        <Lock strokeWidth={2.5} size={13} className="text-foreground-muted" aria-label="Private community" />
                       )}
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
                     <span className="inline-flex items-center gap-1">
-                      <Users size={10} /> {community.member_count} member
+                      <Users strokeWidth={2.5} size={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
                     </span>
                     {onlineCount > 0 && (
@@ -227,8 +237,8 @@ export function ChatHeader({
                 </div>
               </div>
               <div ref={menuRef} className="relative flex items-center gap-2">
-                {/* Settings button — community owner only */}
-                {currentUserId && community?.owner_id === currentUserId && onSettingsClick && (
+                {/* Settings button — community owner or admin with settings permission */}
+                {currentUserId && canOpenSettings && onSettingsClick && (
                   <button
                     type="button"
                     onClick={onSettingsClick}
@@ -236,7 +246,7 @@ export function ChatHeader({
                     aria-label="Community settings"
                     title="Community settings"
                   >
-                    <Settings size={15} />
+                    <Settings strokeWidth={2.5} size={15} />
                   </button>
                 )}
                 <div className="relative">
@@ -247,7 +257,7 @@ export function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
                     className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    Joined <ChevronDown size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
+                    Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
                   </button>
                   {openMenu === "joined" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -271,7 +281,7 @@ export function ChatHeader({
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
                     className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
                   >
-                    <MoreHorizontal size={16} />
+                    <MoreHorizontal strokeWidth={2.5} size={16} />
                   </button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
@@ -312,7 +322,7 @@ export function ChatHeader({
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">
-                    <Icon size={14} aria-hidden="true" />
+                    <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
                   </span>
                 </button>
@@ -337,4 +347,4 @@ export function ChatHeader({
       </div>
     </>
   );
-}
+});

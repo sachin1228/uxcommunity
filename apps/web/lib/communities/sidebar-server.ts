@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
-import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { getMasterImageMap, getMasterLottieMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
+import { embedLottieData, type LottieFormat } from "./dp";
 
 type ActivityRow = {
   community_id: string;
@@ -47,7 +48,7 @@ export async function getSidebarCommunities(userId: string) {
   const activityById = new Map(rows.map((row) => [row.community_id, row]));
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at")
+    .select("id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at, lottie_url, lottie_format")
     .in("id", rows.map((row) => row.community_id))
     .eq("is_active", true);
   if (error) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
@@ -59,28 +60,63 @@ export async function getSidebarCommunities(userId: string) {
   }
   const images: Record<string, string | null> = {};
   const names: Record<string, string | null> = {};
+  // Master-resolved lottie DP per community (url + format + embedded data).
+  const lotties: Record<string, { url: string | null; format: LottieFormat | null; data: unknown }> = {};
   const validIds = new Set<string>();
   await Promise.all(Object.entries(byType).map(async ([type, items]) => {
     if (!TABLE_LOOKUP[type]) {
       items.forEach((item) => validIds.add(item.id));
       return;
     }
-    const [imageMap, nameMap] = await Promise.all([getMasterImageMap(type), getMasterNameMap(type)]);
+    const [imageMap, nameMap, lottieMap] = await Promise.all([
+      getMasterImageMap(type),
+      getMasterNameMap(type),
+      getMasterLottieMap(type),
+    ]);
     for (const item of items) {
       if (!(item.reference_id in imageMap)) continue;
       validIds.add(item.id);
       images[item.id] = imageMap[item.reference_id] ?? null;
       names[item.id] = nameMap[item.reference_id] ?? null;
+      const masterLottie = lottieMap[item.reference_id];
+      lotties[item.id] = {
+        url: masterLottie?.lottie_url ?? null,
+        format: (masterLottie?.lottie_format as LottieFormat | null) ?? null,
+        data: null,
+      };
     }
   }));
+
+  // Communities without a master row (general / member-created) use the lottie
+  // stored on the community row itself — include it so it gets embedded too.
+  for (const community of communities ?? []) {
+    if (!lotties[community.id] && community.lottie_url && community.lottie_format) {
+      lotties[community.id] = {
+        url: community.lottie_url,
+        format: community.lottie_format as LottieFormat,
+        data: null,
+      };
+    }
+  }
+
+  // Embed animation payloads (R2 is not browser-fetchable) — cached per URL.
+  await Promise.all(
+    Object.entries(lotties).map(async ([id, l]) => {
+      if (l.url && l.format) l.data = await embedLottieData(l.url, l.format);
+    })
+  );
 
   const result = (communities ?? []).filter((community) => validIds.has(community.id)).map((community) => {
     const row = activityById.get(community.id)!;
     const message = row.last_message;
     const reaction = row.last_reaction;
+    const lottie = lotties[community.id];
     return {
       ...community,
       image_url: images[community.id] ?? community.image_url ?? null,
+      lottie_url: lottie?.url ?? community.lottie_url ?? null,
+      lottie_format: lottie?.format ?? community.lottie_format ?? null,
+      lottie_data: lottie?.data ?? null,
       reference_name: names[community.id] ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,

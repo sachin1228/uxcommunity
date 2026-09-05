@@ -9,6 +9,9 @@ import {
   patchCachedRequest,
   setCachedRequest,
 } from "@/lib/request-cache";
+import type { MessageMention } from "./mentions";
+
+export type { MessageMention } from "./mentions";
 
 export interface MessageReaction {
   emoji: string;
@@ -34,6 +37,8 @@ export interface CachedMessage {
   image_url?: string | null;
   deleted_at?: string | null;
   edited_at?: string | null;
+  /** Members @mentioned in this message — `@Name` tokens in `content`. */
+  mentions?: MessageMention[];
 }
 
 /** A thread-created event shown inline in the chat timeline. */
@@ -48,6 +53,13 @@ export interface CachedThreadEvent {
   users: { name: string; avatar_url: string | null } | null;
 }
 
+/** Effective community-management grants for the current user. */
+export interface ClientCommunityPermissions {
+  can_edit_settings?: boolean;
+  can_manage_members?: boolean;
+  can_delete_messages?: boolean;
+}
+
 export interface CachedMeta {
   community: {
     id: string;
@@ -55,12 +67,19 @@ export interface CachedMeta {
     type: string;
     member_count: number;
     image_url: string | null;
+    lottie_url?: string | null;
+    lottie_format?: "json" | "dotlottie" | null;
+    lottie_data?: unknown;
     is_private?: boolean;
     enabled_tabs?: string[];
     owner_id?: string | null;
     invite_token?: string | null;
     description?: string | null;
     created_at?: string;
+    /** "owner" | "admin" | "member" — the current user's role in this community. */
+    current_user_role?: string | null;
+    /** Effective permission grants (owners: everything; admins: configured toggles). */
+    current_user_permissions?: ClientCommunityPermissions | null;
   };
   members: {
     user_id: string;
@@ -90,6 +109,9 @@ export interface CachedSidebarCommunity {
   name: string;
   type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   reference_name?: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
@@ -137,6 +159,9 @@ export interface CachedExploreCommunity {
   name: string;
   type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
   description: string | null;
   is_private?: boolean;
   member_count: number;

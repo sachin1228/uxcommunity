@@ -553,6 +553,7 @@ class RealtimeClient {
 
   onPresence(room: string, handler: PresenceHandler): () => void {
     const state = this.getOrCreateRoom(room);
+    this.getRoomConnection(room);
     state.presenceHandlers.add(handler);
 
     const cached = this.presenceCache.get(room);

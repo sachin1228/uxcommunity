@@ -9,7 +9,9 @@ import { contentHash } from "@/lib/moderation/normalize";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rl = await rateLimit(`signup:${ip}`, 5, 3600);
+  // Validation-only endpoint (checks invitation + email, creates nothing), so the
+  // cap is generous: it stops bot loops without punishing a human retrying.
+  const rl = await rateLimit(`signup:step1:complete:v2:${ip}`, 60, 3600);
   if (!rl.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },

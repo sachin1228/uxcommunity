@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { createServiceClient } from "@/lib/supabase/service";
+import { embedLottieData } from "@/lib/communities/dp";
 
 export async function GET() {
   const timer = createServerTimer("GET /api/communities/all");
@@ -49,7 +50,26 @@ export async function GET() {
     );
   }
 
-  const body = { communities: communities ?? [] };
+  const rows = (communities ?? []) as Array<Record<string, unknown>>;
+
+  // Embed lottie animation payloads for communities with an animated DP
+  // (R2 is not browser-fetchable, so the data ships inline). Cached per URL.
+  const enriched = await Promise.all(
+    rows.map(async (community) => {
+      if (community.lottie_url && community.lottie_format) {
+        return {
+          ...community,
+          lottie_data: await embedLottieData(
+            community.lottie_url as string,
+            community.lottie_format as "json" | "dotlottie"
+          ),
+        };
+      }
+      return { ...community, lottie_data: null };
+    })
+  );
+
+  const body = { communities: enriched };
   timer.finish({
     database_queries: 1,
     rows: body.communities.length,

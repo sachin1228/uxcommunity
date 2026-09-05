@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { LogOut, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
+import { useLogout } from "@/components/ui/useLogout";
 
 interface Props {
   name: string;
@@ -16,37 +17,24 @@ interface Props {
 
 export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const router = useRouter();
-
-  async function handleLogout() {
-    setLoading(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      // Clear all module-level caches so the next user who logs in on this
-      // tab never sees data belonging to the current user.
-      const { clearAllUserCaches } = await import("@/lib/communities/cache");
-      clearAllUserCaches();
-      router.replace("/login");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { loggingOut, handleLogout } = useLogout();
 
   return (
     <div className="relative">
+      {loggingOut && <BrandedLoadingScreen label="Logging out" />}
+
       {/* Avatar trigger */}
       <button
         ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
-        className="h-7 w-7 rounded-full overflow-hidden shrink-0 focus:outline-none ring-2 ring-transparent hover:ring-accent/40 transition-all"
+        className="h-8 w-8 rounded-full overflow-hidden shrink-0 focus:outline-none"
         aria-label="Profile menu"
       >
         {avatarUrl ? (
-          <AvatarImg url={avatarUrl} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
+          <AvatarImg url={avatarUrl} name={name} size={32} className="h-8 w-8 rounded-full object-cover" />
         ) : (
-          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center select-none">
+          <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center select-none">
             <span className="font-display text-xs font-semibold text-accent-foreground">
               {initial}
             </span>
@@ -86,16 +74,16 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
             onClick={() => setOpen(false)}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors"
           >
-            <UserCircle size={14} />
+            <UserCircle strokeWidth={2.5} size={14} />
             My Profile
           </Link>
           <button
             onClick={handleLogout}
-            disabled={loading}
+            disabled={loggingOut}
             className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
           >
-            <LogOut size={14} />
-            {loading ? "Signing out…" : "Sign out"}
+            <LogOut strokeWidth={2.5} size={14} />
+            {loggingOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       </DropdownMenu>

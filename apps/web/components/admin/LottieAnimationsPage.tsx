@@ -129,7 +129,7 @@ export function LottieAnimationsPage() {
           className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
           title="Refresh"
         >
-          <RefreshCcw size={14} />
+          <RefreshCcw strokeWidth={2.5} size={14} />
         </button>
       </div>
 
@@ -137,7 +137,7 @@ export function LottieAnimationsPage() {
         <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
           <p className="font-body text-xs text-red-400 flex-1">{error}</p>
           <button onClick={() => setError(null)}>
-            <X size={13} className="text-red-400" />
+            <X strokeWidth={2.5} size={13} className="text-red-400" />
           </button>
         </div>
       )}
@@ -145,7 +145,7 @@ export function LottieAnimationsPage() {
       {/* ── Universal ──────────────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Globe size={14} className="text-accent" />
+          <Globe strokeWidth={2.5} size={14} className="text-accent" />
           <h2 className="font-body text-sm font-semibold text-foreground">Universal</h2>
           <span className="font-body text-[10px] text-foreground-muted">
             — fallback for all communities
@@ -166,7 +166,7 @@ export function LottieAnimationsPage() {
       {/* ── Per type ───────────────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Layers size={14} className="text-accent" />
+          <Layers strokeWidth={2.5} size={14} className="text-accent" />
           <h2 className="font-body text-sm font-semibold text-foreground">Per Type</h2>
           <span className="font-body text-[10px] text-foreground-muted">
             — overrides universal for all communities of that type
@@ -175,7 +175,7 @@ export function LottieAnimationsPage() {
         <div className="space-y-2">
           {TYPE_CONFIG.map(({ key, label, Icon }) => (
             <div key={key} className="flex items-center gap-2">
-              <Icon size={13} className="text-foreground-muted shrink-0" />
+              <Icon size={13} strokeWidth={2.5} className="text-foreground-muted shrink-0" />
               <div className="flex-1">
                 <AnimationSlot
                   label={label}
@@ -196,7 +196,7 @@ export function LottieAnimationsPage() {
       {/* ── Per community ──────────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center gap-2 mb-3">
-          <Clapperboard size={14} className="text-accent" />
+          <Clapperboard strokeWidth={2.5} size={14} className="text-accent" />
           <h2 className="font-body text-sm font-semibold text-foreground">Per Community</h2>
           <span className="font-body text-[10px] text-foreground-muted">
             — highest priority, overrides type &amp; universal
@@ -216,7 +216,7 @@ export function LottieAnimationsPage() {
               onClick={() => setSearch("")}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
             >
-              <X size={12} />
+              <X strokeWidth={2.5} size={12} />
             </button>
           )}
         </div>

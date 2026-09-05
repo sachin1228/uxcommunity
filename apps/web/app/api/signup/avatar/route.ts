@@ -1,18 +1,19 @@
 import { randomUUID } from "node:crypto";
-import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { sendWelcomeEmail } from "@/lib/email";
 import { extensionForMime } from "@/lib/image-utils";
-import { deleteFromR2, uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { rateLimit } from "@/lib/auth/rate-limit";
+import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
+import { autoJoinCommunities } from "@/lib/communities/auto-join";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -32,7 +33,7 @@ function safeSignupError(error: { code?: string; message?: string }) {
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-  const rateLimitResult = await rateLimit(`signup:complete:${ip}`, 5, 3600);
+  const rateLimitResult = await rateLimit(`signup:finalize:v2:${ip}`, 20, 3600);
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -72,14 +73,22 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (file && parsed.data.avatar_source !== "upload") {
+  const { identity, profile, interest_ids, token } = parsed.data;
+  const avatarSource = parsed.data.avatar_source ?? null;
+  const preUploadedUrl = parsed.data.avatar_url ?? null;
+
+  if (file && avatarSource !== "upload") {
     return NextResponse.json({ error: "Invalid profile picture source." }, { status: 422 });
   }
-  if (!file && parsed.data.avatar_source) {
+  if (avatarSource === "upload" && !file && !preUploadedUrl) {
     return NextResponse.json({ error: "A profile picture file is required." }, { status: 422 });
   }
+  if (preUploadedUrl && !parseR2Key(preUploadedUrl)) {
+    // Only accept pictures uploaded through /api/signup/picture — never a
+    // client-supplied arbitrary URL.
+    return NextResponse.json({ error: "Invalid profile picture." }, { status: 422 });
+  }
 
-  const { identity, profile, interest_ids, token } = parsed.data;
   const db = createServiceClient();
   const nameDecision = await moderateText({ content: identity.name, contentType: "username" });
   await logModerationDecision(db, {
@@ -89,8 +98,14 @@ export async function POST(request: NextRequest) {
   });
   if (!nameDecision.allowed) return moderationFailureResponse(nameDecision);
 
-  let profilePictureUrl: string | null = null;
-  let uploadedKey: string | null = null;
+  // A picture uploaded earlier via /api/signup/picture (already moderated)
+  // skips the file path below.
+  let profilePictureUrl: string | null = preUploadedUrl;
+  let uploadedKey: string | null = file
+    ? null
+    : preUploadedUrl
+      ? parseR2Key(preUploadedUrl)
+      : null;
 
   if (file) {
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -116,7 +131,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const passwordHash = await bcrypt.hash(identity.password, 12);
+  const passwordHash = await hashPassword(identity.password);
   const { data, error } = await db.rpc("complete_signup", {
     p_name: identity.name,
     p_email: identity.email.toLowerCase(),
@@ -144,6 +159,19 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = data[0].user_id as string;
+
+  // Join every profile-based community (General + city + sector + interests)
+  // server-side so the sidebar shows the full list the first time the dashboard
+  // loads. Non-fatal if it fails — the dashboard layout retries exactly once via
+  // the designer_profiles.communities_auto_joined flag.
+  let joinedCommunities = 0;
+  try {
+    const joined = await autoJoinCommunities(userId);
+    joinedCommunities = joined.length;
+  } catch (autoJoinError) {
+    console.error("[signup/avatar] auto-join error:", autoJoinError);
+  }
+
   if (token) {
     try {
       await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
@@ -157,7 +185,12 @@ export async function POST(request: NextRequest) {
     email: identity.email.toLowerCase(),
     role: "user",
   });
-  const response = NextResponse.json({ success: true, userId, avatar_url: profilePictureUrl });
+  const response = NextResponse.json({
+    success: true,
+    userId,
+    avatar_url: profilePictureUrl,
+    joined_communities: joinedCommunities,
+  });
   setSessionCookie(response, sessionToken, request.nextUrl.hostname);
   return response;
 }

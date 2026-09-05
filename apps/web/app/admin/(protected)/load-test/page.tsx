@@ -176,7 +176,7 @@ export default function LoadTestPage() {
                     : "text-foreground-muted hover:text-foreground"
                 }`}
               >
-                {t === "test" ? <Gauge size={13} /> : <Users size={13} />}
+                {t === "test" ? <Gauge strokeWidth={2.5} size={13} /> : <Users strokeWidth={2.5} size={13} />}
                 {t === "test" ? "Run Test" : "Seed Users"}
               </button>
             ))}
@@ -200,7 +200,7 @@ export default function LoadTestPage() {
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
-                  <ChevronDown size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
+                  <ChevronDown strokeWidth={2.5} size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
                 </div>
                 <p className="font-body text-[11px] text-foreground-muted">
                   {SCENARIOS.find((s) => s.value === scenario)?.desc}
@@ -381,7 +381,7 @@ export default function LoadTestPage() {
                   }}
                   className="font-body text-[11px] text-accent hover:underline flex items-center gap-1"
                 >
-                  <ChevronRight size={11} className="rotate-90" />
+                  <ChevronRight strokeWidth={2.5} size={11} className="rotate-90" />
                   Jump to bottom
                 </button>
               )}
@@ -390,7 +390,7 @@ export default function LoadTestPage() {
                   onClick={() => setLines([])}
                   className="font-body text-[11px] text-foreground-muted hover:text-foreground flex items-center gap-1"
                 >
-                  <RefreshCw size={11} />
+                  <RefreshCw strokeWidth={2.5} size={11} />
                   Clear
                 </button>
               )}
@@ -473,7 +473,7 @@ function PasswordField({
           className="absolute right-2.5 top-2 text-foreground-muted hover:text-foreground"
           tabIndex={-1}
         >
-          {show ? <EyeOff size={12} /> : <Eye size={12} />}
+          {show ? <EyeOff strokeWidth={2.5} size={12} /> : <Eye strokeWidth={2.5} size={12} />}
         </button>
       </div>
     </div>
@@ -490,7 +490,7 @@ function RunButton({
       onClick={onStop}
       className="flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs font-medium text-red-400 transition hover:bg-red-500/20"
     >
-      <Square size={12} />
+      <Square strokeWidth={2.5} size={12} />
       Stop
     </button>
   ) : (
@@ -498,7 +498,7 @@ function RunButton({
       onClick={onClick}
       className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50"
     >
-      <Play size={12} />
+      <Play strokeWidth={2.5} size={12} />
       {label}
     </button>
   );

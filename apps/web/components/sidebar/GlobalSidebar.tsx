@@ -121,7 +121,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Home size={15} className="shrink-0" />
+              <Home strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Home</span>
             </Link>
           </li>
@@ -134,7 +134,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Compass size={15} className="shrink-0" />
+              <Compass strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Explore Communities</span>
             </Link>
           </li>
@@ -147,7 +147,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Library size={15} className="shrink-0" />
+              <Library strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
             </Link>
           </li>
@@ -160,7 +160,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
               }`}
             >
-              <Briefcase size={15} className="shrink-0" />
+              <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
             </Link>
           </li>
@@ -183,7 +183,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               onClick={() => setCreateOpen(true)}
               className="flex w-full cursor-pointer items-center gap-[11px] rounded-lg px-[11px] py-[7px] text-left font-body text-sm font-normal text-foreground-muted transition-colors hover:text-foreground hover:bg-surface-raised"
             >
-              <Plus size={15} className="shrink-0" />
+              <Plus strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Start a community</span>
             </button>
           </li>
@@ -258,8 +258,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                   c={c}
                   active={c.id === activeCommunityId}
                   typingText={typingMap.get(c.id)}
-                  onClick={() => handleNavigate(c.id)}
-                  onHover={() => prefetchCommunity(c.id)}
+                  onClick={handleNavigate}
+                  onHover={prefetchCommunity}
                 />
               ))}
             </ul>

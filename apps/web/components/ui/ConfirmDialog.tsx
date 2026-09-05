@@ -49,7 +49,7 @@ export function ConfirmDialog({
     >
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
-          <AlertTriangle size={18} />
+          <AlertTriangle strokeWidth={2.5} size={18} />
         </div>
         <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
       </div>
@@ -68,7 +68,7 @@ export function ConfirmDialog({
           disabled={pending}
           className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
         >
-          {pending ? <Spinner size={15} className="text-white" /> : <Trash2 size={14} />}
+          {pending ? <Spinner size={15} className="text-white" /> : <Trash2 strokeWidth={2.5} size={14} />}
           {pending ? "Deleting…" : confirmLabel}
         </button>
       </div>

@@ -63,16 +63,6 @@ const readStates = new Map<string, CommunityReadState>();
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let activeUserId: string | null = null;
 
-function logReadCache(communityId: string, action: string, reason: string) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[READ CACHE] community: ${communityId} action: ${action} reason: ${reason}`);
-}
-
-function logReadNetwork(communityId: string, reason: string) {
-  if (process.env.NODE_ENV === "production") return;
-  console.info(`[READ NETWORK] community: ${communityId} reason: ${reason}`);
-}
-
 function ensureState(communityId: string): CommunityReadState {
   let state = readStates.get(communityId);
   if (!state) {
@@ -106,7 +96,6 @@ function evictReadStatesIfNeeded(): void {
     for (const [communityId, state] of readStates) {
       if (debounceTimers.has(communityId) || state.inFlight) continue;
       readStates.delete(communityId);
-      logReadCache(communityId, "evicted", "cache at max size");
       evicted = true;
       break;
     }
@@ -181,13 +170,9 @@ export function scheduleMarkRead(
 ): void {
   mergeActivity(communityId, opts);
 
-  const reason = opts.reason ?? "event";
   const existing = debounceTimers.get(communityId);
   if (existing) {
     clearTimeout(existing);
-    logReadCache(communityId, "debounced", `combined with pending request (${reason})`);
-  } else {
-    logReadCache(communityId, "scheduled", `event: ${reason}`);
   }
   debounceTimers.set(
     communityId,
@@ -215,18 +200,12 @@ function fireMarkRead(communityId: string): void {
   // Deduplicate simultaneous requests: never stack a second PATCH while one
   // is in flight. The next event after the cooldown will re-request if needed.
   if (state.inFlight) {
-    logReadCache(communityId, "skipped", "request already in flight (deduplicated)");
     return;
   }
 
   if (state.lastUpdatedAt !== null) {
     const elapsedMs = Date.now() - state.lastUpdatedAt;
     if (elapsedMs < readManagerConfig.cooldownMs) {
-      logReadCache(
-        communityId,
-        "skipped",
-        `already updated ${Math.floor(elapsedMs / 1000)}s ago`,
-      );
       return;
     }
   }
@@ -241,18 +220,11 @@ function fireMarkRead(communityId: string): void {
   }
 
   if (unreadCount === 0) {
-    logReadCache(communityId, "skipped", "no unread messages");
     return;
   }
 
   state.inFlight = true;
   state.lastUpdatedAt = Date.now();
-  logReadNetwork(
-    communityId,
-    unreadCount === null || unreadCount === undefined
-      ? "unknown unread state"
-      : "unread messages",
-  );
   markReadOnServer(communityId)
     .catch(() => {})
     .finally(() => {

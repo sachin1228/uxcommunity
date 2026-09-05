@@ -231,28 +231,28 @@ export function ResourceCard({
         aria-label="Resource options"
         className={`flex items-center justify-center text-foreground-subtle hover:bg-surface-raised hover:text-foreground ${isDetail ? "h-8 w-8 rounded-lg border border-border" : "h-7 w-7 rounded-md"}`}
       >
-        <MoreHorizontal size={15} />
+        <MoreHorizontal strokeWidth={2.5} size={15} />
       </button>
       {menuOpen && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           {!isDetail && (
             <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-              <Bookmark size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
+              <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
               {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
             </button>
           )}
           {isOwner ? (
             <>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil size={11} /> Edit
+                <Pencil strokeWidth={2.5} size={11} /> Edit
               </button>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                <Trash2 size={11} />{deleting ? "Deleting…" : "Delete"}
+                <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           ) : (
             <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag size={11} />{reported ? "Reported" : "Report"}
+              <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}
             </button>
           )}
         </div>
@@ -279,12 +279,12 @@ export function ResourceCard({
                 aria-busy={saveBusy}
                 className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${resource.user_saved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
               >
-                {resource.user_saved ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+                {resource.user_saved ? <BookmarkCheck strokeWidth={2.5} size={13} /> : <Bookmark strokeWidth={2.5} size={13} />}
                 {resource.user_saved ? "Saved" : "Save"}
                 <span className="font-mono text-[10px]">{resource.save_count}</span>
               </button>
               <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover">
-                <ExternalLink size={13} />Open
+                <ExternalLink strokeWidth={2.5} size={13} />Open
               </a>
               {optionsMenu}
             </div>
@@ -295,7 +295,7 @@ export function ResourceCard({
           <>
             <h1 className="mt-3 font-display text-lg font-semibold leading-snug text-foreground">{resource.title}</h1>
             <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent">
-              <ExternalLink size={11} />{getDomain(resource.url)}
+              <ExternalLink strokeWidth={2.5} size={11} />{getDomain(resource.url)}
             </a>
             {resource.description && <p className="mt-4 whitespace-pre-wrap font-body text-sm leading-relaxed text-foreground-muted">{resource.description}</p>}
             {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
@@ -360,7 +360,7 @@ export function ResourceCard({
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
               <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <Heart size={20} strokeWidth={2} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
+                <Heart size={20} strokeWidth={2.5} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
                 <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}

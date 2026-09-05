@@ -18,6 +18,16 @@ service = "uxcommunity-web"
 [images]
 binding = "IMAGES"
 
+# Backing store for the Next.js data cache (unstable_cache), wired up in
+# open-next.config.ts. Without it the feed / lottie / master-data caches only
+# live in per-isolate memory, so every cold isolate recomputes the heavy home
+# feed RPC (~0.8–1.8s) and re-fetches Lottie payloads from R2 on each sidebar
+# load. Create the bucket once before deploying:
+#   wrangler r2 bucket create uxcommunity-web-next-cache
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "uxcommunity-web-next-cache"
+
 # Non-secret, public-by-design values used at runtime by server code.
 # Secrets (SESSION_SECRET, SUPABASE_SERVICE_ROLE_KEY, REALTIME_URL,
 # REALTIME_PUBLISH_SECRET, UPSTASH_REDIS_REST_URL/TOKEN, RESEND_API_KEY,

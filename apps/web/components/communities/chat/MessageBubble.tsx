@@ -1,16 +1,18 @@
 "use client";
 
-import { Fragment, useState, useRef, useEffect } from "react";
+import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import { AnimatedEmoji } from "./AnimatedEmoji";
 
-import type { CachedMessage, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
 import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
+import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { ModalPortal } from "@/components/ui/Modal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
@@ -30,6 +32,10 @@ interface MessageBubbleProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Opens the full-screen image viewer for a chat image URL. */
+  onImageClick: (url: string) => void;
+  /** Moderator (owner/admin with delete permission) may delete other members' messages. */
+  canModerate?: boolean;
   /** Play the entrance animation (bubble pop + word wave). Only for live arrivals. */
   animate?: boolean;
 }
@@ -114,7 +120,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup, onClick,
 }: {
   url: string;
   isMe: boolean;
@@ -124,6 +130,8 @@ function BubbleImage({
   createdAt?: string;
   status?: CachedMessage["status"];
   isFirstInGroup?: boolean;
+  /** Opens the image in the full-screen viewer. */
+  onClick?: () => void;
 }) {
   return (
     <div
@@ -146,11 +154,16 @@ function BubbleImage({
       <img
         src={url}
         alt="Image"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
         className={`block max-w-full object-cover ${
           standalone ? "" : "rounded-xl"
-        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""}`}
+        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
+        draggable={false}
       />
       {standalone && createdAt && !uploading && status !== "failed" && (
         <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5">
@@ -158,7 +171,7 @@ function BubbleImage({
             {fmtTime(createdAt)}
           </span>
           {isMe && (
-            <CheckCheck size={11} className="text-white/90" />
+            <CheckCheck strokeWidth={2.5} size={11} className="text-white/90" />
           )}
         </div>
       )}
@@ -171,7 +184,7 @@ function BubbleImage({
               className="absolute inset-0 flex items-center justify-center text-white"
               aria-label="Cancel upload"
             >
-              <X size={14} />
+              <X strokeWidth={2.5} size={14} />
             </button>
           </div>
         </div>
@@ -191,7 +204,7 @@ function RetryIndicator({ onRetry }: { onRetry: () => void }) {
         aria-label="Retry sending"
         title="Tap to retry"
       >
-        <RefreshCw size={13} />
+        <RefreshCw strokeWidth={2.5} size={13} />
       </button>
       <span className="font-body text-[9px] text-red-400 leading-none">Retry</span>
     </div>
@@ -213,8 +226,9 @@ function DeleteConfirmDialog({
 }) {
   // Close on backdrop click
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
     >
       <div
@@ -247,6 +261,7 @@ function DeleteConfirmDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -271,6 +286,7 @@ function MessageHoverActions({
   showMenu = true,
   insideBubble = false,
   dotsVisible = false,
+  canModerate = false,
 }: {
   msg: CachedMessage;
   isMe: boolean;
@@ -288,6 +304,8 @@ function MessageHoverActions({
   insideBubble?: boolean;
   /** Controls three-dot button visibility when insideBubble=true (proximity-based). */
   dotsVisible?: boolean;
+  /** Moderator may delete other members' messages. */
+  canModerate?: boolean;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -318,8 +336,16 @@ function MessageHoverActions({
     return () => document.removeEventListener("mousedown", handler);
   }, [pickerOpen]);
 
-  // No actions on deleted or still-sending messages
-  if (isDeleted || msg.status === "sending") return null;
+  // No actions on deleted messages
+  if (isDeleted) return null;
+
+  // While sending, render an invisible spacer that matches the reaction
+  // button's footprint so the bubble's available width doesn't change (and
+  // the text doesn't re-wrap) the moment the message flips to "sent".
+  if (msg.status === "sending") {
+    if (insideBubble || !showReaction) return null;
+    return <div aria-hidden className="w-7 h-7 shrink-0" />;
+  }
 
   return (
     <div
@@ -379,7 +405,7 @@ function MessageHoverActions({
             aria-label="React to message"
             title="React"
           >
-            <Smile size={14} />
+            <Smile strokeWidth={2.5} size={14} />
           </button>
         </div>
       )}
@@ -431,7 +457,7 @@ function MessageHoverActions({
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
             role="menuitem"
           >
-            <Reply size={14} className="text-foreground-muted shrink-0" />
+            <Reply strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
             <span>Reply</span>
           </button>
 
@@ -445,7 +471,7 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Copy size={14} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
               <span>Copy</span>
             </button>
           )}
@@ -460,12 +486,12 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Pencil size={14} className="text-foreground-muted shrink-0" />
+              <Pencil strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
               <span>Edit</span>
             </button>
           )}
 
-          {isMe && (
+          {(isMe || canModerate) && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
               <button
@@ -477,8 +503,8 @@ function MessageHoverActions({
                 className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition-colors"
                 role="menuitem"
               >
-                <Trash2 size={14} className="shrink-0" />
-                <span>Delete</span>
+                <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
+                <span>{isMe ? "Delete" : "Delete for everyone"}</span>
               </button>
             </>
           )}
@@ -558,13 +584,29 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
   return parts;
 }
 
+/** Highlighted chip for a `@Name` mention inside a message bubble. */
+function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
+  return (
+    <span
+      className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
+        isMe
+          ? "bg-black/25 text-accent-foreground"
+          : "bg-accent/15 text-accent"
+      }`}
+    >
+      {text}</span>
+  );
+}
+
 function MessageContent({
   content,
+  mentions,
   isMe,
   showPreview,
   animate = false,
 }: {
   content: string;
+  mentions: MessageMention[];
   isMe: boolean;
   showPreview: boolean;
   /** When true, each word rises into place with a staggered delay. */
@@ -572,38 +614,77 @@ function MessageContent({
 }) {
   const previewUrl = showPreview ? extractFirstUrl(content) : null;
 
+  // Mentions are matched against the raw text first (longest name wins), so
+  // exactly the stored mentions become chips and everything else — including
+  // hand-typed @words that were never picked — renders as plain text.
+  const segments = useMemo(
+    () => splitContentByMentions(content, mentions ?? []),
+    [content, mentions],
+  );
+
   let parts: React.ReactNode[];
 
   if (animate) {
-    // Split on whitespace (keeping the whitespace so pre-wrap newlines survive)
-    // and wrap every word in a span that carries its stagger index.
-    const tokens = content.split(/(\s+)/);
+    // Split each plain-text segment on whitespace (keeping the whitespace so
+    // pre-wrap newlines survive) and wrap every word in a span that carries
+    // its stagger index. Mention chips are whole tokens with a single index.
     let wordIdx = 0;
-    let offset = 0;
-    parts = tokens.map((tok) => {
-      const key = offset;
-      offset += tok.length;
-      if (!tok) return null;
-      if (/^\s+$/.test(tok)) return tok;
-      const i = wordIdx++;
-      return (
-        <span
-          key={key}
-          className="chat-word-in"
-          style={{ "--i": i } as React.CSSProperties}
-        >
-          {renderRichChunk(tok, isMe, key)}
-        </span>
-      );
-    });
+    let keyIdx = 0;
+    parts = [];
+    for (const segment of segments) {
+      if (segment.mention) {
+        const i = wordIdx++;
+        const key = keyIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            <MentionChip text={segment.text} isMe={isMe} />
+          </span>,
+        );
+        continue;
+      }
+      const tokens = segment.text.split(/(\s+)/);
+      for (const tok of tokens) {
+        const key = keyIdx++;
+        if (!tok) continue;
+        if (/^\s+$/.test(tok)) {
+          parts.push(tok);
+          continue;
+        }
+        const i = wordIdx++;
+        parts.push(
+          <span
+            key={key}
+            className="chat-word-in"
+            style={{ "--i": i } as React.CSSProperties}
+          >
+            {renderRichChunk(tok, isMe, key)}
+          </span>,
+        );
+      }
+    }
   } else {
-    parts = renderRichChunk(content, isMe, 0);
+    parts = [];
+    let keyIdx = 0;
+    for (const segment of segments) {
+      if (segment.mention) {
+        parts.push(
+          <MentionChip key={keyIdx++} text={segment.text} isMe={isMe} />,
+        );
+      } else if (segment.text) {
+        parts.push(...renderRichChunk(segment.text, isMe, keyIdx));
+        keyIdx += segment.text.length;
+      }
+    }
   }
 
   return (
     <>
       <div
-        className={`font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words ${
+        className={`chat-message-text font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
           isMe ? "text-accent-foreground" : "text-foreground"
         }`}
       >
@@ -658,7 +739,7 @@ function DeletedBubble({
           className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
         />
       )}
-      <Ban size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
@@ -669,7 +750,13 @@ function DeletedBubble({
   );
 }
 
-export function MessageBubble({
+/**
+ * Memoized so a parent re-render (typing in the input, the 1s typing-indicator
+ * tick, presence updates) doesn't re-render every bubble in the chat — the
+ * handlers are useCallback-stable and message objects are referentially
+ * stable, so unchanged bubbles bail out of reconciliation entirely.
+ */
+export const MessageBubble = memo(function MessageBubble({
   msg,
   isMe,
   isSameAuthor,
@@ -685,6 +772,8 @@ export function MessageBubble({
   onEdit,
   onCopy,
   onDelete,
+  onImageClick,
+  canModerate = false,
   animate = false,
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -692,14 +781,22 @@ export function MessageBubble({
   const [nearBubble, setNearBubble] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
-  /** Show three-dot button when mouse is within the bubble area. */
+  /**
+   * Show three-dot button when the mouse is anywhere over the bubble (with a
+   * small margin), plus a bit of runway on the reaction-button side so the
+   * dots stay visible while moving between the bubble and the emoji button.
+   * Using the full bubble rect (not just a fixed band near one edge) means
+   * wide, multi-line bubbles behave the same as short ones.
+   */
   function handleRowMouseMove(e: React.MouseEvent) {
     if (!bubbleRef.current) return;
     const r = bubbleRef.current.getBoundingClientRect();
-    const withinX = isMe
-      ? e.clientX >= r.left - 150 && e.clientX <= r.left + 150
-      : e.clientX >= r.right - 150 && e.clientX <= r.right + 150;
-    const withinY = e.clientY >= r.top - 4 && e.clientY <= r.bottom + 4;
+    const PAD = 8;
+    const REACH = 48; // room for the reaction button beside the bubble
+    const minX = isMe ? r.left - REACH : r.left - PAD;
+    const maxX = isMe ? r.right + PAD : r.right + REACH;
+    const withinX = e.clientX >= minX && e.clientX <= maxX;
+    const withinY = e.clientY >= r.top - PAD && e.clientY <= r.bottom + PAD;
     setNearBubble(withinX && withinY);
   }
 
@@ -720,7 +817,15 @@ export function MessageBubble({
     !!msg.content &&
     isEmojiOnly(msg.content);
 
-  const rowHighlight = highlighted ? "bg-black/60" : "";
+  // Inline style: Tailwind does not emit color-mix() for arbitrary CSS-var
+  // utilities with an opacity modifier (bg-[var(--x)]/25 never compiles), so
+  // the translucent blue row flash is applied directly.
+  const rowHighlightStyle: React.CSSProperties | undefined = highlighted
+    ? {
+        backgroundColor:
+          "color-mix(in srgb, var(--ds-blue-700) 25%, transparent)",
+      }
+    : undefined;
   const isFirstInGroup = !isSameAuthor;
 
   const handleDeleteConfirm = () => {
@@ -743,7 +848,8 @@ export function MessageBubble({
       )}
       <div
         data-message-id={msg.id}
-        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${rowHighlight} ${
+        style={rowHighlightStyle}
+        className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
           isMe ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
         onMouseMove={handleRowMouseMove}
@@ -786,10 +892,10 @@ export function MessageBubble({
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
-                      <Clock size={10} className="text-foreground-muted/60 animate-pulse" />
+                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck size={11} className="text-foreground-muted/70" />
+                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -810,14 +916,15 @@ export function MessageBubble({
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
+                canModerate={canModerate}
               />
             </div>
           ) : (
             /* ── Normal bubble ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
               {failed && <RetryIndicator onRetry={() => onRetrySend(msg.id)} />}
-              {/* Entrance animation lives on this wrapper (not the bubble) so the
-                  bubble's own opacity classes for sending/failed states stay intact. */}
+                  {/* Entrance animation lives on this wrapper (not the bubble) so the
+                      bubble's own state classes (e.g. failed) stay intact. */}
               <div
                 className={`relative min-w-0 ${animate ? "chat-bubble-in" : ""}`}
                 data-side={isMe ? "right" : "left"}
@@ -831,9 +938,7 @@ export function MessageBubble({
                       ? "flex flex-col items-start"
                       : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
                           isMe
-                            ? msg.status === "sending"
-                              ? "bg-[var(--ds-blue-700)] opacity-70 [--color-accent-foreground:white]"
-                              : msg.status === "failed"
+                            ? msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
                             : "bg-surface-raised"
@@ -861,11 +966,13 @@ export function MessageBubble({
                       status={msg.status}
                       isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
+                      onClick={() => onImageClick(imageUrl)}
                     />
                   )}
                   {msg.content && (
                     <MessageContent
                       content={msg.content}
+                      mentions={msg.mentions ?? []}
                       isMe={isMe}
                       showPreview={msg.status !== "failed"}
                       animate={animate}
@@ -884,10 +991,10 @@ export function MessageBubble({
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock size={10} className="text-accent-foreground opacity-60 animate-pulse" />
+                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck size={11} className="text-accent-foreground opacity-70" />
+                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>
@@ -909,6 +1016,7 @@ export function MessageBubble({
                     showReaction={false}
                     insideBubble
                     dotsVisible={nearBubble}
+                    canModerate={canModerate}
                   />
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
@@ -927,6 +1035,7 @@ export function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 showMenu={false}
+                canModerate={canModerate}
               />
             </div>
           )}
@@ -935,4 +1044,4 @@ export function MessageBubble({
       </div>
     </Fragment>
   );
-}
+});

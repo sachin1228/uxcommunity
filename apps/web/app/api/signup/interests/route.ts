@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
+import { MAX_DESIGN_INTERESTS } from "@/lib/interests";
 
 const schema = z.object({
-  interest_ids: z.array(z.string().uuid()).min(0),
+  interest_ids: z
+    .array(z.string().uuid())
+    .min(0)
+    .max(MAX_DESIGN_INTERESTS, `You can select up to ${MAX_DESIGN_INTERESTS} topics.`),
 });
 
 export async function POST(request: NextRequest) {

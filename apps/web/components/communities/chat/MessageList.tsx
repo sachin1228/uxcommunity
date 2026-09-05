@@ -1,13 +1,14 @@
 "use client";
 
-import { RefObject, useMemo, useRef } from "react";
-import { LottieLoader } from "@/components/ui/LottieLoader";
+import { RefObject, memo, useMemo, useRef } from "react";
+// Disabled for now: chat loading uses the plain Spinner below.
+// import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
 import { fmtDate } from "./chatUtils";
-import { CommunityIcon } from "../CommunityIcon";
+import { CommunityDp } from "../CommunityDp";
 import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
@@ -17,6 +18,9 @@ interface Community {
   name: string;
   type: string;
   image_url: string | null;
+  lottie_url?: string | null;
+  lottie_format?: "json" | "dotlottie" | null;
+  lottie_data?: unknown;
 }
 
 interface DateGroup {
@@ -54,6 +58,8 @@ interface MessageListProps {
   displayCommunity: Community | null;
   communityId: string;
   highlightedMsgId: string | null;
+  /** Moderator (owner/admin with delete permission) may delete other members' messages. */
+  canModerateMessages?: boolean;
   onReplyClick: (replyId: string) => void;
   onCancelSend: (msgId: string) => void;
   onRetrySend: (msgId: string) => void;
@@ -62,9 +68,18 @@ interface MessageListProps {
   onEdit: (msg: CachedMessage) => void;
   onCopy: (msg: CachedMessage) => void;
   onDelete: (msgId: string) => void;
+  /** Opens the full-screen image viewer for a chat image URL. */
+  onImageClick: (url: string) => void;
 }
 
-export function MessageList({
+/**
+ * Memoized so typing in the chat input (a CommunityChat state change) doesn't
+ * re-render the whole list: `grouped`, `threadEvents`, the refs, and every
+ * handler are referentially stable between keystrokes, so the message map is
+ * skipped entirely — unchanged bubbles already bail out individually via
+ * MessageBubble's memo.
+ */
+export const MessageList = memo(function MessageList({
   grouped,
   threadEvents,
   currentUserId,
@@ -81,6 +96,7 @@ export function MessageList({
   displayCommunity,
   communityId,
   highlightedMsgId,
+  canModerateMessages = false,
   onReplyClick,
   onCancelSend,
   onRetrySend,
@@ -89,6 +105,7 @@ export function MessageList({
   onEdit,
   onCopy,
   onDelete,
+  onImageClick,
 }: MessageListProps) {
   // Merge messages + thread events into date-grouped timeline items.
   const mergedGroups = useMemo<MergedGroup[]>(() => {
@@ -177,13 +194,20 @@ export function MessageList({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div
+        className="flex h-full items-center justify-center"
+        role="status"
+        aria-label="Loading messages"
+      >
+        {/* Disabled temporarily. Re-enable this block to restore the chat Lottie.
         <LottieLoader
           communityId={communityId}
           communityType={displayCommunity?.type ?? ""}
           size={200}
           showFallback={false}
-        />
+        /> */}
+        <Spinner size={28} />
+        <span className="sr-only">Loading messages</span>
       </div>
     );
   }
@@ -218,18 +242,15 @@ export function MessageList({
           but no chat messages while the thread fetch is still in flight.     */}
       {mergedGroups.length === 0 && threadsReady && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
-          <div className="h-12 w-12 rounded-full bg-surface-raised flex items-center justify-center text-2xl overflow-hidden shrink-0">
-            {displayCommunity?.image_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={displayCommunity.image_url}
-                alt={displayCommunity.name}
-                className="h-12 w-12 rounded-full object-cover"
-              />
-            ) : (
-              <CommunityIcon size={48} className="bg-surface-raised" />
-            )}
-          </div>
+          <CommunityDp
+            imageUrl={displayCommunity?.image_url ?? null}
+            lottieUrl={displayCommunity?.lottie_url}
+            lottieFormat={displayCommunity?.lottie_format}
+            lottieData={displayCommunity?.lottie_data}
+            name={displayCommunity?.name ?? ""}
+            size={48}
+            className="bg-surface-raised"
+          />
           <p className="font-body text-sm text-foreground-muted text-center">
             Welcome to{" "}
             <span className="font-medium text-foreground">
@@ -266,7 +287,7 @@ export function MessageList({
               </div>
             )}
 
-            {group.items.map((item) => {
+            {group.items.map((item, itemIdx) => {
               if (item.kind === "thread") {
                 // Thread notifications break the "same author" run for messages.
                 prevItem = null;
@@ -283,9 +304,25 @@ export function MessageList({
               // message item
               const msg = item.msg;
               const isMe = msg.user_id === currentUserId;
+              // The message at the very top of the loaded window is the avatar
+              // equivalent of the oldest date group's pill: while more history
+              // may exist above, whether it *starts* an author run is only a
+              // guess — the run could continue into the unloaded messages above.
+              // Rendering the group header (dp + name + bubble tail) there would
+              // make it "float": every time an older page is prepended and the
+              // run extends further up, the header jumps to the earlier message
+              // and every row below reflows (layout shift). So while history may
+              // exist above we render the topmost message as a plain
+              // continuation, and only give it a header once the real
+              // predecessor is loaded — either hasMoreAbove turns false (the
+              // true start of the history) or a genuine different-author /
+              // thread item now actually precedes it.
+              const isWindowTopMessage =
+                groupIdx === 0 && itemIdx === 0 && item.kind === "message";
               const isSameAuthor =
-                prevItem?.kind === "message" &&
-                prevItem.msg.user_id === msg.user_id;
+                (isWindowTopMessage && hasMoreAbove) ||
+                (prevItem?.kind === "message" &&
+                  prevItem.msg.user_id === msg.user_id);
               prevItem = item;
               const isFirstUnread = firstUnreadMsgId !== null && msg.id === firstUnreadMsgId;
               const dividerNode = isFirstUnread ? (
@@ -310,6 +347,8 @@ export function MessageList({
                   onEdit={onEdit}
                   onCopy={onCopy}
                   onDelete={onDelete}
+                  onImageClick={onImageClick}
+                  canModerate={canModerateMessages && !isMe}
                   animate={animateIdsRef.current.has(msg.id)}
                 />
               );
@@ -321,4 +360,4 @@ export function MessageList({
       <div ref={bottomRef} />
     </div>
   );
-}
+});

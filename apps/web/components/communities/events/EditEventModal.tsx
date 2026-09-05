@@ -3,8 +3,9 @@
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import type { CommunityEvent } from "./types";
-import { compressChatImageClient, compressedFile } from "@/lib/image-client";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface EditEventModalProps {
   event: CommunityEvent;
@@ -55,10 +56,16 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     setError(null);
     try {
       const form = new FormData();
-      try {
-        form.append("file", compressedFile(await compressChatImageClient(file), file));
-      } catch {
+      if (file.type === "image/gif") {
+        // Animated GIFs pass through untouched — compressing them would flatten
+        // the animation into a static frame.
         form.append("file", file);
+      } else {
+        try {
+          form.append("file", compressedFile(await compressImage(file), file));
+        } catch {
+          form.append("file", file);
+        }
       }
       const res = await fetch(`/api/communities/${communityId}/events/upload`, { method: "POST", body: form });
       const data = await res.json();
@@ -112,8 +119,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-event-title"
@@ -131,7 +139,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             <p className="mt-1 font-body text-sm text-foreground-muted">Update event details.</p>
           </div>
           <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X size={20} />
+            <X strokeWidth={2.5} size={20} />
           </button>
         </div>
 
@@ -151,7 +159,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                   className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                   aria-label="Remove cover image"
                 >
-                  <X size={12} />
+                  <X strokeWidth={2.5} size={12} />
                 </button>
               </div>
             ) : (
@@ -161,7 +169,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 onClick={() => imageInputRef.current?.click()}
                 className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-raised text-foreground-muted hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {imageUploading ? <Spinner size={20} /> : <ImagePlus size={20} />}
+                {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
                 <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
                 <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
               </button>
@@ -201,14 +209,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Calendar size={11} /> Start date <span className="text-accent">*</span>
+                <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
               </span>
               <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Clock size={11} /> Start time <span className="text-accent">*</span>
+                <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
               </span>
               <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)}
                 className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
@@ -234,7 +242,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
 
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2">
-              <Video size={15} className="text-foreground-muted" />
+              <Video strokeWidth={2.5} size={15} className="text-foreground-muted" />
               <span>
                 <span className="block font-body text-sm font-medium text-foreground">Online event</span>
                 <span className="block font-body text-xs text-foreground-muted">Happening virtually via a meeting link.</span>
@@ -249,7 +257,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           {isOnline ? (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
@@ -258,7 +266,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           ) : (
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input value={location} onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
@@ -268,7 +276,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
 
           <label className="block">
             <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
+              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional)</span>
             </span>
             <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="Leave blank for unlimited"
@@ -277,7 +285,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
 
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
             <span className="flex items-center gap-2.5">
-              <Globe size={15} className="shrink-0 text-foreground-muted" />
+              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
               <span>
                 <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
                 <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
@@ -298,11 +306,12 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">Cancel</button>
           <button type="submit" disabled={saving}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">
-            {saving ? <Spinner size={15} className="text-white" /> : <Check size={15} />}
+            {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
         </div>
       </form>
     </div>
+    </ModalPortal>
   );
 }

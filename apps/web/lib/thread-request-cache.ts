@@ -28,27 +28,16 @@ function keyFor(url: string, userId: string) {
   return `${userId}:${parsed.pathname}${parsed.search}`
 }
 
-function debugCache(url: string, source: "cache" | "ssr", ageMs: number) {
-  if (process.env.NODE_ENV !== "development") return
-  console.debug(`[THREAD CACHE]\n${url}\nsource: ${source}\nage: ${Math.floor(ageMs / 1000)}s`)
-}
-
-function debugNetwork(reason: "miss" | "stale" | "forced") {
-  if (process.env.NODE_ENV !== "development") return
-  console.debug(`[THREAD NETWORK]\nreason: ${reason}`)
-}
-
 function store<T>(key: string, value: T, fetchedAt = Date.now()) {
   entries.delete(key)
   entries.set(key, { value, fetchedAt })
   while (entries.size > MAX_ENTRIES) entries.delete(entries.keys().next().value!)
 }
 
-async function request<T>(url: string, key: string, reason: "miss" | "stale" | "forced") {
+async function request<T>(url: string, key: string) {
   const pending = inFlight.get(key) as Promise<T> | undefined
   if (pending) return pending
 
-  debugNetwork(reason)
   const promise = fetch(url, { cache: "no-store" })
     .then(async (response) => {
       const body = await response.json().catch(() => null)
@@ -75,19 +64,17 @@ export async function fetchThreadResource<T>(url: string, options: ReadOptions<T
   const stale = age >= THREAD_CACHE_TTL_MS[options.kind]
 
   if (!options.force && cached && !stale) {
-    debugCache(url, "cache", age)
     return cached.value
   }
 
   if (!options.force && cached) {
-    debugCache(url, "cache", age)
-    void request<T>(url, key, "stale")
+    void request<T>(url, key)
       .then((value) => options.onRevalidated?.(value))
       .catch(() => undefined)
     return cached.value
   }
 
-  return request<T>(url, key, options.force ? "forced" : "miss")
+  return request<T>(url, key)
 }
 
 export function seedThreadResource<T>(url: string, value: T, userId: string) {
@@ -95,7 +82,6 @@ export function seedThreadResource<T>(url: string, value: T, userId: string) {
   const current = entries.get(key)
   if (current) return
   store(key, value)
-  debugCache(url, "ssr", 0)
 }
 
 export function getThreadResource<T>(url: string, userId: string): T | undefined {

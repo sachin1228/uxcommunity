@@ -7,9 +7,9 @@ import {
   restoreSidebarEntry,
   sidebarStore,
 } from "@/lib/communities/cache";
-import type { CachedMessage, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
-import { compressChatImageClient, compressedFile } from "@/lib/image-client";
+import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
 
 type Message = CachedMessage;
 
@@ -24,6 +24,8 @@ interface UseSendMessageOptions {
   onClearReply: () => void;
   /** Ref to the bottom sentinel — scrolled into view instantly on every send. */
   scrollToBottomRef: React.RefObject<HTMLDivElement>;
+  /** Resolves the members @mentioned in the final text (composer registry). */
+  resolveMentions?: (content: string) => MessageMention[];
 }
 
 type RetryData = {
@@ -42,7 +44,19 @@ export function useSendMessage({
   replyTo,
   onClearReply,
   scrollToBottomRef,
+  resolveMentions,
 }: UseSendMessageOptions) {
+  // Stable-ish helper: mentions only exist while there is text to mention in.
+  const mentionResolverRef = useRef(resolveMentions);
+  useEffect(() => {
+    mentionResolverRef.current = resolveMentions;
+  }, [resolveMentions]);
+  const resolveMentionsFor = (content: string): MessageMention[] => {
+    const trimmed = content.trim();
+    return trimmed && mentionResolverRef.current
+      ? mentionResolverRef.current(trimmed)
+      : [];
+  };
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +72,14 @@ export function useSendMessage({
   // still in flight would otherwise fire a duplicate POST. This ref stays
   // locked until the request fully settles (success or failure).
   const sendLockRef = useRef(false);
+
+  // Mirror of `sending` kept in a ref so handleRetrySend's guard can read it
+  // without depending on the state value (which would recreate the callback on
+  // every send and defeat MessageBubble's memoization).
+  const sendingRef = useRef(sending);
+  useEffect(() => {
+    sendingRef.current = sending;
+  }, [sending]);
 
   // Stores retry data (file + content + replyTo) keyed by tempId so failed
   // messages can be retried without losing the original payload.
@@ -175,6 +197,8 @@ export function useSendMessage({
       replyTo: msgReplyTo,
     });
 
+    const mentions = resolveMentionsFor(content);
+
     const optimistic: Message = {
       id: tempId,
       content,
@@ -185,6 +209,7 @@ export function useSendMessage({
       reactions: [],
       reply_to: msgReplyTo ?? null,
       image_url: imagePreviewUrl,
+      mentions,
     };
 
     setMessages((prev) => {
@@ -235,16 +260,7 @@ export function useSendMessage({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const sendStartedAt = performance.now();
-    const clientTimings: Record<string, number> = {};
-    const measureClient = async <T,>(name: string, operation: () => Promise<T>) => {
-      const startedAt = performance.now();
-      try {
-        return await operation();
-      } finally {
-        clientTimings[name] = Math.round((performance.now() - startedAt) * 100) / 100;
-      }
-    };
+    const runClientOperation = <T,>(operation: () => Promise<T>) => operation();
 
     try {
       let uploadedImageUrl: string | null = null;
@@ -252,9 +268,9 @@ export function useSendMessage({
       if (imageFile) {
         // Compress on the client (canvas → WebP); the upload route stores the
         // bytes as-is since server-side Sharp is unavailable on Workers.
-        const fileToSend = await measureClient("client_compression", async () => {
+        const fileToSend = await runClientOperation(async () => {
           try {
-            return compressedFile(await compressChatImageClient(imageFile), imageFile);
+            return compressedFile(await compressImage(imageFile), imageFile);
           } catch {
             return imageFile;
           }
@@ -262,7 +278,7 @@ export function useSendMessage({
         const fd = new FormData();
         fd.append("file", fileToSend);
 
-        const uploadRes = await measureClient("image_upload_request", () =>
+        const uploadRes = await runClientOperation(() =>
           fetch(
             `/api/communities/${communityId}/messages/upload`,
             { method: "POST", body: fd, signal: abortController.signal },
@@ -292,7 +308,16 @@ export function useSendMessage({
         uploadedImageUrl = uploadedUrl;
       }
 
-      const res = await measureClient("message_create_request", () =>
+      // Warm the browser cache for the uploaded image while the message POST is
+      // in flight. The optimistic bubble is showing the local blob URL — swapping
+      // the <img> src to the network URL before it has loaded collapses the
+      // bubble into a blank frame for a split second. Preloading (and awaiting it
+      // before the merge below) makes the blob → network transition seamless.
+      const imagePreload = uploadedImageUrl
+        ? preloadImage(uploadedImageUrl)
+        : null;
+
+      const res = await runClientOperation(() =>
         dedupeFetch(`/api/communities/${communityId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -300,6 +325,7 @@ export function useSendMessage({
             content,
             reply_to_id: msgReplyTo?.id ?? null,
             image_url: uploadedImageUrl,
+            mentions: mentions.map((m) => ({ user_id: m.user_id })),
           }),
           signal: abortController.signal,
         }),
@@ -316,23 +342,31 @@ export function useSendMessage({
           throw new Error("Server returned success without a message.");
         }
 
+        // Ensure the uploaded image is decoded before swapping it into the
+        // message, so the blob → network URL transition never flashes an empty
+        // bubble. (Preload resolves on failure too, so this can't hang.)
+        if (imagePreload) await imagePreload;
+
         setMessages((prev) => {
           // The server returns a bare insert (users: null, reply_to: null) to
           // avoid expensive post-insert DB fetches. Merge it over the optimistic
           // message so we preserve the sender's name/avatar and reply preview
-          // that the client already had.
+          // that the client already had. When Realtime beat the API response,
+          // the real entry already carries those fields (and the blob URL) —
+          // merge on top of it instead of the removed optimistic bubble.
           const optimistic = prev.find((m) => m.id === tempId);
+          const existing   = prev.find((m) => m.id === message.id);
 
           const merged: Message = {
-            ...(optimistic ?? {}),
+            ...(existing ?? optimistic ?? {}),
             ...message,
-            users:     message.users    ?? optimistic?.users    ?? null,
-            reply_to:  message.reply_to ?? optimistic?.reply_to ?? null,
-            image_url: message.image_url ?? optimistic?.image_url ?? null,
+            users:     message.users    ?? existing?.users    ?? optimistic?.users    ?? null,
+            reply_to:  message.reply_to ?? existing?.reply_to ?? optimistic?.reply_to ?? null,
+            image_url: message.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
             status: "sent" as const,
           };
 
-          if (prev.some((m) => m.id === message.id)) {
+          if (existing) {
             // Realtime beat the API response — update the existing real entry.
             const next = prev
               .filter((m) => m.id !== tempId)
@@ -406,10 +440,6 @@ export function useSendMessage({
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllerRef.current = null;
-      if (process.env.NODE_ENV === "development") {
-        clientTimings.total_send = Math.round((performance.now() - sendStartedAt) * 100) / 100;
-        console.debug("[client-timing] community message send", clientTimings);
-      }
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }
@@ -460,7 +490,7 @@ export function useSendMessage({
    */
   const handleRetrySend = useCallback(async (failedTempId: string) => {
     const retryData = failedRetryDataRef.current.get(failedTempId);
-    if (!retryData || sending || sendLockRef.current) return;
+    if (!retryData || sendingRef.current || sendLockRef.current) return;
 
     sendLockRef.current = true;
 
@@ -493,7 +523,7 @@ export function useSendMessage({
       sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, sending, setMessages]);
+  }, [communityId, setMessages]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -525,6 +555,7 @@ export function useSendMessage({
       reactions: [],
       reply_to: null,
       image_url: gifUrl,
+      mentions: [],
     };
 
     setMessages((prev) => {
@@ -567,7 +598,7 @@ export function useSendMessage({
       const res = await dedupeFetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "", image_url: gifUrl }),
+        body: JSON.stringify({ content: "", image_url: gifUrl, mentions: [] }),
       });
 
       const data = await res.json().catch(() => ({}));

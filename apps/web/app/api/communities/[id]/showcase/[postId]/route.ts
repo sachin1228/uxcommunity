@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
 
@@ -83,6 +84,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!title || title.length > 120 || !imageUrl || imageUrl.length > 2048 || !CATEGORIES.has(category)) return NextResponse.json({ error: "One or more showcase fields are invalid." }, { status: 422 });
   const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, category, is_public: isPublic, allow_replies: allowReplies }).eq("id", postId).eq("user_id", userId).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
+
+  if (shouldDeletePreviousR2Asset(existing.image_url ?? null, imageUrl) && existing.image_url) {
+    await deleteOwnedR2AssetIfUnique(db, existing.image_url, [
+      { table: "community_showcase_posts", column: "image_url" },
+    ]);
+  }
+
   return NextResponse.json({ post: await enrich(db, data, userId) });
 }
 
@@ -94,5 +102,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
   const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+
+  await deleteR2AssetIfUnreferenced(db, existing.image_url, [
+    { table: "community_showcase_posts", column: "image_url" },
+  ]);
+
   return new NextResponse(null, { status: 204 });
 }

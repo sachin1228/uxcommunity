@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 
 async function enrichOne(
   db: ReturnType<typeof createServiceClient>,
@@ -152,6 +153,12 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const previousUrl = existing?.cover_image_url ?? null;
+  const nextUrl = data?.cover_image_url ?? null;
+  if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
+    await deleteOwnedR2AssetIfUnique(db, previousUrl, [{ table: "community_events", column: "cover_image_url" }]);
+  }
+
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
   ]);
@@ -184,8 +191,18 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
 
+  const { data: eventRow } = await db
+    .from("community_events")
+    .select("id, cover_image_url")
+    .eq("id", eventId)
+    .maybeSingle();
+
   const { error } = await db.from("community_events").delete().eq("id", eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await deleteR2AssetIfUnreferenced(db, eventRow?.cover_image_url, [
+    { table: "community_events", column: "cover_image_url" },
+  ]);
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },

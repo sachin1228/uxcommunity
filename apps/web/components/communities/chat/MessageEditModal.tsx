@@ -55,7 +55,7 @@ export function MessageEditModal({
             className="rounded-full p-1 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close edit message dialog"
           >
-            <X size={25} strokeWidth={2} />
+            <X size={25} strokeWidth={2.5} />
           </button>
           <h2 className="font-body text-lg font-medium text-foreground">Edit message</h2>
         </div>
@@ -75,7 +75,7 @@ export function MessageEditModal({
             </p>
             <div className="mt-1 flex items-center justify-end gap-1 text-accent-foreground opacity-60">
               <span className="font-mono text-[10px]">{fmtTime(message.created_at)}</span>
-              <CheckCheck size={12} />
+              <CheckCheck strokeWidth={2.5} size={12} />
             </div>
           </div>
         </div>
@@ -104,7 +104,7 @@ export function MessageEditModal({
               aria-label="Add emoji"
               title="Add emoji"
             >
-              <Smile size={21} />
+              <Smile strokeWidth={2.5} size={21} />
             </button>
             <button
               type="button"
@@ -114,7 +114,7 @@ export function MessageEditModal({
               aria-label="Save edited message"
               title="Save edit"
             >
-              <Check size={23} strokeWidth={3} />
+              <Check size={23} strokeWidth={2.5} />
             </button>
           </div>
         </div>

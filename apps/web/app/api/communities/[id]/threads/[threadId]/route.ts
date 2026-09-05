@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { moderateText } from "@/lib/moderation/text";
+import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique } from "@/lib/r2";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
@@ -160,6 +161,26 @@ export async function PATCH(
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }
 
+  const oldUrls = Array.isArray(existing.attachments)
+    ? (existing.attachments as Array<{ url?: string }>).map((attachment) => attachment?.url ?? null)
+    : [];
+  const newUrls = Array.isArray(attachments)
+    ? attachments.map((attachment) => attachment.url ?? null)
+    : [];
+  for (const previousUrl of oldUrls) {
+    if (!previousUrl) continue;
+    const stillUsed = newUrls.some((nextUrl) => previousUrl === nextUrl);
+    if (!stillUsed) {
+      await deleteOwnedR2AssetIfUnique(db, previousUrl, [{
+        table: "community_threads",
+        column: "attachments",
+        getUrls: (value) => Array.isArray(value)
+          ? value.flatMap((attachment) => attachment && typeof attachment === "object" && typeof attachment.url === "string" ? [attachment.url] : [])
+          : [],
+      }]);
+    }
+  }
+
   void publishRealtimeBatch([
     {
       room: realtimeRooms.threads(communityId),
@@ -207,8 +228,25 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Thread not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own threads." }, { status: 403 });
 
+  const { data: threadRow } = await db
+    .from("community_threads")
+    .select("id, attachments")
+    .eq("id", threadId)
+    .maybeSingle();
+
   const { error } = await db.from("community_threads").delete().eq("id", threadId);
   if (error) { console.error("[DELETE thread]", error); return NextResponse.json({ error: "Failed to delete thread." }, { status: 500 }); }
+
+  const attachments = Array.isArray(threadRow?.attachments) ? threadRow.attachments as Array<{ url?: string }> : [];
+  for (const attachment of attachments) {
+    await deleteR2AssetIfUnreferenced(db, attachment?.url, [{
+      table: "community_threads",
+      column: "attachments",
+      getUrls: (value) => Array.isArray(value)
+        ? value.flatMap((item) => item && typeof item === "object" && typeof item.url === "string" ? [item.url] : [])
+        : [],
+    }]);
+  }
 
   void publishRealtimeBatch([
     {

@@ -86,7 +86,7 @@ function Composer({
           {saving ? (
             <Spinner size={13} className="text-white" />
           ) : (
-            <Send size={13} />
+            <Send strokeWidth={2.5} size={13} />
           )}
           Post
         </button>
@@ -148,7 +148,7 @@ function CommentRow({
               className="ml-auto text-foreground-subtle hover:text-red-400"
               aria-label="Delete comment"
             >
-              <Trash2 size={13} />
+              <Trash2 strokeWidth={2.5} size={13} />
             </button>
           )}
         </div>
@@ -161,7 +161,7 @@ function CommentRow({
             onClick={() => setReplying(!replying)}
             className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle"
           >
-            <CornerDownRight size={11} />
+            <CornerDownRight strokeWidth={2.5} size={11} />
             Reply
           </button>
         )}

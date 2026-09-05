@@ -28,6 +28,8 @@ interface MembersViewProps {
   communityId: string;
   currentUserId: string;
   isOwner?:    boolean;
+  /** Owner or admin granted "manage members" — may remove members & decide requests. */
+  canManageMembers?: boolean;
   isPrivate?:  boolean;
 }
 
@@ -46,7 +48,9 @@ function timeAgo(iso: string): string {
   return `${d}d ago`;
 }
 
-export function MembersView({ communityId, currentUserId, isOwner = false, isPrivate = false }: MembersViewProps) {
+export function MembersView({ communityId, currentUserId, isOwner = false, canManageMembers = false, isPrivate = false }: MembersViewProps) {
+  // Owners can do everything; admins act within their granted permissions.
+  const manager = isOwner || canManageMembers;
   const requestUrl = `/api/communities/${communityId}/members?page=0`;
   const hydrated = getCachedRequest<{ members?: CommunityMember[]; has_more?: boolean }>(requestUrl, currentUserId);
   const cachedMembers = membersCache.get(communityId);
@@ -138,9 +142,9 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
     return () => ctrl.abort();
   }, [communityId, currentUserId, debouncedQ, requestUrl]);
 
-  // Fetch pending requests (owner + private only)
+  // Fetch pending requests (managers + private only)
   useEffect(() => {
-    if (!isOwner || !isPrivate) { setRequests([]); setRequestsLoaded(true); return; }
+    if (!manager || !isPrivate) { setRequests([]); setRequestsLoaded(true); return; }
     setRequestsLoading(true);
     fetch(`/api/communities/${communityId}/requests`)
       .then((r) => (r.ok ? r.json() : null))
@@ -150,7 +154,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
         setRequestsLoading(false);
       })
       .catch(() => { setRequestsLoaded(true); setRequestsLoading(false); });
-  }, [communityId, isOwner, isPrivate]);
+  }, [communityId, manager, isPrivate]);
 
   // Close menu on outside click
   useEffect(() => {
@@ -233,12 +237,17 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
     if (res.ok) setMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
+  const orderedMembers = [...members].sort((a, b) => {
+    const roleRank = (role: string) => role === "owner" ? 0 : role === "admin" ? 1 : 2;
+    return roleRank(a.role) - roleRank(b.role);
+  });
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Search */}
       <div className="px-5 py-3 shrink-0">
         <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+          <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -251,7 +260,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
 
       <div className="flex-1 overflow-y-auto">
         {/* Pending Requests section */}
-        {isOwner && isPrivate && (requestsLoading || (requestsLoaded && requests.length > 0)) && (
+        {manager && isPrivate && (requestsLoading || (requestsLoaded && requests.length > 0)) && (
           <div className="px-5 pb-2">
             <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-2">
               Pending Requests
@@ -283,7 +292,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Check size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
+                        <Check strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
                       </button>
                       <button
                         type="button"
@@ -291,7 +300,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                         disabled={busyRequestId === req.id}
                         className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <X size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
+                        <X strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
                       </button>
                     </div>
                   </li>
@@ -309,21 +318,28 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
           </div>
         ) : members.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
-            <Users size={32} className="opacity-30" />
+            <Users strokeWidth={2.5} size={32} className="opacity-30" />
             <p className="font-body text-sm">
               {debouncedQ ? "No members match your search." : "No members yet."}
             </p>
           </div>
         ) : (
           <>
-            {isOwner && !debouncedQ && (
+            {manager && !debouncedQ && (
               <p className="px-5 pt-1 pb-0.5 font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
                 Members
               </p>
             )}
-            <ul className="px-3 py-2" ref={isOwner ? menuRef : undefined}>
-              {members.map((member) => {
-                const isOwnerRow = member.role === "owner";
+            <ul className="px-3 py-2" ref={manager ? menuRef : undefined}>
+              {orderedMembers.map((member) => {
+                const isOwnerRow  = member.role === "owner";
+                const isAdminRow  = member.role === "admin";
+                // Owners may remove anyone except other owners / themselves.
+                // Admins may remove regular members only (never other admins).
+                const canRemoveRow =
+                  member.user_id !== currentUserId &&
+                  !isOwnerRow &&
+                  !(isAdminRow && !isOwner);
                 return (
                   <li
                     key={member.user_id}
@@ -335,11 +351,15 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                         <p className="font-body text-sm font-semibold text-foreground truncate leading-none">
                           {member.name}
                         </p>
-                        {isOwnerRow && (
+                        {isOwnerRow ? (
                           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
                             Owner
                           </span>
-                        )}
+                        ) : isAdminRow ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                            Admin
+                          </span>
+                        ) : null}
                       </div>
                       {member.designation && (
                         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
@@ -347,8 +367,8 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                         </span>
                       )}
                     </div>
-                    {/* Remove button — owner only, non-owner rows */}
-                    {isOwner && !isOwnerRow && (
+                    {/* Remove button — managers only, protected rows excluded */}
+                    {manager && canRemoveRow && (
                       <div className="relative shrink-0">
                         <button
                           type="button"
@@ -356,7 +376,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, isPri
                           className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
                           aria-label="Member options"
                         >
-                          <MoreHorizontal size={14} />
+                          <MoreHorizontal strokeWidth={2.5} size={14} />
                         </button>
                         {openMenuFor === member.user_id && (
                           <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">

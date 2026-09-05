@@ -72,7 +72,7 @@ export function ProfileHero({
             onClick={onOpenAvatarPicker}
             className="flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-accent hover:border-accent/40 transition-all mt-2"
           >
-            <Camera size={11} />
+            <Camera strokeWidth={2.5} size={11} />
             Change photo
           </button>
         </div>
@@ -94,7 +94,7 @@ export function ProfileHero({
 
           <div className="flex flex-col gap-1.5">
             <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-              <Mail size={11} /> Email
+              <Mail strokeWidth={2.5} size={11} /> Email
             </label>
             <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{email}</p>
           </div>
@@ -102,7 +102,7 @@ export function ProfileHero({
           {memberSince && (
             <div className="flex flex-col gap-1.5">
               <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar size={11} /> Member Since
+                <Calendar strokeWidth={2.5} size={11} /> Member Since
               </label>
               <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{memberSince}</p>
             </div>
