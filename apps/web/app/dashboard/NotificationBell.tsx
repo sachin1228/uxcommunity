@@ -235,11 +235,11 @@ export function NotificationBell({ userId }: Props) {
         aria-label={hasUnread ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="relative h-8 w-8 flex items-center justify-center rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+        className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-foreground-muted hover:bg-surface-raised hover:text-foreground"
       >
-        <Bell size={16} strokeWidth={2.5} />
-        {hasUnread && (
-          <span className="absolute -right-1 -top-1 min-w-4 h-4 rounded-full bg-red-500 px-1 text-[9px] font-semibold leading-4 text-white">
+        <Bell size={15} strokeWidth={2.5} />
+          {hasUnread && (
+            <span className="absolute -right-1 -top-1 min-w-3.5 h-3.5 rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white">
             {visibleCount}
           </span>
         )}

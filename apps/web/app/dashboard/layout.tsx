@@ -4,6 +4,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
+import { BrandLogo } from "@/components/ui/BrandLogo";
+import { NotificationBell } from "@/app/dashboard/NotificationBell";
+import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 
 
 export default async function DashboardLayout({
@@ -64,18 +67,25 @@ export default async function DashboardLayout({
   const sidebarUser = { name, email, avatarUrl, initial };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">
-      <div className="hidden h-full lg:block">
-        <GlobalSidebar userId={userId} user={sidebarUser} />
-      </div>
-
-      <div className="flex min-w-0 flex-1 flex-col bg-background-subtle">
-        <header className="flex h-12 shrink-0 items-center border-b border-border px-3 lg:hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+      <header className="flex h-[48px] shrink-0 items-center justify-between border-b border-border bg-background px-3 lg:px-5">
+        <div className="flex min-w-0 items-center gap-2">
           <MobileSidebar userId={userId} user={sidebarUser} />
-          <span className="ml-2 font-body text-sm font-medium text-foreground">
-            Menu
-          </span>
-        </header>
+          <BrandLogo
+            iconClassName="h-5 w-5"
+            wordmarkClassName="text-sm"
+          />
+        </div>
+        <div className="flex h-full items-center gap-2">
+          <NotificationBell userId={userId} />
+          <ProfileDropdown {...sidebarUser} />
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1">
+        <div className="hidden h-full lg:block">
+          <GlobalSidebar userId={userId} user={sidebarUser} />
+        </div>
 
         <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background-subtle">
           {children}

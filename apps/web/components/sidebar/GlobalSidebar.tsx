@@ -10,9 +10,7 @@ import { useSidebarCommunities } from "@/components/communities/panel/useSidebar
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
-import { NotificationBell } from "@/app/dashboard/NotificationBell";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
-import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 
 interface SidebarUser {
   name: string;
@@ -93,14 +91,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           }}
         />
       )}
-      <div className="flex h-[57px] shrink-0 items-center gap-[11px] px-[13px]">
-        <ProfileDropdown {...user} />
-        <p className="min-w-0 flex-1 truncate font-body text-base font-semibold text-foreground">
-          {user.name}
-        </p>
-        <NotificationBell userId={userId} />
-      </div>
-
       {!mobile && <BrowserNotificationInitializer />}
 
       <div className="min-h-0 flex-1 overflow-y-auto">

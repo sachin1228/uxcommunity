@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { LogOut, UserCircle } from "lucide-react";
+import { Compass, Library, LogOut, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
@@ -28,13 +28,13 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
       <button
         ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
-        className="h-8 w-8 rounded-full overflow-hidden shrink-0 focus:outline-none"
+        className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border focus:outline-none"
         aria-label="Profile menu"
       >
         {avatarUrl ? (
-          <AvatarImg url={avatarUrl} name={name} size={32} className="h-8 w-8 rounded-full object-cover" />
+          <AvatarImg url={avatarUrl} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
         ) : (
-          <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center select-none">
+          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center select-none">
             <span className="font-display text-xs font-semibold text-accent-foreground">
               {initial}
             </span>
@@ -48,42 +48,48 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
         open={open}
         onClose={() => setOpen(false)}
         align="right"
-        className="w-56"
+        className="w-48"
       >
-        {/* User info header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.08]">
-          <div className="h-9 w-9 rounded-full overflow-hidden shrink-0">
-            {avatarUrl ? (
-              <AvatarImg url={avatarUrl} name={name} size={36} className="h-9 w-9 rounded-full object-cover" />
-            ) : (
-              <div className="h-9 w-9 rounded-full bg-accent flex items-center justify-center select-none">
-                <span className="font-display text-sm font-semibold text-accent-foreground">{initial}</span>
-              </div>
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="font-body text-sm font-medium text-foreground truncate">{name}</p>
-            <p className="font-body text-[11px] text-foreground-muted truncate">{email}</p>
-          </div>
+        <div className="border-b border-border px-3.5 py-3">
+          <p className="truncate font-body text-sm font-medium leading-tight text-foreground">{name}</p>
+          <p className="mt-1 truncate font-body text-xs leading-tight text-foreground-muted">{email}</p>
         </div>
 
-        {/* Actions */}
-        <div className="py-1">
+        <div className="border-b border-border py-1">
           <Link
             href="/dashboard/profile"
             onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
           >
-            <UserCircle strokeWidth={2.5} size={14} />
-            My Profile
+            <UserCircle strokeWidth={2} size={16} />
+            <span>View profile</span>
           </Link>
+          <Link
+            href="/dashboard/communities"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <Compass strokeWidth={2} size={16} />
+            <span>Explore communities</span>
+          </Link>
+          <Link
+            href="/dashboard/library"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
+          >
+            <Library strokeWidth={2} size={16} />
+            <span>Library</span>
+          </Link>
+        </div>
+
+        <div className="py-1">
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground hover:bg-white/[0.08] transition-colors disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50"
           >
-            <LogOut strokeWidth={2.5} size={14} />
-            {loggingOut ? "Signing out…" : "Sign out"}
+            <LogOut strokeWidth={2} size={16} />
+            <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
           </button>
         </div>
       </DropdownMenu>
