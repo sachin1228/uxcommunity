@@ -45,7 +45,7 @@ export async function GET() {
     threadIds.length
       ? db
           .from("community_threads")
-          .select("id, community_id, user_id, title, description, category, tags, attachments, links, allow_replies, created_at, updated_at, communities(name)")
+          .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(name)")
           .in("id", threadIds)
           .order("created_at", { ascending: false })
       : { data: [] },

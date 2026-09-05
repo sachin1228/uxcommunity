@@ -56,6 +56,7 @@ function renderWithLinks(text: string, isNested = false) {
   return parts;
 }
 import { EditThreadModal } from "./EditThreadModal";
+import { ThreadPollResult } from "./PollResult";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -374,6 +375,9 @@ export function ThreadCard({
             {renderWithLinks(thread.title, true)}
           </h3>
         )}
+
+        {/* ── Poll ── */}
+        {thread.poll ? <ThreadPollResult poll={thread.poll} /> : null}
 
         {/* ── Attachments ── */}
         {(() => {
