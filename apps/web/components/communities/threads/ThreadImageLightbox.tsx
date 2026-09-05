@@ -14,6 +14,7 @@ import type { CommunityThread, ThreadAttachment, ThreadComment } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { ThreadPollResult } from "./PollResult";
+import { ModalPortal } from "@/components/ui/Modal";
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,7 @@ export function ThreadImageLightbox({
     : thread.comment_count;
 
   return (
+    <ModalPortal>
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
@@ -365,5 +367,6 @@ export function ThreadImageLightbox({
         </aside>
       </div>
     </div>
+    </ModalPortal>
   );
 }
