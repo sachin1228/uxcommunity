@@ -10,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadComment } from "./types";
-import { THREAD_CATEGORIES } from "./types";
 import { formatFullDate } from "./threadShared";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
@@ -173,7 +172,6 @@ export function ThreadImageLightbox({
   if (images.length === 0) return null;
 
   const image = images[index];
-  const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const authorName = thread.users?.name ?? "Member";
   const totalComments = comments
     ? comments.reduce((total, comment) => total + 1 + comment.replies.length, 0)
@@ -288,11 +286,6 @@ export function ThreadImageLightbox({
                 {formatFullDate(thread.created_at)} · Threads
               </p>
             </div>
-            {category && (
-              <span className="ml-auto shrink-0 rounded-full border border-border px-2.5 py-0.5 font-body text-[11px] text-foreground-muted">
-                {category.label}
-              </span>
-            )}
           </div>
 
           {/* Scrollable body */}
