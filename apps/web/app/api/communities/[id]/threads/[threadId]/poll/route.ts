@@ -6,8 +6,11 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 /**
  * Vote on a thread poll (one vote per user; single choice).
- * Body: { option_index: number | null } — null removes the user's vote
- * (clicking the already-selected option toggles it off).
+ * Body: { option_index: number }.
+ *
+ * Votes are final: the endpoint rejects unvotes and vote changes, so a user
+ * can only ever record one vote (re-voting the same option is idempotent and
+ * just returns the current totals).
  */
 export async function POST(
   request: NextRequest,
@@ -51,25 +54,31 @@ export async function POST(
     return NextResponse.json({ error: "This thread does not have a poll." }, { status: 400 });
   }
 
-  // Desired vote: an integer index into the options, or null to unvote.
-  const desiredIndex = body?.option_index === null || body?.option_index === undefined
-    ? null
-    : body.option_index;
-  if (desiredIndex !== null && (!Number.isInteger(desiredIndex) || (desiredIndex as number) < 0 || (desiredIndex as number) >= options.length)) {
+  // Desired vote: an integer index into the options. Unvotes are not allowed.
+  const desiredIndex = body?.option_index;
+  if (!Number.isInteger(desiredIndex) || (desiredIndex as number) < 0 || (desiredIndex as number) >= options.length) {
     return NextResponse.json({ error: "Invalid poll option." }, { status: 400 });
   }
 
-  if (desiredIndex === null) {
-    const { error } = await db
-      .from("thread_poll_votes")
-      .delete()
-      .eq("thread_id", threadId)
-      .eq("user_id", userId);
-    if (error) {
-      console.error("[DELETE poll vote]", error);
-      return NextResponse.json({ error: "Failed to remove your vote." }, { status: 500 });
-    }
-  } else {
+  // One final vote per user: an existing vote on a different option cannot be
+  // changed, and re-voting the same option is a no-op (idempotent).
+  const { data: existingVote } = await db
+    .from("thread_poll_votes")
+    .select("option_index")
+    .eq("thread_id", threadId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (
+    existingVote &&
+    Number.isInteger(existingVote.option_index) &&
+    (existingVote.option_index as number) !== (desiredIndex as number)
+  ) {
+    return NextResponse.json(
+      { error: "Your vote on this poll is final and cannot be changed." },
+      { status: 409 },
+    );
+  }
+  if (!existingVote) {
     const { error } = await db
       .from("thread_poll_votes")
       .upsert(
@@ -101,7 +110,7 @@ export async function POST(
       room: realtimeRooms.threads(communityId),
       topic: "poll",
       data: {
-        event: desiredIndex === null ? "DELETE" : "INSERT",
+        event: "INSERT",
         thread_id: threadId,
         user_id: userId,
         counts,
@@ -112,7 +121,7 @@ export async function POST(
       room: realtimeRooms.profile(thread.user_id),
       topic: "poll",
       data: {
-        event: desiredIndex === null ? "DELETE" : "INSERT",
+        event: "INSERT",
         thread_id: threadId,
         user_id: userId,
         counts,

@@ -115,6 +115,7 @@ export function ThreadCard({
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
   const [pollVoteBusy, setPollVoteBusy] = useState(false);
+  const [pollVotePending, setPollVotePending] = useState<number | null>(null);
   const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -267,21 +268,11 @@ export function ThreadCard({
     const optionCount = currentPoll.options.length;
     if (optionIndex < 0 || optionIndex >= optionCount) return;
 
-    const baseCounts =
-      pollVoteOverride && pollVoteOverride.counts.length === optionCount
-        ? pollVoteOverride.counts
-        : Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === optionCount
-          ? thread.poll_vote_counts
-          : currentPoll.options.map(() => 0);
+    // Votes are final: a user who already voted cannot vote again or change it.
     const currentUserVote = pollVoteOverride ? pollVoteOverride.userVote : (thread.poll_user_vote ?? null);
-    const nextUserVote = currentUserVote === optionIndex ? null : optionIndex;
-    const optimisticCounts = baseCounts.slice();
-    if (currentUserVote !== null && optimisticCounts[currentUserVote] > 0) {
-      optimisticCounts[currentUserVote] -= 1;
-    }
-    if (nextUserVote !== null) optimisticCounts[nextUserVote] += 1;
+    if (currentUserVote !== null) return;
 
-    setPollVoteOverride({ counts: optimisticCounts, userVote: nextUserVote });
+    setPollVotePending(optionIndex);
     setPollVoteBusy(true);
     try {
       const response = await dedupeFetch(
@@ -289,7 +280,7 @@ export function ThreadCard({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ option_index: nextUserVote }),
+          body: JSON.stringify({ option_index: optionIndex }),
         },
         { cooldownMode: "exact" },
       );
@@ -299,14 +290,17 @@ export function ThreadCard({
         error?: string;
       } | null;
       if (!response.ok || !Array.isArray(result?.counts)) {
-        throw new Error(result?.error ?? "Failed to update poll vote.");
+        throw new Error(result?.error ?? "Failed to record your vote.");
       }
+      // Results appear only after the vote is confirmed by the server.
       setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null });
       onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null);
     } catch (error) {
+      // Stay in the pre-vote state; the user can try again.
       setPollVoteOverride(null);
-      showInteractionError(error instanceof Error ? error.message : "Failed to update poll vote.");
+      showInteractionError(error instanceof Error ? error.message : "Failed to record your vote.");
     } finally {
+      setPollVotePending(null);
       setPollVoteBusy(false);
     }
   }
@@ -451,6 +445,7 @@ export function ThreadCard({
             counts={displayedPollCounts}
             userVote={displayedPollUserVote}
             busy={pollVoteBusy}
+            pendingOption={pollVotePending}
             onVote={(optionIndex) => void handlePollVote(optionIndex)}
           />
         )}
