@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ShowcaseDetailClient } from "@/components/communities/showcase/ShowcaseDetailClient";
+import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
 import type { ShowcaseComment, ShowcasePost } from "@/components/communities/showcase/types";
 
 export default async function ShowcaseDetailPage({ params }: { params: Promise<{ postId: string }> }) {
@@ -18,8 +19,11 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
   const post = { ...row, author: { name: author?.name ?? "Community member", avatar_url: profile?.avatar_url ?? null }, like_count: likes?.length ?? 0, comment_count: enriched.length, user_liked: Boolean(myLike), user_saved: Boolean(mySave) } as ShowcasePost;
   return (
     <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
       <div className="mx-auto w-full max-w-[40rem]">
         <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} backHref="/dashboard" backLabel="Home" />
+      </div>
+        <HomeSidebar />
       </div>
     </div>
   );
