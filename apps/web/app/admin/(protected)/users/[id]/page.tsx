@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ShieldOff, ShieldCheck, Trash2, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { UserInfoCard } from "@/components/admin/users/UserInfoCard";
 import type { AdminUser, UserApplication, UserInterest } from "@/components/admin/users/userTypes";
@@ -226,6 +227,7 @@ export default function UserDetailPage() {
 
       {/* Delete confirm modal */}
       {confirmDelete && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
             <h2 className="font-display text-lg font-semibold text-foreground mb-1">
@@ -254,6 +256,7 @@ export default function UserDetailPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

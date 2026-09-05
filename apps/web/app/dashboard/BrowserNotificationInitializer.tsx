@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BellOff, MousePointer2, X } from "lucide-react";
 import { initializeBrowserNotifications } from "@/lib/communities/message-notifications";
+import { ModalPortal } from "@/components/ui/Modal";
 
 type BrowserPermission = NotificationPermission | "unsupported";
 
@@ -71,8 +72,9 @@ export function BrowserNotificationInitializer() {
       )}
 
       {showGuide && (
+        <ModalPortal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="notification-guide-title"
@@ -110,6 +112,7 @@ export function BrowserNotificationInitializer() {
             </button>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   );

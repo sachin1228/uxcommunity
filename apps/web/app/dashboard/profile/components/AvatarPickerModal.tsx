@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Upload, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 
 interface AvatarPickerModalProps {
   uploadPreview: string | null;
@@ -26,8 +27,9 @@ export function AvatarPickerModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -120,5 +122,6 @@ export function AvatarPickerModal({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
