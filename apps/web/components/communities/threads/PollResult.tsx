@@ -102,22 +102,14 @@ export function ThreadPollResult({
                       <Check strokeWidth={3} size={12} />
                     </span>
                   ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-muted">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground">
                       {letter}
                     </span>
                   )}
-                  <span
-                    className={`min-w-0 flex-1 whitespace-pre-wrap break-words font-body text-sm leading-snug ${
-                      isSelected ? "font-medium text-foreground" : "text-foreground"
-                    }`}
-                  >
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-words font-body text-sm font-medium leading-snug text-foreground">
                     {option}
                   </span>
-                  <span
-                    className={`shrink-0 font-body text-xs tabular-nums ${
-                      isSelected ? "font-medium text-foreground" : "text-foreground-muted"
-                    }`}
-                  >
+                  <span className="shrink-0 font-body text-xs font-medium tabular-nums text-foreground">
                     {percents[index]}%
                   </span>
                 </div>
@@ -126,9 +118,7 @@ export function ThreadPollResult({
                   role="presentation"
                 >
                   <span
-                    className={`block h-full rounded-full transition-all duration-300 ${
-                      isSelected ? "bg-accent" : "bg-foreground-muted"
-                    }`}
+                    className="block h-full rounded-full bg-accent transition-all duration-300"
                     style={{ width: `${percents[index]}%` }}
                   />
                 </span>
