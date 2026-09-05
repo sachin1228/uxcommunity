@@ -70,10 +70,10 @@ export function ThreadPollResult({
   const undoId = useId();
 
   return (
-    <div className="mt-3 rounded-xl border border-border bg-background p-4">
+    <div className="rounded-xl py-4">
       <div className="flex items-center gap-1.5">
-        <BarChart3 strokeWidth={2.5} size={13} className="text-foreground-muted" />
-        <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
+        <BarChart3 strokeWidth={2.5} size={13} className="text-[var(--ds-blue-700)]" />
+        <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-[var(--ds-blue-700)]">
           Poll
         </span>
       </div>
@@ -172,9 +172,10 @@ export function ThreadPollResult({
 
       <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] tabular-nums text-foreground-subtle">
         <span role="status">
-          {hasVoted
-            ? `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"} · You voted for ${options[selected ?? 0] ?? "an option"}`
-            : `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"}`}
+          <span className="font-semibold text-white">
+            {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
+          </span>
+          {hasVoted && ` · You voted for ${options[selected ?? 0] ?? "an option"}`}
         </span>
         {hasVoted && interactive && onUndo && canUndo !== false && (
           <span className="group/undo relative inline-flex items-center">

@@ -17,13 +17,16 @@ interface CarouselImage {
  * reverse. An invisible copy of the first image anchors the viewport height in
  * normal flow, so the surrounding thread layout never jumps. Swipe gestures
  * work on touch devices without interfering with vertical scrolling.
+ *
+ * Clicking the visible image reports its index via `onImageClick` so the
+ * parent can open the full-screen lightbox — images never open in a new tab.
  */
 export function ThreadImageCarousel({
   images,
-  isDetail,
+  onImageClick,
 }: {
   images: CarouselImage[];
-  isDetail: boolean;
+  onImageClick: (index: number) => void;
 }) {
   const [index, setIndex] = useState(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -35,15 +38,6 @@ export function ThreadImageCarousel({
   const hasNext = index < images.length - 1;
   const goPrev = () => setIndex((current) => Math.max(0, current - 1));
   const goNext = () => setIndex((current) => Math.min(images.length - 1, current + 1));
-
-  function openImage(url: string) {
-    // A swipe ends in a click on touch devices — don't open the tab after one.
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
 
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
@@ -115,47 +109,31 @@ export function ThreadImageCarousel({
               className="h-full w-full object-cover"
             />
           );
-          const clickGuard = (event: React.MouseEvent) => {
-            if (suppressClickRef.current) {
-              event.preventDefault();
-              suppressClickRef.current = false;
-              return;
-            }
-            event.stopPropagation();
-          };
-          return isDetail ? (
-            <a
-              key={img.url}
-              href={img.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-hidden={!active}
-              tabIndex={active ? undefined : -1}
-              className={`h-full w-full shrink-0 overflow-hidden ${
-                active ? "block" : "pointer-events-none block"
-              }`}
-              onClick={clickGuard}
-            >
-              {inner}
-            </a>
-          ) : (
+          return (
             <div
               key={img.url}
-              role="link"
+              role="button"
               tabIndex={active ? 0 : -1}
               aria-hidden={!active}
+              aria-label={active ? `Open image ${slideIndex + 1} of ${images.length}` : undefined}
               className={`h-full w-full shrink-0 overflow-hidden ${
                 active ? "block cursor-pointer" : "pointer-events-none block"
               }`}
               onClick={(event) => {
-                clickGuard(event);
-                if (!event.defaultPrevented) openImage(img.url);
+                // A swipe ends in a click on touch devices — don't open after one.
+                if (suppressClickRef.current) {
+                  event.preventDefault();
+                  suppressClickRef.current = false;
+                  return;
+                }
+                event.stopPropagation();
+                onImageClick(slideIndex);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
+                if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   event.stopPropagation();
-                  openImage(img.url);
+                  onImageClick(slideIndex);
                 }
               }}
             >
@@ -193,7 +171,7 @@ export function ThreadImageCarousel({
       <div
         role="group"
         aria-label="Image navigation"
-        className="absolute bottom-2.5 left-1/2 z-20 px-1.5 py-1 flex -translate-x-1/2 items-center rounded-full bg-black/50"
+        className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full bg-black/50 px-1.5 py-1"
       >
         {images.map((img, dotIndex) => {
           const active = dotIndex === index;
