@@ -57,6 +57,7 @@ function renderWithLinks(text: string, isNested = false) {
 }
 import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
+import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -546,63 +547,8 @@ export function ThreadCard({
                 <img src={images[0].url} alt={images[0].name} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
               </ImgWrap>
             );
-          } else if (images.length === 2) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-56 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
-              </div>
-            );
-          } else if (images.length === 3) {
-            imageGrid = (
-              <div className="mt-3 flex h-64 gap-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block flex-[2] overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="flex flex-1 flex-col gap-1">
-                  {images.slice(1).map((img) => (
-                    <ImgWrap key={img.url} img={img} className="block flex-1 overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
-          } else if (images.length === 4) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-44 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
-              </div>
-            );
-          } else {
-            const visible  = images.slice(1, 5);
-            const overflow = images.length - 5;
-            imageGrid = (
-              <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-52 w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="grid grid-cols-4 gap-1 h-28">
-                  {visible.map((img, i) => (
-                    <ImgWrap key={img.url} img={img} className="relative block overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                      {i === visible.length - 1 && overflow > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/55">
-                          <span className="font-display text-lg font-bold text-white">+{overflow}</span>
-                        </div>
-                      )}
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
+          } else if (images.length > 1) {
+            imageGrid = <ThreadImageCarousel images={images} isDetail={isDetail} />;
           }
 
           return <>{imageGrid}{fileList}</>;
