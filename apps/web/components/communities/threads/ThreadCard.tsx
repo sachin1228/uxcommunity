@@ -58,6 +58,7 @@ function renderWithLinks(text: string, isNested = false) {
 import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
+import { ThreadImageLightbox } from "./ThreadImageLightbox";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -110,6 +111,7 @@ export function ThreadCard({
     latestLikeRef.current = { thread, onLikeChanged };
   });
   const [menuOpen, setMenuOpen]       = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
@@ -346,6 +348,10 @@ export function ThreadCard({
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.created_at);
 
+  const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
+  const images = attachments.filter((a) => a.type.startsWith("image/"));
+  const files  = attachments.filter((a) => !a.type.startsWith("image/"));
+
   const pollOptionCount = thread.poll?.options.length ?? 0;
   const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
     ? thread.poll_vote_counts
@@ -364,14 +370,14 @@ export function ThreadCard({
 
   function handleCardClick(event: React.MouseEvent<HTMLElement>) {
     if (!onOpen) return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button']");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     onOpen();
   }
 
   function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (!onOpen || event.key !== "Enter") return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button']");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     event.preventDefault();
     onOpen();
@@ -493,10 +499,6 @@ export function ThreadCard({
 
         {/* ── Attachments ── */}
         {(() => {
-          const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
-          const images = attachments.filter((a) => a.type.startsWith("image/"));
-          const files  = attachments.filter((a) => !a.type.startsWith("image/"));
-
           const fileList = files.length > 0 ? (
             <div className="mt-3 space-y-1.5">
               {files.map((att) =>
@@ -523,32 +525,24 @@ export function ThreadCard({
 
           if (images.length === 0) return fileList;
 
-          function ImgWrap({ img, children, className }: { img: typeof images[0]; children: React.ReactNode; className?: string }) {
-            return isDetail ? (
-              <a href={img.url} target="_blank" rel="noopener noreferrer" className={className}>
-                {children}
-              </a>
-            ) : (
-              <div
-                role="link" tabIndex={0} className={className}
-                onClick={(e) => { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); } }}
-              >
-                {children}
-              </div>
-            );
-          }
-
           let imageGrid: React.ReactNode = null;
 
           if (images.length === 1) {
             imageGrid = (
-              <ImgWrap img={images[0]} className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer">
-                <img src={images[0].url} alt={images[0].name} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
-              </ImgWrap>
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open image viewer"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); } }}
+                className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={images[0].url} alt={images[0].name} draggable={false} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
+              </div>
             );
           } else if (images.length > 1) {
-            imageGrid = <ThreadImageCarousel images={images} isDetail={isDetail} />;
+            imageGrid = <ThreadImageCarousel images={images} onImageClick={(i) => setLightboxIndex(i)} />;
           }
 
           return <>{imageGrid}{fileList}</>;
@@ -623,6 +617,16 @@ export function ThreadCard({
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
       />
+
+      {lightboxIndex !== null && (
+        <ThreadImageLightbox
+          thread={thread}
+          communityId={communityId}
+          images={images}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      )}
     </>
   );
 }
