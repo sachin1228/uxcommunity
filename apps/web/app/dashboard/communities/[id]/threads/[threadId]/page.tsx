@@ -17,7 +17,7 @@ export default async function ThreadDetailPage({ params }: Props) {
 
   const [{ data: membership }, { data: community }] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ])
 
   if (!membership || !thread) redirect(`/dashboard/communities/${communityId}`)

@@ -197,6 +197,9 @@ export function ShowcaseDetailClient({
   initialComments,
   currentUserId,
   communityId,
+  communityName,
+  communityImage,
+  showCommunityAttribution = false,
   backHref,
   backLabel,
 }: {
@@ -204,6 +207,9 @@ export function ShowcaseDetailClient({
   initialComments: ShowcaseComment[];
   currentUserId: string;
   communityId: string;
+  communityName?: string;
+  communityImage?: string | null;
+  showCommunityAttribution?: boolean;
   backHref?: string;
   backLabel?: string;
 }) {
@@ -296,6 +302,8 @@ export function ShowcaseDetailClient({
           post={post}
           currentUserId={currentUserId}
           communityId={communityId}
+          communityName={showCommunityAttribution ? communityName : undefined}
+          communityImage={showCommunityAttribution ? communityImage : undefined}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}

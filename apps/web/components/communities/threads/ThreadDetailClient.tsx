@@ -254,6 +254,8 @@ interface Props {
   currentUserId: string;
   communityId: string;
   communityName: string;
+  communityImage?: string | null;
+  showCommunityAttribution?: boolean;
   /** When provided, renders a back link above the post (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -266,6 +268,9 @@ export function ThreadDetailClient({
   initialComments,
   currentUserId,
   communityId,
+  communityName,
+  communityImage,
+  showCommunityAttribution = false,
   backHref,
   backLabel = "Home",
   flushLayout = false,
@@ -478,6 +483,9 @@ export function ThreadDetailClient({
               thread={thread}
               currentUserId={currentUserId}
               communityId={communityId}
+              communityName={showCommunityAttribution ? communityName : undefined}
+              communityImage={showCommunityAttribution ? communityImage : undefined}
+              communityNamePlacement="below"
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
               onUpdated={handleUpdated}

@@ -29,7 +29,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 
   const { data: community } = await db
     .from("communities")
-    .select("name")
+    .select("name, image_url")
     .eq("id", communityId)
     .maybeSingle();
 
@@ -43,6 +43,8 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
             currentUserId={userId}
             communityId={communityId}
             communityName={community?.name ?? "Community"}
+            communityImage={community?.image_url ?? null}
+            showCommunityAttribution
             backHref="/dashboard"
             backLabel="Home"
           />

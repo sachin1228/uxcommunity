@@ -45,7 +45,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ]);
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
@@ -89,6 +89,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             currentUserAvatar={profileRow?.avatar_url ?? null}
             communityId={communityId}
             communityName={communityData?.name ?? "Community"}
+            communityImage={communityData?.image_url ?? null}
             showCommunityAttribution
             backHref="/dashboard"
             backLabel="Home"

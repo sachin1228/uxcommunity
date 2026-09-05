@@ -246,7 +246,7 @@ interface Props {
   communityName: string;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
@@ -332,6 +332,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                 resource={resource}
                 currentUserId={currentUserId}
                 communityId={communityId}
+                communityName={communityName}
                 onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
                 onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
                 onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
