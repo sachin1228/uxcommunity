@@ -225,11 +225,8 @@ export function ThreadImageLightbox({
 
           {images.length > 1 && (
             <div className="shrink-0 border-t border-white/10 px-4 py-3">
-              <div ref={stripRef} className="flex items-center justify-between gap-4">
-                <span className="shrink-0 font-body text-xs tabular-nums text-white/70" role="status">
-                  Image {index + 1} of {images.length}
-                </span>
-                <div className="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-none px-1 py-1">
+              <div ref={stripRef} className="flex overflow-x-auto scrollbar-none px-1 py-1">
+                <div className="mx-auto flex w-max items-center gap-2">
                   {images.map((img, i) => (
                     <button
                       key={`${img.url}-${i}`}
