@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -377,6 +378,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
 
       {/* Delete confirm modal */}
       {confirmDelete && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
             <h2 className="font-display text-base font-semibold text-foreground mb-1">Delete &ldquo;{item.name}&rdquo;?</h2>
@@ -404,6 +406,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

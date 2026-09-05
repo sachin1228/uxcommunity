@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface Props {
@@ -81,8 +82,9 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
   }
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -189,5 +191,6 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         </form>
       </div>
     </div>
+    </ModalPortal>
   );
 }

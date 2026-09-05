@@ -15,6 +15,7 @@ import {
   Clock3,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityActivityPanel } from "@/components/admin/communities/CommunityActivityPanel";
 import {
   PERMISSION_OPTIONS,
@@ -305,8 +306,9 @@ export default function CommunityAdminPermissionsPage() {
 
       {/* Remove confirm modal */}
       {showRemoveConfirm && (
+        <ModalPortal>
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowRemoveConfirm(false); }}
         >
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
@@ -335,6 +337,7 @@ export default function CommunityAdminPermissionsPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

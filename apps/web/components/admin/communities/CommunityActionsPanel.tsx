@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 
 interface Props {
   communityId: string;
@@ -109,6 +110,7 @@ export function CommunityActionsPanel({
 
       {/* Delete confirm modal */}
       {confirmDelete && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
             <h2 className="font-display text-base font-semibold text-foreground mb-1">
@@ -148,6 +150,7 @@ export function CommunityActionsPanel({
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </>
   );

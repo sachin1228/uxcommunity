@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Globe, ImagePlus, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { SHOWCASE_CATEGORIES, type ShowcaseCategory, type ShowcasePost } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -26,7 +27,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your work."); } finally { setSaving(false); }
   }
   const field = "w-full rounded-xl border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent";
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="showcase-form-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+  return <ModalPortal><div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="showcase-form-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <form onSubmit={submit} className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl">
       <div className="flex items-start justify-between gap-4"><div><h2 id="showcase-form-title" className="font-display text-xl font-semibold text-foreground">{editing ? "Edit showcase" : "Share your work"}</h2><p className="mt-1 font-body text-sm text-foreground-muted">{editing ? "Update the details of your showcase post." : "Give the community a closer look at what you’re making."}</p></div><button type="button" onClick={onClose} aria-label="Close"><X strokeWidth={2.5} className="text-foreground-muted" size={20}/></button></div>
       <div className="mt-6 grid gap-5 md:grid-cols-2">
@@ -37,5 +38,5 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
       <label className="mt-5 flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3"><span><span className="block font-body text-sm font-medium text-foreground">Allow replies</span><span className="block font-body text-xs text-foreground-muted">Other members can comment on this showcase.</span></span><span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${allowReplies ? "bg-accent" : "bg-border"}`}><input type="checkbox" checked={allowReplies} onChange={(event) => setAllowReplies(event.target.checked)} className="sr-only"/><span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${allowReplies ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`}/></span></label>
       <label className="mt-3 flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3"><span className="flex items-center gap-2.5"><Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted"/><span><span className="block font-body text-sm font-medium text-foreground">Share publicly</span><span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span></span></span><span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}><input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="sr-only"/><span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`}/></span></label>
       {error && <p className="mt-4 font-body text-sm text-red-400">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded-xl border border-border px-4 py-2.5 font-body text-sm text-foreground-muted">Cancel</button><button disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground disabled:opacity-60">{saving && <Spinner size={15} className="text-white" />}{saving ? "Saving…" : editing ? "Save changes" : "Share work"}</button></div>
-    </form></div>;
+    </form></div></ModalPortal>;
 }

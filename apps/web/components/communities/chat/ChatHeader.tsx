@@ -7,6 +7,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
 
 interface Community {
@@ -77,8 +78,9 @@ function ConfirmDialog({
 
   return (
     // Backdrop
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div className="w-full max-w-xs rounded-2xl border border-white/[0.08] bg-surface-raised shadow-2xl p-5 animate-in zoom-in-95 fade-in duration-150 mx-4">
@@ -105,6 +107,7 @@ function ConfirmDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

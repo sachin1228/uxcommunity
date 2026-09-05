@@ -12,6 +12,7 @@ import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { ModalPortal } from "@/components/ui/Modal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
@@ -225,8 +226,9 @@ function DeleteConfirmDialog({
 }) {
   // Close on backdrop click
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
     >
       <div
@@ -259,6 +261,7 @@ function DeleteConfirmDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

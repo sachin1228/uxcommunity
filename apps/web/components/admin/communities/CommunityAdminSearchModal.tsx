@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import {
   CommunityAdmin,
   ALL_PERMISSIONS,
@@ -131,8 +132,9 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
   }, [onClose]);
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-150"
@@ -249,5 +251,6 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

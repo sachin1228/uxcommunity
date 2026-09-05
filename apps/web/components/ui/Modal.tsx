@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useCallback, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -14,6 +15,21 @@ interface ModalProps {
   hideCloseButton?: boolean;
   /** Extra classes applied to the panel div (e.g. "p-0" to remove default padding) */
   panelClassName?: string;
+}
+
+interface ModalPortalProps {
+  children: React.ReactNode;
+}
+
+export function ModalPortal({ children }: ModalPortalProps) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
+  if (!mounted) return null;
+  return createPortal(children, document.body);
 }
 
 export function Modal({
@@ -45,8 +61,9 @@ export function Modal({
   if (!open) return null;
 
   return (
+    <ModalPortal>
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
       aria-modal="true"
       role="dialog"
     >
@@ -89,5 +106,6 @@ export function Modal({
         {children}
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Trash2, Sparkles, Users } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityRow, type CommunityListItem } from "@/components/admin/communities/CommunityRow";
 
 // Main origin tabs: communities the uxcommunity app creates itself vs the
@@ -263,6 +264,7 @@ export default function AdminCommunitiesPage() {
 
       {/* Reset All Chat confirmation modal */}
       {showResetConfirm && (
+        <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
             <h2 className="font-display text-base font-semibold text-foreground mb-1">
@@ -295,6 +297,7 @@ export default function AdminCommunitiesPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );
