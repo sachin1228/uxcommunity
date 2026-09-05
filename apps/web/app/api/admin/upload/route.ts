@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
+import { extensionForMime } from "@/lib/image-utils";
 import { uploadToR2 } from "@/lib/r2";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -31,7 +32,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Image must be under 5 MB." }, { status: 422 });
   }
 
-  const ext = file.name.split(".").pop() ?? "jpg";
+  // Extension always derives from the declared MIME so the R2 key and the
+  // stored Content-Type agree (the client now sends WebP for raster images).
+  const ext = file.type === "image/svg+xml" ? "svg" : extensionForMime(file.type);
   const key = `master-data/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
   try {

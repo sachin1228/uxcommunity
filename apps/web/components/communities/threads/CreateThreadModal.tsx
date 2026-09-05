@@ -10,7 +10,7 @@ import type { CommunityThread, ThreadAttachment, ThreadCategory } from "./types"
 import { THREAD_CATEGORIES, THREAD_TAGS } from "./types";
 import { CategoryIcon } from "./categoryIcons";
 import { CATEGORY_COLORS } from "./threadShared";
-import { compressChatImageClient, compressedFile } from "@/lib/image-client";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 /** Derive a title (≤120 chars) from the composer body. */
 function bodyToTitle(body: string): string {
@@ -192,7 +192,7 @@ export function CreateThreadModal({
         const formData = new FormData();
         let payload = file;
         if (file.type.startsWith("image/")) {
-          try { payload = compressedFile(await compressChatImageClient(file), file); } catch { /* keep original */ }
+          try { payload = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
         }
         formData.append("file", payload);
         const response = await fetch(

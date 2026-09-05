@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { prepareImageForUpload } from '@/lib/prepareImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import {
@@ -75,15 +76,17 @@ export function CommunityContentEditor({ visible, communityId, kind, item, onClo
     if (attachments.length >= 5) return setError('You can add up to 5 images.');
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permission.status !== 'granted') return setError('Photo library permission is required.');
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85, allowsEditing: false });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsEditing: false });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     setUploading(true); setError(null);
     try {
+      // Native WebP encode (quality 0.90, ≤ 2560px) — same contract as the web app.
+      const prepared = await prepareImageForUpload(asset, `thread-image-${Date.now()}`);
       const attachment = await uploadThreadImage(communityId, {
-        uri: asset.uri,
-        name: asset.fileName ?? `thread-image-${Date.now()}.jpg`,
-        type: asset.mimeType ?? 'image/jpeg',
+        uri: prepared.uri,
+        name: prepared.name,
+        type: prepared.mimeType,
       });
       setAttachments((current) => [...current, attachment]);
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not upload image.'); }

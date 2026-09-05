@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { compressImage } from "@/lib/compressImage";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface Props {
   entity: string;
@@ -33,12 +33,14 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
   async function uploadImage(file: File): Promise<string | null> {
     setImageUploading(true);
     try {
+      // Raster images are compressed to WebP client-side (SVGs pass through —
+      // they are vector files that compression would not help).
       let uploadFile: File | Blob = file;
       if (file.type !== "image/svg+xml") {
-        try { uploadFile = await compressImage(file); } catch { /* fall back to original */ }
+        try { uploadFile = compressedFile(await compressImage(file), file); } catch { /* fall back to original */ }
       }
       const fd = new FormData();
-      fd.append("file", uploadFile, file.name);
+      fd.append("file", uploadFile, uploadFile instanceof File ? uploadFile.name : file.name);
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (!res.ok) { setAddError(data.error ?? "Image upload failed."); return null; }
