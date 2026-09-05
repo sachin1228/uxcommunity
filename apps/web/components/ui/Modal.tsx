@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
+import { useEffect, useCallback, useSyncExternalStore } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -25,6 +26,12 @@ export function Modal({
   hideCloseButton = false,
   panelClassName,
 }: ModalProps) {
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -42,9 +49,9 @@ export function Modal({
     };
   }, [open, handleKeyDown]);
 
-  if (!open) return null;
+  if (!mounted || !open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       aria-modal="true"
@@ -88,6 +95,7 @@ export function Modal({
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

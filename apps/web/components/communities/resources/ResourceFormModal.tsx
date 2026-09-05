@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
+import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityResource, ResourceType } from "./types";
@@ -40,6 +41,11 @@ export function ResourceFormModal({
   initialIsPublic = false,
 }: ResourceFormModalProps) {
   const isEdit = mode === "edit";
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
   const [url, setUrl] = useState(resource?.url ?? "");
   const [description, setDescription] = useState(resource?.description ?? "");
@@ -157,7 +163,9 @@ export function ResourceFormModal({
 
   const showPreview = !previewDismissed && (previewLoading || preview);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
@@ -323,6 +331,7 @@ export function ResourceFormModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
