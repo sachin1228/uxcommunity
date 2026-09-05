@@ -181,19 +181,31 @@ export function ThreadImageCarousel({
         <ChevronRight size={18} strokeWidth={2.5} />
       </button>
 
-      {/* Pagination dots */}
+      {/* Pagination indicators (carousel dots) — one per image, clickable */}
       <div
-        aria-hidden
-        className="absolute bottom-2.5 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1"
+        role="group"
+        aria-label="Image navigation"
+        className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full bg-black/50 px-2 py-1"
       >
-        {images.map((img, dotIndex) => (
-          <span
-            key={img.url}
-            className={`h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
-              dotIndex === index ? "bg-white" : "bg-white/40"
-            }`}
-          />
-        ))}
+        {images.map((img, dotIndex) => {
+          const active = dotIndex === index;
+          return (
+            <button
+              key={img.url}
+              type="button"
+              aria-label={`Go to image ${dotIndex + 1} of ${images.length}`}
+              aria-current={active ? "true" : undefined}
+              onClick={() => setIndex(dotIndex)}
+              className="flex h-5 w-5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <span
+                className={`block h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
+                  active ? "bg-white" : "bg-white/40"
+                }`}
+              />
+            </button>
+          );
+        })}
       </div>
 
       <span className="sr-only" role="status">
