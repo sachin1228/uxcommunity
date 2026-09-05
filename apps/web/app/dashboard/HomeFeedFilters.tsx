@@ -125,13 +125,6 @@ export function HomeFeedFilters() {
               );
             })}
           </div>
-
-          <span
-            className="fb-filter-chip grid size-11 shrink-0 place-items-center rounded-[14px] transition-colors duration-150"
-            aria-label="More feed filters"
-          >
-            <SlidersHorizontal strokeWidth={2.5} size={16} />
-          </span>
         </div>
       </div>
     </section>
