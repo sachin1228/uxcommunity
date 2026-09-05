@@ -76,11 +76,6 @@ export function resetDedupeFetchImpl() {
   fetchImpl = (input, init) => globalThis.fetch(input, init)
 }
 
-function devLog(key: string, source: "new" | "dedup" | "replay" | "removed" | "bypass") {
-  if (process.env.NODE_ENV !== "development") return
-  console.debug(`[dedupe-fetch] ${source} ${key}`)
-}
-
 function normalizeUrl(input: RequestInfo | URL): string {
   try {
     const url = new URL(String(input), "http://uxcommunity.local")
@@ -147,7 +142,6 @@ export function dedupeFetch(
   const body = bodyKey(init?.body)
   if (body === null) {
     telemetry.bypassed += 1
-    devLog("", "bypass")
     return fetchImpl(input, init)
   }
 
@@ -161,7 +155,6 @@ export function dedupeFetch(
   const pending = inFlight.get(key)
   if (pending) {
     telemetry.deduped += 1
-    devLog(key, "dedup")
     return pending.then((buffered) => reconstructResponse(buffered))
   }
 
@@ -174,7 +167,6 @@ export function dedupeFetch(
   const last = settled.get(key)
   if (last && now - last.settledAt < settleWindowMs) {
     telemetry.replayed += 1
-    devLog(key, "replay")
     return Promise.resolve(reconstructResponse(last.buffered))
   }
 
@@ -185,7 +177,6 @@ export function dedupeFetch(
     const cooldownMs = options.mutationCooldownMs ?? DEFAULT_MUTATION_COOLDOWN_MS
     if (urlLast && now - urlLast.settledAt < cooldownMs) {
       telemetry.replayed += 1
-      devLog(`${urlKey} *`, "replay")
       return Promise.resolve(reconstructResponse(urlLast.buffered))
     }
   }
@@ -195,7 +186,6 @@ export function dedupeFetch(
   //    and settle-window replays — receives a fresh Response built from that
   //    buffer, so response bodies are never shared between readers.
   telemetry.new += 1
-  devLog(key, "new")
   const raw = fetchImpl(input, init)
   const request = raw.then(
     async (response) => {
@@ -229,7 +219,6 @@ export function dedupeFetch(
   void request
     .finally(() => {
       inFlight.delete(key)
-      devLog(key, "removed")
     })
     .catch(() => undefined)
   return request.then((buffered) => reconstructResponse(buffered))

@@ -260,16 +260,7 @@ export function useSendMessage({
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    const sendStartedAt = performance.now();
-    const clientTimings: Record<string, number> = {};
-    const measureClient = async <T,>(name: string, operation: () => Promise<T>) => {
-      const startedAt = performance.now();
-      try {
-        return await operation();
-      } finally {
-        clientTimings[name] = Math.round((performance.now() - startedAt) * 100) / 100;
-      }
-    };
+    const runClientOperation = <T,>(operation: () => Promise<T>) => operation();
 
     try {
       let uploadedImageUrl: string | null = null;
@@ -277,7 +268,7 @@ export function useSendMessage({
       if (imageFile) {
         // Compress on the client (canvas → WebP); the upload route stores the
         // bytes as-is since server-side Sharp is unavailable on Workers.
-        const fileToSend = await measureClient("client_compression", async () => {
+        const fileToSend = await runClientOperation(async () => {
           try {
             return compressedFile(await compressImage(imageFile), imageFile);
           } catch {
@@ -287,7 +278,7 @@ export function useSendMessage({
         const fd = new FormData();
         fd.append("file", fileToSend);
 
-        const uploadRes = await measureClient("image_upload_request", () =>
+        const uploadRes = await runClientOperation(() =>
           fetch(
             `/api/communities/${communityId}/messages/upload`,
             { method: "POST", body: fd, signal: abortController.signal },
@@ -326,7 +317,7 @@ export function useSendMessage({
         ? preloadImage(uploadedImageUrl)
         : null;
 
-      const res = await measureClient("message_create_request", () =>
+      const res = await runClientOperation(() =>
         dedupeFetch(`/api/communities/${communityId}/messages`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -449,10 +440,6 @@ export function useSendMessage({
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllerRef.current = null;
-      if (process.env.NODE_ENV === "development") {
-        clientTimings.total_send = Math.round((performance.now() - sendStartedAt) * 100) / 100;
-        console.debug("[client-timing] community message send", clientTimings);
-      }
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }

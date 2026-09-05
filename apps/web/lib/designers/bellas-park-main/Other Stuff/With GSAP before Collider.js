@@ -141,7 +141,6 @@ scene.add(sun);
 
 const shadowHelper = new THREE.CameraHelper(sun.shadow.camera);
 scene.add(shadowHelper);
-console.log(sun.shadow);
 const helper = new THREE.DirectionalLightHelper(sun, 5);
 scene.add(helper);
 
