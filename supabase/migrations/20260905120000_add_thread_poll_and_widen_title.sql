@@ -9,21 +9,34 @@
 -- poll stores an optional object:
 --   { "question": string, "options": [string, ...] }
 -- with 2..6 options. Shape is validated by the API on write.
+--
+-- Idempotent: safe to re-run (e.g. from the SQL editor) if
+-- this migration was already applied once.
 -- ============================================================
 
 alter table public.community_threads
   alter column title type varchar(2000);
 
 alter table public.community_threads
-  drop constraint community_threads_title_check;
+  drop constraint if exists community_threads_title_check;
 
 alter table public.community_threads
   add constraint community_threads_title_check
   check (char_length(title) between 1 and 2000);
 
 alter table public.community_threads
-  add column poll jsonb;
+  add column if not exists poll jsonb;
 
-alter table public.community_threads
-  add constraint community_threads_poll_object_check
-  check (poll is null or jsonb_typeof(poll) = 'object');
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'community_threads_poll_object_check'
+      and conrelid = 'public.community_threads'::regclass
+  ) then
+    alter table public.community_threads
+      add constraint community_threads_poll_object_check
+      check (poll is null or jsonb_typeof(poll) = 'object');
+  end if;
+end $$;
