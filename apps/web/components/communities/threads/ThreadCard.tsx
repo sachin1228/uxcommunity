@@ -626,6 +626,7 @@ export function ThreadCard({
           images={images}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
+          onLikeToggle={() => likeCoalescerRef.current?.toggle()}
           onUpdated={onUpdated}
         />
       )}

@@ -57,6 +57,8 @@ interface ThreadImageLightboxProps {
   /** Image to show first. */
   initialIndex: number;
   onClose: () => void;
+  /** Toggles like/unlike (wired to the card's optimistic like logic). */
+  onLikeToggle?: () => void;
   /** Syncs the parent (card / feed / detail page) when the comment count changes. */
   onUpdated?: (thread: CommunityThread) => void;
 }
@@ -74,6 +76,7 @@ export function ThreadImageLightbox({
   images,
   initialIndex,
   onClose,
+  onLikeToggle,
   onUpdated,
 }: ThreadImageLightboxProps) {
   const [index, setIndex] = useState(() =>
@@ -301,14 +304,21 @@ export function ThreadImageLightbox({
 
             {/* Engagement stats */}
             <div className="mt-4 flex items-center gap-4">
-              <span className="inline-flex items-center gap-1.5 font-body text-sm font-semibold tabular-nums text-foreground">
+              <button
+                type="button"
+                onClick={onLikeToggle}
+                disabled={!onLikeToggle}
+                aria-label={thread.user_liked ? "Unlike" : "Like"}
+                aria-pressed={thread.user_liked}
+                className="group/like inline-flex items-center gap-1.5 rounded-md font-body text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 ease-out hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:hover:scale-100"
+              >
                 <Heart
                   strokeWidth={2.5}
                   size={16}
-                  className={thread.user_liked ? "fill-red-500 text-red-500" : "text-foreground"}
+                  className={thread.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground group-hover/like:text-red-400"}
                 />
                 {thread.like_count}
-              </span>
+              </button>
               <span className="inline-flex items-center gap-1.5 font-body text-sm font-semibold tabular-nums text-foreground">
                 <MessageCircle strokeWidth={2.5} size={16} className="text-foreground" />
                 {totalComments}
