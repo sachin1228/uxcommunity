@@ -70,7 +70,7 @@ interface ThreadCardProps {
   onUpdated: (thread: CommunityThread) => void;
   onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
-  onPollVoteChanged?: (threadId: string, counts: number[], userVote: number | null) => void;
+  onPollVoteChanged?: (threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) => void;
   onDeleted: (threadId: string) => void;
   communityName?: string;
   communityImage?: string | null;
@@ -116,7 +116,7 @@ export function ThreadCard({
   const [interactionError, setInteractionError] = useState<string | null>(null);
   const [pollVoteBusy, setPollVoteBusy] = useState(false);
   const [pollVotePending, setPollVotePending] = useState<number | null>(null);
-  const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null } | null>(null);
+  const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -248,7 +248,7 @@ export function ThreadCard({
   // Reflect externally-confirmed totals (parent sync or realtime) once they land.
   useEffect(() => {
     setPollVoteOverride(null);
-  }, [thread.poll_vote_counts, thread.poll_user_vote]);
+  }, [thread.poll_vote_counts, thread.poll_user_vote, thread.poll_undo_used]);
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
@@ -287,20 +287,55 @@ export function ThreadCard({
       const result = (await response.json().catch(() => null)) as {
         counts?: number[];
         user_vote?: number | null;
+        undo_used?: boolean;
         error?: string;
       } | null;
       if (!response.ok || !Array.isArray(result?.counts)) {
         throw new Error(result?.error ?? "Failed to record your vote.");
       }
       // Results appear only after the vote is confirmed by the server.
-      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null });
-      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null);
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
     } catch (error) {
       // Stay in the pre-vote state; the user can try again.
       setPollVoteOverride(null);
       showInteractionError(error instanceof Error ? error.message : "Failed to record your vote.");
     } finally {
       setPollVotePending(null);
+      setPollVoteBusy(false);
+    }
+  }
+
+  async function handlePollUndo() {
+    if (!thread.poll || pollVoteBusy) return;
+    setPollVoteBusy(true);
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "undo" }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        undo_used?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to undo your vote.");
+      }
+      // Back to the pre-vote state with the one-time undo consumed.
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
+    } catch (error) {
+      // Keep showing results — the vote stands until the server says otherwise.
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to undo your vote.");
+    } finally {
       setPollVoteBusy(false);
     }
   }
@@ -318,6 +353,9 @@ export function ThreadCard({
   const displayedPollUserVote = pollVoteOverride
     ? pollVoteOverride.userVote
     : (thread.poll_user_vote ?? null);
+  const displayedPollUndoUsed = pollVoteOverride
+    ? pollVoteOverride.undoUsed
+    : (thread.poll_undo_used ?? false);
 
   const cardClassName = onOpen
     ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
@@ -446,7 +484,9 @@ export function ThreadCard({
             userVote={displayedPollUserVote}
             busy={pollVoteBusy}
             pendingOption={pollVotePending}
+            canUndo={!displayedPollUndoUsed}
             onVote={(optionIndex) => void handlePollVote(optionIndex)}
+            onUndo={() => void handlePollUndo()}
           />
         )}
 

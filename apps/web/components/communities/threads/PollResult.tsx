@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { BarChart3, Check, Loader2 } from "lucide-react";
 import type { ThreadPoll } from "./types";
 
@@ -43,14 +44,19 @@ export function ThreadPollResult({
   userVote,
   busy,
   pendingOption,
+  canUndo,
   onVote,
+  onUndo,
 }: {
   poll: ThreadPoll;
   counts?: number[];
   userVote?: number | null;
   busy?: boolean;
   pendingOption?: number | null;
+  /** Whether the viewer may still use their one-time undo. */
+  canUndo?: boolean;
   onVote?: (optionIndex: number) => void;
+  onUndo?: () => void;
 }) {
   const options = Array.isArray(poll.options) ? poll.options : [];
   const totals = Array.isArray(counts) && counts.length === options.length
@@ -61,6 +67,7 @@ export function ThreadPollResult({
   const interactive = typeof onVote === "function";
   const hasVoted = selected !== null;
   const percents = percentageParts(totals, totalVotes);
+  const undoId = useId();
 
   return (
     <div className="mt-3 rounded-xl border border-border bg-background p-4">
@@ -173,10 +180,37 @@ export function ThreadPollResult({
         </div>
       ))}
 
-      <p role="status" className="mt-3 font-body text-[11px] tabular-nums text-foreground-subtle">
-        {hasVoted
-          ? `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"} · You voted for ${options[selected ?? 0] ?? "an option"}`
-          : `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"}`}
+      <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] tabular-nums text-foreground-subtle">
+        <span role="status">
+          {hasVoted
+            ? `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"} · You voted for ${options[selected ?? 0] ?? "an option"}`
+            : `${totalVotes} ${totalVotes === 1 ? "vote" : "votes"}`}
+        </span>
+        {hasVoted && interactive && onUndo && canUndo !== false && (
+          <span className="group/undo relative inline-flex items-center">
+            <button
+              type="button"
+              onClick={onUndo}
+              disabled={busy}
+              aria-label="Undo your vote"
+              aria-describedby={undoId}
+              className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy ? (
+                <Loader2 size={11} strokeWidth={2.5} className="animate-spin" aria-hidden />
+              ) : (
+                "Undo"
+              )}
+            </button>
+            <span
+              id={undoId}
+              role="tooltip"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 font-body text-[10px] font-normal normal-case tracking-normal text-foreground-muted opacity-0 shadow-xs transition-opacity duration-150 group-hover/undo:opacity-100 group-focus-within/undo:opacity-100"
+            >
+              You can undo only once
+            </span>
+          </span>
+        )}
       </p>
     </div>
   );

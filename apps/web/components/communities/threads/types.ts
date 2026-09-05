@@ -70,6 +70,8 @@ export interface CommunityThread {
   /** Per-option vote totals (aligned with poll.options) + the viewer's vote. */
   poll_vote_counts?: number[];
   poll_user_vote?: number | null;
+  /** Whether the viewer already used their one-time poll undo. */
+  poll_undo_used?: boolean;
   created_at: string;
   updated_at: string;
   like_count: number;

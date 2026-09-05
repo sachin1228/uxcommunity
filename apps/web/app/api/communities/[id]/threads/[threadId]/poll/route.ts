@@ -6,11 +6,12 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 /**
  * Vote on a thread poll (one vote per user; single choice).
- * Body: { option_index: number }.
+ * Body: { option_index: number } or { action: "undo" }.
  *
- * Votes are final: the endpoint rejects unvotes and vote changes, so a user
- * can only ever record one vote (re-voting the same option is idempotent and
- * just returns the current totals).
+ * A user can undo their vote exactly once per poll (undo_used), then vote
+ * again — that second vote is final. Vote changes without an undo, and any
+ * second undo, are rejected. Re-voting the same option is idempotent and
+ * just returns the current totals.
  */
 export async function POST(
   request: NextRequest,
@@ -23,7 +24,7 @@ export async function POST(
     return error as Response;
   }
 
-  const body = (await request.json().catch(() => null)) as { option_index?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { action?: unknown; option_index?: unknown } | null;
   const { id: communityId, threadId } = await params;
   const userId = session.userId!;
   const db = createServiceClient();
@@ -54,47 +55,69 @@ export async function POST(
     return NextResponse.json({ error: "This thread does not have a poll." }, { status: 400 });
   }
 
-  // Desired vote: an integer index into the options. Unvotes are not allowed.
-  const desiredIndex = body?.option_index;
-  if (!Number.isInteger(desiredIndex) || (desiredIndex as number) < 0 || (desiredIndex as number) >= options.length) {
-    return NextResponse.json({ error: "Invalid poll option." }, { status: 400 });
+  // Undo removes the vote once per user; otherwise an integer option index.
+  const isUndo = body?.action === "undo";
+  let desiredIndex: number | null = null;
+  if (!isUndo) {
+    const candidate = body?.option_index;
+    if (!Number.isInteger(candidate) || (candidate as number) < 0 || (candidate as number) >= options.length) {
+      return NextResponse.json({ error: "Invalid poll option." }, { status: 400 });
+    }
+    desiredIndex = candidate as number;
   }
 
-  // One final vote per user: an existing vote on a different option cannot be
-  // changed, and re-voting the same option is a no-op (idempotent).
   const { data: existingVote } = await db
     .from("thread_poll_votes")
-    .select("option_index")
+    .select("option_index, undo_used")
     .eq("thread_id", threadId)
     .eq("user_id", userId)
     .maybeSingle();
-  if (
-    existingVote &&
-    Number.isInteger(existingVote.option_index) &&
-    (existingVote.option_index as number) !== (desiredIndex as number)
-  ) {
-    return NextResponse.json(
-      { error: "Your vote on this poll is final and cannot be changed." },
-      { status: 409 },
-    );
-  }
-  if (!existingVote) {
+
+  if (isUndo) {
+    if (!existingVote || (existingVote.option_index as number | null) === null) {
+      return NextResponse.json({ error: "You don't have an active vote on this poll." }, { status: 400 });
+    }
+    if (existingVote.undo_used === true) {
+      return NextResponse.json({ error: "You can only undo your vote once." }, { status: 409 });
+    }
     const { error } = await db
       .from("thread_poll_votes")
-      .upsert(
-        { thread_id: threadId, user_id: userId, option_index: desiredIndex as number },
-        { onConflict: "thread_id,user_id" },
-      );
+      .update({ option_index: null, undo_used: true })
+      .eq("thread_id", threadId)
+      .eq("user_id", userId);
     if (error) {
-      console.error("[UPSERT poll vote]", error);
-      return NextResponse.json({ error: "Failed to record your vote." }, { status: 500 });
+      console.error("[UNDO poll vote]", error);
+      return NextResponse.json({ error: "Failed to undo your vote." }, { status: 500 });
+    }
+  } else {
+    // Voting: changing an active vote requires the (one-time) undo first, and
+    // re-voting the same option is a no-op. Re-voting after an undo is allowed
+    // — upsert only updates option_index, so undo_used is preserved.
+    const activeIndex = existingVote ? (existingVote.option_index as number | null) : null;
+    if (activeIndex !== null && activeIndex !== (desiredIndex as number)) {
+      return NextResponse.json(
+        { error: "Your vote on this poll is final. You can undo it first, but only once." },
+        { status: 409 },
+      );
+    }
+    if (activeIndex !== (desiredIndex as number)) {
+      const { error } = await db
+        .from("thread_poll_votes")
+        .upsert(
+          { thread_id: threadId, user_id: userId, option_index: desiredIndex as number },
+          { onConflict: "thread_id,user_id" },
+        );
+      if (error) {
+        console.error("[UPSERT poll vote]", error);
+        return NextResponse.json({ error: "Failed to record your vote." }, { status: 500 });
+      }
     }
   }
 
   // Recompute authoritative totals + the caller's current vote.
   const [{ data: voteRows }, { data: mineRow }] = await Promise.all([
     db.from("thread_poll_votes").select("option_index").eq("thread_id", threadId),
-    db.from("thread_poll_votes").select("option_index").eq("thread_id", threadId).eq("user_id", userId).maybeSingle(),
+    db.from("thread_poll_votes").select("option_index, undo_used").eq("thread_id", threadId).eq("user_id", userId).maybeSingle(),
   ]);
 
   const counts = Array.from({ length: options.length }, () => 0);
@@ -104,31 +127,34 @@ export async function POST(
     }
   }
   const userVote = mineRow && Number.isInteger(mineRow.option_index) ? (mineRow.option_index as number) : null;
+  const undoUsed = mineRow?.undo_used === true;
 
   void publishRealtimeBatch([
     {
       room: realtimeRooms.threads(communityId),
       topic: "poll",
       data: {
-        event: "INSERT",
+        event: isUndo ? "UNDO" : "INSERT",
         thread_id: threadId,
         user_id: userId,
         counts,
         user_vote: userVote,
+        undo_used: undoUsed,
       },
     },
     {
       room: realtimeRooms.profile(thread.user_id),
       topic: "poll",
       data: {
-        event: "INSERT",
+        event: isUndo ? "UNDO" : "INSERT",
         thread_id: threadId,
         user_id: userId,
         counts,
         user_vote: userVote,
+        undo_used: undoUsed,
       },
     },
   ]);
 
-  return NextResponse.json({ counts, user_vote: userVote });
+  return NextResponse.json({ counts, user_vote: userVote, undo_used: undoUsed });
 }

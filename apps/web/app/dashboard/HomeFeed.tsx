@@ -125,10 +125,10 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     ));
   }, [updateItems]);
 
-  const handleThreadPollVoted = useCallback((id: string, counts: number[], userVote: number | null) => {
+  const handleThreadPollVoted = useCallback((id: string, counts: number[], userVote: number | null, undoUsed: boolean) => {
     updateItems((prev) => prev.map((it) =>
       it._type === "thread" && it.id === id
-        ? { ...it, poll_vote_counts: counts, poll_user_vote: userVote }
+        ? { ...it, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed }
         : it
     ));
   }, [updateItems]);

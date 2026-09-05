@@ -11,9 +11,11 @@ export function pollOptionCount(row: Record<string, unknown>): number {
 }
 
 /**
- * Attach `poll_vote_counts` (aligned with the poll's options) and
- * `poll_user_vote` (the viewer's option index, or null) to thread rows that
- * carry a poll. Rows without a poll are returned unchanged.
+ * Attach `poll_vote_counts` (aligned with the poll's options),
+ * `poll_user_vote` (the viewer's option index, or null) and
+ * `poll_undo_used` (whether the viewer has already used their one-time undo)
+ * to thread rows that carry a poll. Rows without a poll are returned
+ * unchanged.
  *
  * Read paths call this after their primary query so thread cards can render
  * live totals. On query failure we log and return the rows unchanged — cards
@@ -36,7 +38,7 @@ export async function attachPollVotes(
 
   const [{ data: voteRows, error: voteError }, { data: myRows, error: myError }] = await Promise.all([
     db.from("thread_poll_votes").select("thread_id, option_index").in("thread_id", threadIds),
-    db.from("thread_poll_votes").select("thread_id, option_index").eq("user_id", userId).in("thread_id", threadIds),
+    db.from("thread_poll_votes").select("thread_id, option_index, undo_used").eq("user_id", userId).in("thread_id", threadIds),
   ]);
 
   if (voteError || myError) {
@@ -56,15 +58,24 @@ export async function attachPollVotes(
     }
   }
 
-  const mine: Record<string, number | null> = {};
+  const mine: Record<string, { optionIndex: number | null; undoUsed: boolean }> = {};
   for (const vote of myRows ?? []) {
-    mine[vote.thread_id] = Number.isInteger(vote.option_index) ? vote.option_index : null;
+    mine[vote.thread_id] = {
+      optionIndex: Number.isInteger(vote.option_index) ? (vote.option_index as number) : null,
+      undoUsed: vote.undo_used === true,
+    };
   }
 
   return rows.map((row) => {
     const id = row.id as string;
+    const mineVote = id ? mine[id] : undefined;
     return id && tally[id]
-      ? { ...row, poll_vote_counts: tally[id], poll_user_vote: mine[id] ?? null }
+      ? {
+          ...row,
+          poll_vote_counts: tally[id],
+          poll_user_vote: mineVote?.optionIndex ?? null,
+          poll_undo_used: mineVote?.undoUsed ?? false,
+        }
       : row;
   });
 }

@@ -205,16 +205,16 @@ export function ProfileThreads({
     );
   }
 
-  function handlePollVoteChanged(threadId: string, counts: number[], userVote: number | null) {
+  function handlePollVoteChanged(threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) {
     setThreads((current) =>
       current.map((t) =>
-        t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote } : t,
+        t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } : t,
       ),
     );
     setSavedItems((current) =>
       current.map((item) =>
         item.type === "thread" && item.data.id === threadId
-          ? { ...item, data: { ...item.data, poll_vote_counts: counts, poll_user_vote: userVote } }
+          ? { ...item, data: { ...item.data, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } }
           : item,
       ),
     );
