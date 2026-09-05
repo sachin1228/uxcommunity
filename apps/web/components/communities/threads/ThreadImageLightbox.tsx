@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  ExternalLink,
   Heart,
   MessageCircle,
   X,
@@ -395,18 +394,6 @@ export function ThreadImageLightbox({
                 </>
               )}
             </div>
-          </div>
-
-          {/* Footer: full thread link */}
-          <div className="shrink-0 border-t border-border p-3">
-            <a
-              href={`/dashboard/communities/${communityId}/threads/${thread.id}`}
-              onClick={onClose}
-              className="flex items-center justify-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs font-medium text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
-            >
-              View full thread
-              <ExternalLink strokeWidth={2.5} size={12} />
-            </a>
           </div>
         </aside>
       </div>
