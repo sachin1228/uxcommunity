@@ -12,49 +12,10 @@ import {
 } from "lucide-react";
 import type { CommunityThread, ThreadAttachment, ThreadComment } from "./types";
 import { THREAD_CATEGORIES } from "./types";
-import { formatFullDate, formatRelativeDate } from "./threadShared";
+import { formatFullDate } from "./threadShared";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
-
-// ── Avatar ────────────────────────────────────────────────────────────────────
-
-function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" }) {
-  const initial = name.charAt(0).toUpperCase();
-  const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-9 w-9 text-xs";
-  return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
-      {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        <span className="font-display font-bold text-accent">{initial}</span>
-      )}
-    </div>
-  );
-}
-
-// ── Read-only comment row (matches the thread detail page, minus actions) ─────
-
-function CommentRow({ comment, isReply = false }: { comment: ThreadComment; isReply?: boolean }) {
-  const name = comment.users?.name ?? "Member";
-  return (
-    <div className={`flex gap-2.5 ${isReply ? "pl-8" : ""}`}>
-      <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "sm" : "md"} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-body text-xs font-semibold text-foreground">{name}</span>
-          <span className="font-body text-[11px] text-foreground-subtle">{formatRelativeDate(comment.created_at)}</span>
-        </div>
-        <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm text-foreground-muted">{comment.body}</p>
-        {comment.replies.map((reply) => (
-          <div key={reply.id} className="mt-3">
-            <CommentRow comment={reply} isReply />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+import { Avatar, CommentBox, CommentRow } from "./ThreadComments";
 
 // ── Download helper (mirrors the chat lightbox) ───────────────────────────────
 
@@ -92,11 +53,14 @@ async function downloadImage(url: string, fallbackName: string) {
 interface ThreadImageLightboxProps {
   thread: CommunityThread;
   communityId: string;
+  currentUserId: string;
   /** Image attachments only (already filtered by the caller). */
   images: ThreadAttachment[];
   /** Image to show first. */
   initialIndex: number;
   onClose: () => void;
+  /** Syncs the parent (card / feed / detail page) when the comment count changes. */
+  onUpdated?: (thread: CommunityThread) => void;
 }
 
 /**
@@ -108,9 +72,11 @@ interface ThreadImageLightboxProps {
 export function ThreadImageLightbox({
   thread,
   communityId,
+  currentUserId,
   images,
   initialIndex,
   onClose,
+  onUpdated,
 }: ThreadImageLightboxProps) {
   const [index, setIndex] = useState(() =>
     Math.min(Math.max(initialIndex, 0), Math.max(0, images.length - 1)),
@@ -128,10 +94,16 @@ export function ThreadImageLightbox({
   }, [images.length]);
 
   // Keyboard navigation (Esc / arrows) + scroll lock while the viewer is open.
+  // Arrow keys are ignored while typing in the comment box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable)) return;
+      if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
     };
     document.addEventListener("keydown", onKey);
@@ -158,6 +130,38 @@ export function ThreadImageLightbox({
       cancelled = true;
     };
   }, [communityId, thread.id]);
+
+  // Post / reply / delete a comment (same shape as the thread detail page).
+  function handleCommentPosted(comment: ThreadComment) {
+    setComments((current) => {
+      const list = current ?? [];
+      return comment.parent_id
+        ? list.map((item) => item.id === comment.parent_id
+          ? { ...item, replies: [...item.replies.filter((reply) => reply.id !== comment.id), comment] }
+          : item)
+        : [...list.filter((item) => item.id !== comment.id), { ...comment, replies: [] }];
+    });
+  }
+
+  function handleCommentDeleted(id: string, parentId: string | null) {
+    setComments((current) => {
+      const list = current ?? [];
+      return parentId
+        ? list.map((comment) => comment.id === parentId
+          ? { ...comment, replies: comment.replies.filter((reply) => reply.id !== id) }
+          : comment)
+        : list.filter((comment) => comment.id !== id);
+    });
+  }
+
+  // Keep the thread (and therefore the feed card / detail page) in sync with
+  // the real comment count as comments are posted or deleted.
+  useEffect(() => {
+    if (comments === null) return;
+    const total = comments.reduce((acc, comment) => acc + 1 + comment.replies.length, 0);
+    onUpdated?.({ ...thread, comment_count: total });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments]);
 
   // Keep the active thumbnail in view when navigating.
   useEffect(() => {
@@ -228,7 +232,7 @@ export function ThreadImageLightbox({
                 <span className="shrink-0 font-body text-xs tabular-nums text-white/70" role="status">
                   Image {index + 1} of {images.length}
                 </span>
-                <div className="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-none">
+                <div className="flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-none px-1 py-1">
                   {images.map((img, i) => (
                     <button
                       key={`${img.url}-${i}`}
@@ -338,17 +342,57 @@ export function ThreadImageLightbox({
                   Couldn&apos;t load comments.
                 </p>
               )}
-              {comments && comments.length === 0 && (
-                <p className="mt-4 font-body text-xs text-foreground-subtle">
-                  No comments yet.
-                </p>
-              )}
-              {comments && comments.length > 0 && (
-                <div className="mt-4 space-y-4">
-                  {comments.map((comment) => (
-                    <CommentRow key={comment.id} comment={comment} />
-                  ))}
-                </div>
+              {comments !== null && !commentsError && (
+                <>
+                  {thread.allow_replies ? (
+                    <div className="mt-3">
+                      <CommentBox
+                        communityId={communityId}
+                        threadId={thread.id}
+                        onPosted={handleCommentPosted}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-3 border-y border-border px-3 py-2.5 text-center font-body text-xs text-foreground-subtle">
+                      Replies are closed for this thread.
+                    </div>
+                  )}
+
+                  {comments.length === 0 ? (
+                    <p className="mt-4 font-body text-xs text-foreground-subtle">
+                      No comments yet. Be the first!
+                    </p>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="space-y-3">
+                          <CommentRow
+                            comment={comment}
+                            communityId={communityId}
+                            threadId={thread.id}
+                            currentUserId={currentUserId}
+                            allowReplies={thread.allow_replies}
+                            onDeleted={handleCommentDeleted}
+                            onReplied={handleCommentPosted}
+                          />
+                          {comment.replies.map((reply) => (
+                            <CommentRow
+                              key={reply.id}
+                              comment={reply}
+                              communityId={communityId}
+                              threadId={thread.id}
+                              currentUserId={currentUserId}
+                              allowReplies={false}
+                              isReply
+                              onDeleted={handleCommentDeleted}
+                              onReplied={handleCommentPosted}
+                            />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

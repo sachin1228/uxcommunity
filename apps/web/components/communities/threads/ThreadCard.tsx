@@ -622,9 +622,11 @@ export function ThreadCard({
         <ThreadImageLightbox
           thread={thread}
           communityId={communityId}
+          currentUserId={currentUserId}
           images={images}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
+          onUpdated={onUpdated}
         />
       )}
     </>
