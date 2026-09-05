@@ -44,10 +44,16 @@ export function CreateEventModal({
     setError(null);
     try {
       const form = new FormData();
-      try {
-        form.append("file", compressedFile(await compressImage(file), file));
-      } catch {
+      if (file.type === "image/gif") {
+        // Animated GIFs pass through untouched — compressing them would flatten
+        // the animation into a static frame.
         form.append("file", file);
+      } else {
+        try {
+          form.append("file", compressedFile(await compressImage(file), file));
+        } catch {
+          form.append("file", file);
+        }
       }
       const res = await fetch(`/api/communities/${communityId}/events/upload`, { method: "POST", body: form });
       const data = await res.json();

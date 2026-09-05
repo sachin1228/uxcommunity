@@ -14,15 +14,7 @@
  */
 
 import { encode } from "@jsquash/webp";
-import { fitWithinBounds } from "./image-geometry";
-
-/**
- * Universal quality. WebP (libwebp) accepts 0–100; 0.90 is the product-level
- * setting on the 0–1 scale used everywhere else in the app (canvas, native
- * pickers), so it is converted to 90 when calling the encoder. Kept in lockstep
- * with IMAGE_QUALITY in lib/image-client.ts.
- */
-const IMAGE_QUALITY = 0.9;
+import { fitWithinBounds, IMAGE_QUALITY } from "./image-geometry";
 
 interface CompressRequest {
   id: number;

@@ -191,7 +191,9 @@ export function CreateThreadModal({
       for (const file of files) {
         const formData = new FormData();
         let payload = file;
-        if (file.type.startsWith("image/")) {
+        // Animated GIFs pass through untouched — compressing them would flatten
+        // the animation into a static frame.
+        if (file.type.startsWith("image/") && file.type !== "image/gif") {
           try { payload = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
         }
         formData.append("file", payload);

@@ -18,7 +18,9 @@
  * filename is applied by `compressedFile()` at the call site.
  */
 
-import { fitWithinBounds, readWebpDimensions } from "./image-geometry";
+import { fitWithinBounds, IMAGE_QUALITY, MAX_DIMENSION, readWebpDimensions } from "./image-geometry";
+
+export { IMAGE_QUALITY, MAX_DIMENSION } from "./image-geometry";
 
 export interface ClientCompressedImage {
   blob: Blob;
@@ -35,15 +37,6 @@ export interface CompressOptions {
    */
   maxDimension?: number;
 }
-
-/**
- * Universal lossy quality — 0.90 for every image type (avatars, chat images,
- * community images, post images, portfolio images, screenshots, UI images).
- */
-export const IMAGE_QUALITY = 0.9;
-
-/** Universal longest-edge cap in pixels. */
-export const MAX_DIMENSION = 2560;
 
 /**
  * Avatar uploads are displayed tiny (≤ a few hundred CSS pixels at 2–3x), so

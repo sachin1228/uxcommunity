@@ -1,7 +1,20 @@
 /**
- * Pure image geometry helpers — safe to import anywhere (main thread, worker,
- * SSR). No DOM, no WASM.
+ * Pure image geometry + shared compression constants — safe to import anywhere
+ * (main thread, worker, SSR). No DOM, no WASM.
+ *
+ * Constants live here (rather than in image-client.ts) so the compression
+ * Worker can import the exact same values without pulling in DOM/Worker code.
  */
+
+/**
+ * Universal lossy quality — 0.90 for every image type (avatars, chat images,
+ * community images, post images, portfolio images, screenshots, UI images).
+ * 0–1 scale; libwebp callers convert to 0–100 by multiplying by 100.
+ */
+export const IMAGE_QUALITY = 0.9;
+
+/** Universal longest-edge cap in pixels. */
+export const MAX_DIMENSION = 2560;
 
 /**
  * Downscale `width` × `height` to fit inside `maxDimension` on the longest

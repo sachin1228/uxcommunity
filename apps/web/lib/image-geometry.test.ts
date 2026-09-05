@@ -1,7 +1,14 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { fitWithinBounds, readWebpDimensions } from "./image-geometry"
+import { fitWithinBounds, IMAGE_QUALITY, MAX_DIMENSION, readWebpDimensions } from "./image-geometry"
+
+// ── Shared compression constants ─────────────────────────────────────────────
+
+test("compression constants are fixed at quality 0.90 and 2560px", () => {
+  assert.equal(IMAGE_QUALITY, 0.9)
+  assert.equal(MAX_DIMENSION, 2560)
+})
 
 // ── fitWithinBounds ──────────────────────────────────────────────────────────
 
