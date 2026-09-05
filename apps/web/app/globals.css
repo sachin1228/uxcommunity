@@ -461,6 +461,8 @@ select:focus-visible {
     opacity: 0;
     transform: translate(80vw, -20vh) rotate(15deg) scale(1);
   }
+}
+
 /* ─── Logging-out screen loader ──────────────────────────────────────── */
 /* Dots arranged in a ring fade in sequence so the pulse travels around the
    circle — the Vercel-style loader on the full-screen "Logging out" state. */
