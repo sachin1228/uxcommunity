@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteR2Keys, getR2PublicBase, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
+import { deleteFromR2, getR2PublicBase, getR2KeyFromUrl, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
 
 interface TrackedReference {
   key: string;
@@ -29,6 +29,14 @@ async function collectTrackedReferences(db: ReturnType<typeof createServiceClien
     { table: "designer_profiles", column: "avatar_url", entityType: "profile" },
     { table: "communities", column: "image_url", entityType: "community" },
     { table: "communities", column: "lottie_url", entityType: "community" },
+    { table: "cities", column: "image_url", entityType: "city" },
+    { table: "cities", column: "lottie_url", entityType: "city" },
+    { table: "design_sectors", column: "image_url", entityType: "sector" },
+    { table: "design_sectors", column: "lottie_url", entityType: "sector" },
+    { table: "design_interests", column: "image_url", entityType: "interest" },
+    { table: "design_interests", column: "lottie_url", entityType: "interest" },
+    { table: "experience_levels", column: "image_url", entityType: "experience_level" },
+    { table: "experience_levels", column: "lottie_url", entityType: "experience_level" },
     { table: "community_messages", column: "image_url", entityType: "message" },
     { table: "community_events", column: "cover_image_url", entityType: "event" },
     { table: "community_showcase_posts", column: "image_url", entityType: "showcase" },
@@ -44,7 +52,7 @@ async function collectTrackedReferences(db: ReturnType<typeof createServiceClien
     for (const row of data ?? []) {
       const url = coerceHttpUrl(row?.[query.column]);
       if (!url) continue;
-      const key = url.includes("r2") || url.includes("cloudflarestorage") ? new URL(url).pathname.replace(/^\//, "") : null;
+      const key = getR2KeyFromUrl(url);
       if (!key) continue;
       references.push({
         key,
@@ -65,7 +73,7 @@ async function collectTrackedReferences(db: ReturnType<typeof createServiceClien
         if (!attachment || typeof attachment !== "object") continue;
         const url = coerceHttpUrl((attachment as { url?: unknown }).url);
         if (!url) continue;
-        const key = url.includes("r2") || url.includes("cloudflarestorage") ? new URL(url).pathname.replace(/^\//, "") : null;
+        const key = getR2KeyFromUrl(url);
         if (!key) continue;
         references.push({
           key,
@@ -169,13 +177,31 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "No valid orphan object keys were provided for deletion." }, { status: 400 });
       }
 
-      const result = await deleteR2Keys(normalized);
+      const tracked = await collectTrackedReferences(createServiceClient());
+      const trackedKeys = new Set(tracked.map((reference) => reference.key));
+      const protectedKeys = normalized.filter((key) => trackedKeys.has(key));
+      const deletableKeys = normalized.filter((key) => !trackedKeys.has(key));
+      const failed = protectedKeys.map((key) => ({
+        key,
+        error: "Object is referenced by the database and was not deleted.",
+      }));
+      const deleted: string[] = [];
+
+      for (const key of deletableKeys) {
+        try {
+          await deleteFromR2(key);
+          deleted.push(key);
+        } catch (error) {
+          failed.push({ key, error: error instanceof Error ? error.message : "Unknown delete error" });
+        }
+      }
+
       return NextResponse.json({
-        deleted: result.deleted,
-        failed: result.failed,
+        deleted,
+        failed,
         total: normalized.length,
-        deletedCount: result.deleted.length,
-        failedCount: result.failed.length,
+        deletedCount: deleted.length,
+        failedCount: failed.length,
       });
     }
 

@@ -213,7 +213,13 @@ export type R2ReferenceLookup = {
   column: string;
   idColumn?: string;
   idValue?: string;
+  getUrls?: (value: unknown) => string[];
 };
+
+function getReferenceUrls(lookup: R2ReferenceLookup, value: unknown): string[] {
+  if (lookup.getUrls) return lookup.getUrls(value);
+  return typeof value === "string" ? [value] : [];
+}
 
 export async function deleteOwnedR2AssetIfUnique(
   db: any,
@@ -226,6 +232,7 @@ export async function deleteOwnedR2AssetIfUnique(
   }
 
   const references: Array<{ table: string; column: string; id: string | null }> = [];
+  let lookupFailed = false;
 
   for (const lookup of referenceLookups) {
     let query = db.from(lookup.table).select(`id, ${lookup.column}`);
@@ -235,14 +242,19 @@ export async function deleteOwnedR2AssetIfUnique(
     const { data, error } = await query;
     if (error) {
       console.error("[r2] reference lookup failed", { table: lookup.table, column: lookup.column, error });
+      lookupFailed = true;
       continue;
     }
     for (const row of data ?? []) {
-      const candidate = row?.[lookup.column];
-      if (typeof candidate === "string" && getR2KeyFromUrl(candidate) === key) {
+      const candidates = getReferenceUrls(lookup, row?.[lookup.column]);
+      if (candidates.some((candidate) => getR2KeyFromUrl(candidate) === key)) {
         references.push({ table: lookup.table, column: lookup.column, id: typeof row?.id === "string" ? row.id : null });
       }
     }
+  }
+
+  if (lookupFailed) {
+    return { status: "skipped", key, references };
   }
 
   if (references.length > 1) {
@@ -253,6 +265,39 @@ export async function deleteOwnedR2AssetIfUnique(
     return { status: "skipped", key, references };
   }
 
+  try {
+    await deleteFromR2(key);
+    return { status: "deleted", key, references };
+  } catch (error) {
+    console.error("[r2] delete failed", { key, error });
+    return { status: "skipped", key, references };
+  }
+}
+
+export async function deleteR2AssetIfUnreferenced(
+  db: any,
+  url: string | null | undefined,
+  referenceLookups: R2ReferenceLookup[] = [],
+): Promise<{ status: "deleted" | "referenced" | "missing" | "skipped"; key: string | null; references: Array<{ table: string; column: string; id: string | null }> }> {
+  const key = url ? getR2KeyFromUrl(url) : null;
+  if (!key) return { status: "missing", key: null, references: [] };
+
+  const references: Array<{ table: string; column: string; id: string | null }> = [];
+  for (const lookup of referenceLookups) {
+    const { data, error } = await db.from(lookup.table).select(`id, ${lookup.column}`);
+    if (error) {
+      console.error("[r2] reference lookup failed", { table: lookup.table, column: lookup.column, error });
+      return { status: "skipped", key, references };
+    }
+    for (const row of data ?? []) {
+      const candidates = getReferenceUrls(lookup, row?.[lookup.column]);
+      if (candidates.some((candidate) => getR2KeyFromUrl(candidate) === key)) {
+        references.push({ table: lookup.table, column: lookup.column, id: typeof row?.id === "string" ? row.id : null });
+      }
+    }
+  }
+
+  if (references.length > 0) return { status: "referenced", key, references };
   try {
     await deleteFromR2(key);
     return { status: "deleted", key, references };

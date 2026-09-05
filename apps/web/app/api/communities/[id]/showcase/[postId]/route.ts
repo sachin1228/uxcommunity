@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 
 const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
 
@@ -86,14 +86,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
 
   if (shouldDeletePreviousR2Asset(existing.image_url ?? null, imageUrl) && existing.image_url) {
-    const previousKey = parseR2Key(existing.image_url);
-    if (previousKey) {
-      try {
-        await deleteFromR2(previousKey);
-      } catch (cleanupError) {
-        console.error("[PATCH showcase] previous image cleanup failed:", cleanupError);
-      }
-    }
+    await deleteOwnedR2AssetIfUnique(db, existing.image_url, [
+      { table: "community_showcase_posts", column: "image_url" },
+    ]);
   }
 
   return NextResponse.json({ post: await enrich(db, data, userId) });
@@ -105,17 +100,12 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { data: existing } = await getPost(db, id, postId);
   if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
-  const previousKey = existing.image_url ? parseR2Key(existing.image_url) : null;
   const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
 
-  if (previousKey) {
-    try {
-      await deleteFromR2(previousKey);
-    } catch (cleanupError) {
-      console.error("[DELETE showcase] image cleanup failed:", cleanupError);
-    }
-  }
+  await deleteR2AssetIfUnreferenced(db, existing.image_url, [
+    { table: "community_showcase_posts", column: "image_url" },
+  ]);
 
   return new NextResponse(null, { status: 204 });
 }

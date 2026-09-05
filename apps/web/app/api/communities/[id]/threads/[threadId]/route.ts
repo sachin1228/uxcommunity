@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { moderateText } from "@/lib/moderation/text";
-import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique } from "@/lib/r2";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
@@ -169,15 +169,15 @@ export async function PATCH(
     : [];
   for (const previousUrl of oldUrls) {
     if (!previousUrl) continue;
-    const previousKey = parseR2Key(previousUrl);
-    if (!previousKey) continue;
     const stillUsed = newUrls.some((nextUrl) => previousUrl === nextUrl);
-    if (!stillUsed && shouldDeletePreviousR2Asset(previousUrl, "https://placeholder.invalid")) {
-      try {
-        await deleteFromR2(previousKey);
-      } catch (cleanupError) {
-        console.error("[PATCH thread] attachment cleanup failed:", cleanupError);
-      }
+    if (!stillUsed) {
+      await deleteOwnedR2AssetIfUnique(db, previousUrl, [{
+        table: "community_threads",
+        column: "attachments",
+        getUrls: (value) => Array.isArray(value)
+          ? value.flatMap((attachment) => attachment && typeof attachment === "object" && typeof attachment.url === "string" ? [attachment.url] : [])
+          : [],
+      }]);
     }
   }
 
@@ -239,13 +239,13 @@ export async function DELETE(
 
   const attachments = Array.isArray(threadRow?.attachments) ? threadRow.attachments as Array<{ url?: string }> : [];
   for (const attachment of attachments) {
-    const key = attachment?.url ? parseR2Key(attachment.url) : null;
-    if (!key) continue;
-    try {
-      await deleteFromR2(key);
-    } catch (cleanupError) {
-      console.error("[DELETE thread] attachment cleanup failed:", cleanupError);
-    }
+    await deleteR2AssetIfUnreferenced(db, attachment?.url, [{
+      table: "community_threads",
+      column: "attachments",
+      getUrls: (value) => Array.isArray(value)
+        ? value.flatMap((item) => item && typeof item === "object" && typeof item.url === "string" ? [item.url] : [])
+        : [],
+    }]);
   }
 
   void publishRealtimeBatch([

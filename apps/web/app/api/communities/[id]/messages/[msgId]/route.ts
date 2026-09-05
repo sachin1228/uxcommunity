@@ -152,23 +152,16 @@ export async function DELETE(
     .eq("id", msgId)
     .eq("community_id", communityId);
 
-  if (msg.image_url) {
-    const previousKey = msg.image_url.includes("r2") || msg.image_url.includes("cloudflarestorage")
-      ? new URL(msg.image_url).pathname.replace(/^\//, "")
-      : null;
-    if (previousKey) {
-      try {
-        await import("@/lib/r2").then(({ deleteFromR2 }) => deleteFromR2(previousKey));
-      } catch (cleanupError) {
-        console.error("[DELETE message] image cleanup error:", cleanupError);
-      }
-    }
-  }
-
   if (error) {
     console.error("[DELETE message]", error);
     return NextResponse.json({ error: "Failed to delete message." }, { status: 500 });
   }
+
+  await import("@/lib/r2").then(({ deleteR2AssetIfUnreferenced }) =>
+    deleteR2AssetIfUnreferenced(db, msg.image_url, [
+      { table: "community_messages", column: "image_url" },
+    ])
+  );
 
   // Audit trail for moderation deletions of other members' messages.
   if (!isOwn && canModerate) {

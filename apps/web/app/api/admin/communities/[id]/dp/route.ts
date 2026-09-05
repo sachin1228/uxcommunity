@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 
 const MAX_IMAGE_BYTES  = 5 * 1024 * 1024; // 5 MB — same as master-data uploads
@@ -15,6 +15,19 @@ const MASTER_TABLE: Record<string, { table: string; idCol: string }> = {
   interest:         { table: "design_interests",  idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
 };
+
+const DP_REFERENCE_LOOKUPS = [
+  { table: "communities", column: "image_url" },
+  { table: "communities", column: "lottie_url" },
+  { table: "cities", column: "image_url" },
+  { table: "cities", column: "lottie_url" },
+  { table: "design_sectors", column: "image_url" },
+  { table: "design_sectors", column: "lottie_url" },
+  { table: "design_interests", column: "image_url" },
+  { table: "design_interests", column: "lottie_url" },
+  { table: "experience_levels", column: "image_url" },
+  { table: "experience_levels", column: "lottie_url" },
+];
 
 // ── POST /api/admin/communities/[id]/dp ──────────────────────────────────────
 // Replaces the display picture of an APP-CREATED community (owner_id IS NULL)
@@ -136,32 +149,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to save display picture." }, { status: 500 });
   }
 
-  const previousImageUrl = community.image_url ?? null;
-  const nextImageUrl = kind === "image" ? url : community.image_url ?? null;
-  if (shouldDeletePreviousR2Asset(previousImageUrl, nextImageUrl) && previousImageUrl) {
-    const previousKey = parseR2Key(previousImageUrl);
-    if (previousKey) {
-      try {
-        await deleteFromR2(previousKey);
-      } catch (cleanupError) {
-        console.error("[community-dp] previous picture cleanup failed:", cleanupError);
-      }
-    }
-  }
-
-  const previousLottieUrl = community.lottie_url ?? null;
-  const nextLottieUrl = kind === "lottie" ? url : community.lottie_url ?? null;
-  if (shouldDeletePreviousR2Asset(previousLottieUrl, nextLottieUrl) && previousLottieUrl) {
-    const previousKey = parseR2Key(previousLottieUrl);
-    if (previousKey) {
-      try {
-        await deleteFromR2(previousKey);
-      } catch (cleanupError) {
-        console.error("[community-dp] previous lottie cleanup failed:", cleanupError);
-      }
-    }
-  }
-
   // Mirror onto the linked master-data row so the change propagates everywhere.
   let master_synced = false;
   const lookup = MASTER_TABLE[community.type];
@@ -172,6 +159,11 @@ export async function POST(
       .eq(lookup.idCol, community.reference_id);
     master_synced = !masterError;
     if (masterError) console.error("[community-dp] master row sync failed:", masterError);
+  }
+
+  const previousUrl = kind === "image" ? community.image_url : community.lottie_url;
+  if ((!lookup || master_synced) && shouldDeletePreviousR2Asset(previousUrl, url) && previousUrl) {
+    await deleteOwnedR2AssetIfUnique(db, previousUrl, DP_REFERENCE_LOOKUPS);
   }
 
   revalidateTag("master-images", {});
@@ -233,17 +225,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to remove animation." }, { status: 500 });
   }
 
-  if (previousLottieUrl) {
-    const previousKey = parseR2Key(previousLottieUrl);
-    if (previousKey) {
-      try {
-        await deleteFromR2(previousKey);
-      } catch (cleanupError) {
-        console.error("[community-dp] delete lottie cleanup failed:", cleanupError);
-      }
-    }
-  }
-
   let master_synced = false;
   const lookup = MASTER_TABLE[community.type];
   if (lookup && community.reference_id) {
@@ -252,6 +233,16 @@ export async function DELETE(
       .update({ lottie_url: null, lottie_format: null })
       .eq(lookup.idCol, community.reference_id);
     master_synced = !masterError;
+  }
+
+  if ((!lookup || master_synced) && previousLottieUrl) {
+    await deleteR2AssetIfUnreferenced(db, previousLottieUrl, [
+      { table: "communities", column: "lottie_url" },
+      { table: "cities", column: "lottie_url" },
+      { table: "design_sectors", column: "lottie_url" },
+      { table: "design_interests", column: "lottie_url" },
+      { table: "experience_levels", column: "lottie_url" },
+    ]);
   }
 
   revalidateTag("master-images", {});
