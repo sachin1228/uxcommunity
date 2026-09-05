@@ -5,6 +5,7 @@ import {
   collectR2Keys,
   shouldDeletePreviousR2Asset,
   getR2KeyFromUrl,
+  normalizeR2DeleteKeys,
 } from "./r2";
 
 test("collectR2Keys deduplicates and ignores non-R2 URLs", () => {
@@ -36,4 +37,19 @@ test("getR2KeyFromUrl extracts the object key from the configured public base", 
 
   assert.equal(getR2KeyFromUrl("https://example.r2.dev/avatars/user-1/a.png"), "avatars/user-1/a.png");
   assert.equal(getR2KeyFromUrl("https://other.example.com/avatars/user-1/a.png"), null);
+});
+
+test("normalizeR2DeleteKeys accepts only exact object keys and strips invalid input", () => {
+  process.env.R2_PUBLIC_URL = "https://example.r2.dev";
+
+  assert.deepEqual(normalizeR2DeleteKeys([
+    "avatars/user-1/a.png",
+    "avatars/user-1/a.png",
+    "https://example.r2.dev/avatars/user-1/b.png",
+    "../secret",
+    "",
+    "*",
+    null,
+    undefined,
+  ]), ["avatars/user-1/a.png"]);
 });

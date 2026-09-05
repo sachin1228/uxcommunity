@@ -306,7 +306,7 @@ export function EventCard({
             dateInline
             secondaryLabel={event.is_online ? "Event · Online" : event.location ? `Event · ${event.location}` : "Event"}
           />
-          <div onClick={(e) => e.preventDefault()}>
+          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <EventOptionsMenu
               saved={event.user_saved}
               shared={shared}
@@ -350,13 +350,15 @@ export function EventCard({
       {showEditModal && !past && (
         <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
       )}
-      <ConfirmDialog
-        open={confirmDelete}
-        title="Delete event?"
-        message="This will permanently remove this event. This cannot be undone."
-        onClose={() => setConfirmDelete(false)}
-        onConfirm={handleDelete}
-      />
+      <div onClick={(e) => e.stopPropagation()}>
+        <ConfirmDialog
+          open={confirmDelete}
+          title="Delete event?"
+          message="This will permanently remove this event. This cannot be undone."
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={handleDelete}
+        />
+      </div>
     </article>
   );
 }

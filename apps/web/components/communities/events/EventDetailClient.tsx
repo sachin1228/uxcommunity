@@ -9,7 +9,7 @@ import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
-import { fetchJsonCached, getCachedRequest, setCachedRequest } from "@/lib/request-cache";
+import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
@@ -292,21 +292,39 @@ export function EventDetailClient({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const fetchComments = useCallback(async () => {
-    try {
-      const data = await fetchJsonCached<{ comments?: EventComment[] }>(
-        commentsUrl,
-        { staleMs: 15_000 },
-        currentUserId,
-      );
-      setComments(data.comments ?? []);
-    } finally { setCommentsLoading(false); }
-  }, [commentsUrl, currentUserId]);
-
-  useEffect(() => { void fetchComments(); }, [fetchComments]);
   useEffect(() => {
-    setCachedRequest(commentsUrl, { comments }, currentUserId);
-  }, [comments, commentsUrl, currentUserId]);
+    let isActive = true;
+
+    async function loadComments() {
+      try {
+        const data = await fetchJsonCached<{ comments?: EventComment[] }>(
+          commentsUrl,
+          { staleMs: 15_000 },
+          currentUserId,
+        );
+        if (!isActive) return;
+        const nextComments = data.comments ?? [];
+        setComments(nextComments);
+        setCachedRequest(commentsUrl, { comments: nextComments }, currentUserId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (/event not found/i.test(message)) {
+          invalidateRequest(commentsUrl, currentUserId);
+          router.push(`/dashboard/communities/${communityId}`);
+          return;
+        }
+        console.error("[EventDetailClient] failed to fetch comments:", error);
+      } finally {
+        if (isActive) setCommentsLoading(false);
+      }
+    }
+
+    void loadComments();
+
+    return () => {
+      isActive = false;
+    };
+  }, [commentsUrl, currentUserId, router, communityId]);
 
   const handleLikeChanged = useCallback((eventId: string, liked: boolean, count: number) => {
     setEvent((current) => current.id === eventId
@@ -388,7 +406,11 @@ export function EventDetailClient({
               communityName={showCommunityAttribution ? communityName : undefined}
               communityImage={communityImage}
               onUpdated={setEvent}
-              onDeleted={() => router.push(`/dashboard/communities/${communityId}`)}
+              onDeleted={() => {
+                invalidateRequest(commentsUrl, currentUserId);
+                invalidateRequest(`/api/communities/${communityId}/events/${event.id}`, currentUserId);
+                router.push(`/dashboard/communities/${communityId}`);
+              }}
               onRsvpChanged={(_, rsvped, count) => setEvent((current) => ({ ...current, user_rsvped: rsvped, rsvp_count: count }))}
               onRsvpSettled={async () => {
                 const response = await fetch(`/api/communities/${communityId}/events/${event.id}/rsvp/list`);

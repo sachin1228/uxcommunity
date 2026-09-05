@@ -17,6 +17,14 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 
 const EVENTS_STALE_MS = 60_000;
 
+function mergeUniqueEvents(events: CommunityEvent[]) {
+  const byId = new Map<string, CommunityEvent>();
+  for (const event of events) {
+    byId.set(event.id, event);
+  }
+  return [...byId.values()];
+}
+
 export function EventsView({
   communityId,
   currentUserId,
@@ -52,7 +60,7 @@ export function EventsView({
           currentUserId,
         ),
       ]);
-      const allEvents = [...(upcomingData.events ?? []), ...(pastData.events ?? [])];
+      const allEvents = mergeUniqueEvents([...(upcomingData.events ?? []), ...(pastData.events ?? [])]);
       setEvents(allEvents);
       setNextCursor(allEvents.length > 25 ? upcomingData.nextCursor ?? null : null);
       setError(null);
@@ -110,7 +118,7 @@ export function EventsView({
 
   function writeCache(updater: (prev: CommunityEvent[]) => CommunityEvent[]) {
     setEvents((prev) => {
-      const next = updater(prev);
+      const next = mergeUniqueEvents(updater(prev));
       patchCachedRequest<{ events?: CommunityEvent[] }>(
         requestUrl,
         (current) => ({ ...current, events: next }),

@@ -100,6 +100,39 @@ export function collectR2Keys(values: Array<string | null | undefined>): string[
   return keys;
 }
 
+export function normalizeR2DeleteKeys(values: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const keys: string[] = [];
+
+  for (const value of values) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const trimmed = value.trim();
+    if (trimmed.includes("http://") || trimmed.includes("https://") || trimmed.includes("..") || trimmed.includes("*") || trimmed.startsWith("/")) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    keys.push(trimmed);
+  }
+
+  return keys;
+}
+
+export async function deleteR2Keys(keys: Array<string | null | undefined>): Promise<{ deleted: string[]; failed: Array<{ key: string; error: string }> }> {
+  const normalized = normalizeR2DeleteKeys(keys);
+  const deleted: string[] = [];
+  const failed: Array<{ key: string; error: string }> = [];
+
+  for (const key of normalized) {
+    try {
+      await deleteFromR2(key);
+      deleted.push(key);
+    } catch (error) {
+      failed.push({ key, error: error instanceof Error ? error.message : "Unknown delete error" });
+    }
+  }
+
+  return { deleted, failed };
+}
+
 export function shouldDeletePreviousR2Asset(
   previousUrl: string | null | undefined,
   nextUrl: string | null | undefined,

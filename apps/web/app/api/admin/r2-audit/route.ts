@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { listR2ObjectKeys } from "@/lib/r2";
+import { deleteR2Keys, getR2PublicBase, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
 
 interface TrackedReference {
   key: string;
@@ -120,13 +120,20 @@ export async function GET() {
   const brokenReferences = [...seen.values()].filter((entry) => !keySet.has(entry.key));
   const validCount = [...trackedKeys].filter((key) => keySet.has(key)).length;
 
+  const publicBase = getR2PublicBase();
+
   return NextResponse.json({
     totalObjects: r2Objects.length,
     trackedObjects: tracked.length,
     validTrackedObjects: validCount,
     potentialOrphans: orphanKeys.length,
     brokenReferences: brokenReferences.length,
-    orphans: orphanKeys.slice(0, 200).map((key) => ({ key, size: 0, status: "orphan" })),
+    orphans: orphanKeys.slice(0, 200).map((key) => ({
+      key,
+      size: 0,
+      status: "orphan",
+      previewUrl: `${publicBase}/${key}`,
+    })),
     brokenReferenceDetails: brokenReferences.slice(0, 200).map((entry) => ({
       key: entry.key,
       table: entry.table,
@@ -151,12 +158,29 @@ export async function POST(request: Request) {
 
   try {
     const payload = await request.json();
-    if (payload?.action !== "scan") {
-      return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
+    if (payload?.action === "scan") {
+      return GET();
     }
+
+    if (payload?.action === "delete-orphans") {
+      const keys = Array.isArray(payload?.keys) ? payload.keys : [];
+      const normalized = normalizeR2DeleteKeys(keys);
+      if (normalized.length === 0) {
+        return NextResponse.json({ error: "No valid orphan object keys were provided for deletion." }, { status: 400 });
+      }
+
+      const result = await deleteR2Keys(normalized);
+      return NextResponse.json({
+        deleted: result.deleted,
+        failed: result.failed,
+        total: normalized.length,
+        deletedCount: result.deleted.length,
+        failedCount: result.failed.length,
+      });
+    }
+
+    return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
-
-  return GET();
 }

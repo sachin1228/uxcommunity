@@ -136,15 +136,28 @@ export async function POST(
     return NextResponse.json({ error: "Failed to save display picture." }, { status: 500 });
   }
 
-  const previousUrl = community.image_url ?? null;
-  const nextUrl = kind === "image" ? url : community.image_url ?? null;
-  if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
-    const previousKey = parseR2Key(previousUrl);
+  const previousImageUrl = community.image_url ?? null;
+  const nextImageUrl = kind === "image" ? url : community.image_url ?? null;
+  if (shouldDeletePreviousR2Asset(previousImageUrl, nextImageUrl) && previousImageUrl) {
+    const previousKey = parseR2Key(previousImageUrl);
     if (previousKey) {
       try {
         await deleteFromR2(previousKey);
       } catch (cleanupError) {
         console.error("[community-dp] previous picture cleanup failed:", cleanupError);
+      }
+    }
+  }
+
+  const previousLottieUrl = community.lottie_url ?? null;
+  const nextLottieUrl = kind === "lottie" ? url : community.lottie_url ?? null;
+  if (shouldDeletePreviousR2Asset(previousLottieUrl, nextLottieUrl) && previousLottieUrl) {
+    const previousKey = parseR2Key(previousLottieUrl);
+    if (previousKey) {
+      try {
+        await deleteFromR2(previousKey);
+      } catch (cleanupError) {
+        console.error("[community-dp] previous lottie cleanup failed:", cleanupError);
       }
     }
   }
@@ -198,7 +211,7 @@ export async function DELETE(
 
   const { data: community, error } = await db
     .from("communities")
-    .select("id, name, type, reference_id, owner_id, image_url")
+    .select("id, name, type, reference_id, owner_id, image_url, lottie_url")
     .eq("id", id)
     .maybeSingle();
   if (error || !community) {
@@ -211,12 +224,24 @@ export async function DELETE(
     );
   }
 
+  const previousLottieUrl = community.lottie_url ?? null;
   const { error: communityError } = await db
     .from("communities")
     .update({ lottie_url: null, lottie_format: null })
     .eq("id", id);
   if (communityError) {
     return NextResponse.json({ error: "Failed to remove animation." }, { status: 500 });
+  }
+
+  if (previousLottieUrl) {
+    const previousKey = parseR2Key(previousLottieUrl);
+    if (previousKey) {
+      try {
+        await deleteFromR2(previousKey);
+      } catch (cleanupError) {
+        console.error("[community-dp] delete lottie cleanup failed:", cleanupError);
+      }
+    }
   }
 
   let master_synced = false;
