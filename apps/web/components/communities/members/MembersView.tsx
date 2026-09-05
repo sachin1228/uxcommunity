@@ -237,6 +237,11 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
     if (res.ok) setMembers((prev) => prev.filter((m) => m.user_id !== userId));
   }
 
+  const orderedMembers = [...members].sort((a, b) => {
+    const roleRank = (role: string) => role === "owner" ? 0 : role === "admin" ? 1 : 2;
+    return roleRank(a.role) - roleRank(b.role);
+  });
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Search */}
@@ -326,7 +331,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
               </p>
             )}
             <ul className="px-3 py-2" ref={manager ? menuRef : undefined}>
-              {members.map((member) => {
+              {orderedMembers.map((member) => {
                 const isOwnerRow  = member.role === "owner";
                 const isAdminRow  = member.role === "admin";
                 // Owners may remove anyone except other owners / themselves.
