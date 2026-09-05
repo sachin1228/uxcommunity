@@ -55,6 +55,11 @@ export default function ToolsPage() {
   const [purgeSummary, setPurgeSummary] = useState<PurgeSummary | null>(null);
   const [purgeError, setPurgeError] = useState<string | null>(null);
 
+  // ── R2 audit state ──────────────────────────────────────────────────────
+  const [r2Status, setR2Status] = useState<Status>("idle");
+  const [r2Summary, setR2Summary] = useState<any>(null);
+  const [r2Error, setR2Error] = useState<string | null>(null);
+
   async function runRecompression() {
     setRecompressStatus("running");
     setRecompressSummary(null);
@@ -112,6 +117,26 @@ export default function ToolsPage() {
     } catch {
       setMigrateError("Network error. Please try again.");
       setMigrateStatus("error");
+    }
+  }
+
+  async function runR2Audit() {
+    setR2Status("running");
+    setR2Summary(null);
+    setR2Error(null);
+    try {
+      const res = await fetch("/api/admin/r2-audit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "scan" }) });
+      const data = await res.json();
+      if (!res.ok) {
+        setR2Error(data.error ?? "An unexpected error occurred.");
+        setR2Status("error");
+        return;
+      }
+      setR2Summary(data);
+      setR2Status("done");
+    } catch {
+      setR2Error("Network error. Please try again.");
+      setR2Status("error");
     }
   }
 
@@ -183,6 +208,63 @@ export default function ToolsPage() {
         {migrateStatus === "error" && migrateError && (
           <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
             <p className="font-body text-xs text-red-400">{migrateError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── R2 storage health ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
+            <Database strokeWidth={2.5} size={18} className="text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-body text-sm font-semibold text-foreground">R2 storage health</h2>
+            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+              Scans the configured Cloudflare R2 bucket and compares it against the database-backed image references to highlight potential orphaned objects and broken references.
+            </p>
+
+            <button
+              onClick={runR2Audit}
+              disabled={r2Status === "running"}
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {r2Status === "running" ? (
+                <>
+                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                  Scanning…
+                </>
+              ) : (
+                <>
+                  <Database strokeWidth={2.5} size={13} />
+                  {r2Status === "done" ? "Scan again" : "Scan R2 storage"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {r2Status === "done" && r2Summary && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="flex flex-wrap gap-4 mb-4">
+              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={r2Summary.totalObjects} label="total objects" />
+              <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={r2Summary.trackedObjects} label="tracked" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-red-400" />} value={r2Summary.potentialOrphans} label="potential orphans" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={r2Summary.brokenReferences} label="broken refs" />
+            </div>
+            {r2Summary.orphans?.length > 0 && (
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                {r2Summary.orphans.slice(0, 20).map((item: any, i: number) => (
+                  <div key={i} className="px-3 py-2 font-body text-[11px] text-foreground-muted">{item.key}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {r2Status === "error" && r2Error && (
+          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <p className="font-body text-xs text-red-400">{r2Error}</p>
           </div>
         )}
       </div>

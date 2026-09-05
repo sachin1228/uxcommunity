@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 
 const MAX_IMAGE_BYTES  = 5 * 1024 * 1024; // 5 MB — same as master-data uploads
@@ -134,6 +134,19 @@ export async function POST(
   if (communityError) {
     console.error("[community-dp] community update failed:", communityError);
     return NextResponse.json({ error: "Failed to save display picture." }, { status: 500 });
+  }
+
+  const previousUrl = community.image_url ?? null;
+  const nextUrl = kind === "image" ? url : community.image_url ?? null;
+  if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
+    const previousKey = parseR2Key(previousUrl);
+    if (previousKey) {
+      try {
+        await deleteFromR2(previousKey);
+      } catch (cleanupError) {
+        console.error("[community-dp] previous picture cleanup failed:", cleanupError);
+      }
+    }
   }
 
   // Mirror onto the linked master-data row so the change propagates everywhere.

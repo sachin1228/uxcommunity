@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { deleteFromR2, parseR2Key, shouldDeletePreviousR2Asset } from "@/lib/r2";
 
 async function enrichOne(
   db: ReturnType<typeof createServiceClient>,
@@ -152,6 +153,19 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const previousUrl = existing?.cover_image_url ?? null;
+  const nextUrl = data?.cover_image_url ?? null;
+  if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
+    const previousKey = parseR2Key(previousUrl);
+    if (previousKey) {
+      try {
+        await deleteFromR2(previousKey);
+      } catch (cleanupError) {
+        console.error("[PATCH event] previous cover cleanup failed:", cleanupError);
+      }
+    }
+  }
+
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
   ]);
@@ -184,8 +198,23 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: "Event not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "Not the event owner." }, { status: 403 });
 
+  const { data: eventRow } = await db
+    .from("community_events")
+    .select("id, cover_image_url")
+    .eq("id", eventId)
+    .maybeSingle();
+
   const { error } = await db.from("community_events").delete().eq("id", eventId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const previousKey = eventRow?.cover_image_url ? parseR2Key(eventRow.cover_image_url) : null;
+  if (previousKey) {
+    try {
+      await deleteFromR2(previousKey);
+    } catch (cleanupError) {
+      console.error("[DELETE event] cover cleanup failed:", cleanupError);
+    }
+  }
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },
