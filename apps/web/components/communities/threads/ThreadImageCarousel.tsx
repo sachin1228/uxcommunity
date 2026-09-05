@@ -193,7 +193,7 @@ export function ThreadImageCarousel({
       <div
         role="group"
         aria-label="Image navigation"
-        className="absolute bottom-2.5 left-1/2 z-20 flex -translate-x-1/2 items-center rounded-full bg-black/50 px-2 py-1"
+        className="absolute bottom-2.5 left-1/2 z-20 px-1.5 py-1 flex -translate-x-1/2 items-center rounded-full bg-black/50"
       >
         {images.map((img, dotIndex) => {
           const active = dotIndex === index;
@@ -204,7 +204,7 @@ export function ThreadImageCarousel({
               aria-label={`Go to image ${dotIndex + 1} of ${images.length}`}
               aria-current={active ? "true" : undefined}
               onClick={() => setIndex(dotIndex)}
-              className="flex h-5 w-5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex h-3 w-2.5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             >
               <span
                 className={`block h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
