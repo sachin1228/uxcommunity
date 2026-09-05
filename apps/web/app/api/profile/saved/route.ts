@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 function communityOf(raw: unknown): { name: string } | null {
   if (!raw) return null;
@@ -72,10 +73,15 @@ export async function GET() {
     communities: undefined,
     users: null,
   }));
+  const threadRows = await attachPollVotes(
+    db,
+    threads as unknown as Array<Record<string, unknown>>,
+    userId,
+  );
 
-  let enrichedThreads: unknown[] = threads;
-  if (threads.length) {
-    const ids = threads.map((t) => t.id);
+  let enrichedThreads: unknown[] = threadRows;
+  if (threadRows.length) {
+    const ids = threadRows.map((t) => t.id);
     const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] =
       await Promise.all([
         db.from("thread_likes").select("thread_id").in("thread_id", ids),
@@ -91,7 +97,7 @@ export async function GET() {
     const myLikeSet = new Set((myLikes ?? []).map((l) => l.thread_id));
     const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
-    enrichedThreads = threads.map((t) => ({
+    enrichedThreads = threadRows.map((t) => ({
       ...t,
       like_count: likeCountMap[t.id] ?? 0,
       user_liked: myLikeSet.has(t.id),

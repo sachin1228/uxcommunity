@@ -8,6 +8,7 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const CATEGORIES = new Set<ThreadCategory>([
@@ -100,7 +101,7 @@ async function enrichThread(
     db.from("thread_comments").select("id", { count: "exact", head: true }).eq("thread_id", threadId),
   ]);
 
-  return {
+  const base = {
     ...row,
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     like_count: (allLikes ?? []).length,
@@ -108,6 +109,8 @@ async function enrichThread(
     user_saved: Boolean(mySave),
     comment_count: commentCount ?? 0,
   };
+  const [withVotes] = await attachPollVotes(db, [base], currentUserId);
+  return withVotes ?? base;
 }
 
 export async function GET(
@@ -155,7 +158,7 @@ export async function PATCH(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db.from("community_threads").select("id, user_id, community_id").eq("id", threadId);
+  let existingQuery = db.from("community_threads").select("id, user_id, community_id, poll").eq("id", threadId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
@@ -193,6 +196,13 @@ export async function PATCH(
     .single();
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }
+
+  // Poll question/options changed (or the poll was removed/added) — stored
+  // votes point at option indices, so reset them rather than leave stale totals.
+  const previousPoll = (existing as { poll?: unknown }).poll ?? null;
+  if (JSON.stringify(previousPoll) !== JSON.stringify(normalizedPoll.poll)) {
+    await db.from("thread_poll_votes").delete().eq("thread_id", threadId);
+  }
 
   const oldUrls = Array.isArray(existing.attachments)
     ? (existing.attachments as Array<{ url?: string }>).map((attachment) => attachment?.url ?? null)

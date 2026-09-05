@@ -1,6 +1,7 @@
 import "server-only"
 
 import type { CommunityThread, ThreadComment } from "@/components/communities/threads/types"
+import { attachPollVotes } from "@/lib/threads/poll-votes"
 import { createServiceClient } from "@/lib/supabase/service"
 
 type Database = ReturnType<typeof createServiceClient>
@@ -78,5 +79,14 @@ export async function loadThreadDetail(options: LoadOptions) {
     loadThread(db, options),
     loadComments(db, options.threadId),
   ])
-  return { db, thread, comments }
+  let threadWithVotes = thread
+  if (thread) {
+    const [attached] = await attachPollVotes(
+      db,
+      [thread as unknown as Record<string, unknown>],
+      options.userId,
+    )
+    threadWithVotes = (attached ?? thread) as CommunityThread
+  }
+  return { db, thread: threadWithVotes, comments }
 }

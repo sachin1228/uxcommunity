@@ -125,6 +125,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     ));
   }, [updateItems]);
 
+  const handleThreadPollVoted = useCallback((id: string, counts: number[], userVote: number | null) => {
+    updateItems((prev) => prev.map((it) =>
+      it._type === "thread" && it.id === id
+        ? { ...it, poll_vote_counts: counts, poll_user_vote: userVote }
+        : it
+    ));
+  }, [updateItems]);
+
   const handleThreadDeleted = useCallback((id: string) => {
     updateItems((prev) => prev.filter((it) => !(it._type === "thread" && it.id === id)));
   }, [updateItems]);
@@ -312,6 +320,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onUpdated={handleThreadUpdated}
                 onLikeChanged={handleThreadLikeChanged}
                 onSaveChanged={handleThreadSaveChanged}
+                onPollVoteChanged={handleThreadPollVoted}
                 onDeleted={handleThreadDeleted}
                 onOpen={() => router.push(`/dashboard/threads/${group.item.id}`)}
               />

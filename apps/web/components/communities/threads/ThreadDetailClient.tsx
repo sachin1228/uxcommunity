@@ -341,6 +341,23 @@ export function ThreadDetailClient({
     realtimeClient.connect();
 
     const likesRoom = realtimeRooms.threads(communityId);
+    const unsubPoll = realtimeClient.on(likesRoom, "poll", (data) => {
+      const record = data as { thread_id?: string; user_id?: string; counts?: number[]; user_vote?: number | null } | null;
+      if (!record?.thread_id || record.thread_id !== thread.id || !Array.isArray(record.counts)) return;
+      const current = threadRef.current;
+      const next = {
+        ...current,
+        poll_vote_counts: record.counts,
+        poll_user_vote: record.user_id === currentUserId ? (record.user_vote ?? null) : current.poll_user_vote ?? null,
+      };
+      threadRef.current = next;
+      setThread(next);
+      patchThreadResource<{ thread?: CommunityThread }>(
+        detailUrl,
+        currentUserId,
+        (cached) => ({ ...cached, thread: cached.thread ? { ...cached.thread, poll_vote_counts: next.poll_vote_counts, poll_user_vote: next.poll_user_vote } : next }),
+      );
+    });
     const unsubLikesRoom = realtimeClient.subscribe(likesRoom);
     const unsubLikes = realtimeClient.on(likesRoom, "like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
@@ -366,6 +383,7 @@ export function ThreadDetailClient({
     return () => {
       unsubComments();
       unsubCommentsRoom();
+      unsubPoll();
       unsubLikes();
       unsubLikesRoom();
     };
@@ -398,6 +416,10 @@ export function ThreadDetailClient({
 
   function handleSaveChanged(_threadId: string, saved: boolean) {
     writeThread((current) => ({ ...current, user_saved: saved }));
+  }
+
+  function handlePollVoteChanged(_threadId: string, counts: number[], userVote: number | null) {
+    writeThread((current) => ({ ...current, poll_vote_counts: counts, poll_user_vote: userVote }));
   }
 
   function handleUpdated(updated: CommunityThread) {
@@ -488,6 +510,7 @@ export function ThreadDetailClient({
               communityNamePlacement="below"
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
+              onPollVoteChanged={handlePollVoteChanged}
               onUpdated={handleUpdated}
               onDeleted={handleDeleted}
             />

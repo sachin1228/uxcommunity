@@ -70,6 +70,7 @@ interface ThreadCardProps {
   onUpdated: (thread: CommunityThread) => void;
   onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
+  onPollVoteChanged?: (threadId: string, counts: number[], userVote: number | null) => void;
   onDeleted: (threadId: string) => void;
   communityName?: string;
   communityImage?: string | null;
@@ -85,6 +86,7 @@ export function ThreadCard({
   onUpdated,
   onLikeChanged,
   onSaveChanged,
+  onPollVoteChanged,
   onDeleted,
   communityName,
   communityImage,
@@ -112,6 +114,8 @@ export function ThreadCard({
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
+  const [pollVoteBusy, setPollVoteBusy] = useState(false);
+  const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -240,6 +244,11 @@ export function ThreadCard({
     saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
   }, [thread.user_saved]);
 
+  // Reflect externally-confirmed totals (parent sync or realtime) once they land.
+  useEffect(() => {
+    setPollVoteOverride(null);
+  }, [thread.poll_vote_counts, thread.poll_user_vote]);
+
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -252,10 +261,69 @@ export function ThreadCard({
     likeCoalescerRef.current?.toggle();
   }
 
+  async function handlePollVote(optionIndex: number) {
+    const currentPoll = thread.poll;
+    if (!currentPoll || pollVoteBusy) return;
+    const optionCount = currentPoll.options.length;
+    if (optionIndex < 0 || optionIndex >= optionCount) return;
+
+    const baseCounts =
+      pollVoteOverride && pollVoteOverride.counts.length === optionCount
+        ? pollVoteOverride.counts
+        : Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === optionCount
+          ? thread.poll_vote_counts
+          : currentPoll.options.map(() => 0);
+    const currentUserVote = pollVoteOverride ? pollVoteOverride.userVote : (thread.poll_user_vote ?? null);
+    const nextUserVote = currentUserVote === optionIndex ? null : optionIndex;
+    const optimisticCounts = baseCounts.slice();
+    if (currentUserVote !== null && optimisticCounts[currentUserVote] > 0) {
+      optimisticCounts[currentUserVote] -= 1;
+    }
+    if (nextUserVote !== null) optimisticCounts[nextUserVote] += 1;
+
+    setPollVoteOverride({ counts: optimisticCounts, userVote: nextUserVote });
+    setPollVoteBusy(true);
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ option_index: nextUserVote }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to update poll vote.");
+      }
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null);
+    } catch (error) {
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to update poll vote.");
+    } finally {
+      setPollVoteBusy(false);
+    }
+  }
+
   const authorName = thread.users?.name ?? "Member";
   const dateLabel  = isDetail
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.created_at);
+
+  const pollOptionCount = thread.poll?.options.length ?? 0;
+  const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
+    ? thread.poll_vote_counts
+    : thread.poll ? thread.poll.options.map(() => 0) : [];
+  const displayedPollCounts = pollVoteOverride?.counts ?? pollBaseCounts;
+  const displayedPollUserVote = pollVoteOverride
+    ? pollVoteOverride.userVote
+    : (thread.poll_user_vote ?? null);
 
   const cardClassName = onOpen
     ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
@@ -377,7 +445,15 @@ export function ThreadCard({
         )}
 
         {/* ── Poll ── */}
-        {thread.poll ? <ThreadPollResult poll={thread.poll} /> : null}
+        {thread.poll && (
+          <ThreadPollResult
+            poll={thread.poll}
+            counts={displayedPollCounts}
+            userVote={displayedPollUserVote}
+            busy={pollVoteBusy}
+            onVote={(optionIndex) => void handlePollVote(optionIndex)}
+          />
+        )}
 
         {/* ── Attachments ── */}
         {(() => {

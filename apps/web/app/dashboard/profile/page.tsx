@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { ProfileClient } from "./ProfileClient";
 import type { ProfileThread } from "@/components/communities/threads/types";
 
@@ -44,7 +45,11 @@ export default async function ProfilePage() {
   ]);
 
   // Compute real like + comment counts so the profile page doesn't open with all zeros.
-  const threadList = rawThreads ?? [];
+  const threadList = await attachPollVotes(
+    db,
+    (rawThreads ?? []) as unknown as Array<Record<string, unknown>>,
+    userId,
+  );
   const threadIds = threadList.map((t) => t.id);
 
   const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] = threadIds.length

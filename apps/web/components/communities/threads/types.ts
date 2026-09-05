@@ -67,6 +67,9 @@ export interface CommunityThread {
   allow_replies: boolean;
   is_public?: boolean;
   poll?: ThreadPoll | null;
+  /** Per-option vote totals (aligned with poll.options) + the viewer's vote. */
+  poll_vote_counts?: number[];
+  poll_user_vote?: number | null;
   created_at: string;
   updated_at: string;
   like_count: number;

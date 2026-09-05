@@ -90,6 +90,26 @@ export function ThreadsView({
       realtimeClient.on(room, "thread", () => void fetchThreads(true, true)),
     );
 
+    // Subscribe to poll vote totals for realtime poll counts
+    unsubscribes.push(
+      realtimeClient.on(room, "poll", (data) => {
+        const record = data as { thread_id?: string; user_id?: string; counts?: number[]; user_vote?: number | null } | null;
+        if (!record?.thread_id || !Array.isArray(record.counts)) return;
+        setThreads((current) =>
+          current.map((thread) =>
+            thread.id !== record.thread_id
+              ? thread
+              : {
+                  ...thread,
+                  poll_vote_counts: record.counts,
+                  // The event's user_vote belongs to the voter — only trust it when it is us.
+                  poll_user_vote: record.user_id === currentUserId ? (record.user_vote ?? null) : thread.poll_user_vote ?? null,
+                },
+          ),
+        );
+      }),
+    );
+
     // Subscribe to like changes for realtime like counts
     unsubscribes.push(
       realtimeClient.on(room, "like", (data) => {
@@ -151,6 +171,12 @@ export function ThreadsView({
   function handleLikeChanged(threadId: string, liked: boolean, newCount: number) {
     writeCache((cur) =>
       cur.map((t) => t.id === threadId ? { ...t, user_liked: liked, like_count: newCount } : t),
+    );
+  }
+
+  function handlePollVoteChanged(threadId: string, counts: number[], userVote: number | null) {
+    writeCache((cur) =>
+      cur.map((t) => t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote } : t),
     );
   }
 
@@ -281,6 +307,7 @@ export function ThreadsView({
                   onUpdated={handleUpdated}
                   onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}
+                  onPollVoteChanged={handlePollVoteChanged}
                   onDeleted={handleDeleted}
                   onOpen={() => router.push(`/dashboard/communities/${communityId}/threads/${thread.id}`)}
                 />
