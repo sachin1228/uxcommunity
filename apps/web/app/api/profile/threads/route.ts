@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 export async function GET() {
   let session;
@@ -16,7 +17,7 @@ export async function GET() {
   const { data, error } = await db
     .from("community_threads")
     .select(
-      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, created_at, updated_at, communities(name)",
+      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(name)",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -34,7 +35,12 @@ export async function GET() {
     return { ...thread, users: null, community, communities: undefined };
   });
 
-  if (!threads.length) return NextResponse.json({ threads: [] });
+  const threadsWithVotes = await attachPollVotes(
+    db,
+    threads as unknown as Array<Record<string, unknown>>,
+    userId,
+  );
+  if (!threadsWithVotes.length) return NextResponse.json({ threads: [] });
 
   const threadIds = threads.map((t) => t.id);
   const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] = await Promise.all([
@@ -54,7 +60,7 @@ export async function GET() {
   const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
   return NextResponse.json({
-    threads: threads.map((thread) => ({
+    threads: threadsWithVotes.map((thread) => ({
       ...thread,
       like_count: likeCountMap[thread.id] ?? 0,
       user_liked: myLikeSet.has(thread.id),

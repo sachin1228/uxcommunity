@@ -56,6 +56,8 @@ function renderWithLinks(text: string, isNested = false) {
   return parts;
 }
 import { EditThreadModal } from "./EditThreadModal";
+import { ThreadPollResult } from "./PollResult";
+import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { formatFullDate, formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -69,6 +71,7 @@ interface ThreadCardProps {
   onUpdated: (thread: CommunityThread) => void;
   onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
+  onPollVoteChanged?: (threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) => void;
   onDeleted: (threadId: string) => void;
   communityName?: string;
   communityImage?: string | null;
@@ -84,6 +87,7 @@ export function ThreadCard({
   onUpdated,
   onLikeChanged,
   onSaveChanged,
+  onPollVoteChanged,
   onDeleted,
   communityName,
   communityImage,
@@ -111,6 +115,9 @@ export function ThreadCard({
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
+  const [pollVoteBusy, setPollVoteBusy] = useState(false);
+  const [pollVotePending, setPollVotePending] = useState<number | null>(null);
+  const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -239,6 +246,11 @@ export function ThreadCard({
     saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
   }, [thread.user_saved]);
 
+  // Reflect externally-confirmed totals (parent sync or realtime) once they land.
+  useEffect(() => {
+    setPollVoteOverride(null);
+  }, [thread.poll_vote_counts, thread.poll_user_vote, thread.poll_undo_used]);
+
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -251,10 +263,100 @@ export function ThreadCard({
     likeCoalescerRef.current?.toggle();
   }
 
+  async function handlePollVote(optionIndex: number) {
+    const currentPoll = thread.poll;
+    if (!currentPoll || pollVoteBusy) return;
+    const optionCount = currentPoll.options.length;
+    if (optionIndex < 0 || optionIndex >= optionCount) return;
+
+    // Votes are final: a user who already voted cannot vote again or change it.
+    const currentUserVote = pollVoteOverride ? pollVoteOverride.userVote : (thread.poll_user_vote ?? null);
+    if (currentUserVote !== null) return;
+
+    setPollVotePending(optionIndex);
+    setPollVoteBusy(true);
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ option_index: optionIndex }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        undo_used?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to record your vote.");
+      }
+      // Results appear only after the vote is confirmed by the server.
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
+    } catch (error) {
+      // Stay in the pre-vote state; the user can try again.
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to record your vote.");
+    } finally {
+      setPollVotePending(null);
+      setPollVoteBusy(false);
+    }
+  }
+
+  async function handlePollUndo() {
+    if (!thread.poll || pollVoteBusy) return;
+    setPollVoteBusy(true);
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "undo" }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        undo_used?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to undo your vote.");
+      }
+      // Back to the pre-vote state with the one-time undo consumed.
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
+    } catch (error) {
+      // Keep showing results — the vote stands until the server says otherwise.
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to undo your vote.");
+    } finally {
+      setPollVoteBusy(false);
+    }
+  }
+
   const authorName = thread.users?.name ?? "Member";
   const dateLabel  = isDetail
     ? formatFullDate(thread.created_at)
     : formatRelativeDate(thread.created_at);
+
+  const pollOptionCount = thread.poll?.options.length ?? 0;
+  const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
+    ? thread.poll_vote_counts
+    : thread.poll ? thread.poll.options.map(() => 0) : [];
+  const displayedPollCounts = pollVoteOverride?.counts ?? pollBaseCounts;
+  const displayedPollUserVote = pollVoteOverride
+    ? pollVoteOverride.userVote
+    : (thread.poll_user_vote ?? null);
+  const displayedPollUndoUsed = pollVoteOverride
+    ? pollVoteOverride.undoUsed
+    : (thread.poll_undo_used ?? false);
 
   const cardClassName = onOpen
     ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
@@ -375,6 +477,20 @@ export function ThreadCard({
           </h3>
         )}
 
+        {/* ── Poll ── */}
+        {thread.poll && (
+          <ThreadPollResult
+            poll={thread.poll}
+            counts={displayedPollCounts}
+            userVote={displayedPollUserVote}
+            busy={pollVoteBusy}
+            pendingOption={pollVotePending}
+            canUndo={!displayedPollUndoUsed}
+            onVote={(optionIndex) => void handlePollVote(optionIndex)}
+            onUndo={() => void handlePollUndo()}
+          />
+        )}
+
         {/* ── Attachments ── */}
         {(() => {
           const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
@@ -431,63 +547,8 @@ export function ThreadCard({
                 <img src={images[0].url} alt={images[0].name} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
               </ImgWrap>
             );
-          } else if (images.length === 2) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-56 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
-              </div>
-            );
-          } else if (images.length === 3) {
-            imageGrid = (
-              <div className="mt-3 flex h-64 gap-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block flex-[2] overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="flex flex-1 flex-col gap-1">
-                  {images.slice(1).map((img) => (
-                    <ImgWrap key={img.url} img={img} className="block flex-1 overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
-          } else if (images.length === 4) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-44 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
-              </div>
-            );
-          } else {
-            const visible  = images.slice(1, 5);
-            const overflow = images.length - 5;
-            imageGrid = (
-              <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-52 w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="grid grid-cols-4 gap-1 h-28">
-                  {visible.map((img, i) => (
-                    <ImgWrap key={img.url} img={img} className="relative block overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                      {i === visible.length - 1 && overflow > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/55">
-                          <span className="font-display text-lg font-bold text-white">+{overflow}</span>
-                        </div>
-                      )}
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
+          } else if (images.length > 1) {
+            imageGrid = <ThreadImageCarousel images={images} isDetail={isDetail} />;
           }
 
           return <>{imageGrid}{fileList}</>;

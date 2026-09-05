@@ -8,6 +8,7 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const CATEGORIES = new Set<ThreadCategory>([
@@ -16,6 +17,38 @@ const CATEGORIES = new Set<ThreadCategory>([
 ]);
 
 interface RawAttachment { name?: unknown; url?: unknown; type?: unknown; size?: unknown; }
+
+interface RawPoll {
+  question?: unknown;
+  options?: unknown;
+}
+
+const THREAD_TITLE_MAX_LENGTH = 2000;
+const POLL_QUESTION_MAX_LENGTH = 200;
+const POLL_OPTION_MAX_LENGTH = 100;
+const POLL_MIN_OPTIONS = 2;
+const POLL_MAX_OPTIONS = 6;
+
+/**
+ * Validate an optional poll payload.
+ * Returns { poll: null } when absent, the normalized poll when present,
+ * or null when the shape is invalid.
+ */
+function normalizePoll(value: unknown): { poll: { question: string; options: string[] } | null } | null {
+  if (value == null) return { poll: null };
+  if (typeof value !== "object" || Array.isArray(value)) return null;
+  const { question: rawQuestion, options: rawOptions } = value as RawPoll;
+  if (typeof rawQuestion !== "string") return null;
+  const question = rawQuestion.trim();
+  if (!question || question.length > POLL_QUESTION_MAX_LENGTH) return null;
+  if (!Array.isArray(rawOptions)) return null;
+  const options = rawOptions.filter((option): option is string => typeof option === "string").map((option) => option.trim());
+  if (options.length !== rawOptions.length) return null;
+  if (options.length < POLL_MIN_OPTIONS || options.length > POLL_MAX_OPTIONS) return null;
+  if (options.some((option) => !option || option.length > POLL_OPTION_MAX_LENGTH)) return null;
+  if (new Set(options).size !== options.length) return null;
+  return { poll: { question, options } };
+}
 
 function normalizeTags(value: unknown): string[] | null {
   if (!Array.isArray(value) || value.length > 3) return null;
@@ -68,7 +101,7 @@ async function enrichThread(
     db.from("thread_comments").select("id", { count: "exact", head: true }).eq("thread_id", threadId),
   ]);
 
-  return {
+  const base = {
     ...row,
     users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
     like_count: (allLikes ?? []).length,
@@ -76,6 +109,8 @@ async function enrichThread(
     user_saved: Boolean(mySave),
     comment_count: commentCount ?? 0,
   };
+  const [withVotes] = await attachPollVotes(db, [base], currentUserId);
+  return withVotes ?? base;
 }
 
 export async function GET(
@@ -92,7 +127,7 @@ export async function GET(
 
   let threadQuery = db
     .from("community_threads")
-    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, poll, created_at, updated_at")
     .eq("id", threadId);
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
@@ -123,7 +158,7 @@ export async function PATCH(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db.from("community_threads").select("id, user_id, community_id").eq("id", threadId);
+  let existingQuery = db.from("community_threads").select("id, user_id, community_id, poll").eq("id", threadId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
@@ -141,9 +176,10 @@ export async function PATCH(
   const attachments = normalizeAttachments(body.attachments);
   const allowReplies = body.allow_replies !== false;
   const isPublic = body.is_public === true;
+  const normalizedPoll = normalizePoll(body.poll);
 
-  if (!title || title.length > 120) return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
-  if (!CATEGORIES.has(category) || !tags || !links || !attachments) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
+  if (!title || title.length > THREAD_TITLE_MAX_LENGTH) return NextResponse.json({ error: `Title is required and must be ${THREAD_TITLE_MAX_LENGTH} characters or fewer.` }, { status: 422 });
+  if (!CATEGORIES.has(category) || !tags || !links || !attachments || !normalizedPoll) return NextResponse.json({ error: "One or more thread fields are invalid." }, { status: 422 });
 
   const text = title;
   const decision = await moderateText({ content: text, contentType: "post", userId });
@@ -154,12 +190,19 @@ export async function PATCH(
 
   const { data: updated, error } = await db
     .from("community_threads")
-    .update({ title, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic })
+    .update({ title, category, tags, attachments, links, allow_replies: allowReplies, is_public: isPublic, poll: normalizedPoll.poll })
     .eq("id", threadId)
-    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, category, tags, attachments, links, allow_replies, is_public, poll, created_at, updated_at")
     .single();
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }
+
+  // Poll question/options changed (or the poll was removed/added) — stored
+  // votes point at option indices, so reset them rather than leave stale totals.
+  const previousPoll = (existing as { poll?: unknown }).poll ?? null;
+  if (JSON.stringify(previousPoll) !== JSON.stringify(normalizedPoll.poll)) {
+    await db.from("thread_poll_votes").delete().eq("thread_id", threadId);
+  }
 
   const oldUrls = Array.isArray(existing.attachments)
     ? (existing.attachments as Array<{ url?: string }>).map((attachment) => attachment?.url ?? null)

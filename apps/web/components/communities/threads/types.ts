@@ -1,27 +1,20 @@
+/** Max body (title) length for threads — mirrors the DB column + API validation. */
+export const THREAD_BODY_MAX_LENGTH = 2000;
+
 export const THREAD_TAGS = [
-  "UI Design",
-  "UX Design",
-  "Typography",
-  "Color Theory",
-  "Layout",
+  "UI/UX",
+  "Product Design",
+  "Graphic Design",
+  "Design Systems",
+  "Web Design",
+  "Mobile Design",
   "Branding",
   "Illustration",
-  "Iconography",
-  "Motion Design",
-  "Design Systems",
-  "Prototyping",
-  "Figma",
-  "User Research",
-  "Accessibility",
-  "Mobile Design",
-  "Web Design",
-  "Product Design",
-  "Interaction Design",
-  "Components",
-  "Dark Mode",
-  "Responsive Design",
-  "Portfolio",
-  "Freelance",
+  "3D / Motion",
+  "Typography",
+  "Tools & Workflow",
+  "Career",
+  "Other",
 ] as const;
 
 export type ThreadTag = (typeof THREAD_TAGS)[number];
@@ -36,6 +29,24 @@ export const THREAD_CATEGORIES = [
 ] as const;
 
 export type ThreadCategory = (typeof THREAD_CATEGORIES)[number]["value"];
+
+// ── Polls ────────────────────────────────────────────────────────────────────
+
+export const POLL_MIN_OPTIONS = 2;
+export const POLL_MAX_OPTIONS = 6;
+export const POLL_QUESTION_MAX_LENGTH = 200;
+export const POLL_OPTION_MAX_LENGTH = 100;
+
+export interface ThreadPoll {
+  question: string;
+  options: string[];
+}
+
+/** Editable (draft) form of a poll used by the composers. */
+export interface ThreadPollDraft {
+  question: string;
+  options: string[];
+}
 
 export interface ThreadAttachment {
   name: string;
@@ -55,6 +66,12 @@ export interface CommunityThread {
   links: string[];
   allow_replies: boolean;
   is_public?: boolean;
+  poll?: ThreadPoll | null;
+  /** Per-option vote totals (aligned with poll.options) + the viewer's vote. */
+  poll_vote_counts?: number[];
+  poll_user_vote?: number | null;
+  /** Whether the viewer already used their one-time poll undo. */
+  poll_undo_used?: boolean;
   created_at: string;
   updated_at: string;
   like_count: number;
