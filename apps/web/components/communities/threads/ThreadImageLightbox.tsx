@@ -302,7 +302,7 @@ export function ThreadImageLightbox({
               />
             )}
 
-            {/* Engagement stats */}
+            {/* Engagement stats — like button mirrors the thread card design */}
             <div className="mt-4 flex items-center gap-4">
               <button
                 type="button"
@@ -310,17 +310,27 @@ export function ThreadImageLightbox({
                 disabled={!onLikeToggle}
                 aria-label={thread.user_liked ? "Unlike" : "Like"}
                 aria-pressed={thread.user_liked}
-                className="group/like inline-flex items-center gap-1.5 rounded-md font-body text-sm font-semibold tabular-nums text-foreground transition-transform duration-150 ease-out hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-default disabled:hover:scale-100"
+                className="group/like flex items-center gap-2"
               >
                 <Heart
+                  size={20}
                   strokeWidth={2.5}
-                  size={16}
-                  className={thread.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground group-hover/like:text-red-400"}
+                  className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
+                    thread.user_liked
+                      ? "fill-red-500 text-red-500"
+                      : "fill-none text-white"
+                  }`}
                 />
-                {thread.like_count}
+                <span
+                  className={`font-body text-sm font-semibold tabular-nums ${
+                    thread.user_liked ? "text-red-500" : "text-white"
+                  }`}
+                >
+                  {thread.like_count}
+                </span>
               </button>
-              <span className="inline-flex items-center gap-1.5 font-body text-sm font-semibold tabular-nums text-foreground">
-                <MessageCircle strokeWidth={2.5} size={16} className="text-foreground" />
+              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
+                <MessageCircle size={20} strokeWidth={2.5} />
                 {totalComments}
               </span>
             </div>
