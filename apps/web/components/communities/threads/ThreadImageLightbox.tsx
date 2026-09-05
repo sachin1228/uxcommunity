@@ -28,22 +28,17 @@ function fileNameForUrl(url: string): string {
   }
 }
 
-async function downloadImage(url: string, fallbackName: string) {
-  try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error("fetch failed");
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = fallbackName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-  } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+function downloadImage(url: string, fallbackName: string) {
+  // Download through our same-origin proxy: the R2 bucket sends no CORS
+  // headers, so a direct fetch is blocked and an anchor would navigate. The
+  // proxy responds with Content-Disposition: attachment, so the image always
+  // downloads and never opens a new tab.
+  const a = document.createElement("a");
+  a.href = `/api/image-download?url=${encodeURIComponent(url)}`;
+  a.download = fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
