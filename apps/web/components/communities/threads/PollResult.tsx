@@ -175,7 +175,11 @@ export function ThreadPollResult({
           <span className="font-semibold text-[var(--ds-blue-700)]">
             {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
           </span>
-          {hasVoted && ` · You voted for ${options[selected ?? 0] ?? "an option"}`}
+          {hasVoted && (
+            <span className="text-white">
+              {` · You voted for ${options[selected ?? 0] ?? "an option"}`}
+            </span>
+          )}
         </span>
         {hasVoted && interactive && onUndo && canUndo !== false && (
           <span className="group/undo relative inline-flex items-center">
