@@ -11,12 +11,12 @@ interface CarouselImage {
 /**
  * Inline image carousel for thread cards with 2+ images.
  *
- * The first image anchors the viewport in normal flow (so the container's
- * height — and the surrounding thread layout — never changes when switching
- * slides); every other image is layered on top with object-cover. Slides
- * crossfade with a short opacity transition. Arrows navigate with mouse or
- * keyboard, and horizontal swipes work on touch devices without interfering
- * with vertical scrolling.
+ * All images sit side by side in a horizontal track and the viewport slides
+ * between them (translateX on the track), so Next moves the current image out
+ * to the left while the next one enters from the right — and Previous does the
+ * reverse. An invisible copy of the first image anchors the viewport height in
+ * normal flow, so the surrounding thread layout never jumps. Swipe gestures
+ * work on touch devices without interfering with vertical scrolling.
  */
 export function ThreadImageCarousel({
   images,
@@ -78,37 +78,41 @@ export function ThreadImageCarousel({
     }
   }
 
-  const slideClassName = (active: boolean) =>
-    `transition-opacity duration-200 ease-out ${
-      active ? "opacity-100" : "pointer-events-none opacity-0"
-    }`;
-
   return (
     <div
       role="group"
       aria-roledescription="carousel"
       aria-label="Thread images"
       onKeyDown={handleKeyDown}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      style={{ touchAction: "pan-y" }}
       className="relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
     >
-      {/* Stable viewport — the first image defines the height */}
+      {/* Invisible sizing anchor — keeps the viewport height identical to the
+          single-image layout so the thread never jumps while sliding. */}
+      <img
+        src={images[0].url}
+        alt=""
+        draggable={false}
+        aria-hidden
+        className="pointer-events-none block w-full max-h-[480px] object-cover opacity-0"
+      />
+
+      {/* Slide track — images sit physically next to each other and the
+          viewport translates between them (300ms ease-out, no bounce). */}
       <div
-        className="relative w-full"
-        style={{ touchAction: "pan-y" }}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        className="absolute inset-0 flex h-full w-full transition-transform duration-300 ease-out"
+        style={{ transform: `translateX(-${index * 100}%)` }}
       >
         {images.map((img, slideIndex) => {
-          const active = index === slideIndex;
-          const isAnchor = slideIndex === 0;
+          const active = slideIndex === index;
           const inner = (
             <img
               src={img.url}
               alt={img.name}
               draggable={false}
-              className={`object-cover ${
-                isAnchor ? "block w-full max-h-[480px]" : "absolute inset-0 h-full w-full"
-              } ${slideClassName(active)}`}
+              className="h-full w-full object-cover"
             />
           );
           const clickGuard = (event: React.MouseEvent) => {
@@ -127,7 +131,9 @@ export function ThreadImageCarousel({
               rel="noopener noreferrer"
               aria-hidden={!active}
               tabIndex={active ? undefined : -1}
-              className={active ? "block" : "pointer-events-none block"}
+              className={`h-full w-full shrink-0 overflow-hidden ${
+                active ? "block" : "pointer-events-none block"
+              }`}
               onClick={clickGuard}
             >
               {inner}
@@ -138,7 +144,9 @@ export function ThreadImageCarousel({
               role="link"
               tabIndex={active ? 0 : -1}
               aria-hidden={!active}
-              className={active ? "block cursor-pointer" : "pointer-events-none block"}
+              className={`h-full w-full shrink-0 overflow-hidden ${
+                active ? "block cursor-pointer" : "pointer-events-none block"
+              }`}
               onClick={(event) => {
                 clickGuard(event);
                 if (!event.defaultPrevented) openImage(img.url);
