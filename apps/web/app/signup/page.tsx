@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Spinner } from "@/components/ui/Spinner";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { compressImage } from "@/lib/compressImage";
+import { compressAvatarClient } from "@/lib/image-client";
 import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
@@ -221,10 +221,10 @@ function SignupInner() {
     e.target.value = "";
     setStep4Error(null);
     try {
-      const compressed = await compressImage(file);
+      const compressed = await compressAvatarClient(file);
       if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-      setUploadedBlob(compressed);
-      setUploadPreviewUrl(URL.createObjectURL(compressed));
+      setUploadedBlob(compressed.blob);
+      setUploadPreviewUrl(URL.createObjectURL(compressed.blob));
     } catch {
       setStep4Error("Failed to process image. Please try a different file.");
     }
@@ -251,7 +251,7 @@ function SignupInner() {
       if (uploadedBlob) {
         const fd = new FormData();
         fd.append("payload", JSON.stringify(payload));
-        fd.append("file", uploadedBlob, "profile-picture.jpg");
+        fd.append("file", uploadedBlob, "profile-picture.webp");
         res = await fetch("/api/signup/avatar", { method: "POST", body: fd });
       } else {
         res = await fetch("/api/signup/avatar", {

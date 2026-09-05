@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
-import { compressImage } from "@/lib/compressImage";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface MasterItem {
   id: string;
@@ -132,13 +132,13 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
     setImageUploading(true);
     setImageError(null);
     try {
-      // Compress raster images before upload (skip SVG — vector files need no compression)
+      // Compress raster images to WebP before upload (skip SVG — vector files need no compression).
       let uploadFile: File | Blob = file;
       if (file.type !== "image/svg+xml") {
-        try { uploadFile = await compressImage(file); } catch { /* fall back to original */ }
+        try { uploadFile = compressedFile(await compressImage(file), file); } catch { /* fall back to original */ }
       }
       const fd = new FormData();
-      fd.append("file", uploadFile, file.name);
+      fd.append("file", uploadFile, uploadFile instanceof File ? uploadFile.name : file.name);
       const uploadRes = await fetch("/api/admin/upload", { method: "POST", body: fd });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) { setImageError(uploadData.error ?? "Upload failed."); return; }

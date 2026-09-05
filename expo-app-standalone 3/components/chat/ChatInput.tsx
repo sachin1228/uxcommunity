@@ -12,6 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { Message } from '@/lib/communities';
 import * as ImagePicker from 'expo-image-picker';
+import { prepareImageForUpload } from '@/lib/prepareImage';
 
 export interface PendingImage {
   uri: string;
@@ -52,14 +53,22 @@ export function ChatInput({ replyTo, onCancelReply, onSend, onTypingChange, disa
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      quality: 0.85,
+      // No intermediate loss here — prepareImageForUpload applies the final
+      // WebP quality-0.90 encode (max dimension 2560, never upscaled).
+      quality: 1,
       allowsEditing: false,
     });
 
     if (result.canceled || !result.assets[0]) return;
 
     const asset = result.assets[0];
-    setPendingImage({ uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' });
+    try {
+      const prepared = await prepareImageForUpload(asset, `chat-image-${Date.now()}`);
+      setPendingImage({ uri: prepared.uri, mimeType: prepared.mimeType });
+    } catch {
+      // Keep the original picked image as a last-resort fallback.
+      setPendingImage({ uri: asset.uri, mimeType: asset.mimeType ?? 'image/jpeg' });
+    }
   }
 
   const canSend = (!!text.trim() || !!pendingImage) && !disabled;

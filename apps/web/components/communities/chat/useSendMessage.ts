@@ -9,7 +9,7 @@ import {
 } from "@/lib/communities/cache";
 import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
-import { compressChatImageClient, compressedFile, preloadImage } from "@/lib/image-client";
+import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
 
 type Message = CachedMessage;
 
@@ -279,7 +279,7 @@ export function useSendMessage({
         // bytes as-is since server-side Sharp is unavailable on Workers.
         const fileToSend = await measureClient("client_compression", async () => {
           try {
-            return compressedFile(await compressChatImageClient(imageFile), imageFile);
+            return compressedFile(await compressImage(imageFile), imageFile);
           } catch {
             return imageFile;
           }

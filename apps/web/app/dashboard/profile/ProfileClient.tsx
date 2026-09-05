@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { compressImage } from "@/lib/compressImage";
+import { compressAvatarClient } from "@/lib/image-client";
 import { ProfileCard } from "./components/ProfileCard";
 import { ProfileThreads } from "./components/ProfileThreads";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
@@ -66,10 +66,10 @@ export function ProfileClient({
     event.target.value = "";
     setPictureError(null);
     try {
-      const compressed = await compressImage(file);
+      const compressed = await compressAvatarClient(file);
       if (uploadPreview) URL.revokeObjectURL(uploadPreview);
-      setUploadBlob(compressed);
-      setUploadPreview(URL.createObjectURL(compressed));
+      setUploadBlob(compressed.blob);
+      setUploadPreview(URL.createObjectURL(compressed.blob));
     } catch {
       setPictureError("Failed to process the profile picture. Please try a different file.");
     }
@@ -81,7 +81,7 @@ export function ProfileClient({
     setPictureError(null);
     try {
       const formData = new FormData();
-      formData.append("file", uploadBlob, "profile-picture.jpg");
+      formData.append("file", uploadBlob, "profile-picture.webp");
       const response = await fetch("/api/profile/avatar", { method: "POST", body: formData });
       const data = await response.json();
       if (!response.ok) {

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Calendar, Check, Clock, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent } from "./types";
-import { compressChatImageClient, compressedFile } from "@/lib/image-client";
+import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface CreateEventModalProps {
   communityId?: string;
@@ -44,10 +44,16 @@ export function CreateEventModal({
     setError(null);
     try {
       const form = new FormData();
-      try {
-        form.append("file", compressedFile(await compressChatImageClient(file), file));
-      } catch {
+      if (file.type === "image/gif") {
+        // Animated GIFs pass through untouched — compressing them would flatten
+        // the animation into a static frame.
         form.append("file", file);
+      } else {
+        try {
+          form.append("file", compressedFile(await compressImage(file), file));
+        } catch {
+          form.append("file", file);
+        }
       }
       const res = await fetch(`/api/communities/${communityId}/events/upload`, { method: "POST", body: form });
       const data = await res.json();
