@@ -89,7 +89,7 @@ export function ThreadPollResult({
 
       {options.length > 0 && (hasVoted ? (
         /* ── Results — only shown once the current user has voted ── */
-        <div className="mt-3 flex flex-col gap-2">
+        <div className={`mt-3 gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}>
           {options.map((option, index) => {
             const isSelected = selected === index;
             const letter = String.fromCharCode(65 + index);
@@ -133,7 +133,11 @@ export function ThreadPollResult({
         </div>
       ) : (
         /* ── Pre-vote — options only, no result information ── */
-        <div role="radiogroup" aria-label="Poll options" className="mt-3 flex flex-col gap-2">
+        <div
+          role="radiogroup"
+          aria-label="Poll options"
+          className={`mt-3 gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}
+        >
           {options.map((option, index) => {
             const letter = String.fromCharCode(65 + index);
             const isPending = pendingOption === index;
@@ -146,7 +150,7 @@ export function ThreadPollResult({
                 aria-label={`Vote for ${letter}. ${option}`}
                 onClick={() => onVote?.(index)}
                 disabled={busy || !interactive}
-                className={`group flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed ${
+                className={`group/option flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed ${
                   busy ? "disabled:opacity-60" : ""
                 } ${
                   interactive
@@ -162,7 +166,7 @@ export function ThreadPollResult({
                     aria-hidden
                   />
                 ) : (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-subtle transition-colors group-hover:border-foreground-subtle group-hover:text-foreground-muted">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-subtle transition-colors group-hover/option:border-foreground-subtle group-hover/option:text-foreground-muted">
                     {letter}
                   </span>
                 )}
