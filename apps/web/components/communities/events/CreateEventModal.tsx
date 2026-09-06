@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Calendar, Check, Clock, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
+import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -314,6 +314,7 @@ export function CreateEventModal({
             description="This event will appear on the home feed for all members."
             checked={isPublic}
             onChange={setIsPublic}
+            icon={<Globe strokeWidth={2.5} size={15} />}
           />
         </div>
 

@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import {
   Globe,
+  MessageCircle,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -267,6 +268,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               description="Other members can reply to this thread."
               checked={allowReplies}
               onChange={setAllowReplies}
+              icon={<MessageCircle strokeWidth={2.5} size={15} />}
             />
             <ToggleRow
               title="Share publicly"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Globe, ImagePlus, X } from "lucide-react";
+import { Globe, ImagePlus, MessageCircle, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -36,7 +36,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
         <div className="md:col-span-2"><span className="mb-2 block font-body text-xs text-foreground-muted">Preview image *</span><button type="button" onClick={() => fileRef.current?.click()} className="flex min-h-48 w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-border bg-surface-raised text-foreground-muted hover:border-accent/60">{preview ? <img src={preview} alt="Work preview" className="max-h-80 w-full object-cover"/> : <span className="flex flex-col items-center gap-2 font-body text-sm"><ImagePlus strokeWidth={2.5} size={24}/>Choose a cover image</span>}</button><input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); if (next) setPreview(URL.createObjectURL(next)); }}/></div>
         <label><span className="mb-1.5 block font-body text-xs text-foreground-muted">Category</span><select className={field} value={category} onChange={(event) => setCategory(event.target.value as ShowcaseCategory)}>{SHOWCASE_CATEGORIES.filter((item) => item.value !== "all").map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
       </div>
-      <div className="mt-5 divide-y divide-border"><ToggleRow title="Allow replies" description="Other members can comment on this showcase." checked={allowReplies} onChange={setAllowReplies} /><ToggleRow title="Share publicly" description="Visible to everyone, not just community members." checked={isPublic} onChange={setIsPublic} icon={<Globe strokeWidth={2.5} size={15} />} /></div>
+      <div className="mt-5 divide-y divide-border"><ToggleRow title="Allow replies" description="Other members can comment on this showcase." checked={allowReplies} onChange={setAllowReplies} icon={<MessageCircle strokeWidth={2.5} size={15} />} /><ToggleRow title="Share publicly" description="Visible to everyone, not just community members." checked={isPublic} onChange={setIsPublic} icon={<Globe strokeWidth={2.5} size={15} />} /></div>
       {error && <p className="mt-4 font-body text-sm text-red-400">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button><button disabled={saving} className="modal-btn modal-btn-primary">{saving && <Spinner size={15} className="text-white" />}{saving ? "Saving…" : editing ? "Save changes" : "Share work"}</button></div>
     </form></div></ModalPortal>;
 }
