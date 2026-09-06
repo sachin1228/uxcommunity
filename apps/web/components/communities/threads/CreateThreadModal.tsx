@@ -188,7 +188,7 @@ export function CreateThreadModal({
   return (
     <ModalPortal>
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-thread-title"
@@ -196,24 +196,24 @@ export function CreateThreadModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl"
+        className="flex max-h-[min(800px,80vh)] w-full max-w-[540px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_24px_70px_-20px_rgba(0,0,0,0.45)]"
       >
         {/* ── Header ── */}
-        <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
-          <div>
-            <h2 id="create-thread-title" className="font-display text-lg font-semibold text-foreground">
+        <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-2 pt-5 sm:px-6">
+          <div className="min-w-0">
+            <h2 id="create-thread-title" className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
               Create Thread
             </h2>
-            <p className="mt-0.5 font-body text-xs text-foreground-muted">
+            <p className="mt-1 font-body text-[13px] text-foreground-muted">
               Share your thoughts, ask a question, or start a discussion
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={20} />
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
-        <div className="space-y-4 px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-4 sm:px-6">
           {/* ── Post / Poll tabs ── */}
           <ComposerTabs value={tab} onChange={selectTab} />
 
@@ -255,13 +255,11 @@ export function CreateThreadModal({
             onAddMore={() => fileInputRef.current?.click()}
           />
 
-          <div className="border-t border-border" />
-
           {/* ── Category ── */}
           <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Toggles ── */}
-          <div className="overflow-hidden rounded-xl border border-border bg-surface-raised divide-y divide-border">
+          <div className="divide-y divide-border">
             <ToggleRow
               title="Allow replies"
               description="Other members can reply to this thread."
@@ -279,21 +277,23 @@ export function CreateThreadModal({
         </div>
 
         {error && (
-          <div className="mx-6 mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
-            <p className="font-body text-sm text-red-400">{error}</p>
+          <div className="shrink-0 px-5 pb-1 sm:px-6">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2">
+              <p className="font-body text-sm text-red-400">{error}</p>
+            </div>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3 sm:px-6">
+          <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || uploading}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent px-3 font-body text-[13px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Spinner size={15} className="text-white" />}
+            {saving && <Spinner size={14} className="text-white" />}
             {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
           </button>
         </div>
