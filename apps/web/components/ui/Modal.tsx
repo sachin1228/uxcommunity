@@ -76,20 +76,20 @@ export function Modal({
 
       {/* Panel */}
       <div
-        className={`relative z-10 w-full ${maxWidth} rounded-xl border border-border bg-surface shadow-xl max-h-[calc(100vh-2rem)] overflow-y-auto ${panelClassName ?? "p-8"}`}
+        className={`relative z-10 w-full ${maxWidth} modal-panel max-h-[min(800px,calc(100vh-2rem))] overflow-y-auto ${panelClassName ?? "p-6"}`}
       >
         {title && (
           <div className="mb-6 flex items-start justify-between gap-4">
-            <h2 className="font-display text-xl font-semibold text-foreground">
+            <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
               {title}
             </h2>
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="flex-shrink-0 text-foreground-muted hover:text-foreground transition-colors"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                 aria-label="Close"
               >
-                <X strokeWidth={2.5} size={18} />
+                <X strokeWidth={2.5} size={16} />
               </button>
             )}
           </div>
@@ -97,10 +97,10 @@ export function Modal({
         {!title && !hideCloseButton && (
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-foreground-muted hover:text-foreground transition-colors"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             aria-label="Close"
           >
-            <X strokeWidth={2.5} size={18} />
+            <X strokeWidth={2.5} size={16} />
           </button>
         )}
         {children}

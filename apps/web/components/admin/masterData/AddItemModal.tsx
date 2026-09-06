@@ -88,10 +88,10 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+      <div className="modal-panel relative z-10 w-full max-w-md p-5">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
-          <button onClick={onClose} className="text-foreground-muted hover:text-foreground transition-colors">
+          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
           </button>
         </div>
@@ -109,7 +109,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               value={addName}
               onChange={(e) => { setAddName(e.target.value); setAddError(null); }}
               placeholder={`e.g. ${entity === "City" ? "Pune" : "SaaS & Software"}`}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
+              className="field w-full"
             />
           </div>
 
@@ -171,14 +171,14 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="modal-btn modal-btn-secondary"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={addLoading || imageUploading}
-              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors disabled:opacity-60"
+              className="modal-btn modal-btn-primary"
             >
               {addLoading || imageUploading ? (
                 <Spinner className="h-3 w-3 text-white" />

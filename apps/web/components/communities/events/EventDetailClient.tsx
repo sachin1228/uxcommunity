@@ -215,7 +215,7 @@ function CommentNode({
                   placeholder={`Write a reply…`}
                   rows={2}
                   maxLength={2000}
-                  className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground placeholder:text-foreground-subtle focus:border-accent focus:outline-none"
+                  className="field w-full resize-none"
                 />
                 {replyError && <p className="font-body text-[11px] text-red-400">{replyError}</p>}
                 <div className="flex items-center gap-2">

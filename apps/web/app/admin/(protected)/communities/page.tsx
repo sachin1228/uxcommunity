@@ -221,7 +221,7 @@ export default function AdminCommunitiesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search communities…"
-          className="w-full rounded-lg border border-border bg-surface pl-8 pr-4 py-2 font-body text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/40"
+          className="field w-full pl-8 pr-4"
         />
       </div>
 
@@ -266,7 +266,7 @@ export default function AdminCommunitiesPage() {
       {showResetConfirm && (
         <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <div className="modal-panel w-full max-w-sm p-6">
             <h2 className="font-display text-base font-semibold text-foreground mb-1">
               Reset all community chat?
             </h2>
@@ -282,14 +282,14 @@ export default function AdminCommunitiesPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => { setShowResetConfirm(false); setResetError(null); }}
-                className="flex-1 rounded-md border border-border py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised transition-colors"
+                className="modal-btn modal-btn-secondary flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleResetAllChat}
                 disabled={resetLoading}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-red-600 py-2 font-body text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
+                className="modal-btn modal-btn-danger flex-1"
               >
                 {resetLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete all

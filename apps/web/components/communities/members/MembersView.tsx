@@ -253,7 +253,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search members…"
-            className="w-full bg-surface-raised text-foreground placeholder:text-foreground-muted font-body text-sm rounded-lg pl-8 pr-3 py-2 border border-border focus:outline-none focus:border-accent transition-colors"
+            className="field w-full pl-8 pr-3"
           />
         </div>
       </div>

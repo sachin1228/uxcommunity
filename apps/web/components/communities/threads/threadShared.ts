@@ -15,16 +15,6 @@ export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg:
   collaboration:{ border: "#0891B2", text: "#67E8F9", bg: "rgba(8,145,178,0.10)"  },
 };
 
-/**
- * Selected-state colors for choice chips (category + tags). Uses the design
- * system's Geist blue tokens so it adapts to light/dark automatically.
- */
-export const BLUE_SELECTED_STYLE = {
-  borderColor: "var(--ds-blue-700)",
-  backgroundColor: "var(--ds-blue-100)",
-  color: "var(--ds-blue-900)",
-} as const;
-
 export function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
   const minutes = Math.max(1, Math.floor(elapsed / 60_000));
@@ -47,11 +37,6 @@ export function formatFullDate(value: string) {
 export function bodyToTitle(body: string): string {
   const trimmed = body.trim();
   return trimmed.slice(0, THREAD_BODY_MAX_LENGTH) || "Thread";
-}
-
-/** A poll draft that has no content at all (question + every option blank). */
-export function isPollDraftEmpty(draft: ThreadPollDraft): boolean {
-  return !draft.question.trim() && draft.options.every((option) => !option.trim());
 }
 
 /** Human-readable validation message for an incomplete poll draft. */

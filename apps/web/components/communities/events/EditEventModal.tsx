@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -129,8 +130,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+        className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl flex-col overflow-hidden"
       >
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="edit-event-title" className="font-display text-xl font-semibold text-foreground">
@@ -138,8 +140,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             </h2>
             <p className="mt-1 font-body text-sm text-foreground-muted">Update event details.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={20} />
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -186,7 +188,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 maxLength={120}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="What's the event called?"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-14 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full pr-14"
               />
               <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">{title.length}/120</span>
             </div>
@@ -202,7 +204,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell people what to expect…"
               rows={4}
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full resize-y"
             />
           </label>
 
@@ -212,14 +214,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
               </span>
               <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                 <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
               </span>
               <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
           </div>
 
@@ -229,30 +231,24 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 End date <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
             <label className="block">
               <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                 End time <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
           </div>
 
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2">
-              <Video strokeWidth={2.5} size={15} className="text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Online event</span>
-                <span className="block font-body text-xs text-foreground-muted">Happening virtually via a meeting link.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 rounded-full transition-colors ${isOnline ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isOnline} onChange={(e) => setIsOnline(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isOnline ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Online event"
+            description="Happening virtually via a meeting link."
+            checked={isOnline}
+            onChange={setIsOnline}
+            icon={<Video strokeWidth={2.5} size={15} />}
+          />
 
           {isOnline ? (
             <label className="block">
@@ -261,7 +257,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </span>
               <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+                className="field w-full" />
             </label>
           ) : (
             <label className="block">
@@ -270,7 +266,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </span>
               <input value={location} onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+                className="field w-full" />
             </label>
           )}
 
@@ -280,32 +276,27 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             </span>
             <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="Leave blank for unlimited"
-              className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+              className="field w-full" />
           </label>
 
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Share publicly"
+            description="Visible to everyone, not just community members."
+            checked={isPublic}
+            onChange={setIsPublic}
+            icon={<Globe strokeWidth={2.5} size={15} />}
+          />
         </div>
 
         {error && (
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">{error}</p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">Cancel</button>
-          <button type="submit" disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
+          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
+          <button type="submit" disabled={saving} className="modal-btn modal-btn-primary">
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>

@@ -64,7 +64,7 @@ function ResetPasswordInner() {
   }
 
   const inputClass =
-    "w-full rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20";
+    "field w-full";
 
   const fieldError = (key: string) =>
     fieldErrors[key]?.length ? (

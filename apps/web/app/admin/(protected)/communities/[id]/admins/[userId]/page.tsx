@@ -311,7 +311,7 @@ export default function CommunityAdminPermissionsPage() {
           className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
           onMouseDown={(e) => { if (e.target === e.currentTarget) setShowRemoveConfirm(false); }}
         >
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <div className="modal-panel w-full max-w-sm p-6">
             <h2 className="font-display text-base font-semibold text-foreground mb-1 flex items-center gap-2">
               <ShieldOff strokeWidth={2.5} size={15} className="text-red-400" /> Remove {firstName}&apos;s admin rights?
             </h2>
@@ -323,14 +323,14 @@ export default function CommunityAdminPermissionsPage() {
               <button
                 onClick={() => setShowRemoveConfirm(false)}
                 disabled={removing}
-                className="flex-1 rounded-md border border-border py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised transition-colors disabled:opacity-50"
+                className="modal-btn modal-btn-secondary flex-1"
               >
                 <span className="inline-flex items-center gap-1"><X strokeWidth={2.5} size={11} /> Cancel</span>
               </button>
               <button
                 onClick={handleRemoveAdmin}
                 disabled={removing}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                className="modal-btn modal-btn-danger-soft flex-1"
               >
                 {removing ? <Spinner className="h-3 w-3" /> : <ShieldOff strokeWidth={2.5} size={11} />} Remove admin
               </button>

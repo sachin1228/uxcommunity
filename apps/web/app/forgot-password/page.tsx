@@ -109,7 +109,7 @@ export default function ForgotPasswordPage() {
                       setError(null);
                     }}
                     placeholder="you@studio.com"
-                    className="rounded-md border border-border bg-background px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full"
+                    className="field w-full"
                     autoComplete="email"
                     autoFocus
                     required

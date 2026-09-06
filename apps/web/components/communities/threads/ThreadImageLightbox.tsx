@@ -294,6 +294,7 @@ export function ThreadImageLightbox({
                 poll={thread.poll}
                 counts={thread.poll_vote_counts}
                 userVote={thread.poll_user_vote}
+                hideQuestion={thread.poll.question.trim() === thread.title.trim()}
               />
             )}
 

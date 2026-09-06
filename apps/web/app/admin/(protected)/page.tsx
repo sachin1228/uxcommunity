@@ -131,13 +131,13 @@ export default function AdminApplicationsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or email…"
-            className="w-full rounded-md border border-border bg-surface pl-8 pr-3 py-1.5 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent focus:ring-1 focus:ring-accent/20"
+            className="field w-full pl-8 pr-3"
           />
         </div>
         <select
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className="rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20"
+          className="field"
         >
           <option value="">All tags</option>
           {allTags.map((t) => (

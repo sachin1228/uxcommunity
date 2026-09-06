@@ -138,7 +138,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="w-full rounded-lg border border-border bg-surface-raised pl-8 pr-8 py-1.5 font-body text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/40"
+              className="field w-full pl-8 pr-8"
             />
             {query && (
               <button

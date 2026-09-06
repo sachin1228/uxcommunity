@@ -38,7 +38,7 @@ export function AvatarPickerModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="profile-picture-title"
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl"
+        className="modal-panel w-full max-w-lg overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 id="profile-picture-title" className="font-display text-base font-semibold text-foreground">
@@ -48,9 +48,9 @@ export function AvatarPickerModal({
             type="button"
             onClick={onClose}
             aria-label="Close profile picture dialog"
-            className="text-foreground-muted transition-colors hover:text-foreground"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
           >
-            <X strokeWidth={2.5} aria-hidden="true" />
+            <X strokeWidth={2.5} size={16} aria-hidden="true" />
           </button>
         </div>
 
@@ -102,11 +102,11 @@ export function AvatarPickerModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+            className="modal-btn modal-btn-secondary"
           >
             Cancel
           </button>
@@ -114,7 +114,7 @@ export function AvatarPickerModal({
             type="button"
             onClick={onSave}
             disabled={saving || !uploadPreview}
-            className="flex items-center gap-2 rounded-lg bg-accent px-5 py-2 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+            className="modal-btn modal-btn-primary"
           >
             {saving && <Spinner className="size-3.5" />}
             {saving ? "Saving…" : "Save profile picture"}

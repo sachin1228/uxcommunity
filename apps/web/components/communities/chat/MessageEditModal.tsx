@@ -45,7 +45,7 @@ export function MessageEditModal({
       onClose={onClose}
       maxWidth="max-w-xl"
       hideCloseButton
-      panelClassName="overflow-hidden rounded-2xl border-border bg-surface p-0 shadow-2xl"
+      panelClassName="overflow-hidden p-0"
     >
       <div className="flex max-h-[calc(100vh-2rem)] flex-col">
         <div className="flex shrink-0 items-center gap-4 border-b border-border px-6 py-4">

@@ -229,7 +229,7 @@ export default function UserDetailPage() {
       {confirmDelete && (
         <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 shadow-xl">
+          <div className="modal-panel w-full max-w-sm p-6">
             <h2 className="font-display text-lg font-semibold text-foreground mb-1">
               Delete account?
             </h2>
@@ -241,14 +241,14 @@ export default function UserDetailPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(false)}
-                className="flex-1 rounded-md border border-border py-2 font-body text-sm text-foreground-muted hover:bg-surface-raised transition-colors"
+                className="modal-btn modal-btn-secondary flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={!!actionLoading}
-                className="flex-1 flex items-center justify-center gap-2 rounded-md bg-red-600 py-2 font-body text-sm font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
+                className="modal-btn modal-btn-danger flex-1"
               >
                 {actionLoading === "delete" ? <Spinner className="h-4 w-4" /> : null}
                 Delete
