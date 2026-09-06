@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
   Heart, Bookmark, Flag, MessageCircle,
   MoreHorizontal, Paperclip, Pencil, Trash2,
@@ -10,6 +10,8 @@ import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -122,6 +124,23 @@ export function ThreadCard({
   const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [titleExpanded, setTitleExpanded] = useState(false);
+  const [titleOverflow, setTitleOverflow] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+
+  // Collapse long thread bodies to two lines on feed cards and offer a "More" toggle.
+  // Measured while clamped (before the user expands), so the button stays visible.
+  useIsomorphicLayoutEffect(() => {
+    if (isDetail) return;
+    setTitleExpanded(false);
+    const el = titleRef.current;
+    if (!el) return;
+    const measure = () => setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
+    measure();
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+  }, [isDetail, thread.title]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -478,9 +497,24 @@ export function ThreadCard({
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : (
-          <h3 className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
-            {renderWithLinks(thread.title, true)}
-          </h3>
+          <>
+            <h3
+              ref={titleRef}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2"}`}
+            >
+              {renderWithLinks(thread.title, true)}
+            </h3>
+            {titleOverflow && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded((prev) => !prev); }}
+                aria-expanded={titleExpanded}
+                className="mt-1.5 inline-flex items-center gap-1 font-body text-xs font-medium text-accent transition-colors hover:text-accent-hover"
+              >
+                {titleExpanded ? "Show less" : "More"}
+              </button>
+            )}
+          </>
         )}
 
         {/* ── Poll ── */}
