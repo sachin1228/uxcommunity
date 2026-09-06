@@ -24,7 +24,7 @@ export function HomeSidebar() {
       aria-label="Homepage sidebar"
       className="hidden w-64 shrink-0 flex-col gap-4 pt-8 xl:flex"
     >
-      <section className="rounded-xl border border-border bg-surface p-4">
+      <section className="rounded-xl border border-border bg-background-subtle p-4">
         <h2 className="font-body text-xs font-semibold uppercase tracking-widest text-foreground-muted">
           Discover
         </h2>
@@ -46,7 +46,7 @@ export function HomeSidebar() {
         </nav>
       </section>
 
-      <section className="rounded-xl border border-border bg-surface p-4">
+      <section className="rounded-xl border border-border bg-background-subtle p-4">
         <h2 className="font-body text-xs font-semibold uppercase tracking-widest text-foreground-muted">
           Your space
         </h2>
@@ -68,7 +68,7 @@ export function HomeSidebar() {
         </nav>
       </section>
 
-      <section className="rounded-xl border border-border bg-surface p-4">
+      <section className="rounded-xl border border-border bg-background-subtle p-4">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-foreground">
           <Plus size={17} strokeWidth={2.5} aria-hidden="true" />
         </div>

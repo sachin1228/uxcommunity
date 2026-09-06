@@ -87,7 +87,7 @@ export default async function DashboardLayout({
           <GlobalSidebar userId={userId} user={sidebarUser} />
         </div>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background-subtle">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">
           {children}
         </main>
       </div>
