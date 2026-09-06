@@ -34,7 +34,7 @@ export function PostAuthorMeta({
       </div>
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate font-body text-[15px] font-semibold text-foreground">
+          <span className="truncate font-body text-sm font-semibold text-foreground">
             {authorName}
           </span>
           {dateInline && (

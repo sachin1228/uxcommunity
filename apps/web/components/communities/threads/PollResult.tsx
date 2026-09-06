@@ -74,13 +74,6 @@ export function ThreadPollResult({
 
   return (
     <div className="rounded-xl py-4">
-      <div className="flex items-center gap-1.5">
-        <BarChart3 strokeWidth={2.5} size={13} className="text-foreground" />
-        <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-foreground">
-          Poll
-        </span>
-      </div>
-
       {!hideQuestion && poll.question && (
         <p className="mt-2 whitespace-pre-wrap break-words font-body text-sm font-medium leading-relaxed text-foreground">
           {poll.question}
@@ -89,7 +82,7 @@ export function ThreadPollResult({
 
       {options.length > 0 && (hasVoted ? (
         /* ── Results — only shown once the current user has voted ── */
-        <div className={`mt-3 gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}>
+        <div className={`gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}>
           {options.map((option, index) => {
             const isSelected = selected === index;
             const letter = String.fromCharCode(65 + index);
