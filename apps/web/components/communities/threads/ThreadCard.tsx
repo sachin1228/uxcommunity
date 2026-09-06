@@ -534,7 +534,7 @@ export function ThreadCard({
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
                 style={{ left: `${moreLeft}px` }}
-                className="absolute bottom-0 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
+                className="absolute bottom-0 min-w-16 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
               >
                 More
               </button>
