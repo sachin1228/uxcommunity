@@ -497,7 +497,7 @@ export function ThreadCard({
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : (
-          <>
+          <div className="relative">
             <h3
               ref={titleRef}
               className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2"}`}
@@ -508,12 +508,12 @@ export function ThreadCard({
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
-                className="mt-1.5 inline-flex items-center gap-1 font-body text-xs font-medium text-foreground-subtle transition-colors hover:text-accent"
+                className="absolute bottom-0 right-0 bg-gradient-to-l from-background-subtle to-transparent pl-5 font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
               >
                 More
               </button>
             )}
-          </>
+          </div>
         )}
 
         {/* ── Poll ── */}
