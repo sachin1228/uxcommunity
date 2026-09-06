@@ -90,7 +90,7 @@ export function ThreadImageCarousel({
         alt=""
         draggable={false}
         aria-hidden
-        className="pointer-events-none block w-full max-h-[480px] object-cover opacity-0"
+        className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
       />
 
       {/* Slide track — images sit physically next to each other and the
@@ -101,12 +101,13 @@ export function ThreadImageCarousel({
       >
         {images.map((img, slideIndex) => {
           const active = slideIndex === index;
+          // Native aspect ratio, capped at 480px tall — never cropped.
           const inner = (
             <img
               src={img.url}
               alt={img.name}
               draggable={false}
-              className="h-full w-full object-cover"
+              className="mx-auto h-full w-auto max-w-full object-contain"
             />
           );
           return (
