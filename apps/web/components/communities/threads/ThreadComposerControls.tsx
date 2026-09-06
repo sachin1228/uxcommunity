@@ -49,7 +49,7 @@ export function ComposerTabs({
     <div
       role="tablist"
       aria-label="Thread type"
-      className="flex items-center gap-1 overflow-x-auto md:gap-3"
+      className="flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
