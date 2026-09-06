@@ -66,7 +66,7 @@ function Composer({
         placeholder={
           parentId ? "Write a reply…" : "Leave constructive feedback…"
         }
-        className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
+        className="field w-full resize-none"
       />
       {error && <p className="font-body text-xs text-red-400">{error}</p>}
       <div className="flex items-center gap-2">

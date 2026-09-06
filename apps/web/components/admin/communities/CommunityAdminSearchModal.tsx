@@ -170,7 +170,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="w-full rounded-lg border border-border bg-surface-raised pl-9 pr-3 py-2 font-body text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-accent transition-colors"
+              className="field w-full pl-9 pr-3"
             />
           </div>
         </div>

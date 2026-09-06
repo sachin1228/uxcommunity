@@ -227,7 +227,7 @@ export function CreateThreadModal({
                 maxLength={THREAD_BODY_MAX_LENGTH}
                 placeholder="What do you want to talk about?"
                 rows={4}
-                className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 pb-6 pr-16 pt-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
               />
               <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
                 {body.length}/{THREAD_BODY_MAX_LENGTH}

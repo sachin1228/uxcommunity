@@ -170,7 +170,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
                   rows={2}
-                  className="w-full rounded-md border border-border bg-surface-raised px-2 py-1 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 resize-none"
+                  className="field w-full resize-none"
                 />
                 {editError && <p className="font-body text-[11px] text-red-400">{editError}</p>}
                 <div className="flex gap-2">
@@ -247,7 +247,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
             placeholder="Describe the rule…"
             rows={2}
             maxLength={500}
-            className="w-full rounded-md border border-border bg-surface-raised px-2 py-1.5 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 resize-none placeholder:text-foreground-muted"
+            className="field w-full resize-none"
           />
           <div className="flex items-center justify-between">
             <span className="font-mono text-[11px] text-foreground-muted">{newText.length}/500</span>

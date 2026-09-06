@@ -194,7 +194,7 @@ export default function LoadTestPage() {
                   <select
                     value={scenario}
                     onChange={(e) => setScenario(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent pr-7"
+                    className="field w-full pr-7"
                   >
                     {SCENARIOS.map((s) => (
                       <option key={s.value} value={s.value}>{s.label}</option>
@@ -235,8 +235,7 @@ export default function LoadTestPage() {
                     max={500}
                     value={concurrentVus}
                     onChange={(e) => setConcurrentVus(Number(e.target.value))}
-                    className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                  />
+                    className="field w-full" />
                 </div>
               )}
 
@@ -253,8 +252,7 @@ export default function LoadTestPage() {
                       max={500}
                       value={floodVus}
                       onChange={(e) => setFloodVus(Number(e.target.value))}
-                      className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                      className="field w-full" />
                     <p className="font-body text-[11px] text-foreground-muted">
                       500 VUs × 2s sleep ≈ 250 msg/s · ~45k msgs in 3 min
                     </p>
@@ -268,8 +266,7 @@ export default function LoadTestPage() {
                       value={floodDuration}
                       onChange={(e) => setFloodDuration(e.target.value)}
                       placeholder="e.g. 3m, 10m, 1h"
-                      className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-                    />
+                      className="field w-full" />
                   </div>
                 </>
               )}
@@ -352,8 +349,7 @@ export default function LoadTestPage() {
                   max={1000}
                   value={userCount}
                   onChange={(e) => setUserCount(Number(e.target.value))}
-                  className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent"
-                />
+                  className="field w-full" />
               </div>
 
               <RunButton running={isRunning} onClick={runSeed} onStop={stop} label="Seed Users" />
@@ -442,8 +438,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
-      />
+        className="field w-full" />
     </div>
   );
 }
@@ -465,7 +460,7 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2 pr-8 font-body text-xs text-foreground placeholder:text-foreground-muted/50 focus:outline-none focus:ring-1 focus:ring-accent"
+          className="field w-full pr-8"
         />
         <button
           type="button"

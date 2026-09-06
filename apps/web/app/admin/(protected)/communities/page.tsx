@@ -221,7 +221,7 @@ export default function AdminCommunitiesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search communities…"
-          className="w-full rounded-lg border border-border bg-surface pl-8 pr-4 py-2 font-body text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent/40"
+          className="field w-full pl-8 pr-4"
         />
       </div>
 

@@ -186,7 +186,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 maxLength={120}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="What's the event called?"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-14 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full pr-14"
               />
               <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">{title.length}/120</span>
             </div>
@@ -202,7 +202,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell people what to expect…"
               rows={4}
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full resize-y"
             />
           </label>
 
@@ -212,14 +212,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
               </span>
               <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
                 <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
               </span>
               <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
           </div>
 
@@ -229,14 +229,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
                 End date <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
             <label className="block">
               <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
                 End time <span className="font-normal text-foreground-subtle">(optional)</span>
               </span>
               <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent" />
+                className="field w-full" />
             </label>
           </div>
 
@@ -261,7 +261,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </span>
               <input type="url" value={meetLink} onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+                className="field w-full" />
             </label>
           ) : (
             <label className="block">
@@ -270,7 +270,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               </span>
               <input value={location} onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+                className="field w-full" />
             </label>
           )}
 
@@ -280,7 +280,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             </span>
             <input type="number" min={1} value={maxAttendees} onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="Leave blank for unlimited"
-              className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent" />
+              className="field w-full" />
           </label>
 
           <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">

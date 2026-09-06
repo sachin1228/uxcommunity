@@ -236,7 +236,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 value={editName}
                 onChange={(e) => { setEditName(e.target.value); setEditError(null); }}
                 autoFocus
-                className="rounded-lg border border-accent bg-surface px-3 py-2 font-display text-xl font-semibold text-foreground outline-none focus:ring-1 focus:ring-accent/30 flex-1 min-w-0"
+                className="field border-accent font-display text-xl font-semibold flex-1 min-w-0"
               />
               <button onClick={handleEditSave} disabled={editLoading} className="text-green-400 hover:text-green-300 transition-colors shrink-0" aria-label="Save">
                 {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={18} />}

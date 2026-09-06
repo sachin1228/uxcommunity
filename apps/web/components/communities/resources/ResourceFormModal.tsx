@@ -204,7 +204,7 @@ export function ResourceFormModal({
               placeholder="What makes this resource worth sharing?"
               rows={4}
               required
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full resize-y"
             />
           </label>
 
@@ -248,7 +248,7 @@ export function ResourceFormModal({
                 }}
                 placeholder="https://..."
                 type="url"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full pr-9"
               />
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner

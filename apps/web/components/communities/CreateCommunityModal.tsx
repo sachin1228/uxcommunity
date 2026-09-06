@@ -81,7 +81,7 @@ function RuleRow({
         onChange={(event) => onChange(event.target.value)}
         placeholder="Add a community rule"
         maxLength={160}
-        className="min-w-0 flex-1 rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+        className="field min-w-0 flex-1"
       />
       <button
         type="button"
@@ -237,7 +237,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   onChange={(event) => setName(event.target.value)}
                   maxLength={80}
                   placeholder="e.g. Design Systems"
-                  className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full"
                 />
               </div>
               <div className="grid gap-2">
@@ -342,7 +342,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   maxLength={500}
                   rows={3}
                   placeholder="What should members use this community for?"
-                  className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full resize-none"
                 />
               </div>
               <div>

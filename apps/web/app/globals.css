@@ -27,6 +27,13 @@
   --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
+  /* Field inputs — Geist-style ring fields (light theme) */
+  --color-field:            #FAFAFA;
+  --color-field-ring:       rgba(0, 0, 0, 0.16);
+  --color-field-ring-hover: rgba(0, 0, 0, 0.24);
+  --color-field-ring-focus: rgba(10, 10, 10, 0.55);
+  --color-field-halo:       rgba(10, 10, 10, 0.14);
+
   --color-signal:            #0A0A0A;
 
   --color-overlay:            #0A0A0A;
@@ -171,6 +178,13 @@
     --color-border-subtle:     #1D1D21;  /* section dividers */
     --color-border-strong:     #2D2D34;  /* active components */
     --color-input-border:      #303036;  /* input fields */
+
+    /* Field inputs — Geist-style ring fields (dark theme) */
+    --color-field:            #151517;
+    --color-field-ring:       rgba(255, 255, 255, 0.14);
+    --color-field-ring-hover: rgba(255, 255, 255, 0.24);
+    --color-field-ring-focus: rgba(255, 255, 255, 0.60);
+    --color-field-halo:       rgba(255, 255, 255, 0.22);
 
     --color-signal:            #FFFFFF;
 
@@ -373,6 +387,60 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
+}
+
+/* ─── Field inputs (Geist-style) ───────────────────────────────────────
+   Applied through the `field` class on text-ish inputs, textareas and
+   selects. A borderless field with a neutral ring that strengthens on
+   hover and gains a soft halo on focus — colors adapt to light/dark. */
+@layer components {
+  .field {
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-md);
+    background-color: var(--color-field);
+    color: var(--color-foreground);
+    box-shadow: 0 0 0 1px var(--color-field-ring);
+    outline: none;
+    transition: box-shadow 150ms ease, background-color 150ms ease;
+  }
+
+  .field:hover {
+    box-shadow: 0 0 0 1px var(--color-field-ring-hover);
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    box-shadow:
+      0 0 0 1px var(--color-field-ring-focus),
+      0 0 0 4px var(--color-field-halo);
+  }
+
+  .field::placeholder {
+    color: var(--color-foreground-subtle);
+  }
+
+  .field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  input.field {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  textarea.field {
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  select.field {
+    height: 32px;
+    padding: 0 26px 0 12px;
+  }
 }
 
 /* ─── Custom scrollbar ───────────────────────────────────────────────── */

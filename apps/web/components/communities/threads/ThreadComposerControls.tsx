@@ -167,7 +167,7 @@ export function PollComposer({
             onChange={(e) => setQuestion(e.target.value)}
             maxLength={POLL_QUESTION_MAX_LENGTH}
             placeholder="Ask something…"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+            className="field w-full"
           />
         </div>
 
@@ -182,7 +182,7 @@ export function PollComposer({
                 onChange={(e) => setOption(index, e.target.value)}
                 maxLength={POLL_OPTION_MAX_LENGTH}
                 placeholder={`Option ${index + 1}`}
-                className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field min-w-0 flex-1"
               />
               {options.length > POLL_MIN_OPTIONS && (
                 <button

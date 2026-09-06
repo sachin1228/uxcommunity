@@ -341,7 +341,7 @@ export function CommunitySettingsView({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}
-                  className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full"
                 />
               </div>
               <div>
@@ -354,7 +354,7 @@ export function CommunitySettingsView({
                   maxLength={500}
                   rows={3}
                   placeholder="What's this community about?"
-                  className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full resize-none"
                 />
               </div>
             </div>
@@ -501,7 +501,7 @@ export function CommunitySettingsView({
                       }}
                       maxLength={160}
                       placeholder="Describe the rule…"
-                      className="flex-1 rounded-md border border-accent bg-surface-raised px-2.5 py-1.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-muted"
+                      className="field flex-1 border-accent"
                     />
                     <button
                       type="button"
@@ -549,7 +549,7 @@ export function CommunitySettingsView({
                 <input
                   readOnly
                   value={inviteUrl}
-                  className="flex-1 min-w-0 rounded-lg border border-border bg-surface-raised px-3 py-2 font-mono text-xs text-foreground-muted outline-none"
+                  className="field flex-1 min-w-0 font-mono"
                 />
                 <button
                   type="button"

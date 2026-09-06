@@ -300,7 +300,7 @@ export default function CommunitiesIndexPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search communities…"
-            className="w-full rounded-full border border-border bg-surface-raised pl-8 pr-4 py-2 font-body text-sm text-foreground placeholder:text-foreground-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
+            className="field w-full pl-8 pr-4"
           />
         </div>
 

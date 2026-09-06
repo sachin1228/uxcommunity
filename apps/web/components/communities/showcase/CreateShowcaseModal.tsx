@@ -26,7 +26,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
       const data = await response.json(); if (!response.ok) throw new Error(data.error ?? `Could not ${editing ? "update" : "share"} your work.`); if (editing) onUpdated?.(data.post); else onCreated?.(data.post); onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your work."); } finally { setSaving(false); }
   }
-  const field = "w-full rounded-xl border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent";
+  const field = "field w-full";
   return <ModalPortal><div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="showcase-form-title" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <form onSubmit={submit} className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl">
       <div className="flex items-start justify-between gap-4"><div><h2 id="showcase-form-title" className="font-display text-xl font-semibold text-foreground">{editing ? "Edit showcase" : "Share your work"}</h2><p className="mt-1 font-body text-sm text-foreground-muted">{editing ? "Update the details of your showcase post." : "Give the community a closer look at what you’re making."}</p></div><button type="button" onClick={onClose} aria-label="Close"><X strokeWidth={2.5} className="text-foreground-muted" size={20}/></button></div>

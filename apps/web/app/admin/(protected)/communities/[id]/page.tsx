@@ -273,7 +273,7 @@ export default function CommunityDetailPage() {
                     if (e.key === "Enter") handleRenameSave();
                     if (e.key === "Escape") setEditing(false);
                   }}
-                  className="flex-1 max-w-md rounded-md border border-border bg-surface-raised px-2 py-1 font-display text-lg font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40"
+                  className="field flex-1 max-w-md font-display text-lg font-semibold"
                 />
                 <button
                   onClick={handleRenameSave}
@@ -398,7 +398,7 @@ export default function CommunityDetailPage() {
                       value={editDesc}
                       onChange={(e) => setEditDesc(e.target.value)}
                       rows={3}
-                      className="w-full rounded-md border border-border bg-surface-raised px-2.5 py-1.5 font-body text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-accent/40 resize-none"
+                      className="field w-full resize-none"
                     />
                     {editDescError && (
                       <p className="font-body text-[11px] text-red-400">{editDescError}</p>

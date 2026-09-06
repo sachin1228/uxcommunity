@@ -22,7 +22,7 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
           onChange={(e) => onChange(e.target.value)}
           rows={3}
           placeholder="Private notes — not visible to the applicant…"
-          className="rounded-md border border-border bg-surface px-3 py-2 font-body text-xs text-foreground outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/20 w-full resize-none"
+          className="field w-full resize-none"
         />
       </div>
       <button

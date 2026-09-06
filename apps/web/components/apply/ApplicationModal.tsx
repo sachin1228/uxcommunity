@@ -76,7 +76,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
   }
 
   const inputClass =
-    "rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+    "field w-full";
 
   const fieldError = (key: string) =>
     fieldErrors[key]?.length ? (

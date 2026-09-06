@@ -180,7 +180,7 @@ export function CreateEventModal({
                 maxLength={120}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="What's the event called?"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-14 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full pr-14"
               />
               <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">
                 {title.length}/120
@@ -199,7 +199,7 @@ export function CreateEventModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell people what to expect…"
               rows={4}
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full resize-y"
             />
           </label>
 
@@ -213,7 +213,7 @@ export function CreateEventModal({
                 type="date"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
+                className="field w-full"
               />
             </label>
             <label className="block">
@@ -224,7 +224,7 @@ export function CreateEventModal({
                 type="time"
                 value={eventTime}
                 onChange={(e) => setEventTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
+                className="field w-full"
               />
             </label>
           </div>
@@ -239,7 +239,7 @@ export function CreateEventModal({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
+                className="field w-full"
               />
             </label>
             <label className="block">
@@ -250,7 +250,7 @@ export function CreateEventModal({
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
+                className="field w-full"
               />
             </label>
           </div>
@@ -286,7 +286,7 @@ export function CreateEventModal({
                 value={meetLink}
                 onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full"
               />
             </label>
           ) : (
@@ -298,7 +298,7 @@ export function CreateEventModal({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full"
               />
             </label>
           )}
@@ -314,7 +314,7 @@ export function CreateEventModal({
               value={maxAttendees}
               onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="e.g. 50"
-              className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full"
             />
           </label>
 
