@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Heart,
-  MessageCircle,
   X,
 } from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type ThreadComment } from "./types";
 import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
@@ -271,27 +271,27 @@ export function ThreadImageLightbox({
                 disabled={!onLikeToggle}
                 aria-label={thread.user_liked ? "Unlike" : "Like"}
                 aria-pressed={thread.user_liked}
-                className="group/like flex items-center gap-2"
+                className="group/like flex cursor-pointer items-center gap-2"
               >
-                <Heart
-                  size={20}
-                  strokeWidth={2.5}
+                <HeartIcon
+                  size={16}
+                  active={thread.user_liked}
                   className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                     thread.user_liked
-                      ? "fill-red-500 text-red-500"
-                      : "fill-none text-white"
+                      ? "text-[var(--ds-blue-700)]"
+                      : "fill-none text-foreground-subtle group-hover/like:text-white"
                   }`}
                 />
                 <span
                   className={`font-body text-sm font-semibold tabular-nums ${
-                    thread.user_liked ? "text-red-500" : "text-white"
+                    thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
                   }`}
                 >
                   {thread.like_count}
                 </span>
               </button>
-              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
-                <MessageCircle size={20} strokeWidth={2.5} />
+              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+                <CommentIcon />
                 {totalComments}
               </span>
             </div>

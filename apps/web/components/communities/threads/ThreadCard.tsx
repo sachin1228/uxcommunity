@@ -2,9 +2,11 @@
 
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
-  Heart, Bookmark, Flag, MessageCircle,
+  Bookmark, Flag,
   MoreHorizontal, Paperclip, Pencil, Trash2,
 } from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
@@ -596,20 +598,20 @@ export function ThreadCard({
               onClick={handleLike}
               aria-label={thread.user_liked ? "Unlike" : "Like"}
               aria-pressed={thread.user_liked}
-              className="group/like flex items-center gap-2"
+              className="group/like flex cursor-pointer items-center gap-2"
             >
-              <Heart
-                size={20}
-                strokeWidth={2.5}
+              <HeartIcon
+                size={16}
+                active={thread.user_liked}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
-                    ? "fill-red-500 text-red-500"
-                    : "fill-none text-white"
+                    ? "text-[var(--ds-blue-700)]"
+                    : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-semibold tabular-nums ${
-                  thread.user_liked ? "text-red-500" : "text-white"
+                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >
                 {thread.like_count}
@@ -617,8 +619,8 @@ export function ThreadCard({
             </button>
 
             {/* Comments */}
-            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
-              <MessageCircle size={20} strokeWidth={2.5} />
+            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+              <CommentIcon />
               {thread.comment_count}
             </span>
           </div>

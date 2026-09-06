@@ -396,7 +396,7 @@ export function EventDetailClient({
           />
         )}
         {/* Event post */}
-        <section className={`mx-5 md:mx-8 ${communityFeedLayout.detailCard}`}>
+        <section className={communityFeedLayout.detailCard}>
             <EventCard
               variant="detail"
               event={event}
@@ -425,7 +425,7 @@ export function EventDetailClient({
         </section>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
+        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },

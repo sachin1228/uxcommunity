@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Calendar, ExternalLink, Heart, MapPin, MessageCircle, UserPlus, Video } from "lucide-react";
+import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -332,14 +334,14 @@ export function EventCard({
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
           aria-label={event.user_liked ? "Unlike event" : "Like event"}
           aria-pressed={event.user_liked}
-          className="group/like flex shrink-0 items-center gap-2"
+          className="group/like flex shrink-0 cursor-pointer items-center gap-2"
         >
-          <Heart size={20} strokeWidth={2.5} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "fill-red-500 text-red-500" : "fill-none text-foreground"}`} />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-red-500" : "text-foreground"}`}>{event.like_count}</span>
+          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
         </button>
 
-        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <MessageCircle strokeWidth={2.5} size={20} />
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+          <CommentIcon />
           {event.comment_count ?? 0}
         </span>
 

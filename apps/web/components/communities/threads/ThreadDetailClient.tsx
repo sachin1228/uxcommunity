@@ -292,7 +292,7 @@ export function ThreadDetailClient({
         </div>
 
         {/* ── Comments section ── */}
-        <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
+        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
           <div className="mb-4 flex items-center gap-2">
             <span className="font-display text-sm font-semibold text-foreground">
               {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
