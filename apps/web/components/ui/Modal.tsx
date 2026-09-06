@@ -1,8 +1,9 @@
 "use client";
 
 import { createPortal } from "react-dom";
-import { useEffect, useCallback, useSyncExternalStore } from "react";
-import { X } from "lucide-react";
+import { useRef, useSyncExternalStore } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   open: boolean;
@@ -32,80 +33,28 @@ export function ModalPortal({ children }: ModalPortalProps) {
   return createPortal(children, document.body);
 }
 
-export function Modal({
-  open,
-  onClose,
-  title,
-  children,
-  maxWidth = "max-w-lg",
-  hideCloseButton = false,
-  panelClassName,
-}: ModalProps) {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose]
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleKeyDown);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [open, handleKeyDown]);
-
-  if (!open) return null;
+export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", hideCloseButton = false, panelClassName }: ModalProps) {
+  const previousFocus = useRef<HTMLElement | null>(null);
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
-      aria-modal="true"
-      role="dialog"
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Panel */}
-      <div
-        className={`relative z-10 w-full ${maxWidth} modal-panel max-h-[min(800px,calc(100vh-2rem))] overflow-y-auto ${panelClassName ?? "p-6"}`}
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <DialogContent
+        aria-describedby={undefined}
+        showCloseButton={!hideCloseButton}
+        className={cn("flex w-[calc(100%-2rem)] max-h-[min(800px,calc(100dvh-2rem))] flex-col overflow-y-auto rounded-lg", maxWidth, panelClassName)}
+        onOpenAutoFocus={() => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+        onCloseAutoFocus={(event) => {
+          if (previousFocus.current?.isConnected) {
+            event.preventDefault();
+            previousFocus.current.focus();
+          }
+        }}
       >
-        {title && (
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <h2 className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
-              {title}
-            </h2>
-            {!hideCloseButton && (
-              <button
-                onClick={onClose}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
-                aria-label="Close"
-              >
-                <X strokeWidth={2.5} size={16} />
-              </button>
-            )}
-          </div>
-        )}
-        {!title && !hideCloseButton && (
-          <button
-            onClick={onClose}
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
-            aria-label="Close"
-          >
-            <X strokeWidth={2.5} size={16} />
-          </button>
-        )}
+        <DialogHeader className={title ? "pr-8" : "sr-only"}>
+          <DialogTitle>{title ?? "Dialog"}</DialogTitle>
+        </DialogHeader>
         {children}
-      </div>
-    </div>
-    </ModalPortal>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Spinner } from "@/components/ui/Spinner";
 import { MAX_DESIGN_INTERESTS } from "@/lib/interests";
@@ -43,15 +45,15 @@ export function SignupStep3({
         <InterestsMultiSelect options={options} selected={selected} onChange={onChange} />
       </div>
 
-      <button
+      <Button variant="default"
         type="button"
         onClick={onContinue}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {loading && <Spinner className="h-4 w-4 text-white" />}
         {loading ? "Saving…" : "Continue →"}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
@@ -41,18 +43,18 @@ export function ShowcaseOptionsMenu({
       className="relative"
       onClick={(event) => event.stopPropagation()}
     >
-      <button
+      <Button variant="ghost" size="icon"
         type="button"
         aria-label="Showcase options"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-popover"
+        className="flex size-7 items-center justify-center"
       >
         <MoreHorizontal strokeWidth={2.5} size={16} />
-      </button>
+      </Button>
       {open && (
         <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-card py-1 shadow-lg">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => {
               setOpen(false);
@@ -60,36 +62,36 @@ export function ShowcaseOptionsMenu({
             }}
             aria-pressed={saved}
       aria-busy={busy}
-      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover"
+      className="flex w-full items-center gap-2 px-3 py-2"
 
           >
             <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}
-          </button>
+          </Button>
           {canManage && (
             <>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => {
                   setOpen(false);
                   onEdit();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover"
+                className="flex w-full items-center gap-2 px-3 py-2"
               >
                 <Pencil strokeWidth={2.5} size={12} />
                 Edit
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 onClick={() => {
                   setOpen(false);
                   onDelete();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-popover"
+                className="flex w-full items-center gap-2 px-3 py-2"
               >
                 <Trash2 strokeWidth={2.5} size={12} />
                 Delete
-              </button>
+              </Button>
             </>
           )}
         </div>

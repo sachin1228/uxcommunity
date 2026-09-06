@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
@@ -243,7 +245,7 @@ export function EventCard({
             <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
             <div className="ml-auto hidden shrink-0 md:block">
               {!past ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
@@ -251,7 +253,7 @@ export function EventCard({
                 >
                   <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
+                </Button>
               ) : (
                 <span className="font-body text-xs font-medium text-muted-foreground">This event has ended</span>
               )}
@@ -268,7 +270,7 @@ export function EventCard({
           <div className="mt-auto flex items-end justify-between gap-3 pt-3 md:pt-0">
             <div className="md:hidden">
               {!past ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
@@ -276,7 +278,7 @@ export function EventCard({
                 >
                   <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
+                </Button>
               ) : (
                 <span className="font-body text-sm font-medium text-muted-foreground">This event has ended</span>
               )}
@@ -329,7 +331,7 @@ export function EventCard({
       <div className="mt-4">{eventBody}</div>
 
       <div className="mt-3 flex items-center justify-between gap-4">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
           aria-label={event.user_liked ? "Unlike event" : "Like event"}
@@ -338,7 +340,7 @@ export function EventCard({
         >
           <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`} />
           <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`}>{event.like_count}</span>
-        </button>
+        </Button>
 
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:text-white">
           <CommentIcon />

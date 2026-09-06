@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -128,10 +130,10 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
           {(status === "idle" || status === "loading" || status === "error") && (
             <>
-              <button
+              <Button variant="default"
                 onClick={handleJoin}
                 disabled={status === "loading"}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {status === "loading" ? (
                   <><Spinner size={15} className="text-primary-foreground" /> Joining…</>
@@ -140,7 +142,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
                 ) : (
                   <><MessageSquare strokeWidth={2.5} size={14} /> Join community</>
                 )}
-              </button>
+              </Button>
 
               {status === "error" && errorMsg && (
                 <p className="mt-3 text-center font-body text-xs text-red-400">{errorMsg}</p>

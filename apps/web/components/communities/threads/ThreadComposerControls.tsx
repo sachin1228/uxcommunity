@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import {
   BarChart3,
@@ -47,7 +51,7 @@ export function CategoryPicker({
           const Icon = CATEGORY_ICONS[item.value];
           const active = value === item.value;
           return (
-            <button
+            <Button variant="ghost"
               key={item.value}
               type="button"
               onClick={() => onChange(item.value)}
@@ -60,7 +64,7 @@ export function CategoryPicker({
             >
               <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
               {item.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -95,7 +99,7 @@ export function ComposerTabs({
         const Icon = tab.icon;
         const active = value === tab.value;
         return (
-          <button
+          <Button variant="ghost"
             key={tab.value}
             type="button"
             role="tab"
@@ -111,7 +115,7 @@ export function ComposerTabs({
               <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
               {tab.label}
             </span>
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -161,19 +165,19 @@ export function PollComposer({
 
       <div className="mt-3 space-y-3">
         <div>
-          <label
+          <Label
             htmlFor="poll-question"
             className="mb-1.5 block font-body text-xs font-medium text-muted-foreground"
           >
             Question
-          </label>
-          <input
+          </Label>
+          <Input
             id="poll-question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             maxLength={POLL_QUESTION_MAX_LENGTH}
             placeholder="Ask something…"
-            className="field w-full"
+            className="w-full"
           />
         </div>
 
@@ -183,36 +187,36 @@ export function PollComposer({
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border font-body text-[11px] font-semibold text-muted-foreground">
                 {String.fromCharCode(65 + index)}
               </span>
-              <input
+              <Input
                 value={option}
                 onChange={(e) => setOption(index, e.target.value)}
                 maxLength={POLL_OPTION_MAX_LENGTH}
                 placeholder={`Option ${index + 1}`}
-                className="field min-w-0 flex-1"
+                className="min-w-0 flex-1"
               />
               {options.length > POLL_MIN_OPTIONS && (
-                <button
+                <Button variant="ghost" size="icon"
                   type="button"
                   onClick={() => removeOption(index)}
                   aria-label={`Remove option ${index + 1}`}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center"
                 >
                   <X strokeWidth={2.5} size={13} />
-                </button>
+                </Button>
               )}
             </div>
           ))}
         </div>
 
         {options.length < POLL_MAX_OPTIONS && (
-          <button
+          <Button variant="outline"
             type="button"
             onClick={addOption}
-            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 transition-colors"
           >
             <Plus strokeWidth={2.5} size={12} />
             Add option
-          </button>
+          </Button>
         )}
         {options.length >= POLL_MAX_OPTIONS && (
           <p className="font-body text-[11px] text-muted-foreground">
@@ -254,23 +258,23 @@ export function ImageAttachmentsRow({
             alt={image.name}
             className="h-full w-full object-cover"
           />
-          <button
+          <Button variant="ghost" size="icon"
             type="button"
             onClick={() => onRemove(image.url)}
-            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
+            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
             aria-label={`Remove ${image.name}`}
           >
             <X strokeWidth={2.5} size={10} />
-          </button>
+          </Button>
         </div>
       ))}
 
       {images.length < THREAD_IMAGE_MAX && (
-        <button
+        <Button variant="outline" size="icon"
           type="button"
           onClick={onAddMore}
           disabled={uploading}
-          className="flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border px-3 font-body text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-0.5 px-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? (
             <Spinner size={16} />
@@ -279,7 +283,7 @@ export function ImageAttachmentsRow({
           )}
           <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add more"}</span>
           <span className="text-[10px] text-muted-foreground">(Max {THREAD_IMAGE_MAX})</span>
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -302,14 +306,14 @@ export function FileAttachmentList({
         >
           <Paperclip strokeWidth={2.5} size={13} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{file.name}</span>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => onRemove(file.url)}
             aria-label={`Remove ${file.name}`}
-            className="text-muted-foreground hover:text-foreground"
+            className=""
           >
             <X strokeWidth={2.5} size={13} />
-          </button>
+          </Button>
         </div>
       ))}
     </div>
@@ -337,15 +341,15 @@ export function ComposerMedia({
 
   if (attachments.length === 0) {
     return (
-      <button
+      <Button variant="outline"
         type="button"
         onClick={onAddMore}
         disabled={uploading}
-        className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-16 w-full items-center justify-center gap-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
       >
         {uploading ? <Spinner size={14} /> : <ImageIcon strokeWidth={2.5} size={15} />}
         {uploading ? "Uploading…" : "Add photo or file"}
-      </button>
+      </Button>
     );
   }
 
@@ -361,15 +365,15 @@ export function ComposerMedia({
       )}
 
       {images.length === 0 && files.length > 0 && (
-        <button
+        <Button variant="outline"
           type="button"
           onClick={onAddMore}
           disabled={uploading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 px-3 py-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? <Spinner size={13} /> : <ImageIcon strokeWidth={2.5} size={13} />}
           {uploading ? "Uploading…" : "Add photo"}
-        </button>
+        </Button>
       )}
 
       {files.length > 0 && (
@@ -398,7 +402,7 @@ export function ToggleRow({
   icon?: React.ReactNode;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3">
+    <Label className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3">
       <span className="flex items-center gap-2.5">
         {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
         <span>
@@ -426,6 +430,6 @@ export function ToggleRow({
           }`}
         />
       </span>
-    </label>
+    </Label>
   );
 }

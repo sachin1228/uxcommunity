@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -125,12 +127,12 @@ export default function CommunityAdminPermissionsPage() {
         <p className="font-body text-sm text-muted-foreground">
           This member is not an admin of this community (or the community was removed).
         </p>
-        <button
+        <Button variant="ghost"
           onClick={() => router.push(`/admin/communities/${communityId}`)}
-          className="font-body text-xs text-primary hover:underline"
+          className="hover:underline"
         >
           Back to community
-        </button>
+        </Button>
       </div>
     );
   }
@@ -140,12 +142,12 @@ export default function CommunityAdminPermissionsPage() {
   return (
     <div className="flex w-full flex-col gap-6">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push(`/admin/communities/${communityId}`)}
-        className="flex items-center gap-1.5 font-body text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+        className="flex items-center gap-1.5 transition-colors w-fit"
       >
         <ArrowLeft strokeWidth={2.5} size={13} /> {communityName || "Community"}
-      </button>
+      </Button>
 
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card px-6 py-5">
@@ -168,14 +170,14 @@ export default function CommunityAdminPermissionsPage() {
           </div>
         </div>
 
-        <button
+        <Button variant="default"
           onClick={handleSave}
           disabled={!dirty || saving}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 font-body text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
         >
           {saving ? <Spinner className="h-3 w-3 text-primary-foreground" /> : <Save strokeWidth={2.5} size={12} />}
           {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
-        </button>
+        </Button>
       </div>
 
       {/* Body: permissions + activity (left) | about + danger (right) */}
@@ -216,7 +218,7 @@ export default function CommunityAdminPermissionsPage() {
                         {description}
                       </p>
                     </div>
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       role="switch"
                       aria-checked={checked}
@@ -234,7 +236,7 @@ export default function CommunityAdminPermissionsPage() {
                           checked ? "translate-x-5 bg-primary-foreground" : "translate-x-0 bg-foreground"
                         }`}
                       />
-                    </button>
+                    </Button>
                   </div>
                 );
               })}
@@ -293,12 +295,12 @@ export default function CommunityAdminPermissionsPage() {
               <p className="font-body text-[11px] text-muted-foreground mt-1 leading-relaxed">
                 {firstName} stays a regular member — they just lose the in-app management controls.
               </p>
-              <button
+              <Button variant="destructive"
                 onClick={() => setShowRemoveConfirm(true)}
-                className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 transition-colors"
               >
                 <Trash2 strokeWidth={2.5} size={12} /> Remove admin
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -320,20 +322,20 @@ export default function CommunityAdminPermissionsPage() {
               lose access to community settings, member management, and message moderation in the app.
             </p>
             <div className="flex gap-2">
-              <button
+              <Button variant="outline"
                 onClick={() => setShowRemoveConfirm(false)}
                 disabled={removing}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 <span className="inline-flex items-center gap-1"><X strokeWidth={2.5} size={11} /> Cancel</span>
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleRemoveAdmin}
                 disabled={removing}
-                className="modal-btn modal-btn-danger-soft flex-1"
+                className="flex-1"
               >
                 {removing ? <Spinner className="h-3 w-3" /> : <ShieldOff strokeWidth={2.5} size={11} />} Remove admin
-              </button>
+              </Button>
             </div>
           </div>
         </div>

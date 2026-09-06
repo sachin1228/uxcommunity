@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -226,35 +228,35 @@ export function ResourceCard({
 
   const optionsMenu = (
     <div className="relative shrink-0" ref={menuRef} onClick={(event) => { event.preventDefault(); event.stopPropagation(); }}>
-      <button
+      <Button variant="ghost"
         type="button"
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen((open) => !open); }}
         aria-label="Resource options"
         className={`flex items-center justify-center text-muted-foreground hover:bg-popover hover:text-foreground ${isDetail ? "h-8 w-8 rounded-lg border border-border" : "h-7 w-7 rounded-md"}`}
       >
         <MoreHorizontal strokeWidth={2.5} size={15} />
-      </button>
+      </Button>
       {menuOpen && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-card py-1 shadow-lg">
           {!isDetail && (
-            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
+            <Button variant="ghost" type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5">
               <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
               {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
-            </button>
+            </Button>
           )}
           {isOwner ? (
             <>
-              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
+              <Button variant="ghost" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5">
                 <Pencil strokeWidth={2.5} size={11} /> Edit
-              </button>
-              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50">
+              </Button>
+              <Button variant="ghost" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 disabled:opacity-50">
                 <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
-              </button>
+              </Button>
             </>
           ) : (
-            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50">
+            <Button variant="ghost" type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 disabled:opacity-50">
               <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -274,7 +276,7 @@ export function ResourceCard({
           />
           {isDetail ? (
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={handleSave}
                 aria-busy={saveBusy}
@@ -283,7 +285,7 @@ export function ResourceCard({
                 {resource.user_saved ? <BookmarkCheck strokeWidth={2.5} size={13} /> : <Bookmark strokeWidth={2.5} size={13} />}
                 {resource.user_saved ? "Saved" : "Save"}
                 <span className="font-mono text-[10px]">{resource.save_count}</span>
-              </button>
+              </Button>
               <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 font-body text-sm font-medium text-primary-foreground hover:bg-primary">
                 <ExternalLink strokeWidth={2.5} size={13} />Open
               </a>
@@ -360,10 +362,10 @@ export function ResourceCard({
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
-              <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+              <Button variant="ghost" type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
                 <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`} />
                 <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`}>{resource.save_count}</span>
-              </button>
+              </Button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
           </>

@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -95,25 +98,25 @@ function CommunityCard({
         {/* Action — never faded so tooltip stays fully visible */}
         <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
           {c.joined ? (
-            <button
+            <Button variant="default"
               onClick={() => router.push(`/dashboard/communities/${c.id}`)}
-              className="flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1 font-body text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+              className="flex items-center gap-1 px-3 py-1 transition-colors"
             >
               <Check size={10} strokeWidth={2.5} />
               Joined
-            </button>
+            </Button>
           ) : locked ? (
             <>
-              <button
+              <Button variant="outline"
                 ref={lockBtnRef}
                 disabled
                 onMouseEnter={showTip}
                 onMouseLeave={hideTip}
-                className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-muted-foreground/60"
+                className="flex items-center cursor-pointer gap-1 px-3 py-1"
               >
                 <Lock strokeWidth={2.5} size={10} />
                 Join
-              </button>
+              </Button>
               {tipPos && typeof document !== "undefined" && createPortal(
                 <div
                   className="pointer-events-none w-56 rounded-xl border border-white/10 bg-[#1c1c1e] px-3 py-2.5 shadow-2xl"
@@ -127,20 +130,20 @@ function CommunityCard({
               )}
             </>
           ) : c.has_pending_request ? (
-            <button
+            <Button variant="outline"
               disabled
-              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-muted-foreground/60"
+              className="flex items-center gap-1 px-3 py-1"
             >
               Request sent
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button variant="outline"
               onClick={() => onJoin(c.id)}
               disabled={joining}
-              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-card hover:border-border-strong transition-colors disabled:opacity-60"
+              className="px-3 py-1 transition-colors disabled:opacity-60"
             >
               {joining ? "…" : c.is_private ? "Request to join" : "Join"}
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -295,12 +298,12 @@ export default function CommunitiesIndexPage() {
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.35-4.35" />
           </svg>
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search communities…"
-            className="field w-full pl-8 pr-4"
+            className="w-full pl-8 pr-4"
           />
         </div>
 
@@ -309,7 +312,7 @@ export default function CommunitiesIndexPage() {
           {TABS.map((tab) => {
             const isActive = activeTab === tab.value;
             return (
-              <button
+              <Button variant="ghost"
                 key={tab.value}
                 onClick={() => setActiveTab(tab.value)}
                 className={`shrink-0 rounded-full border px-4 py-1.5 font-body text-sm font-medium transition-colors ${
@@ -319,7 +322,7 @@ export default function CommunitiesIndexPage() {
                 }`}
               >
                 {tab.label}
-              </button>
+              </Button>
             );
           }          )}
         </div>

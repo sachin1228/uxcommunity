@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { memo, useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
@@ -117,7 +119,7 @@ export const CommunityRow = memo(function CommunityRow({
 
   return (
     <li>
-      <button
+      <Button variant="ghost"
         onClick={() => onClick(c.id)}
         onMouseEnter={handleMouseEnter}
         className={`flex w-full items-start gap-[11px] rounded-lg px-[9px] py-[9px] text-left transition-colors ${
@@ -200,7 +202,7 @@ export const CommunityRow = memo(function CommunityRow({
             )}
           </div>
         </div>
-      </button>
+      </Button>
     </li>
   );
 });

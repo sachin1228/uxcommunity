@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
@@ -108,7 +110,7 @@ export function HomeFeedFilters() {
             {FILTERS.map((filter) => {
               const isActive = filter === active;
               return (
-                <button
+                <Button variant="ghost"
                   key={filter}
                   type="button"
                   ref={(el) => {
@@ -121,7 +123,7 @@ export function HomeFeedFilters() {
                   }`}
                 >
                   {filter}
-                </button>
+                </Button>
               );
             })}
           </div>

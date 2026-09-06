@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
@@ -75,32 +77,32 @@ export function CommunityMessagesList({
                 {confirmMsgId === msg.id ? (
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="font-body text-[11px] text-muted-foreground">Delete?</span>
-                    <button
+                    <Button variant="ghost"
                       onClick={() => handleDeleteMessage(msg.id)}
                       disabled={deletingMsgId === msg.id}
-                      className="font-body text-[11px] text-red-400 hover:text-red-300 font-medium disabled:opacity-50"
+                      className="disabled:opacity-50"
                     >
                       {deletingMsgId === msg.id ? (
                         <Spinner className="h-3 w-3" />
                       ) : (
                         "Yes"
                       )}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="ghost"
                       onClick={() => setConfirmMsgId(null)}
-                      className="font-body text-[11px] text-muted-foreground hover:text-foreground"
+                      className=""
                     >
                       No
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
+                  <Button variant="ghost"
                     onClick={() => setConfirmMsgId(msg.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-muted-foreground hover:text-red-400 rounded"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1"
                     title="Delete message"
                   >
                     <Trash2 strokeWidth={2.5} size={12} />
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

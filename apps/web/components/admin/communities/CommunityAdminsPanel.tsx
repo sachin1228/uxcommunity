@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -92,12 +94,12 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
               Admins get owner-style management controls in the app, scoped by the permissions you grant.
             </p>
           </div>
-          <button
+          <Button variant="default"
             onClick={() => setShowAdd(true)}
-            className="shrink-0 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 hover:opacity-90 transition-opacity"
           >
             <Plus strokeWidth={2.5} size={13} /> Add admin
-          </button>
+          </Button>
         </div>
 
         {loading ? (
@@ -115,12 +117,12 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
               No admins yet. Search the community&apos;s members and promote one to give them
               in-app management powers.
             </p>
-            <button
+            <Button variant="ghost"
               onClick={() => setShowAdd(true)}
-              className="mt-1 inline-flex items-center gap-1 font-body text-xs text-primary hover:text-primary/80 transition-colors"
+              className="mt-1 inline-flex items-center gap-1 transition-colors"
             >
               <Plus strokeWidth={2.5} size={12} /> Add the first admin
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="divide-y divide-border/70">
@@ -162,39 +164,39 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <button
+                    <Button variant="outline"
                       onClick={() => router.push(`/admin/communities/${communityId}/admins/${admin.user_id}`)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 transition-colors"
                     >
                       Manage <ChevronRight strokeWidth={2.5} size={12} />
-                    </button>
+                    </Button>
 
                     {confirmingId === admin.user_id ? (
                       <span className="inline-flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 py-1 pl-2 pr-1">
                         <span className="font-body text-[10px] text-red-400">Remove?</span>
-                        <button
+                        <Button variant="ghost"
                           onClick={() => handleRemove(admin)}
                           disabled={removingId === admin.user_id}
-                          className="px-1 py-0.5 font-body text-[11px] font-semibold text-red-400 hover:text-red-300 disabled:opacity-50"
+                          className="px-1 py-0.5 disabled:opacity-50"
                         >
                           {removingId === admin.user_id ? <Spinner className="h-3 w-3" /> : "Yes"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="ghost"
                           onClick={() => setConfirmingId(null)}
-                          className="px-1 py-0.5 font-body text-[11px] text-muted-foreground hover:text-foreground"
+                          className="px-1 py-0.5"
                         >
                           No
-                        </button>
+                        </Button>
                       </span>
                     ) : (
-                      <button
+                      <Button variant="destructive" size="icon"
                         onClick={() => setConfirmingId(admin.user_id)}
-                        className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="h-7 w-7 flex items-center justify-center transition-colors"
                         title="Remove admin rights (keeps them as a member)"
                         aria-label={`Remove admin rights for ${admin.name}`}
                       >
                         <ShieldOff strokeWidth={2.5} size={13} />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

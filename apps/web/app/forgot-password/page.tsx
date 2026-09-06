@@ -1,4 +1,8 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import Link from "next/link";
@@ -97,11 +101,11 @@ export default function ForgotPasswordPage() {
                   </div>
                 )}
 
-                <label className="flex flex-col gap-1.5">
+                <Label className="flex flex-col gap-1.5">
                   <span className="font-body text-xs font-medium text-foreground">
                     Email address
                   </span>
-                  <input
+                  <Input
                     type="email"
                     value={email}
                     onChange={(e) => {
@@ -109,21 +113,21 @@ export default function ForgotPasswordPage() {
                       setError(null);
                     }}
                     placeholder="you@studio.com"
-                    className="field w-full"
+                    className="w-full"
                     autoComplete="email"
                     autoFocus
                     required
                   />
-                </label>
+                </Label>
 
-                <button
+                <Button variant="default"
                   type="submit"
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {loading && <Spinner className="h-4 w-4 text-white" />}
                   {loading ? "Sending…" : "Send reset link"}
-                </button>
+                </Button>
               </form>
             </>
           )}

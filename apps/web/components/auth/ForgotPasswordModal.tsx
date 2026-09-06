@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
@@ -72,12 +76,12 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
               registered, a reset link is on its way. It expires in 1 hour.
             </p>
           </div>
-          <button
+          <Button variant="outline"
             onClick={handleClose}
-            className="modal-btn modal-btn-secondary mt-2"
+            className="mt-2"
           >
             Close
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -91,11 +95,11 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
             </div>
           )}
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               Email address
             </span>
-            <input
+            <Input
               type="email"
               value={email}
               onChange={(e) => {
@@ -108,16 +112,16 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
               autoFocus
               required
             />
-          </label>
+          </Label>
 
-          <button
+          <Button variant="default"
             type="submit"
             disabled={loading}
-            className="modal-btn modal-btn-primary w-full"
+            className="w-full"
           >
             {loading && <Spinner size={14} />}
             {loading ? "Sending…" : "Send reset link"}
-          </button>
+          </Button>
         </form>
       )}
     </Modal>

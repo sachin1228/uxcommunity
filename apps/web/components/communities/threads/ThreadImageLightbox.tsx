@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -165,28 +167,28 @@ export function ThreadImageLightbox({
         className="relative flex h-[88vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
       >
         {/* Close — top-right corner of the modal */}
-        <button
+        <Button variant="ghost" size="icon"
           type="button"
           onClick={onClose}
           aria-label="Close viewer"
           title="Close (Esc)"
-          className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+          className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center transition-colors"
         >
           <X strokeWidth={2.5} size={18} />
-        </button>
+        </Button>
 
         {/* ── Left: image canvas + carousel ─────────────────────────────── */}
         <div className="relative flex min-w-0 flex-1 flex-col bg-[#151515]">
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-16 py-4">
             {index > 0 && (
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={goPrev}
                 aria-label="Previous image"
-                className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+                className="absolute left-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center transition-colors"
               >
                 <ChevronLeft strokeWidth={2.5} size={22} />
-              </button>
+              </Button>
             )}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -196,14 +198,14 @@ export function ThreadImageLightbox({
               className="max-h-full max-w-full select-none rounded-sm object-contain shadow-2xl"
             />
             {index < images.length - 1 && (
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={goNext}
                 aria-label="Next image"
-                className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+                className="absolute right-4 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center transition-colors"
               >
                 <ChevronRight strokeWidth={2.5} size={22} />
-              </button>
+              </Button>
             )}
           </div>
 
@@ -212,7 +214,7 @@ export function ThreadImageLightbox({
               <div ref={stripRef} className="flex overflow-x-auto scrollbar-none px-1 py-1">
                 <div className="mx-auto flex w-max items-center gap-2">
                   {images.map((img, i) => (
-                    <button
+                    <Button variant="ghost"
                       key={`${img.url}-${i}`}
                       type="button"
                       onClick={() => setIndex(i)}
@@ -226,7 +228,7 @@ export function ThreadImageLightbox({
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={img.url} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -265,7 +267,7 @@ export function ThreadImageLightbox({
 
             {/* Engagement stats — like button mirrors the thread card design */}
             <div className="mt-4 flex items-center gap-4">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onLikeToggle}
                 disabled={!onLikeToggle}
@@ -289,7 +291,7 @@ export function ThreadImageLightbox({
                 >
                   {thread.like_count}
                 </span>
-              </button>
+              </Button>
               <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-muted-foreground transition-colors duration-150 hover:text-white">
                 <CommentIcon />
                 {totalComments}

@@ -1,4 +1,9 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { Camera, Mail, Calendar } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -68,22 +73,22 @@ export function ProfileHero({
             </div>
           </div>
 
-          <button
+          <Button variant="outline"
             onClick={onOpenAvatarPicker}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-popover px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-all mt-2"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-all mt-2"
           >
             <Camera strokeWidth={2.5} size={11} />
             Change photo
-          </button>
+          </Button>
         </div>
 
         {/* Identity fields */}
         <div className="flex-1 grid grid-cols-1 gap-5 pt-1">
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Display Name
-            </label>
-            <input
+            </Label>
+            <Input
               type="text"
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
@@ -93,17 +98,17 @@ export function ProfileHero({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Mail strokeWidth={2.5} size={11} /> Email
-            </label>
+            </Label>
             <p className="font-body text-sm text-muted-foreground pb-0.5 border-b border-border/40">{email}</p>
           </div>
 
           {memberSince && (
             <div className="flex flex-col gap-1.5">
-              <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar strokeWidth={2.5} size={11} /> Member Since
-              </label>
+              </Label>
               <p className="font-body text-sm text-muted-foreground pb-0.5 border-b border-border/40">{memberSince}</p>
             </div>
           )}
@@ -112,10 +117,10 @@ export function ProfileHero({
         {/* Bio */}
         <div className="w-56 pt-1">
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+            <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Bio
-            </label>
-            <textarea
+            </Label>
+            <Textarea
               value={bio}
               onChange={(e) => onBioChange(e.target.value)}
               placeholder="A short note about yourself — what you design, love, or believe in…"

@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
@@ -151,26 +154,26 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
               They get owner-style controls in the app — you can trim permissions afterwards.
             </p>
           </div>
-          <button
+          <Button variant="outline" size="icon"
             onClick={onClose}
-            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+            className="h-8 w-8 shrink-0 flex items-center justify-center transition-colors"
             aria-label="Close"
           >
             <X strokeWidth={2.5} size={15} />
-          </button>
+          </Button>
         </div>
 
         {/* Search */}
         <div className="px-5 py-3 shrink-0">
           <div className="relative">
             <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
+            <Input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="field w-full pl-9 pr-3"
+              className="w-full pl-9 pr-3"
             />
           </div>
         </div>
@@ -217,10 +220,10 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         Admin
                       </span>
                     ) : (
-                      <button
+                      <Button variant="default"
                         onClick={() => handlePromote(member)}
                         disabled={busyUserId === member.user_id}
-                        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 font-body text-xs font-medium text-primary hover:bg-primary/20 transition-colors disabled:opacity-60"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-60"
                       >
                         {busyUserId === member.user_id ? (
                           <Spinner className="h-3 w-3" />
@@ -229,7 +232,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         ) : (
                           "Add as admin"
                         )}
-                      </button>
+                      </Button>
                     )}
                   </li>
                 );
@@ -239,13 +242,13 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
 
           {!busy && hasMore && (
             <div className="px-2 pt-2">
-              <button
+              <Button variant="outline"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="w-full rounded-lg border border-border py-2 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-50"
+                className="w-full py-2 transition-colors disabled:opacity-50"
               >
                 {loadingMore ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${members.length} of ${total})`}
-              </button>
+              </Button>
             </div>
           )}
         </div>

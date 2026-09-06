@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Search, X } from "lucide-react";
@@ -133,21 +136,21 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
               size={13}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
-            <input
+            <Input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="field w-full pl-8 pr-8"
+              className="w-full pl-8 pr-8"
             />
             {query && (
-              <button
+              <Button variant="ghost"
                 onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors"
                 aria-label="Clear search"
               >
                 <X strokeWidth={2.5} size={12} />
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -171,12 +174,12 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
               className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-popover/60 transition-colors"
             >
               <div className="min-w-0">
-                <button
+                <Button variant="ghost"
                   onClick={() => router.push(`/admin/users/${m.user_id}`)}
-                  className="font-body text-xs font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  className="transition-colors flex items-center gap-1"
                 >
                   {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-muted-foreground" />
-                </button>
+                </Button>
                 <p className="font-body text-[11px] text-muted-foreground truncate">{m.email}</p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -198,12 +201,12 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
               className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-popover/60 transition-colors"
             >
               <div className="min-w-0">
-                <button
+                <Button variant="ghost"
                   onClick={() => router.push(`/admin/users/${m.id}`)}
-                  className="font-body text-xs font-medium text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  className="transition-colors flex items-center gap-1"
                 >
                   {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-muted-foreground" />
-                </button>
+                </Button>
                 <p className="font-body text-[11px] text-muted-foreground truncate">{m.email}</p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
@@ -219,13 +222,13 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
 
       {hasQuery && visibleRows && hasMore && (
         <div className="border-t border-border/70 px-5 py-3">
-          <button
+          <Button variant="outline"
             onClick={loadMore}
             disabled={busy}
-            className="w-full rounded-lg border border-border py-2 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-50"
+            className="w-full py-2 transition-colors disabled:opacity-50"
           >
             {busy ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${visibleRows.length} of ${total})`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -16,16 +18,16 @@ export function ApplicationHistory({ history }: Props) {
 
   return (
     <div>
-      <button
+      <Button variant="ghost"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
+        className="flex items-center gap-1 transition-colors mb-2"
       >
         <ChevronDown
           size={13}
           className={`transition-transform ${open ? "rotate-180" : ""}`}
         />
         {history.length} previous application{history.length > 1 ? "s" : ""}
-      </button>
+      </Button>
 
       {open && (
         <div className="flex flex-col gap-2">

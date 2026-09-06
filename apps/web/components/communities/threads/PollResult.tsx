@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useId } from "react";
 import { BarChart3, Check, Loader2 } from "lucide-react";
@@ -135,7 +137,7 @@ export function ThreadPollResult({
             const letter = String.fromCharCode(65 + index);
             const isPending = pendingOption === index;
             return (
-              <button
+              <Button variant="ghost"
                 key={index}
                 type="button"
                 role="radio"
@@ -166,7 +168,7 @@ export function ThreadPollResult({
                 <span className="min-w-0 flex-1 whitespace-pre-wrap break-words font-body text-sm leading-snug text-foreground">
                   {option}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -181,20 +183,20 @@ export function ThreadPollResult({
         </span>
         {hasVoted && interactive && onUndo && canUndo !== false && (
           <span className="group/undo relative inline-flex items-center">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onUndo}
               disabled={busy}
               aria-label="Undo your vote"
               aria-describedby={undoId}
-              className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-primary transition-colors hover:text-primary hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
+              className="px-0.5 tabular-nums transition-colors hover:underline underline-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 size={11} strokeWidth={2.5} className="animate-spin" aria-hidden />
               ) : (
                 "Undo"
               )}
-            </button>
+            </Button>
             <span
               id={undoId}
               role="tooltip"

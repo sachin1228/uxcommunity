@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
@@ -75,10 +77,10 @@ export function CommunityActionsPanel({
                 : "Makes this community visible to users again."}
             </p>
           </div>
-          <button
+          <Button variant="outline"
             onClick={handleToggle}
             disabled={toggleLoading}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs font-medium text-muted-foreground hover:bg-popover transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-50"
           >
             {toggleLoading ? (
               <Spinner className="h-3.5 w-3.5" />
@@ -88,7 +90,7 @@ export function CommunityActionsPanel({
               <ToggleLeft strokeWidth={2.5} size={14} className="text-muted-foreground" />
             )}
             {isActive ? "Deactivate" : "Activate"}
-          </button>
+          </Button>
         </div>
 
         {/* Delete */}
@@ -99,12 +101,12 @@ export function CommunityActionsPanel({
               Permanently removes the community, all members, and all messages. Cannot be undone.
             </p>
           </div>
-          <button
+          <Button variant="destructive"
             onClick={() => setConfirmDelete(true)}
-            className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
           >
             <Trash2 strokeWidth={2.5} size={12} /> Delete
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -133,20 +135,20 @@ export function CommunityActionsPanel({
               </p>
             )}
             <div className="flex gap-2">
-              <button
+              <Button variant="outline"
                 onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="modal-btn modal-btn-danger flex-1"
+                className="flex-1"
               >
                 {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
@@ -38,22 +40,22 @@ export function MobileSidebar({ userId, user }: Props) {
 
   return (
     <>
-      <button
+      <Button variant="ghost" size="icon"
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-popover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden"
+        className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors lg:hidden"
         aria-label="Open navigation menu"
         aria-expanded={open}
         aria-controls="mobile-dashboard-navigation"
       >
         <Menu strokeWidth={2.5} size={18} aria-hidden="true" />
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <button
+          <Button variant="ghost"
             type="button"
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-sm"
             onClick={() => setOpen(false)}
             aria-label="Close navigation menu"
           />
@@ -66,15 +68,15 @@ export function MobileSidebar({ userId, user }: Props) {
           >
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
               <span className="font-body text-sm font-semibold text-foreground">Navigation</span>
-              <button
+              <Button variant="ghost" size="icon"
                 ref={closeButtonRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-popover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex h-9 w-9 items-center justify-center transition-colors"
                 aria-label="Close navigation menu"
               >
                 <X strokeWidth={2.5} size={20} aria-hidden="true" />
-              </button>
+              </Button>
             </div>
             <div className="min-h-0 flex-1" onClick={() => setOpen(false)}>
               <GlobalSidebar userId={userId} user={user} mobile />

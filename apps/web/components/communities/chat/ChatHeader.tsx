@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { memo, useEffect, useRef, useState } from "react";
 import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
@@ -87,23 +89,23 @@ function ConfirmDialog({
         <p className="font-display text-sm font-semibold text-foreground mb-1">{copy.title}</p>
         <p className="font-body text-xs text-muted-foreground leading-relaxed mb-5">{copy.body}</p>
         <div className="flex gap-2">
-          <button
+          <Button variant="outline"
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="modal-btn modal-btn-secondary flex-1"
+            className="flex-1"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="destructive"
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="modal-btn modal-btn-danger flex-1"
+            className="flex-1"
           >
             {busy ? <Spinner size={12} /> : null}
             {copy.cta}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -239,60 +241,60 @@ export const ChatHeader = memo(function ChatHeader({
               <div ref={menuRef} className="relative flex items-center gap-2">
                 {/* Settings button — community owner or admin with settings permission */}
                 {currentUserId && canOpenSettings && onSettingsClick && (
-                  <button
+                  <Button variant="outline" size="icon"
                     type="button"
                     onClick={onSettingsClick}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                    className="h-8 w-8 flex items-center justify-center transition-colors"
                     aria-label="Community settings"
                     title="Community settings"
                   >
                     <Settings strokeWidth={2.5} size={15} />
-                  </button>
+                  </Button>
                 )}
                 <div className="relative">
-                  <button
+                  <Button variant="outline"
                     type="button"
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "joined"}
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
-                    className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-popover transition-colors"
+                    className="h-8 flex items-center gap-1.5 px-3 transition-colors"
                   >
                     Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
-                  </button>
+                  </Button>
                   {openMenu === "joined" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                      <button
+                      <Button variant="destructive"
                         type="button"
                         role="menuitem"
                         onClick={() => requestAction("leave")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex w-full items-center px-3 py-2 text-left transition-colors"
                       >
                         Leave community
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
                 <div className="relative">
-                  <button
+                  <Button variant="outline" size="icon"
                     type="button"
                     aria-label="Community options"
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "more"}
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                    className="h-8 w-8 flex items-center justify-center transition-colors"
                   >
                     <MoreHorizontal strokeWidth={2.5} size={16} />
-                  </button>
+                  </Button>
                   {openMenu === "more" && (
                     <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                      <button
+                      <Button variant="destructive"
                         type="button"
                         role="menuitem"
                         onClick={() => requestAction("delete")}
-                        className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                        className="flex w-full items-center px-3 py-2 text-left transition-colors"
                       >
                         Delete chat
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
@@ -307,7 +309,7 @@ export const ChatHeader = memo(function ChatHeader({
                 ["events",    "Events",    Calendar],
                 ["members",   "Members",   Users],
               ] as const).filter(([tab]) => visibleTabs.includes(tab)).map(([tab, label, Icon]) => (
-                <button
+                <Button variant="ghost"
                   key={tab}
                   type="button"
                   role="tab"
@@ -323,7 +325,7 @@ export const ChatHeader = memo(function ChatHeader({
                     <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                     {label}
                   </span>
-                </button>
+                </Button>
               ))}
             </nav>
           </>

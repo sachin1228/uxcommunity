@@ -1,4 +1,8 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -67,20 +71,20 @@ export default function UsersPage() {
           size={13}
           className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name or email…"
-          className="field w-full pl-8 pr-8"
+          className="w-full pl-8 pr-8"
         />
         {search && (
-          <button
+          <Button variant="ghost"
             onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2"
           >
             <X strokeWidth={2.5} size={12} />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -95,30 +99,30 @@ export default function UsersPage() {
             No users found.
           </p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border">
                 {["Name", "Email", "Joined", "Status", "Actions"].map((h, i) => (
-                  <th
+                  <TableHead
                     key={h}
                     className={`px-4 py-2.5 font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider ${
                       i === 4 ? "text-right" : "text-left"
                     }`}
                   >
                     {h}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {users.map((user, idx) => (
-                <tr
+                <TableRow
                   key={user.id}
                   className={`${
                     idx < users.length - 1 ? "border-b border-border" : ""
                   } hover:bg-popover transition-colors`}
                 >
-                  <td className="px-4 py-2.5">
+                  <TableCell className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
                       <AvatarThumb
                         url={user.designer_profiles?.avatar_url}
@@ -134,18 +138,18 @@ export default function UsersPage() {
                         {user.name}
                       </p>
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <p className="font-body text-xs text-muted-foreground">{user.email}</p>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <p className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
                       {new Date(user.created_at).toLocaleDateString("en-GB", {
                         day: "numeric", month: "short", year: "numeric",
                       })}
                     </p>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <span
                       className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
                         user.is_blocked
@@ -155,19 +159,19 @@ export default function UsersPage() {
                     >
                       {user.is_blocked ? "Blocked" : "Active"}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <button
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-right">
+                    <Button variant="outline"
                       onClick={() => router.push(`/admin/users/${user.id}`)}
-                      className="rounded-md border border-border px-2.5 py-1 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                      className="px-2.5 py-1 transition-colors"
                     >
                       View
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -185,20 +189,20 @@ export default function UsersPage() {
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-1.5">
-            <button
+            <Button variant="outline"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-2.5 py-1.5 transition-colors disabled:opacity-40"
             >
               <ChevronLeft strokeWidth={2.5} size={13} /> Prev
-            </button>
-            <button
+            </Button>
+            <Button variant="outline"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-2.5 py-1.5 transition-colors disabled:opacity-40"
             >
               Next <ChevronRight strokeWidth={2.5} size={13} />
-            </button>
+            </Button>
           </div>
         </div>
       )}

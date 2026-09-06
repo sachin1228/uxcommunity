@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -184,13 +186,13 @@ function ReadyPhase({
         )}
       </p>
 
-      <button
+      <Button variant="default"
         type="button"
         onClick={onGoToDashboard}
-        className="mt-8 w-full rounded-md bg-primary py-3 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
+        className="mt-8 w-full py-3 transition-colors"
       >
         Go to Dashboard →
-      </button>
+      </Button>
     </div>
   );
 }
@@ -225,20 +227,20 @@ function ErrorPhase({
       <p className="mt-1.5 text-center font-body text-sm text-muted-foreground">
         {errorMessage ?? "We couldn't finish setting up your account. Please try again."}
       </p>
-      <button
+      <Button variant="default"
         type="button"
         onClick={onRetry}
-        className="mt-7 w-full rounded-md bg-primary py-3 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
+        className="mt-7 w-full py-3 transition-colors"
       >
         Try Again
-      </button>
-      <button
+      </Button>
+      <Button variant="ghost"
         type="button"
         onClick={onClose}
-        className="mt-3 font-body text-sm text-muted-foreground transition-colors hover:text-foreground"
+        className="mt-3 transition-colors"
       >
         Go back
-      </button>
+      </Button>
     </div>
   );
 }

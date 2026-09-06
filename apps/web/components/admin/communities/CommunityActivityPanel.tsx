@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useMemo, useState } from "react";
 import { Activity, ShieldCheck } from "lucide-react";
@@ -76,7 +78,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
       {!adminId && actors.length > 1 && (
         <div className="flex flex-wrap items-center gap-1.5 px-5 pt-3">
           {[{ id: "all", name: "All" }, ...actors].map((actor) => (
-            <button
+            <Button variant="ghost"
               key={actor.id}
               onClick={() => setFilter(actor.id)}
               className={`rounded-full px-2.5 py-1 font-body text-[11px] transition-colors border ${
@@ -86,7 +88,7 @@ export function CommunityActivityPanel({ communityId, adminId, limit = 30 }: Pro
               }`}
             >
               {actor.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}

@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useEffect, useRef } from "react";
 import { Check, CheckCheck, Smile, X } from "lucide-react";
@@ -49,14 +52,14 @@ export function MessageEditModal({
     >
       <div className="flex max-h-[calc(100vh-2rem)] flex-col">
         <div className="flex shrink-0 items-center gap-4 border-b border-border px-6 py-4">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
+            className="p-1 transition-colors"
             aria-label="Close edit message dialog"
           >
             <X size={25} strokeWidth={2.5} />
-          </button>
+          </Button>
           <h2 className="font-body text-lg font-medium text-foreground">Edit message</h2>
         </div>
 
@@ -83,7 +86,7 @@ export function MessageEditModal({
         <div className="shrink-0 px-6 pb-6 pt-3">
           {error && <p className="mb-2 font-body text-xs text-red-400">{error}</p>}
           <div className="flex items-end gap-3 border-b-2 border-primary pb-2">
-            <textarea
+            <Textarea
               ref={textareaRef}
               data-edit-message-input
               value={input}
@@ -95,27 +98,27 @@ export function MessageEditModal({
               onKeyDown={onKeyDown}
               rows={1}
               placeholder="Edit message"
-              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent font-body text-[16px] leading-7 text-foreground outline-none placeholder:text-muted-foreground"
+              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent leading-7 outline-none"
               disabled={saving}
             />
-            <button
+            <Button variant="ghost" size="icon"
               type="button"
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
+              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
               aria-label="Add emoji"
               title="Add emoji"
             >
               <Smile strokeWidth={2.5} size={21} />
-            </button>
-            <button
+            </Button>
+            <Button variant="default" size="icon"
               type="button"
               onClick={onSave}
               disabled={saving || !input.trim()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-10 w-10 shrink-0 items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Save edited message"
               title="Save edit"
             >
               <Check size={23} strokeWidth={2.5} />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

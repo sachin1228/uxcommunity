@@ -1,4 +1,9 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
@@ -188,27 +193,27 @@ export function ResourceFormModal({
               {isEdit ? "Update the details of your resource." : "Share something useful with your community."}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground" aria-label="Close">
+          <Button variant="ghost" size="icon" type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-6 space-y-5">
           {/* Description */}
-          <label className="block">
+          <Label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
               Description <span className="text-primary">*</span>
             </span>
-            <textarea
+            <Textarea
               value={description}
               maxLength={2000}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What makes this resource worth sharing?"
               rows={4}
               required
-              className="field w-full resize-y"
+              className="w-full resize-y"
             />
-          </label>
+          </Label>
 
           {/* Resource type */}
           <fieldset>
@@ -217,7 +222,7 @@ export function ResourceFormModal({
             </legend>
             <div className="flex flex-wrap gap-2">
               {RESOURCE_TYPES.map((t) => (
-                <button
+                <Button variant="ghost"
                   key={t.value}
                   type="button"
                   onClick={() => setResourceType(t.value)}
@@ -229,18 +234,18 @@ export function ResourceFormModal({
                 >
                   <ResourceTypeIcon type={t.value} size={11} />
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
           </fieldset>
 
           {/* URL */}
-          <label className="block">
+          <Label className="block">
             <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
               URL <span className="text-primary">*</span>
             </span>
             <div className="relative">
-              <input
+              <Input
                 value={url}
                 onChange={(e) => {
                   const nextUrl = e.target.value;
@@ -250,7 +255,7 @@ export function ResourceFormModal({
                 }}
                 placeholder="https://..."
                 type="url"
-                className="field w-full pr-9"
+                className="w-full pr-9"
               />
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner
@@ -263,7 +268,7 @@ export function ResourceFormModal({
                 />
               </div>
             </div>
-          </label>
+          </Label>
 
           {/* Figma detection banner */}
           {figmaLink && (
@@ -316,17 +321,17 @@ export function ResourceFormModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
+          <Button variant="outline" type="button" onClick={onClose} className="">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="default"
             type="submit"
             disabled={saving}
-            className="modal-btn modal-btn-primary"
+            className=""
           >
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
-          </button>
+          </Button>
         </div>
       </form>
     </div>,

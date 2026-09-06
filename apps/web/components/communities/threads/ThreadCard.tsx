@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
@@ -428,49 +430,49 @@ export function ThreadCard({
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            <button
+            <Button variant="ghost" size="icon"
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((prev) => !prev); }}
               aria-label="Thread options"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-popover hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center"
             >
               <MoreHorizontal strokeWidth={2.5} size={15} />
-            </button>
+            </Button>
             {menuOpen && (
               <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-card py-1 shadow-lg">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={(e) => {
                     handleSave(e);
                     setMenuOpen(false);
                   }}
                   aria-pressed={displayedSaved}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground"
+                  className="flex w-full items-center gap-2 px-3 py-1.5"
                 >
                   <Bookmark strokeWidth={2.5} size={11} fill={displayedSaved ? "currentColor" : "none"} />
                   {displayedSaved ? "Unsave" : "Save"}
-                </button>
+                </Button>
                 {isOwner ? (
                   <>
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground"
+                      className="flex w-full items-center gap-2 px-3 py-1.5"
                     >
                       <Pencil strokeWidth={2.5} size={11} /> Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="ghost"
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setConfirmDelete(true); }}
                       disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 disabled:opacity-50"
                     >
                       <Trash2 strokeWidth={2.5} size={11} />
                       {deleting ? "Deleting…" : "Delete"}
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
@@ -479,11 +481,11 @@ export function ThreadCard({
                       setTimeout(() => setReported(false), 3000);
                     }}
                     disabled={reported}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 disabled:opacity-50"
                   >
                     <Flag strokeWidth={2.5} size={11} />
                     {reported ? "Reported" : "Report"}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -505,14 +507,14 @@ export function ThreadCard({
             </h3>
             {/* "…More" right after the last visible word, on the same line. */}
             {titleOverflow && !titleExpanded && morePos && (
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
                 style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
-                className="absolute min-w-16 bg-muted font-body text-xs font-medium leading-snug text-muted-foreground transition-colors hover:text-primary"
+                className="absolute min-w-16 leading-snug transition-colors"
               >
                 …More
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -593,7 +595,7 @@ export function ThreadCard({
         <div className="mt-3 flex items-center justify-between gap-4">
           <div className="flex shrink-0 items-center gap-4">
             {/* Like */}
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={handleLike}
               aria-label={thread.user_liked ? "Unlike" : "Like"}
@@ -616,7 +618,7 @@ export function ThreadCard({
               >
                 {thread.like_count}
               </span>
-            </button>
+            </Button>
 
             {/* Comments */}
             <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-muted-foreground transition-colors duration-150 hover:text-white">

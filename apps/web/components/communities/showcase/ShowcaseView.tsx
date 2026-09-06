@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/shadcn/native-select";
+
 
 import { useEffect, useMemo, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -169,7 +172,7 @@ export function ShowcaseView({
               }[item.value];
 
               return (
-                <button
+                <Button variant="ghost"
                   key={item.value}
                   type="button"
                   onClick={() => setCategory(item.value)}
@@ -182,7 +185,7 @@ export function ShowcaseView({
                 >
                   <Icon size={14} strokeWidth={2.5} />
                   {item.label}
-                </button>
+                </Button>
               );
             })}
             <div className="relative shrink-0">
@@ -190,17 +193,17 @@ export function ShowcaseView({
                 size={14}
                 className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
-              <select
+              <NativeSelect
                 value={sort}
                 onChange={(event) =>
                   setSort(event.target.value as "newest" | "popular")
                 }
                 aria-label="Sort showcase posts"
-                className="h-8 appearance-none rounded-lg border border-border bg-popover py-1 pl-8 pr-8 font-body text-xs text-foreground"
+                className="h-8 appearance-none py-1 pl-8 pr-8"
               >
-                <option value="newest">Newest first</option>
-                <option value="popular">Most discussed</option>
-              </select>
+                <NativeSelectOption value="newest">Newest first</NativeSelectOption>
+                <NativeSelectOption value="popular">Most discussed</NativeSelectOption>
+              </NativeSelect>
               <ChevronDown
                 size={14}
                 className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -247,14 +250,14 @@ export function ShowcaseView({
             ))}
             {nextCursor && (
               <div className="flex justify-center py-6">
-                <button
+                <Button variant="outline"
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-popover disabled:opacity-60"
+                  className="px-4 py-2 disabled:opacity-60"
                 >
                   {loadingMore ? "Loading…" : "Load more"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

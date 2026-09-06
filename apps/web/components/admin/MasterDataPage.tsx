@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Search, X, ChevronRight, ImagePlus } from "lucide-react";
@@ -141,13 +145,13 @@ export function MasterDataPage({
       <div className="flex items-center justify-between mb-5">
         <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
         {!readOnly && (
-          <button
+          <Button variant="default"
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
           >
             <Plus strokeWidth={2.5} size={13} />
             Add {entity}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -156,7 +160,7 @@ export function MasterDataPage({
         {(["active", "inactive"] as const).map((tab) => {
           const count = items.filter((i) => (tab === "active" ? i.is_active : !i.is_active)).length;
           return (
-            <button
+            <Button variant="ghost"
               key={tab}
               onClick={() => { setActiveTab(tab); setSearch(""); }}
               className={`px-4 py-2 font-body text-xs font-medium capitalize transition-colors border-b-2 -mb-px ${
@@ -173,7 +177,7 @@ export function MasterDataPage({
               }`}>
                 {count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -184,20 +188,20 @@ export function MasterDataPage({
           size={13}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${title.toLowerCase()}…`}
-          className="field w-full pl-8 pr-8"
+          className="w-full pl-8 pr-8"
         />
         {search && (
-          <button
+          <Button variant="ghost"
             onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2"
           >
             <X strokeWidth={2.5} size={12} />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -213,12 +217,12 @@ export function MasterDataPage({
               No {entity.toLowerCase()}s yet.
             </p>
             {!readOnly && (
-              <button
+              <Button variant="default"
                 onClick={() => setModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground hover:bg-primary transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
               >
                 <Plus strokeWidth={2.5} size={13} />Add your first {entity.toLowerCase()}
-              </button>
+              </Button>
             )}
           </div>
         ) : filtered.length === 0 ? (
@@ -226,27 +230,27 @@ export function MasterDataPage({
             No results for &quot;{search}&quot;
           </p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border">
                 {/* 24px thumbnail + 32px horizontal cell padding — locking this
                     column wide enough keeps the table from squeezing the image. */}
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider w-14" />
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Name</th>
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Status</th>
-                <th className="px-4 py-2 w-6" />
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider w-14" />
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Name</TableHead>
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Status</TableHead>
+                <TableHead className="px-4 py-2 w-6" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((item, idx) => (
-                <tr
+                <TableRow
                   key={item.id}
                   onClick={() => router.push(`${basePath}/${item.id}`)}
                   className={`cursor-pointer ${
                     idx < filtered.length - 1 ? "border-b border-border" : ""
                   } hover:bg-popover transition-colors`}
                 >
-                  <td className="px-4 py-2">
+                  <TableCell className="px-4 py-2">
                     {item.image_url ? (
                       // Master-data images are dark tiles with a light icon in the
                       // center — the bordered chip keeps them visible against the
@@ -261,8 +265,8 @@ export function MasterDataPage({
                         <ImagePlus strokeWidth={2.5} size={11} className="text-muted-foreground" />
                       </div>
                     )}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <span
                       className={`font-body text-xs ${
                         item.is_active
@@ -272,8 +276,8 @@ export function MasterDataPage({
                     >
                       {item.name}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <span
                       className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
                         item.is_active
@@ -283,14 +287,14 @@ export function MasterDataPage({
                     >
                       {item.is_active ? "Active" : "Inactive"}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5 w-6">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 w-6">
                     <ChevronRight strokeWidth={2.5} size={13} className="text-muted-foreground" />
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 

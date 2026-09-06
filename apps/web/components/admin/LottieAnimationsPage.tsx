@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState, useEffect, useCallback } from "react";
 import { Clapperboard, RefreshCcw, X, Layers, Sparkles, TrendingUp, Globe, MapPin } from "lucide-react";
@@ -124,21 +127,21 @@ export function LottieAnimationsPage() {
             Priority: community → type → universal → spinner.
           </p>
         </div>
-        <button
+        <Button variant="outline" size="icon"
           onClick={load}
-          className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+          className="h-8 w-8 flex items-center justify-center transition-colors"
           title="Refresh"
         >
           <RefreshCcw strokeWidth={2.5} size={14} />
-        </button>
+        </Button>
       </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3">
           <p className="font-body text-xs text-red-400 flex-1">{error}</p>
-          <button onClick={() => setError(null)}>
+          <Button variant="ghost" onClick={() => setError(null)}>
             <X strokeWidth={2.5} size={13} className="text-red-400" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -204,20 +207,20 @@ export function LottieAnimationsPage() {
         </div>
 
         <div className="relative mb-3">
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search communities…"
-            className="field w-full"
+            className="w-full"
           />
           {search && (
-            <button
+            <Button variant="ghost"
               onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2"
             >
               <X strokeWidth={2.5} size={12} />
-            </button>
+            </Button>
           )}
         </div>
 

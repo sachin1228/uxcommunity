@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { BrandedLoadingScreen } from "@/components/ui/BrandedLoadingScreen";
 import { useLogout } from "@/components/ui/useLogout";
@@ -9,13 +11,13 @@ export function DashboardLogoutButton() {
   return (
     <>
       {loggingOut && <BrandedLoadingScreen label="Logging out" />}
-      <button
+      <Button variant="ghost"
         onClick={handleLogout}
         disabled={loggingOut}
-        className="rounded-md px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-60"
+        className="px-3 py-1.5 transition-colors disabled:opacity-60"
       >
         {loggingOut ? "…" : "Sign out"}
-      </button>
+      </Button>
     </>
   );
 }

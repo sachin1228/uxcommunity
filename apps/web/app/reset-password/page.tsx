@@ -1,4 +1,8 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -121,11 +125,11 @@ function ResetPasswordInner() {
                 </div>
               )}
 
-              <label className="flex flex-col gap-1.5">
+              <Label className="flex flex-col gap-1.5">
                 <span className="font-body text-xs font-medium text-foreground">
                   New password
                 </span>
-                <input
+                <Input
                   type="password"
                   value={password}
                   onChange={(e) => {
@@ -140,13 +144,13 @@ function ResetPasswordInner() {
                   required
                 />
                 {fieldError("password")}
-              </label>
+              </Label>
 
-              <label className="flex flex-col gap-1.5">
+              <Label className="flex flex-col gap-1.5">
                 <span className="font-body text-xs font-medium text-foreground">
                   Confirm new password
                 </span>
-                <input
+                <Input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => {
@@ -160,16 +164,16 @@ function ResetPasswordInner() {
                   required
                 />
                 {fieldError("confirm_password")}
-              </label>
+              </Label>
 
-              <button
+              <Button variant="default"
                 type="submit"
                 disabled={loading}
-                className="mt-1 flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
+                className="mt-1 flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading && <Spinner className="h-4 w-4 text-white" />}
                 {loading ? "Updating password…" : "Update password"}
-              </button>
+              </Button>
             </form>
           </div>
         )}

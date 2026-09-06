@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback } from "react";
 
@@ -20,13 +22,13 @@ export default function TooManyRequestsPage() {
           We received a burst of requests from this browser, so we paused it for
           a moment. Please wait a few seconds and try again.
         </p>
-        <button
+        <Button variant="default"
           type="button"
           onClick={retry}
-          className="mt-7 inline-flex items-center justify-center rounded-md bg-primary px-5 py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
+          className="mt-7 inline-flex items-center justify-center px-5 py-2.5 transition-colors"
         >
           Try again
-        </button>
+        </Button>
       </section>
     </main>
   );

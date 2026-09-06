@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -214,7 +216,7 @@ export function ResourcesView({
               const Icon = item.icon;
               const count = item.value === "all" ? resources.length : resources.filter((resource) => resource.resource_type === item.value).length;
               return (
-                <button
+                <Button variant="ghost"
                   key={item.value}
                   type="button"
                   onClick={() => setFilter(item.value)}
@@ -224,7 +226,7 @@ export function ResourcesView({
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
                   <span className="font-mono text-[10px]">{count}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -233,9 +235,9 @@ export function ResourcesView({
         {error && (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="font-body text-sm text-red-400">{error}</p>
-            <button type="button" onClick={() => void fetchResources()} className="font-body text-xs text-red-300 underline">
+            <Button variant="ghost" type="button" onClick={() => void fetchResources()} className="underline">
               Try again
-            </button>
+            </Button>
           </div>
         )}
 
@@ -281,14 +283,14 @@ export function ResourcesView({
             ))}
             {hasMore && (
               <div className="flex justify-center py-6">
-                <button
+                <Button variant="outline"
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-popover disabled:opacity-60"
+                  className="px-4 py-2 disabled:opacity-60"
                 >
                   {loadingMore ? "Loading…" : "Load more"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

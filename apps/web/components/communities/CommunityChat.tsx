@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
@@ -1303,10 +1305,10 @@ export function CommunityChat({
           <footer className="relative shrink-0 z-10 bg-background">
             {/* @ pill — jump to messages where the user was mentioned */}
             {visiblePendingMentions.length > 0 && (
-              <button
+              <Button variant="default" size="icon"
                 type="button"
                 onClick={jumpToPendingMention}
-                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white shadow-lg hover:bg-[var(--ds-blue-800)] transition-colors"
+                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center transition-colors"
                 aria-label={`${visiblePendingMentions.length} pending mention${visiblePendingMentions.length === 1 ? "" : "s"} — jump to message`}
                 title="Jump to the message where you were mentioned"
               >
@@ -1316,17 +1318,17 @@ export function CommunityChat({
                     ? "9+"
                     : visiblePendingMentions.length}
                 </span>
-              </button>
+              </Button>
             )}
             {/* Scroll-to-bottom button — floats just above the footer edge */}
             {showScrollToBottom && (
-              <button
+              <Button variant="outline" size="icon"
                 onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-                className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-popover shadow-lg border border-border text-muted-foreground hover:text-foreground transition-colors"
+                className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center transition-colors"
                 aria-label="Scroll to bottom"
               >
                 <ChevronDown strokeWidth={2.5} size={16} />
-              </button>
+              </Button>
             )}
             <TypingIndicator users={typingUsers} />
             <div>

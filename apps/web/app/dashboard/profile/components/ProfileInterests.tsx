@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useRef, useState } from "react";
 import { Pencil, ChevronDown, X, Check } from "lucide-react";
@@ -59,32 +61,32 @@ export function ProfileInterests({
           <span className="font-body text-sm text-muted-foreground ">No interests selected yet</span>
         ) : (
           selectedInterests.map((interest) => (
-            <button
+            <Button variant="destructive"
               key={interest.id}
               type="button"
               onClick={() => toggle(interest.id)}
-              className="group flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-body text-xs text-foreground hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-all"
+              className="group flex items-center gap-1.5 px-3 py-1 transition-all"
             >
               <span>{INTEREST_EMOJIS[interest.name] ?? "🎨"}</span>
               {interest.name}
               <X strokeWidth={2.5} size={10} className="opacity-50 group-hover:opacity-100" />
-            </button>
+            </Button>
           ))
         )}
       </div>
 
       {/* Dropdown trigger */}
       <div ref={containerRef} className="relative inline-block">
-        <button
+        <Button variant="outline"
           ref={triggerRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-primary/40 bg-popover px-4 py-2 font-body text-sm text-muted-foreground hover:text-foreground transition-all"
+          className="flex items-center gap-2 px-4 py-2 transition-all"
         >
           <Pencil strokeWidth={2.5} size={12} />
           Edit interests
           <ChevronDown strokeWidth={2.5} size={12} className={`transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
+        </Button>
 
         {/* Portal dropdown — always above other content */}
         <DropdownMenu
@@ -98,12 +100,12 @@ export function ProfileInterests({
             {allInterests.map((interest) => {
               const selected = interestIds.includes(interest.id);
               return (
-                <button
+                <Button variant="ghost"
                   key={interest.id}
                   type="button"
                   onClick={() => toggle(interest.id)}
                   aria-pressed={selected}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.08] transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
                 >
                   <span className="text-base leading-none shrink-0">
                     {INTEREST_EMOJIS[interest.name] ?? "🎨"}
@@ -119,7 +121,7 @@ export function ProfileInterests({
                   >
                     {selected && <Check size={11} className="text-primary-foreground" strokeWidth={2.5} />}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>

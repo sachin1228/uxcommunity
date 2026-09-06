@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2, Database } from "lucide-react";
@@ -196,10 +198,10 @@ export default function ToolsPage() {
               skipped. Safe to run more than once.
             </p>
 
-            <button
+            <Button variant="default"
               onClick={runMigration}
               disabled={migrateStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {migrateStatus === "running" ? (
                 <>
@@ -212,7 +214,7 @@ export default function ToolsPage() {
                   {migrateStatus === "done" ? "Run again" : "Run migration"}
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -255,10 +257,10 @@ export default function ToolsPage() {
               Scans the configured Cloudflare R2 bucket and compares it against the database-backed image references to highlight potential orphaned objects and broken references.
             </p>
 
-            <button
+            <Button variant="default"
               onClick={runR2Audit}
               disabled={r2Status === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {r2Status === "running" ? (
                 <>
@@ -271,7 +273,7 @@ export default function ToolsPage() {
                   {r2Status === "done" ? "Scan again" : "Scan R2 storage"}
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -289,10 +291,10 @@ export default function ToolsPage() {
                   <p className="font-body text-[11px] text-muted-foreground">
                     {r2Summary.orphans.length} orphaned object(s) found.
                   </p>
-                  <button
+                  <Button variant="destructive"
                     onClick={() => setShowR2DeleteConfirm(true)}
                     disabled={r2DeleteStatus === "running"}
-                    className="inline-flex items-center gap-2 rounded-md bg-red-500 px-3 py-1.5 font-body text-[11px] font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {r2DeleteStatus === "running" ? (
                       <>
@@ -305,7 +307,7 @@ export default function ToolsPage() {
                         Delete listed orphans
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
 
                 {showR2DeleteConfirm && (
@@ -314,18 +316,18 @@ export default function ToolsPage() {
                       This will permanently delete the displayed orphaned R2 objects. This action cannot be undone.
                     </p>
                     <div className="mt-3 flex items-center gap-2">
-                      <button
+                      <Button variant="destructive"
                         onClick={deleteR2Orphans}
-                        className="inline-flex items-center gap-2 rounded-md bg-red-500 px-3 py-1.5 font-body text-[11px] font-medium text-white transition-colors hover:bg-red-600"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 transition-colors"
                       >
                         Confirm delete
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="outline"
                         onClick={() => setShowR2DeleteConfirm(false)}
-                        className="rounded-md border border-border px-3 py-1.5 font-body text-[11px] text-muted-foreground transition-colors hover:border-muted-foreground"
+                        className="px-3 py-1.5 transition-colors"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -384,10 +386,10 @@ export default function ToolsPage() {
               this after the migration above to standardise all image sizes.
             </p>
 
-            <button
+            <Button variant="default"
               onClick={runRecompression}
               disabled={recompressStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {recompressStatus === "running" ? (
                 <>
@@ -400,7 +402,7 @@ export default function ToolsPage() {
                   {recompressStatus === "done" ? "Run again" : "Run recompression"}
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -447,10 +449,10 @@ export default function ToolsPage() {
               already point to Cloudflare R2. <span className="text-red-400 font-medium">This cannot be undone.</span>
             </p>
 
-            <button
+            <Button variant="destructive"
               onClick={runPurge}
               disabled={purgeStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-red-500 px-3.5 py-1.5 font-body text-xs font-medium text-white transition-colors hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 px-3.5 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {purgeStatus === "running" ? (
                 <>
@@ -463,7 +465,7 @@ export default function ToolsPage() {
                   {purgeStatus === "done" ? "Run again" : "Delete Supabase files"}
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -132,7 +134,7 @@ export function AdminSidebar() {
 
       {/* Master Data accordion */}
       <div>
-        <button
+        <Button variant="ghost"
           onClick={() => setOpen((v) => !v)}
           className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
             masterGroupActive
@@ -146,7 +148,7 @@ export function AdminSidebar() {
             size={14}
             className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           />
-        </button>
+        </Button>
 
         {open && (
           <div className="mt-1 ml-2 flex flex-col gap-1 border-l border-border pl-2">

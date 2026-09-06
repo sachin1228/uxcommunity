@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -112,13 +114,13 @@ export default function UserDetailPage() {
   return (
     <div className="max-w-2xl">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push("/admin/users")}
-        className="mb-6 flex items-center gap-1.5 font-body text-sm text-muted-foreground hover:text-foreground transition-colors"
+        className="mb-6 flex items-center gap-1.5 transition-colors"
       >
         <ArrowLeft strokeWidth={2.5} size={14} />
         Back to users
-      </button>
+      </Button>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
@@ -152,7 +154,7 @@ export default function UserDetailPage() {
         </div>
 
         <div className="flex gap-2">
-          <button
+          <Button variant="ghost"
             onClick={handleBlock}
             disabled={!!actionLoading}
             className={`flex items-center gap-2 rounded-md border px-3 py-1.5 font-body text-sm transition-colors disabled:opacity-50 ${
@@ -169,16 +171,16 @@ export default function UserDetailPage() {
               <ShieldOff strokeWidth={2.5} size={14} />
             )}
             {user.is_blocked ? "Unblock" : "Block"}
-          </button>
+          </Button>
 
-          <button
+          <Button variant="destructive"
             onClick={() => setConfirmDelete(true)}
             disabled={!!actionLoading}
-            className="flex items-center gap-2 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-sm text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 transition-colors disabled:opacity-50"
           >
             <Trash2 strokeWidth={2.5} size={14} />
             Delete
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -200,7 +202,7 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        <button
+        <Button variant="ghost"
           onClick={handleToggleAllCommunities}
           disabled={allCommunitiesLoading}
           aria-pressed={memberOfAll}
@@ -219,7 +221,7 @@ export default function UserDetailPage() {
               }`}
             />
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Details card */}
@@ -239,20 +241,20 @@ export default function UserDetailPage() {
               ({user.email}) and all their data. This cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button
+              <Button variant="outline"
                 onClick={() => setConfirmDelete(false)}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleDelete}
                 disabled={!!actionLoading}
-                className="modal-btn modal-btn-danger flex-1"
+                className="flex-1"
               >
                 {actionLoading === "delete" ? <Spinner className="h-4 w-4" /> : null}
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>

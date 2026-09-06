@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -203,12 +207,12 @@ export default function CommunityDetailPage() {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
         <p className="font-body text-sm text-muted-foreground">{error ?? "Community not found."}</p>
-        <button
+        <Button variant="ghost"
           onClick={() => router.push("/admin/communities")}
-          className="font-body text-xs text-primary hover:underline"
+          className="hover:underline"
         >
           Back to Communities
-        </button>
+        </Button>
       </div>
     );
   }
@@ -234,12 +238,12 @@ export default function CommunityDetailPage() {
   return (
     <div className="flex w-full flex-col gap-6">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push("/admin/communities")}
-        className="flex items-center gap-1.5 font-body text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
+        className="flex items-center gap-1.5 transition-colors w-fit"
       >
         <ArrowLeft strokeWidth={2.5} size={13} /> Communities
-      </button>
+      </Button>
 
       {/* Hero */}
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -265,7 +269,7 @@ export default function CommunityDetailPage() {
           <div className="min-w-0 flex-1 sm:pb-1.5">
             {editing ? (
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   autoFocus
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
@@ -273,34 +277,34 @@ export default function CommunityDetailPage() {
                     if (e.key === "Enter") handleRenameSave();
                     if (e.key === "Escape") setEditing(false);
                   }}
-                  className="field flex-1 max-w-md font-display text-lg font-semibold"
+                  className="flex-1 max-w-md text-lg font-semibold"
                 />
-                <button
+                <Button variant="ghost"
                   onClick={handleRenameSave}
                   disabled={editLoading}
-                  className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
+                  className="p-1 text-green-400 disabled:opacity-50"
                 >
                   {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={15} />}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   onClick={() => { setEditing(false); setEditError(null); }}
-                  className="p-1 text-muted-foreground hover:text-foreground"
+                  className="p-1"
                 >
                   <X strokeWidth={2.5} size={15} />
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <h1 className="font-display text-2xl font-semibold text-foreground truncate">
                   {community.name}
                 </h1>
-                <button
+                <Button variant="ghost"
                   onClick={() => { setEditName(community.name); setEditing(true); }}
-                  className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  className="shrink-0 p-1 transition-colors"
                   title="Rename community"
                 >
                   <Pencil strokeWidth={2.5} size={13} />
-                </button>
+                </Button>
               </div>
             )}
             {editError && (
@@ -345,7 +349,7 @@ export default function CommunityDetailPage() {
           const isActive = tab === t.id;
           const Icon = t.icon;
           return (
-            <button
+            <Button variant="ghost"
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-2 font-body text-xs whitespace-nowrap transition-colors ${
@@ -366,7 +370,7 @@ export default function CommunityDetailPage() {
               {isActive && (
                 <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t-full" />
               )}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -393,30 +397,30 @@ export default function CommunityDetailPage() {
                 </p>
                 {editingDesc ? (
                   <div className="flex flex-col gap-1.5">
-                    <textarea
+                    <Textarea
                       autoFocus
                       value={editDesc}
                       onChange={(e) => setEditDesc(e.target.value)}
                       rows={3}
-                      className="field w-full resize-none"
+                      className="w-full resize-none"
                     />
                     {editDescError && (
                       <p className="font-body text-[11px] text-red-400">{editDescError}</p>
                     )}
                     <div className="flex gap-2">
-                      <button
+                      <Button variant="default"
                         onClick={handleDescSave}
                         disabled={editDescLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 px-2.5 py-1 transition-colors disabled:opacity-50"
                       >
                         {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost"
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 transition-colors"
                       >
                         <X strokeWidth={2.5} size={11} /> Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -424,13 +428,13 @@ export default function CommunityDetailPage() {
                     <p className={`font-body text-xs leading-relaxed ${community.description ? "text-muted-foreground" : "text-muted-foreground italic"}`}>
                       {community.description || "No description yet — click the pencil to add one."}
                     </p>
-                    <button
+                    <Button variant="ghost"
                       onClick={() => { setEditDesc(community.description ?? ""); setEditingDesc(true); }}
-                      className="shrink-0 p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+                      className="shrink-0 p-1 opacity-0 group-hover:opacity-100 transition-all"
                       title="Edit description"
                     >
                       <Pencil strokeWidth={2.5} size={11} />
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -485,34 +489,34 @@ export default function CommunityDetailPage() {
                   />
                   <div className="flex flex-col gap-2 min-w-0">
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button variant="outline"
                         type="button"
                         onClick={() => imageInputRef.current?.click()}
                         disabled={dpBusy !== null}
-                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-popover transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-50"
                       >
                         <ImagePlus strokeWidth={2.5} size={13} />
                         {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="outline"
                         type="button"
                         onClick={() => lottieInputRef.current?.click()}
                         disabled={dpBusy !== null}
-                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-popover transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-50"
                       >
                         <Clapperboard strokeWidth={2.5} size={13} />
                         {dpBusy === "lottie" ? <Spinner className="h-3 w-3" /> : "Upload Lottie"}
-                      </button>
+                      </Button>
                       {community.lottie_url && (
-                        <button
+                        <Button variant="destructive"
                           type="button"
                           onClick={handleRemoveAnimation}
                           disabled={dpBusy !== null}
-                          className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-50"
                         >
                           <Eraser strokeWidth={2.5} size={13} />
                           {dpBusy === "remove" ? <Spinner className="h-3 w-3" /> : "Remove animation"}
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <input

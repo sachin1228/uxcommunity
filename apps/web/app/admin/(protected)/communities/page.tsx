@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody } from "@/components/ui/shadcn/table";
+
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -110,13 +114,13 @@ export default function AdminCommunitiesPage() {
               : `${communities.length} live communit${communities.length !== 1 ? "ies" : "y"}`}
           </p>
         </div>
-        <button
+        <Button variant="destructive"
           onClick={() => { setShowResetConfirm(true); setResetResult(null); setResetError(null); }}
-          className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
         >
           <Trash2 strokeWidth={2.5} size={12} />
           Reset all chat
-        </button>
+        </Button>
       </div>
 
       {/* Reset success banner */}
@@ -125,12 +129,12 @@ export default function AdminCommunitiesPage() {
           <p className="font-body text-xs text-green-400">
             ✓ Deleted {resetResult.deleted} message{resetResult.deleted !== 1 ? "s" : ""} across all communities.
           </p>
-          <button
+          <Button variant="ghost"
             onClick={() => setResetResult(null)}
-            className="font-body text-[11px] text-green-400/70 hover:text-green-400 transition-colors"
+            className="text-green-400/70 transition-colors"
           >
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
 
@@ -145,7 +149,7 @@ export default function AdminCommunitiesPage() {
               const isActive = mainTab === tab.value;
               const Icon = tab.icon;
               return (
-                <button
+                <Button variant="ghost"
                   key={tab.value}
                   onClick={() => { setMainTab(tab.value); setTypeTab("all"); }}
                   // border-b-0 on both states keeps every tab the same height, so
@@ -167,7 +171,7 @@ export default function AdminCommunitiesPage() {
                   >
                     {countByMainTab(tab.value)}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -184,7 +188,7 @@ export default function AdminCommunitiesPage() {
           {TYPE_TABS.map((tab) => {
             const isActive = typeTab === tab.value;
             return (
-              <button
+              <Button variant="ghost"
                 key={tab.value}
                 onClick={() => setTypeTab(tab.value)}
                 className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-2 font-body text-xs whitespace-nowrap transition-colors ${
@@ -204,7 +208,7 @@ export default function AdminCommunitiesPage() {
                 {isActive && (
                   <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t-full" />
                 )}
-              </button>
+              </Button>
             );
           })}
         </div>
@@ -216,12 +220,12 @@ export default function AdminCommunitiesPage() {
           size={13}
           className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search communities…"
-          className="field w-full pl-8 pr-4"
+          className="w-full pl-8 pr-4"
         />
       </div>
 
@@ -236,19 +240,19 @@ export default function AdminCommunitiesPage() {
             <p className="font-body text-sm text-muted-foreground">No communities found</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-popover">
-                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Community</th>
-                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Type</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Members</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Messages</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Status</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Created</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border bg-popover">
+                <TableHead className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Community</TableHead>
+                <TableHead className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Type</TableHead>
+                <TableHead className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Members</TableHead>
+                <TableHead className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Messages</TableHead>
+                <TableHead className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Status</TableHead>
+                <TableHead className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Created</TableHead>
+                <TableHead className="px-4 py-2.5" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((c, i) => (
                 <CommunityRow
                   key={c.id}
@@ -257,8 +261,8 @@ export default function AdminCommunitiesPage() {
                   onClick={() => router.push(`/admin/communities/${c.id}`)}
                 />
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -280,20 +284,20 @@ export default function AdminCommunitiesPage() {
               </p>
             )}
             <div className="flex gap-2">
-              <button
+              <Button variant="outline"
                 onClick={() => { setShowResetConfirm(false); setResetError(null); }}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleResetAllChat}
                 disabled={resetLoading}
-                className="modal-btn modal-btn-danger flex-1"
+                className="flex-1"
               >
                 {resetLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete all
-              </button>
+              </Button>
             </div>
           </div>
         </div>

@@ -1,4 +1,9 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/shadcn/native-select";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Play, Square, RefreshCw, Users, Gauge, ChevronDown, ChevronRight, Eye, EyeOff } from "lucide-react";
@@ -167,7 +172,7 @@ export default function LoadTestPage() {
           {/* Tabs */}
           <div className="flex gap-1 rounded-lg bg-popover p-1">
             {(["test", "seed"] as const).map((t) => (
-              <button
+              <Button variant="ghost"
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-body text-xs transition-colors ${
@@ -178,7 +183,7 @@ export default function LoadTestPage() {
               >
                 {t === "test" ? <Gauge strokeWidth={2.5} size={13} /> : <Users strokeWidth={2.5} size={13} />}
                 {t === "test" ? "Run Test" : "Seed Users"}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -187,19 +192,19 @@ export default function LoadTestPage() {
             <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
               {/* Scenario picker */}
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   Scenario
-                </label>
+                </Label>
                 <div className="relative">
-                  <select
+                  <NativeSelect
                     value={scenario}
                     onChange={(e) => setScenario(e.target.value)}
-                    className="field w-full pr-7"
+                    className="w-full pr-7"
                   >
                     {SCENARIOS.map((s) => (
-                      <option key={s.value} value={s.value}>{s.label}</option>
+                      <NativeSelectOption key={s.value} value={s.value}>{s.label}</NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                   <ChevronDown strokeWidth={2.5} size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-muted-foreground" />
                 </div>
                 <p className="font-body text-[11px] text-muted-foreground">
@@ -226,16 +231,16 @@ export default function LoadTestPage() {
               {/* Concurrent VUs — only shown for chat_concurrent */}
               {scenario === "chat_concurrent" && (
                 <div className="flex flex-col gap-1">
-                  <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Concurrent VUs
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     type="number"
                     min={1}
                     max={500}
                     value={concurrentVus}
                     onChange={(e) => setConcurrentVus(Number(e.target.value))}
-                    className="field w-full" />
+                    className="w-full" />
                 </div>
               )}
 
@@ -243,30 +248,30 @@ export default function LoadTestPage() {
               {scenario === "chat_flood" && (
                 <>
                   <div className="flex flex-col gap-1">
-                    <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                       Flood VUs
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="number"
                       min={1}
                       max={500}
                       value={floodVus}
                       onChange={(e) => setFloodVus(Number(e.target.value))}
-                      className="field w-full" />
+                      className="w-full" />
                     <p className="font-body text-[11px] text-muted-foreground">
                       500 VUs × 2s sleep ≈ 250 msg/s · ~45k msgs in 3 min
                     </p>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                    <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                       Duration
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       type="text"
                       value={floodDuration}
                       onChange={(e) => setFloodDuration(e.target.value)}
                       placeholder="e.g. 3m, 10m, 1h"
-                      className="field w-full" />
+                      className="w-full" />
                   </div>
                 </>
               )}
@@ -340,16 +345,16 @@ export default function LoadTestPage() {
               />
 
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   User Count
-                </label>
-                <input
+                </Label>
+                <Input
                   type="number"
                   min={1}
                   max={1000}
                   value={userCount}
                   onChange={(e) => setUserCount(Number(e.target.value))}
-                  className="field w-full" />
+                  className="w-full" />
               </div>
 
               <RunButton running={isRunning} onClick={runSeed} onStop={stop} label="Seed Users" />
@@ -370,25 +375,25 @@ export default function LoadTestPage() {
             </span>
             <div className="flex items-center gap-2">
               {!autoScroll && lines.length > 0 && (
-                <button
+                <Button variant="ghost"
                   onClick={() => {
                     setAutoScroll(true);
                     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
                   }}
-                  className="font-body text-[11px] text-primary hover:underline flex items-center gap-1"
+                  className="hover:underline flex items-center gap-1"
                 >
                   <ChevronRight strokeWidth={2.5} size={11} className="rotate-90" />
                   Jump to bottom
-                </button>
+                </Button>
               )}
               {lines.length > 0 && (
-                <button
+                <Button variant="ghost"
                   onClick={() => setLines([])}
-                  className="font-body text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                  className="flex items-center gap-1"
                 >
                   <RefreshCw strokeWidth={2.5} size={11} />
                   Clear
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -430,15 +435,15 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
         {label}
-      </label>
-      <input
+      </Label>
+      <Input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="field w-full" />
+        className="w-full" />
     </div>
   );
 }
@@ -451,25 +456,25 @@ function PasswordField({
   const [show, setShow] = useState(false);
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
         {label}
-      </label>
+      </Label>
       <div className="relative">
-        <input
+        <Input
           type={show ? "text" : "password"}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="field w-full pr-8"
+          className="w-full pr-8"
         />
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
+          className="absolute right-2.5 top-2"
           tabIndex={-1}
         >
           {show ? <EyeOff strokeWidth={2.5} size={12} /> : <Eye strokeWidth={2.5} size={12} />}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -481,21 +486,21 @@ function RunButton({
   running: boolean; onClick: () => void; onStop: () => void; label: string;
 }) {
   return running ? (
-    <button
+    <Button variant="destructive"
       onClick={onStop}
-      className="flex items-center justify-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 font-body text-xs font-medium text-red-400 transition hover:bg-red-500/20"
+      className="flex items-center justify-center gap-2 px-4 py-2.5 transition"
     >
       <Square strokeWidth={2.5} size={12} />
       Stop
-    </button>
+    </Button>
   ) : (
-    <button
+    <Button variant="default"
       onClick={onClick}
-      className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-body text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+      className="flex items-center justify-center gap-2 px-4 py-2.5 transition disabled:opacity-50"
     >
       <Play strokeWidth={2.5} size={12} />
       {label}
-    </button>
+    </Button>
   );
 }
 

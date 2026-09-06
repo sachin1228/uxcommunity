@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -229,13 +231,13 @@ export function NotificationBell({ userId }: Props) {
 
   return (
     <div className="relative">
-      <button
+      <Button variant="outline" size="icon"
         ref={triggerRef}
         type="button"
         aria-label={hasUnread ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-muted-foreground hover:bg-popover hover:text-foreground"
+        className="relative flex h-8 w-8 items-center justify-center transition-colors"
       >
         <Bell size={15} strokeWidth={2.5} />
           {hasUnread && (
@@ -243,7 +245,7 @@ export function NotificationBell({ userId }: Props) {
             {visibleCount}
           </span>
         )}
-      </button>
+      </Button>
 
       <DropdownMenu
         triggerRef={triggerRef}
@@ -259,15 +261,15 @@ export function NotificationBell({ userId }: Props) {
               {hasUnread ? `${unreadCount} unread` : "All caught up"}
             </p>
           </div>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={markAllRead}
             disabled={!hasUnread}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-body text-[11px] text-muted-foreground hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-2 py-1 disabled:opacity-40"
           >
             <CheckCheck strokeWidth={2.5} size={13} />
             Mark read
-          </button>
+          </Button>
         </div>
 
         <div className="max-h-[420px] overflow-y-auto">

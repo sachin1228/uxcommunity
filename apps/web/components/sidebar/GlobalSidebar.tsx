@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
@@ -153,14 +155,14 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             </Link>
           </li>
           <li>
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="flex w-full cursor-pointer items-center gap-[11px] rounded-lg px-[11px] py-[7px] text-left font-body text-sm font-normal text-muted-foreground transition-colors hover:text-foreground hover:bg-popover"
+              className="flex w-full cursor-pointer items-center gap-[11px] px-[11px] py-[7px] text-left font-normal transition-colors"
             >
               <Plus strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Start a community</span>
-            </button>
+            </Button>
           </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
@@ -192,15 +194,15 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={11} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <div className="px-4 py-6 text-center">
               <MessageSquare
@@ -216,15 +218,15 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={11} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <ul className="flex flex-col gap-[3px] px-[13px]">
               {sorted.map((c) => (

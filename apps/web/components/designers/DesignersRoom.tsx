@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
@@ -270,13 +272,13 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {error && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-4 bg-background px-6 text-center">
           <p className="font-body text-sm text-foreground">{error}</p>
-          <button
+          <Button variant="default"
             type="button"
             onClick={leave}
-            className="rounded-lg bg-primary px-4 py-2 font-body text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+            className="px-4 py-2 transition-opacity hover:opacity-90"
           >
             Back to dashboard
-          </button>
+          </Button>
         </div>
       )}
 
@@ -294,7 +296,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
           <span className="hidden rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs font-medium text-foreground backdrop-blur md:block">
             Bella Park
           </span>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={toggleMic}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
@@ -314,8 +316,8 @@ export function DesignersRoomView({ userId, userName }: Props) {
             }
           >
             {micState === "on" ? <Mic strokeWidth={2.5} size={17} /> : <MicOff strokeWidth={2.5} size={17} />}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             onClick={toggleMute}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
@@ -325,7 +327,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             title={muted ? "Unmute voice" : "Mute voice"}
           >
             {muted ? <VolumeX strokeWidth={2.5} size={17} /> : <Volume2 strokeWidth={2.5} size={17} />}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -349,14 +351,14 @@ export function DesignersRoomView({ userId, userName }: Props) {
               This is a live room with real people. Walk up to someone to hear them—no microphone is
               needed to listen.
             </p>
-            <button
+            <Button variant="default"
               type="button"
               onClick={enterPark}
-              className="modal-btn modal-btn-primary mt-6"
+              className="mt-6"
               autoFocus
             >
               Enter Bella Park
-            </button>
+            </Button>
           </div>
         </div>
       )}

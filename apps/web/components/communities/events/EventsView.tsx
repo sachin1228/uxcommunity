@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, CalendarCheck2, CalendarX2, Plus } from "lucide-react";
@@ -186,7 +188,7 @@ export function EventsView({
             ].map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Button variant="ghost"
                   key={item.value}
                   type="button"
                   onClick={() => setFilter(item.value)}
@@ -195,7 +197,7 @@ export function EventsView({
                 >
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label} ({item.count})
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -204,7 +206,7 @@ export function EventsView({
         {error && (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="font-body text-sm text-red-400">{error}</p>
-            <button type="button" onClick={() => void fetchEvents()} className="font-body text-xs text-red-300 underline">Try again</button>
+            <Button variant="ghost" type="button" onClick={() => void fetchEvents()} className="underline">Try again</Button>
           </div>
         )}
 
@@ -250,9 +252,9 @@ export function EventsView({
             })}
             {nextCursor && (
               <div className="flex justify-center py-6">
-                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-popover disabled:opacity-60">
+                <Button variant="outline" type="button" onClick={() => void loadMore()} disabled={loadingMore} className="px-4 py-2 disabled:opacity-60">
                   {loadingMore ? "Loading…" : "Load more"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

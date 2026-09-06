@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useCallback } from "react";
 import { Reply, Copy } from "lucide-react";
@@ -160,7 +162,7 @@ export function MessageActionSlider({
             {REACTIONS.map(({ emoji, label, bg, activeBg }) => {
               const isActive = myEmoji === emoji;
               return (
-                <button
+                <Button variant="ghost"
                   key={label}
                   onClick={() => handleReaction(emoji)}
                   className={`${isActive ? activeBg : bg} w-12 h-12 rounded-full flex items-center justify-center shadow-lg
@@ -169,7 +171,7 @@ export function MessageActionSlider({
                   aria-label={`${isActive ? "Remove" : "Add"} ${label} reaction`}
                 >
                   <AnimatedEmoji emoji={emoji} size={28} />
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -177,8 +179,8 @@ export function MessageActionSlider({
           {/* Action rows */}
           <div className="mx-4 mb-4 rounded-2xl bg-white/[0.06] overflow-hidden divide-y divide-white/[0.06]">
             {/* Reply */}
-            <button
-              className="w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-white/[0.05] active:bg-white/10 transition-colors"
+            <Button variant="ghost"
+              className="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-white/10 transition-colors"
               onClick={() => {
                 if (message) onReply(message);
                 onClose();
@@ -186,11 +188,11 @@ export function MessageActionSlider({
             >
               <Reply strokeWidth={2.5} size={18} className="text-muted-foreground shrink-0" />
               <span className="font-body text-sm text-foreground">Reply</span>
-            </button>
+            </Button>
 
             {/* Copy */}
-            <button
-              className="w-full flex items-center gap-3 px-4 py-4 text-left hover:bg-white/[0.05] active:bg-white/10 transition-colors"
+            <Button variant="ghost"
+              className="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-white/10 transition-colors"
               onClick={() => {
                 if (message) onCopy(message);
                 onClose();
@@ -198,7 +200,7 @@ export function MessageActionSlider({
             >
               <Copy strokeWidth={2.5} size={18} className="text-muted-foreground shrink-0" />
               <span className="font-body text-sm text-foreground">Copy</span>
-            </button>
+            </Button>
           </div>
 
           {/* Safe-area spacer for mobile */}

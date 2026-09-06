@@ -1,4 +1,9 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useMemo, useRef, useState } from "react";
 import {
@@ -76,21 +81,21 @@ function RuleRow({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <input
+      <Input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Add a community rule"
         maxLength={160}
-        className="field min-w-0 flex-1"
+        className="min-w-0 flex-1"
       />
-      <button
+      <Button variant="outline" size="icon"
         type="button"
         onClick={onRemove}
-        className="h-9 w-9 shrink-0 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
+        className="h-9 w-9 shrink-0 transition-colors"
         aria-label="Remove rule"
       >
         <X strokeWidth={2.5} size={14} className="mx-auto" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -199,29 +204,29 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
               : "Members can discover and join your new public community."}
           </p>
           <div className="mt-5 flex items-center gap-2 rounded-lg border border-border bg-popover p-2">
-            <input
+            <Input
               readOnly
               value={created.invite_url}
-              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-xs text-muted-foreground outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-muted-foreground outline-none"
             />
-            <button
+            <Button variant="default"
               type="button"
               onClick={() => navigator.clipboard.writeText(created.invite_url).catch(() => {})}
-              className="rounded-md bg-primary px-3 py-2 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"
+              className="px-3 py-2 transition-colors"
             >
               Copy
-            </button>
+            </Button>
           </div>
-          <button
+          <Button variant="default"
             type="button"
             onClick={() => {
               onCreated(created);
               handleClose();
             }}
-            className="modal-btn modal-btn-primary mt-6 w-full"
+            className="mt-6 w-full"
           >
             Open Community
-          </button>
+          </Button>
         </div>
       ) : (
         <>
@@ -229,15 +234,15 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
           {step === 1 && (
             <div className="space-y-5">
               <div>
-                <label className="mb-2 block font-body text-xs font-medium text-foreground">
+                <Label className="mb-2 block font-body text-xs font-medium text-foreground">
                   Community Name <span className="text-primary">*</span>
-                </label>
-                <input
+                </Label>
+                <Input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   maxLength={80}
                   placeholder="e.g. Design Systems"
-                  className="field w-full"
+                  className="w-full"
                 />
               </div>
               <div className="grid gap-2">
@@ -247,7 +252,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 ] as const).map(([value, Icon, label, copy]) => {
                   const active = privacy === value;
                   return (
-                    <button
+                    <Button variant="ghost"
                       key={value}
                       type="button"
                       onClick={() => setPrivacy(value)}
@@ -260,7 +265,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                         <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
                         <span className="block font-body text-xs text-muted-foreground">{copy}</span>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -276,7 +281,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 {FEATURE_OPTIONS.map(({ id, label, description: copy, icon: Icon, required }) => {
                   const active = tabs.includes(id);
                   return (
-                    <button
+                    <Button variant="ghost"
                       key={id}
                       type="button"
                       onClick={() => toggleTab(id)}
@@ -300,7 +305,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                           Required
                         </span>
                       )}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -310,10 +315,10 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
           {step === 3 && (
             <div className="space-y-5">
               <div className="flex items-center gap-3">
-                <button
+                <Button variant="outline" size="icon"
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-popover text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                  className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden transition-colors"
                   aria-label="Choose community picture"
                 >
                   {imagePreview ? (
@@ -321,7 +326,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   ) : (
                     <ImagePlus strokeWidth={2.5} size={20} />
                   )}
-                </button>
+                </Button>
                 <div className="min-w-0">
                   <p className="font-body text-sm font-semibold text-foreground">Community picture</p>
                   <p className="font-body text-xs text-muted-foreground">JPEG, PNG, or WebP under 10 MB.</p>
@@ -335,27 +340,27 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 />
               </div>
               <div>
-                <label className="mb-2 block font-body text-xs font-medium text-foreground">Description</label>
-                <textarea
+                <Label className="mb-2 block font-body text-xs font-medium text-foreground">Description</Label>
+                <Textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   maxLength={500}
                   rows={3}
                   placeholder="What should members use this community for?"
-                  className="field w-full resize-none"
+                  className="w-full resize-none"
                 />
               </div>
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="font-body text-xs font-medium text-foreground">Starter rules</label>
-                  <button
+                  <Label className="font-body text-xs font-medium text-foreground">Starter rules</Label>
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => setRules((prev) => [...prev, ""])}
                     disabled={rules.length >= 8}
-                    className="inline-flex items-center gap-1 font-body text-xs text-primary disabled:opacity-50"
+                    className="inline-flex items-center gap-1 disabled:opacity-50"
                   >
                     <Plus strokeWidth={2.5} size={12} /> Add rule
-                  </button>
+                  </Button>
                 </div>
                 <div className="space-y-2">
                   {rules.map((rule, index) => (
@@ -378,33 +383,33 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
           )}
 
           <div className="mt-7 flex items-center justify-between gap-3">
-            <button
+            <Button variant="outline"
               type="button"
               onClick={step === 1 ? handleClose : () => setStep((prev) => prev - 1)}
               disabled={submitting}
-              className="modal-btn modal-btn-secondary"
+              className=""
             >
               {step === 1 ? "Cancel" : "Back"}
-            </button>
+            </Button>
             {step < 3 ? (
-              <button
+              <Button variant="default"
                 type="button"
                 onClick={() => setStep((prev) => prev + 1)}
                 disabled={!canContinue}
-                className="modal-btn modal-btn-primary"
+                className=""
               >
                 Continue
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button variant="default"
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canContinue || submitting}
-                className="modal-btn modal-btn-primary"
+                className=""
               >
                 {submitting && <Spinner size={14} className="text-primary-foreground" />}
                 {submitting ? "Creating..." : "Create Community"}
-              </button>
+              </Button>
             )}
           </div>
         </>

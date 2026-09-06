@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Bookmark, Flag, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
@@ -61,7 +63,7 @@ export function EventOptionsMenu({
         event.stopPropagation();
       }}
     >
-      <button
+      <Button variant="ghost" size="icon"
         type="button"
         onClick={(event) => {
           event.preventDefault();
@@ -70,34 +72,34 @@ export function EventOptionsMenu({
         }}
         aria-label="Event options"
         aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
+        className="flex h-8 w-8 items-center justify-center transition-colors"
       >
         <MoreHorizontal strokeWidth={2.5} size={16} />
-      </button>
+      </Button>
       {open && (
         <div className="absolute right-0 top-9 z-30 min-w-[150px] rounded-lg border border-border bg-card py-1 shadow-lg">
-          <button type="button" onClick={() => run(onSave)} disabled={saving} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50">
+          <Button variant="ghost" type="button" onClick={() => run(onSave)} disabled={saving} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 disabled:opacity-50">
             <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
             {saving ? "Saving…" : saved ? "Unsave" : "Save"}
-          </button>
-          <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
+          </Button>
+          <Button variant="ghost" type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2">
             <Share2 strokeWidth={2.5} size={12} /> {shared ? "Copied!" : "Share"}
-          </button>
+          </Button>
           {isOwner && !past && onEdit && onDelete && (
             <>
-              <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
+              <Button variant="ghost" type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-2">
                 <Pencil strokeWidth={2.5} size={12} /> Edit
-              </button>
-              <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50">
+              </Button>
+              <Button variant="ghost" type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-2 disabled:opacity-50">
                 {deleting ? <Spinner size={12} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 {deleting ? "Deleting…" : "Delete"}
-              </button>
+              </Button>
             </>
           )}
           {onReport && (
-            <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50">
+            <Button variant="ghost" type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-2 disabled:opacity-50">
               <Flag strokeWidth={2.5} size={12} /> {reported ? "Reported" : "Report"}
-            </button>
+            </Button>
           )}
         </div>
       )}

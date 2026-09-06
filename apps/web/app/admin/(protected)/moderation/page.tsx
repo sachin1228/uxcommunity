@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, ShieldAlert, Trash2 } from "lucide-react";
@@ -90,7 +93,7 @@ export default function ModerationPage() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         {TABS.map((tab) => (
-          <button
+          <Button variant="ghost"
             key={tab.value}
             onClick={() => selectStatus(tab.value)}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${
@@ -101,7 +104,7 @@ export default function ModerationPage() {
           >
             <p className="font-body text-xs text-muted-foreground">{tab.label}</p>
             <p className="mt-1 font-mono text-2xl text-foreground">{counts[tab.value]}</p>
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -115,28 +118,28 @@ export default function ModerationPage() {
             <p className="font-body text-sm text-muted-foreground">No moderation events found.</p>
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-popover">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border bg-popover">
                 {["Content", "User", "Decision", "Rules", "Time", "Actions"].map((heading, index) => (
-                  <th key={heading} className={`px-4 py-2.5 font-body text-[11px] font-medium text-muted-foreground ${index === 5 ? "text-right" : "text-left"}`}>
+                  <TableHead key={heading} className={`px-4 py-2.5 font-body text-[11px] font-medium text-muted-foreground ${index === 5 ? "text-right" : "text-left"}`}>
                     {heading}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {events.map((event, index) => (
-                <tr key={event.id} className={`${index < events.length - 1 ? "border-b border-border" : ""} align-top`}>
-                  <td className="px-4 py-3">
+                <TableRow key={event.id} className={`${index < events.length - 1 ? "border-b border-border" : ""} align-top`}>
+                  <TableCell className="px-4 py-3">
                     <p className="font-body text-xs font-medium text-foreground">{event.content_type.replaceAll("_", " ")}</p>
                     <p className="mt-1 font-mono text-[10px] text-muted-foreground">{event.content_ref_id ?? event.id}</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <p className="font-body text-xs text-foreground">{event.users?.name ?? "Unknown"}</p>
                     <p className="font-body text-[11px] text-muted-foreground">{event.users?.email ?? "No account"}</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] ${
                       event.status === "approved" ? "bg-green-500/10 text-green-400" : event.status === "review" ? "bg-yellow-500/10 text-yellow-400" : "bg-red-500/10 text-red-400"
                     }`}>
@@ -144,8 +147,8 @@ export default function ModerationPage() {
                     </span>
                     <p className="mt-1 font-body text-[11px] text-muted-foreground">{event.reason || "No reason"}</p>
                     <p className="font-mono text-[10px] text-muted-foreground">{event.provider} · {Math.round(event.confidence * 100)}%</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <div className="flex max-w-sm flex-wrap gap-1">
                       {(event.triggered_rules ?? []).slice(0, 4).map((rule, ruleIndex) => (
                         <span key={`${event.id}-${ruleIndex}`} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
@@ -153,37 +156,37 @@ export default function ModerationPage() {
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <p className="font-mono text-[10px] text-muted-foreground">{new Date(event.created_at).toLocaleString()}</p>
                     <p className="font-mono text-[10px] text-muted-foreground">{event.duration_ms} ms</p>
-                  </td>
-                  <td className="px-4 py-3">
+                  </TableCell>
+                  <TableCell className="px-4 py-3">
                     <div className="flex justify-end gap-1.5">
                       {event.status !== "approved" && (
-                        <button onClick={() => updateEvent(event.id, { status: "approved" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-muted-foreground hover:text-foreground">
+                        <Button variant="outline" onClick={() => updateEvent(event.id, { status: "approved" })} className="px-2 py-1">
                           Approve
-                        </button>
+                        </Button>
                       )}
                       {event.status !== "rejected" && (
-                        <button onClick={() => updateEvent(event.id, { status: "rejected" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-muted-foreground hover:text-foreground">
+                        <Button variant="outline" onClick={() => updateEvent(event.id, { status: "rejected" })} className="px-2 py-1">
                           Reject
-                        </button>
+                        </Button>
                       )}
                       {event.user_id && (
-                        <button title="Permanent ban" onClick={() => updateEvent(event.id, { ban_user: true, moderator_notes: "Permanent ban from moderation queue." })} className="rounded-md border border-border p-1.5 text-muted-foreground hover:text-red-400">
+                        <Button variant="outline" title="Permanent ban" onClick={() => updateEvent(event.id, { ban_user: true, moderator_notes: "Permanent ban from moderation queue." })} className="p-1.5">
                           <ShieldAlert strokeWidth={2.5} size={14} />
-                        </button>
+                        </Button>
                       )}
-                      <button title="Delete event" onClick={() => deleteEvent(event.id)} className="rounded-md border border-border p-1.5 text-muted-foreground hover:text-red-400">
+                      <Button variant="outline" title="Delete event" onClick={() => deleteEvent(event.id)} className="p-1.5">
                         <Trash2 strokeWidth={2.5} size={14} />
-                      </button>
+                      </Button>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
@@ -191,12 +194,12 @@ export default function ModerationPage() {
         <div className="flex items-center justify-between">
           <p className="font-body text-xs text-muted-foreground">Page {page} of {totalPages}</p>
           <div className="flex gap-1.5">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground disabled:opacity-40">
+            <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 px-2.5 py-1.5 disabled:opacity-40">
               <ChevronLeft strokeWidth={2.5} size={13} /> Prev
-            </button>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground disabled:opacity-40">
+            </Button>
+            <Button variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 px-2.5 py-1.5 disabled:opacity-40">
               Next <ChevronRight strokeWidth={2.5} size={13} />
-            </button>
+            </Button>
           </div>
         </div>
       )}

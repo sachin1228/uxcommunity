@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import {
   Camera, Mail, Calendar,
@@ -50,13 +54,13 @@ export function ProfileCard({
               </div>
             )}
           </div>
-          <button
+          <Button variant="outline"
             onClick={onOpenAvatarPicker}
-            className="flex items-center gap-1 rounded-full border border-border bg-popover px-2.5 py-1 font-body text-[10px] text-muted-foreground hover:text-primary hover:border-primary/40 transition-all whitespace-nowrap"
+            className="flex items-center gap-1 px-2.5 py-1 transition-all whitespace-nowrap"
           >
             <Camera strokeWidth={2.5} size={9} />
             Change photo
-          </button>
+          </Button>
         </div>
 
         {/* Name / email / since — all read-only */}
@@ -88,10 +92,10 @@ export function ProfileCard({
         {/* LinkedIn + Portfolio */}
         <div className="flex flex-col justify-center gap-3 px-5 py-4 w-64 shrink-0">
           <div>
-            <label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1">
+            <Label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1">
               <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
-            </label>
-            <input
+            </Label>
+            <Input
               type="url"
               value={linkedin}
               onChange={(e) => onLinkedinChange(e.target.value)}
@@ -100,10 +104,10 @@ export function ProfileCard({
             />
           </div>
           <div>
-            <label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1">
+            <Label className="font-body text-[10px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 mb-1">
               <Globe strokeWidth={2.5} size={9} /> Portfolio
-            </label>
-            <input
+            </Label>
+            <Input
               type="url"
               value={portfolio}
               onChange={(e) => onPortfolioChange(e.target.value)}

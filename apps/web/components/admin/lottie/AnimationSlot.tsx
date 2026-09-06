@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useRef, useState } from "react";
 import { Clapperboard, Upload, Trash2, Film } from "lucide-react";
@@ -53,14 +55,14 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
 
       <div className="flex items-center gap-1.5 shrink-0">
         {setting && (
-          <button
+          <Button variant="destructive" size="icon"
             onClick={handleDelete}
             disabled={deleting || uploading}
             title="Remove animation"
-            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
+            className="h-7 w-7 flex items-center justify-center transition-colors disabled:opacity-40"
           >
             {deleting ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={13} />}
-          </button>
+          </Button>
         )}
         <input
           ref={fileRef}
@@ -72,14 +74,14 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
             if (file) { onUpload(file); e.target.value = ""; }
           }}
         />
-        <button
+        <Button variant="outline"
           onClick={() => fileRef.current?.click()}
           disabled={uploading || deleting}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 transition-colors disabled:opacity-40"
         >
           {uploading ? <Spinner className="h-3 w-3" /> : <Upload strokeWidth={2.5} size={12} />}
           {setting ? "Replace" : "Upload"}
-        </button>
+        </Button>
       </div>
     </div>
   );

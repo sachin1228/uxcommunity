@@ -1,4 +1,8 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -71,53 +75,53 @@ export function SignupStep1({
 
         <div className="flex flex-col gap-1.5">
           <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1.5">
+            <Label className="flex flex-col gap-1.5">
               <span className="font-body text-xs font-medium text-foreground">
                 Name <span className="text-red-400">*</span>
               </span>
-              <input type="text" value={state.first_name}
+              <Input type="text" value={state.first_name}
                 onChange={(e) => onChange({ first_name: e.target.value })}
                 placeholder="Enter your name" className={inputClass} autoComplete="given-name" required />
               <FieldError errors={fieldErrors} field="first_name" />
-            </label>
-            <label className="flex flex-col gap-1.5">
+            </Label>
+            <Label className="flex flex-col gap-1.5">
               <span className="font-body text-xs font-medium text-foreground">
                 Surname <span className="text-red-400">*</span>
               </span>
-              <input type="text" value={state.last_name}
+              <Input type="text" value={state.last_name}
                 onChange={(e) => onChange({ last_name: e.target.value })}
                 placeholder="Enter your surname" className={inputClass} autoComplete="family-name" required />
               <FieldError errors={fieldErrors} field="last_name" />
-            </label>
+            </Label>
           </div>
           {/* Server-side validation runs on the combined name built from both parts. */}
           <FieldError errors={fieldErrors} field="name" />
         </div>
 
-        <label className="flex flex-col gap-1.5">
+        <Label className="flex flex-col gap-1.5">
           <span className="font-body text-xs font-medium text-foreground">
             Email <span className="text-red-400">*</span>
           </span>
-          <input type="email" value={state.email}
+          <Input type="email" value={state.email}
             onChange={(e) => onChange({ email: e.target.value })}
             placeholder="you@gmail.com" className={inputClass} autoComplete="username" required />
           <FieldError errors={fieldErrors} field="email" />
-        </label>
+        </Label>
 
         <div className="flex flex-col gap-1.5">
           <span className="font-body text-xs font-medium text-foreground">
             Password <span className="text-red-400">*</span>
           </span>
           <div className="relative">
-            <input type={showPassword ? "text" : "password"} value={state.password}
+            <Input type={showPassword ? "text" : "password"} value={state.password}
               onChange={(e) => onChange({ password: e.target.value })}
               placeholder="Min 8 chars, 1 number"
               className={inputClass} autoComplete="new-password" required />
-            <button type="button" tabIndex={-1}
+            <Button variant="ghost" type="button" tabIndex={-1}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center transition-colors">
               {showPassword ? <EyeOff /> : <EyeOpen />}
-            </button>
+            </Button>
           </div>
           <FieldError errors={fieldErrors} field="password" />
         </div>
@@ -127,23 +131,23 @@ export function SignupStep1({
             Confirm Password <span className="text-red-400">*</span>
           </span>
           <div className="relative">
-            <input type={showConfirm ? "text" : "password"} value={state.confirm_password}
+            <Input type={showConfirm ? "text" : "password"} value={state.confirm_password}
               onChange={(e) => onChange({ confirm_password: e.target.value })}
               placeholder="••••••••" className={inputClass} autoComplete="new-password" required />
-            <button type="button" tabIndex={-1}
+            <Button variant="ghost" type="button" tabIndex={-1}
               onClick={() => setShowConfirm((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center transition-colors">
               {showConfirm ? <EyeOff /> : <EyeOpen />}
-            </button>
+            </Button>
           </div>
           <FieldError errors={fieldErrors} field="confirm_password" />
         </div>
 
-        <button type="submit" disabled={loading}
-          className="mt-2 flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed">
+        <Button variant="default" type="submit" disabled={loading}
+          className="mt-2 flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
           {loading && <Spinner className="h-4 w-4 text-white" />}
           {loading ? "Creating account…" : "Continue →"}
-        </button>
+        </Button>
       </form>
     </div>
   );

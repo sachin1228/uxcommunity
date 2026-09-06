@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, Trash2 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
+import { useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/shadcn/alert-dialog";
+import { Button } from "@/components/ui/shadcn/button";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface ConfirmDialogProps {
@@ -15,63 +16,50 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
 }
 
-/**
- * Reusable destructive-action confirmation modal. Replaces the browser's
- * native `confirm()` — Escape, backdrop click and the Cancel button all
- * dismiss it; the confirm button shows a spinner while the action runs.
- */
-export function ConfirmDialog({
-  open,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  confirmLabel = "Delete",
-}: ConfirmDialogProps) {
+/** Keeps the confirmation open until the asynchronous action succeeds. */
+export function ConfirmDialog({ open, onClose, onConfirm, title, message, confirmLabel = "Delete" }: ConfirmDialogProps) {
   const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const previousFocus = useRef<HTMLElement | null>(null);
 
   async function handleConfirm() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setPending(true);
+    setError(null);
     try {
       await onConfirm();
       onClose();
+    } catch {
+      setError("The action could not be completed. Please try again.");
     } finally {
+      inFlight.current = false;
       setPending(false);
     }
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={pending ? () => undefined : onClose}
-      title={title}
-      maxWidth="max-w-sm"
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
-          <AlertTriangle strokeWidth={2.5} size={18} />
-        </div>
-        <p className="font-body text-sm leading-6 text-muted-foreground">{message}</p>
-      </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={pending}
-          className="modal-btn modal-btn-secondary"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => void handleConfirm()}
-          disabled={pending}
-          className="modal-btn modal-btn-danger"
-        >
-          {pending ? <Spinner size={14} /> : <Trash2 strokeWidth={2.5} size={14} />}
-          {pending ? "Deleting…" : confirmLabel}
-        </button>
-      </div>
-    </Modal>
+    <AlertDialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !inFlight.current) onClose(); }}>
+      <AlertDialogContent
+        className="w-[calc(100%-2rem)] max-w-sm rounded-lg"
+        onOpenAutoFocus={() => { setError(null); previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+        onCloseAutoFocus={(event) => { if (previousFocus.current?.isConnected) { event.preventDefault(); previousFocus.current.focus(); } }}
+        onEscapeKeyDown={(event) => { if (inFlight.current) event.preventDefault(); }}
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription asChild><div>{message}</div></AlertDialogDescription>
+        </AlertDialogHeader>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
+          <Button type="button" variant="destructive" onClick={() => void handleConfirm()} disabled={pending} aria-busy={pending}>
+            {pending ? <Spinner size={14} /> : <Trash2 data-icon="inline-start" />}
+            {pending ? "Working…" : confirmLabel}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { AtSign, Loader2 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
@@ -86,7 +88,7 @@ export function MentionSuggestions({
           options.map((option, index) => {
             const active = index === activeIndex;
             return (
-              <button
+              <Button variant="ghost"
                 key={option.user_id}
                 type="button"
                 role="option"
@@ -109,7 +111,7 @@ export function MentionSuggestions({
                     {option.designation}
                   </span>
                 )}
-              </button>
+              </Button>
             );
           })
         )}

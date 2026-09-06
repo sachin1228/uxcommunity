@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -63,10 +65,10 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
         <span className="font-body text-xs text-muted-foreground">Interactive prototype</span>
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={toggleFullscreen}
-          className="inline-flex min-h-8 items-center gap-1.5 font-body text-xs font-medium text-primary hover:text-primary"
+          className="inline-flex min-h-8 items-center gap-1.5"
           aria-label={isFullscreen ? "Exit full screen" : "View prototype in full screen"}
         >
           {isFullscreen ? (
@@ -78,7 +80,7 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
               View full screen <Maximize2 strokeWidth={2.5} size={12} />
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

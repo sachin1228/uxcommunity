@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
@@ -96,7 +98,7 @@ function ReactionPills({
       {reactions.map(({ emoji, user_ids }) => {
         const iMine = user_ids.includes(currentUserId);
         return (
-          <button
+          <Button variant="ghost"
             key={emoji}
             onClick={(e) => { e.stopPropagation(); onReaction(msgId, emoji); }}
             title={iMine ? "Remove reaction" : undefined}
@@ -111,7 +113,7 @@ function ReactionPills({
             {user_ids.length > 1 && (
               <span className="text-[10px] opacity-70">{user_ids.length}</span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -179,13 +181,13 @@ function BubbleImage({
         <div className="absolute inset-0 flex items-center justify-center rounded-xl">
           <div className="relative w-12 h-12">
             <div className="absolute inset-0 rounded-full border-[3px] border-white/20 border-t-white animate-spin" />
-            <button
+            <Button variant="ghost"
               onClick={(e) => { e.stopPropagation(); onCancel?.(); }}
-              className="absolute inset-0 flex items-center justify-center text-white"
+              className="absolute inset-0 flex items-center justify-center"
               aria-label="Cancel upload"
             >
               <X strokeWidth={2.5} size={14} />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -198,14 +200,14 @@ function BubbleImage({
 function RetryIndicator({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-1 shrink-0 self-center">
-      <button
+      <Button variant="destructive" size="icon"
         onClick={(e) => { e.stopPropagation(); onRetry(); }}
-        className="h-7 w-7 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 active:scale-90 transition-all"
+        className="h-7 w-7 flex items-center justify-center active:scale-90 transition-all"
         aria-label="Retry sending"
         title="Tap to retry"
       >
         <RefreshCw strokeWidth={2.5} size={13} />
-      </button>
+      </Button>
       <span className="font-body text-[9px] text-red-400 leading-none">Retry</span>
     </div>
   );
@@ -245,19 +247,19 @@ function DeleteConfirmDialog({
         </div>
 
         <div className="flex flex-col">
-          <button
+          <Button variant="ghost"
             onClick={(e) => { e.stopPropagation(); onConfirm(); }}
-            className="w-full px-5 py-3.5 font-body text-sm font-semibold text-red-400 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
+            className="w-full px-5 py-3.5 active:bg-white/[0.08] transition-colors text-center"
           >
             Delete for everyone
-          </button>
+          </Button>
           <div className="h-px bg-white/[0.06]" />
-          <button
+          <Button variant="ghost"
             onClick={(e) => { e.stopPropagation(); onCancel(); }}
-            className="w-full px-5 py-3.5 font-body text-sm text-muted-foreground hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
+            className="w-full px-5 py-3.5 active:bg-white/[0.08] transition-colors text-center"
           >
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -368,7 +370,7 @@ function MessageHoverActions({
               {REACTIONS.map(({ emoji, label, bg }) => {
                 const isActive = myEmoji === emoji;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={label}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -387,12 +389,12 @@ function MessageHoverActions({
                     title={label}
                   >
                     <AnimatedEmoji emoji={emoji} size={20} />
-                  </button>
+                  </Button>
                 );
               })}
             </div>
           )}
-          <button
+          <Button variant="ghost"
             onClick={(e) => { e.stopPropagation(); setPickerOpen((v) => !v); }}
             className={`
               w-7 h-7 rounded-full flex items-center justify-center
@@ -406,14 +408,14 @@ function MessageHoverActions({
             title="React"
           >
             <Smile strokeWidth={2.5} size={14} />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Reply, copy, and delete menu */}
       {showMenu && (
       <div className={insideBubble ? "absolute top-1 right-1 z-30" : "relative"}>
-        <button
+        <Button variant="ghost"
           ref={triggerBtnRef}
           onClick={(e) => { e.stopPropagation(); onMenuOpenChange(!menuOpen); }}
           className={`
@@ -439,7 +441,7 @@ function MessageHoverActions({
           title="More actions"
         >
           <MoreHorizontal size={14} strokeWidth={2.5} />
-        </button>
+        </Button>
 
         {/* Portal dropdown — renders at document.body, above all stacking contexts */}
         <DropdownMenu
@@ -448,64 +450,64 @@ function MessageHoverActions({
           onClose={() => onMenuOpenChange(false)}
           align="right"
         >
-          <button
+          <Button variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onReply(msg);
               onMenuOpenChange(false);
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
             role="menuitem"
           >
             <Reply strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
             <span>Reply</span>
-          </button>
+          </Button>
 
           {canCopy && (
-            <button
+            <Button variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 onCopy(msg);
                 onMenuOpenChange(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
               role="menuitem"
             >
               <Copy strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Copy</span>
-            </button>
+            </Button>
           )}
 
           {isMe && canCopy && editAvailable && (
-            <button
+            <Button variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(msg);
                 onMenuOpenChange(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
               role="menuitem"
             >
               <Pencil strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Edit</span>
-            </button>
+            </Button>
           )}
 
           {(isMe || canModerate) && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
-              <button
+              <Button variant="destructive"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteClick();
                   onMenuOpenChange(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                 role="menuitem"
               >
                 <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
                 <span>{isMe ? "Delete" : "Delete for everyone"}</span>
-              </button>
+              </Button>
             </>
           )}
         </DropdownMenu>

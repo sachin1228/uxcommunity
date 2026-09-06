@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -301,7 +303,7 @@ export function ProfileThreads({
       {/* Tab bar */}
       <div className="flex border-b border-border">
         {TABS.map((tab) => (
-          <button
+          <Button variant="ghost"
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-5 py-3.5 font-body text-sm font-medium transition-colors border-b-2 -mb-px ${
@@ -312,7 +314,7 @@ export function ProfileThreads({
           >
             {tab.icon}
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 

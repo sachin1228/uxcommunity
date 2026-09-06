@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
@@ -87,7 +89,7 @@ export function ShowcaseCard({
       <div
         className="mt-3 flex items-center gap-4"
       >
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={(e) => { e.stopPropagation(); toggleLike(); }}
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
@@ -104,7 +106,7 @@ export function ShowcaseCard({
           <span className="font-body text-sm font-semibold text-muted-foreground group-hover/like:text-white">
             {post.like_count}
           </span>
-        </button>
+        </Button>
 
         {post.allow_replies !== false && (
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:text-white">

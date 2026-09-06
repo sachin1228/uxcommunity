@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useCallback } from "react";
 import { MessageSquare, Plus, Search } from "lucide-react";
@@ -50,7 +52,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         />
       )}
 
-      <button
+      <Button variant="ghost"
         onClick={() => router.push("/dashboard/communities")}
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors text-left ${
           pathname === "/dashboard/communities"
@@ -60,7 +62,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
       >
         <Search strokeWidth={2.5} size={13} />
         Explore Communities
-      </button>
+      </Button>
 
       <div className="mx-2 mb-0.5" />
 
@@ -75,15 +77,15 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={12} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <div className="px-4 py-10 text-center">
               <MessageSquare
@@ -93,14 +95,14 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <p className="font-body text-xs text-muted-foreground">
                 No communities yet
               </p>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-1.5 font-body text-xs font-medium text-black transition-colors hover:bg-[#cccccc]"
+                className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-black transition-colors"
               >
                 <Plus strokeWidth={2.5} size={12} />
                 Create Community
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
@@ -109,15 +111,15 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
               <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={12} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <ul className="space-y-0.5">
               {sorted.map((c) => (

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState, useCallback } from "react";
 
@@ -386,14 +388,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
     {hasMore && (
       <div className="flex justify-center border-t border-border py-6">
-        <button
+        <Button variant="outline"
           type="button"
           onClick={() => void loadMore()}
           disabled={loadingMore}
-          className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-popover disabled:opacity-60"
+          className="px-4 py-2 disabled:opacity-60"
         >
           {loadingMore ? "Loading…" : "Load older posts"}
-        </button>
+        </Button>
       </div>
     )}
 

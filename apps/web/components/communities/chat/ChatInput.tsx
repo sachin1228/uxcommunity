@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { forwardRef, useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -301,13 +304,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             <div className="flex-1 min-w-0">
               <p className="font-body text-[11px] text-muted-foreground truncate">Image ready to send</p>
             </div>
-            <button
+            <Button variant="ghost"
               onClick={onImageRemove}
-              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-card"
+              className="shrink-0 transition-colors p-1"
               aria-label="Remove image"
             >
               <X strokeWidth={2.5} size={14} />
-            </button>
+            </Button>
           </div>
         )}
 
@@ -319,13 +322,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               <p className="font-body text-[10px] text-muted-foreground/70 truncate flex-1">
                 {(() => { try { return new URL(linkPreviewUrl!).hostname.replace(/^www\./, ""); } catch { return linkPreviewUrl; } })()}
               </p>
-              <button
+              <Button variant="ghost"
                 onClick={() => setDismissedUrl(linkPreviewUrl!)}
-                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-card"
+                className="shrink-0 transition-colors p-0.5"
                 aria-label="Dismiss link preview"
               >
                 <X strokeWidth={2.5} size={12} />
-              </button>
+              </Button>
             </div>
             <LinkPreview url={linkPreviewUrl!} isMe={false} />
           </div>
@@ -369,13 +372,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     {replyTo.content}
                   </p>
                 </div>
-                <button
+                <Button variant="ghost"
                   onClick={onCancelReply}
-                  className="shrink-0 text-muted-foreground hover:text-foreground transition-colors p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-card"
+                  className="shrink-0 transition-colors p-2"
                   aria-label="Cancel reply"
                 >
                   <X strokeWidth={2.5} size={18} />
-                </button>
+                </Button>
               </div>
             )}
 
@@ -389,7 +392,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             <div className="flex items-end gap-2 py-2">
               {/* Emoji + Image picker buttons */}
               <div className="flex items-center">
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-emoji-toggle
                   onClick={togglePicker}
@@ -403,17 +406,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   aria-expanded={pickerOpen}
                 >
                   <Smile strokeWidth={2.5} size={19} />
-                </button>
+                </Button>
 
-                <button
+                <Button variant="ghost" size="icon"
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={sending}
-                  className="shrink-0 h-9 w-9 flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-card transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-9 w-9 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Attach image"
                 >
                   <ImageIcon strokeWidth={2.5} size={19} />
-                </button>
+                </Button>
               </div>
 
               {/*
@@ -427,7 +430,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               */}
               {/* mb-1.5 = (36px button − 24px line) / 2 → centered when single-line */}
               <div className="flex-1 relative min-w-0 mb-1.5">
-                <textarea
+                <Textarea
                   ref={ref}
                   data-chat-input
                   value={input}
@@ -452,7 +455,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onBlur={onBlur}
                   placeholder={placeholder}
                   rows={1}
-                  className="block w-full resize-none bg-transparent font-body text-[15px] outline-none overflow-y-auto scrollbar-none whitespace-pre-wrap break-words placeholder:text-muted-foreground"
+                  className="block w-full resize-none bg-transparent outline-none overflow-y-auto scrollbar-none whitespace-pre-wrap break-words"
                   style={{
                     lineHeight: "1.5",
                     height: "24px",
@@ -476,10 +479,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               </div>
 
               {canSend && (
-                <button
+                <Button variant="default" size="icon"
                   onClick={() => { closePicker(); onSend(); }}
                   disabled={sending}
-                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white hover:bg-[var(--ds-blue-800)] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
                   title="Send"
                 >
@@ -491,7 +494,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   >
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
                   </svg>
-                </button>
+                </Button>
               )}
             </div>{/* end input row */}
           </div>{/* end outer box */}

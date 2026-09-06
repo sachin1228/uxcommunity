@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
@@ -91,34 +95,34 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
       <div className="modal-panel relative z-10 w-full max-w-md p-5">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
-          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground" aria-label="Close">
+          <Button variant="ghost" size="icon" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
+            <Label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
               {entity} name <span className="text-red-400">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
               ref={modalInputRef}
               autoFocus
               type="text"
               value={addName}
               onChange={(e) => { setAddName(e.target.value); setAddError(null); }}
               placeholder={`e.g. ${entity === "City" ? "Pune" : "SaaS & Software"}`}
-              className="field w-full"
+              className="w-full"
             />
           </div>
 
           {/* Image upload */}
           <div>
-            <label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
+            <Label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
               Logo / Image{" "}
               <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
+            </Label>
             <input
               ref={fileInputRef}
               type="file"
@@ -134,51 +138,51 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                   className="h-16 w-16 rounded-lg object-cover border border-border"
                 />
                 <div className="flex flex-col gap-1.5">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="font-body text-xs text-primary hover:underline text-left"
+                    className="hover:underline text-left"
                   >
                     Change image
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreview(null); }}
-                    className="font-body text-xs text-muted-foreground hover:text-red-400 text-left"
+                    className="text-left"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
-              <button
+              <Button variant="default"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-primary bg-popover hover:bg-primary/5 py-5 transition-colors"
+                className="w-full flex flex-col items-center justify-center gap-2 py-5 transition-colors"
               >
                 <ImagePlus strokeWidth={2.5} size={20} className="text-muted-foreground" />
                 <span className="font-body text-xs text-muted-foreground">Click to upload</span>
                 <span className="font-body text-[10px] text-muted-foreground">
                   PNG, JPG, WebP, SVG · max 5 MB
                 </span>
-              </button>
+              </Button>
             )}
           </div>
 
           {addError && <p className="font-body text-xs text-red-400">{addError}</p>}
 
           <div className="flex gap-2 justify-end pt-1">
-            <button
+            <Button variant="outline"
               type="button"
               onClick={onClose}
-              className="modal-btn modal-btn-secondary"
+              className=""
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button variant="default"
               type="submit"
               disabled={addLoading || imageUploading}
-              className="modal-btn modal-btn-primary"
+              className=""
             >
               {addLoading || imageUploading ? (
                 <Spinner className="h-3 w-3 text-white" />
@@ -186,7 +190,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                 <Plus strokeWidth={2.5} size={13} />
               )}
               {imageUploading ? "Uploading…" : `Add ${entity}`}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

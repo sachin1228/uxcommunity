@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect, useRef } from "react";
 import { INTEREST_EMOJIS, MAX_DESIGN_INTERESTS } from "@/lib/interests";
@@ -82,14 +84,14 @@ export function InterestsMultiSelect({
             className="inline-flex items-center gap-1 rounded-md bg-popover px-2 py-0.5 font-body text-xs text-foreground"
           >
             {o.name}
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={(e) => { e.stopPropagation(); remove(o.id); }}
-              className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
+              className="ml-0.5 transition-colors"
               aria-label={`Remove ${o.name}`}
             >
               ×
-            </button>
+            </Button>
           </span>
         ))}
         <span className="flex-1 min-w-[80px] select-none font-body text-sm text-muted-foreground">
@@ -121,12 +123,12 @@ export function InterestsMultiSelect({
             {options.map((option) => {
               const isSelected = selected.includes(option.id);
               return (
-                <button
+                <Button variant="ghost"
                   key={option.id}
                   type="button"
                   onClick={() => toggle(option.id)}
                   aria-pressed={isSelected}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
                 >
                   <InterestIcon imageUrl={option.image_url} name={option.name} />
                   <span className="flex-1 font-body text-sm text-foreground">
@@ -150,7 +152,7 @@ export function InterestsMultiSelect({
                       </svg>
                     )}
                   </span>
-                </button>
+                </Button>
               );
             })}
           </div>

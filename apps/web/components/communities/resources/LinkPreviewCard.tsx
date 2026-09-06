@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Globe, X } from "lucide-react";
 import type { LinkPreviewData } from "@/lib/communities/linkPreview";
@@ -18,14 +20,14 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
   return (
     <div className="relative flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-popover p-4">
       {onDismiss && (
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={onDismiss}
-          className="absolute right-2 top-2 z-10 rounded-full bg-black/50 p-1 text-white/80 backdrop-blur-sm hover:text-white"
+          className="absolute right-2 top-2 z-10 p-1 backdrop-blur-sm"
           aria-label="Remove preview"
         >
           <X strokeWidth={2.5} size={12} />
-        </button>
+        </Button>
       )}
 
       <div className="min-w-0 flex-1">

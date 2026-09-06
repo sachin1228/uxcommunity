@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useRef, useState, useEffect } from "react";
 import {
@@ -177,9 +180,9 @@ export function CreateThreadModal({
                 Share your thoughts, ask a question, or start a discussion
               </p>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground">
+            <Button variant="ghost" size="icon" type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors">
               <X strokeWidth={2.5} size={16} />
-            </button>
+            </Button>
           </div>
 
           {/* ── Post / Poll tabs ── */}
@@ -188,14 +191,14 @@ export function CreateThreadModal({
           {/* ── Composer body / poll composer ── */}
           {tab === "post" ? (
             <div className="relative">
-              <textarea
+              <Textarea
                 ref={textareaRef}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={THREAD_BODY_MAX_LENGTH}
                 placeholder="What do you want to talk about?"
                 rows={4}
-                className="field w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
+                className="w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
               />
               <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-muted-foreground">
                 {body.length}/{THREAD_BODY_MAX_LENGTH}
@@ -254,17 +257,17 @@ export function CreateThreadModal({
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-muted-foreground transition-colors hover:bg-popover hover:text-foreground">
+          <Button variant="outline" type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center px-3 transition-colors">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="default"
             type="submit"
             disabled={saving || uploading}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 font-body text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 px-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Spinner size={14} className="text-white" />}
             {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
-          </button>
+          </Button>
         </div>
 
         {/* Drag-and-drop overlay — shown while files hover over the modal. */}

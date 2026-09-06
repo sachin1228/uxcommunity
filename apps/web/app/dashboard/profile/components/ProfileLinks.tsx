@@ -1,4 +1,7 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { Linkedin, Globe } from "lucide-react";
 
@@ -33,10 +36,10 @@ export function ProfileLinks({
       <SectionLabel num="02" label="Links" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="flex flex-col gap-1.5">
-          <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Linkedin strokeWidth={2.5} size={11} /> LinkedIn
-          </label>
-          <input
+          </Label>
+          <Input
             type="url"
             value={linkedin}
             onChange={(e) => onLinkedinChange(e.target.value)}
@@ -45,10 +48,10 @@ export function ProfileLinks({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Globe strokeWidth={2.5} size={11} /> Portfolio
-          </label>
-          <input
+          </Label>
+          <Input
             type="url"
             value={portfolio}
             onChange={(e) => onPortfolioChange(e.target.value)}

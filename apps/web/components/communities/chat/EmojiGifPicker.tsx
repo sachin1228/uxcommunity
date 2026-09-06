@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Search, X } from "lucide-react";
@@ -72,19 +75,19 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-popover border border-border rounded-lg px-2.5 py-1.5">
           <Search strokeWidth={2.5} size={12} className="text-muted-foreground shrink-0" />
-          <input
+          <Input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder={type === "gif" ? "Search GIFs…" : "Search stickers…"}
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-body min-w-0"
+            className="flex-1 bg-transparent outline-none min-w-0"
           />
           {query && (
-            <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
-              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" aria-label="Clear">
+            <Button variant="ghost" onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
+              className="shrink-0 transition-colors" aria-label="Clear">
               <X strokeWidth={2.5} size={11} />
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -194,19 +197,19 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
       <div className="px-2 pt-2 pb-1.5 shrink-0">
         <div className="flex items-center gap-1.5 bg-popover border border-border rounded-lg px-2.5 py-1.5">
           <Search strokeWidth={2.5} size={12} className="text-muted-foreground shrink-0" />
-          <input
+          <Input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search emoji…"
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-body min-w-0"
+            className="flex-1 bg-transparent outline-none min-w-0"
           />
           {query && (
-            <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
-              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" aria-label="Clear">
+            <Button variant="ghost" onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
+              className="shrink-0 transition-colors" aria-label="Clear">
               <X strokeWidth={2.5} size={11} />
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -216,7 +219,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
         <div className="px-2 pb-1.5 shrink-0 overflow-x-auto">
           <div className="flex gap-1.5">
             {categories.map((category) => (
-              <button
+              <Button variant="ghost"
                 key={category}
                 onClick={() => setSelectedCategory(category)}
                 className={`whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium transition-colors
@@ -226,7 +229,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
                   }`}
               >
                 {category}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -241,11 +244,10 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
         ) : (
           <div className="grid grid-cols-8 gap-0.5">
             {filteredEmojis.map((emoji) => (
-              <button
+              <Button variant="ghost" size="icon"
                 key={emoji.codepoint}
                 onClick={() => onSelect(emoji.unicode)}
-                className="w-8 h-8 flex items-center justify-center rounded-md
-                  hover:bg-popover active:scale-90 transition-all duration-100"
+                className="w-8 h-8 flex items-center justify-center active:scale-90 transition-all duration-100"
                 title={emoji.name}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -255,7 +257,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
                   className="w-6 h-6"
                   loading="lazy"
                 />
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -290,7 +292,7 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
         ]).map((t) => {
           const active = tab === t.id;
           return (
-            <button
+            <Button variant="ghost"
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2
@@ -317,7 +319,7 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
                   {t.label}
                 </span>
               )}
-            </button>
+            </Button>
           );
         })}
       </div>

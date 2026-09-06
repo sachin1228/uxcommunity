@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -207,13 +210,13 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
   return (
     <div className="max-w-xl">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push(listPath)}
-        className="mb-6 flex items-center gap-1.5 font-body text-xs text-muted-foreground hover:text-foreground transition-colors"
+        className="mb-6 flex items-center gap-1.5 transition-colors"
       >
         <ArrowLeft strokeWidth={2.5} size={13} />
         Back to {entity.toLowerCase()}s
-      </button>
+      </Button>
 
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
@@ -231,19 +234,19 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         <div className="flex-1 min-w-0">
           {editing ? (
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="text"
                 value={editName}
                 onChange={(e) => { setEditName(e.target.value); setEditError(null); }}
                 autoFocus
-                className="field border-primary font-display text-xl font-semibold flex-1 min-w-0"
+                className="text-xl font-semibold flex-1 min-w-0"
               />
-              <button onClick={handleEditSave} disabled={editLoading} className="text-green-400 hover:text-green-300 transition-colors shrink-0" aria-label="Save">
+              <Button variant="ghost" onClick={handleEditSave} disabled={editLoading} className="text-green-400 transition-colors shrink-0" aria-label="Save">
                 {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={18} />}
-              </button>
-              <button onClick={() => { setEditing(false); setEditError(null); }} className="text-muted-foreground hover:text-foreground transition-colors shrink-0" aria-label="Cancel">
+              </Button>
+              <Button variant="ghost" onClick={() => { setEditing(false); setEditError(null); }} className="transition-colors shrink-0" aria-label="Cancel">
                 <X strokeWidth={2.5} size={18} />
-              </button>
+              </Button>
             </div>
           ) : (
             <h1 className="font-display text-2xl font-semibold text-foreground truncate">{item.name}</h1>
@@ -286,12 +289,12 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             <p className="font-body text-xs font-medium text-foreground">Rename {entity}</p>
             <p className="font-body text-[11px] text-muted-foreground mt-0.5">Update the display name</p>
           </div>
-          <button
+          <Button variant="outline"
             onClick={() => { setEditing(true); setEditName(item.name); }}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
           >
             <Pencil strokeWidth={2.5} size={12} /> Edit
-          </button>
+          </Button>
         </div>
 
         {/* Image */}
@@ -309,20 +312,20 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             ) : (
               <>
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={handleImageChange} className="hidden" />
-                <button
+                <Button variant="outline"
                   onClick={() => imageInputRef.current?.click()}
-                  className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
                 >
                   <Upload strokeWidth={2.5} size={12} />
                   {item.image_url ? "Replace" : "Upload"}
-                </button>
+                </Button>
                 {item.image_url && (
-                  <button
+                  <Button variant="outline"
                     onClick={handleRemoveImage}
-                    className="rounded-md border border-border px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-red-400 hover:border-red-500/30 transition-colors"
+                    className="px-3 py-1.5 transition-colors"
                   >
                     Remove
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -342,7 +345,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                   : "Make available again in dropdowns"}
               </p>
             </div>
-            <button
+            <Button variant="ghost"
               onClick={handleToggle}
               disabled={toggleLoading}
               className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-body text-xs font-medium transition-colors disabled:opacity-60 ${
@@ -353,7 +356,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             >
               {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight strokeWidth={2.5} size={14} /> : <ToggleLeft strokeWidth={2.5} size={14} />}
               {item.is_active ? "Deactivate" : "Activate"}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -366,12 +369,12 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
                 Permanently removed. Blocked if linked to a designer profile.
               </p>
             </div>
-            <button
+            <Button variant="destructive"
               onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
             >
               <Trash2 strokeWidth={2.5} size={12} /> Delete
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -389,20 +392,20 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
               <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">{deleteError}</p>
             )}
             <div className="flex gap-2">
-              <button
+              <Button variant="outline"
                 onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="modal-btn modal-btn-danger flex-1"
+                className="flex-1"
               >
                 {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete
-              </button>
+              </Button>
             </div>
           </div>
         </div>

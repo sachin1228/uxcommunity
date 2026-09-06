@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect } from "react";
 import { ExternalLink, X } from "lucide-react";
@@ -99,13 +101,13 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
               })}
             </p>
           </div>
-          <button
+          <Button variant="ghost" size="icon"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
+            className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
           >
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         {/* External links */}

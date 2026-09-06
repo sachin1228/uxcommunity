@@ -1,4 +1,9 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchJsonCached, setCachedRequest } from "@/lib/request-cache";
@@ -250,23 +255,23 @@ export function CommunitySettingsView({
             <p className="font-body text-[11px] text-muted-foreground mt-0.5">{community.name}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <Button variant="default"
               type="button"
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? <Spinner size={12} className="text-primary-foreground" /> : <Save strokeWidth={2.5} size={12} />}
               Save changes
-            </button>
-            <button
+            </Button>
+            <Button variant="outline" size="icon"
               type="button"
               onClick={onClose}
-              className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+              className="h-8 w-8 flex items-center justify-center transition-colors"
               aria-label="Close settings"
             >
               <X strokeWidth={2.5} size={15} />
-            </button>
+            </Button>
           </div>
         </div>
         {saveMsg && (
@@ -288,14 +293,14 @@ export function CommunitySettingsView({
             <div className="space-y-4">
               {/* Community photo */}
               <div>
-                <label className="block font-body text-xs font-medium text-foreground mb-1.5">
+                <Label className="block font-body text-xs font-medium text-foreground mb-1.5">
                   Community Photo
-                </label>
+                </Label>
                 <div className="flex items-center gap-3">
-                  <button
+                  <Button variant="outline" size="icon"
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-popover text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden transition-colors"
                     aria-label="Change community photo"
                   >
                     {imagePreview ? (
@@ -303,23 +308,23 @@ export function CommunitySettingsView({
                     ) : (
                       <ImagePlus strokeWidth={2.5} size={20} />
                     )}
-                  </button>
+                  </Button>
                   <div className="min-w-0 space-y-1">
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={() => fileRef.current?.click()}
-                      className="block font-body text-xs text-primary hover:text-primary transition-colors"
+                      className="block transition-colors"
                     >
                       {imagePreview ? "Replace photo" : "Upload photo"}
-                    </button>
+                    </Button>
                     {imagePreview && (
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={() => handleImageChange(null)}
-                        className="block font-body text-xs text-muted-foreground hover:text-red-400 transition-colors"
+                        className="block transition-colors"
                       >
                         Remove photo
-                      </button>
+                      </Button>
                     )}
                     <p className="font-body text-[11px] text-muted-foreground">JPEG, PNG, or WebP under 10 MB.</p>
                   </div>
@@ -334,27 +339,27 @@ export function CommunitySettingsView({
               </div>
 
               <div>
-                <label className="block font-body text-xs font-medium text-foreground mb-1.5">
+                <Label className="block font-body text-xs font-medium text-foreground mb-1.5">
                   Community Name
-                </label>
-                <input
+                </Label>
+                <Input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}
-                  className="field w-full"
+                  className="w-full"
                 />
               </div>
               <div>
-                <label className="block font-body text-xs font-medium text-foreground mb-1.5">
+                <Label className="block font-body text-xs font-medium text-foreground mb-1.5">
                   Description
-                </label>
-                <textarea
+                </Label>
+                <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   maxLength={500}
                   rows={3}
                   placeholder="What's this community about?"
-                  className="field w-full resize-none"
+                  className="w-full resize-none"
                 />
               </div>
             </div>
@@ -383,7 +388,7 @@ export function CommunitySettingsView({
               ] as const).map(([value, Icon, label, copy]) => {
                 const active = isPrivate === (value === "private");
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={value}
                     type="button"
                     onClick={() => setIsPrivate(value === "private")}
@@ -401,7 +406,7 @@ export function CommunitySettingsView({
                         <Check strokeWidth={2.5} size={10} />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -417,7 +422,7 @@ export function CommunitySettingsView({
               {FEATURE_OPTIONS.map(({ id, label, description: copy, icon: Icon, required }) => {
                 const active = tabs.includes(id);
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={id}
                     type="button"
                     onClick={() => toggleTab(id)}
@@ -441,7 +446,7 @@ export function CommunitySettingsView({
                         Required
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -459,13 +464,13 @@ export function CommunitySettingsView({
                 </p>
               </div>
               {!addingRule && rules.length < 12 && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => setAddingRule(true)}
-                  className="inline-flex items-center gap-1 font-body text-xs text-primary hover:text-primary transition-colors"
+                  className="inline-flex items-center gap-1 transition-colors"
                 >
                   <Plus strokeWidth={2.5} size={12} /> Add rule
-                </button>
+                </Button>
               )}
             </div>
             {rulesLoaded && (
@@ -479,19 +484,19 @@ export function CommunitySettingsView({
                       {i + 1}
                     </span>
                     <span className="flex-1 font-body text-sm text-foreground leading-relaxed">{rule}</span>
-                    <button
+                    <Button variant="ghost" size="icon"
                       type="button"
                       onClick={() => setRules((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center transition-all"
                       aria-label="Remove rule"
                     >
                       <X strokeWidth={2.5} size={12} />
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 {addingRule && (
                   <div className="flex items-center gap-2 px-3 py-2">
-                    <input
+                    <Input
                       ref={newRuleRef}
                       value={newRule}
                       onChange={(e) => setNewRule(e.target.value)}
@@ -501,22 +506,22 @@ export function CommunitySettingsView({
                       }}
                       maxLength={160}
                       placeholder="Describe the rule…"
-                      className="field flex-1 border-primary"
+                      className="flex-1"
                     />
-                    <button
+                    <Button variant="default"
                       type="button"
                       onClick={commitNewRule}
-                      className="rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground hover:bg-primary transition-colors"
+                      className="px-3 py-1.5 transition-colors"
                     >
                       Add
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="outline"
                       type="button"
                       onClick={() => { setAddingRule(false); setNewRule(""); }}
-                      className="rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                      className="px-2.5 py-1.5 transition-colors"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -546,30 +551,30 @@ export function CommunitySettingsView({
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <input
+                <Input
                   readOnly
                   value={inviteUrl}
-                  className="field flex-1 min-w-0 font-mono"
+                  className="flex-1 min-w-0 font-mono"
                 />
-                <button
+                <Button variant="outline"
                   type="button"
                   onClick={handleCopyLink}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 transition-colors"
                 >
                   {copiedLink ? <Check strokeWidth={2.5} size={12} className="text-green-400" /> : <Copy strokeWidth={2.5} size={12} />}
                   {copiedLink ? "Copied!" : "Copy"}
-                </button>
+                </Button>
               </div>
               <div className="flex items-center justify-between">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleRegenerate}
                   disabled={regenerating}
-                  className="inline-flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 transition-colors disabled:opacity-50"
                 >
                   {regenerating ? <Spinner size={11} /> : <RefreshCw strokeWidth={2.5} size={11} />}
                   Regenerate link
-                </button>
+                </Button>
                 {regenMsg && (
                   <p className="font-body text-[11px] text-amber-400">{regenMsg}</p>
                 )}
@@ -601,23 +606,23 @@ export function CommunitySettingsView({
                     </div>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button
+                    <Button variant="outline"
                       type="button"
                       onClick={() => setShowDeleteConfirm(false)}
                       disabled={deleting}
-                      className="flex-1 rounded-lg border border-border py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground transition-colors disabled:opacity-50"
+                      className="flex-1 py-2 transition-colors disabled:opacity-50"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="destructive"
                       type="button"
                       onClick={handleDelete}
                       disabled={deleting}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 transition-colors disabled:opacity-50"
                     >
                       {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -628,13 +633,13 @@ export function CommunitySettingsView({
                       Permanently remove this community and all its content.
                     </p>
                   </div>
-                  <button
+                  <Button variant="destructive"
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-500/30 px-3 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 transition-colors"
                   >
                     <Trash2 strokeWidth={2.5} size={12} /> Delete
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

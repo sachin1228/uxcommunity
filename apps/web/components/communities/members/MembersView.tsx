@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Check, MoreHorizontal, Search, Users, X } from "lucide-react";
@@ -248,12 +251,12 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       <div className="px-5 py-3 shrink-0">
         <div className="relative">
           <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-          <input
+          <Input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search members…"
-            className="field w-full pl-8 pr-3"
+            className="w-full pl-8 pr-3"
           />
         </div>
       </div>
@@ -286,22 +289,22 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
+                      <Button variant="outline"
                         type="button"
                         onClick={() => handleAccept(req.id)}
                         disabled={busyRequestId === req.id}
-                        className="inline-flex items-center gap-1 rounded-md bg-green-500/10 border border-green-500/20 px-2.5 py-1.5 font-body text-xs font-medium text-green-400 hover:bg-green-500/20 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-green-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Check strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Accepting…" : "Accept"}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="outline"
                         type="button"
                         onClick={() => handleDecline(req.id)}
                         disabled={busyRequestId === req.id}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <X strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
-                      </button>
+                      </Button>
                     </div>
                   </li>
                 ))}
@@ -370,23 +373,23 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                     {/* Remove button — managers only, protected rows excluded */}
                     {manager && canRemoveRow && (
                       <div className="relative shrink-0">
-                        <button
+                        <Button variant="ghost" size="icon"
                           type="button"
                           onClick={() => setOpenMenuFor(openMenuFor === member.user_id ? null : member.user_id)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                          className="h-7 w-7 flex items-center justify-center transition-colors"
                           aria-label="Member options"
                         >
                           <MoreHorizontal strokeWidth={2.5} size={14} />
-                        </button>
+                        </Button>
                         {openMenuFor === member.user_id && (
                           <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
-                            <button
+                            <Button variant="destructive"
                               type="button"
                               onClick={() => handleRemoveMember(member.user_id)}
-                              className="flex w-full items-center rounded-lg px-3 py-2 text-left font-body text-xs text-red-400 hover:bg-red-400/10 transition-colors"
+                              className="flex w-full items-center px-3 py-2 text-left transition-colors"
                             >
                               Remove from community
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </div>
