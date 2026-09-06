@@ -49,7 +49,7 @@ export function ComposerTabs({
     <div
       role="tablist"
       aria-label="Thread type"
-      className="mb-3 flex items-center gap-6 overflow-x-auto pb-px shadow-[0_-1px_0_var(--color-border)_inset]"
+      className="flex items-center gap-1 overflow-x-auto md:gap-3"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -61,14 +61,16 @@ export function ComposerTabs({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.value)}
-            className={`-mb-px flex cursor-pointer items-center gap-1.5 whitespace-nowrap border-0 border-b-2 bg-transparent px-0.5 py-3.5 font-body text-sm outline-none transition-colors ${
+            className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
               active
                 ? "border-accent text-foreground"
                 : "border-transparent text-foreground-muted hover:text-foreground"
             }`}
           >
-            <Icon strokeWidth={2.5} size={14} />
-            {tab.label}
+            <span className="inline-flex items-center gap-1.5">
+              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+              {tab.label}
+            </span>
           </button>
         );
       })}
