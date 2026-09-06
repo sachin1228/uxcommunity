@@ -126,19 +126,45 @@ export function ThreadCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const [titleExpanded, setTitleExpanded] = useState(false);
   const [titleOverflow, setTitleOverflow] = useState(false);
+  const [moreLeft, setMoreLeft] = useState<number | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
   // Collapse long thread bodies to two lines on feed cards and offer a "More" toggle.
-  // Measured while clamped (before the user expands), so the button stays visible.
+  // The button is placed right after the last visible character (+ the clamp ellipsis)
+  // so it reads inline with the text end, re-measured on resize and once fonts load.
   useIsomorphicLayoutEffect(() => {
     if (isDetail) return;
     setTitleExpanded(false);
     const el = titleRef.current;
     if (!el) return;
-    const measure = () => setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
+
+    const measure = () => {
+      try {
+        setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
+        const box = el.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rects = Array.from(range.getClientRects()).filter(
+          (r) => r.width > 0 && r.bottom <= box.bottom + 1,
+        );
+        const lastLine = rects[rects.length - 1];
+        if (!lastLine) return;
+        // ~1em for the native ellipsis; clamp so the button always fits in the card.
+        const left = Math.min(lastLine.right - box.left + 16, box.width - 64);
+        setMoreLeft(Math.max(0, left));
+      } catch {
+        setMoreLeft(null);
+      }
+    };
+
     measure();
     if (typeof document !== "undefined" && document.fonts?.ready) {
       document.fonts.ready.then(measure).catch(() => {});
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      return () => observer.disconnect();
     }
   }, [isDetail, thread.title]);
 
@@ -498,18 +524,17 @@ export function ThreadCard({
           <div className="relative">
             <h3
               ref={titleRef}
-              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${
-                titleExpanded ? "" : "line-clamp-2"
-              } ${titleOverflow && !titleExpanded ? "pr-12" : ""}`}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2"}`}
             >
               {renderWithLinks(thread.title, true)}
             </h3>
-            {/* Sits in the space reserved by pr-12, so it never covers the text. */}
-            {titleOverflow && !titleExpanded && (
+            {/* Positioned right after the last visible character, so it hugs the text. */}
+            {titleOverflow && !titleExpanded && moreLeft !== null && (
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
-                className="absolute bottom-0 right-0 bg-background-subtle pl-3 font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
+                style={{ left: `${moreLeft}px` }}
+                className="absolute bottom-0 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
               >
                 More
               </button>
