@@ -2,30 +2,27 @@
 
 import { useRef, useState, useEffect } from "react";
 import {
-  BarChart3,
   Globe,
-  Image as ImageIcon,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { CommunityThread, ThreadAttachment, ThreadCategory, ThreadPollDraft } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
-  isPollDraftEmpty,
   serializePollDraft,
   validatePollDraft,
 } from "./threadShared";
 import {
   CategoryPicker,
-  ComposerToolButton,
-  FileAttachmentList,
-  ImageAttachmentsRow,
+  ComposerMedia,
+  ComposerTabs,
   PollComposer,
-  TagPicker,
   THREAD_IMAGE_MAX,
   ToggleRow,
+  type ThreadComposerTab,
 } from "./ThreadComposerControls";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -45,20 +42,27 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
+  const hasPoll = Boolean(thread.poll);
+
   const [body,            setBody]            = useState(thread.title);
   const [category,        setCategory]        = useState<ThreadCategory>(thread.category);
-  const [tags,            setTags]            = useState<string[]>(thread.tags);
   const [attachments,     setAttachments]     = useState<ThreadAttachment[]>(thread.attachments);
-  const [activeTool,      setActiveTool]      = useState<"photo" | "poll">(thread.poll ? "poll" : "photo");
+  const [tab,             setTab]             = useState<ThreadComposerTab>(hasPoll ? "poll" : "post");
+  const [pollRemoved,     setPollRemoved]     = useState(false);
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(() => pollToDraft(thread.poll));
+  const [confirmRemovePoll, setConfirmRemovePoll] = useState(false);
   const [allowReplies,    setAllowReplies]    = useState(thread.allow_replies);
   const [isPublic,        setIsPublic]        = useState(thread.is_public ?? false);
   const [uploading,       setUploading]       = useState(false);
   const [saving,          setSaving]          = useState(false);
   const [error,           setError]           = useState<string | null>(null);
 
-  const images    = attachments.filter((a) => a.type.startsWith("image/"));
-  const nonImages = attachments.filter((a) => !a.type.startsWith("image/"));
+  const images = attachments.filter((a) => a.type.startsWith("image/"));
+
+  // Once the poll has been removed the thread is a plain post — keep the Post
+  // composer on screen so the tab switcher can't re-add the deleted poll.
+  const selectedTab: ThreadComposerTab = pollRemoved ? "post" : tab;
+  const showTabs = hasPoll && !pollRemoved;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -111,30 +115,47 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
     }
   }
 
-  /** Validate the poll draft (when present) and return the value to send, or null to abort. */
-  function resolvePoll(): { poll: { question: string; options: string[] } | null } | null {
-    if (!pollDraft) return { poll: null };
-    if (isPollDraftEmpty(pollDraft)) return { poll: null };
-    const invalid = validatePollDraft(pollDraft);
-    if (invalid) {
-      setActiveTool("poll");
-      setError(invalid);
-      return null;
+  function requestTab(next: ThreadComposerTab) {
+    if (next === selectedTab) return;
+    // Removing an existing poll deletes its votes — ask first.
+    if (hasPoll && !pollRemoved && next === "post") {
+      setConfirmRemovePoll(true);
+      return;
     }
-    return { poll: serializePollDraft(pollDraft) };
+    setTab(next);
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!body.trim()) {
-      setError("Write something before saving.");
-      return;
-    }
-    const resolvedPoll = resolvePoll();
-    if (!resolvedPoll) return;
 
-    const title = bodyToTitle(body);
-    // Like the Create modal, links are derived from the body text on save.
+    let title: string;
+    let poll: { question: string; options: string[] } | null;
+
+    if (pollRemoved || selectedTab === "post") {
+      if (!body.trim()) {
+        setError("Write something before saving.");
+        return;
+      }
+      title = bodyToTitle(body);
+      poll = null;
+    } else {
+      if (!pollDraft) {
+        setError("Add a question for your poll.");
+        return;
+      }
+      const invalid = validatePollDraft(pollDraft);
+      if (invalid) {
+        setError(invalid);
+        return;
+      }
+      const serialized = serializePollDraft(pollDraft);
+      const pollIsContent = thread.title.trim() === thread.poll?.question.trim();
+      // Polls created as standalone posts use the question as the thread text;
+      // keep any separate caption on older threads untouched.
+      title = pollIsContent ? serialized.question : thread.title;
+      poll = serialized;
+    }
+
     const extractedLinks = [...new Set(body.match(/https?:\/\/[^\s<>"]+/g) ?? [])];
     setSaving(true);
     setError(null);
@@ -145,12 +166,12 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         body: JSON.stringify({
           title,
           category,
-          tags,
+          tags: thread.tags,
           attachments,
           links: extractedLinks,
           allow_replies: allowReplies,
           is_public: isPublic,
-          poll: resolvedPoll.poll,
+          poll,
         }),
       });
       const data = await response.json();
@@ -168,11 +189,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
     } finally {
       setSaving(false);
     }
-  }
-
-  function openPoll() {
-    setActiveTool("poll");
-    setPollDraft((current) => current ?? { question: "", options: ["", ""] });
   }
 
   return (
@@ -199,87 +215,51 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {/* ── Composer body ── */}
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              maxLength={THREAD_BODY_MAX_LENGTH}
-              placeholder="What do you want to talk about?"
-              rows={4}
-              className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 pb-6 pr-16 pt-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-            />
-            <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
-              {body.length}/{THREAD_BODY_MAX_LENGTH}
-            </span>
-          </div>
+          {/* ── Post / Poll tabs (only when the thread already has a poll) ── */}
+          {showTabs && <ComposerTabs value={selectedTab} onChange={requestTab} />}
 
-          {/* ── Media toolbar (below the text) ── */}
-          <div className="flex items-center gap-1.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,application/pdf,application/zip,text/plain"
-              className="hidden"
-              onChange={handleFiles}
-            />
-            <ComposerToolButton
-              active={activeTool === "photo"}
-              disabled={uploading}
-              onClick={() => {
-                if (activeTool !== "photo") { setActiveTool("photo"); return; }
-                if (!uploading && images.length < THREAD_IMAGE_MAX) fileInputRef.current?.click();
-              }}
-            >
-              {uploading && activeTool === "photo" ? <Spinner size={14} /> : <ImageIcon size={14} />}
-              {uploading && activeTool === "photo" ? "Uploading…" : "Photo"}
-            </ComposerToolButton>
-            <ComposerToolButton active={activeTool === "poll"} onClick={openPoll}>
-              <BarChart3 size={14} />
-              Poll
-            </ComposerToolButton>
-          </div>
-
-          {/* ── Active media panel ── */}
-          {activeTool === "photo" && (
-            <>
-              <ImageAttachmentsRow
-                images={images}
-                uploading={uploading}
-                onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
-                onAddMore={() => fileInputRef.current?.click()}
+          {/* ── Composer body / poll composer ── */}
+          {selectedTab === "post" ? (
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                maxLength={THREAD_BODY_MAX_LENGTH}
+                placeholder="What do you want to talk about?"
+                rows={4}
+                className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 pb-6 pr-16 pt-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
               />
-              <FileAttachmentList
-                files={nonImages}
-                onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
-              />
-            </>
-          )}
-
-          {activeTool === "poll" && pollDraft && (
-            <div className="space-y-2">
-              <PollComposer value={pollDraft} onChange={setPollDraft} />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => { setPollDraft(null); setActiveTool("photo"); setError(null); }}
-                  className="font-body text-[11px] text-foreground-subtle underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  Remove poll
-                </button>
-              </div>
+              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
+                {body.length}/{THREAD_BODY_MAX_LENGTH}
+              </span>
             </div>
+          ) : (
+            pollDraft && (
+              <PollComposer value={pollDraft} onChange={setPollDraft} />
+            )
           )}
+
+          {/* ── Images / files (available for both posts and polls) ── */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,application/zip,text/plain"
+            className="hidden"
+            onChange={handleFiles}
+          />
+          <ComposerMedia
+            attachments={attachments}
+            uploading={uploading}
+            onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
+            onAddMore={() => fileInputRef.current?.click()}
+          />
 
           <div className="border-t border-border" />
 
           {/* ── Category ── */}
           <CategoryPicker value={category} onChange={setCategory} />
-
-          {/* ── Tags ── */}
-          <TagPicker selected={tags} onChange={setTags} />
 
           {/* ── Toggles ── */}
           <div className="overflow-hidden rounded-xl border border-border bg-surface-raised divide-y divide-border">
@@ -322,6 +302,22 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         </div>
       </form>
     </div>
+
+    {confirmRemovePoll && (
+      <ConfirmDialog
+        open={confirmRemovePoll}
+        onClose={() => setConfirmRemovePoll(false)}
+        onConfirm={() => {
+          setPollRemoved(true);
+          setTab("post");
+          setPollDraft(null);
+          setConfirmRemovePoll(false);
+        }}
+        title="Remove poll?"
+        message="Removing the poll deletes it and all its votes from this thread. You can keep the post text and save it as a regular thread instead."
+        confirmLabel="Remove poll"
+      />
+    )}
     </ModalPortal>
   );
 }

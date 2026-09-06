@@ -47,6 +47,7 @@ export function ThreadPollResult({
   canUndo,
   onVote,
   onUndo,
+  hideQuestion = false,
 }: {
   poll: ThreadPoll;
   counts?: number[];
@@ -57,6 +58,8 @@ export function ThreadPollResult({
   canUndo?: boolean;
   onVote?: (optionIndex: number) => void;
   onUndo?: () => void;
+  /** Hide the question line when it is already shown as the thread's content. */
+  hideQuestion?: boolean;
 }) {
   const options = Array.isArray(poll.options) ? poll.options : [];
   const totals = Array.isArray(counts) && counts.length === options.length
@@ -78,9 +81,11 @@ export function ThreadPollResult({
         </span>
       </div>
 
-      <p className="mt-2 whitespace-pre-wrap break-words font-body text-sm font-medium leading-relaxed text-foreground">
-        {poll.question}
-      </p>
+      {!hideQuestion && poll.question && (
+        <p className="mt-2 whitespace-pre-wrap break-words font-body text-sm font-medium leading-relaxed text-foreground">
+          {poll.question}
+        </p>
+      )}
 
       {options.length > 0 && (hasVoted ? (
         /* ── Results — only shown once the current user has voted ── */

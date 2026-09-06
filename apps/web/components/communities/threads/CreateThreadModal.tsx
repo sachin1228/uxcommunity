@@ -2,9 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import {
-  BarChart3,
   Globe,
-  Image as ImageIcon,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -13,19 +11,17 @@ import type { CommunityThread, ThreadAttachment, ThreadCategory, ThreadPollDraft
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
-  isPollDraftEmpty,
   serializePollDraft,
   validatePollDraft,
 } from "./threadShared";
 import {
   CategoryPicker,
-  ComposerToolButton,
-  FileAttachmentList,
-  ImageAttachmentsRow,
+  ComposerMedia,
+  ComposerTabs,
   PollComposer,
-  TagPicker,
   THREAD_IMAGE_MAX,
   ToggleRow,
+  type ThreadComposerTab,
 } from "./ThreadComposerControls";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -54,9 +50,8 @@ export function CreateThreadModal({
 
   const [body,            setBody]            = useState("");
   const [category,        setCategory]        = useState<ThreadCategory>("question");
-  const [tags,            setTags]            = useState<string[]>([]);
   const [attachments,     setAttachments]     = useState<ThreadAttachment[]>([]);
-  const [activeTool,      setActiveTool]      = useState<"photo" | "poll">("photo");
+  const [tab,             setTab]             = useState<ThreadComposerTab>("post");
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(null);
   const [allowReplies,    setAllowReplies]    = useState(true);
   const [isPublic,        setIsPublic]        = useState(false);
@@ -64,8 +59,7 @@ export function CreateThreadModal({
   const [saving,          setSaving]          = useState(false);
   const [error,           setError]           = useState<string | null>(null);
 
-  const images    = attachments.filter((a) => a.type.startsWith("image/"));
-  const nonImages = attachments.filter((a) => !a.type.startsWith("image/"));
+  const images = attachments.filter((a) => a.type.startsWith("image/"));
 
   // Auto-grow textarea
   useEffect(() => {
@@ -122,29 +116,43 @@ export function CreateThreadModal({
     }
   }
 
-  /** Validate the poll draft (when present) and return the value to send, or null to abort. */
-  function resolvePoll(): { poll: { question: string; options: string[] } | null } | null {
-    if (!pollDraft) return { poll: null };
-    if (isPollDraftEmpty(pollDraft)) return { poll: null };
-    const invalid = validatePollDraft(pollDraft);
-    if (invalid) {
-      setActiveTool("poll");
-      setError(invalid);
-      return null;
+  function selectTab(next: ThreadComposerTab) {
+    setTab(next);
+    // Seeding the draft on first entry keeps the composer focused on typing.
+    if (next === "poll") {
+      setPollDraft((current) => current ?? emptyPollDraft());
     }
-    return { poll: serializePollDraft(pollDraft) };
   }
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!body.trim()) {
-      setError("Write something before posting.");
-      return;
-    }
-    const resolvedPoll = resolvePoll();
-    if (!resolvedPoll) return;
 
-    const title = bodyToTitle(body);
+    let title: string;
+    let poll: { question: string; options: string[] } | null;
+
+    if (tab === "poll") {
+      if (!pollDraft) {
+        setError("Add a question for your poll.");
+        return;
+      }
+      const invalid = validatePollDraft(pollDraft);
+      if (invalid) {
+        setError(invalid);
+        return;
+      }
+      const serialized = serializePollDraft(pollDraft);
+      // The poll question is the post's content — shown once on the thread.
+      title = serialized.question;
+      poll = serialized;
+    } else {
+      if (!body.trim()) {
+        setError("Write something before posting.");
+        return;
+      }
+      title = bodyToTitle(body);
+      poll = null;
+    }
+
     const extractedLinks = [...new Set(body.match(/https?:\/\/[^\s<>"]+/g) ?? [])];
     setSaving(true);
     setError(null);
@@ -157,12 +165,12 @@ export function CreateThreadModal({
           body: JSON.stringify({
             title,
             category,
-            tags,
+            tags: [],
             attachments,
             links: extractedLinks,
             allow_replies: allowReplies,
             is_public: isPublic,
-            poll: resolvedPoll.poll,
+            poll,
           }),
         },
       );
@@ -175,11 +183,6 @@ export function CreateThreadModal({
     } finally {
       setSaving(false);
     }
-  }
-
-  function openPoll() {
-    setActiveTool("poll");
-    setPollDraft((current) => current ?? emptyPollDraft());
   }
 
   return (
@@ -211,87 +214,51 @@ export function CreateThreadModal({
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {/* ── Composer body ── */}
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              maxLength={THREAD_BODY_MAX_LENGTH}
-              placeholder="What do you want to talk about?"
-              rows={4}
-              className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 pb-6 pr-16 pt-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-            />
-            <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
-              {body.length}/{THREAD_BODY_MAX_LENGTH}
-            </span>
-          </div>
+          {/* ── Post / Poll tabs ── */}
+          <ComposerTabs value={tab} onChange={selectTab} />
 
-          {/* ── Media toolbar (below the text) ── */}
-          <div className="flex items-center gap-1.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/*,application/pdf,application/zip,text/plain"
-              className="hidden"
-              onChange={handleFiles}
-            />
-            <ComposerToolButton
-              active={activeTool === "photo"}
-              disabled={uploading}
-              onClick={() => {
-                if (activeTool !== "photo") { setActiveTool("photo"); return; }
-                if (images.length < THREAD_IMAGE_MAX) fileInputRef.current?.click();
-              }}
-            >
-              {uploading && activeTool === "photo" ? <Spinner size={14} /> : <ImageIcon size={14} />}
-              {uploading && activeTool === "photo" ? "Uploading…" : "Photo"}
-            </ComposerToolButton>
-            <ComposerToolButton active={activeTool === "poll"} onClick={openPoll}>
-              <BarChart3 size={14} />
-              Poll
-            </ComposerToolButton>
-          </div>
-
-          {/* ── Active media panel ── */}
-          {activeTool === "photo" && (
-            <>
-              <ImageAttachmentsRow
-                images={images}
-                uploading={uploading}
-                onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
-                onAddMore={() => fileInputRef.current?.click()}
+          {/* ── Composer body / poll composer ── */}
+          {tab === "post" ? (
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                maxLength={THREAD_BODY_MAX_LENGTH}
+                placeholder="What do you want to talk about?"
+                rows={4}
+                className="w-full resize-none overflow-hidden rounded-xl border border-border bg-surface-raised px-4 pb-6 pr-16 pt-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
               />
-              <FileAttachmentList
-                files={nonImages}
-                onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
-              />
-            </>
-          )}
-
-          {activeTool === "poll" && pollDraft && (
-            <div className="space-y-2">
-              <PollComposer value={pollDraft} onChange={setPollDraft} />
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => { setPollDraft(null); setActiveTool("photo"); setError(null); }}
-                  className="font-body text-[11px] text-foreground-subtle underline-offset-2 hover:text-foreground hover:underline"
-                >
-                  Remove poll
-                </button>
-              </div>
+              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
+                {body.length}/{THREAD_BODY_MAX_LENGTH}
+              </span>
             </div>
+          ) : (
+            pollDraft && (
+              <PollComposer value={pollDraft} onChange={setPollDraft} />
+            )
           )}
+
+          {/* ── Images / files (available for both posts and polls) ── */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,application/pdf,application/zip,text/plain"
+            className="hidden"
+            onChange={handleFiles}
+          />
+          <ComposerMedia
+            attachments={attachments}
+            uploading={uploading}
+            onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
+            onAddMore={() => fileInputRef.current?.click()}
+          />
 
           <div className="border-t border-border" />
 
           {/* ── Category ── */}
           <CategoryPicker value={category} onChange={setCategory} />
-
-          {/* ── Tags ── */}
-          <TagPicker selected={tags} onChange={setTags} />
 
           {/* ── Toggles ── */}
           <div className="overflow-hidden rounded-xl border border-border bg-surface-raised divide-y divide-border">
@@ -327,7 +294,7 @@ export function CreateThreadModal({
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Spinner size={15} className="text-white" />}
-            {saving ? "Posting…" : "Post Thread"}
+            {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
           </button>
         </div>
       </form>

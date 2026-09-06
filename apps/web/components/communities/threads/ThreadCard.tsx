@@ -492,6 +492,7 @@ export function ThreadCard({
             busy={pollVoteBusy}
             pendingOption={pollVotePending}
             canUndo={!displayedPollUndoUsed}
+            hideQuestion={thread.poll.question.trim() === thread.title.trim()}
             onVote={(optionIndex) => void handlePollVote(optionIndex)}
             onUndo={() => void handlePollUndo()}
           />

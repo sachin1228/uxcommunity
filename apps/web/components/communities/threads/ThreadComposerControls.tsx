@@ -2,8 +2,9 @@
 
 import {
   BarChart3,
-  Check,
+  Image as ImageIcon,
   Paperclip,
+  PenLine,
   Plus,
   X,
 } from "lucide-react";
@@ -11,7 +12,6 @@ import { Spinner } from "@/components/ui/Spinner";
 import { CategoryIcon } from "./categoryIcons";
 import {
   THREAD_CATEGORIES,
-  THREAD_TAGS,
   POLL_MIN_OPTIONS,
   POLL_MAX_OPTIONS,
   POLL_QUESTION_MAX_LENGTH,
@@ -28,7 +28,49 @@ import { BLUE_SELECTED_STYLE } from "./threadShared";
  * All components are controlled — the modals keep their own state/submit logic.
  */
 
-// ── Choice chips (category + tags) ────────────────────────────────────────────
+// ── Thread composer type (tabs) ──────────────────────────────────────────────
+
+/** What the composer is building: a plain text post or a poll. */
+export type ThreadComposerTab = "post" | "poll";
+
+export function ComposerTabs({
+  value,
+  onChange,
+}: {
+  value: ThreadComposerTab;
+  onChange: (value: ThreadComposerTab) => void;
+}) {
+  const tabs: Array<{ value: ThreadComposerTab; label: string; icon: typeof PenLine }> = [
+    { value: "post", label: "Post", icon: PenLine },
+    { value: "poll", label: "Poll", icon: BarChart3 },
+  ];
+
+  return (
+    <div className="flex gap-1 rounded-xl border border-border bg-surface-raised p-1">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const active = value === tab.value;
+        return (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => onChange(tab.value)}
+            aria-pressed={active}
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-body text-xs font-medium transition-colors ${
+              active ? "" : "text-foreground-muted hover:text-foreground"
+            }`}
+            style={active ? BLUE_SELECTED_STYLE : undefined}
+          >
+            <Icon strokeWidth={2.5} size={14} />
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Choice chips (categories) ────────────────────────────────────────────────
 
 const chipBase =
   "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-body text-xs font-medium transition-colors";
@@ -66,90 +108,6 @@ export function CategoryPicker({
         })}
       </div>
     </fieldset>
-  );
-}
-
-export function TagPicker({
-  selected,
-  onChange,
-  max = 3,
-}: {
-  selected: string[];
-  onChange: (tags: string[]) => void;
-  max?: number;
-}) {
-  function toggle(tag: string) {
-    if (selected.includes(tag)) {
-      onChange(selected.filter((item) => item !== tag));
-    } else if (selected.length < max) {
-      onChange([...selected, tag]);
-    }
-  }
-
-  return (
-    <div>
-      <div className="mb-2 flex items-baseline justify-between gap-3">
-        <span className="font-body text-xs font-medium text-foreground-muted">
-          Tags <span className="font-normal text-foreground-subtle">(up to {max})</span>
-        </span>
-        <span className="font-body text-xs tabular-nums text-foreground-subtle">
-          {selected.length}/{max} selected
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {/* Show any legacy stored tags (kept from older tag lists) as removable chips too. */}
-        {Array.from(new Set([...THREAD_TAGS, ...selected])).map((tag) => {
-          const active = selected.includes(tag);
-          const maxed = !active && selected.length >= max;
-          return (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => toggle(tag)}
-              disabled={maxed}
-              aria-pressed={active}
-              className={`${chipBase} ${active ? "" : maxed
-                ? "cursor-not-allowed border-border text-foreground-subtle opacity-45"
-                : chipIdle}`}
-              style={active ? BLUE_SELECTED_STYLE : undefined}
-            >
-              {active && <Check strokeWidth={2.5} size={11} />}
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Composer toolbar ──────────────────────────────────────────────────────────
-
-export function ComposerToolButton({
-  active,
-  disabled,
-  onClick,
-  children,
-}: {
-  active?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={active}
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 font-body text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        active
-          ? "border-accent/40 bg-accent/10 text-accent"
-          : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -351,7 +309,73 @@ export function FileAttachmentList({
   );
 }
 
-// ── Toggle row ────────────────────────────────────────────────────────────────
+/**
+ * Images/files area shared by the Post and Poll composer tabs. Shows a dashed
+ * add tile when nothing is attached yet, the image preview row + file list once
+ * something is added, and always keeps an "add" affordance visible.
+ */
+export function ComposerMedia({
+  attachments,
+  uploading,
+  onRemove,
+  onAddMore,
+}: {
+  attachments: ThreadAttachment[];
+  uploading: boolean;
+  onRemove: (url: string) => void;
+  onAddMore: () => void;
+}) {
+  const images = attachments.filter((a) => a.type.startsWith("image/"));
+  const files = attachments.filter((a) => !a.type.startsWith("image/"));
+
+  if (attachments.length === 0) {
+    return (
+      <button
+        type="button"
+        onClick={onAddMore}
+        disabled={uploading}
+        className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {uploading ? <Spinner size={14} /> : <ImageIcon strokeWidth={2.5} size={15} />}
+        {uploading ? "Uploading…" : "Add photo or file"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {images.length > 0 && (
+        <ImageAttachmentsRow
+          images={images}
+          uploading={uploading}
+          onRemove={onRemove}
+          onAddMore={onAddMore}
+        />
+      )}
+
+      {images.length === 0 && files.length > 0 && (
+        <button
+          type="button"
+          onClick={onAddMore}
+          disabled={uploading}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {uploading ? <Spinner size={13} /> : <ImageIcon strokeWidth={2.5} size={13} />}
+          {uploading ? "Uploading…" : "Add photo"}
+        </button>
+      )}
+
+      {files.length > 0 && (
+        <FileAttachmentList
+          files={files}
+          onRemove={onRemove}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Toggle row (blue theme) ──────────────────────────────────────────────────
 
 export function ToggleRow({
   title,
@@ -375,18 +399,23 @@ export function ToggleRow({
           <span className="block font-body text-xs text-foreground-muted">{description}</span>
         </span>
       </span>
-      <span
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${checked ? "bg-accent" : "bg-border"}`}
-      >
+      <span className="relative h-6 w-11 shrink-0">
         <input
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="sr-only"
+          className="peer sr-only"
         />
         <span
-          className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${
-            checked ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
+          aria-hidden="true"
+          className={`block h-6 w-11 rounded-full transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-accent/25 ${
+            checked ? "bg-[var(--ds-blue-700)]" : "bg-border"
+          }`}
+        />
+        <span
+          aria-hidden="true"
+          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_0_2px_rgba(0,0,0,0.25),0_1px_2px_rgba(0,0,0,0.15)] transition-transform duration-150 ${
+            checked ? "translate-x-5" : ""
           }`}
         />
       </span>

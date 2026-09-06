@@ -1,24 +1,6 @@
 /** Max body (title) length for threads — mirrors the DB column + API validation. */
 export const THREAD_BODY_MAX_LENGTH = 2000;
 
-export const THREAD_TAGS = [
-  "UI/UX",
-  "Product Design",
-  "Graphic Design",
-  "Design Systems",
-  "Web Design",
-  "Mobile Design",
-  "Branding",
-  "Illustration",
-  "3D / Motion",
-  "Typography",
-  "Tools & Workflow",
-  "Career",
-  "Other",
-] as const;
-
-export type ThreadTag = (typeof THREAD_TAGS)[number];
-
 export const THREAD_CATEGORIES = [
   { value: "question", label: "Question" },
   { value: "discussion", label: "Discussion" },

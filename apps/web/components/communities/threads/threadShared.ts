@@ -16,8 +16,8 @@ export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg:
 };
 
 /**
- * Selected-state colors for choice chips (category + tags). Uses the design
- * system's Geist blue tokens so it adapts to light/dark automatically.
+ * Selected-state colors for choice chips (categories, composer tabs). Uses the
+ * design system's Geist blue tokens so it adapts to light/dark automatically.
  */
 export const BLUE_SELECTED_STYLE = {
   borderColor: "var(--ds-blue-700)",
@@ -47,11 +47,6 @@ export function formatFullDate(value: string) {
 export function bodyToTitle(body: string): string {
   const trimmed = body.trim();
   return trimmed.slice(0, THREAD_BODY_MAX_LENGTH) || "Thread";
-}
-
-/** A poll draft that has no content at all (question + every option blank). */
-export function isPollDraftEmpty(draft: ThreadPollDraft): boolean {
-  return !draft.question.trim() && draft.options.every((option) => !option.trim());
 }
 
 /** Human-readable validation message for an incomplete poll draft. */
