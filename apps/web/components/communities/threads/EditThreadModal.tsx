@@ -8,7 +8,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { CommunityThread, ThreadAttachment, ThreadCategory, ThreadPollDraft } from "./types";
+import type { CommunityThread, ThreadAttachment, ThreadPollDraft } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
@@ -16,7 +16,6 @@ import {
   validatePollDraft,
 } from "./threadShared";
 import {
-  CategoryPicker,
   ComposerMedia,
   ComposerTabs,
   PollComposer,
@@ -45,7 +44,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const hasPoll = Boolean(thread.poll);
 
   const [body,            setBody]            = useState(thread.title);
-  const [category,        setCategory]        = useState<ThreadCategory>(thread.category);
   const [attachments,     setAttachments]     = useState<ThreadAttachment[]>(thread.attachments);
   const [tab,             setTab]             = useState<ThreadComposerTab>(hasPoll ? "poll" : "post");
   const [pollRemoved,     setPollRemoved]     = useState(false);
@@ -165,7 +163,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          category,
+          category: thread.category,
           tags: thread.tags,
           attachments,
           links: extractedLinks,
@@ -261,9 +259,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
             onAddMore={() => fileInputRef.current?.click()}
           />
-
-          {/* ── Category ── */}
-          <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Toggles ── */}
           <div className="divide-y divide-border">

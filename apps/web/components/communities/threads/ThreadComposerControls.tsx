@@ -9,18 +9,14 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { CategoryIcon } from "./categoryIcons";
 import {
-  THREAD_CATEGORIES,
   POLL_MIN_OPTIONS,
   POLL_MAX_OPTIONS,
   POLL_QUESTION_MAX_LENGTH,
   POLL_OPTION_MAX_LENGTH,
   type ThreadAttachment,
-  type ThreadCategory,
   type ThreadPollDraft,
 } from "./types";
-import { BLUE_SELECTED_STYLE } from "./threadShared";
 
 /**
  * Shared presentational pieces for the Create Thread and Edit Thread modals so
@@ -75,47 +71,6 @@ export function ComposerTabs({
         );
       })}
     </div>
-  );
-}
-
-// ── Choice chips (categories) ────────────────────────────────────────────────
-
-const chipBase =
-  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-body text-xs font-medium transition-colors";
-const chipIdle =
-  "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground";
-
-export function CategoryPicker({
-  value,
-  onChange,
-}: {
-  value: ThreadCategory;
-  onChange: (value: ThreadCategory) => void;
-}) {
-  return (
-    <fieldset>
-      <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
-        What&apos;s this about?
-      </legend>
-      <div className="flex flex-wrap gap-2">
-        {THREAD_CATEGORIES.map((item) => {
-          const active = value === item.value;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => onChange(item.value)}
-              aria-pressed={active}
-              className={`${chipBase} ${active ? "" : chipIdle}`}
-              style={active ? BLUE_SELECTED_STYLE : undefined}
-            >
-              <CategoryIcon category={item.value} size={12} />
-              {item.label}
-            </button>
-          );
-        })}
-      </div>
-    </fieldset>
   );
 }
 

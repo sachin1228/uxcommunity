@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import type { CommunityThread, ThreadAttachment, ThreadCategory, ThreadPollDraft } from "./types";
+import type { CommunityThread, ThreadAttachment, ThreadPollDraft } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
@@ -15,7 +15,6 @@ import {
   validatePollDraft,
 } from "./threadShared";
 import {
-  CategoryPicker,
   ComposerMedia,
   ComposerTabs,
   PollComposer,
@@ -49,7 +48,6 @@ export function CreateThreadModal({
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
   const [body,            setBody]            = useState("");
-  const [category,        setCategory]        = useState<ThreadCategory>("question");
   const [attachments,     setAttachments]     = useState<ThreadAttachment[]>([]);
   const [tab,             setTab]             = useState<ThreadComposerTab>("post");
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(null);
@@ -164,7 +162,7 @@ export function CreateThreadModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             title,
-            category,
+            category: "question",
             tags: [],
             attachments,
             links: extractedLinks,
@@ -255,9 +253,6 @@ export function CreateThreadModal({
             onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
             onAddMore={() => fileInputRef.current?.click()}
           />
-
-          {/* ── Category ── */}
-          <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Toggles ── */}
           <div className="divide-y divide-border">

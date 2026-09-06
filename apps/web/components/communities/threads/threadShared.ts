@@ -15,16 +15,6 @@ export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg:
   collaboration:{ border: "#0891B2", text: "#67E8F9", bg: "rgba(8,145,178,0.10)"  },
 };
 
-/**
- * Selected-state colors for choice chips (categories). Uses the design
- * system's Geist blue tokens so it adapts to light/dark automatically.
- */
-export const BLUE_SELECTED_STYLE = {
-  borderColor: "var(--ds-blue-700)",
-  backgroundColor: "var(--ds-blue-100)",
-  color: "var(--ds-blue-900)",
-} as const;
-
 export function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
   const minutes = Math.max(1, Math.floor(elapsed / 60_000));
