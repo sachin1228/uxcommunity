@@ -6,8 +6,6 @@ export const THREAD_CATEGORIES = [
   { value: "discussion", label: "Discussion" },
   { value: "idea", label: "Idea" },
   { value: "feedback", label: "Feedback" },
-  { value: "referral", label: "Referral" },
-  { value: "collaboration", label: "Collaboration" },
 ] as const;
 
 export type ThreadCategory = (typeof THREAD_CATEGORIES)[number]["value"];

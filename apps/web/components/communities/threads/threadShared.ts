@@ -11,8 +11,6 @@ export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg:
   discussion:   { border: "#737373", text: "#E5E5E5", bg: "rgba(255,255,255,0.08)" },
   idea:         { border: "#D97706", text: "#FCD34D", bg: "rgba(217,119,6,0.10)"  },
   feedback:     { border: "#EA580C", text: "#FB923C", bg: "rgba(234,88,12,0.10)"  },
-  referral:     { border: "#16A34A", text: "#4ADE80", bg: "rgba(22,163,74,0.10)"  },
-  collaboration:{ border: "#0891B2", text: "#67E8F9", bg: "rgba(8,145,178,0.10)"  },
 };
 
 export function formatRelativeDate(value: string) {

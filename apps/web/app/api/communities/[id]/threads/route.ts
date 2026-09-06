@@ -19,8 +19,6 @@ const CATEGORIES = new Set<ThreadCategory>([
   "discussion",
   "idea",
   "feedback",
-  "referral",
-  "collaboration",
 ]);
 
 interface RawAttachment {

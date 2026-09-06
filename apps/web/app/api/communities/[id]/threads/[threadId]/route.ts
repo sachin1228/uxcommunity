@@ -12,8 +12,7 @@ import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const CATEGORIES = new Set<ThreadCategory>([
-  "question", "discussion",
-  "idea", "feedback", "referral", "collaboration",
+  "question", "discussion", "idea", "feedback",
 ]);
 
 interface RawAttachment { name?: unknown; url?: unknown; type?: unknown; size?: unknown; }

@@ -9,7 +9,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { CommunityThread, ThreadAttachment, ThreadPollDraft } from "./types";
+import type { CommunityThread, ThreadAttachment, ThreadPollDraft, ThreadCategory } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
@@ -17,6 +17,7 @@ import {
   validatePollDraft,
 } from "./threadShared";
 import {
+  CategoryPicker,
   ComposerMedia,
   ComposerTabs,
   PollComposer,
@@ -50,6 +51,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const [pollRemoved,     setPollRemoved]     = useState(false);
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(() => pollToDraft(thread.poll));
   const [confirmRemovePoll, setConfirmRemovePoll] = useState(false);
+  const [category,        setCategory]        = useState<ThreadCategory>(thread.category);
   const [allowReplies,    setAllowReplies]    = useState(thread.allow_replies);
   const [isPublic,        setIsPublic]        = useState(thread.is_public ?? false);
   const [uploading,       setUploading]       = useState(false);
@@ -164,7 +166,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
-          category: thread.category,
+          category,
           tags: thread.tags,
           attachments,
           links: extractedLinks,
@@ -244,6 +246,9 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               <PollComposer value={pollDraft} onChange={setPollDraft} />
             )
           )}
+
+          {/* ── Category ── */}
+          <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Images / files (available for both posts and polls) ── */}
           <input
