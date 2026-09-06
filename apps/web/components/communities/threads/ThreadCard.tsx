@@ -474,11 +474,11 @@ export function ThreadCard({
 
         {/* ── Title ── */}
         {isDetail ? (
-          <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
+          <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-base font-semibold leading-snug text-foreground">
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : (
-          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
+          <h3 className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
             {renderWithLinks(thread.title, true)}
           </h3>
         )}
