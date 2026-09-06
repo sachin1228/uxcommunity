@@ -508,7 +508,7 @@ export function ThreadCard({
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
-                className="mt-1.5 inline-flex items-center gap-1 font-body text-xs font-medium text-accent transition-colors hover:text-accent-hover"
+                className="mt-1.5 inline-flex items-center gap-1 font-body text-xs font-medium text-foreground-subtle transition-colors hover:text-accent"
               >
                 More
               </button>
