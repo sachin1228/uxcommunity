@@ -57,9 +57,10 @@ export function ComposerTabs({
             onClick={() => onChange(tab.value)}
             aria-pressed={active}
             className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-body text-xs font-medium transition-colors ${
-              active ? "" : "text-foreground-muted hover:text-foreground"
+              active
+                ? "bg-accent/10 text-accent"
+                : "text-foreground-muted hover:text-foreground"
             }`}
-            style={active ? BLUE_SELECTED_STYLE : undefined}
           >
             <Icon strokeWidth={2.5} size={14} />
             {tab.label}

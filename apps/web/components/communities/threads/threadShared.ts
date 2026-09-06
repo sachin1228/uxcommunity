@@ -16,8 +16,8 @@ export const CATEGORY_COLORS: Record<string, { border: string; text: string; bg:
 };
 
 /**
- * Selected-state colors for choice chips (categories, composer tabs). Uses the
- * design system's Geist blue tokens so it adapts to light/dark automatically.
+ * Selected-state colors for choice chips (categories). Uses the design
+ * system's Geist blue tokens so it adapts to light/dark automatically.
  */
 export const BLUE_SELECTED_STYLE = {
   borderColor: "var(--ds-blue-700)",
