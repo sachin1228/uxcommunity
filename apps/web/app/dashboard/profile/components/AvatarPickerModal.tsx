@@ -102,7 +102,7 @@ export function AvatarPickerModal({
           )}
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-border px-6 py-4">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button
             type="button"
             onClick={onClose}

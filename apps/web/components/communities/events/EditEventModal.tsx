@@ -130,8 +130,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     >
       <form
         onSubmit={handleSubmit}
-        className="modal-panel max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto p-5"
+        className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl flex-col overflow-hidden"
       >
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="edit-event-title" className="font-display text-xl font-semibold text-foreground">
@@ -291,7 +292,9 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-sm text-red-400">{error}</p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
           <button type="submit" disabled={saving} className="modal-btn modal-btn-primary">
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
