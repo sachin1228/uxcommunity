@@ -247,7 +247,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
       {/* Search */}
       <div className="px-5 py-3 shrink-0">
         <div className="relative">
-          <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
+          <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={query}
@@ -262,10 +262,10 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
         {/* Pending Requests section */}
         {manager && isPrivate && (requestsLoading || (requestsLoaded && requests.length > 0)) && (
           <div className="px-5 pb-2">
-            <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-2">
+            <p className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">
               Pending Requests
               {requests.length > 0 && (
-                <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-accent/15 text-accent text-[10px] font-bold px-1">
+                <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary/15 text-primary text-[10px] font-bold px-1">
                   {requests.length}
                 </span>
               )}
@@ -277,11 +277,11 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             ) : (
               <ul className="space-y-1">
                 {requests.map((req) => (
-                  <li key={req.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-surface-raised/50">
+                  <li key={req.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-popover/50">
                     <ChatAvatar name={req.name} url={req.avatar_url} size={9} />
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-sm font-semibold text-foreground truncate leading-none">{req.name}</p>
-                      <p className="font-body text-xs text-foreground-muted mt-0.5">
+                      <p className="font-body text-xs text-muted-foreground mt-0.5">
                         Requested to join {timeAgo(req.requested_at)}
                       </p>
                     </div>
@@ -298,7 +298,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         type="button"
                         onClick={() => handleDecline(req.id)}
                         disabled={busyRequestId === req.id}
-                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <X strokeWidth={2.5} size={11} /> {busyRequestId === req.id ? "Declining…" : "Decline"}
                       </button>
@@ -317,7 +317,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             <Spinner size={24} />
           </div>
         ) : members.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-foreground-muted py-16">
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground py-16">
             <Users strokeWidth={2.5} size={32} className="opacity-30" />
             <p className="font-body text-sm">
               {debouncedQ ? "No members match your search." : "No members yet."}
@@ -326,7 +326,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
         ) : (
           <>
             {manager && !debouncedQ && (
-              <p className="px-5 pt-1 pb-0.5 font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <p className="px-5 pt-1 pb-0.5 font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Members
               </p>
             )}
@@ -343,7 +343,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                 return (
                   <li
                     key={member.user_id}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-raised transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-popover transition-colors"
                   >
                     <ChatAvatar name={member.name} url={member.avatar_url} size={9} />
                     <div className="min-w-0 flex-1">
@@ -352,7 +352,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                           {member.name}
                         </p>
                         {isOwnerRow ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[9px] font-bold uppercase tracking-wider leading-none shrink-0">
                             Owner
                           </span>
                         ) : isAdminRow ? (
@@ -362,7 +362,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         ) : null}
                       </div>
                       {member.designation && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-medium leading-none">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium leading-none">
                           {member.designation}
                         </span>
                       )}
@@ -373,13 +373,13 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
                         <button
                           type="button"
                           onClick={() => setOpenMenuFor(openMenuFor === member.user_id ? null : member.user_id)}
-                          className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
+                          className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                           aria-label="Member options"
                         >
                           <MoreHorizontal strokeWidth={2.5} size={14} />
                         </button>
                         {openMenuFor === member.user_id && (
-                          <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                          <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                             <button
                               type="button"
                               onClick={() => handleRemoveMember(member.user_id)}
@@ -405,7 +405,7 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             )}
 
             {!hasMore && members.length > 0 && (
-              <p className="text-center font-body text-[11px] text-foreground-muted/50 pb-4 pt-1">
+              <p className="text-center font-body text-[11px] text-muted-foreground/50 pb-4 pt-1">
                 {members.length} member{members.length !== 1 ? "s" : ""}
                 {debouncedQ ? " matched" : " total"}
               </p>

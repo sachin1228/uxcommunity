@@ -89,7 +89,7 @@ export function ThreadPollResult({
             return (
               <div
                 key={index}
-                className={`rounded-lg border px-3 py-2.5 ${isSelected ? "border-accent/40 bg-accent/5" : "border-border bg-background"}`}
+                className={`rounded-lg border px-3 py-2.5 ${isSelected ? "border-primary/40 bg-primary/5" : "border-border bg-background"}`}
               >
                 <div className="flex items-center gap-2.5">
                   {isSelected ? (
@@ -100,7 +100,7 @@ export function ThreadPollResult({
                       <Check strokeWidth={3} size={12} />
                     </span>
                   ) : (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-card font-body text-[10px] font-semibold text-foreground">
                       {letter}
                     </span>
                   )}
@@ -116,7 +116,7 @@ export function ThreadPollResult({
                   role="presentation"
                 >
                   <span
-                    className="block h-full rounded-full bg-accent transition-all duration-300"
+                    className="block h-full rounded-full bg-primary transition-all duration-300"
                     style={{ width: `${percents[index]}%` }}
                   />
                 </span>
@@ -143,11 +143,11 @@ export function ThreadPollResult({
                 aria-label={`Vote for ${letter}. ${option}`}
                 onClick={() => onVote?.(index)}
                 disabled={busy || !interactive}
-                className={`group/option flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed ${
+                className={`group/option flex w-full items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed ${
                   busy ? "disabled:opacity-60" : ""
                 } ${
                   interactive
-                    ? "hover:border-foreground-subtle hover:bg-surface-raised active:bg-surface-raised"
+                    ? "hover:border-muted-foreground hover:bg-popover active:bg-popover"
                     : "cursor-default"
                 }`}
               >
@@ -155,11 +155,11 @@ export function ThreadPollResult({
                   <Loader2
                     size={16}
                     strokeWidth={2.5}
-                    className="shrink-0 animate-spin text-accent"
+                    className="shrink-0 animate-spin text-primary"
                     aria-hidden
                   />
                 ) : (
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface font-body text-[10px] font-semibold text-foreground-subtle transition-colors group-hover/option:border-foreground-subtle group-hover/option:text-foreground-muted">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-card font-body text-[10px] font-semibold text-muted-foreground transition-colors group-hover/option:border-muted-foreground group-hover/option:text-muted-foreground">
                     {letter}
                   </span>
                 )}
@@ -172,7 +172,7 @@ export function ThreadPollResult({
         </div>
       ))}
 
-      <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] tabular-nums text-foreground-subtle">
+      <p className="mt-3 flex flex-wrap items-center gap-x-1.5 font-body text-[11px] tabular-nums text-muted-foreground">
         <span role="status">
           <span className="font-semibold text-white">
             {totalVotes} {totalVotes === 1 ? "vote" : "votes"}
@@ -187,7 +187,7 @@ export function ThreadPollResult({
               disabled={busy}
               aria-label="Undo your vote"
               aria-describedby={undoId}
-              className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-accent transition-colors hover:text-accent-hover hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-sm px-0.5 font-body text-[11px] font-medium tabular-nums text-primary transition-colors hover:text-primary hover:underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? (
                 <Loader2 size={11} strokeWidth={2.5} className="animate-spin" aria-hidden />
@@ -198,7 +198,7 @@ export function ThreadPollResult({
             <span
               id={undoId}
               role="tooltip"
-              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 font-body text-[10px] font-normal normal-case tracking-normal text-foreground-muted opacity-0 shadow-xs transition-opacity duration-150 group-hover/undo:opacity-100 group-focus-within/undo:opacity-100"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md border border-border bg-card px-2 py-1 font-body text-[10px] font-normal normal-case tracking-normal text-muted-foreground opacity-0 shadow-xs transition-opacity duration-150 group-hover/undo:opacity-100 group-focus-within/undo:opacity-100"
             >
               You can undo only once
             </span>

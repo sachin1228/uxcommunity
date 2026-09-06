@@ -91,7 +91,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
       <div className="modal-panel relative z-10 w-full max-w-md p-5">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
-          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
           </button>
         </div>
@@ -99,7 +99,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
           <div>
-            <label className="block font-body text-xs font-medium text-foreground-muted mb-1.5">
+            <label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
               {entity} name <span className="text-red-400">*</span>
             </label>
             <input
@@ -115,9 +115,9 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
 
           {/* Image upload */}
           <div>
-            <label className="block font-body text-xs font-medium text-foreground-muted mb-1.5">
+            <label className="block font-body text-xs font-medium text-muted-foreground mb-1.5">
               Logo / Image{" "}
-              <span className="text-foreground-muted font-normal">(optional)</span>
+              <span className="text-muted-foreground font-normal">(optional)</span>
             </label>
             <input
               ref={fileInputRef}
@@ -137,14 +137,14 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="font-body text-xs text-accent hover:underline text-left"
+                    className="font-body text-xs text-primary hover:underline text-left"
                   >
                     Change image
                   </button>
                   <button
                     type="button"
                     onClick={() => { setImageFile(null); setImagePreview(null); }}
-                    className="font-body text-xs text-foreground-muted hover:text-red-400 text-left"
+                    className="font-body text-xs text-muted-foreground hover:text-red-400 text-left"
                   >
                     Remove
                   </button>
@@ -154,11 +154,11 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-accent bg-surface-raised hover:bg-accent/5 py-5 transition-colors"
+                className="w-full flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border hover:border-primary bg-popover hover:bg-primary/5 py-5 transition-colors"
               >
-                <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
-                <span className="font-body text-xs text-foreground-muted">Click to upload</span>
-                <span className="font-body text-[10px] text-foreground-muted">
+                <ImagePlus strokeWidth={2.5} size={20} className="text-muted-foreground" />
+                <span className="font-body text-xs text-muted-foreground">Click to upload</span>
+                <span className="font-body text-[10px] text-muted-foreground">
                   PNG, JPG, WebP, SVG · max 5 MB
                 </span>
               </button>

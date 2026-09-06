@@ -5,14 +5,14 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 
 function PaperClip() {
   return (
-    <svg viewBox="0 0 32 72" className="w-6 h-14 text-foreground-muted/60 drop-shadow-sm" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+    <svg viewBox="0 0 32 72" className="w-6 h-14 text-muted-foreground/60 drop-shadow-sm" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
       <path d="M16 68 C5 68 2 60 2 52 L2 20 C2 10 8 4 16 4 C24 4 30 10 30 20 L30 52 C30 58 26 64 20 64 C14 64 10 59 10 53 L10 22 C10 17 13 14 16 14 C19 14 22 17 22 22 L22 52" />
     </svg>
   );
 }
 
 const fieldCls =
-  "bg-transparent border-b border-border focus:border-accent outline-none text-foreground font-body text-sm transition-colors w-full pb-0.5 placeholder:text-foreground-subtle resize-none";
+  "bg-transparent border-b border-border focus:border-primary outline-none text-foreground font-body text-sm transition-colors w-full pb-0.5 placeholder:text-muted-foreground resize-none";
 
 interface ProfileHeroProps {
   name: string;
@@ -36,7 +36,7 @@ export function ProfileHero({
   onOpenAvatarPicker,
 }: ProfileHeroProps) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-7 mb-5 relative overflow-hidden">
+    <div className="rounded-2xl border border-border bg-card p-7 mb-5 relative overflow-hidden">
       {/* Decorative dots */}
       <div
         className="absolute top-0 right-0 w-48 h-48 opacity-[0.03] pointer-events-none"
@@ -54,12 +54,12 @@ export function ProfileHero({
               className="bg-white p-2 pb-3 shadow-xl rounded-sm mt-4"
               style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2)" }}
             >
-              <div className="w-28 h-28 overflow-hidden rounded-sm bg-overlay-elevated">
+              <div className="w-28 h-28 overflow-hidden rounded-sm bg-popover">
                 {avatarUrl ? (
                   <AvatarImg url={avatarUrl} name={name} size={112} className="w-28 h-28 object-cover" />
                 ) : (
-                  <div className="w-28 h-28 flex items-center justify-center bg-accent/20">
-                    <span className="font-display text-4xl font-bold text-accent">
+                  <div className="w-28 h-28 flex items-center justify-center bg-primary/20">
+                    <span className="font-display text-4xl font-bold text-primary">
                       {name.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -70,7 +70,7 @@ export function ProfileHero({
 
           <button
             onClick={onOpenAvatarPicker}
-            className="flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-accent hover:border-accent/40 transition-all mt-2"
+            className="flex items-center gap-1.5 rounded-full border border-border bg-popover px-3 py-1.5 font-body text-xs text-muted-foreground hover:text-primary hover:border-primary/40 transition-all mt-2"
           >
             <Camera strokeWidth={2.5} size={11} />
             Change photo
@@ -80,7 +80,7 @@ export function ProfileHero({
         {/* Identity fields */}
         <div className="flex-1 grid grid-cols-1 gap-5 pt-1">
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider">
+            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Display Name
             </label>
             <input
@@ -93,18 +93,18 @@ export function ProfileHero({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
               <Mail strokeWidth={2.5} size={11} /> Email
             </label>
-            <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{email}</p>
+            <p className="font-body text-sm text-muted-foreground pb-0.5 border-b border-border/40">{email}</p>
           </div>
 
           {memberSince && (
             <div className="flex flex-col gap-1.5">
-              <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+              <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                 <Calendar strokeWidth={2.5} size={11} /> Member Since
               </label>
-              <p className="font-body text-sm text-foreground-subtle pb-0.5 border-b border-border/40">{memberSince}</p>
+              <p className="font-body text-sm text-muted-foreground pb-0.5 border-b border-border/40">{memberSince}</p>
             </div>
           )}
         </div>
@@ -112,7 +112,7 @@ export function ProfileHero({
         {/* Bio */}
         <div className="w-56 pt-1">
           <div className="flex flex-col gap-1.5">
-            <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider">
+            <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
               Bio
             </label>
             <textarea

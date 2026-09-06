@@ -36,7 +36,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
   return (
     <tr
       onClick={onClick}
-      className={`cursor-pointer transition-colors hover:bg-surface-raised ${
+      className={`cursor-pointer transition-colors hover:bg-popover ${
         !isLast ? "border-b border-border" : ""
       }`}
     >
@@ -51,12 +51,12 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
               lottieData={c.lottie_data}
               name={c.name}
               size={32}
-              className="bg-surface-raised"
+              className="bg-popover"
             />
             {c.lottie_url && (
               <span
                 title="Animated display picture (Lottie)"
-                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-background"
               >
                 <Sparkles strokeWidth={2.5} size={9} />
               </span>
@@ -77,7 +77,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       <td className="px-4 py-3">
         <span
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-body text-[11px] font-medium ${
-            TYPE_COLORS[c.type] ?? "bg-surface-raised text-foreground-muted"
+            TYPE_COLORS[c.type] ?? "bg-popover text-muted-foreground"
           }`}
         >
           {TYPE_LABELS[c.type] ?? c.type}
@@ -86,7 +86,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
 
       {/* Members */}
       <td className="px-4 py-3 text-right">
-        <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
+        <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted-foreground">
           <Users strokeWidth={2.5} size={11} />
           {c.member_count.toLocaleString()}
         </span>
@@ -94,7 +94,7 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
 
       {/* Messages */}
       <td className="px-4 py-3 text-right">
-        <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
+        <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted-foreground">
           <MessageSquare strokeWidth={2.5} size={11} />
           {c.message_count.toLocaleString()}
         </span>
@@ -114,13 +114,13 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
       </td>
 
       {/* Created */}
-      <td className="px-4 py-3 text-right font-body text-xs text-foreground-muted">
+      <td className="px-4 py-3 text-right font-body text-xs text-muted-foreground">
         {fmtDate(c.created_at)}
       </td>
 
       {/* Chevron */}
       <td className="px-4 py-3 text-right">
-        <ChevronRight strokeWidth={2.5} size={14} className="text-foreground-muted ml-auto" />
+        <ChevronRight strokeWidth={2.5} size={14} className="text-muted-foreground ml-auto" />
       </td>
     </tr>
   );

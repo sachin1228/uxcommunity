@@ -89,13 +89,13 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
     <Modal open={open} onClose={handleClose} title="Apply to uxcommunity" maxWidth="max-w-md">
       {step === "success" ? (
         <div className="flex flex-col items-center gap-4 py-4 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
             <span className="text-2xl">🎉</span>
           </div>
           <h3 className="font-display text-lg font-semibold text-foreground">
             Application submitted!
           </h3>
-          <p className="font-body text-sm text-foreground-muted leading-relaxed">
+          <p className="font-body text-sm text-muted-foreground leading-relaxed">
             Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
           </p>
           <button
@@ -188,7 +188,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             {loading ? "Submitting…" : "Submit Application"}
           </button>
 
-          <p className="text-center font-body text-xs text-foreground-muted">
+          <p className="text-center font-body text-xs text-muted-foreground">
             Join a curated community of designers — we review every application and send invitations to those who are approved.
           </p>
         </form>

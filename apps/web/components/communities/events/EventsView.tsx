@@ -168,7 +168,7 @@ export function EventsView({
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Events</h2>
-            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-muted-foreground">
               <span className="block">Community meetups, workshops, and</span>
               <span className="block">get-togethers.</span>
             </p>
@@ -191,7 +191,7 @@ export function EventsView({
                   type="button"
                   onClick={() => setFilter(item.value)}
                   aria-pressed={filter === item.value}
-                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground"}`}
                 >
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label} ({item.count})
@@ -250,7 +250,7 @@ export function EventsView({
             })}
             {nextCursor && (
               <div className="flex justify-center py-6">
-                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60">
+                <button type="button" onClick={() => void loadMore()} disabled={loadingMore} className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-popover disabled:opacity-60">
                   {loadingMore ? "Loading…" : "Load more"}
                 </button>
               </div>

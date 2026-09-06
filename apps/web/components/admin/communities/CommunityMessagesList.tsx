@@ -36,11 +36,11 @@ export function CommunityMessagesList({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-3 border-b border-border">
         <h2 className="font-body text-xs font-semibold text-foreground">
           Recent Messages
-          <span className="ml-2 font-mono text-[11px] text-foreground-muted font-normal">
+          <span className="ml-2 font-mono text-[11px] text-muted-foreground font-normal">
             {messageCount > 10
               ? `Last 10 of ${messageCount.toLocaleString()}`
               : messageCount}
@@ -49,13 +49,13 @@ export function CommunityMessagesList({
       </div>
 
       {messages.length === 0 ? (
-        <p className="px-5 py-6 font-body text-xs text-foreground-muted">No messages yet.</p>
+        <p className="px-5 py-6 font-body text-xs text-muted-foreground">No messages yet.</p>
       ) : (
         <div className="divide-y divide-border">
           {messages.map((msg) => (
             <div
               key={msg.id}
-              className="px-5 py-3 group hover:bg-surface-raised transition-colors"
+              className="px-5 py-3 group hover:bg-popover transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -63,18 +63,18 @@ export function CommunityMessagesList({
                     <span className="font-body text-[11px] font-medium text-foreground">
                       {msg.user_name}
                     </span>
-                    <span className="font-body text-[11px] text-foreground-muted">
+                    <span className="font-body text-[11px] text-muted-foreground">
                       {fmtDateTime(msg.created_at)}
                     </span>
                   </div>
-                  <p className="font-body text-xs text-foreground-muted line-clamp-2">
+                  <p className="font-body text-xs text-muted-foreground line-clamp-2">
                     {msg.content}
                   </p>
                 </div>
 
                 {confirmMsgId === msg.id ? (
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="font-body text-[11px] text-foreground-muted">Delete?</span>
+                    <span className="font-body text-[11px] text-muted-foreground">Delete?</span>
                     <button
                       onClick={() => handleDeleteMessage(msg.id)}
                       disabled={deletingMsgId === msg.id}
@@ -88,7 +88,7 @@ export function CommunityMessagesList({
                     </button>
                     <button
                       onClick={() => setConfirmMsgId(null)}
-                      className="font-body text-[11px] text-foreground-muted hover:text-foreground"
+                      className="font-body text-[11px] text-muted-foreground hover:text-foreground"
                     >
                       No
                     </button>
@@ -96,7 +96,7 @@ export function CommunityMessagesList({
                 ) : (
                   <button
                     onClick={() => setConfirmMsgId(msg.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-foreground-muted hover:text-red-400 rounded"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 p-1 text-muted-foreground hover:text-red-400 rounded"
                     title="Delete message"
                   >
                     <Trash2 strokeWidth={2.5} size={12} />

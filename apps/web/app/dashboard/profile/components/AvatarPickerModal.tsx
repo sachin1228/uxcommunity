@@ -48,7 +48,7 @@ export function AvatarPickerModal({
             type="button"
             onClick={onClose}
             aria-label="Close profile picture dialog"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
           >
             <X strokeWidth={2.5} size={16} aria-hidden="true" />
           </button>
@@ -75,15 +75,15 @@ export function AvatarPickerModal({
               <img
                 src={uploadPreview}
                 alt="Profile picture preview"
-                className="size-20 rounded-full object-cover ring-2 ring-accent"
+                className="size-20 rounded-full object-cover ring-2 ring-primary"
               />
               <div className="flex flex-col gap-1">
                 <p className="font-body text-sm font-medium text-foreground">Profile picture ready</p>
-                <p className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 5 MB</p>
+                <p className="font-body text-xs text-muted-foreground">JPEG, PNG or WebP · max 5 MB</p>
                 <button
                   type="button"
                   onClick={onRemoveUpload}
-                  className="w-fit font-body text-xs text-foreground-muted transition-colors hover:text-red-400"
+                  className="w-fit font-body text-xs text-muted-foreground transition-colors hover:text-red-400"
                 >
                   Remove picture
                 </button>
@@ -93,11 +93,11 @@ export function AvatarPickerModal({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent/50 hover:text-foreground"
+              className="flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
             >
               <Upload strokeWidth={2.5} aria-hidden="true" />
               <span className="font-body text-sm font-medium">Upload a profile picture</span>
-              <span className="font-body text-xs text-foreground-subtle">JPEG, PNG or WebP · max 5 MB</span>
+              <span className="font-body text-xs text-muted-foreground">JPEG, PNG or WebP · max 5 MB</span>
             </button>
           )}
         </div>

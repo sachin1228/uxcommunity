@@ -1,12 +1,8 @@
 import type { Config } from "tailwindcss";
+import animate from "tailwindcss-animate";
 
-/**
- * Tailwind config — all colors reference CSS custom properties from
- * @uxcommunity/design-system/css/tokens.css (imported in globals.css).
- * Light/dark mode is handled entirely by `prefers-color-scheme` in CSS;
- * no class-based toggling needed.
- */
 const config: Config = {
+  darkMode: ["class"],
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -14,62 +10,49 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Page / layout
-        background:           "var(--color-background)",
-        "background-subtle":  "var(--color-background-subtle)",
-
-        // Surfaces (cards, panels)
-        surface:              "var(--color-surface)",
-        "surface-raised":     "var(--color-surface-raised)",
-
-        // Text
-        foreground:           "var(--color-foreground)",
-        "foreground-muted":   "var(--color-foreground-muted)",
-        "foreground-subtle":  "var(--color-foreground-subtle)",
-
-        // Accent (Geist blue — primary)
-        // <alpha-value> is Tailwind's placeholder — replaced with the opacity
-        // fraction at build time so ring-accent/20, bg-accent/10, etc. work.
-        accent: "rgb(var(--color-accent-rgb) / <alpha-value>)",
-        "accent-hover":       "var(--color-accent-hover)",
-        "accent-soft":        "var(--color-accent-soft)",
-        "accent-foreground":  "var(--color-accent-foreground)",
-
-        // Borders
-        border:               "var(--color-border)",
-        "border-subtle":      "var(--color-border-subtle)",
-
-        // Brand signal
-        signal:               "var(--color-signal)",
-
-        // Always-dark overlay panel (left brand panel, code blocks, etc.)
-        overlay:               "var(--color-overlay)",
-        "overlay-raised":      "var(--color-overlay-raised)",
-        "overlay-elevated":    "var(--color-overlay-elevated)",
-        "overlay-foreground":  "var(--color-overlay-foreground)",
-        "overlay-muted":       "var(--color-overlay-muted)",
+        background: "hsl(var(--background) / <alpha-value>)",
+        foreground: "hsl(var(--foreground) / <alpha-value>)",
+        card: { DEFAULT: "hsl(var(--card) / <alpha-value>)", foreground: "hsl(var(--card-foreground) / <alpha-value>)" },
+        popover: { DEFAULT: "hsl(var(--popover) / <alpha-value>)", foreground: "hsl(var(--popover-foreground) / <alpha-value>)" },
+        primary: { DEFAULT: "hsl(var(--primary) / <alpha-value>)", foreground: "hsl(var(--primary-foreground) / <alpha-value>)" },
+        secondary: { DEFAULT: "hsl(var(--secondary) / <alpha-value>)", foreground: "hsl(var(--secondary-foreground) / <alpha-value>)" },
+        muted: { DEFAULT: "hsl(var(--muted) / <alpha-value>)", foreground: "hsl(var(--muted-foreground) / <alpha-value>)" },
+        accent: { DEFAULT: "hsl(var(--accent) / <alpha-value>)", foreground: "hsl(var(--accent-foreground) / <alpha-value>)" },
+        destructive: { DEFAULT: "hsl(var(--destructive) / <alpha-value>)", foreground: "hsl(var(--destructive-foreground) / <alpha-value>)" },
+        border: "hsl(var(--border) / <alpha-value>)",
+        input: "hsl(var(--input) / <alpha-value>)",
+        ring: "hsl(var(--ring) / <alpha-value>)",
+        scrim: "hsl(var(--scrim) / <alpha-value>)",
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background) / <alpha-value>)",
+          foreground: "hsl(var(--sidebar-foreground) / <alpha-value>)",
+          primary: "hsl(var(--sidebar-primary) / <alpha-value>)",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground) / <alpha-value>)",
+          accent: "hsl(var(--sidebar-accent) / <alpha-value>)",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground) / <alpha-value>)",
+          border: "hsl(var(--sidebar-border) / <alpha-value>)",
+          ring: "hsl(var(--sidebar-ring) / <alpha-value>)",
+        },
       },
       fontFamily: {
+        sans: ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "Geist", "sans-serif"],
-        body:    ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono:    ["var(--font-mono)", "Geist Mono", "ui-monospace", "monospace"],
+        body: ["var(--font-display)", "Geist", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "Geist Mono", "ui-monospace", "monospace"],
       },
       boxShadow: {
-        xs:   "var(--shadow-xs)",
-        sm:   "var(--shadow-sm)",
-        md:   "var(--shadow-md)",
-        card: "var(--shadow-card)",
+        xs: "0 1px 2px hsl(var(--scrim) / 0.05)",
+        card: "0 1px 3px hsl(var(--scrim) / 0.1)",
       },
       borderRadius: {
-        sm:   "var(--radius-sm)",
-        md:   "var(--radius-md)",
-        lg:   "var(--radius-lg)",
-        xl:   "var(--radius-xl)",
-        full: "var(--radius-full)",
+        sm: "calc(var(--radius) - 4px)",
+        md: "calc(var(--radius) - 2px)",
+        lg: "var(--radius)",
+        xl: "calc(var(--radius) + 4px)",
       },
     },
   },
-  plugins: [],
+  plugins: [animate],
 };
 
 export default config;

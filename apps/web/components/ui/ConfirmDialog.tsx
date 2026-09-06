@@ -51,7 +51,7 @@ export function ConfirmDialog({
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-500">
           <AlertTriangle strokeWidth={2.5} size={18} />
         </div>
-        <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
+        <p className="font-body text-sm leading-6 text-muted-foreground">{message}</p>
       </div>
       <div className="mt-6 flex justify-end gap-2">
         <button

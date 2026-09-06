@@ -5,8 +5,8 @@ import { MapPin, Layers, Star, Lock } from "lucide-react";
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <span className="font-mono text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded">{num}</span>
-      <span className="font-display text-xs font-semibold text-foreground-muted uppercase tracking-widest">{label}</span>
+      <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">{num}</span>
+      <span className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</span>
       <div className="flex-1 h-px bg-border" />
     </div>
   );
@@ -24,31 +24,31 @@ export function ProfileIdentity({
   experienceLevel,
 }: ProfileIdentityProps) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6 mb-5">
+    <div className="rounded-2xl border border-border bg-card p-6 mb-5">
       <SectionLabel num="01" label="Professional Identity" />
       <div className="flex flex-wrap gap-3 mb-3">
         {city && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <MapPin strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2">
+            <MapPin strokeWidth={2.5} size={13} className="text-primary shrink-0" />
             <span className="font-body text-sm text-foreground">{city}</span>
           </div>
         )}
         {sector && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <Layers strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2">
+            <Layers strokeWidth={2.5} size={13} className="text-primary shrink-0" />
             <span className="font-body text-sm text-foreground">{sector}</span>
           </div>
         )}
         {experienceLevel && (
-          <div className="flex items-center gap-2 rounded-xl border border-border bg-surface-raised px-3.5 py-2">
-            <Star strokeWidth={2.5} size={13} className="text-accent shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-popover px-3.5 py-2">
+            <Star strokeWidth={2.5} size={13} className="text-primary shrink-0" />
             <span className="font-body text-sm text-foreground capitalize">
               {experienceLevel.replace(/_/g, " ")}
             </span>
           </div>
         )}
       </div>
-      <p className="flex items-center gap-1.5 font-body text-[11px] text-foreground-subtle">
+      <p className="flex items-center gap-1.5 font-body text-[11px] text-muted-foreground">
         <Lock strokeWidth={2.5} size={10} />
         These are linked to your community membership and can&apos;t be changed here.
       </p>

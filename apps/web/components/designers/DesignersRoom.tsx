@@ -262,7 +262,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {!ready && !error && (
         <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-background">
           <Spinner className="h-9 w-9" />
-          <p className="font-body text-sm text-foreground-muted">Entering the park…</p>
+          <p className="font-body text-sm text-muted-foreground">Entering the park…</p>
         </div>
       )}
 
@@ -273,7 +273,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
           <button
             type="button"
             onClick={leave}
-            className="rounded-lg bg-accent px-4 py-2 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+            className="rounded-lg bg-primary px-4 py-2 font-body text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
           >
             Back to dashboard
           </button>
@@ -283,10 +283,10 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {/* Top controls sit in the 60px margin, outside the game canvas. */}
       {ready && !intro && (
         <div className="absolute right-0 top-[-48px] z-30 flex h-9 items-center gap-2">
-          <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-foreground-muted backdrop-blur sm:flex">
+          <span className="hidden items-center gap-1.5 rounded-lg border border-border bg-background/70 px-3 py-1.5 font-body text-xs text-muted-foreground backdrop-blur sm:flex">
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                realtimeConnected ? "bg-emerald-500" : "bg-foreground-muted/40"
+                realtimeConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
               }`}
             />
             {realtimeConnected ? `${online} online` : "park offline"}
@@ -299,8 +299,8 @@ export function DesignersRoomView({ userId, userName }: Props) {
             onClick={toggleMic}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
               micState === "on"
-                ? "bg-accent text-accent-foreground"
-                : "bg-background/70 text-foreground-muted hover:text-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background/70 text-muted-foreground hover:text-foreground"
             }`}
             aria-label={micState === "on" ? "Turn off microphone" : "Turn on microphone"}
             title={
@@ -319,7 +319,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             type="button"
             onClick={toggleMute}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border border-border backdrop-blur transition-colors ${
-              muted ? "bg-background/70 text-foreground" : "bg-background/70 text-foreground-muted hover:text-foreground"
+              muted ? "bg-background/70 text-foreground" : "bg-background/70 text-muted-foreground hover:text-foreground"
             }`}
             aria-label={muted ? "Unmute voice" : "Mute voice"}
             title={muted ? "Unmute voice" : "Mute voice"}
@@ -344,7 +344,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             </h2>
             <p
               id="bella-welcome-description"
-              className="mt-3 font-body text-sm leading-relaxed text-foreground-muted"
+              className="mt-3 font-body text-sm leading-relaxed text-muted-foreground"
             >
               This is a live room with real people. Walk up to someone to hear them—no microphone is
               needed to listen.

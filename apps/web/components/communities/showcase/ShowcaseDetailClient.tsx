@@ -74,14 +74,14 @@ function Composer({
           <button
             type="button"
             onClick={onCancel}
-            className="font-body text-xs text-foreground-muted"
+            className="font-body text-xs text-muted-foreground"
           >
             Cancel
           </button>
         )}
         <button
           disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-sm text-accent-foreground disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-sm text-primary-foreground disabled:opacity-50"
         >
           {saving ? (
             <Spinner size={13} className="text-white" />
@@ -132,7 +132,7 @@ function CommentRow({
           className="size-8 rounded-full object-cover"
         />
       ) : (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
           {name[0]}
         </div>
       )}
@@ -145,21 +145,21 @@ function CommentRow({
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="ml-auto text-foreground-subtle hover:text-red-400"
+              className="ml-auto text-muted-foreground hover:text-red-400"
               aria-label="Delete comment"
             >
               <Trash2 strokeWidth={2.5} size={13} />
             </button>
           )}
         </div>
-        <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm text-foreground-muted">
+        <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm text-muted-foreground">
           {comment.body}
         </p>
         {!reply && (
           <button
             type="button"
             onClick={() => setReplying(!replying)}
-            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle"
+            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-muted-foreground"
           >
             <CornerDownRight strokeWidth={2.5} size={11} />
             Reply
@@ -296,7 +296,7 @@ export function ShowcaseDetailClient({
         <BackLink
           href={backHref ?? `/dashboard/communities/${communityId}?tab=showcase`}
           label={backLabel ?? "Showcase"}
-          className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted"
+          className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-muted-foreground"
         />
         <ShowcaseCard
           post={post}
@@ -345,7 +345,7 @@ export function ShowcaseDetailClient({
               </div>
             ))}
             {!comments.length && (
-              <p className="text-center font-body text-sm text-foreground-muted">
+              <p className="text-center font-body text-sm text-muted-foreground">
                 No comments yet. Be the first!
               </p>
             )}

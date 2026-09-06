@@ -86,7 +86,7 @@ export function Modal({
             {!hideCloseButton && (
               <button
                 onClick={onClose}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
                 aria-label="Close"
               >
                 <X strokeWidth={2.5} size={16} />
@@ -97,7 +97,7 @@ export function Modal({
         {!title && !hideCloseButton && (
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+            className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
             aria-label="Close"
           >
             <X strokeWidth={2.5} size={16} />

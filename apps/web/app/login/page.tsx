@@ -77,7 +77,7 @@ export default function LoginPage() {
                 {showApplyLink && (
                   <Link
                     href="/signup"
-                    className="mt-1 inline-block font-body text-xs text-accent underline hover:text-accent-hover"
+                    className="mt-1 inline-block font-body text-xs text-primary underline hover:text-primary"
                   >
                     Create an account →
                   </Link>
@@ -107,7 +107,7 @@ export default function LoginPage() {
                 </span>
                 <Link
                   href="/forgot-password"
-                  className="font-body text-xs text-accent transition-colors hover:text-accent-hover"
+                  className="font-body text-xs text-primary transition-colors hover:text-primary"
                 >
                   Forgot password?
                 </Link>
@@ -125,7 +125,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-subtle transition-colors hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff strokeWidth={2.5} size={16} /> : <Eye strokeWidth={2.5} size={16} />}
@@ -136,7 +136,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-1 flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading && <Spinner className="h-4 w-4 text-white" />}
               {loading ? "Logging in…" : "Log in"}
@@ -145,7 +145,7 @@ export default function LoginPage() {
 
           <div className="my-6 flex items-center gap-3">
             <span className="h-px flex-1 bg-border" />
-            <span className="font-mono text-[10px] uppercase tracking-wider text-foreground-subtle">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
               or continue with
             </span>
             <span className="h-px flex-1 bg-border" />
@@ -154,7 +154,7 @@ export default function LoginPage() {
           <button
             type="button"
             disabled
-            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-border bg-surface py-2.5 font-body text-sm text-foreground-subtle opacity-60"
+            className="flex w-full cursor-not-allowed items-center justify-center rounded-md border border-border bg-card py-2.5 font-body text-sm text-muted-foreground opacity-60"
           >
             Google{" "}
             <span className="font-mono text-[10px] tracking-wide">
@@ -163,11 +163,11 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="mt-6 text-center font-body text-sm text-foreground-muted">
+        <p className="mt-6 text-center font-body text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
             href="/signup"
-            className="font-medium text-accent transition-colors hover:text-accent-hover"
+            className="font-medium text-primary transition-colors hover:text-primary"
           >
             Sign up
           </Link>

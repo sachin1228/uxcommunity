@@ -58,7 +58,7 @@ function CommunityCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`group flex flex-col gap-2 rounded-xl border bg-surface-raised p-3 transition-colors ${
+      className={`group flex flex-col gap-2 rounded-xl border bg-popover p-3 transition-colors ${
         c.joined
           ? "border-white/[0.1] hover:border-white/[0.18] cursor-pointer"
           : locked
@@ -78,7 +78,7 @@ function CommunityCard({
             lottieData={c.lottie_data}
             name={c.name}
             size={36}
-            className="bg-surface"
+            className="bg-card"
           />
 
           {/* Name + member count */}
@@ -86,7 +86,7 @@ function CommunityCard({
             <p className="font-display text-sm font-semibold text-foreground truncate leading-tight">
               {c.name}
             </p>
-            <p className="font-body text-[11px] text-foreground-muted leading-tight mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground leading-tight mt-0.5">
               {c.member_count.toLocaleString()} member{c.member_count !== 1 ? "s" : ""}
             </p>
           </div>
@@ -97,7 +97,7 @@ function CommunityCard({
           {c.joined ? (
             <button
               onClick={() => router.push(`/dashboard/communities/${c.id}`)}
-              className="flex items-center gap-1 rounded-full border border-accent/40 px-3 py-1 font-body text-xs font-medium text-accent hover:bg-accent/10 transition-colors"
+              className="flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1 font-body text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
             >
               <Check size={10} strokeWidth={2.5} />
               Joined
@@ -109,7 +109,7 @@ function CommunityCard({
                 disabled
                 onMouseEnter={showTip}
                 onMouseLeave={hideTip}
-                className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
+                className="flex items-center cursor-pointer gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-muted-foreground/60"
               >
                 <Lock strokeWidth={2.5} size={10} />
                 Join
@@ -119,7 +119,7 @@ function CommunityCard({
                   className="pointer-events-none w-56 rounded-xl border border-white/10 bg-[#1c1c1e] px-3 py-2.5 shadow-2xl"
                   style={{ position: "fixed", top: tipPos.top, right: tipPos.right, zIndex: 9999 }}
                 >
-                  <p className="font-body text-[11px] text-foreground-muted/90 text-center leading-relaxed">
+                  <p className="font-body text-[11px] text-muted-foreground/90 text-center leading-relaxed">
                     {LOCK_REASON[c.type] ?? "Update your profile to join"}
                   </p>
                 </div>,
@@ -129,7 +129,7 @@ function CommunityCard({
           ) : c.has_pending_request ? (
             <button
               disabled
-              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-foreground-muted/60"
+              className="flex items-center gap-1 rounded-full border border-white/[0.06] px-3 py-1 font-body text-xs font-medium text-muted-foreground/60"
             >
               Request sent
             </button>
@@ -137,7 +137,7 @@ function CommunityCard({
             <button
               onClick={() => onJoin(c.id)}
               disabled={joining}
-              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-surface hover:border-border-strong transition-colors disabled:opacity-60"
+              className="rounded-full border border-border px-3 py-1 font-body text-xs font-semibold text-foreground hover:bg-card hover:border-border-strong transition-colors disabled:opacity-60"
             >
               {joining ? "…" : c.is_private ? "Request to join" : "Join"}
             </button>
@@ -147,7 +147,7 @@ function CommunityCard({
 
       {/* ── Description — faded when locked ── */}
       {c.description && (
-        <p className={`font-body text-[11px] leading-relaxed text-foreground-muted line-clamp-2 pl-[46px] ${locked ? "opacity-50" : ""}`}>
+        <p className={`font-body text-[11px] leading-relaxed text-muted-foreground line-clamp-2 pl-[46px] ${locked ? "opacity-50" : ""}`}>
           {c.description}
         </p>
       )}
@@ -288,7 +288,7 @@ export default function CommunitiesIndexPage() {
         {/* Search */}
         <div className="relative mb-4">
           <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             width="13" height="13" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
           >
@@ -315,7 +315,7 @@ export default function CommunitiesIndexPage() {
                 className={`shrink-0 rounded-full border px-4 py-1.5 font-body text-sm font-medium transition-colors ${
                   isActive
                     ? "border-foreground bg-foreground text-background"
-                    : "border-border bg-transparent text-foreground-muted hover:border-border-strong hover:text-foreground"
+                    : "border-border bg-transparent text-muted-foreground hover:border-border-strong hover:text-foreground"
                 }`}
               >
                 {tab.label}
@@ -340,7 +340,7 @@ export default function CommunitiesIndexPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
-            <p className="font-body text-sm text-foreground-muted">No communities found</p>
+            <p className="font-body text-sm text-muted-foreground">No communities found</p>
           </div>
         ) : (
           <>

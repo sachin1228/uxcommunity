@@ -82,7 +82,7 @@ export default function ModerationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-semibold text-foreground">Moderation</h1>
-          <p className="font-body text-xs text-foreground-muted mt-0.5">
+          <p className="font-body text-xs text-muted-foreground mt-0.5">
             Review flagged content and user safety actions
           </p>
         </div>
@@ -95,31 +95,31 @@ export default function ModerationPage() {
             onClick={() => selectStatus(tab.value)}
             className={`rounded-lg border px-4 py-3 text-left transition-colors ${
               status === tab.value
-                ? "border-accent bg-accent/10"
-                : "border-border bg-surface hover:bg-surface-raised"
+                ? "border-primary bg-primary/10"
+                : "border-border bg-card hover:bg-popover"
             }`}
           >
-            <p className="font-body text-xs text-foreground-muted">{tab.label}</p>
+            <p className="font-body text-xs text-muted-foreground">{tab.label}</p>
             <p className="mt-1 font-mono text-2xl text-foreground">{counts[tab.value]}</p>
           </button>
         ))}
       </div>
 
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-16">
             <Spinner className="h-5 w-5" />
           </div>
         ) : events.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="font-body text-sm text-foreground-muted">No moderation events found.</p>
+            <p className="font-body text-sm text-muted-foreground">No moderation events found.</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border bg-surface-raised">
+              <tr className="border-b border-border bg-popover">
                 {["Content", "User", "Decision", "Rules", "Time", "Actions"].map((heading, index) => (
-                  <th key={heading} className={`px-4 py-2.5 font-body text-[11px] font-medium text-foreground-muted ${index === 5 ? "text-right" : "text-left"}`}>
+                  <th key={heading} className={`px-4 py-2.5 font-body text-[11px] font-medium text-muted-foreground ${index === 5 ? "text-right" : "text-left"}`}>
                     {heading}
                   </th>
                 ))}
@@ -127,14 +127,14 @@ export default function ModerationPage() {
             </thead>
             <tbody>
               {events.map((event, index) => (
-                <tr key={event.id} className={`${index < events.length - 1 ? "border-b border-border-subtle" : ""} align-top`}>
+                <tr key={event.id} className={`${index < events.length - 1 ? "border-b border-border" : ""} align-top`}>
                   <td className="px-4 py-3">
                     <p className="font-body text-xs font-medium text-foreground">{event.content_type.replaceAll("_", " ")}</p>
-                    <p className="mt-1 font-mono text-[10px] text-foreground-muted">{event.content_ref_id ?? event.id}</p>
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">{event.content_ref_id ?? event.id}</p>
                   </td>
                   <td className="px-4 py-3">
                     <p className="font-body text-xs text-foreground">{event.users?.name ?? "Unknown"}</p>
-                    <p className="font-body text-[11px] text-foreground-muted">{event.users?.email ?? "No account"}</p>
+                    <p className="font-body text-[11px] text-muted-foreground">{event.users?.email ?? "No account"}</p>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] ${
@@ -142,40 +142,40 @@ export default function ModerationPage() {
                     }`}>
                       {event.status}
                     </span>
-                    <p className="mt-1 font-body text-[11px] text-foreground-muted">{event.reason || "No reason"}</p>
-                    <p className="font-mono text-[10px] text-foreground-muted">{event.provider} · {Math.round(event.confidence * 100)}%</p>
+                    <p className="mt-1 font-body text-[11px] text-muted-foreground">{event.reason || "No reason"}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{event.provider} · {Math.round(event.confidence * 100)}%</p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex max-w-sm flex-wrap gap-1">
                       {(event.triggered_rules ?? []).slice(0, 4).map((rule, ruleIndex) => (
-                        <span key={`${event.id}-${ruleIndex}`} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-foreground-muted">
+                        <span key={`${event.id}-${ruleIndex}`} className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                           {rule.category}
                         </span>
                       ))}
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-mono text-[10px] text-foreground-muted">{new Date(event.created_at).toLocaleString()}</p>
-                    <p className="font-mono text-[10px] text-foreground-muted">{event.duration_ms} ms</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{new Date(event.created_at).toLocaleString()}</p>
+                    <p className="font-mono text-[10px] text-muted-foreground">{event.duration_ms} ms</p>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1.5">
                       {event.status !== "approved" && (
-                        <button onClick={() => updateEvent(event.id, { status: "approved" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-foreground-muted hover:text-foreground">
+                        <button onClick={() => updateEvent(event.id, { status: "approved" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-muted-foreground hover:text-foreground">
                           Approve
                         </button>
                       )}
                       {event.status !== "rejected" && (
-                        <button onClick={() => updateEvent(event.id, { status: "rejected" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-foreground-muted hover:text-foreground">
+                        <button onClick={() => updateEvent(event.id, { status: "rejected" })} className="rounded-md border border-border px-2 py-1 font-body text-xs text-muted-foreground hover:text-foreground">
                           Reject
                         </button>
                       )}
                       {event.user_id && (
-                        <button title="Permanent ban" onClick={() => updateEvent(event.id, { ban_user: true, moderator_notes: "Permanent ban from moderation queue." })} className="rounded-md border border-border p-1.5 text-foreground-muted hover:text-red-400">
+                        <button title="Permanent ban" onClick={() => updateEvent(event.id, { ban_user: true, moderator_notes: "Permanent ban from moderation queue." })} className="rounded-md border border-border p-1.5 text-muted-foreground hover:text-red-400">
                           <ShieldAlert strokeWidth={2.5} size={14} />
                         </button>
                       )}
-                      <button title="Delete event" onClick={() => deleteEvent(event.id)} className="rounded-md border border-border p-1.5 text-foreground-muted hover:text-red-400">
+                      <button title="Delete event" onClick={() => deleteEvent(event.id)} className="rounded-md border border-border p-1.5 text-muted-foreground hover:text-red-400">
                         <Trash2 strokeWidth={2.5} size={14} />
                       </button>
                     </div>
@@ -189,12 +189,12 @@ export default function ModerationPage() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-xs text-foreground-muted">Page {page} of {totalPages}</p>
+          <p className="font-body text-xs text-muted-foreground">Page {page} of {totalPages}</p>
           <div className="flex gap-1.5">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground disabled:opacity-40">
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground disabled:opacity-40">
               <ChevronLeft strokeWidth={2.5} size={13} /> Prev
             </button>
-            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground disabled:opacity-40">
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground disabled:opacity-40">
               Next <ChevronRight strokeWidth={2.5} size={13} />
             </button>
           </div>

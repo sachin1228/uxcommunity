@@ -52,7 +52,7 @@ export function MessageEditModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+            className="rounded-full p-1 text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
             aria-label="Close edit message dialog"
           >
             <X size={25} strokeWidth={2.5} />
@@ -68,12 +68,12 @@ export function MessageEditModal({
             backgroundSize: "24px 24px",
           }}
         >
-          <div className="relative max-w-[65%] rounded-[10px] rounded-tl-none bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-accent-foreground shadow-sm [--color-accent-foreground:white]">
+          <div className="relative max-w-[65%] rounded-[10px] rounded-tl-none bg-[var(--ds-blue-700)] px-3 pt-2 pb-1.5 text-primary-foreground shadow-sm [--color-accent-foreground:white]">
             <MessageBubbleTail className="text-[var(--ds-blue-700)]" />
             <p className="whitespace-pre-wrap break-words font-body text-[15px] leading-6">
               {input || message.content}
             </p>
-            <div className="mt-1 flex items-center justify-end gap-1 text-accent-foreground opacity-60">
+            <div className="mt-1 flex items-center justify-end gap-1 text-primary-foreground opacity-60">
               <span className="font-mono text-[10px]">{fmtTime(message.created_at)}</span>
               <CheckCheck strokeWidth={2.5} size={12} />
             </div>
@@ -82,7 +82,7 @@ export function MessageEditModal({
 
         <div className="shrink-0 px-6 pb-6 pt-3">
           {error && <p className="mb-2 font-body text-xs text-red-400">{error}</p>}
-          <div className="flex items-end gap-3 border-b-2 border-accent pb-2">
+          <div className="flex items-end gap-3 border-b-2 border-primary pb-2">
             <textarea
               ref={textareaRef}
               data-edit-message-input
@@ -95,12 +95,12 @@ export function MessageEditModal({
               onKeyDown={onKeyDown}
               rows={1}
               placeholder="Edit message"
-              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent font-body text-[16px] leading-7 text-foreground outline-none placeholder:text-foreground-muted"
+              className="max-h-[120px] min-h-[28px] flex-1 resize-none overflow-y-auto bg-transparent font-body text-[16px] leading-7 text-foreground outline-none placeholder:text-muted-foreground"
               disabled={saving}
             />
             <button
               type="button"
-              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+              className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
               aria-label="Add emoji"
               title="Add emoji"
             >
@@ -110,7 +110,7 @@ export function MessageEditModal({
               type="button"
               onClick={onSave}
               disabled={saving || !input.trim()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Save edited message"
               title="Save edit"
             >

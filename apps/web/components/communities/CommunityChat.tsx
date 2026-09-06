@@ -1160,7 +1160,7 @@ export function CommunityChat({
   if (!loading && !displayCommunity) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="font-body text-sm text-foreground-muted">Community not found.</p>
+        <p className="font-body text-sm text-muted-foreground">Community not found.</p>
       </div>
     );
   }
@@ -1322,7 +1322,7 @@ export function CommunityChat({
             {showScrollToBottom && (
               <button
                 onClick={() => bottomRef.current?.scrollIntoView({ behavior: "smooth" })}
-                className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-surface-raised shadow-lg border border-border text-foreground-muted hover:text-foreground transition-colors"
+                className="absolute -top-10 right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-popover shadow-lg border border-border text-muted-foreground hover:text-foreground transition-colors"
                 aria-label="Scroll to bottom"
               >
                 <ChevronDown strokeWidth={2.5} size={16} />

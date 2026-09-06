@@ -38,8 +38,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 function EmptyState({ icon, message }: { icon: React.ReactNode; message: string }) {
   return (
     <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
-      <div className="mx-auto flex justify-center mb-2 text-foreground-subtle">{icon}</div>
-      <p className="font-body text-sm text-foreground-muted">{message}</p>
+      <div className="mx-auto flex justify-center mb-2 text-muted-foreground">{icon}</div>
+      <p className="font-body text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }
@@ -306,8 +306,8 @@ export function ProfileThreads({
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-5 py-3.5 font-body text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === tab.id
-                ? "border-accent text-accent"
-                : "border-transparent text-foreground-muted hover:text-foreground"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {tab.icon}

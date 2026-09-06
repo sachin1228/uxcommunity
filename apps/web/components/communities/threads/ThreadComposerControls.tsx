@@ -39,7 +39,7 @@ export function CategoryPicker({
 }) {
   return (
     <div>
-      <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+      <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
         Category
       </span>
       <div className="flex flex-wrap gap-2">
@@ -54,8 +54,8 @@ export function CategoryPicker({
               aria-pressed={active}
               className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
                 active
-                  ? "border-accent bg-accent/5 text-accent"
-                  : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground"
               }`}
             >
               <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
@@ -103,8 +103,8 @@ export function ComposerTabs({
             onClick={() => onChange(tab.value)}
             className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
               active
-                ? "border-accent text-foreground"
-                : "border-transparent text-foreground-muted hover:text-foreground"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             <span className="inline-flex items-center gap-1.5">
@@ -153,8 +153,8 @@ export function PollComposer({
   return (
     <div className="rounded-xl border border-border bg-background p-4">
       <div className="flex items-center gap-1.5">
-        <BarChart3 strokeWidth={2.5} size={13} className="text-foreground-muted" />
-        <span className="font-body text-xs font-semibold text-foreground-muted">
+        <BarChart3 strokeWidth={2.5} size={13} className="text-muted-foreground" />
+        <span className="font-body text-xs font-semibold text-muted-foreground">
           Poll
         </span>
       </div>
@@ -163,7 +163,7 @@ export function PollComposer({
         <div>
           <label
             htmlFor="poll-question"
-            className="mb-1.5 block font-body text-xs font-medium text-foreground-muted"
+            className="mb-1.5 block font-body text-xs font-medium text-muted-foreground"
           >
             Question
           </label>
@@ -180,7 +180,7 @@ export function PollComposer({
         <div className="space-y-1.5">
           {options.map((option, index) => (
             <div key={index} className="flex items-center gap-2">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border font-body text-[11px] font-semibold text-foreground-subtle">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border font-body text-[11px] font-semibold text-muted-foreground">
                 {String.fromCharCode(65 + index)}
               </span>
               <input
@@ -195,7 +195,7 @@ export function PollComposer({
                   type="button"
                   onClick={() => removeOption(index)}
                   aria-label={`Remove option ${index + 1}`}
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-foreground-subtle hover:text-foreground"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
                 >
                   <X strokeWidth={2.5} size={13} />
                 </button>
@@ -208,14 +208,14 @@ export function PollComposer({
           <button
             type="button"
             onClick={addOption}
-            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent"
+            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
           >
             <Plus strokeWidth={2.5} size={12} />
             Add option
           </button>
         )}
         {options.length >= POLL_MAX_OPTIONS && (
-          <p className="font-body text-[11px] text-foreground-subtle">
+          <p className="font-body text-[11px] text-muted-foreground">
             You can add up to {POLL_MAX_OPTIONS} options.
           </p>
         )}
@@ -270,7 +270,7 @@ export function ImageAttachmentsRow({
           type="button"
           onClick={onAddMore}
           disabled={uploading}
-          className="flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border px-3 font-body text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex min-w-[112px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-dashed border-border px-3 font-body text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? (
             <Spinner size={16} />
@@ -278,7 +278,7 @@ export function ImageAttachmentsRow({
             <Plus strokeWidth={2.5} size={18} />
           )}
           <span className="text-[11px] font-medium">{uploading ? "Uploading…" : "Add more"}</span>
-          <span className="text-[10px] text-foreground-subtle">(Max {THREAD_IMAGE_MAX})</span>
+          <span className="text-[10px] text-muted-foreground">(Max {THREAD_IMAGE_MAX})</span>
         </button>
       )}
     </div>
@@ -298,7 +298,7 @@ export function FileAttachmentList({
       {files.map((file) => (
         <div
           key={file.url}
-          className="flex items-center gap-2 rounded-lg bg-surface-raised px-3 py-2 font-body text-xs text-foreground-muted"
+          className="flex items-center gap-2 rounded-lg bg-popover px-3 py-2 font-body text-xs text-muted-foreground"
         >
           <Paperclip strokeWidth={2.5} size={13} className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">{file.name}</span>
@@ -306,7 +306,7 @@ export function FileAttachmentList({
             type="button"
             onClick={() => onRemove(file.url)}
             aria-label={`Remove ${file.name}`}
-            className="text-foreground-subtle hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground"
           >
             <X strokeWidth={2.5} size={13} />
           </button>
@@ -341,7 +341,7 @@ export function ComposerMedia({
         type="button"
         onClick={onAddMore}
         disabled={uploading}
-        className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
       >
         {uploading ? <Spinner size={14} /> : <ImageIcon strokeWidth={2.5} size={15} />}
         {uploading ? "Uploading…" : "Add photo or file"}
@@ -365,7 +365,7 @@ export function ComposerMedia({
           type="button"
           onClick={onAddMore}
           disabled={uploading}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
         >
           {uploading ? <Spinner size={13} /> : <ImageIcon strokeWidth={2.5} size={13} />}
           {uploading ? "Uploading…" : "Add photo"}
@@ -400,10 +400,10 @@ export function ToggleRow({
   return (
     <label className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3">
       <span className="flex items-center gap-2.5">
-        {icon && <span className="shrink-0 text-foreground-muted">{icon}</span>}
+        {icon && <span className="shrink-0 text-muted-foreground">{icon}</span>}
         <span>
           <span className="block font-body text-sm font-medium text-foreground">{title}</span>
-          <span className="block font-body text-xs text-foreground-muted">{description}</span>
+          <span className="block font-body text-xs text-muted-foreground">{description}</span>
         </span>
       </span>
       <span className="relative h-6 w-11 shrink-0">
@@ -415,7 +415,7 @@ export function ToggleRow({
         />
         <span
           aria-hidden="true"
-          className={`block h-6 w-11 rounded-full transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-accent/25 ${
+          className={`block h-6 w-11 rounded-full transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-primary/25 ${
             checked ? "bg-[var(--ds-blue-700)]" : "bg-border"
           }`}
         />

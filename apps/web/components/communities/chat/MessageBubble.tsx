@@ -68,10 +68,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-primary-foreground opacity-80" : "text-muted-foreground"}`}>
         {reply.user_name}
       </p>
-      <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[11px] truncate ${isMe ? "text-primary-foreground opacity-70" : "text-muted-foreground"}`}>
         {reply.content || "📷 Image"}
       </p>
     </div>
@@ -146,7 +146,7 @@ function BubbleImage({
           ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
-                : "border-border bg-surface-raised"
+                : "border-border bg-popover"
             }`
           : "relative"}
       >
@@ -239,7 +239,7 @@ function DeleteConfirmDialog({
           <p className="font-body text-base font-semibold text-foreground text-center">
             Delete message?
           </p>
-          <p className="font-body text-xs text-foreground-muted text-center mt-1">
+          <p className="font-body text-xs text-muted-foreground text-center mt-1">
             This will delete the message for everyone in this chat.
           </p>
         </div>
@@ -254,7 +254,7 @@ function DeleteConfirmDialog({
           <div className="h-px bg-white/[0.06]" />
           <button
             onClick={(e) => { e.stopPropagation(); onCancel(); }}
-            className="w-full px-5 py-3.5 font-body text-sm text-foreground-muted hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
+            className="w-full px-5 py-3.5 font-body text-sm text-muted-foreground hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
           >
             Cancel
           </button>
@@ -399,7 +399,7 @@ function MessageHoverActions({
               transition-colors duration-100
               ${pickerOpen
                 ? "bg-white/15 text-foreground"
-                : "text-foreground-muted hover:text-foreground hover:bg-white/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/10"
               }
             `}
             aria-label="React to message"
@@ -457,7 +457,7 @@ function MessageHoverActions({
             className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
             role="menuitem"
           >
-            <Reply strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+            <Reply strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
             <span>Reply</span>
           </button>
 
@@ -471,7 +471,7 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Copy strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Copy</span>
             </button>
           )}
@@ -486,7 +486,7 @@ function MessageHoverActions({
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
               role="menuitem"
             >
-              <Pencil strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+              <Pencil strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Edit</span>
             </button>
           )}
@@ -572,7 +572,7 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className={`underline underline-offset-2 break-all ${
-          isMe ? "text-accent-foreground opacity-90 hover:opacity-100" : "text-foreground hover:opacity-80"
+          isMe ? "text-primary-foreground opacity-90 hover:opacity-100" : "text-foreground hover:opacity-80"
         }`}
       >
         {url}
@@ -590,8 +590,8 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
     <span
       className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
         isMe
-          ? "bg-black/25 text-accent-foreground"
-          : "bg-accent/15 text-accent"
+          ? "bg-black/25 text-primary-foreground"
+          : "bg-primary/15 text-primary"
       }`}
     >
       {text}</span>
@@ -685,7 +685,7 @@ function MessageContent({
     <>
       <div
         className={`chat-message-text font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
-          isMe ? "text-accent-foreground" : "text-foreground"
+          isMe ? "text-primary-foreground" : "text-foreground"
         }`}
       >
         {parts}
@@ -730,20 +730,20 @@ function DeletedBubble({
       className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-          : "bg-surface-raised"
+          : "bg-popover"
         }`}
     >
       {isFirstInGroup && (
         <MessageBubbleTail
           side={isMe ? "right" : "left"}
-          className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
+          className={isMe ? "text-[var(--ds-blue-700)]" : "text-popover"}
         />
       )}
-      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
-      <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
+      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-primary-foreground" : "shrink-0 text-muted-foreground"} />
+      <span className={`font-body text-xs ${isMe ? "text-primary-foreground" : "text-muted-foreground"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
+      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-primary-foreground opacity-60" : "text-muted-foreground"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>
@@ -868,7 +868,7 @@ export const MessageBubble = memo(function MessageBubble({
         <div className="min-w-0 max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
-            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
+            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-muted-foreground">
               <span>{sender.name}</span>
             </p>
           )}
@@ -886,16 +886,16 @@ export const MessageBubble = memo(function MessageBubble({
                   <AnimatedEmoji emoji={msg.content} size={EMOJI_MESSAGE_SIZE} />
                   <div className="flex items-center gap-1 mt-0.5">
                     {msg.edited_at && (
-                      <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
+                      <span className="font-body text-[10px] text-muted-foreground/60">edited</span>
                     )}
-                    <span className="font-mono text-[10px] text-foreground-muted/70">
+                    <span className="font-mono text-[10px] text-muted-foreground/70">
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
-                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
+                      <Clock strokeWidth={2.5} size={10} className="text-muted-foreground/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
+                      <CheckCheck strokeWidth={2.5} size={11} className="text-muted-foreground/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -941,7 +941,7 @@ export const MessageBubble = memo(function MessageBubble({
                             ? msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised"
+                            : "bg-popover"
                         }`
                   }`}
                 >
@@ -952,7 +952,7 @@ export const MessageBubble = memo(function MessageBubble({
                         ? msg.status === "failed"
                           ? "text-red-500/80"
                           : "text-[var(--ds-blue-700)]"
-                        : "text-surface-raised"}
+                        : "text-popover"}
                     />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
@@ -981,20 +981,20 @@ export const MessageBubble = memo(function MessageBubble({
                   {!imageOnly && (
                     <div className="flex items-center justify-end gap-1 mt-1">
                       {msg.edited_at && (
-                        <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
+                        <span className={`font-body text-[10px] ${isMe ? "text-primary-foreground opacity-50" : "text-muted-foreground"}`}>
                           edited
                         </span>
                       )}
                       <span className={`font-mono text-[10px] ${
-                        isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
+                        isMe ? "text-primary-foreground opacity-60" : "text-muted-foreground"
                       }`}>
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
+                        <Clock strokeWidth={2.5} size={10} className="text-primary-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
+                        <CheckCheck strokeWidth={2.5} size={11} className="text-primary-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>

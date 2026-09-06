@@ -28,7 +28,7 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
       <button
         onClick={onSave}
         disabled={saving}
-        className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2 font-body text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
+        className="flex items-center justify-center gap-2 rounded-md bg-popover py-2 font-body text-xs font-medium text-foreground transition-colors hover:bg-popover disabled:opacity-60"
       >
         {saving && <Spinner className="h-3 w-3" />}
         {saving ? "Saving…" : "Save Notes & Tags"}

@@ -149,7 +149,7 @@ export function MessageActionSlider({
           {/* Message preview */}
           {message && (
             <div className="px-5 py-3 border-b border-white/[0.06]">
-              <p className="font-body text-xs text-foreground-muted line-clamp-2">
+              <p className="font-body text-xs text-muted-foreground line-clamp-2">
                 {message.content}
               </p>
             </div>
@@ -184,7 +184,7 @@ export function MessageActionSlider({
                 onClose();
               }}
             >
-              <Reply strokeWidth={2.5} size={18} className="text-foreground-muted shrink-0" />
+              <Reply strokeWidth={2.5} size={18} className="text-muted-foreground shrink-0" />
               <span className="font-body text-sm text-foreground">Reply</span>
             </button>
 
@@ -196,7 +196,7 @@ export function MessageActionSlider({
                 onClose();
               }}
             >
-              <Copy strokeWidth={2.5} size={18} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={18} className="text-muted-foreground shrink-0" />
               <span className="font-body text-sm text-foreground">Copy</span>
             </button>
           </div>

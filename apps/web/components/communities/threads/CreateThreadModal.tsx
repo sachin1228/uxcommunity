@@ -173,11 +173,11 @@ export function CreateThreadModal({
               <h2 id="create-thread-title" className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
                 Create Thread
               </h2>
-              <p className="mt-1 font-body text-[13px] text-foreground-muted">
+              <p className="mt-1 font-body text-[13px] text-muted-foreground">
                 Share your thoughts, ask a question, or start a discussion
               </p>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-popover hover:text-foreground">
               <X strokeWidth={2.5} size={16} />
             </button>
           </div>
@@ -197,7 +197,7 @@ export function CreateThreadModal({
                 rows={4}
                 className="field w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
               />
-              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
+              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-muted-foreground">
                 {body.length}/{THREAD_BODY_MAX_LENGTH}
               </span>
             </div>
@@ -254,13 +254,13 @@ export function CreateThreadModal({
         )}
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+          <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-muted-foreground transition-colors hover:bg-popover hover:text-foreground">
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving || uploading}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent px-3 font-body text-[13px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-primary px-3 font-body text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Spinner size={14} className="text-white" />}
             {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
@@ -271,11 +271,11 @@ export function CreateThreadModal({
         {isDragging && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
+            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-primary bg-primary/10"
           >
             <div className="flex flex-col items-center gap-2">
-              <ImageIcon strokeWidth={2.5} size={22} className="text-accent" />
-              <span className="font-body text-sm font-medium text-accent">
+              <ImageIcon strokeWidth={2.5} size={22} className="text-primary" />
+              <span className="font-body text-sm font-medium text-primary">
                 Drop images or files to attach
               </span>
             </div>

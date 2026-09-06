@@ -92,7 +92,7 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
       <h1 className="mt-8 font-display text-2xl font-semibold text-foreground">
         Welcome{firstName ? `, ${firstName}` : ""}!
       </h1>
-      <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">
+      <p className="mt-1.5 text-center font-body text-sm text-muted-foreground">
         Setting everything up for you — this will only take a moment.
       </p>
 
@@ -104,11 +104,11 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
             <li
               key={step.label}
               className={`flex items-center gap-3 rounded-lg border px-4 py-2.5 transition-colors ${
-                done ? "border-border/60 bg-surface" : "border-transparent bg-transparent"
+                done ? "border-border/60 bg-card" : "border-transparent bg-transparent"
               }`}
             >
               {done ? (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                   <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                     <path
                       fillRule="evenodd"
@@ -123,12 +123,12 @@ function LoadingPhase({ firstName }: { firstName?: string }) {
                 </span>
               ) : (
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center">
-                  <span className="h-2 w-2 rounded-full bg-foreground-subtle/50" />
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
                 </span>
               )}
               <span
                 className={`font-body text-sm transition-colors ${
-                  done || active ? "text-foreground" : "text-foreground-subtle"
+                  done || active ? "text-foreground" : "text-muted-foreground"
                 }`}
               >
                 {step.label}
@@ -153,7 +153,7 @@ function ReadyPhase({
   return (
     <div className="flex w-full max-w-sm flex-col items-center animate-in fade-in zoom-in-95 duration-300">
       <div className="relative">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg">
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg">
           <svg className="h-9 w-9" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
@@ -162,7 +162,7 @@ function ReadyPhase({
             />
           </svg>
         </div>
-        <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-surface-raised text-base shadow animate-in fade-in zoom-in-95 duration-200">
+        <span className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-popover text-base shadow animate-in fade-in zoom-in-95 duration-200">
           🎉
         </span>
       </div>
@@ -170,7 +170,7 @@ function ReadyPhase({
       <h1 className="mt-8 text-center font-display text-3xl font-semibold text-foreground">
         You&apos;re all set{firstName ? `, ${firstName}` : ""}!
       </h1>
-      <p className="mt-2 text-center font-body text-sm text-foreground-muted">
+      <p className="mt-2 text-center font-body text-sm text-muted-foreground">
         {typeof joinedCommunities === "number" && joinedCommunities > 0 ? (
           <>
             Your account is ready and you&apos;ve been added to{" "}
@@ -187,7 +187,7 @@ function ReadyPhase({
       <button
         type="button"
         onClick={onGoToDashboard}
-        className="mt-8 w-full rounded-md bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+        className="mt-8 w-full rounded-md bg-primary py-3 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
       >
         Go to Dashboard →
       </button>
@@ -222,20 +222,20 @@ function ErrorPhase({
       <h1 className="mt-6 font-display text-xl font-semibold text-foreground">
         Something went wrong
       </h1>
-      <p className="mt-1.5 text-center font-body text-sm text-foreground-muted">
+      <p className="mt-1.5 text-center font-body text-sm text-muted-foreground">
         {errorMessage ?? "We couldn't finish setting up your account. Please try again."}
       </p>
       <button
         type="button"
         onClick={onRetry}
-        className="mt-7 w-full rounded-md bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+        className="mt-7 w-full rounded-md bg-primary py-3 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
       >
         Try Again
       </button>
       <button
         type="button"
         onClick={onClose}
-        className="mt-3 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+        className="mt-3 font-body text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         Go back
       </button>

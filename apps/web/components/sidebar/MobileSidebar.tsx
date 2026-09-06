@@ -41,7 +41,7 @@ export function MobileSidebar({ userId, user }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-popover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:hidden"
         aria-label="Open navigation menu"
         aria-expanded={open}
         aria-controls="mobile-dashboard-navigation"
@@ -70,7 +70,7 @@ export function MobileSidebar({ userId, user }: Props) {
                 ref={closeButtonRef}
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-popover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 aria-label="Close navigation menu"
               >
                 <X strokeWidth={2.5} size={20} aria-hidden="true" />

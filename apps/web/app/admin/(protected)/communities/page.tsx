@@ -104,7 +104,7 @@ export default function AdminCommunitiesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-xl font-semibold text-foreground">Communities</h1>
-          <p className="font-body text-xs text-foreground-muted mt-0.5">
+          <p className="font-body text-xs text-muted-foreground mt-0.5">
             {loading
               ? "Loading…"
               : `${communities.length} live communit${communities.length !== 1 ? "ies" : "y"}`}
@@ -153,7 +153,7 @@ export default function AdminCommunitiesPage() {
                   className={`relative flex items-center gap-1.5 rounded-t-md border border-b-0 px-3 py-2 font-body text-xs whitespace-nowrap transition-colors ${
                     isActive
                       ? "border-border bg-background text-foreground"
-                      : "border-transparent text-foreground-muted hover:text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <Icon size={13} strokeWidth={2.5} />
@@ -161,8 +161,8 @@ export default function AdminCommunitiesPage() {
                   <span
                     className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
                       isActive
-                        ? "bg-accent/15 text-accent"
-                        : "bg-surface-raised text-foreground-muted"
+                        ? "bg-primary/15 text-primary"
+                        : "bg-popover text-muted-foreground"
                     }`}
                   >
                     {countByMainTab(tab.value)}
@@ -188,21 +188,21 @@ export default function AdminCommunitiesPage() {
                 key={tab.value}
                 onClick={() => setTypeTab(tab.value)}
                 className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-2 font-body text-xs whitespace-nowrap transition-colors ${
-                  isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
+                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab.label}
                 <span
                   className={`font-mono text-[11px] font-medium px-1.5 py-0.5 rounded-full ${
                     isActive
-                      ? "bg-accent/15 text-accent"
-                      : "bg-surface-raised text-foreground-muted"
+                      ? "bg-primary/15 text-primary"
+                      : "bg-popover text-muted-foreground"
                   }`}
                 >
                   {countByTypeTab(tab.value)}
                 </span>
                 {isActive && (
-                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+                  <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t-full" />
                 )}
               </button>
             );
@@ -214,7 +214,7 @@ export default function AdminCommunitiesPage() {
       <div className="relative">
         <Search
           size={13}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
         <input
           type="text"
@@ -233,18 +233,18 @@ export default function AdminCommunitiesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
-            <p className="font-body text-sm text-foreground-muted">No communities found</p>
+            <p className="font-body text-sm text-muted-foreground">No communities found</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border bg-surface-raised">
-                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-foreground-muted">Community</th>
-                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-foreground-muted">Type</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-foreground-muted">Members</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-foreground-muted">Messages</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-foreground-muted">Status</th>
-                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-foreground-muted">Created</th>
+              <tr className="border-b border-border bg-popover">
+                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Community</th>
+                <th className="px-4 py-2.5 text-left font-body text-[11px] font-medium text-muted-foreground">Type</th>
+                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Members</th>
+                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Messages</th>
+                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Status</th>
+                <th className="px-4 py-2.5 text-right font-body text-[11px] font-medium text-muted-foreground">Created</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -270,7 +270,7 @@ export default function AdminCommunitiesPage() {
             <h2 className="font-display text-base font-semibold text-foreground mb-1">
               Reset all community chat?
             </h2>
-            <p className="font-body text-xs text-foreground-muted mb-5">
+            <p className="font-body text-xs text-muted-foreground mb-5">
               This will permanently delete <span className="text-red-400 font-medium">every message</span> across{" "}
               <span className="text-foreground font-medium">all {communities.length} communities</span>. Members and communities themselves are kept. This cannot be undone.
             </p>

@@ -117,7 +117,7 @@ export function ImageLightbox({
             <p className="font-body text-sm font-semibold text-foreground truncate">
               {image.user_name ?? "Unknown"}
             </p>
-            <p className="font-body text-[11px] text-foreground-muted">
+            <p className="font-body text-[11px] text-muted-foreground">
               {fmtDate(image.created_at)} at {fmtTime(image.created_at)}
             </p>
           </div>

@@ -34,8 +34,8 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
         {avatarUrl ? (
           <AvatarImg url={avatarUrl} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
         ) : (
-          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center select-none">
-            <span className="font-display text-xs font-semibold text-accent-foreground">
+          <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center select-none">
+            <span className="font-display text-xs font-semibold text-primary-foreground">
               {initial}
             </span>
           </div>
@@ -52,14 +52,14 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
       >
         <div className="border-b border-border px-3.5 py-3">
           <p className="truncate font-body text-sm font-medium leading-tight text-foreground">{name}</p>
-          <p className="mt-1 truncate font-body text-xs leading-tight text-foreground-muted">{email}</p>
+          <p className="mt-1 truncate font-body text-xs leading-tight text-muted-foreground">{email}</p>
         </div>
 
         <div className="border-b border-border py-1">
           <Link
             href="/dashboard/profile"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             <UserCircle strokeWidth={2} size={16} />
             <span>View profile</span>
@@ -67,7 +67,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
           <Link
             href="/dashboard/communities"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             <Compass strokeWidth={2} size={16} />
             <span>Explore communities</span>
@@ -75,7 +75,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
           <Link
             href="/dashboard/library"
             onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
           >
             <Library strokeWidth={2} size={16} />
             <span>Library</span>
@@ -86,7 +86,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-muted-foreground transition-colors hover:bg-card hover:text-foreground disabled:opacity-50"
           >
             <LogOut strokeWidth={2} size={16} />
             <span>{loggingOut ? "Signing out..." : "Sign out"}</span>

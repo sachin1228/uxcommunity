@@ -18,17 +18,17 @@ export function InviteLinkBox({ inviteLink }: Props) {
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
+    <div className="rounded-md border border-border bg-card p-3">
       <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
         <Link strokeWidth={2.5} size={12} /> Invitation Link
       </p>
       <div className="flex items-center gap-2">
-        <p className="font-mono text-xs text-foreground-muted bg-surface-raised rounded px-2.5 py-1.5 flex-1 truncate select-all">
+        <p className="font-mono text-xs text-muted-foreground bg-popover rounded px-2.5 py-1.5 flex-1 truncate select-all">
           {inviteLink}
         </p>
         <button
           onClick={copyLink}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors shrink-0"
+          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors shrink-0"
         >
           {copied ? (
             <CheckCheck strokeWidth={2.5} size={12} className="text-green-400" />
@@ -38,7 +38,7 @@ export function InviteLinkBox({ inviteLink }: Props) {
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      <p className="font-body text-[10px] text-foreground-muted mt-1.5">
+      <p className="font-body text-[10px] text-muted-foreground mt-1.5">
         Share this link with the applicant to let them create their account.
       </p>
     </div>

@@ -81,7 +81,7 @@ export function ThreadImageCarousel({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: "pan-y" }}
-      className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
+      className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-card"
     >
       {/* Invisible sizing anchor — keeps the viewport height identical to the
           single-image layout so the thread never jumps while sliding. */}

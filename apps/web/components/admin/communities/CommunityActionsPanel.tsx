@@ -62,14 +62,14 @@ export function CommunityActionsPanel({
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-surface overflow-hidden divide-y divide-border">
+      <div className="rounded-xl border border-border bg-card overflow-hidden divide-y divide-border">
         {/* Activate / Deactivate */}
         <div className="flex items-center justify-between px-5 py-3.5">
           <div>
             <p className="font-body text-xs font-medium text-foreground">
               {isActive ? "Deactivate community" : "Activate community"}
             </p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">
               {isActive
                 ? "Hides this community from all users immediately. Members and messages are preserved."
                 : "Makes this community visible to users again."}
@@ -78,14 +78,14 @@ export function CommunityActionsPanel({
           <button
             onClick={handleToggle}
             disabled={toggleLoading}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs font-medium text-foreground-muted hover:bg-surface-raised transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs font-medium text-muted-foreground hover:bg-popover transition-colors disabled:opacity-50"
           >
             {toggleLoading ? (
               <Spinner className="h-3.5 w-3.5" />
             ) : isActive ? (
               <ToggleRight strokeWidth={2.5} size={14} className="text-green-400" />
             ) : (
-              <ToggleLeft strokeWidth={2.5} size={14} className="text-foreground-muted" />
+              <ToggleLeft strokeWidth={2.5} size={14} className="text-muted-foreground" />
             )}
             {isActive ? "Deactivate" : "Activate"}
           </button>
@@ -95,7 +95,7 @@ export function CommunityActionsPanel({
         <div className="flex items-center justify-between px-5 py-3.5">
           <div>
             <p className="font-body text-xs font-medium text-red-400">Delete community</p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">
               Permanently removes the community, all members, and all messages. Cannot be undone.
             </p>
           </div>
@@ -116,7 +116,7 @@ export function CommunityActionsPanel({
             <h2 className="font-display text-base font-semibold text-foreground mb-1">
               Delete &ldquo;{communityName}&rdquo;?
             </h2>
-            <p className="font-body text-xs text-foreground-muted mb-5">
+            <p className="font-body text-xs text-muted-foreground mb-5">
               This will permanently remove the community and all{" "}
               <span className="text-foreground font-medium">
                 {messageCount} message{messageCount !== 1 ? "s" : ""}

@@ -45,7 +45,7 @@ interface TabDef {
 function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="px-6 py-3.5">
-      <p className="font-body text-[10px] uppercase tracking-wider text-foreground-muted">{label}</p>
+      <p className="font-body text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-1 font-mono text-sm text-foreground">{value}</p>
     </div>
   );
@@ -53,8 +53,8 @@ function StatTile({ label, value }: { label: string; value: React.ReactNode }) {
 
 function MetaCell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="bg-surface px-5 py-4">
-      <p className="font-body text-[10px] uppercase tracking-wider text-foreground-muted">{label}</p>
+    <div className="bg-card px-5 py-4">
+      <p className="font-body text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <div className="mt-1.5 font-body text-xs text-foreground">{children ?? "—"}</div>
     </div>
   );
@@ -202,10 +202,10 @@ export default function CommunityDetailPage() {
   if (error || !community) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <p className="font-body text-sm text-foreground-muted">{error ?? "Community not found."}</p>
+        <p className="font-body text-sm text-muted-foreground">{error ?? "Community not found."}</p>
         <button
           onClick={() => router.push("/admin/communities")}
-          className="font-body text-xs text-accent hover:underline"
+          className="font-body text-xs text-primary hover:underline"
         >
           Back to Communities
         </button>
@@ -229,20 +229,20 @@ export default function CommunityDetailPage() {
   ];
 
   const typeClasses = TYPE_COLORS_WITH_BORDER[community.type] ??
-    "bg-surface-raised text-foreground-muted border-border";
+    "bg-popover text-muted-foreground border-border";
 
   return (
     <div className="flex w-full flex-col gap-6">
       {/* Back */}
       <button
         onClick={() => router.push("/admin/communities")}
-        className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
+        className="flex items-center gap-1.5 font-body text-xs text-muted-foreground hover:text-foreground transition-colors w-fit"
       >
         <ArrowLeft strokeWidth={2.5} size={13} /> Communities
       </button>
 
       {/* Hero */}
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
         {/* Subtle banner */}
         <div
           aria-hidden="true"
@@ -250,7 +250,7 @@ export default function CommunityDetailPage() {
         />
 
         <div className="flex flex-col gap-5 px-6 pb-5 sm:flex-row sm:items-end sm:-mt-10">
-          <div className="rounded-full ring-4 ring-surface">
+          <div className="rounded-full ring-4 ring-card">
             <CommunityDp
               imageUrl={community.image_url}
               lottieUrl={community.lottie_url}
@@ -258,7 +258,7 @@ export default function CommunityDetailPage() {
               lottieData={community.lottie_data}
               name={community.name}
               size={76}
-              className="bg-surface-raised"
+              className="bg-popover"
             />
           </div>
 
@@ -284,7 +284,7 @@ export default function CommunityDetailPage() {
                 </button>
                 <button
                   onClick={() => { setEditing(false); setEditError(null); }}
-                  className="p-1 text-foreground-muted hover:text-foreground"
+                  className="p-1 text-muted-foreground hover:text-foreground"
                 >
                   <X strokeWidth={2.5} size={15} />
                 </button>
@@ -296,7 +296,7 @@ export default function CommunityDetailPage() {
                 </h1>
                 <button
                   onClick={() => { setEditName(community.name); setEditing(true); }}
-                  className="shrink-0 p-1 text-foreground-muted hover:text-foreground transition-colors"
+                  className="shrink-0 p-1 text-muted-foreground hover:text-foreground transition-colors"
                   title="Rename community"
                 >
                   <Pencil strokeWidth={2.5} size={13} />
@@ -317,7 +317,7 @@ export default function CommunityDetailPage() {
                 </span>
               )}
               {appCreated && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-body text-[11px] font-medium bg-surface-raised text-foreground-muted border border-border">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-body text-[11px] font-medium bg-popover text-muted-foreground border border-border">
                   App-created
                 </span>
               )}
@@ -349,7 +349,7 @@ export default function CommunityDetailPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`relative flex items-center gap-1.5 px-3 pb-2.5 pt-2 font-body text-xs whitespace-nowrap transition-colors ${
-                isActive ? "text-foreground" : "text-foreground-muted hover:text-foreground"
+                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Icon size={13} strokeWidth={2.5} />
@@ -357,14 +357,14 @@ export default function CommunityDetailPage() {
               {t.count != null && (
                 <span
                   className={`font-mono text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-                    isActive ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
+                    isActive ? "bg-primary/15 text-primary" : "bg-popover text-muted-foreground"
                   }`}
                 >
                   {t.count.toLocaleString()}
                 </span>
               )}
               {isActive && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent rounded-t-full" />
+                <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-primary rounded-t-full" />
               )}
             </button>
           );
@@ -376,11 +376,11 @@ export default function CommunityDetailPage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
             {/* Details */}
-            <div className="rounded-xl border border-border bg-surface overflow-hidden">
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
               <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
                 <div>
                   <h2 className="font-body text-sm font-semibold text-foreground">Details</h2>
-                  <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+                  <p className="font-body text-[11px] text-muted-foreground mt-0.5">
                     Description and metadata for this community.
                   </p>
                 </div>
@@ -388,7 +388,7 @@ export default function CommunityDetailPage() {
 
               {/* Description (inline edit) */}
               <div className="px-5 py-4">
-                <p className="font-body text-[10px] uppercase tracking-wider text-foreground-muted mb-1.5">
+                <p className="font-body text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
                   Description
                 </p>
                 {editingDesc ? (
@@ -407,13 +407,13 @@ export default function CommunityDetailPage() {
                       <button
                         onClick={handleDescSave}
                         disabled={editDescLoading}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50"
                       >
                         {editDescLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
                       </button>
                       <button
                         onClick={() => { setEditingDesc(false); setEditDescError(null); }}
-                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <X strokeWidth={2.5} size={11} /> Cancel
                       </button>
@@ -421,12 +421,12 @@ export default function CommunityDetailPage() {
                   </div>
                 ) : (
                   <div className="group flex items-start gap-2">
-                    <p className={`font-body text-xs leading-relaxed ${community.description ? "text-foreground-muted" : "text-foreground-subtle italic"}`}>
+                    <p className={`font-body text-xs leading-relaxed ${community.description ? "text-muted-foreground" : "text-muted-foreground italic"}`}>
                       {community.description || "No description yet — click the pencil to add one."}
                     </p>
                     <button
                       onClick={() => { setEditDesc(community.description ?? ""); setEditingDesc(true); }}
-                      className="shrink-0 p-1 text-foreground-muted hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
+                      className="shrink-0 p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-all"
                       title="Edit description"
                     >
                       <Pencil strokeWidth={2.5} size={11} />
@@ -448,7 +448,7 @@ export default function CommunityDetailPage() {
                   </span>
                 </MetaCell>
                 <MetaCell label="Community ID">
-                  <span className="font-mono text-[11px] text-foreground-muted break-all select-all">{community.id}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground break-all select-all">{community.id}</span>
                 </MetaCell>
                 <MetaCell label="Linked to">{community.reference_name ?? "—"}</MetaCell>
                 <MetaCell label="Created">{fmtDateTime(community.created_at)}</MetaCell>
@@ -461,16 +461,16 @@ export default function CommunityDetailPage() {
           <div className="flex min-w-0 flex-col gap-6">
             {/* Display picture — app-created communities only */}
             {appCreated && (
-              <div className="rounded-xl border border-border bg-surface p-5">
+              <div className="rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="font-display text-sm font-semibold text-foreground">Display picture</h2>
                   {community.lottie_url && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent px-2 py-0.5 font-body text-[10px] font-medium">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 font-body text-[10px] font-medium">
                       <Clapperboard strokeWidth={2.5} size={10} /> Animated
                     </span>
                   )}
                 </div>
-                <p className="font-body text-[11px] text-foreground-muted mb-4">
+                <p className="font-body text-[11px] text-muted-foreground mb-4">
                   Replace with a static image or a Lottie animation. Applies everywhere in the app.
                 </p>
                 <div className="flex items-center gap-4">
@@ -481,7 +481,7 @@ export default function CommunityDetailPage() {
                     lottieData={community.lottie_data}
                     name={community.name}
                     size={64}
-                    className="bg-surface-raised"
+                    className="bg-popover"
                   />
                   <div className="flex flex-col gap-2 min-w-0">
                     <div className="flex flex-wrap gap-2">
@@ -489,7 +489,7 @@ export default function CommunityDetailPage() {
                         type="button"
                         onClick={() => imageInputRef.current?.click()}
                         disabled={dpBusy !== null}
-                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-popover transition-colors disabled:opacity-50"
                       >
                         <ImagePlus strokeWidth={2.5} size={13} />
                         {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
@@ -498,7 +498,7 @@ export default function CommunityDetailPage() {
                         type="button"
                         onClick={() => lottieInputRef.current?.click()}
                         disabled={dpBusy !== null}
-                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-popover transition-colors disabled:opacity-50"
                       >
                         <Clapperboard strokeWidth={2.5} size={13} />
                         {dpBusy === "lottie" ? <Spinner className="h-3 w-3" /> : "Upload Lottie"}

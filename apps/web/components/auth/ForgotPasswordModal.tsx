@@ -60,14 +60,14 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
     <Modal open={open} onClose={handleClose} title="Reset your password" maxWidth="max-w-sm">
       {step === "sent" ? (
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
             <span className="text-2xl">✉️</span>
           </div>
           <div>
             <p className="font-body text-sm text-foreground font-medium mb-1">
               Check your inbox
             </p>
-            <p className="font-body text-sm text-foreground-muted leading-relaxed">
+            <p className="font-body text-sm text-muted-foreground leading-relaxed">
               If <span className="text-foreground">{email}</span> is
               registered, a reset link is on its way. It expires in 1 hour.
             </p>
@@ -81,7 +81,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <p className="font-body text-sm text-foreground-muted -mt-2">
+          <p className="font-body text-sm text-muted-foreground -mt-2">
             Enter your email and we'll send you a link to set a new password.
           </p>
 

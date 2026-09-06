@@ -58,7 +58,7 @@ function StepDots({ step }: { step: number }) {
       {[1, 2, 3].map((item) => (
         <span
           key={item}
-          className={`h-1.5 rounded-full transition-all ${item <= step ? "w-5 bg-accent" : "w-1.5 bg-border"}`}
+          className={`h-1.5 rounded-full transition-all ${item <= step ? "w-5 bg-primary" : "w-1.5 bg-border"}`}
         />
       ))}
     </div>
@@ -86,7 +86,7 @@ function RuleRow({
       <button
         type="button"
         onClick={onRemove}
-        className="h-9 w-9 shrink-0 rounded-lg border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+        className="h-9 w-9 shrink-0 rounded-lg border border-border text-muted-foreground transition-colors hover:bg-popover hover:text-foreground"
         aria-label="Remove rule"
       >
         <X strokeWidth={2.5} size={14} className="mx-auto" />
@@ -187,27 +187,27 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
     <Modal open={open} onClose={handleClose} maxWidth="max-w-xl" title={created ? undefined : "Create Community"}>
       {created ? (
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-accent/15 text-accent">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15 text-primary">
             <Check strokeWidth={2.5} size={24} />
           </div>
           <h2 className="font-display text-xl font-semibold text-foreground">
             {created.is_private ? "Invite your first members" : "Your community is live"}
           </h2>
-          <p className="mx-auto mt-2 max-w-sm font-body text-sm leading-relaxed text-foreground-muted">
+          <p className="mx-auto mt-2 max-w-sm font-body text-sm leading-relaxed text-muted-foreground">
             {created.is_private
               ? "Members can request access through this private invite link."
               : "Members can discover and join your new public community."}
           </p>
-          <div className="mt-5 flex items-center gap-2 rounded-lg border border-border bg-surface-raised p-2">
+          <div className="mt-5 flex items-center gap-2 rounded-lg border border-border bg-popover p-2">
             <input
               readOnly
               value={created.invite_url}
-              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-xs text-foreground-muted outline-none"
+              className="min-w-0 flex-1 bg-transparent px-2 font-mono text-xs text-muted-foreground outline-none"
             />
             <button
               type="button"
               onClick={() => navigator.clipboard.writeText(created.invite_url).catch(() => {})}
-              className="rounded-md bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+              className="rounded-md bg-primary px-3 py-2 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary"
             >
               Copy
             </button>
@@ -230,7 +230,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
             <div className="space-y-5">
               <div>
                 <label className="mb-2 block font-body text-xs font-medium text-foreground">
-                  Community Name <span className="text-accent">*</span>
+                  Community Name <span className="text-primary">*</span>
                 </label>
                 <input
                   value={name}
@@ -252,13 +252,13 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       type="button"
                       onClick={() => setPrivacy(value)}
                       className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                        active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
+                        active ? "border-primary bg-primary/10" : "border-border bg-popover hover:border-primary/60"
                       }`}
                     >
-                      <Icon size={18} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
+                      <Icon size={18} strokeWidth={2.5} className={active ? "text-primary" : "text-muted-foreground"} />
                       <span className="min-w-0">
                         <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
-                        <span className="block font-body text-xs text-foreground-muted">{copy}</span>
+                        <span className="block font-body text-xs text-muted-foreground">{copy}</span>
                       </span>
                     </button>
                   );
@@ -269,7 +269,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
 
           {step === 2 && (
             <div>
-              <p className="mb-4 font-body text-sm text-foreground-muted">
+              <p className="mb-4 font-body text-sm text-muted-foreground">
                 Choose the areas members will see. Chat is always included.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -282,21 +282,21 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                       onClick={() => toggleTab(id)}
                       disabled={required}
                       className={`relative rounded-lg border p-3 text-left transition-colors ${
-                        active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
+                        active ? "border-primary bg-primary/10" : "border-border bg-popover hover:border-primary/60"
                       } ${required ? "cursor-default" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon size={16} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
+                        <Icon size={16} strokeWidth={2.5} className={active ? "text-primary" : "text-muted-foreground"} />
                         <span className="font-body text-sm font-semibold text-foreground">{label}</span>
                       </div>
-                      <p className="mt-1 font-body text-xs leading-relaxed text-foreground-muted">{copy}</p>
+                      <p className="mt-1 font-body text-xs leading-relaxed text-muted-foreground">{copy}</p>
                       <span className={`absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full border ${
-                        active ? "border-accent bg-accent text-accent-foreground" : "border-border"
+                        active ? "border-primary bg-primary text-primary-foreground" : "border-border"
                       }`}>
                         {active && <Check strokeWidth={2.5} size={10} />}
                       </span>
                       {required && (
-                        <span className="mt-2 inline-block rounded-full bg-surface px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-foreground-muted">
+                        <span className="mt-2 inline-block rounded-full bg-card px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-muted-foreground">
                           Required
                         </span>
                       )}
@@ -313,7 +313,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                  className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-popover text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                   aria-label="Choose community picture"
                 >
                   {imagePreview ? (
@@ -324,7 +324,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 </button>
                 <div className="min-w-0">
                   <p className="font-body text-sm font-semibold text-foreground">Community picture</p>
-                  <p className="font-body text-xs text-foreground-muted">JPEG, PNG, or WebP under 10 MB.</p>
+                  <p className="font-body text-xs text-muted-foreground">JPEG, PNG, or WebP under 10 MB.</p>
                 </div>
                 <input
                   ref={fileRef}
@@ -352,7 +352,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                     type="button"
                     onClick={() => setRules((prev) => [...prev, ""])}
                     disabled={rules.length >= 8}
-                    className="inline-flex items-center gap-1 font-body text-xs text-accent disabled:opacity-50"
+                    className="inline-flex items-center gap-1 font-body text-xs text-primary disabled:opacity-50"
                   >
                     <Plus strokeWidth={2.5} size={12} /> Add rule
                   </button>
@@ -402,7 +402,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 disabled={!canContinue || submitting}
                 className="modal-btn modal-btn-primary"
               >
-                {submitting && <Spinner size={14} className="text-accent-foreground" />}
+                {submitting && <Spinner size={14} className="text-primary-foreground" />}
                 {submitting ? "Creating..." : "Create Community"}
               </button>
             )}

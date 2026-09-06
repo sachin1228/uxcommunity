@@ -60,7 +60,7 @@ export function SignupStep1({
       <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Create your account
       </h2>
-      <p className="font-body text-sm text-foreground-muted mb-7">Step 1 of 4</p>
+      <p className="font-body text-sm text-muted-foreground mb-7">Step 1 of 4</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
@@ -115,7 +115,7 @@ export function SignupStep1({
               className={inputClass} autoComplete="new-password" required />
             <button type="button" tabIndex={-1}
               onClick={() => setShowPassword((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-foreground-subtle hover:text-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground transition-colors">
               {showPassword ? <EyeOff /> : <EyeOpen />}
             </button>
           </div>
@@ -132,7 +132,7 @@ export function SignupStep1({
               placeholder="••••••••" className={inputClass} autoComplete="new-password" required />
             <button type="button" tabIndex={-1}
               onClick={() => setShowConfirm((v) => !v)}
-              className="absolute inset-y-0 right-3 flex items-center text-foreground-subtle hover:text-foreground transition-colors">
+              className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground transition-colors">
               {showConfirm ? <EyeOff /> : <EyeOpen />}
             </button>
           </div>
@@ -140,7 +140,7 @@ export function SignupStep1({
         </div>
 
         <button type="submit" disabled={loading}
-          className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
+          className="mt-2 flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed">
           {loading && <Spinner className="h-4 w-4 text-white" />}
           {loading ? "Creating account…" : "Continue →"}
         </button>

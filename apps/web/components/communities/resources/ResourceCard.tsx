@@ -230,29 +230,29 @@ export function ResourceCard({
         type="button"
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen((open) => !open); }}
         aria-label="Resource options"
-        className={`flex items-center justify-center text-foreground-subtle hover:bg-surface-raised hover:text-foreground ${isDetail ? "h-8 w-8 rounded-lg border border-border" : "h-7 w-7 rounded-md"}`}
+        className={`flex items-center justify-center text-muted-foreground hover:bg-popover hover:text-foreground ${isDetail ? "h-8 w-8 rounded-lg border border-border" : "h-7 w-7 rounded-md"}`}
       >
         <MoreHorizontal strokeWidth={2.5} size={15} />
       </button>
       {menuOpen && (
-        <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+        <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-card py-1 shadow-lg">
           {!isDetail && (
-            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
               <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
               {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
             </button>
           )}
           {isOwner ? (
             <>
-              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground">
                 <Pencil strokeWidth={2.5} size={11} /> Edit
               </button>
-              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+              <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setConfirmDelete(true); }} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50">
                 <Trash2 strokeWidth={2.5} size={11} />{deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           ) : (
-            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setReported(true); setTimeout(() => setReported(false), 3000); }} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50">
               <Flag strokeWidth={2.5} size={11} />{reported ? "Reported" : "Report"}
             </button>
           )}
@@ -278,13 +278,13 @@ export function ResourceCard({
                 type="button"
                 onClick={handleSave}
                 aria-busy={saveBusy}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${resource.user_saved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${resource.user_saved ? "border-primary/40 bg-primary/10 text-primary" : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary"}`}
               >
                 {resource.user_saved ? <BookmarkCheck strokeWidth={2.5} size={13} /> : <Bookmark strokeWidth={2.5} size={13} />}
                 {resource.user_saved ? "Saved" : "Save"}
                 <span className="font-mono text-[10px]">{resource.save_count}</span>
               </button>
-              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover">
+              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 font-body text-sm font-medium text-primary-foreground hover:bg-primary">
                 <ExternalLink strokeWidth={2.5} size={13} />Open
               </a>
               {optionsMenu}
@@ -295,14 +295,14 @@ export function ResourceCard({
         {isDetail ? (
           <>
             <h1 className="mt-3 font-display text-lg font-semibold leading-snug text-foreground">{resource.title}</h1>
-            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent">
+            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
               <ExternalLink strokeWidth={2.5} size={11} />{getDomain(resource.url)}
             </a>
-            {resource.description && <p className="mt-4 whitespace-pre-wrap font-body text-sm leading-relaxed text-foreground-muted">{resource.description}</p>}
+            {resource.description && <p className="mt-4 whitespace-pre-wrap font-body text-sm leading-relaxed text-muted-foreground">{resource.description}</p>}
             {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
             {resource.tags.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
-                {resource.tags.map((tag) => <span key={tag} className="font-body text-[11px] text-foreground-subtle">#{tag}</span>)}
+                {resource.tags.map((tag) => <span key={tag} className="font-body text-[11px] text-muted-foreground">#{tag}</span>)}
               </div>
             )}
           </>
@@ -318,7 +318,7 @@ export function ResourceCard({
                 href={resource.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-surface-raised p-4 transition-opacity duration-150 hover:opacity-90 active:opacity-75"
+                className="mt-4 flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-popover p-4 transition-opacity duration-150 hover:opacity-90 active:opacity-75"
               >
                 <div className="min-w-0 flex-1">
                   {linkPreview.title && (
@@ -327,7 +327,7 @@ export function ResourceCard({
                     </p>
                   )}
                   {linkPreview.description && (
-                    <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-foreground-muted">
+                    <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-muted-foreground">
                       {linkPreview.description}
                     </p>
                   )}
@@ -341,13 +341,13 @@ export function ResourceCard({
                       className="h-3.5 w-3.5 rounded-sm"
                       onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
                     />
-                    <span className="truncate font-body text-[11px] text-foreground-subtle">
+                    <span className="truncate font-body text-[11px] text-muted-foreground">
                       {getDomain(resource.url)}
                     </span>
                   </div>
                 </div>
                 {linkPreview.image && (
-                  <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-surface">
+                  <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-card">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={linkPreview.image}
@@ -361,8 +361,8 @@ export function ResourceCard({
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
               <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
+                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`} />
+                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>

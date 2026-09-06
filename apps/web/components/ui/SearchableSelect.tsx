@@ -89,9 +89,9 @@ export function SearchableSelect({
   }
 
   const triggerClass =
-    "relative flex w-full cursor-pointer items-center justify-between rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm outline-none transition-colors focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 disabled:opacity-50 disabled:cursor-not-allowed " +
-    (open ? "border-accent ring-2 ring-accent/20 " : "") +
-     (selectedLabel ? "text-foreground " : "text-foreground-muted ");
+    "relative flex w-full cursor-pointer items-center justify-between rounded-md border border-border bg-card px-3.5 py-2.5 font-body text-sm outline-none transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed " +
+    (open ? "border-primary ring-2 ring-primary/20 " : "") +
+     (selectedLabel ? "text-foreground " : "text-muted-foreground ");
 
   return (
     <div ref={containerRef} className="relative w-full" onKeyDown={handleKeyDown}>
@@ -115,7 +115,7 @@ export function SearchableSelect({
               className="h-5 w-5 shrink-0 rounded object-cover"
             />
           ) : selectedLabel ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface-raised font-body text-[10px] font-semibold text-foreground-muted uppercase select-none">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-popover font-body text-[10px] font-semibold text-muted-foreground uppercase select-none">
               {selectedLabel[0]}
             </span>
           ) : null}
@@ -123,7 +123,7 @@ export function SearchableSelect({
         </span>
         <svg
           className={
-            "ml-2 h-4 w-4 flex-shrink-0 text-foreground-muted transition-transform duration-150 " +
+            "ml-2 h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-150 " +
             (open ? "rotate-180" : "")
           }
           xmlns="http://www.w3.org/2000/svg"
@@ -141,12 +141,12 @@ export function SearchableSelect({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-surface-raised shadow-md overflow-hidden">
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md overflow-hidden">
           {/* Search input */}
             <div className="border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
               <svg
-                className="h-3.5 w-3.5 flex-shrink-0 text-foreground-muted"
+                className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 20 20"
                 fill="currentColor"
@@ -164,7 +164,7 @@ export function SearchableSelect({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search…"
-                 className="w-full bg-transparent font-body text-sm text-foreground placeholder:text-foreground-subtle outline-none"
+                 className="w-full bg-transparent font-body text-sm text-foreground placeholder:text-muted-foreground outline-none"
               />
             </div>
           </div>
@@ -185,8 +185,8 @@ export function SearchableSelect({
                   className={
                     "flex cursor-pointer items-center gap-2.5 px-3.5 py-2 font-body text-sm transition-colors " +
                     (isSelected
-                      ? "bg-accent/10 text-accent"
-                       : "text-foreground hover:bg-background-subtle")
+                      ? "bg-primary/10 text-primary"
+                       : "text-foreground hover:bg-muted")
                   }
                 >
                   {/* Image or letter avatar */}
@@ -198,7 +198,7 @@ export function SearchableSelect({
                       className="h-5 w-5 shrink-0 rounded object-cover"
                     />
                   ) : (
-                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-surface font-body text-[10px] font-semibold uppercase text-foreground-muted select-none">
+                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-card font-body text-[10px] font-semibold uppercase text-muted-foreground select-none">
                       {option.label[0]}
                     </span>
                   )}
@@ -207,7 +207,7 @@ export function SearchableSelect({
 
                   {isSelected && (
                     <svg
-                      className="h-3.5 w-3.5 shrink-0 text-accent"
+                      className="h-3.5 w-3.5 shrink-0 text-primary"
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 20 20"
                       fill="currentColor"
@@ -232,13 +232,13 @@ export function SearchableSelect({
                 className={
                   "flex cursor-pointer items-center gap-2 px-3.5 py-2 font-body text-sm  transition-colors " +
                   (value === otherValue
-                    ? "bg-accent/10 text-accent"
-                     : "text-foreground-muted hover:bg-background-subtle")
+                    ? "bg-primary/10 text-primary"
+                     : "text-muted-foreground hover:bg-muted")
                 }
               >
                 {value === otherValue ? (
                   <svg
-                    className="h-3.5 w-3.5 flex-shrink-0 text-accent"
+                    className="h-3.5 w-3.5 flex-shrink-0 text-primary"
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 20 20"
                     fill="currentColor"
@@ -256,7 +256,7 @@ export function SearchableSelect({
             )}
 
             {filtered.length === 0 && !showOther && (
-               <li className="px-3.5 py-3 text-center font-body text-sm text-foreground-muted">
+               <li className="px-3.5 py-3 text-center font-body text-sm text-muted-foreground">
                 No results found
               </li>
             )}

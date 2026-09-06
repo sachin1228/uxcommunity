@@ -432,12 +432,12 @@ export function ThreadCard({
               type="button"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); setMenuOpen((prev) => !prev); }}
               aria-label="Thread options"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-popover hover:text-foreground"
             >
               <MoreHorizontal strokeWidth={2.5} size={15} />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+              <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-card py-1 shadow-lg">
                 <button
                   type="button"
                   onClick={(e) => {
@@ -445,7 +445,7 @@ export function ThreadCard({
                     setMenuOpen(false);
                   }}
                   aria-pressed={displayedSaved}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground"
                 >
                   <Bookmark strokeWidth={2.5} size={11} fill={displayedSaved ? "currentColor" : "none"} />
                   {displayedSaved ? "Unsave" : "Save"}
@@ -455,7 +455,7 @@ export function ThreadCard({
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setShowEditModal(true); }}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground"
                     >
                       <Pencil strokeWidth={2.5} size={11} /> Edit
                     </button>
@@ -463,7 +463,7 @@ export function ThreadCard({
                       type="button"
                       onClick={(e) => { e.preventDefault(); setMenuOpen(false); setConfirmDelete(true); }}
                       disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50"
                     >
                       <Trash2 strokeWidth={2.5} size={11} />
                       {deleting ? "Deleting…" : "Delete"}
@@ -479,7 +479,7 @@ export function ThreadCard({
                       setTimeout(() => setReported(false), 3000);
                     }}
                     disabled={reported}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground disabled:opacity-50"
                   >
                     <Flag strokeWidth={2.5} size={11} />
                     {reported ? "Reported" : "Report"}
@@ -509,7 +509,7 @@ export function ThreadCard({
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
                 style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
-                className="absolute min-w-16 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
+                className="absolute min-w-16 bg-muted font-body text-xs font-medium leading-snug text-muted-foreground transition-colors hover:text-primary"
               >
                 …More
               </button>
@@ -538,19 +538,19 @@ export function ThreadCard({
               {files.map((att) =>
                 isDetail ? (
                   <a key={att.url} href={att.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
+                    className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
                     <Paperclip strokeWidth={2.5} size={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
-                    <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
+                    <span className="shrink-0 text-muted-foreground">{(att.size / 1024).toFixed(0)} KB</span>
                   </a>
                 ) : (
                   <div key={att.url} role="link" tabIndex={0}
                     onClick={(e) => { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); }}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(att.url, "_blank", "noopener,noreferrer"); } }}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:border-accent/40 hover:text-accent">
+                    className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-body text-xs text-muted-foreground hover:border-primary/40 hover:text-primary">
                     <Paperclip strokeWidth={2.5} size={12} />
                     <span className="min-w-0 flex-1 truncate">{att.name}</span>
-                    <span className="shrink-0 text-foreground-subtle">{(att.size / 1024).toFixed(0)} KB</span>
+                    <span className="shrink-0 text-muted-foreground">{(att.size / 1024).toFixed(0)} KB</span>
                   </div>
                 )
               )}
@@ -569,7 +569,7 @@ export function ThreadCard({
                 aria-label="Open image viewer"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); }}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); } }}
-                className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               >
                 {/* Native aspect ratio, capped at 480px tall — never cropped. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -606,12 +606,12 @@ export function ThreadCard({
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
                     ? "text-[var(--ds-blue-700)]"
-                    : "text-foreground-subtle group-hover/like:text-white"
+                    : "text-muted-foreground group-hover/like:text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-semibold tabular-nums ${
-                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
+                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"
                 }`}
               >
                 {thread.like_count}
@@ -619,7 +619,7 @@ export function ThreadCard({
             </button>
 
             {/* Comments */}
-            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-muted-foreground transition-colors duration-150 hover:text-white">
               <CommentIcon />
               {thread.comment_count}
             </span>

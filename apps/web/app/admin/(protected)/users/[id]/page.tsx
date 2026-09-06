@@ -95,7 +95,7 @@ export default function UserDetailPage() {
 
   if (error || !user) {
     return (
-      <div className="py-16 text-center font-body text-sm text-foreground-muted">
+      <div className="py-16 text-center font-body text-sm text-muted-foreground">
         {error ?? "User not found."}
       </div>
     );
@@ -114,7 +114,7 @@ export default function UserDetailPage() {
       {/* Back */}
       <button
         onClick={() => router.push("/admin/users")}
-        className="mb-6 flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground transition-colors"
+        className="mb-6 flex items-center gap-1.5 font-body text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft strokeWidth={2.5} size={14} />
         Back to users
@@ -124,7 +124,7 @@ export default function UserDetailPage() {
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
           {avatarUrl ? (
-            <span className="h-16 w-16 shrink-0 rounded-full overflow-hidden ring-1 ring-border flex items-center justify-center bg-surface-raised">
+            <span className="h-16 w-16 shrink-0 rounded-full overflow-hidden ring-1 ring-border flex items-center justify-center bg-popover">
               <AvatarImg
                 url={avatarUrl}
                 name={user.name}
@@ -133,7 +133,7 @@ export default function UserDetailPage() {
               />
             </span>
           ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-raised ring-1 ring-border font-display text-xl font-semibold text-foreground-muted select-none">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-popover ring-1 ring-border font-display text-xl font-semibold text-muted-foreground select-none">
               {initials}
             </span>
           )}
@@ -158,7 +158,7 @@ export default function UserDetailPage() {
             className={`flex items-center gap-2 rounded-md border px-3 py-1.5 font-body text-sm transition-colors disabled:opacity-50 ${
               user.is_blocked
                 ? "border-green-500/30 text-green-400 hover:bg-green-500/10"
-                : "border-border text-foreground-muted hover:text-red-400 hover:border-red-400/30"
+                : "border-border text-muted-foreground hover:text-red-400 hover:border-red-400/30"
             }`}
           >
             {actionLoading === "block" ? (
@@ -183,16 +183,16 @@ export default function UserDetailPage() {
       </div>
 
       {/* Member of all communities toggle */}
-      <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4">
+      <div className="mb-6 flex items-center justify-between rounded-xl border border-border bg-card px-5 py-4">
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-raised">
-            <Users strokeWidth={2.5} size={16} className="text-foreground-muted" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-popover">
+            <Users strokeWidth={2.5} size={16} className="text-muted-foreground" />
           </span>
           <div>
             <p className="font-body text-sm font-medium text-foreground">
               Member of all communities
             </p>
-            <p className="font-body text-xs text-foreground-muted">
+            <p className="font-body text-xs text-muted-foreground">
               {memberOfAll
                 ? "This user is joined to every community."
                 : "Turn on to instantly add this user to every community."}
@@ -205,7 +205,7 @@ export default function UserDetailPage() {
           disabled={allCommunitiesLoading}
           aria-pressed={memberOfAll}
           className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
-            memberOfAll ? "bg-accent" : "bg-surface-raised border border-border"
+            memberOfAll ? "bg-primary" : "bg-popover border border-border"
           }`}
         >
           {allCommunitiesLoading ? (
@@ -215,7 +215,7 @@ export default function UserDetailPage() {
           ) : (
             <span
                 className={`inline-block h-4 w-4 transform rounded-full shadow transition-transform duration-200 ${
-                memberOfAll ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"
+                memberOfAll ? "translate-x-6 bg-primary-foreground" : "translate-x-1 bg-white"
               }`}
             />
           )}
@@ -233,7 +233,7 @@ export default function UserDetailPage() {
             <h2 className="font-display text-lg font-semibold text-foreground mb-1">
               Delete account?
             </h2>
-            <p className="font-body text-sm text-foreground-muted mb-6">
+            <p className="font-body text-sm text-muted-foreground mb-6">
               This will permanently remove{" "}
               <span className="text-foreground font-medium">{user.name}</span>{" "}
               ({user.email}) and all their data. This cannot be undone.

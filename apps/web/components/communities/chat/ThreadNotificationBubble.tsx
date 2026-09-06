@@ -67,7 +67,7 @@ export function ThreadNotificationBubble({
       {/* Content column */}
       <div className="flex-1 min-w-0">
         {/* Header line */}
-        <p className="font-body text-[11px] text-foreground-muted mb-1.5 ml-0.5">
+        <p className="font-body text-[11px] text-muted-foreground mb-1.5 ml-0.5">
           <span className="font-semibold text-foreground">{name}</span>
           {" created a new thread"}
           <span className="mx-1.5 opacity-40">·</span>
@@ -79,7 +79,7 @@ export function ThreadNotificationBubble({
           {/* Thread card */}
           <a
             href={href}
-            className="flex items-center gap-3 flex-1 min-w-0 rounded-xl bg-surface-raised border border-white/[0.06] px-3 py-2.5 hover:bg-white/[0.06] transition-colors group"
+            className="flex items-center gap-3 flex-1 min-w-0 rounded-xl bg-popover border border-white/[0.06] px-3 py-2.5 hover:bg-white/[0.06] transition-colors group"
           >
             {/* Thumbnail */}
             <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-white/[0.06]">
@@ -91,7 +91,7 @@ export function ThreadNotificationBubble({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <CatIcon size={22} strokeWidth={2.5} className="text-foreground-muted" />
+                <CatIcon size={22} strokeWidth={2.5} className="text-muted-foreground" />
               )}
             </div>
 
@@ -100,7 +100,7 @@ export function ThreadNotificationBubble({
               <p className="font-body text-sm font-medium text-foreground line-clamp-2 leading-snug">
                 {event.title}
               </p>
-              <p className="font-body text-xs text-accent mt-1.5 flex items-center gap-0.5 group-hover:underline">
+              <p className="font-body text-xs text-primary mt-1.5 flex items-center gap-0.5 group-hover:underline">
                 View Thread
                 <ChevronRight size={12} strokeWidth={2.5} />
               </p>
@@ -108,7 +108,7 @@ export function ThreadNotificationBubble({
           </a>
 
           {/* Category badge */}
-          <span className="shrink-0 font-body text-xs text-foreground-muted border border-white/[0.12] rounded-full px-3 py-1 bg-surface-raised whitespace-nowrap">
+          <span className="shrink-0 font-body text-xs text-muted-foreground border border-white/[0.12] rounded-full px-3 py-1 bg-popover whitespace-nowrap">
             {label}
           </span>
         </div>

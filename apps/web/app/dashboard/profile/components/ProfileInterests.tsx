@@ -8,8 +8,8 @@ import { DropdownMenu } from "@/components/ui/DropdownMenu";
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <span className="font-mono text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded">{num}</span>
-      <span className="font-display text-xs font-semibold text-foreground-muted uppercase tracking-widest">{label}</span>
+      <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">{num}</span>
+      <span className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</span>
       <div className="flex-1 h-px bg-border" />
     </div>
   );
@@ -50,20 +50,20 @@ export function ProfileInterests({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6 mb-8">
+    <div className="rounded-2xl border border-border bg-card p-6 mb-8">
       <SectionLabel num="03" label="Design Interests" />
 
       {/* Selected chips */}
       <div className="flex flex-wrap gap-2 mb-4 min-h-[32px]">
         {selectedInterests.length === 0 ? (
-          <span className="font-body text-sm text-foreground-subtle ">No interests selected yet</span>
+          <span className="font-body text-sm text-muted-foreground ">No interests selected yet</span>
         ) : (
           selectedInterests.map((interest) => (
             <button
               key={interest.id}
               type="button"
               onClick={() => toggle(interest.id)}
-              className="group flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 font-body text-xs text-foreground hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-all"
+              className="group flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 font-body text-xs text-foreground hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-400 transition-all"
             >
               <span>{INTEREST_EMOJIS[interest.name] ?? "🎨"}</span>
               {interest.name}
@@ -79,7 +79,7 @@ export function ProfileInterests({
           ref={triggerRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-accent/40 bg-surface-raised px-4 py-2 font-body text-sm text-foreground-muted hover:text-foreground transition-all"
+          className="flex items-center gap-2 rounded-lg border border-dashed border-border hover:border-primary/40 bg-popover px-4 py-2 font-body text-sm text-muted-foreground hover:text-foreground transition-all"
         >
           <Pencil strokeWidth={2.5} size={12} />
           Edit interests
@@ -112,20 +112,20 @@ export function ProfileInterests({
                   <span
                     className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border shrink-0 transition-colors ${
                       selected
-                        ? "border-accent bg-accent"
+                        ? "border-primary bg-primary"
                         : "border-border bg-transparent"
                     }`}
                     aria-hidden="true"
                   >
-                    {selected && <Check size={11} className="text-accent-foreground" strokeWidth={2.5} />}
+                    {selected && <Check size={11} className="text-primary-foreground" strokeWidth={2.5} />}
                   </span>
                 </button>
               );
             })}
           </div>
           {atLimit && (
-            <div className="border-t border-border bg-accent/5 px-4 py-2">
-              <p className="font-body text-xs text-foreground-muted">
+            <div className="border-t border-border bg-primary/5 px-4 py-2">
+              <p className="font-body text-xs text-muted-foreground">
                 Maximum of {MAX_DESIGN_INTERESTS} topics selected — remove one to pick another.
               </p>
             </div>

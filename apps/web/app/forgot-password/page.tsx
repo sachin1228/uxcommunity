@@ -52,31 +52,31 @@ export default function ForgotPasswordPage() {
         {/* Back link */}
         <Link
           href="/login"
-          className="mb-6 ml-8 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+          className="mb-6 ml-8 inline-flex items-center gap-1.5 font-body text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft strokeWidth={2.5} size={14} />
           Back to login
         </Link>
 
         {/* Card */}
-        <div className="rounded-xl bg-surface p-8 shadow-card">
+        <div className="rounded-xl bg-card p-8 shadow-card">
           {step === "sent" ? (
             <div className="flex flex-col items-center gap-4 py-2 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
-                    <span className="font-mono text-sm text-accent" aria-hidden="true">@</span>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
+                    <span className="font-mono text-sm text-primary" aria-hidden="true">@</span>
               </div>
               <div>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-1">
                   Request received
                 </h2>
-                <p className="font-body text-sm text-foreground-muted leading-relaxed">
+                <p className="font-body text-sm text-muted-foreground leading-relaxed">
                   If <span className="font-medium text-foreground">{email}</span> is
                   registered, a reset link will be sent shortly. It expires in 1 hour.
                 </p>
               </div>
               <Link
                 href="/login"
-                className="mt-2 rounded-md border border-border px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised"
+                className="mt-2 rounded-md border border-border px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-popover"
               >
                 Back to login
               </Link>
@@ -86,7 +86,7 @@ export default function ForgotPasswordPage() {
               <h1 className="font-display text-2xl font-semibold text-foreground">
                 Reset your password
               </h1>
-              <p className="mt-1 font-body text-sm text-foreground-muted">
+              <p className="mt-1 font-body text-sm text-muted-foreground">
                 Enter your email and we'll send you a link to set a new password.
               </p>
 
@@ -119,7 +119,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {loading && <Spinner className="h-4 w-4 text-white" />}
                   {loading ? "Sending…" : "Send reset link"}
@@ -129,11 +129,11 @@ export default function ForgotPasswordPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center font-body text-sm text-foreground-muted">
+        <p className="mt-6 text-center font-body text-sm text-muted-foreground">
           Remember your password?{" "}
           <Link
             href="/login"
-            className="font-medium text-accent transition-colors hover:text-accent-hover"
+            className="font-medium text-primary transition-colors hover:text-primary"
           >
             Log in
           </Link>

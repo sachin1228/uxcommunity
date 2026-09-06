@@ -175,22 +175,22 @@ export default function ToolsPage() {
     <div className="max-w-2xl space-y-5">
       <div>
         <h1 className="font-display text-xl font-semibold text-foreground mb-1">Tools</h1>
-        <p className="font-body text-xs text-foreground-muted">
+        <p className="font-body text-xs text-muted-foreground">
           Admin maintenance utilities. These actions are safe to run multiple times.
         </p>
       </div>
 
       {/* ── Migrate Supabase → R2 ─────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
-            <ArrowRightLeft strokeWidth={2.5} size={18} className="text-accent" />
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+            <ArrowRightLeft strokeWidth={2.5} size={18} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
               Migrate images: Supabase → Cloudflare R2
             </h2>
-            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+            <p className="mt-1 font-body text-xs text-muted-foreground leading-relaxed">
               Copies every image that still lives in Supabase Storage into R2 and
               updates the database URL. Images already in R2 or hosted externally are
               skipped. Safe to run more than once.
@@ -199,7 +199,7 @@ export default function ToolsPage() {
             <button
               onClick={runMigration}
               disabled={migrateStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {migrateStatus === "running" ? (
                 <>
@@ -220,11 +220,11 @@ export default function ToolsPage() {
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
               <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={migrateSummary.migrated} label="migrated" />
-              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-foreground-muted" />} value={migrateSummary.skipped}  label="skipped"  />
+              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-muted-foreground" />} value={migrateSummary.skipped}  label="skipped"  />
               <Stat icon={<AlertCircle strokeWidth={2.5}  size={13} className="text-red-400" />}   value={migrateSummary.failed}   label="failed"   />
             </div>
             {migrateSummary.total === 0 && (
-              <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
+              <p className="font-body text-xs text-muted-foreground">No image records found in the database.</p>
             )}
             {migrateSummary.results.length > 0 && (
               <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
@@ -244,21 +244,21 @@ export default function ToolsPage() {
       </div>
 
       {/* ── R2 storage health ─────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
-            <Database strokeWidth={2.5} size={18} className="text-accent" />
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary">
+            <Database strokeWidth={2.5} size={18} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">R2 storage health</h2>
-            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+            <p className="mt-1 font-body text-xs text-muted-foreground leading-relaxed">
               Scans the configured Cloudflare R2 bucket and compares it against the database-backed image references to highlight potential orphaned objects and broken references.
             </p>
 
             <button
               onClick={runR2Audit}
               disabled={r2Status === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {r2Status === "running" ? (
                 <>
@@ -279,14 +279,14 @@ export default function ToolsPage() {
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex flex-wrap gap-4 mb-4">
               <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={r2Summary.totalObjects} label="total objects" />
-              <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={r2Summary.trackedObjects} label="tracked" />
+              <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-muted-foreground" />} value={r2Summary.trackedObjects} label="tracked" />
               <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-red-400" />} value={r2Summary.potentialOrphans} label="potential orphans" />
               <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={r2Summary.brokenReferences} label="broken refs" />
             </div>
             {r2Summary.orphans?.length > 0 && (
               <>
                 <div className="mt-4 flex items-center justify-between gap-3">
-                  <p className="font-body text-[11px] text-foreground-muted">
+                  <p className="font-body text-[11px] text-muted-foreground">
                     {r2Summary.orphans.length} orphaned object(s) found.
                   </p>
                   <button
@@ -322,7 +322,7 @@ export default function ToolsPage() {
                       </button>
                       <button
                         onClick={() => setShowR2DeleteConfirm(false)}
-                        className="rounded-md border border-border px-3 py-1.5 font-body text-[11px] text-foreground-muted transition-colors hover:border-foreground-muted"
+                        className="rounded-md border border-border px-3 py-1.5 font-body text-[11px] text-muted-foreground transition-colors hover:border-muted-foreground"
                       >
                         Cancel
                       </button>
@@ -338,13 +338,13 @@ export default function ToolsPage() {
                         alt={item.key}
                         width={32}
                         height={32}
-                        className="h-8 w-8 rounded-md border border-border object-cover bg-surface"
+                        className="h-8 w-8 rounded-md border border-border object-cover bg-card"
                         onError={(event) => {
                           const target = event.currentTarget as HTMLImageElement;
                           target.style.display = "none";
                         }}
                       />
-                      <span className="font-body text-[11px] text-foreground-muted break-all">{item.key}</span>
+                      <span className="font-body text-[11px] text-muted-foreground break-all">{item.key}</span>
                     </div>
                   ))}
                 </div>
@@ -369,16 +369,16 @@ export default function ToolsPage() {
       </div>
 
       {/* ── Bulk recompress ───────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-border bg-surface p-5">
+      <div className="rounded-xl border border-border bg-card p-5">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/10">
-            <ImageDown strokeWidth={2.5} size={18} className="text-accent" />
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <ImageDown strokeWidth={2.5} size={18} className="text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-body text-sm font-semibold text-foreground">
               Bulk recompress existing images
             </h2>
-            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+            <p className="mt-1 font-body text-xs text-muted-foreground leading-relaxed">
               Re-processes every uploaded image in R2 — resizes to 300×300 and saves as
               JPEG at 78% quality. Images that are already at 300×300 are skipped. Run
               this after the migration above to standardise all image sizes.
@@ -387,7 +387,7 @@ export default function ToolsPage() {
             <button
               onClick={runRecompression}
               disabled={recompressStatus === "running"}
-              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-1.5 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {recompressStatus === "running" ? (
                 <>
@@ -408,11 +408,11 @@ export default function ToolsPage() {
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
               <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={recompressSummary.compressed} label="compressed" />
-              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-foreground-muted" />} value={recompressSummary.skipped}    label="skipped"    />
+              <Stat icon={<SkipForward strokeWidth={2.5}  size={13} className="text-muted-foreground" />} value={recompressSummary.skipped}    label="skipped"    />
               <Stat icon={<AlertCircle strokeWidth={2.5}  size={13} className="text-red-400" />}   value={recompressSummary.failed}     label="failed"     />
             </div>
             {recompressSummary.total === 0 && (
-              <p className="font-body text-xs text-foreground-muted">No image records found in the database.</p>
+              <p className="font-body text-xs text-muted-foreground">No image records found in the database.</p>
             )}
             {recompressSummary.results.length > 0 && (
               <div className="max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
@@ -432,7 +432,7 @@ export default function ToolsPage() {
       </div>
 
       {/* ── Purge Supabase Storage ────────────────────────────────────────── */}
-      <div className="rounded-xl border border-red-500/20 bg-surface p-5">
+      <div className="rounded-xl border border-red-500/20 bg-card p-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10">
             <Trash2 strokeWidth={2.5} size={18} className="text-red-400" />
@@ -441,7 +441,7 @@ export default function ToolsPage() {
             <h2 className="font-body text-sm font-semibold text-foreground">
               Delete Supabase Storage files
             </h2>
-            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+            <p className="mt-1 font-body text-xs text-muted-foreground leading-relaxed">
               Permanently deletes every file across all Supabase Storage buckets.
               Run this only after the migration above is complete — all DB URLs must
               already point to Cloudflare R2. <span className="text-red-400 font-medium">This cannot be undone.</span>
@@ -471,10 +471,10 @@ export default function ToolsPage() {
           <div className="mt-5 border-t border-border pt-4">
             <div className="flex gap-4 mb-4">
               <Stat icon={<Trash2 strokeWidth={2.5}      size={13} className="text-red-400" />}          value={purgeSummary.totalDeleted} label="deleted" />
-              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={purgeSummary.totalFailed}  label="failed"  />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-muted-foreground" />} value={purgeSummary.totalFailed}  label="failed"  />
             </div>
             {purgeSummary.results.length === 0 && (
-              <p className="font-body text-xs text-foreground-muted">No buckets found in Supabase Storage.</p>
+              <p className="font-body text-xs text-muted-foreground">No buckets found in Supabase Storage.</p>
             )}
             {purgeSummary.results.length > 0 && (
               <div className="max-h-60 overflow-y-auto rounded-lg border border-border divide-y divide-border">
@@ -487,8 +487,8 @@ export default function ToolsPage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-[11px] text-foreground">
-                        <span className="text-foreground-muted">Bucket: </span>{r.bucket}
-                        <span className="text-foreground-muted ml-2">· {r.deleted} deleted</span>
+                        <span className="text-muted-foreground">Bucket: </span>{r.bucket}
+                        <span className="text-muted-foreground ml-2">· {r.deleted} deleted</span>
                         {r.failed > 0 && <span className="text-red-400 ml-2">· {r.failed} failed</span>}
                       </p>
                       {r.errors.map((e, j) => (
@@ -517,7 +517,7 @@ function Stat({ icon, value, label }: { icon: React.ReactNode; value: number; la
     <div className="flex items-center gap-1.5">
       {icon}
       <span className="font-body text-xs font-semibold text-foreground">{value}</span>
-      <span className="font-body text-xs text-foreground-muted">{label}</span>
+      <span className="font-body text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }
@@ -535,7 +535,7 @@ function ResultRow({
   const icon = isSuccess
     ? <CheckCircle2 strokeWidth={2.5} size={12} className="text-green-400 shrink-0" />
     : isSkipped
-    ? <SkipForward strokeWidth={2.5}  size={12} className="text-foreground-muted shrink-0" />
+    ? <SkipForward strokeWidth={2.5}  size={12} className="text-muted-foreground shrink-0" />
     : <AlertCircle strokeWidth={2.5}  size={12} className="text-red-400 shrink-0" />;
 
   return (
@@ -543,11 +543,11 @@ function ResultRow({
       <span className="mt-0.5">{icon}</span>
       <div className="min-w-0 flex-1">
         <p className="font-body text-[11px] text-foreground truncate">
-          <span className="text-foreground-muted">{TABLE_LABELS[result.table] ?? result.table} · </span>
+          <span className="text-muted-foreground">{TABLE_LABELS[result.table] ?? result.table} · </span>
           {result.id}
         </p>
         {result.reason && (
-          <p className="font-body text-[10px] text-foreground-muted">{result.reason}</p>
+          <p className="font-body text-[10px] text-muted-foreground">{result.reason}</p>
         )}
       </div>
     </div>

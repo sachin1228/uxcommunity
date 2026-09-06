@@ -26,14 +26,14 @@ export const TypingIndicator = memo(function TypingIndicator({ users }: { users:
       className="flex items-center gap-2 px-4 py-1 animate-in fade-in slide-in-from-bottom-1 duration-200"
     >
       {/* Dots pill */}
-      <div className="flex items-center gap-0.5 bg-surface-raised rounded-full px-2 py-1 shrink-0">
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-accent" />
+      <div className="flex items-center gap-0.5 bg-popover rounded-full px-2 py-1 shrink-0">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
       </div>
 
       {/* Label */}
-      <span className="font-body text-[11px] text-foreground-muted shrink-0">
+      <span className="font-body text-[11px] text-muted-foreground shrink-0">
         {typingLabel(users)}
       </span>
 

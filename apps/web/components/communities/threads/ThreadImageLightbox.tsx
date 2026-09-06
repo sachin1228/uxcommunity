@@ -279,18 +279,18 @@ export function ThreadImageLightbox({
                   className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                     thread.user_liked
                       ? "text-[var(--ds-blue-700)]"
-                      : "fill-none text-foreground-subtle group-hover/like:text-white"
+                      : "fill-none text-muted-foreground group-hover/like:text-white"
                   }`}
                 />
                 <span
                   className={`font-body text-sm font-semibold tabular-nums ${
-                    thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
+                    thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"
                   }`}
                 >
                   {thread.like_count}
                 </span>
               </button>
-              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+              <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-muted-foreground transition-colors duration-150 hover:text-white">
                 <CommentIcon />
                 {totalComments}
               </span>
@@ -303,7 +303,7 @@ export function ThreadImageLightbox({
               </h3>
 
               {comments === null && !commentsError && (
-                <p className="mt-4 font-body text-xs text-foreground-subtle" role="status">
+                <p className="mt-4 font-body text-xs text-muted-foreground" role="status">
                   Loading comments…
                 </p>
               )}
@@ -323,13 +323,13 @@ export function ThreadImageLightbox({
                       />
                     </div>
                   ) : (
-                    <div className="mt-3 border-y border-border px-3 py-2.5 text-center font-body text-xs text-foreground-subtle">
+                    <div className="mt-3 border-y border-border px-3 py-2.5 text-center font-body text-xs text-muted-foreground">
                       Replies are closed for this thread.
                     </div>
                   )}
 
                   {comments.length === 0 ? (
-                    <p className="mt-4 font-body text-xs text-foreground-subtle">
+                    <p className="mt-4 font-body text-xs text-muted-foreground">
                       No comments yet. Be the first!
                     </p>
                   ) : (

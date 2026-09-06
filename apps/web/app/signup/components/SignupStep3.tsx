@@ -28,8 +28,8 @@ export function SignupStep3({
       <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         What are your design interests?
       </h2>
-      <p className="font-body text-sm text-foreground-muted mb-1">Step 3 of 4</p>
-      <p className="font-body text-xs text-foreground-muted mb-7">
+      <p className="font-body text-sm text-muted-foreground mb-1">Step 3 of 4</p>
+      <p className="font-body text-xs text-muted-foreground mb-7">
         Pick up to {MAX_DESIGN_INTERESTS} topics you care about most. You can always update these later.
       </p>
 
@@ -47,7 +47,7 @@ export function SignupStep3({
         type="button"
         onClick={onContinue}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+        className="w-full flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {loading && <Spinner className="h-4 w-4 text-white" />}
         {loading ? "Saving…" : "Continue →"}

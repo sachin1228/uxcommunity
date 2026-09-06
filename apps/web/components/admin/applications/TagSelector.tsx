@@ -26,8 +26,8 @@ export function TagSelector({ allTags, selectedTags, onToggle }: Props) {
               onClick={() => onToggle(tag.id)}
               className={`rounded-full px-2.5 py-0.5 font-body text-xs transition-colors ${
                 active
-                  ? "bg-accent text-accent-foreground"
-                  : "border border-border bg-surface text-foreground-muted hover:border-accent/40 hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
               }`}
             >
               {tag.name}

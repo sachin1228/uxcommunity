@@ -46,12 +46,12 @@ export function ShowcaseOptionsMenu({
         aria-label="Showcase options"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex size-7 items-center justify-center rounded-md text-foreground-muted hover:bg-surface-raised"
+        className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-popover"
       >
         <MoreHorizontal strokeWidth={2.5} size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-surface py-1 shadow-lg">
+        <div className="absolute right-0 top-8 z-20 min-w-40 rounded-lg border border-border bg-card py-1 shadow-lg">
           <button
             type="button"
             onClick={() => {
@@ -60,7 +60,7 @@ export function ShowcaseOptionsMenu({
             }}
             aria-pressed={saved}
       aria-busy={busy}
-      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover"
 
           >
             <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
@@ -74,7 +74,7 @@ export function ShowcaseOptionsMenu({
                   setOpen(false);
                   onEdit();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
+                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-muted-foreground hover:bg-popover"
               >
                 <Pencil strokeWidth={2.5} size={12} />
                 Edit
@@ -85,7 +85,7 @@ export function ShowcaseOptionsMenu({
                   setOpen(false);
                   onDelete();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised"
+                className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-popover"
               >
                 <Trash2 strokeWidth={2.5} size={12} />
                 Delete

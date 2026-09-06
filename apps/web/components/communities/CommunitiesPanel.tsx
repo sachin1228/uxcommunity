@@ -54,8 +54,8 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         onClick={() => router.push("/dashboard/communities")}
         className={`flex items-center gap-2 mx-3 mt-3 mb-1 px-3 py-2 rounded-lg font-body text-xs font-medium transition-colors text-left ${
           pathname === "/dashboard/communities"
-            ? "bg-accent/10 text-accent"
-            : "text-foreground-muted hover:text-foreground bg-surface-raised hover:bg-surface-raised-hover"
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:text-foreground bg-popover hover:bg-surface-raised-hover"
         }`}
       >
         <Search strokeWidth={2.5} size={13} />
@@ -72,7 +72,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         ) : communities.length === 0 ? (
           <div className="py-0.5">
             <div className="flex items-center justify-between px-3 pt-2 pb-1">
-              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
               <button
@@ -88,9 +88,9 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
             <div className="px-4 py-10 text-center">
               <MessageSquare
                 size={24}
-                className="mx-auto text-foreground-muted mb-2 opacity-40"
+                className="mx-auto text-muted-foreground mb-2 opacity-40"
               />
-              <p className="font-body text-xs text-foreground-muted">
+              <p className="font-body text-xs text-muted-foreground">
                 No communities yet
               </p>
               <button
@@ -106,7 +106,7 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
         ) : (
           <div className="py-0.5">
             <div className="flex items-center justify-between px-3 pt-2 pb-1">
-              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <span className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
               <button

@@ -59,8 +59,8 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
       <div className="flex flex-col items-center justify-center h-full gap-2 px-5 text-center">
         <span className="text-2xl">{type === "gif" ? "🎬" : "🎭"}</span>
         <p className="text-xs font-semibold text-foreground">Not configured</p>
-        <p className="text-[11px] text-foreground-muted leading-relaxed">
-          Set a <code className="bg-surface-raised px-1 py-0.5 rounded text-[10px] font-mono">GIPHY_API_KEY</code> env var to enable {type}s.
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Set a <code className="bg-popover px-1 py-0.5 rounded text-[10px] font-mono">GIPHY_API_KEY</code> env var to enable {type}s.
         </p>
       </div>
     );
@@ -70,19 +70,19 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
     <div className="flex flex-col h-full">
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
-        <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
+        <div className="flex items-center gap-1.5 bg-popover border border-border rounded-lg px-2.5 py-1.5">
+          <Search strokeWidth={2.5} size={12} className="text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder={type === "gif" ? "Search GIFs…" : "Search stickers…"}
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-foreground-muted outline-none font-body min-w-0"
+            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-body min-w-0"
           />
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
-              className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" aria-label="Clear">
               <X strokeWidth={2.5} size={11} />
             </button>
           )}
@@ -97,17 +97,17 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
           </div>
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <p className="text-xs text-foreground-muted">No results</p>
+            <p className="text-xs text-muted-foreground">No results</p>
           </div>
         ) : (
           <div className="columns-2 gap-1 space-y-1">
             {results.map((gif) => (
               <div key={gif.id} onClick={() => onSelect(gif.sendUrl)} title={gif.title}
                 className="break-inside-avoid cursor-pointer rounded-md overflow-hidden
-                  ring-1 ring-transparent hover:ring-accent/50 active:scale-95 transition-all duration-100">
+                  ring-1 ring-transparent hover:ring-primary/50 active:scale-95 transition-all duration-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={gif.previewUrl} alt={gif.title} loading="lazy"
-                  className="w-full h-auto block bg-surface-raised" />
+                  className="w-full h-auto block bg-popover" />
               </div>
             ))}
           </div>
@@ -192,19 +192,19 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
     <div className="flex flex-col h-full">
       {/* Search */}
       <div className="px-2 pt-2 pb-1.5 shrink-0">
-        <div className="flex items-center gap-1.5 bg-surface-raised border border-border rounded-lg px-2.5 py-1.5">
-          <Search strokeWidth={2.5} size={12} className="text-foreground-muted shrink-0" />
+        <div className="flex items-center gap-1.5 bg-popover border border-border rounded-lg px-2.5 py-1.5">
+          <Search strokeWidth={2.5} size={12} className="text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
             type="text"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             placeholder="Search emoji…"
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-foreground-muted outline-none font-body min-w-0"
+            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-body min-w-0"
           />
           {query && (
             <button onClick={() => { onQueryChange(""); inputRef.current?.focus(); }}
-              className="shrink-0 text-foreground-muted hover:text-foreground transition-colors" aria-label="Clear">
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors" aria-label="Clear">
               <X strokeWidth={2.5} size={11} />
             </button>
           )}
@@ -221,8 +221,8 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
                 onClick={() => setSelectedCategory(category)}
                 className={`whitespace-nowrap px-2 py-1 rounded-full text-[10px] font-medium transition-colors
                   ${selectedCategory === category
-                    ? "bg-accent text-accent-foreground"
-                    : "bg-surface-raised text-foreground-muted hover:text-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-popover text-muted-foreground hover:text-foreground"
                   }`}
               >
                 {category}
@@ -236,7 +236,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
       <div ref={gridRef} className="flex-1 overflow-y-auto px-2 pb-1">
         {filteredEmojis.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 gap-1">
-            <p className="text-xs text-foreground-muted">No emoji found</p>
+            <p className="text-xs text-muted-foreground">No emoji found</p>
           </div>
         ) : (
           <div className="grid grid-cols-8 gap-0.5">
@@ -245,7 +245,7 @@ function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
                 key={emoji.codepoint}
                 onClick={() => onSelect(emoji.unicode)}
                 className="w-8 h-8 flex items-center justify-center rounded-md
-                  hover:bg-surface-raised active:scale-90 transition-all duration-100"
+                  hover:bg-popover active:scale-90 transition-all duration-100"
                 title={emoji.name}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -271,7 +271,7 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
 
   return (
     <div
-      className="flex flex-col bg-surface border border-border rounded-xl overflow-hidden shadow-md"
+      className="flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-md"
       style={{ height: 440, width: 340 }}
     >
       {/* ── Content ── */}
@@ -282,7 +282,7 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
       </div>
 
       {/* ── Tab bar — bottom ── */}
-      <div className="flex shrink-0 border-t border-border bg-surface">
+      <div className="flex shrink-0 border-t border-border bg-card">
         {([ 
           { id: "emoji"   as Tab, label: "Emoji",   icon: "😊" },
           { id: "gif"     as Tab, label: "GIF",     icon: null },
@@ -295,16 +295,16 @@ export function EmojiGifPicker({ onEmojiSelect, onGifSelect }: EmojiGifPickerPro
               onClick={() => setTab(t.id)}
               className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2
                 font-body transition-colors duration-150
-                ${active ? "text-accent" : "text-foreground-muted hover:text-foreground"}`}
+                ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
             >
               {active && (
-                <span className="absolute top-0 left-4 right-4 h-[2px] rounded-full bg-accent" />
+                <span className="absolute top-0 left-4 right-4 h-[2px] rounded-full bg-primary" />
               )}
 
               {/* Icon row */}
               {t.id === "gif" ? (
                 <span className={`text-[11px] font-black tracking-wide leading-none
-                  ${active ? "text-accent" : "text-foreground-muted"}`}>
+                  ${active ? "text-primary" : "text-muted-foreground"}`}>
                   GIF
                 </span>
               ) : t.icon ? (

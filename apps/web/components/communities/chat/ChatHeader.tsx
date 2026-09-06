@@ -85,7 +85,7 @@ function ConfirmDialog({
     >
       <div className="modal-panel w-full max-w-xs p-5 animate-in zoom-in-95 fade-in duration-150 mx-4">
         <p className="font-display text-sm font-semibold text-foreground mb-1">{copy.title}</p>
-        <p className="font-body text-xs text-foreground-muted leading-relaxed mb-5">{copy.body}</p>
+        <p className="font-body text-xs text-muted-foreground leading-relaxed mb-5">{copy.body}</p>
         <div className="flex gap-2">
           <button
             type="button"
@@ -211,18 +211,18 @@ export const ChatHeader = memo(function ChatHeader({
                   lottieData={community.lottie_data}
                   name={community.name}
                   size={44}
-                  className="bg-surface-raised"
+                  className="bg-popover"
                 />
                 <div>
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">
                       {community.name}
                       {community.is_private && (
-                        <Lock strokeWidth={2.5} size={13} className="text-foreground-muted" aria-label="Private community" />
+                        <Lock strokeWidth={2.5} size={13} className="text-muted-foreground" aria-label="Private community" />
                       )}
                     </span>
                   </h3>
-                  <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
+                  <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <Users strokeWidth={2.5} size={10} /> {community.member_count} member
                       {community.member_count !== 1 ? "s" : ""}
@@ -242,7 +242,7 @@ export const ChatHeader = memo(function ChatHeader({
                   <button
                     type="button"
                     onClick={onSettingsClick}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
                     aria-label="Community settings"
                     title="Community settings"
                   >
@@ -255,12 +255,12 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "joined"}
                     onClick={() => setOpenMenu(openMenu === "joined" ? null : "joined")}
-                    className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-surface-raised transition-colors"
+                    className="h-8 flex items-center gap-1.5 rounded-lg border border-border px-3 font-body text-xs text-foreground hover:bg-popover transition-colors"
                   >
                     Joined <ChevronDown strokeWidth={2.5} size={13} className={`transition-transform ${openMenu === "joined" ? "rotate-180" : ""}`} />
                   </button>
                   {openMenu === "joined" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-40 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       <button
                         type="button"
                         role="menuitem"
@@ -279,12 +279,12 @@ export const ChatHeader = memo(function ChatHeader({
                     aria-haspopup="menu"
                     aria-expanded={openMenu === "more"}
                     onClick={() => setOpenMenu(openMenu === "more" ? null : "more")}
-                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
                   >
                     <MoreHorizontal strokeWidth={2.5} size={16} />
                   </button>
                   {openMenu === "more" && (
-                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-surface-raised p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                    <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-44 rounded-xl border border-white/[0.08] bg-popover p-1 shadow-2xl animate-in fade-in zoom-in-95 duration-100 origin-top-right">
                       <button
                         type="button"
                         role="menuitem"
@@ -315,8 +315,8 @@ export const ChatHeader = memo(function ChatHeader({
                   onClick={() => onTabChange(tab)}
                   className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
                     activeTab === tab
-                      ? "border-accent text-foreground"
-                      : "border-transparent text-foreground-muted hover:text-foreground"
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <span className="inline-flex items-center gap-1.5">

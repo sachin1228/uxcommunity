@@ -78,23 +78,23 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-3">
           <div>
             <h2 className="font-body text-sm font-semibold text-foreground flex items-center gap-1.5">
-              <ShieldCheck strokeWidth={2.5} size={14} className="text-accent" />
+              <ShieldCheck strokeWidth={2.5} size={14} className="text-primary" />
               Community admins
-              <span className="ml-1 font-mono text-[11px] text-foreground-muted font-normal">
+              <span className="ml-1 font-mono text-[11px] text-muted-foreground font-normal">
                 {admins.length}
               </span>
             </h2>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">
               Admins get owner-style management controls in the app, scoped by the permissions you grant.
             </p>
           </div>
           <button
             onClick={() => setShowAdd(true)}
-            className="shrink-0 flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:opacity-90 transition-opacity"
+            className="shrink-0 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
           >
             <Plus strokeWidth={2.5} size={13} /> Add admin
           </button>
@@ -108,16 +108,16 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
           <p className="px-5 py-4 font-body text-xs text-red-400">{error}</p>
         ) : admins.length === 0 ? (
           <div className="px-5 py-8 flex flex-col items-center justify-center gap-2 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground-muted">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-border bg-popover text-muted-foreground">
               <ShieldOff strokeWidth={2.5} size={16} />
             </span>
-            <p className="font-body text-xs text-foreground-muted max-w-sm">
+            <p className="font-body text-xs text-muted-foreground max-w-sm">
               No admins yet. Search the community&apos;s members and promote one to give them
               in-app management powers.
             </p>
             <button
               onClick={() => setShowAdd(true)}
-              className="mt-1 inline-flex items-center gap-1 font-body text-xs text-accent hover:text-accent/80 transition-colors"
+              className="mt-1 inline-flex items-center gap-1 font-body text-xs text-primary hover:text-primary/80 transition-colors"
             >
               <Plus strokeWidth={2.5} size={12} /> Add the first admin
             </button>
@@ -132,15 +132,15 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
               return (
                 <div
                   key={admin.user_id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-surface-raised/60 transition-colors"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-popover/60 transition-colors"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised font-body text-xs font-semibold text-foreground">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-popover font-body text-xs font-semibold text-foreground">
                     {initialsOf(admin.name)}
                   </span>
 
                   <div className="min-w-0 flex-1">
                     <p className="font-body text-sm font-medium text-foreground truncate">{admin.name}</p>
-                    <p className="mt-0.5 font-body text-[11px] text-foreground-muted truncate">
+                    <p className="mt-0.5 font-body text-[11px] text-muted-foreground truncate">
                       {admin.email} · Admin since {fmtDate(admin.granted_at)}
                     </p>
                   </div>
@@ -149,7 +149,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                     {permKeys.map((key) => (
                       <span
                         key={key}
-                        className="inline-flex items-center rounded-full bg-accent/10 border border-accent/15 px-2 py-0.5 font-body text-[10px] font-medium text-accent"
+                        className="inline-flex items-center rounded-full bg-primary/10 border border-primary/15 px-2 py-0.5 font-body text-[10px] font-medium text-primary"
                       >
                         {PERM_CHIP[key]}
                       </span>
@@ -164,7 +164,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       onClick={() => router.push(`/admin/communities/${communityId}/admins/${admin.user_id}`)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
+                      className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
                     >
                       Manage <ChevronRight strokeWidth={2.5} size={12} />
                     </button>
@@ -181,7 +181,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                         </button>
                         <button
                           onClick={() => setConfirmingId(null)}
-                          className="px-1 py-0.5 font-body text-[11px] text-foreground-muted hover:text-foreground"
+                          className="px-1 py-0.5 font-body text-[11px] text-muted-foreground hover:text-foreground"
                         >
                           No
                         </button>
@@ -189,7 +189,7 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                     ) : (
                       <button
                         onClick={() => setConfirmingId(admin.user_id)}
-                        className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                        className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-500/10 transition-colors"
                         title="Remove admin rights (keeps them as a member)"
                         aria-label={`Remove admin rights for ${admin.name}`}
                       >

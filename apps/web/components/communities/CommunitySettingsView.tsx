@@ -247,22 +247,22 @@ export function CommunitySettingsView({
             <h2 className="font-display text-base font-semibold text-foreground leading-none">
               Community Settings
             </h2>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">{community.name}</p>
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">{community.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 font-body text-xs font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? <Spinner size={12} className="text-accent-foreground" /> : <Save strokeWidth={2.5} size={12} />}
+              {saving ? <Spinner size={12} className="text-primary-foreground" /> : <Save strokeWidth={2.5} size={12} />}
               Save changes
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+              className="h-8 w-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
               aria-label="Close settings"
             >
               <X strokeWidth={2.5} size={15} />
@@ -282,7 +282,7 @@ export function CommunitySettingsView({
 
           {/* General */}
           <section>
-            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-4">
+            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
               General
             </h3>
             <div className="space-y-4">
@@ -295,7 +295,7 @@ export function CommunitySettingsView({
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent hover:text-accent"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-popover text-muted-foreground transition-colors hover:border-primary hover:text-primary"
                     aria-label="Change community photo"
                   >
                     {imagePreview ? (
@@ -308,7 +308,7 @@ export function CommunitySettingsView({
                     <button
                       type="button"
                       onClick={() => fileRef.current?.click()}
-                      className="block font-body text-xs text-accent hover:text-accent-hover transition-colors"
+                      className="block font-body text-xs text-primary hover:text-primary transition-colors"
                     >
                       {imagePreview ? "Replace photo" : "Upload photo"}
                     </button>
@@ -316,12 +316,12 @@ export function CommunitySettingsView({
                       <button
                         type="button"
                         onClick={() => handleImageChange(null)}
-                        className="block font-body text-xs text-foreground-muted hover:text-red-400 transition-colors"
+                        className="block font-body text-xs text-muted-foreground hover:text-red-400 transition-colors"
                       >
                         Remove photo
                       </button>
                     )}
-                    <p className="font-body text-[11px] text-foreground-muted">JPEG, PNG, or WebP under 10 MB.</p>
+                    <p className="font-body text-[11px] text-muted-foreground">JPEG, PNG, or WebP under 10 MB.</p>
                   </div>
                   <input
                     ref={fileRef}
@@ -361,10 +361,10 @@ export function CommunitySettingsView({
           </section>
 
           {!isOwner && (
-            <div className="rounded-lg border border-accent/20 bg-accent/5 px-4 py-3">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
               <p className="font-body text-xs text-foreground leading-relaxed">
                 You are managing <span className="font-medium text-foreground">{community.name}</span> as a{" "}
-                <span className="font-medium text-accent">community admin</span>. Privacy, invite-only access
+                <span className="font-medium text-primary">community admin</span>. Privacy, invite-only access
                 and deletion are controlled by the platform.
               </p>
             </div>
@@ -373,7 +373,7 @@ export function CommunitySettingsView({
           {/* Privacy — owner only */}
           {isOwner && (
           <section>
-            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-4">
+            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
               Privacy
             </h3>
             <div className="grid gap-2">
@@ -388,16 +388,16 @@ export function CommunitySettingsView({
                     type="button"
                     onClick={() => setIsPrivate(value === "private")}
                     className={`relative flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
-                      active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
+                      active ? "border-primary bg-primary/10" : "border-border bg-popover hover:border-primary/60"
                     }`}
                   >
-                    <Icon size={16} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
+                    <Icon size={16} strokeWidth={2.5} className={active ? "text-primary" : "text-muted-foreground"} />
                     <span className="min-w-0">
                       <span className="block font-body text-sm font-semibold text-foreground">{label}</span>
-                      <span className="block font-body text-xs text-foreground-muted">{copy}</span>
+                      <span className="block font-body text-xs text-muted-foreground">{copy}</span>
                     </span>
                     {active && (
-                      <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground shrink-0">
+                      <span className="ml-auto flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground shrink-0">
                         <Check strokeWidth={2.5} size={10} />
                       </span>
                     )}
@@ -410,7 +410,7 @@ export function CommunitySettingsView({
 
           {/* Tabs */}
           <section>
-            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-4">
+            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-4">
               Tabs
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -423,21 +423,21 @@ export function CommunitySettingsView({
                     onClick={() => toggleTab(id)}
                     disabled={required}
                     className={`relative rounded-lg border p-3 text-left transition-colors ${
-                      active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
+                      active ? "border-primary bg-primary/10" : "border-border bg-popover hover:border-primary/60"
                     } ${required ? "cursor-default" : ""}`}
                   >
                     <div className="flex items-center gap-2">
-                      <Icon size={14} strokeWidth={2.5} className={active ? "text-accent" : "text-foreground-muted"} />
+                      <Icon size={14} strokeWidth={2.5} className={active ? "text-primary" : "text-muted-foreground"} />
                       <span className="font-body text-sm font-semibold text-foreground">{label}</span>
                     </div>
-                    <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">{copy}</p>
+                    <p className="mt-1 font-body text-xs text-muted-foreground leading-relaxed">{copy}</p>
                     <span className={`absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full border ${
-                      active ? "border-accent bg-accent text-accent-foreground" : "border-border"
+                      active ? "border-primary bg-primary text-primary-foreground" : "border-border"
                     }`}>
                       {active && <Check strokeWidth={2.5} size={9} />}
                     </span>
                     {required && (
-                      <span className="mt-1.5 inline-block rounded-full bg-surface px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-foreground-muted">
+                      <span className="mt-1.5 inline-block rounded-full bg-card px-2 py-0.5 font-body text-[10px] uppercase tracking-wider text-muted-foreground">
                         Required
                       </span>
                     )}
@@ -451,10 +451,10 @@ export function CommunitySettingsView({
           <section>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted">
+                <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Rules
                 </h3>
-                <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+                <p className="font-body text-[11px] text-muted-foreground mt-0.5">
                   Members see these before joining
                 </p>
               </div>
@@ -462,7 +462,7 @@ export function CommunitySettingsView({
                 <button
                   type="button"
                   onClick={() => setAddingRule(true)}
-                  className="inline-flex items-center gap-1 font-body text-xs text-accent hover:text-accent-hover transition-colors"
+                  className="inline-flex items-center gap-1 font-body text-xs text-primary hover:text-primary transition-colors"
                 >
                   <Plus strokeWidth={2.5} size={12} /> Add rule
                 </button>
@@ -471,18 +471,18 @@ export function CommunitySettingsView({
             {rulesLoaded && (
               <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
                 {rules.length === 0 && !addingRule && (
-                  <p className="px-4 py-3 font-body text-xs text-foreground-muted">No rules yet.</p>
+                  <p className="px-4 py-3 font-body text-xs text-muted-foreground">No rules yet.</p>
                 )}
                 {rules.map((rule, i) => (
-                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 group hover:bg-surface-raised/50 transition-colors">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent/10 font-body text-[10px] font-semibold text-accent">
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 group hover:bg-popover/50 transition-colors">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-body text-[10px] font-semibold text-primary">
                       {i + 1}
                     </span>
                     <span className="flex-1 font-body text-sm text-foreground leading-relaxed">{rule}</span>
                     <button
                       type="button"
                       onClick={() => setRules((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-foreground-muted hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-red-400 transition-all"
                       aria-label="Remove rule"
                     >
                       <X strokeWidth={2.5} size={12} />
@@ -501,19 +501,19 @@ export function CommunitySettingsView({
                       }}
                       maxLength={160}
                       placeholder="Describe the rule…"
-                      className="field flex-1 border-accent"
+                      className="field flex-1 border-primary"
                     />
                     <button
                       type="button"
                       onClick={commitNewRule}
-                      className="rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
+                      className="rounded-md bg-primary px-3 py-1.5 font-body text-xs font-medium text-primary-foreground hover:bg-primary transition-colors"
                     >
                       Add
                     </button>
                     <button
                       type="button"
                       onClick={() => { setAddingRule(false); setNewRule(""); }}
-                      className="rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                      className="rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
                     >
                       Cancel
                     </button>
@@ -525,22 +525,22 @@ export function CommunitySettingsView({
 
           {/* Invite Link */}
           <section>
-            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-foreground-muted mb-3">
+            <h3 className="font-body text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">
               Invite Link
             </h3>
             <div className="rounded-lg border border-border p-4 space-y-3">
               <div className="flex items-center gap-1.5">
                 {isPrivate ? (
                   <>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 font-body text-[10px] font-medium text-foreground-muted border border-border">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-card px-2 py-0.5 font-body text-[10px] font-medium text-muted-foreground border border-border">
                       <Lock strokeWidth={2.5} size={9} /> Private
                     </span>
-                    <p className="font-body text-xs text-foreground-muted">
+                    <p className="font-body text-xs text-muted-foreground">
                       Members must request via this link. You approve each request.
                     </p>
                   </>
                 ) : (
-                  <p className="font-body text-xs text-foreground-muted">
+                  <p className="font-body text-xs text-muted-foreground">
                     Share this link to bring members directly to your community.
                   </p>
                 )}
@@ -554,7 +554,7 @@ export function CommunitySettingsView({
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
                 >
                   {copiedLink ? <Check strokeWidth={2.5} size={12} className="text-green-400" /> : <Copy strokeWidth={2.5} size={12} />}
                   {copiedLink ? "Copied!" : "Copy"}
@@ -565,7 +565,7 @@ export function CommunitySettingsView({
                   type="button"
                   onClick={handleRegenerate}
                   disabled={regenerating}
-                  className="inline-flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
+                  className="inline-flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                 >
                   {regenerating ? <Spinner size={11} /> : <RefreshCw strokeWidth={2.5} size={11} />}
                   Regenerate link
@@ -594,7 +594,7 @@ export function CommunitySettingsView({
                       <p className="font-body text-sm font-semibold text-foreground">
                         Delete community?
                       </p>
-                      <p className="font-body text-xs text-foreground-muted mt-0.5">
+                      <p className="font-body text-xs text-muted-foreground mt-0.5">
                         Deleting <span className="font-medium text-foreground">{community.name}</span> cannot
                         be undone. All members will lose access.
                       </p>
@@ -605,7 +605,7 @@ export function CommunitySettingsView({
                       type="button"
                       onClick={() => setShowDeleteConfirm(false)}
                       disabled={deleting}
-                      className="flex-1 rounded-lg border border-border py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground transition-colors disabled:opacity-50"
+                      className="flex-1 rounded-lg border border-border py-2 font-body text-xs text-muted-foreground hover:bg-popover hover:text-foreground transition-colors disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -624,7 +624,7 @@ export function CommunitySettingsView({
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <p className="font-body text-sm font-medium text-foreground">Delete this community</p>
-                    <p className="font-body text-xs text-foreground-muted mt-0.5">
+                    <p className="font-body text-xs text-muted-foreground mt-0.5">
                       Permanently remove this community and all its content.
                     </p>
                   </div>

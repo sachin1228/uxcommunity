@@ -70,38 +70,38 @@ export function InterestsMultiSelect({
     <div ref={containerRef} className="relative">
       <div
         onClick={() => setOpen((v) => !v)}
-        className={`flex min-h-[42px] cursor-pointer flex-wrap items-center gap-1.5 rounded-md border bg-surface px-3 py-2 transition-colors ${
+        className={`flex min-h-[42px] cursor-pointer flex-wrap items-center gap-1.5 rounded-md border bg-card px-3 py-2 transition-colors ${
           open
-            ? "border-accent ring-2 ring-accent/20"
-            : "border-border hover:border-foreground-subtle"
+            ? "border-primary ring-2 ring-primary/20"
+            : "border-border hover:border-muted-foreground"
         }`}
       >
         {selectedOptions.map((o) => (
           <span
             key={o.id}
-            className="inline-flex items-center gap-1 rounded-md bg-surface-raised px-2 py-0.5 font-body text-xs text-foreground"
+            className="inline-flex items-center gap-1 rounded-md bg-popover px-2 py-0.5 font-body text-xs text-foreground"
           >
             {o.name}
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); remove(o.id); }}
-              className="ml-0.5 text-foreground-muted transition-colors hover:text-foreground"
+              className="ml-0.5 text-muted-foreground transition-colors hover:text-foreground"
               aria-label={`Remove ${o.name}`}
             >
               ×
             </button>
           </span>
         ))}
-        <span className="flex-1 min-w-[80px] select-none font-body text-sm text-foreground-muted">
+        <span className="flex-1 min-w-[80px] select-none font-body text-sm text-muted-foreground">
           {selectedOptions.length === 0 ? "Select topics…" : ""}
         </span>
         {selected.length > 0 && (
-          <span className="shrink-0 rounded-full border border-border bg-surface-raised px-2 py-0.5 font-body text-[10px] font-semibold text-foreground-muted tabular-nums">
+          <span className="shrink-0 rounded-full border border-border bg-popover px-2 py-0.5 font-body text-[10px] font-semibold text-muted-foreground tabular-nums">
             {selected.length}/{MAX_DESIGN_INTERESTS}
           </span>
         )}
         <svg
-          className={`h-4 w-4 shrink-0 text-foreground-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20" fill="currentColor"
         >
           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -109,10 +109,10 @@ export function InterestsMultiSelect({
       </div>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-surface-raised shadow-md">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
           {atLimit && (
-            <div className="border-b border-border bg-accent/5 px-4 py-2">
-              <p className="font-body text-xs text-foreground-muted">
+            <div className="border-b border-border bg-primary/5 px-4 py-2">
+              <p className="font-body text-xs text-muted-foreground">
                 Maximum of {MAX_DESIGN_INTERESTS} topics selected — remove one to pick another.
               </p>
             </div>
@@ -126,7 +126,7 @@ export function InterestsMultiSelect({
                   type="button"
                   onClick={() => toggle(option.id)}
                   aria-pressed={isSelected}
-                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-background-subtle"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted"
                 >
                   <InterestIcon imageUrl={option.image_url} name={option.name} />
                   <span className="flex-1 font-body text-sm text-foreground">
@@ -135,14 +135,14 @@ export function InterestsMultiSelect({
                   <span
                     className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[5px] border transition-colors ${
                       isSelected
-                        ? "border-accent bg-accent"
-                        : "border-foreground-subtle bg-transparent"
+                        ? "border-primary bg-primary"
+                        : "border-muted-foreground bg-transparent"
                     }`}
                     aria-hidden="true"
                   >
                     {isSelected && (
                       <svg
-                        className="h-3 w-3 text-accent-foreground"
+                        className="h-3 w-3 text-primary-foreground"
                         viewBox="0 0 20 20"
                         fill="currentColor"
                       >

@@ -12,7 +12,7 @@ export function CommunityPostLabel({
   className = "",
 }: CommunityPostLabelProps) {
   const content = (
-    <div className={`flex items-center gap-1.5 overflow-hidden whitespace-nowrap font-body text-[11px] text-foreground-subtle ${className}`}>
+    <div className={`flex items-center gap-1.5 overflow-hidden whitespace-nowrap font-body text-[11px] text-muted-foreground ${className}`}>
       <span className="shrink-0">posted in</span>
       {communityImage ? (
         <img
@@ -21,9 +21,9 @@ export function CommunityPostLabel({
           className="h-4 w-4 shrink-0 rounded-full object-cover"
         />
       ) : (
-        <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full bg-accent/20" />
+        <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full bg-primary/20" />
       )}
-      <span className="truncate text-foreground-muted">{communityName}</span>
+      <span className="truncate text-muted-foreground">{communityName}</span>
     </div>
   );
 

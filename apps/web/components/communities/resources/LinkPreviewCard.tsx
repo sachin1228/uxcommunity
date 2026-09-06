@@ -16,7 +16,7 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
   const domain = getDomain(data.url);
 
   return (
-    <div className="relative flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-surface-raised p-4">
+    <div className="relative flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-popover p-4">
       {onDismiss && (
         <button
           type="button"
@@ -35,7 +35,7 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
           </p>
         )}
         {data.description && (
-          <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-foreground-muted">
+          <p className="mt-1 line-clamp-3 font-body text-[10px] leading-relaxed text-muted-foreground">
             {data.description}
           </p>
         )}
@@ -52,15 +52,15 @@ export function LinkPreviewCard({ data, onDismiss }: LinkPreviewCardProps) {
               (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty("display", "block");
             }}
           />
-          <Globe strokeWidth={2.5} size={14} className="hidden text-foreground-subtle" />
-          <span className="truncate font-body text-[11px] text-foreground-subtle">
+          <Globe strokeWidth={2.5} size={14} className="hidden text-muted-foreground" />
+          <span className="truncate font-body text-[11px] text-muted-foreground">
             {domain}
           </span>
         </div>
       </div>
 
       {data.image && (
-        <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-surface">
+        <div className="h-24 w-36 shrink-0 overflow-hidden rounded-lg bg-card">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={data.image}

@@ -21,7 +21,7 @@ function NameWithMatch({ name, query }: { name: string; query: string }) {
   return (
     <>
       {name.slice(0, index)}
-      <span className="text-accent">{name.slice(index, index + query.length)}</span>
+      <span className="text-primary">{name.slice(index, index + query.length)}</span>
       {name.slice(index + query.length)}
     </>
   );
@@ -30,7 +30,7 @@ function NameWithMatch({ name, query }: { name: string; query: string }) {
 function RoleBadge({ role }: { role: string }) {
   if (role === "owner") {
     return (
-      <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-accent/15 text-accent text-[9px] font-bold uppercase tracking-wider leading-none">
+      <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/15 text-primary text-[9px] font-bold uppercase tracking-wider leading-none">
         Owner
       </span>
     );
@@ -62,7 +62,7 @@ export function MentionSuggestions({
   const isEmpty = !loading && options.length === 0;
 
   return (
-    <div className="absolute bottom-full left-0 right-0 z-30 mb-2 overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-150">
+    <div className="absolute bottom-full left-0 right-0 z-30 mb-2 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-150">
       <div
         role="listbox"
         aria-label="Mention a member"
@@ -72,13 +72,13 @@ export function MentionSuggestions({
       >
         {loading && options.length === 0 ? (
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <Loader2 strokeWidth={2.5} size={13} className="animate-spin text-foreground-muted shrink-0" />
-            <p className="font-body text-xs text-foreground-muted">Searching members…</p>
+            <Loader2 strokeWidth={2.5} size={13} className="animate-spin text-muted-foreground shrink-0" />
+            <p className="font-body text-xs text-muted-foreground">Searching members…</p>
           </div>
         ) : isEmpty ? (
           <div className="flex items-center gap-2 px-3 py-2.5">
-            <AtSign strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
-            <p className="font-body text-xs text-foreground-muted">
+            <AtSign strokeWidth={2.5} size={13} className="text-muted-foreground shrink-0" />
+            <p className="font-body text-xs text-muted-foreground">
               No members match “{query}”
             </p>
           </div>
@@ -94,7 +94,7 @@ export function MentionSuggestions({
                 onMouseMove={() => onHover(index)}
                 onClick={() => onPick(option)}
                 className={`flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors ${
-                  active ? "bg-accent/15" : "hover:bg-white/[0.06]"
+                  active ? "bg-primary/15" : "hover:bg-white/[0.06]"
                 }`}
               >
                 <ChatAvatar name={option.name} url={option.avatar_url} size={7} />
@@ -105,7 +105,7 @@ export function MentionSuggestions({
                   {option.role ? <RoleBadge role={option.role} /> : null}
                 </span>
                 {option.designation && (
-                  <span className="shrink-0 font-body text-[11px] text-foreground-muted truncate max-w-[7rem]">
+                  <span className="shrink-0 font-body text-[11px] text-muted-foreground truncate max-w-[7rem]">
                     {option.designation}
                   </span>
                 )}
@@ -116,11 +116,11 @@ export function MentionSuggestions({
       </div>
 
       {/* Hint footer */}
-      <div className="flex items-center justify-between border-t border-border bg-background-subtle px-3 py-1.5">
-        <p className="font-body text-[10px] text-foreground-muted/80">
+      <div className="flex items-center justify-between border-t border-border bg-muted px-3 py-1.5">
+        <p className="font-body text-[10px] text-muted-foreground/80">
           {isEmpty ? "Enter to close" : "Mention a member"}
         </p>
-        <p className="font-body text-[10px] text-foreground-muted/60">
+        <p className="font-body text-[10px] text-muted-foreground/60">
           ↑↓ navigate · ↵ select · esc close
         </p>
       </div>

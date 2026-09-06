@@ -27,7 +27,7 @@ export function CommunityAvatar({
       lottieData={lottieData}
       name={name}
       size={36}
-      className="bg-surface-raised"
+      className="bg-popover"
     />
   );
 }

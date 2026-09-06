@@ -28,11 +28,11 @@ function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: str
   const initial = name.charAt(0).toUpperCase();
   const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
   return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
+    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-primary/15 flex items-center justify-center`}>
       {avatarUrl ? (
         <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
       ) : (
-        <span className="font-display font-bold text-accent">{initial}</span>
+        <span className="font-display font-bold text-primary">{initial}</span>
       )}
     </div>
   );
@@ -102,14 +102,14 @@ function CommentBox({
       {error && <p className="font-body text-xs text-red-400">{error}</p>}
       <div className="flex items-center gap-2">
         {onCancel && (
-          <button type="button" onClick={onCancel} className="font-body text-xs text-foreground-subtle hover:text-foreground">
+          <button type="button" onClick={onCancel} className="font-body text-xs text-muted-foreground hover:text-foreground">
             Cancel
           </button>
         )}
         <button
           type="submit"
           disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2.5 font-body text-sm font-medium text-primary-foreground hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? <Spinner size={12} className="text-white" /> : <Send strokeWidth={2.5} size={12} />}
           {saving ? "Posting…" : "Post"}
@@ -174,24 +174,24 @@ function CommentRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-body text-xs font-semibold text-foreground">{name}</span>
-          <span className="font-body text-[11px] text-foreground-subtle">{formatRelativeDate(comment.created_at)}</span>
+          <span className="font-body text-[11px] text-muted-foreground">{formatRelativeDate(comment.created_at)}</span>
           {isOwner && (
             <div className="relative ml-auto" ref={menuRef}>
               <button
                 type="button"
                 onClick={() => setMenuOpen((p) => !p)}
-                className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
+                className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
                 aria-label="Comment options"
               >
                 <MoreHorizontal strokeWidth={2.5} size={13} />
               </button>
               {menuOpen && (
-                <div className="absolute right-0 top-6 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                <div className="absolute right-0 top-6 z-20 min-w-[110px] rounded-lg border border-border bg-card py-1 shadow-lg">
                   <button
                     type="button"
                     onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
                     disabled={deleting}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-popover disabled:opacity-50"
                   >
                     <Trash2 strokeWidth={2.5} size={11} /> Delete
                   </button>
@@ -200,12 +200,12 @@ function CommentRow({
             </div>
           )}
         </div>
-        <p className="mt-1 font-body text-sm text-foreground-muted whitespace-pre-wrap break-words">{comment.body}</p>
+        <p className="mt-1 font-body text-sm text-muted-foreground whitespace-pre-wrap break-words">{comment.body}</p>
         {!isReply && (
           <button
             type="button"
             onClick={() => setReplying((p) => !p)}
-            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
+            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-muted-foreground hover:text-primary"
           >
             <CornerDownRight strokeWidth={2.5} size={11} /> Reply
           </button>

@@ -155,7 +155,7 @@ export default function LoadTestPage() {
       {/* Header */}
       <div>
         <h1 className="font-display text-xl font-semibold text-foreground">Load Test Runner</h1>
-        <p className="font-body text-xs text-foreground-muted mt-0.5">
+        <p className="font-body text-xs text-muted-foreground mt-0.5">
           Fire k6 stress tests against any environment and watch the output live.
         </p>
       </div>
@@ -165,15 +165,15 @@ export default function LoadTestPage() {
         <div className="w-80 shrink-0 flex flex-col gap-3">
 
           {/* Tabs */}
-          <div className="flex gap-1 rounded-lg bg-surface-raised p-1">
+          <div className="flex gap-1 rounded-lg bg-popover p-1">
             {(["test", "seed"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-body text-xs transition-colors ${
                   tab === t
-                    ? "bg-surface text-foreground shadow-sm"
-                    : "text-foreground-muted hover:text-foreground"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t === "test" ? <Gauge strokeWidth={2.5} size={13} /> : <Users strokeWidth={2.5} size={13} />}
@@ -184,10 +184,10 @@ export default function LoadTestPage() {
 
           {/* ── Run Test form ──────────────────────────────────────────────── */}
           {tab === "test" && (
-            <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
               {/* Scenario picker */}
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+                <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   Scenario
                 </label>
                 <div className="relative">
@@ -200,9 +200,9 @@ export default function LoadTestPage() {
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </select>
-                  <ChevronDown strokeWidth={2.5} size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-foreground-muted" />
+                  <ChevronDown strokeWidth={2.5} size={12} className="pointer-events-none absolute right-2.5 top-2.5 text-muted-foreground" />
                 </div>
-                <p className="font-body text-[11px] text-foreground-muted">
+                <p className="font-body text-[11px] text-muted-foreground">
                   {SCENARIOS.find((s) => s.value === scenario)?.desc}
                 </p>
               </div>
@@ -226,7 +226,7 @@ export default function LoadTestPage() {
               {/* Concurrent VUs — only shown for chat_concurrent */}
               {scenario === "chat_concurrent" && (
                 <div className="flex flex-col gap-1">
-                  <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+                  <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Concurrent VUs
                   </label>
                   <input
@@ -243,7 +243,7 @@ export default function LoadTestPage() {
               {scenario === "chat_flood" && (
                 <>
                   <div className="flex flex-col gap-1">
-                    <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+                    <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                       Flood VUs
                     </label>
                     <input
@@ -253,12 +253,12 @@ export default function LoadTestPage() {
                       value={floodVus}
                       onChange={(e) => setFloodVus(Number(e.target.value))}
                       className="field w-full" />
-                    <p className="font-body text-[11px] text-foreground-muted">
+                    <p className="font-body text-[11px] text-muted-foreground">
                       500 VUs × 2s sleep ≈ 250 msg/s · ~45k msgs in 3 min
                     </p>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+                    <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                       Duration
                     </label>
                     <input
@@ -273,7 +273,7 @@ export default function LoadTestPage() {
 
               {/* Credentials — divider */}
               <div className="border-t border-border pt-3 flex flex-col gap-3">
-                <p className="font-body text-[11px] text-foreground-muted uppercase tracking-wide font-medium">
+                <p className="font-body text-[11px] text-muted-foreground uppercase tracking-wide font-medium">
                   Credentials
                 </p>
 
@@ -319,7 +319,7 @@ export default function LoadTestPage() {
 
           {/* ── Seed Users form ────────────────────────────────────────────── */}
           {tab === "seed" && (
-            <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface p-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
               <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 font-body text-[11px] text-amber-400 leading-relaxed">
                 <strong>Server-side secrets</strong> (SUPABASE_SERVICE_ROLE_KEY and
                 SESSION_SECRET) are read from environment variables — no need to enter them here.
@@ -340,7 +340,7 @@ export default function LoadTestPage() {
               />
 
               <div className="flex flex-col gap-1">
-                <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+                <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                   User Count
                 </label>
                 <input
@@ -365,7 +365,7 @@ export default function LoadTestPage() {
         {/* ── Right panel: live log ───────────────────────────────────────── */}
         <div className="flex-1 min-w-0 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="font-body text-xs text-foreground-muted">
+            <span className="font-body text-xs text-muted-foreground">
               Output {lines.length > 0 && `· ${lines.length} lines`}
             </span>
             <div className="flex items-center gap-2">
@@ -375,7 +375,7 @@ export default function LoadTestPage() {
                     setAutoScroll(true);
                     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
                   }}
-                  className="font-body text-[11px] text-accent hover:underline flex items-center gap-1"
+                  className="font-body text-[11px] text-primary hover:underline flex items-center gap-1"
                 >
                   <ChevronRight strokeWidth={2.5} size={11} className="rotate-90" />
                   Jump to bottom
@@ -384,7 +384,7 @@ export default function LoadTestPage() {
               {lines.length > 0 && (
                 <button
                   onClick={() => setLines([])}
-                  className="font-body text-[11px] text-foreground-muted hover:text-foreground flex items-center gap-1"
+                  className="font-body text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1"
                 >
                   <RefreshCw strokeWidth={2.5} size={11} />
                   Clear
@@ -430,7 +430,7 @@ function Field({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+      <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
         {label}
       </label>
       <input
@@ -451,7 +451,7 @@ function PasswordField({
   const [show, setShow] = useState(false);
   return (
     <div className="flex flex-col gap-1">
-      <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wide">
+      <label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
         {label}
       </label>
       <div className="relative">
@@ -465,7 +465,7 @@ function PasswordField({
         <button
           type="button"
           onClick={() => setShow((s) => !s)}
-          className="absolute right-2.5 top-2 text-foreground-muted hover:text-foreground"
+          className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
           tabIndex={-1}
         >
           {show ? <EyeOff strokeWidth={2.5} size={12} /> : <Eye strokeWidth={2.5} size={12} />}
@@ -491,7 +491,7 @@ function RunButton({
   ) : (
     <button
       onClick={onClick}
-      className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-xs font-medium text-accent-foreground transition hover:bg-accent/90 disabled:opacity-50"
+      className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-body text-xs font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
     >
       <Play strokeWidth={2.5} size={12} />
       {label}

@@ -55,7 +55,7 @@ export default function UsersPage() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-display text-xl font-semibold text-foreground">Users</h1>
-          <p className="font-body text-xs text-foreground-muted mt-0.5">
+          <p className="font-body text-xs text-muted-foreground mt-0.5">
             {total} registered accounts
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function UsersPage() {
       <div className="relative mb-3 max-w-xs">
         <Search
           size={13}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
         <input
           type="text"
@@ -77,7 +77,7 @@ export default function UsersPage() {
         {search && (
           <button
             onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X strokeWidth={2.5} size={12} />
           </button>
@@ -85,13 +85,13 @@ export default function UsersPage() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
+      <div className="rounded-xl border border-border bg-card overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
             <Spinner className="h-4 w-4" />
           </div>
         ) : users.length === 0 ? (
-          <p className="py-12 text-center font-body text-xs text-foreground-muted">
+          <p className="py-12 text-center font-body text-xs text-muted-foreground">
             No users found.
           </p>
         ) : (
@@ -101,7 +101,7 @@ export default function UsersPage() {
                 {["Name", "Email", "Joined", "Status", "Actions"].map((h, i) => (
                   <th
                     key={h}
-                    className={`px-4 py-2.5 font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider ${
+                    className={`px-4 py-2.5 font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider ${
                       i === 4 ? "text-right" : "text-left"
                     }`}
                   >
@@ -115,8 +115,8 @@ export default function UsersPage() {
                 <tr
                   key={user.id}
                   className={`${
-                    idx < users.length - 1 ? "border-b border-border-subtle" : ""
-                  } hover:bg-surface-raised transition-colors`}
+                    idx < users.length - 1 ? "border-b border-border" : ""
+                  } hover:bg-popover transition-colors`}
                 >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
@@ -127,7 +127,7 @@ export default function UsersPage() {
                       <p
                         className={`font-body text-xs font-medium ${
                           user.is_blocked
-                            ? "text-foreground-muted line-through"
+                            ? "text-muted-foreground line-through"
                             : "text-foreground"
                         }`}
                       >
@@ -136,10 +136,10 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="font-body text-xs text-foreground-muted">{user.email}</p>
+                    <p className="font-body text-xs text-muted-foreground">{user.email}</p>
                   </td>
                   <td className="px-4 py-2.5">
-                    <p className="font-mono text-[10px] text-foreground-muted whitespace-nowrap">
+                    <p className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
                       {new Date(user.created_at).toLocaleDateString("en-GB", {
                         day: "numeric", month: "short", year: "numeric",
                       })}
@@ -159,7 +159,7 @@ export default function UsersPage() {
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => router.push(`/admin/users/${user.id}`)}
-                      className="rounded-md border border-border px-2.5 py-1 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                      className="rounded-md border border-border px-2.5 py-1 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
                     >
                       View
                     </button>
@@ -173,7 +173,7 @@ export default function UsersPage() {
 
       {/* Row count */}
       {!loading && total > 0 && (
-        <p className="mb-2 text-right font-body text-[10px] text-foreground-muted">
+        <p className="mb-2 text-right font-body text-[10px] text-muted-foreground">
           {total} user{total !== 1 ? "s" : ""}
         </p>
       )}
@@ -181,21 +181,21 @@ export default function UsersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-xs text-foreground-muted">
+          <p className="font-body text-xs text-muted-foreground">
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-1.5">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
             >
               <ChevronLeft strokeWidth={2.5} size={13} /> Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
             >
               Next <ChevronRight strokeWidth={2.5} size={13} />
             </button>

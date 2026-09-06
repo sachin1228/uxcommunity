@@ -18,7 +18,7 @@ export function ApplicationHistory({ history }: Props) {
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 font-body text-xs text-foreground-muted hover:text-foreground transition-colors mb-2"
+        className="flex items-center gap-1 font-body text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
       >
         <ChevronDown
           size={13}
@@ -30,10 +30,10 @@ export function ApplicationHistory({ history }: Props) {
       {open && (
         <div className="flex flex-col gap-2">
           {history.map((h) => (
-            <div key={h.id} className="rounded-lg border border-border bg-surface p-2.5">
+            <div key={h.id} className="rounded-lg border border-border bg-card p-2.5">
               <div className="flex items-center justify-between mb-1.5">
                 <ApplicationStatusBadge status={h.status} />
-                <span className="font-mono text-[10px] text-foreground-muted">
+                <span className="font-mono text-[10px] text-muted-foreground">
                   {new Date(h.created_at).toLocaleDateString("en-GB", {
                     day: "numeric", month: "short", year: "numeric",
                   })}
@@ -44,22 +44,22 @@ export function ApplicationHistory({ history }: Props) {
                   href={h.linkedin_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-body text-xs text-accent hover:text-accent-hover"
+                  className="font-body text-xs text-primary hover:text-primary"
                 >
                   LinkedIn ↗
                 </a>
-                <span className="text-foreground-muted">·</span>
+                <span className="text-muted-foreground">·</span>
                 <a
                   href={h.portfolio_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-body text-xs text-accent hover:text-accent-hover"
+                  className="font-body text-xs text-primary hover:text-primary"
                 >
                   Portfolio ↗
                 </a>
               </div>
               {h.review_notes && (
-                <p className="font-body text-xs text-foreground-muted">
+                <p className="font-body text-xs text-muted-foreground">
                   {h.review_notes}
                 </p>
               )}

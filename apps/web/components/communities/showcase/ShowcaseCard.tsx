@@ -76,7 +76,7 @@ export function ShowcaseCard({
         {post.title}
       </h2>
 
-      <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-surface-raised">
+      <div className="mt-3 max-h-[480px] overflow-hidden rounded-xl border border-border bg-popover">
         <img
           src={post.image_url}
           alt={`Preview of ${post.title}`}
@@ -99,15 +99,15 @@ export function ShowcaseCard({
             size={16}
             active={post.user_liked}
             fill="none"
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`}
           />
-          <span className="font-body text-sm font-semibold text-foreground-subtle group-hover/like:text-white">
+          <span className="font-body text-sm font-semibold text-muted-foreground group-hover/like:text-white">
             {post.like_count}
           </span>
         </button>
 
         {post.allow_replies !== false && (
-        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:text-white">
           <CommentIcon />
           {post.comment_count}
         </span>

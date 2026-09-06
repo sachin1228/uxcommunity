@@ -30,23 +30,23 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="h-9 w-9 shrink-0 rounded-lg bg-surface-raised flex items-center justify-center">
+        <div className="h-9 w-9 shrink-0 rounded-lg bg-popover flex items-center justify-center">
           {setting ? (
-            <Film strokeWidth={2.5} size={16} className="text-accent" />
+            <Film strokeWidth={2.5} size={16} className="text-primary" />
           ) : (
-            <Clapperboard strokeWidth={2.5} size={16} className="text-foreground-muted" />
+            <Clapperboard strokeWidth={2.5} size={16} className="text-muted-foreground" />
           )}
         </div>
         <div className="min-w-0">
           <p className="font-body text-xs font-medium text-foreground">{label}</p>
           {setting ? (
-            <p className="font-mono text-[10px] text-foreground-muted truncate max-w-[260px]">
+            <p className="font-mono text-[10px] text-muted-foreground truncate max-w-[260px]">
               {setting.lottie_url.split("/").pop()}
             </p>
           ) : (
-            <p className="font-body text-[10px] text-foreground-muted">No animation set</p>
+            <p className="font-body text-[10px] text-muted-foreground">No animation set</p>
           )}
         </div>
       </div>
@@ -57,7 +57,7 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
             onClick={handleDelete}
             disabled={deleting || uploading}
             title="Remove animation"
-            className="h-7 w-7 flex items-center justify-center rounded-md text-foreground-muted hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
+            className="h-7 w-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-40"
           >
             {deleting ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={13} />}
           </button>
@@ -75,7 +75,7 @@ export function AnimationSlot({ label, setting, onUpload, onDelete, uploading }:
         <button
           onClick={() => fileRef.current?.click()}
           disabled={uploading || deleting}
-          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors disabled:opacity-40"
         >
           {uploading ? <Spinner className="h-3 w-3" /> : <Upload strokeWidth={2.5} size={12} />}
           {setting ? "Replace" : "Upload"}

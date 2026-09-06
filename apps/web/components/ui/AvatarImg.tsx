@@ -47,7 +47,7 @@ export function AvatarImg({
       <span
         role="img"
         aria-label={`${name}'s profile picture placeholder`}
-        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-body font-semibold text-accent ${className ?? ""}`}
+        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-secondary font-body font-semibold text-primary ${className ?? ""}`}
         style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.35)) }}
       >
         {initialsForName(name)}
