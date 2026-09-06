@@ -129,7 +129,7 @@ export function ThreadPollResult({
         <div
           role="radiogroup"
           aria-label="Poll options"
-          className={`mt-3 gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}
+          className={`gap-2 ${options.length > 2 ? "grid grid-cols-2" : "flex flex-col"}`}
         >
           {options.map((option, index) => {
             const letter = String.fromCharCode(65 + index);
