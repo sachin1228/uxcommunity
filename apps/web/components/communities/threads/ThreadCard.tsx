@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
   Heart, Bookmark, Flag, MessageCircle,
   MoreHorizontal, Paperclip, Pencil, Trash2,
@@ -10,6 +10,8 @@ import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
 
@@ -59,7 +61,7 @@ import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { ThreadImageLightbox } from "./ThreadImageLightbox";
-import { formatFullDate, formatRelativeDate } from "./threadShared";
+import { formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -122,6 +124,53 @@ export function ThreadCard({
   const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [titleExpanded, setTitleExpanded] = useState(false);
+  const [titleOverflow, setTitleOverflow] = useState(false);
+  const [morePos, setMorePos] = useState<{ left: number; bottom: number } | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+
+  // Collapse long thread bodies to two lines on feed cards and offer a "…More" toggle.
+  // The toggle sits right after the LAST VISIBLE LINE of text (same line, same row) so it
+  // hugs the final word — even when the last clamped line is blank (e.g. a paragraph break
+  // lands on line 2). Re-measured on resize and once web fonts load.
+  useIsomorphicLayoutEffect(() => {
+    if (isDetail) return;
+    setTitleExpanded(false);
+    const el = titleRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      try {
+        setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
+        const box = el.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rects = Array.from(range.getClientRects()).filter(
+          (r) => r.width > 0 && r.bottom <= box.bottom + 1,
+        );
+        const lastLine = rects[rects.length - 1];
+        if (!lastLine) return;
+        // Clamp so the toggle always fits inside the card (covers the tail on full lines).
+        const left = Math.min(lastLine.right - box.left, box.width - 64);
+        setMorePos({
+          left: Math.max(0, left),
+          bottom: Math.max(0, box.bottom - lastLine.bottom),
+        });
+      } catch {
+        setMorePos(null);
+      }
+    };
+
+    measure();
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+  }, [isDetail, thread.title]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -344,9 +393,7 @@ export function ThreadCard({
   }
 
   const authorName = thread.users?.name ?? "Member";
-  const dateLabel  = isDetail
-    ? formatFullDate(thread.created_at)
-    : formatRelativeDate(thread.created_at);
+  const dateLabel  = formatRelativeDate(thread.created_at);
 
   const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
   const images = attachments.filter((a) => a.type.startsWith("image/"));
@@ -474,13 +521,29 @@ export function ThreadCard({
 
         {/* ── Title ── */}
         {isDetail ? (
-          <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
+          <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : (
-          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-            {renderWithLinks(thread.title, true)}
-          </h3>
+          <div className="relative">
+            <h3
+              ref={titleRef}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
+            >
+              {renderWithLinks(thread.title, true)}
+            </h3>
+            {/* "…More" right after the last visible word, on the same line. */}
+            {titleOverflow && !titleExpanded && morePos && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
+                style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
+                className="absolute min-w-16 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
+              >
+                …More
+              </button>
+            )}
+          </div>
         )}
 
         {/* ── Poll ── */}

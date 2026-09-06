@@ -14,15 +14,59 @@ import {
   POLL_MAX_OPTIONS,
   POLL_QUESTION_MAX_LENGTH,
   POLL_OPTION_MAX_LENGTH,
+  THREAD_CATEGORIES,
   type ThreadAttachment,
+  type ThreadCategory,
   type ThreadPollDraft,
 } from "./types";
+import { CATEGORY_ICONS } from "./categoryIcons";
 
 /**
  * Shared presentational pieces for the Create Thread and Edit Thread modals so
  * both stay visually identical ("all thread modals everywhere are consistent").
  * All components are controlled — the modals keep their own state/submit logic.
  */
+
+// ── Thread category picker ───────────────────────────────────────────────────
+
+/** Selectable category chips shared by the Create and Edit thread modals. */
+export function CategoryPicker({
+  value,
+  onChange,
+}: {
+  value: ThreadCategory;
+  onChange: (category: ThreadCategory) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+        Category
+      </span>
+      <div className="flex flex-wrap gap-2">
+        {THREAD_CATEGORIES.map((item) => {
+          const Icon = CATEGORY_ICONS[item.value];
+          const active = value === item.value;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => onChange(item.value)}
+              aria-pressed={active}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
+                active
+                  ? "border-accent bg-accent/5 text-accent"
+                  : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"
+              }`}
+            >
+              <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ── Thread composer type (tabs) ──────────────────────────────────────────────
 

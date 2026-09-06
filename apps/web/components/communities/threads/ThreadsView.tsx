@@ -9,8 +9,6 @@ import {
   MessageSquareText,
   MessagesSquare,
   Plus,
-  UserRoundPlus,
-  UsersRound,
 } from "lucide-react";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
@@ -239,8 +237,6 @@ export function ThreadsView({
                 discussion: MessagesSquare,
                 idea: Lightbulb,
                 feedback: MessageSquareText,
-                referral: UserRoundPlus,
-                collaboration: UsersRound,
               }[item.value],
             }))].map((item) => {
               const Icon = item.icon;
