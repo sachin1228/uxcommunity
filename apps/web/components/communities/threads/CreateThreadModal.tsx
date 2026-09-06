@@ -196,7 +196,7 @@ export function CreateThreadModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="flex max-h-[min(800px,80vh)] w-full max-w-[540px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_24px_70px_-20px_rgba(0,0,0,0.45)]"
+        className="flex max-h-[min(800px,80vh)] w-full max-w-[600px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_24px_70px_-20px_rgba(0,0,0,0.45)]"
       >
         {/* Modal body — scrolls; the header lives inside it like the Geist modal */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-5">
