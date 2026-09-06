@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Calendar, Check, Clock, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -256,24 +257,13 @@ export function CreateEventModal({
           </div>
 
           {/* Online toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2">
-              <Video strokeWidth={2.5} size={15} className="text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Online event</span>
-                <span className="block font-body text-xs text-foreground-muted">Happening virtually via a meeting link.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 rounded-full transition-colors ${isOnline ? "bg-accent" : "bg-border"}`}>
-              <input
-                type="checkbox"
-                checked={isOnline}
-                onChange={(e) => setIsOnline(e.target.checked)}
-                className="sr-only"
-              />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isOnline ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Online event"
+            description="Happening virtually via a meeting link."
+            checked={isOnline}
+            onChange={setIsOnline}
+            icon={<Video strokeWidth={2.5} size={15} />}
+          />
 
           {/* Location / Meet link */}
           {isOnline ? (
@@ -319,21 +309,12 @@ export function CreateEventModal({
           </label>
 
           {/* Make public toggle */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span>
-              <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-              <span className="block font-body text-xs text-foreground-muted">This event will appear on the home feed for all members.</span>
-            </span>
-            <span className={`relative h-6 w-11 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(e) => setIsPublic(e.target.checked)}
-                className="sr-only"
-              />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Share publicly"
+            description="This event will appear on the home feed for all members."
+            checked={isPublic}
+            onChange={setIsPublic}
+          />
         </div>
 
         {error && (

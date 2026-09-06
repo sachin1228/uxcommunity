@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
@@ -296,19 +297,13 @@ export function ResourceFormModal({
           ) : null}
 
           {/* Share publicly */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Share publicly"
+            description="Visible to everyone, not just community members."
+            checked={isPublic}
+            onChange={setIsPublic}
+            icon={<Globe strokeWidth={2.5} size={15} />}
+          />
         </div>
 
         {error && (
