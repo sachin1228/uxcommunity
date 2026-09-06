@@ -81,7 +81,7 @@ export function ThreadImageCarousel({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: "pan-y" }}
-      className="relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
+      className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
     >
       {/* Invisible sizing anchor — keeps the viewport height identical to the
           single-image layout so the thread never jumps while sliding. */}
@@ -148,7 +148,7 @@ export function ThreadImageCarousel({
         type="button"
         aria-label="Previous image"
         onClick={goPrev}
-        className={`absolute left-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+        className={`absolute left-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 ${
           hasPrev ? "" : "hidden"
         }`}
       >
@@ -160,7 +160,7 @@ export function ThreadImageCarousel({
         type="button"
         aria-label="Next image"
         onClick={goNext}
-        className={`absolute right-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+        className={`absolute right-2.5 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/50 text-white transition hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 ${
           hasNext ? "" : "hidden"
         }`}
       >

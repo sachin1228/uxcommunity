@@ -13,50 +13,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
-
-/** Render text with URLs highlighted in the accent color.
- *  isNested=true → uses <span onClick> to avoid <a> inside <a> (list card wrapper). */
-function renderWithLinks(text: string, isNested = false) {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  URL_REGEX.lastIndex = 0;
-  while ((match = URL_REGEX.exec(text)) !== null) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-    const url = match[0];
-    if (isNested) {
-      parts.push(
-        <span
-          key={match.index}
-          role="link"
-          tabIndex={0}
-          className="text-accent hover:underline break-all cursor-pointer"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); } }}
-        >
-          {url}
-        </span>
-      );
-    } else {
-      parts.push(
-        <a
-          key={match.index}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent hover:underline break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {url}
-        </a>
-      );
-    }
-    lastIndex = match.index + url.length;
-  }
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-  return parts;
-}
+import { renderWithLinks } from "./renderWithLinks";
 import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
@@ -120,8 +77,10 @@ export function ThreadCard({
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
   const [pollVoteBusy, setPollVoteBusy] = useState(false);
-  const [pollVotePending, setPollVotePending] = useState<number | null>(null);
   const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
+  // Synchronous guard against overlapping vote/undo requests — state flushes
+  // async, so a second click in the same tick can't be stopped by pollVoteBusy.
+  const pollVoteBusyRef = useRef(false);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [titleExpanded, setTitleExpanded] = useState(false);
@@ -316,7 +275,7 @@ export function ThreadCard({
 
   async function handlePollVote(optionIndex: number) {
     const currentPoll = thread.poll;
-    if (!currentPoll || pollVoteBusy) return;
+    if (!currentPoll || pollVoteBusyRef.current) return;
     const optionCount = currentPoll.options.length;
     if (optionIndex < 0 || optionIndex >= optionCount) return;
 
@@ -324,8 +283,17 @@ export function ThreadCard({
     const currentUserVote = pollVoteOverride ? pollVoteOverride.userVote : (thread.poll_user_vote ?? null);
     if (currentUserVote !== null) return;
 
-    setPollVotePending(optionIndex);
-    setPollVoteBusy(true);
+    // Optimistic vote: flip to the results immediately (clicked option +1) and
+    // let the server round trip confirm or roll it back — no waiting spinner.
+    // The optimistic state stays local to this card; parents and realtime only
+    // ever receive server-confirmed totals so a failed vote can't poison the
+    // shared cache.
+    pollVoteBusyRef.current = true;
+    const optimisticCounts = displayedPollCounts.map((count, index) =>
+      index === optionIndex ? count + 1 : count,
+    );
+    setPollVoteOverride({ counts: optimisticCounts, userVote: optionIndex, undoUsed: displayedPollUndoUsed });
+
     try {
       const response = await dedupeFetch(
         `/api/communities/${communityId}/threads/${thread.id}/poll`,
@@ -345,21 +313,21 @@ export function ThreadCard({
       if (!response.ok || !Array.isArray(result?.counts)) {
         throw new Error(result?.error ?? "Failed to record your vote.");
       }
-      // Results appear only after the vote is confirmed by the server.
+      // Server-confirmed totals replace the optimistic ones.
       setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
       onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
     } catch (error) {
-      // Stay in the pre-vote state; the user can try again.
+      // Roll back to the pre-vote state; the user can try again.
       setPollVoteOverride(null);
       showInteractionError(error instanceof Error ? error.message : "Failed to record your vote.");
     } finally {
-      setPollVotePending(null);
-      setPollVoteBusy(false);
+      pollVoteBusyRef.current = false;
     }
   }
 
   async function handlePollUndo() {
-    if (!thread.poll || pollVoteBusy) return;
+    if (!thread.poll || pollVoteBusyRef.current) return;
+    pollVoteBusyRef.current = true;
     setPollVoteBusy(true);
     try {
       const response = await dedupeFetch(
@@ -388,6 +356,7 @@ export function ThreadCard({
       setPollVoteOverride(null);
       showInteractionError(error instanceof Error ? error.message : "Failed to undo your vote.");
     } finally {
+      pollVoteBusyRef.current = false;
       setPollVoteBusy(false);
     }
   }
@@ -553,7 +522,6 @@ export function ThreadCard({
             counts={displayedPollCounts}
             userVote={displayedPollUserVote}
             busy={pollVoteBusy}
-            pendingOption={pollVotePending}
             canUndo={!displayedPollUndoUsed}
             hideQuestion={thread.poll.question.trim() === thread.title.trim()}
             onVote={(optionIndex) => void handlePollVote(optionIndex)}

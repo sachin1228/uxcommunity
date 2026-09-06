@@ -4,42 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Download,
   Heart,
   MessageCircle,
   X,
 } from "lucide-react";
-import type { CommunityThread, ThreadAttachment, ThreadComment } from "./types";
-import { formatFullDate } from "./threadShared";
+import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type ThreadComment } from "./types";
+import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
-import { Avatar, CommentBox, CommentRow } from "./ThreadComments";
-
-// ── Download helper (mirrors the chat lightbox) ───────────────────────────────
-
-function fileNameForUrl(url: string): string {
-  try {
-    const name = (new URL(url).pathname.split("/").pop() ?? "")
-      .replace(/[^\w.-]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-    return name || "thread-image";
-  } catch {
-    return "thread-image";
-  }
-}
-
-function downloadImage(url: string, fallbackName: string) {
-  // Download through our same-origin proxy: the R2 bucket sends no CORS
-  // headers, so a direct fetch is blocked and an anchor would navigate. The
-  // proxy responds with Content-Disposition: attachment, so the image always
-  // downloads and never opens a new tab.
-  const a = document.createElement("a");
-  a.href = `/api/image-download?url=${encodeURIComponent(url)}`;
-  a.download = fallbackName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-}
+import { CommentBox, CommentRow } from "./ThreadComments";
+import { PostAuthorMeta } from "../PostAuthorMeta";
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -171,6 +145,7 @@ export function ThreadImageLightbox({
 
   const image = images[index];
   const authorName = thread.users?.name ?? "Member";
+  const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
   const totalComments = comments
     ? comments.reduce((total, comment) => total + 1 + comment.replies.length, 0)
     : thread.comment_count;
@@ -189,6 +164,17 @@ export function ThreadImageLightbox({
         aria-label="Thread image viewer"
         className="relative flex h-[88vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
       >
+        {/* Close — top-right corner of the modal */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close viewer"
+          title="Close (Esc)"
+          className="absolute right-3 top-3 z-30 flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+        >
+          <X strokeWidth={2.5} size={18} />
+        </button>
+
         {/* ── Left: image canvas + carousel ─────────────────────────────── */}
         <div className="relative flex min-w-0 flex-1 flex-col bg-[#151515]">
           <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden px-16 py-4">
@@ -247,46 +233,25 @@ export function ThreadImageLightbox({
             </div>
           )}
 
-          {/* Image actions (always visible, incl. small screens) */}
-          <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => downloadImage(image.url, fileNameForUrl(image.url))}
-              aria-label="Download image"
-              title="Download"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
-            >
-              <Download strokeWidth={2.5} size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close viewer"
-              title="Close (Esc)"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
-            >
-              <X strokeWidth={2.5} size={18} />
-            </button>
-          </div>
         </div>
 
         {/* ── Right: thread content + comments ──────────────────────────── */}
         <aside className="hidden w-[380px] shrink-0 flex-col border-l border-border bg-background md:flex">
-          {/* Author header */}
-          <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-5 py-3.5">
-            <Avatar name={authorName} avatarUrl={thread.users?.avatar_url ?? null} />
-            <div className="min-w-0">
-              <p className="truncate font-body text-sm font-semibold text-foreground">{authorName}</p>
-              <p className="font-body text-[11px] text-foreground-muted">
-                {formatFullDate(thread.created_at)} · Threads
-              </p>
-            </div>
+          {/* Author header — matches the thread cards on the dashboard */}
+          <div className="flex shrink-0 items-center border-b border-border py-3.5 pl-5 pr-14">
+            <PostAuthorMeta
+              name={authorName}
+              avatarUrl={thread.users?.avatar_url}
+              createdAt={thread.created_at}
+              dateInline
+              secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
+            />
           </div>
 
           {/* Scrollable body */}
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            <h2 className="whitespace-pre-wrap break-words font-display text-[15px] font-semibold leading-snug text-foreground">
-              {thread.title}
+            <h2 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
+              {renderWithLinks(thread.title, false)}
             </h2>
 
             {thread.poll && (

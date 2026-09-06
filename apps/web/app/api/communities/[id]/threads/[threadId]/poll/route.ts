@@ -37,7 +37,18 @@ export async function POST(
   threadQuery = publicScope
     ? threadQuery.eq("is_public", true).is("community_id", null)
     : threadQuery.eq("community_id", communityId);
-  const { data: thread, error: threadError } = (await threadQuery.maybeSingle()) as unknown as {
+  // The thread row and the caller's existing vote are independent reads —
+  // fetch them in parallel to cut one round trip off the vote path.
+  const [threadResult, existingVoteResult] = await Promise.all([
+    threadQuery.maybeSingle(),
+    db
+      .from("thread_poll_votes")
+      .select("option_index, undo_used")
+      .eq("thread_id", threadId)
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
+  const { data: thread, error: threadError } = threadResult as unknown as {
     data: { id: string; user_id: string; community_id: string | null; poll: unknown } | null;
     error: unknown;
   };
@@ -66,12 +77,7 @@ export async function POST(
     desiredIndex = candidate as number;
   }
 
-  const { data: existingVote } = await db
-    .from("thread_poll_votes")
-    .select("option_index, undo_used")
-    .eq("thread_id", threadId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const existingVote = existingVoteResult.data ?? null;
 
   if (isUndo) {
     if (!existingVote || (existingVote.option_index as number | null) === null) {
