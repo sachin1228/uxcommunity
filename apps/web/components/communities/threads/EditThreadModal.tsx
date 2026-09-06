@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { CommunityThread, ThreadAttachment, ThreadPollDraft, ThreadCategory } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
@@ -19,11 +18,9 @@ import {
 import {
   CategoryPicker,
   ComposerMedia,
-  ComposerTabs,
   PollComposer,
   THREAD_IMAGE_MAX,
   ToggleRow,
-  type ThreadComposerTab,
 } from "./ThreadComposerControls";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -47,10 +44,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
 
   const [body,            setBody]            = useState(thread.title);
   const [attachments,     setAttachments]     = useState<ThreadAttachment[]>(thread.attachments);
-  const [tab,             setTab]             = useState<ThreadComposerTab>(hasPoll ? "poll" : "post");
-  const [pollRemoved,     setPollRemoved]     = useState(false);
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(() => pollToDraft(thread.poll));
-  const [confirmRemovePoll, setConfirmRemovePoll] = useState(false);
   const [category,        setCategory]        = useState<ThreadCategory>(thread.category);
   const [allowReplies,    setAllowReplies]    = useState(thread.allow_replies);
   const [isPublic,        setIsPublic]        = useState(thread.is_public ?? false);
@@ -59,11 +53,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   const [error,           setError]           = useState<string | null>(null);
 
   const images = attachments.filter((a) => a.type.startsWith("image/"));
-
-  // Once the poll has been removed the thread is a plain post — keep the Post
-  // composer on screen so the tab switcher can't re-add the deleted poll.
-  const selectedTab: ThreadComposerTab = pollRemoved ? "post" : tab;
-  const showTabs = hasPoll && !pollRemoved;
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -116,23 +105,13 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
     }
   }
 
-  function requestTab(next: ThreadComposerTab) {
-    if (next === selectedTab) return;
-    // Removing an existing poll deletes its votes — ask first.
-    if (hasPoll && !pollRemoved && next === "post") {
-      setConfirmRemovePoll(true);
-      return;
-    }
-    setTab(next);
-  }
-
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
 
     let title: string;
     let poll: { question: string; options: string[] } | null;
 
-    if (pollRemoved || selectedTab === "post") {
+    if (!hasPoll) {
       if (!body.trim()) {
         setError("Write something before saving.");
         return;
@@ -222,11 +201,13 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             </button>
           </div>
 
-          {/* ── Post / Poll tabs (only when the thread already has a poll) ── */}
-          {showTabs && <ComposerTabs value={selectedTab} onChange={requestTab} />}
-
-          {/* ── Composer body / poll composer ── */}
-          {selectedTab === "post" ? (
+          {/* ── Composer — editing keeps the thread type: posts edit the text,
+               polls edit the poll only ── */}
+          {hasPoll ? (
+            pollDraft && (
+              <PollComposer value={pollDraft} onChange={setPollDraft} />
+            )
+          ) : (
             <div className="relative">
               <textarea
                 ref={textareaRef}
@@ -241,13 +222,9 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
                 {body.length}/{THREAD_BODY_MAX_LENGTH}
               </span>
             </div>
-          ) : (
-            pollDraft && (
-              <PollComposer value={pollDraft} onChange={setPollDraft} />
-            )
           )}
 
-          {/* ── Images / files (available for both posts and polls) ── */}
+          {/* ── Images / files ── */}
           <input
             ref={fileInputRef}
             type="file"
@@ -310,22 +287,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         </div>
       </form>
     </div>
-
-    {confirmRemovePoll && (
-      <ConfirmDialog
-        open={confirmRemovePoll}
-        onClose={() => setConfirmRemovePoll(false)}
-        onConfirm={() => {
-          setPollRemoved(true);
-          setTab("post");
-          setPollDraft(null);
-          setConfirmRemovePoll(false);
-        }}
-        title="Remove poll?"
-        message="Removing the poll deletes it and all its votes from this thread. You can keep the post text and save it as a regular thread instead."
-        confirmLabel="Remove poll"
-      />
-    )}
     </ModalPortal>
   );
 }
