@@ -204,22 +204,23 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         onSubmit={handleSubmit}
         className="flex max-h-[min(800px,80vh)] w-full max-w-[540px] flex-col overflow-hidden rounded-xl bg-surface shadow-[0_0_0_1px_rgba(0,0,0,0.05),0_24px_70px_-20px_rgba(0,0,0,0.45)]"
       >
-        {/* ── Header ── */}
-        <div className="flex shrink-0 items-start justify-between gap-4 px-5 pb-2 pt-5 sm:px-6">
-          <div className="min-w-0">
-            <h2 id="edit-thread-title" className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
-              Edit Thread
-            </h2>
-            <p className="mt-1 font-body text-[13px] text-foreground-muted">
-              Update the content, poll, images, or privacy of this thread
-            </p>
+        {/* Modal body — scrolls; the header lives inside it like the Geist modal */}
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-5">
+          {/* ── Header ── */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 id="edit-thread-title" className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
+                Edit Thread
+              </h2>
+              <p className="mt-1 font-body text-[13px] text-foreground-muted">
+                Update the content, poll, images, or privacy of this thread
+              </p>
+            </div>
+            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+              <X strokeWidth={2.5} size={16} />
+            </button>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
-            <X strokeWidth={2.5} size={16} />
-          </button>
-        </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-4 sm:px-6">
           {/* ── Post / Poll tabs (only when the thread already has a poll) ── */}
           {showTabs && <ComposerTabs value={selectedTab} onChange={requestTab} />}
 
@@ -292,7 +293,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
         )}
 
         {/* ── Footer ── */}
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3 sm:px-6">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
           <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
             Cancel
           </button>
