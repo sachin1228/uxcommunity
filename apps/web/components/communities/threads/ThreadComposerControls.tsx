@@ -152,7 +152,7 @@ export function PollComposer({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-4">
+    <div className="rounded-xl border border-border bg-background p-4">
       <div className="flex items-center gap-1.5">
         <BarChart3 strokeWidth={2.5} size={13} className="text-foreground-muted" />
         <span className="font-body text-xs font-semibold text-foreground-muted">
