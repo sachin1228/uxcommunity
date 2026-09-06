@@ -61,7 +61,7 @@ import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { ThreadImageLightbox } from "./ThreadImageLightbox";
-import { formatFullDate, formatRelativeDate } from "./threadShared";
+import { formatRelativeDate } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -363,9 +363,7 @@ export function ThreadCard({
   }
 
   const authorName = thread.users?.name ?? "Member";
-  const dateLabel  = isDetail
-    ? formatFullDate(thread.created_at)
-    : formatRelativeDate(thread.created_at);
+  const dateLabel  = formatRelativeDate(thread.created_at);
 
   const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
   const images = attachments.filter((a) => a.type.startsWith("image/"));
