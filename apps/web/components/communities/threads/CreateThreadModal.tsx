@@ -3,12 +3,13 @@
 import { useRef, useState, useEffect } from "react";
 import {
   Globe,
+  Image as ImageIcon,
   MessageCircle,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
-import type { CommunityThread, ThreadAttachment, ThreadPollDraft, ThreadCategory } from "./types";
+import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
   bodyToTitle,
@@ -20,11 +21,10 @@ import {
   ComposerMedia,
   ComposerTabs,
   PollComposer,
-  THREAD_IMAGE_MAX,
   ToggleRow,
   type ThreadComposerTab,
 } from "./ThreadComposerControls";
-import { compressImage, compressedFile } from "@/lib/image-client";
+import { useThreadFileUpload } from "./useThreadFileUpload";
 
 /** Default, untouched poll draft shown the first time the user opens Poll. */
 function emptyPollDraft(): ThreadPollDraft {
@@ -50,17 +50,23 @@ export function CreateThreadModal({
   const textareaRef  = useRef<HTMLTextAreaElement>(null);
 
   const [body,            setBody]            = useState("");
-  const [attachments,     setAttachments]     = useState<ThreadAttachment[]>([]);
   const [tab,             setTab]             = useState<ThreadComposerTab>("post");
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(null);
   const [category,        setCategory]        = useState<ThreadCategory>("question");
   const [allowReplies,    setAllowReplies]    = useState(true);
   const [isPublic,        setIsPublic]        = useState(false);
-  const [uploading,       setUploading]       = useState(false);
   const [saving,          setSaving]          = useState(false);
-  const [error,           setError]           = useState<string | null>(null);
 
-  const images = attachments.filter((a) => a.type.startsWith("image/"));
+  const {
+    attachments,
+    removeAttachment,
+    uploading,
+    error,
+    setError,
+    addFiles,
+    dropHandlers,
+    isDragging,
+  } = useThreadFileUpload({ communityId });
 
   // Auto-grow textarea
   useEffect(() => {
@@ -70,51 +76,10 @@ export function CreateThreadModal({
     el.style.height = `${el.scrollHeight}px`;
   }, [body]);
 
-  async function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
+  // The hidden file input and drag-and-drop share the same intake path.
+  function handleFiles(event: React.ChangeEvent<HTMLInputElement>) {
+    addFiles(event.target.files);
     event.target.value = "";
-    if (!files.length) return;
-
-    const newImages = files.filter((file) => file.type.startsWith("image/"));
-    if (newImages.length > 0 && images.length + newImages.length > THREAD_IMAGE_MAX) {
-      setError(`You can add up to ${THREAD_IMAGE_MAX} images.`);
-      return;
-    }
-    if (attachments.length + files.length > 5) {
-      setError("You can add up to 5 attachments.");
-      return;
-    }
-
-    setUploading(true);
-    setError(null);
-    try {
-      const uploaded: ThreadAttachment[] = [];
-      for (const file of files) {
-        const formData = new FormData();
-        let payload = file;
-        // Animated GIFs pass through untouched — compressing them would flatten
-        // the animation into a static frame.
-        if (file.type.startsWith("image/") && file.type !== "image/gif") {
-          try { payload = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
-        }
-        formData.append("file", payload);
-        const response = await fetch(
-          `/api/communities/${communityId}/threads/upload`,
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "Upload failed.");
-        uploaded.push(data.attachment as ThreadAttachment);
-      }
-      setAttachments((c) => [...c, ...uploaded]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setUploading(false);
-    }
   }
 
   function selectTab(next: ThreadComposerTab) {
@@ -197,7 +162,8 @@ export function CreateThreadModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="modal-panel flex max-h-[min(800px,80vh)] w-full max-w-[600px] flex-col overflow-hidden"
+        {...dropHandlers}
+        className="modal-panel relative flex max-h-[min(800px,80vh)] w-full max-w-[600px] flex-col overflow-hidden"
       >
         {/* Modal body — scrolls; the header lives inside it like the Geist modal */}
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-5 pt-5">
@@ -253,7 +219,7 @@ export function CreateThreadModal({
           <ComposerMedia
             attachments={attachments}
             uploading={uploading}
-            onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
+            onRemove={removeAttachment}
             onAddMore={() => fileInputRef.current?.click()}
           />
 
@@ -300,6 +266,21 @@ export function CreateThreadModal({
             {saving ? "Posting…" : tab === "poll" ? "Post Poll" : "Post Thread"}
           </button>
         </div>
+
+        {/* Drag-and-drop overlay — shown while files hover over the modal. */}
+        {isDragging && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <ImageIcon strokeWidth={2.5} size={22} className="text-accent" />
+              <span className="font-body text-sm font-medium text-accent">
+                Drop images or files to attach
+              </span>
+            </div>
+          </div>
+        )}
       </form>
     </div>
     </ModalPortal>
