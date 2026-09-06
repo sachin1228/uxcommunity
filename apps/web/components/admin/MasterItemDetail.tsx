@@ -380,7 +380,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
       {confirmDelete && (
         <ModalPortal>
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+          <div className="modal-panel w-full max-w-sm p-6">
             <h2 className="font-display text-base font-semibold text-foreground mb-1">Delete &ldquo;{item.name}&rdquo;?</h2>
             <p className="font-body text-xs text-foreground-muted mb-5">
               This is permanent and cannot be undone. If any designer profile references this {entity.toLowerCase()}, the delete will be blocked.
@@ -391,14 +391,14 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             <div className="flex gap-2">
               <button
                 onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="flex-1 rounded-md border border-border py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised transition-colors"
+                className="modal-btn modal-btn-secondary flex-1"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={deleteLoading}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-md bg-red-600 py-2 font-body text-xs font-medium text-white hover:bg-red-700 transition-colors disabled:opacity-60"
+                className="modal-btn modal-btn-danger flex-1"
               >
                 {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
                 Yes, delete

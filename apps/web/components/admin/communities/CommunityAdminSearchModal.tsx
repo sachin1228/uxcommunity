@@ -137,7 +137,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-border bg-surface shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-150"
+      <div className="modal-panel w-full max-w-lg flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-150"
         style={{ maxHeight: "min(80vh, 640px)" }}
       >
         {/* Header */}

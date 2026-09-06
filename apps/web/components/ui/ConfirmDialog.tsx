@@ -53,12 +53,12 @@ export function ConfirmDialog({
         </div>
         <p className="font-body text-sm leading-6 text-foreground-muted">{message}</p>
       </div>
-      <div className="mt-6 flex gap-3">
+      <div className="mt-6 flex justify-end gap-2">
         <button
           type="button"
           onClick={onClose}
           disabled={pending}
-          className="flex-1 rounded-lg border border-border py-2.5 font-body text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+          className="modal-btn modal-btn-secondary"
         >
           Cancel
         </button>
@@ -66,9 +66,9 @@ export function ConfirmDialog({
           type="button"
           onClick={() => void handleConfirm()}
           disabled={pending}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 font-body text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+          className="modal-btn modal-btn-danger"
         >
-          {pending ? <Spinner size={15} className="text-white" /> : <Trash2 strokeWidth={2.5} size={14} />}
+          {pending ? <Spinner size={14} /> : <Trash2 strokeWidth={2.5} size={14} />}
           {pending ? "Deleting…" : confirmLabel}
         </button>
       </div>

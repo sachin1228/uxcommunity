@@ -333,7 +333,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
       {ready && !error && intro && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/35 px-4">
           <div
-            className="w-full max-w-md rounded-2xl border border-border bg-background px-8 py-7 text-center shadow-2xl"
+            className="modal-panel w-full max-w-md px-8 py-7 text-center"
             role="dialog"
             aria-modal="true"
             aria-labelledby="bella-welcome-title"
@@ -352,7 +352,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             <button
               type="button"
               onClick={enterPark}
-              className="mt-6 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="modal-btn modal-btn-primary mt-6"
               autoFocus
             >
               Enter Bella Park

@@ -83,7 +83,7 @@ function ConfirmDialog({
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
-      <div className="w-full max-w-xs rounded-2xl border border-white/[0.08] bg-surface-raised shadow-2xl p-5 animate-in zoom-in-95 fade-in duration-150 mx-4">
+      <div className="modal-panel w-full max-w-xs p-5 animate-in zoom-in-95 fade-in duration-150 mx-4">
         <p className="font-display text-sm font-semibold text-foreground mb-1">{copy.title}</p>
         <p className="font-body text-xs text-foreground-muted leading-relaxed mb-5">{copy.body}</p>
         <div className="flex gap-2">
@@ -91,7 +91,7 @@ function ConfirmDialog({
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="flex-1 rounded-xl border border-border py-2 font-body text-xs text-foreground-muted hover:bg-surface hover:text-foreground transition-colors disabled:opacity-50"
+            className="modal-btn modal-btn-secondary flex-1"
           >
             Cancel
           </button>
@@ -99,9 +99,9 @@ function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="flex-1 rounded-xl bg-red-500/10 border border-red-500/20 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="modal-btn modal-btn-danger flex-1"
           >
-            {busy ? <Spinner size={12} className="text-red-400" /> : null}
+            {busy ? <Spinner size={12} /> : null}
             {copy.cta}
           </button>
         </div>

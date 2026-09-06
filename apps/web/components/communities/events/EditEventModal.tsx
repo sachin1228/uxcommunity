@@ -129,7 +129,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+        className="modal-panel max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto p-5"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -138,8 +138,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
             </h2>
             <p className="mt-1 font-body text-sm text-foreground-muted">Update event details.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={20} />
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -303,9 +303,8 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
         )}
 
         <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">Cancel</button>
-          <button type="submit" disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">Cancel</button>
+          <button type="submit" disabled={saving} className="modal-btn modal-btn-primary">
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? "Saving…" : "Save Changes"}
           </button>
