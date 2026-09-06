@@ -75,8 +75,8 @@ export function ThreadPollResult({
   return (
     <div className="rounded-xl py-4">
       <div className="flex items-center gap-1.5">
-        <BarChart3 strokeWidth={2.5} size={13} className="text-[var(--ds-blue-700)]" />
-        <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-[var(--ds-blue-700)]">
+        <BarChart3 strokeWidth={2.5} size={13} className="text-foreground" />
+        <span className="font-body text-[11px] font-semibold uppercase tracking-wide text-foreground">
           Poll
         </span>
       </div>
