@@ -241,9 +241,6 @@ export function CreateThreadModal({
             )
           )}
 
-          {/* ── Category ── */}
-          <CategoryPicker value={category} onChange={setCategory} />
-
           {/* ── Images / files (available for both posts and polls) ── */}
           <input
             ref={fileInputRef}
@@ -259,6 +256,9 @@ export function CreateThreadModal({
             onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
             onAddMore={() => fileInputRef.current?.click()}
           />
+
+          {/* ── Category ── */}
+          <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Toggles ── */}
           <div className="divide-y divide-border">

@@ -247,9 +247,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             )
           )}
 
-          {/* ── Category ── */}
-          <CategoryPicker value={category} onChange={setCategory} />
-
           {/* ── Images / files (available for both posts and polls) ── */}
           <input
             ref={fileInputRef}
@@ -265,6 +262,9 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             onRemove={(url) => setAttachments((c) => c.filter((a) => a.url !== url))}
             onAddMore={() => fileInputRef.current?.click()}
           />
+
+          {/* ── Category ── */}
+          <CategoryPicker value={category} onChange={setCategory} />
 
           {/* ── Toggles ── */}
           <div className="divide-y divide-border">
