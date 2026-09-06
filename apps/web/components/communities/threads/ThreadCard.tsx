@@ -126,12 +126,13 @@ export function ThreadCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const [titleExpanded, setTitleExpanded] = useState(false);
   const [titleOverflow, setTitleOverflow] = useState(false);
-  const [moreLeft, setMoreLeft] = useState<number | null>(null);
+  const [morePos, setMorePos] = useState<{ left: number; bottom: number } | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
 
-  // Collapse long thread bodies to two lines on feed cards and offer a "More" toggle.
-  // The button is placed right after the last visible character (+ the clamp ellipsis)
-  // so it reads inline with the text end, re-measured on resize and once fonts load.
+  // Collapse long thread bodies to two lines on feed cards and offer a "…More" toggle.
+  // The toggle sits right after the LAST VISIBLE LINE of text (same line, same row) so it
+  // hugs the final word — even when the last clamped line is blank (e.g. a paragraph break
+  // lands on line 2). Re-measured on resize and once web fonts load.
   useIsomorphicLayoutEffect(() => {
     if (isDetail) return;
     setTitleExpanded(false);
@@ -149,11 +150,14 @@ export function ThreadCard({
         );
         const lastLine = rects[rects.length - 1];
         if (!lastLine) return;
-        // ~1em for the native ellipsis; clamp so the button always fits in the card.
-        const left = Math.min(lastLine.right - box.left + 16, box.width - 64);
-        setMoreLeft(Math.max(0, left));
+        // Clamp so the toggle always fits inside the card (covers the tail on full lines).
+        const left = Math.min(lastLine.right - box.left, box.width - 64);
+        setMorePos({
+          left: Math.max(0, left),
+          bottom: Math.max(0, box.bottom - lastLine.bottom),
+        });
       } catch {
-        setMoreLeft(null);
+        setMorePos(null);
       }
     };
 
@@ -524,19 +528,19 @@ export function ThreadCard({
           <div className="relative">
             <h3
               ref={titleRef}
-              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2"}`}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
             >
               {renderWithLinks(thread.title, true)}
             </h3>
-            {/* Positioned right after the last visible character, so it hugs the text. */}
-            {titleOverflow && !titleExpanded && moreLeft !== null && (
+            {/* "…More" right after the last visible word, on the same line. */}
+            {titleOverflow && !titleExpanded && morePos && (
               <button
                 type="button"
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
-                style={{ left: `${moreLeft}px` }}
-                className="absolute bottom-0 min-w-16 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
+                style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
+                className="absolute min-w-16 bg-background-subtle font-body text-xs font-medium leading-snug text-foreground-subtle transition-colors hover:text-accent"
               >
-                More
+                …More
               </button>
             )}
           </div>
