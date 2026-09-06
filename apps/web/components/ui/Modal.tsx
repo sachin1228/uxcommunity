@@ -1,7 +1,6 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { useRef, useSyncExternalStore } from "react";
+import { useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { cn } from "@/lib/utils";
 
@@ -9,6 +8,8 @@ interface ModalProps {
   open: boolean;
   onClose: () => void;
   title?: string;
+  titleHidden?: boolean;
+  onOpenAutoFocus?: (event: Event) => void;
   children: React.ReactNode;
   /** Max width class, default "max-w-lg" */
   maxWidth?: string;
@@ -18,22 +19,7 @@ interface ModalProps {
   panelClassName?: string;
 }
 
-interface ModalPortalProps {
-  children: React.ReactNode;
-}
-
-export function ModalPortal({ children }: ModalPortalProps) {
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
-
-  if (!mounted) return null;
-  return createPortal(children, document.body);
-}
-
-export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", hideCloseButton = false, panelClassName }: ModalProps) {
+export function Modal({ open, onClose, title, titleHidden = false, onOpenAutoFocus, children, maxWidth = "max-w-lg", hideCloseButton = false, panelClassName }: ModalProps) {
   const previousFocus = useRef<HTMLElement | null>(null);
 
   return (
@@ -42,7 +28,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", h
         aria-describedby={undefined}
         showCloseButton={!hideCloseButton}
         className={cn("flex w-[calc(100%-2rem)] max-h-[min(800px,calc(100dvh-2rem))] flex-col overflow-y-auto rounded-lg", maxWidth, panelClassName)}
-        onOpenAutoFocus={() => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
+        onOpenAutoFocus={(event) => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; onOpenAutoFocus?.(event); }}
         onCloseAutoFocus={(event) => {
           if (previousFocus.current?.isConnected) {
             event.preventDefault();
@@ -50,7 +36,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", h
           }
         }}
       >
-        <DialogHeader className={title ? "pr-8" : "sr-only"}>
+        <DialogHeader className={title && !titleHidden ? "pr-8" : "sr-only"}>
           <DialogTitle>{title ?? "Dialog"}</DialogTitle>
         </DialogHeader>
         {children}

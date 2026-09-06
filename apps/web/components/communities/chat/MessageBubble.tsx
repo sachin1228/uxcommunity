@@ -14,7 +14,7 @@ import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
-import { ModalPortal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
@@ -226,44 +226,8 @@ function DeleteConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  // Close on backdrop click
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { e.stopPropagation(); onCancel(); }}
-    >
-      <div
-        className="modal-panel w-72 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-          <p className="font-body text-base font-semibold text-foreground text-center">
-            Delete message?
-          </p>
-          <p className="font-body text-xs text-muted-foreground text-center mt-1">
-            This will delete the message for everyone in this chat.
-          </p>
-        </div>
-
-        <div className="flex flex-col">
-          <Button variant="ghost"
-            onClick={(e) => { e.stopPropagation(); onConfirm(); }}
-            className="w-full px-5 py-3.5 active:bg-white/[0.08] transition-colors text-center"
-          >
-            Delete for everyone
-          </Button>
-          <div className="h-px bg-white/[0.06]" />
-          <Button variant="ghost"
-            onClick={(e) => { e.stopPropagation(); onCancel(); }}
-            className="w-full px-5 py-3.5 active:bg-white/[0.08] transition-colors text-center"
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </div>
-    </ModalPortal>
+    <ConfirmDialog open onClose={onCancel} onConfirm={onConfirm} title="Delete message?" message="This will delete the message for everyone in this chat." confirmLabel="Delete for everyone" />
   );
 }
 

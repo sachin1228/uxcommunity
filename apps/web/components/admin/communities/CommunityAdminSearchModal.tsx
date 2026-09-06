@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/shadcn/input";
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import {
   CommunityAdmin,
   ALL_PERMISSIONS,
@@ -126,23 +126,8 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
     }
   }
 
-  // Close on Escape + focus search on open
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    setTimeout(() => inputRef.current?.focus(), 50);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="modal-panel w-full max-w-lg flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-150"
-        style={{ maxHeight: "min(80vh, 640px)" }}
-      >
+    <Modal open onClose={onClose} title="Add community admin" titleHidden hideCloseButton panelClassName="max-h-[min(80dvh,640px)] gap-0 overflow-hidden p-0" onOpenAutoFocus={(event) => { event.preventDefault(); inputRef.current?.focus(); }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border shrink-0">
           <div>
@@ -252,8 +237,6 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
             </div>
           )}
         </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

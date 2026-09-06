@@ -5,8 +5,8 @@ import { Textarea } from "@/components/ui/shadcn/textarea";
 import { Input } from "@/components/ui/shadcn/input";
 
 
-import { createPortal } from "react-dom";
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
+import { Modal } from "@/components/ui/Modal";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -47,11 +47,6 @@ export function ResourceFormModal({
   initialIsPublic = false,
 }: ResourceFormModalProps) {
   const isEdit = mode === "edit";
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
 
   const [url, setUrl] = useState(resource?.url ?? "");
   const [description, setDescription] = useState(resource?.description ?? "");
@@ -125,12 +120,6 @@ export function ResourceFormModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!description.trim()) { setError("Description is required."); return; }
@@ -169,16 +158,8 @@ export function ResourceFormModal({
 
   const showPreview = !previewDismissed && (previewLoading || preview);
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="resource-form-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+  return (
+    <Modal open onClose={onClose} title={isEdit ? "Edit Resource" : "Share a Resource"} titleHidden hideCloseButton maxWidth="max-w-xl" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-xl flex-col overflow-hidden"
@@ -334,7 +315,6 @@ export function ResourceFormModal({
           </Button>
         </div>
       </form>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

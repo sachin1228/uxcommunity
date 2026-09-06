@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/shadcn/textarea";
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
@@ -125,14 +125,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   }
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-event-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Modal open onClose={onClose} title="Edit Event" titleHidden hideCloseButton maxWidth="max-w-2xl" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl flex-col overflow-hidden"
@@ -307,7 +300,6 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           </Button>
         </div>
       </form>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/shadcn/input";
 import { useRef, useState } from "react";
 import { Plus, X, ImagePlus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
 interface Props {
@@ -86,13 +86,7 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
   }
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="modal-panel relative z-10 w-full max-w-md p-5">
+    <Modal open onClose={onClose} title={`Add ${entity}`} titleHidden hideCloseButton maxWidth="max-w-md">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-display text-base font-semibold text-foreground">Add {entity}</h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors" aria-label="Close">
@@ -193,8 +187,6 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
             </Button>
           </div>
         </form>
-      </div>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

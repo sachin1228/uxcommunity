@@ -13,7 +13,7 @@ import { CommentIcon } from "../CommentIcon";
 import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type ThreadComment } from "./types";
 import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { CommentBox, CommentRow } from "./ThreadComments";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 
@@ -69,22 +69,14 @@ export function ThreadImageLightbox({
   // Arrow keys are ignored while typing in the comment box.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-        return;
-      }
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.isContentEditable)) return;
       if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
     };
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, goPrev, goNext]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [goPrev, goNext]);
 
   // Fetch comments once when the viewer opens.
   useEffect(() => {
@@ -153,19 +145,7 @@ export function ThreadImageLightbox({
     : thread.comment_count;
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Thread image viewer"
-        className="relative flex h-[88vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
-      >
+    <Modal open onClose={onClose} title="Thread image viewer" titleHidden hideCloseButton maxWidth="max-w-6xl" panelClassName="h-[88dvh] flex-row gap-0 overflow-hidden p-0">
         {/* Close — top-right corner of the modal */}
         <Button variant="ghost" size="icon"
           type="button"
@@ -369,8 +349,6 @@ export function ThreadImageLightbox({
             </div>
           </div>
         </aside>
-      </div>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

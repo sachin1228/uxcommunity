@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/shadcn/button";
+import { Modal } from "@/components/ui/Modal";
 
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -333,14 +334,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
 
       {/* Entry gate: game controls stay locked until the user enters. */}
       {ready && !error && intro && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/35 px-4">
-          <div
-            className="modal-panel w-full max-w-md px-8 py-7 text-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="bella-welcome-title"
-            aria-describedby="bella-welcome-description"
-          >
+        <Modal open onClose={leave} title="Welcome to Bella Park" titleHidden maxWidth="max-w-md">
             <h2 id="bella-welcome-title" className="font-body text-xl font-semibold text-foreground">
               You&apos;re in Bella Park
             </h2>
@@ -359,8 +353,7 @@ export function DesignersRoomView({ userId, userName }: Props) {
             >
               Enter Bella Park
             </Button>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* On-air indicator when transmitting */}

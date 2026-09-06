@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/shadcn/alert-dialog";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -380,37 +380,24 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
       </div>
 
       {/* Delete confirm modal */}
-      {confirmDelete && (
-        <ModalPortal>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="modal-panel w-full max-w-sm p-6">
-            <h2 className="font-display text-base font-semibold text-foreground mb-1">Delete &ldquo;{item.name}&rdquo;?</h2>
-            <p className="font-body text-xs text-muted-foreground mb-5">
+      <AlertDialog open={confirmDelete} onOpenChange={(open) => { if (!deleteLoading) { setConfirmDelete(open); setDeleteError(null); } }}>
+        <AlertDialogContent onEscapeKeyDown={(event) => { if (deleteLoading) event.preventDefault(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{item.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
               This is permanent and cannot be undone. If any designer profile references this {entity.toLowerCase()}, the delete will be blocked.
-            </p>
-            {deleteError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">{deleteError}</p>
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline"
-                onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="flex-1"
-              >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
-                Yes, delete
-              </Button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading} aria-busy={deleteLoading}>
+              {deleteLoading ? <Spinner size={16} /> : <Trash2 data-icon="inline-start" />}
+              Yes, delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

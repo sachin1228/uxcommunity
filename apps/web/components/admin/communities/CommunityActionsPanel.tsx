@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/shadcn/button";
 import { useState } from "react";
 import { ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/shadcn/alert-dialog";
 
 interface Props {
   communityId: string;
@@ -111,49 +111,24 @@ export function CommunityActionsPanel({
       </div>
 
       {/* Delete confirm modal */}
-      {confirmDelete && (
-        <ModalPortal>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="modal-panel w-full max-w-sm p-6">
-            <h2 className="font-display text-base font-semibold text-foreground mb-1">
-              Delete &ldquo;{communityName}&rdquo;?
-            </h2>
-            <p className="font-body text-xs text-muted-foreground mb-5">
-              This will permanently remove the community and all{" "}
-              <span className="text-foreground font-medium">
-                {messageCount} message{messageCount !== 1 ? "s" : ""}
-              </span>{" "}
-              and{" "}
-              <span className="text-foreground font-medium">
-                {memberCount} member{memberCount !== 1 ? "s" : ""}
-              </span>
-              . Cannot be undone.
-            </p>
-            {deleteError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
-                {deleteError}
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline"
-                onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button variant="destructive"
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="flex-1"
-              >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
-                Yes, delete
-              </Button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
-      )}
+      <AlertDialog open={confirmDelete} onOpenChange={(open) => { if (!deleteLoading) { setConfirmDelete(open); setDeleteError(null); } }}>
+        <AlertDialogContent onEscapeKeyDown={(event) => { if (deleteLoading) event.preventDefault(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{communityName}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the community, {messageCount} messages and {memberCount} members. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading} aria-busy={deleteLoading}>
+              {deleteLoading ? <Spinner size={16} /> : <Trash2 data-icon="inline-start" />}
+              Yes, delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

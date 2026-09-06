@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/shadcn/button";
 import { useRef } from "react";
 import { Upload, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 
 interface AvatarPickerModalProps {
   uploadPreview: string | null;
@@ -29,19 +29,7 @@ export function AvatarPickerModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-picture-title"
-        className="modal-panel w-full max-w-lg overflow-hidden"
-      >
+    <Modal open onClose={onClose} title="Change profile picture" titleHidden hideCloseButton panelClassName="gap-0 p-0">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 id="profile-picture-title" className="font-display text-base font-semibold text-foreground">
             Change profile picture
@@ -122,8 +110,6 @@ export function AvatarPickerModal({
             {saving ? "Saving…" : "Save profile picture"}
           </Button>
         </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
@@ -143,14 +143,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   }
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-thread-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Modal open onClose={onClose} title="Edit Thread" titleHidden hideCloseButton maxWidth="max-w-[600px]" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         {...dropHandlers}
@@ -273,7 +266,6 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
           </div>
         )}
       </form>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

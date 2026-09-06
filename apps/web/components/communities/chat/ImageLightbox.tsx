@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/shadcn/button";
+import { Modal } from "@/components/ui/Modal";
 
 
 import { useCallback, useEffect, useRef } from "react";
@@ -74,17 +75,12 @@ export function ImageLightbox({
   // Keyboard navigation (Esc / arrows) + scroll lock while the viewer is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
     };
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, goPrev, goNext]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [goPrev, goNext]);
 
   // Keep the active thumbnail in view when navigating.
   useEffect(() => {
@@ -101,12 +97,7 @@ export function ImageLightbox({
   if (!image) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex flex-col bg-[#1e1e1e]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Image viewer"
-    >
+    <Modal open onClose={onClose} title="Image viewer" titleHidden hideCloseButton maxWidth="max-w-[calc(100vw-2rem)]" panelClassName="h-[calc(100dvh-2rem)] max-h-none gap-0 overflow-hidden p-0">
       {/* ── Header: sender info + actions ───────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -213,6 +204,6 @@ export function ImageLightbox({
           </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }
