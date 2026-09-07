@@ -2,6 +2,8 @@ interface BrandLogoProps {
   className?: string;
   iconClassName?: string;
   wordmarkClassName?: string;
+  /** Render the SVG mark only, without the "uxcommunity" wordmark. */
+  markOnly?: boolean;
 }
 
 /**
@@ -14,6 +16,7 @@ export function BrandLogo({
   className = "",
   iconClassName = "h-7 w-7",
   wordmarkClassName = "text-[18px]",
+  markOnly = false,
 }: BrandLogoProps) {
   return (
     <span
@@ -81,7 +84,7 @@ export function BrandLogo({
           filter="url(#uxc-bubbleShadow)"
         />
       </svg>
-      <span className={wordmarkClassName}>uxcommunity</span>
+      {!markOnly && <span className={wordmarkClassName}>uxcommunity</span>}
     </span>
   );
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
-const FILTERS = ["Newest", "Trending", "Following"] as const;
+const FILTERS = ["Newest", "Trending"] as const;
 
 type Filter = (typeof FILTERS)[number];
 
@@ -96,7 +96,7 @@ export function HomeFeedFilters() {
             <div
               ref={glowRef}
               aria-hidden="true"
-              className={`pointer-events-none absolute top-[4px] h-9 rounded-full blur-2xl ${SWITCHER_GLOW}`}
+              className={`pointer-events-none absolute top-[4px] h-9 rounded-full blur-xl ${SWITCHER_GLOW}`}
             />
             {/* Sliding pill */}
             <div
