@@ -15,6 +15,7 @@ import {
   getCachedRequest,
   initRequestCache,
   patchCachedRequest,
+  subscribeToRequest,
 } from "@/lib/request-cache";
 
 export type NotificationType =
@@ -113,6 +114,26 @@ export function useNotifications(userId: string) {
   // is suspended while hidden, so notifications created during that window
   // would otherwise be missed until the next 30s refetch.
   useHiddenCatchUp(() => void fetchNotifications(true).catch(() => {}));
+
+  // Instantly sync every hook instance (sidebar badge, notifications page):
+  // when one instance patches the shared cache (mark read, realtime event,
+  // refetch), the others re-read it immediately instead of waiting on the
+  // realtime worker or the next 30s refetch.
+  useEffect(() => {
+    return subscribeToRequest(
+      "/api/notifications",
+      () => {
+        const next = getCachedRequest<{
+          notifications?: NotificationItem[];
+          unread_count?: number;
+        }>("/api/notifications", userId);
+        if (!next) return;
+        setNotifications(next.notifications ?? []);
+        setUnreadCount(next.unread_count ?? 0);
+      },
+      userId,
+    );
+  }, [userId]);
 
   useEffect(() => {
     if (!isVisible) return;
