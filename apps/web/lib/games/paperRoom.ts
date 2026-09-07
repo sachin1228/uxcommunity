@@ -92,6 +92,7 @@ export class PaperRoom {
   private rosterCache: PeerMeta[] = [];
   private status: "connecting" | "SUBSCRIBED" | "error" | "closed" = "connecting";
   private handlers: PaperRoomHandlers = {};
+  private joinPromise: Promise<boolean> | null = null;
 
   private constructor(code: string, me: PaperMe) {
     this.code = code;
@@ -123,8 +124,19 @@ export class PaperRoom {
     return this.rosterCache;
   }
 
-  /** Subscribe + track presence. Resolves true when live. */
+  /**
+   * Subscribe + track presence. Resolves true when live. Idempotent — a
+   * second call (e.g. React StrictMode double-effects) reuses the in-flight
+   * or settled join instead of opening a duplicate channel on the same topic.
+   */
   async join(): Promise<boolean> {
+    if (this.status === "SUBSCRIBED") return true;
+    if (this.joinPromise) return this.joinPromise;
+    this.joinPromise = this.doJoin();
+    return this.joinPromise;
+  }
+
+  private async doJoin(): Promise<boolean> {
     const channel = client().channel(channelNameFor(this.code), {
       config: {
         broadcast: { self: false, ack: false },
@@ -196,6 +208,9 @@ export class PaperRoom {
           resolve(false);
         }
       });
+    }).finally(() => {
+      // Allow a later genuine retry (after an explicit leave / failure).
+      this.joinPromise = null;
     });
   }
 
@@ -232,6 +247,7 @@ export class PaperRoom {
     }
     this.channel = null;
     this.status = "closed";
+    this.joinPromise = null;
     this.rosterCache = [];
     this.handlers = {};
   }
