@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus, Search } from "lucide-react";
+import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -121,15 +121,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
                 </span>
               )}
             </Link>
-            {/* Static search icon — functionality to come */}
-            <button
-              type="button"
-              aria-label="Search"
-              title="Search"
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:border-foreground-muted hover:text-foreground"
-            >
-              <Search strokeWidth={2.5} size={12} />
-            </button>
           </div>
         </div>
       )}
