@@ -96,6 +96,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // Protect application requests while excluding static assets and HMR.
   matcher: [
-    "/((?!_next/|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml|webmanifest)$).*)",
+    "/((?!_next/|favicon.ico|game/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml|html|webmanifest)$).*)",
   ],
 };
