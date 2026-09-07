@@ -94,7 +94,7 @@ export function ThreadPollResult({
                 <div className="flex items-center gap-2.5">
                   {isSelected ? (
                     <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white"
                       aria-hidden
                     >
                       <Check strokeWidth={3} size={12} />

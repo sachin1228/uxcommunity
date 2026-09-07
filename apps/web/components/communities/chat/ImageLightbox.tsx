@@ -195,7 +195,7 @@ export function ImageLightbox({
                 aria-label={`View image ${i + 1} of ${images.length}`}
                 className={`shrink-0 h-14 w-14 overflow-hidden rounded-md border transition-all ${
                   i === index
-                    ? "border-[var(--ds-blue-700)] ring-2 ring-[var(--ds-blue-700)]"
+                    ? "border-[var(--ds-blue-800)] ring-2 ring-[var(--ds-blue-800)]"
                     : "border-white/15 opacity-70 hover:opacity-100"
                 }`}
               >

@@ -314,7 +314,7 @@ export function CommentComposer<C = unknown>({
             disabled={saving || !body.trim()}
             aria-label="Send"
             title="Send"
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-800)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? (
               <Spinner size={14} className="text-white" />

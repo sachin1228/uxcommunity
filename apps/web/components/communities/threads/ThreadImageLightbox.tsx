@@ -221,7 +221,7 @@ export function ThreadImageLightbox({
                       aria-label={`View image ${i + 1} of ${images.length}`}
                       className={`h-14 w-14 shrink-0 overflow-hidden rounded-md border transition-all ${
                         i === index
-                          ? "border-[var(--ds-blue-700)] ring-2 ring-[var(--ds-blue-700)]"
+                          ? "border-[var(--ds-blue-800)] ring-2 ring-[var(--ds-blue-800)]"
                           : "border-white/15 opacity-70 hover:opacity-100"
                       }`}
                     >

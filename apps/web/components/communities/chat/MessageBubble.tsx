@@ -145,7 +145,7 @@ function BubbleImage({
         className={standalone
           ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
               isMe
-                ? "border-[var(--ds-blue-700)]"
+                ? "border-[var(--ds-blue-800)]"
                 : "border-border bg-surface-raised"
             }`
           : "relative"}
@@ -776,14 +776,14 @@ function DeletedBubble({
     <div
       className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
-          ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
+          ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
         }`}
     >
       {isFirstInGroup && (
         <MessageBubbleTail
           side={isMe ? "right" : "left"}
-          className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
+          className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
         />
       )}
       <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
@@ -870,7 +870,7 @@ export const MessageBubble = memo(function MessageBubble({
   const rowHighlightStyle: React.CSSProperties | undefined = highlighted
     ? {
         backgroundColor:
-          "color-mix(in srgb, var(--ds-blue-700) 25%, transparent)",
+          "color-mix(in srgb, var(--ds-blue-800) 25%, transparent)",
       }
     : undefined;
   const isFirstInGroup = !isSameAuthor;
@@ -987,7 +987,7 @@ export const MessageBubble = memo(function MessageBubble({
                           isMe
                             ? msg.status === "failed"
                               ? "bg-red-500/80"
-                              : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
+                              : "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
                             : "bg-surface-raised"
                         }`
                   }`}
@@ -998,7 +998,7 @@ export const MessageBubble = memo(function MessageBubble({
                       className={isMe
                         ? msg.status === "failed"
                           ? "text-red-500/80"
-                          : "text-[var(--ds-blue-700)]"
+                          : "text-[var(--ds-blue-800)]"
                         : "text-surface-raised"}
                     />
                   )}

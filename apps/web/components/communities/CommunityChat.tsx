@@ -1306,7 +1306,7 @@ export function CommunityChat({
               <button
                 type="button"
                 onClick={jumpToPendingMention}
-                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white shadow-lg hover:bg-[var(--ds-blue-800)] transition-colors"
+                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white shadow-lg hover:bg-[var(--ds-blue-900)] transition-colors"
                 aria-label={`${visiblePendingMentions.length} pending mention${visiblePendingMentions.length === 1 ? "" : "s"} — jump to message`}
                 title="Jump to the message where you were mentioned"
               >
