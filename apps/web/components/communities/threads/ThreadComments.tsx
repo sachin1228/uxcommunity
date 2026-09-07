@@ -208,7 +208,7 @@ export function CommentBox({
         )}
         {/* Action buttons — bottom-aligned so they stay pinned to the last
             input line as it grows */}
-        <div className="flex shrink-0 items-end gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* Image attachment — visual placeholder for now, the comments API
               doesn't accept attachments yet. */}
           <button
