@@ -598,6 +598,9 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   );
 }
 
+/** Number of lines shown before a long message collapses behind "Read more". */
+const COLLAPSED_LINES = 5;
+
 function MessageContent({
   content,
   mentions,
@@ -613,6 +616,31 @@ function MessageContent({
   animate?: boolean;
 }) {
   const previewUrl = showPreview ? extractFirstUrl(content) : null;
+  const [collapsed, setCollapsed] = useState(true);
+  const [showToggle, setShowToggle] = useState(false);
+  const textRef = useRef<HTMLDivElement>(null);
+
+  // Only long messages get the toggle: compare the fully-laid-out (unclamped)
+  // text height against the clamped height. The line-clamp class stays on the
+  // element — we temporarily neutralise it with an inline style (inline styles
+  // override classes), measure, then clear it; reading clientHeight afterwards
+  // forces the browser to apply the clamp again synchronously.
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el || !collapsed) return;
+    const measure = () => {
+      el.style.webkitLineClamp = "unset";
+      const natural = el.scrollHeight;
+      el.style.webkitLineClamp = "";
+      setShowToggle(natural > el.clientHeight + 1);
+    };
+    measure();
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [content, collapsed]);
 
   // Mentions are matched against the raw text first (longest name wins), so
   // exactly the stored mentions become chips and everything else — including
@@ -681,15 +709,34 @@ function MessageContent({
     }
   }
 
+  // Literal class on purpose — Tailwind can't generate utilities from
+  // dynamic strings, so keep it in sync with COLLAPSED_LINES above.
+  const collapsedClass = collapsed ? "line-clamp-5" : "";
+
   return (
     <>
       <div
+        ref={textRef}
         className={`chat-message-text font-body text-sm font-normal leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
           isMe ? "text-accent-foreground" : "text-foreground"
-        }`}
+        } ${collapsedClass}`}
       >
         {parts}
       </div>
+      {showToggle && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setCollapsed((v) => !v); }}
+          aria-expanded={!collapsed}
+          className={`mt-1 font-body text-xs font-medium transition-colors ${
+            isMe
+              ? "text-accent-foreground/70 hover:text-accent-foreground"
+              : "text-foreground-muted hover:text-foreground"
+          }`}
+        >
+          {collapsed ? "Read more" : "Show less"}
+        </button>
+      )}
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );
