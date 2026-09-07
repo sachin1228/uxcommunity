@@ -416,7 +416,7 @@ export function ToggleRow({
         <span
           aria-hidden="true"
           className={`block h-6 w-11 rounded-full transition-colors duration-150 peer-focus-visible:ring-2 peer-focus-visible:ring-accent/25 ${
-            checked ? "bg-[var(--ds-blue-700)]" : "bg-border"
+            checked ? "bg-[var(--ds-blue-800)]" : "bg-border"
           }`}
         />
         <span

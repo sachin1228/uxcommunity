@@ -7,6 +7,7 @@ import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
 import { MentionSuggestions } from "./MentionSuggestions";
+import { MAX_MESSAGE_CHARS } from "./chatUtils";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 import type { MessageMention } from "@/lib/communities/cache";
 import {
@@ -139,7 +140,7 @@ function renderComposerOverlay(
     const segment = segments[i];
     if (segment.mention) {
       parts.push(
-        <span key={i} className="text-[var(--ds-blue-700)]">
+        <span key={i} className="text-[var(--ds-blue-800)]">
           {segment.text}
         </span>,
       );
@@ -169,7 +170,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
-    const canSend = !!input.trim() || !!pendingImagePreview;
+    // Over the limit → hide the send button so the message can't be sent.
+    const overLimit = input.length > MAX_MESSAGE_CHARS;
+    const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
 
     // Mirror content for the visual overlay (plain text + emoji SVGs + blue
     // mention tokens). Color spans never change layout, so the overlay stays
@@ -432,12 +435,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   data-chat-input
                   value={input}
                   onChange={(e) => {
-                    onChange(e.target.value);
+                    // No maxLength: let the user keep typing past the limit so
+                    // the inline error below can show, then block sending.
+                    const value = e.target.value;
+                    onChange(value);
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                     // After the value update the caret is at the end of what
                     // was just typed — re-evaluate the @query token.
-                    onComposerActivity?.(e.target.value, e.target.selectionStart);
+                    onComposerActivity?.(value, e.target.selectionStart);
                   }}
                   onKeyUp={(e) => {
                     // Arrow/Home/End/Backspace moves and IME commits don't fire
@@ -475,11 +481,23 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </div>
               </div>
 
+              {/* Character counter — shown once the user is near the 500 limit */}
+              {input.length > 0 && input.length >= MAX_MESSAGE_CHARS - 50 && (
+                <span
+                  className={`shrink-0 mb-0.5 font-mono text-[10px] tabular-nums ${
+                    overLimit ? "text-red-400" : "text-foreground-muted/70"
+                  }`}
+                  aria-live="polite"
+                >
+                  {input.length}/{MAX_MESSAGE_CHARS}
+                </span>
+              )}
+
               {canSend && (
                 <button
                   onClick={() => { closePicker(); onSend(); }}
                   disabled={sending}
-                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white hover:bg-[var(--ds-blue-800)] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="shrink-0 h-8 w-8 mb-0.5 flex items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white hover:bg-[var(--ds-blue-900)] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
                   aria-label="Send"
                   title="Send"
                 >
@@ -494,6 +512,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
               )}
             </div>{/* end input row */}
+
+            {/* Inline error — shown right in the input box while over the limit */}
+            {overLimit && (
+              <p
+                role="alert"
+                className="px-2 pb-1.5 font-body text-[11px] text-red-400"
+              >
+                Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove {input.length - MAX_MESSAGE_CHARS} to send.
+              </p>
+            )}
           </div>{/* end outer box */}
         </div>{/* end anchor */}
 

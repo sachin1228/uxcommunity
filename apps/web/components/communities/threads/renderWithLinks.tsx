@@ -18,7 +18,7 @@ export function renderWithLinks(text: string, isNested = false) {
           key={match.index}
           role="link"
           tabIndex={0}
-          className="text-[var(--ds-blue-700)] hover:underline break-all cursor-pointer"
+          className="text-[var(--ds-blue-800)] hover:underline break-all cursor-pointer"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); } }}
         >
@@ -32,7 +32,7 @@ export function renderWithLinks(text: string, isNested = false) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[var(--ds-blue-700)] hover:underline break-all"
+          className="text-[var(--ds-blue-800)] hover:underline break-all"
           onClick={(e) => e.stopPropagation()}
         >
           {url}
