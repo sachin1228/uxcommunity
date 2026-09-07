@@ -116,15 +116,14 @@ export function CommentBox({
   }, []);
 
   // Position the picker directly above the emoji button, like the chat emoji
-  // picker — right-aligned with the button so it never spills past the
-  // composer's right edge.
+  // picker — horizontally centered on the button.
   const measureAndSetPos = useCallback(() => {
     const btn = emojiBtnRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     setPickerPos({
       bottom: window.innerHeight - rect.top + 8,
-      left:   rect.right - 340,
+      left:   rect.left + rect.width / 2 - 170,
     });
   }, []);
 
@@ -293,8 +292,8 @@ export function CommentBox({
     </form>
 
     {/* ── Emoji picker — portal at document.body, fixed above the emoji
-          button (right-aligned with it), outside the form so its buttons
-          never submit the comment ── */}
+          button (centered on it), outside the form so its buttons never
+          submit the comment ── */}
     {pickerOpen && pickerPos && typeof document !== "undefined" &&
       createPortal(
         <div
