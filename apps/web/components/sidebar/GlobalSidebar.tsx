@@ -100,15 +100,11 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       {!mobile && <BrowserNotificationInitializer />}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-      {/* Profile — avatar + dropdown, above the Workspace nav */}
-      <div className="border-b border-border px-[13px] pb-[11px] pt-[13px]">
-        {!mobile && (
-          <div className="mb-[11px] px-[5px]">
-            <BrandLogo iconClassName="h-5 w-5" wordmarkClassName="text-sm" />
-          </div>
-        )}
-        <ProfileDropdown variant="row" {...user} />
-      </div>
+      {!mobile && (
+        <div className="px-[13px] pb-[11px] pt-[13px]">
+          <BrandLogo iconClassName="h-5 w-5" wordmarkClassName="text-sm" />
+        </div>
+      )}
 
       {/* WORKSPACE nav */}
       <div className="px-[13px] pb-[9px] pt-[13px]">
@@ -278,6 +274,11 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           </div>
         )}
       </div>
+      </div>
+
+      {/* Profile — pinned to the bottom of the sidebar */}
+      <div className="shrink-0 border-t border-border px-[13px] py-[11px]">
+        <ProfileDropdown variant="row" {...user} />
       </div>
     </aside>
   );
