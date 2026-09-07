@@ -3,9 +3,9 @@
 --
 -- One vote per (thread, user). option_index references the
 -- option's position in community_threads.poll->'options'
--- (0-based). Votes are cleared whenever the poll payload on
--- the thread changes (see PATCH route) so stale indices can
--- never outlive their options.
+-- (0-based). Votes are cleared only when the poll's option
+-- list changes (see PATCH route) so stale indices can never
+-- outlive their options; question-only edits keep votes.
 -- ============================================================
 
 create table if not exists public.thread_poll_votes (

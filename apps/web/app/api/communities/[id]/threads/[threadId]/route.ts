@@ -196,10 +196,13 @@ export async function PATCH(
 
   if (error || !updated) { console.error("[PATCH thread]", error); return NextResponse.json({ error: "Failed to update thread." }, { status: 500 }); }
 
-  // Poll question/options changed (or the poll was removed/added) — stored
-  // votes point at option indices, so reset them rather than leave stale totals.
+  // Votes map to poll options by index, so only reset them when the option
+  // list itself changes (renamed/added/removed/reordered) — editing the
+  // question or any other thread field keeps the existing votes intact.
   const previousPoll = (existing as { poll?: unknown }).poll ?? null;
-  if (JSON.stringify(previousPoll) !== JSON.stringify(normalizedPoll.poll)) {
+  const previousOptions = (previousPoll as { options?: unknown } | null)?.options ?? null;
+  const nextOptions = normalizedPoll.poll?.options ?? null;
+  if (JSON.stringify(previousOptions) !== JSON.stringify(nextOptions)) {
     await db.from("thread_poll_votes").delete().eq("thread_id", threadId);
   }
 

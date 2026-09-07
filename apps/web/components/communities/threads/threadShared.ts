@@ -31,6 +31,19 @@ export function formatFullDate(value: string) {
   });
 }
 
+/**
+ * Whether a thread has been edited since it was created. The DB trigger
+ * bumps `updated_at` on every update while `created_at` stays fixed, so an
+ * edited thread is one whose `updated_at` is meaningfully newer (a small
+ * tolerance guards against timestamp serialization noise).
+ */
+export function isThreadEdited(createdAt: string, updatedAt: string): boolean {
+  const created = new Date(createdAt).getTime();
+  const updated = new Date(updatedAt).getTime();
+  if (!Number.isFinite(created) || !Number.isFinite(updated)) return false;
+  return updated - created > 1_000;
+}
+
 /** Derive a title (≤ body max) from the composer body. */
 export function bodyToTitle(body: string): string {
   const trimmed = body.trim();
