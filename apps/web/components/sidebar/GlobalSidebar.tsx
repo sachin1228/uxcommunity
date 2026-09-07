@@ -102,7 +102,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {!mobile && (
         <div className="px-[13px] pb-[11px] pt-[13px]">
-          <BrandLogo iconClassName="h-5 w-5" wordmarkClassName="text-sm" />
+          <BrandLogo iconClassName="h-7 w-7" markOnly />
         </div>
       )}
 
