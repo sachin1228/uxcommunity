@@ -70,7 +70,7 @@ export default async function DashboardLayout({
         <MobileSidebar userId={userId} user={sidebarUser} />
       </div>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
         <div className="hidden h-full lg:block">
           <GlobalSidebar userId={userId} user={sidebarUser} />
         </div>

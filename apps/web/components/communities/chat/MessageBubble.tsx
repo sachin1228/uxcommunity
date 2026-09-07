@@ -68,10 +68,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
         {reply.user_name}
       </p>
-      <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
         {reply.content || "📷 Image"}
       </p>
     </div>
@@ -616,7 +616,11 @@ function MessageContent({
     if (!el || !collapsed) return;
     const measure = () => {
       el.style.webkitLineClamp = "unset";
-      const natural = el.scrollHeight;
+      // offsetHeight = pure layout height. scrollHeight includes the entrance
+      // word-wave animation's translated overflow, so while a message is still
+      // animating in (sending state) even a one-line reply would measure
+      // taller than the 5-line clamp and wrongly show the "Read more" toggle.
+      const natural = el.offsetHeight;
       el.style.webkitLineClamp = "";
       setShowToggle(natural > el.clientHeight + 1);
     };
@@ -709,18 +713,18 @@ function MessageContent({
       >
         {parts}
       </div>
-      {showToggle && (
+      {/* Once expanded a message stays fully open — there is no collapse back. */}
+      {showToggle && collapsed && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setCollapsed((v) => !v); }}
-          aria-expanded={!collapsed}
+          onClick={(e) => { e.stopPropagation(); setCollapsed(false); }}
           className={`mt-1 font-body text-xs font-medium transition-colors ${
             isMe
               ? "text-accent-foreground/70 hover:text-accent-foreground"
               : "text-foreground-muted hover:text-foreground"
           }`}
         >
-          {collapsed ? "Read more" : "Show less"}
+          Read more
         </button>
       )}
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
