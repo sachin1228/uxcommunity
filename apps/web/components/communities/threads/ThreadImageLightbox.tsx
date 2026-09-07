@@ -14,6 +14,7 @@ import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommentBox, CommentRow } from "./ThreadComments";
 import { PostAuthorMeta } from "../PostAuthorMeta";
+import { isThreadEdited } from "./threadShared";
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -244,6 +245,7 @@ export function ThreadImageLightbox({
               avatarUrl={thread.users?.avatar_url}
               createdAt={thread.created_at}
               dateInline
+              edited={isThreadEdited(thread.created_at, thread.updated_at)}
               secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
             />
           </div>

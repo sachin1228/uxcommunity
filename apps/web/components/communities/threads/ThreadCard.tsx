@@ -20,7 +20,7 @@ import { EditThreadModal } from "./EditThreadModal";
 import { ThreadPollResult } from "./PollResult";
 import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { ThreadImageLightbox } from "./ThreadImageLightbox";
-import { formatRelativeDate } from "./threadShared";
+import { formatRelativeDate, isThreadEdited } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -365,6 +365,7 @@ export function ThreadCard({
 
   const authorName = thread.users?.name ?? "Member";
   const dateLabel  = formatRelativeDate(thread.created_at);
+  const edited     = isThreadEdited(thread.created_at, thread.updated_at);
 
   const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
   const images = attachments.filter((a) => a.type.startsWith("image/"));
@@ -418,6 +419,7 @@ export function ThreadCard({
             createdAt={thread.created_at}
             dateLabel={dateLabel}
             dateInline
+            edited={edited}
             secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
           />
 
