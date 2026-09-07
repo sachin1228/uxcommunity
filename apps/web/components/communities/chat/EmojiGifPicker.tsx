@@ -119,7 +119,9 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
 
 // ─── Noto Animated Emoji Grid ────────────────────────────────────────────────
 
-function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
+/** Emoji-only grid (search + category pills). Exported so other composers
+ *  (e.g. thread comments) can reuse it without the GIF/sticker tabs. */
+export function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void }) {
   const [query, setQuery] = useState("");
   const [emojis, setEmojis] = useState<NotoEmoji[]>([]);
   const [categories, setCategories] = useState<string[]>([]);

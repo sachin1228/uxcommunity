@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   CornerDownRight, MessageSquare, MoreHorizontal,
-  Send, Trash2, Users,
+  Trash2, Users,
 } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
@@ -13,6 +13,7 @@ import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
+import { CommentComposer, renderEmojiText } from "../CommentComposer";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -67,11 +68,7 @@ function CommentNode({
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [replyOpen, setReplyOpen] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [replyPosting, setReplyPosting] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const replyRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -81,10 +78,6 @@ function CommentNode({
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
   }, [menuOpen]);
-
-  useEffect(() => {
-    if (replyOpen) setTimeout(() => replyRef.current?.focus(), 0);
-  }, [replyOpen]);
 
   async function handleDelete() {
     setMenuOpen(false);
@@ -96,26 +89,6 @@ function CommentNode({
       );
       if (res.ok) onDelete(comment.id);
     } finally { setDeleting(false); }
-  }
-
-  async function handleReply(e?: React.FormEvent) {
-    e?.preventDefault();
-    const text = replyText.trim();
-    if (!text || replyPosting) return;
-    setReplyPosting(true);
-    setReplyError(null);
-    try {
-      const res = await dedupeFetch(`/api/communities/${communityId}/events/${eventId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text, parent_id: comment.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setReplyError(data.error ?? "Failed to post reply."); return; }
-      onReplyPosted(data.comment);
-      setReplyText("");
-      setReplyOpen(false);
-    } finally { setReplyPosting(false); }
   }
 
   return (
@@ -173,7 +146,7 @@ function CommentNode({
           {/* Body */}
           {comment.body && (
             <p className="mt-1 font-body text-sm text-foreground-muted leading-relaxed whitespace-pre-wrap break-words">
-              {comment.body}
+              {renderEmojiText(comment.body)}
             </p>
           )}
 
@@ -192,7 +165,7 @@ function CommentNode({
           {allowReply && (
             <button
               type="button"
-              onClick={() => { setReplyOpen((p) => !p); setReplyError(null); }}
+              onClick={() => setReplyOpen((p) => !p)}
               className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
             >
               <CornerDownRight strokeWidth={2.5} size={11} />
@@ -203,39 +176,20 @@ function CommentNode({
           {/* Inline reply composer */}
           {replyOpen && (
             <div className="mt-2">
-              <form onSubmit={handleReply} className="space-y-2">
-                <textarea
-                  ref={replyRef}
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handleReply();
-                    if (e.key === "Escape") { setReplyOpen(false); setReplyText(""); }
-                  }}
-                  placeholder={`Write a reply…`}
-                  rows={2}
-                  maxLength={2000}
-                  className="field w-full resize-none"
-                />
-                {replyError && <p className="font-body text-[11px] text-red-400">{replyError}</p>}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => { setReplyOpen(false); setReplyText(""); setReplyError(null); }}
-                    className="font-body text-xs text-foreground-subtle hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!replyText.trim() || replyPosting}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {replyPosting ? <Spinner size={11} className="text-white" /> : <Send strokeWidth={2.5} size={11} />}
-                    {replyPosting ? "Posting…" : "Post"}
-                  </button>
-                </div>
-              </form>
+              <CommentComposer
+                communityId={communityId}
+                kind="events"
+                targetId={eventId}
+                parentId={comment.id}
+                placeholder="Write a reply…"
+                maxLength={2000}
+                autoFocus
+                onPosted={(created) => {
+                  onReplyPosted(created as EventComment);
+                  setReplyOpen(false);
+                }}
+                onCancel={() => setReplyOpen(false)}
+              />
             </div>
           )}
         </div>
@@ -285,12 +239,6 @@ export function EventDetailClient({
   const [comments, setComments] = useState<EventComment[]>(cachedComments?.comments ?? []);
   const [commentsLoading, setCommentsLoading] = useState(!cachedComments);
 
-  // Main composer state
-  const [commentText, setCommentText] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [commentError, setCommentError] = useState<string | null>(null);
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let isActive = true;
@@ -338,34 +286,6 @@ export function EventDetailClient({
       : current);
   }, []);
 
-  // Auto-grow textarea
-  useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = "auto";
-    ta.style.height = `${ta.scrollHeight}px`;
-  }, [commentText]);
-
-  // ── Composer ──
-
-  async function handlePostComment(e?: React.FormEvent) {
-    e?.preventDefault();
-    const text = commentText.trim();
-    if (!text || posting) return;
-    setPosting(true);
-    setCommentError(null);
-    try {
-      const res = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setCommentError(data.error ?? "Failed to post."); return; }
-      setComments((prev) => [...prev, data.comment]);
-      setCommentText("");
-    } finally { setPosting(false); }
-  }
 
   // ── Comment actions passed to CommentNode ──
 
@@ -382,7 +302,6 @@ export function EventDetailClient({
   const totalCommentCount = comments.length;
   const topLevelCount = rootComments.length;
 
-  const canPost = commentText.trim().length > 0 && !posting;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -456,34 +375,14 @@ export function EventDetailClient({
           {activeTab === "discussion" && (
             <div className="mt-5 space-y-5">
               {/* Composer */}
-              <form onSubmit={handlePostComment} className="space-y-2">
-                <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                  <textarea
-                    ref={textareaRef}
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void handlePostComment();
-                    }}
-                    placeholder="Write a comment… (⌘↵ to post)"
-                    rows={3}
-                    maxLength={2000}
-                    className="w-full resize-none bg-transparent px-4 py-3.5 font-body text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
-                  />
-                </div>
-                {commentError && <p className="font-body text-xs text-red-400">{commentError}</p>}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={!canPost}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {posting ? <Spinner size={13} className="text-white" /> : <Send strokeWidth={2.5} size={13} />}
-                    {posting ? "Posting…" : "Post"}
-                  </button>
-                </div>
-              </form>
+              <CommentComposer
+                communityId={communityId}
+                kind="events"
+                targetId={event.id}
+                placeholder="Write a comment… (⌘↵ to post)"
+                maxLength={2000}
+                onPosted={(comment) => setComments((prev) => [...prev, comment as EventComment])}
+              />
 
               {/* Comments heading */}
               {!commentsLoading && (
