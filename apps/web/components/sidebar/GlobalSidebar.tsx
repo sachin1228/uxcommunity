@@ -109,11 +109,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/notifications"
               aria-label={notificationCount > 0 ? `${notificationCount} unread notifications` : "Notifications"}
               title="Notifications"
-              className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
-                notificationsActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
-              }`}
+              className="relative flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground hover:border-foreground-muted"
             >
               <Bell strokeWidth={2.5} size={16} />
               {notificationCount > 0 && (
@@ -130,7 +126,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               type="button"
               aria-label="Search"
               title="Search"
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:border-foreground-muted hover:text-foreground"
             >
               <Search strokeWidth={2.5} size={16} />
             </button>
