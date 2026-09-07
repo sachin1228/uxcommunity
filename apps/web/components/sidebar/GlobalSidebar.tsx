@@ -111,7 +111,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               title="Notifications"
               className="relative flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground hover:border-foreground-muted"
             >
-              <Bell strokeWidth={2.5} size={16} />
+              <Bell strokeWidth={2.5} size={12} />
               {notificationCount > 0 && (
                 <span
                   className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
@@ -128,7 +128,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               title="Search"
               className="flex h-7 w-7 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:border-foreground-muted hover:text-foreground"
             >
-              <Search strokeWidth={2.5} size={16} />
+              <Search strokeWidth={2.5} size={12} />
             </button>
           </div>
         </div>
