@@ -81,7 +81,7 @@ function RuleRow({
         onChange={(event) => onChange(event.target.value)}
         placeholder="Add a community rule"
         maxLength={160}
-        className="min-w-0 flex-1 rounded-lg border border-border bg-surface-raised px-3 py-2 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+        className="field min-w-0 flex-1"
       />
       <button
         type="button"
@@ -218,7 +218,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
               onCreated(created);
               handleClose();
             }}
-            className="mt-6 w-full rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            className="modal-btn modal-btn-primary mt-6 w-full"
           >
             Open Community
           </button>
@@ -237,7 +237,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   onChange={(event) => setName(event.target.value)}
                   maxLength={80}
                   placeholder="e.g. Design Systems"
-                  className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full"
                 />
               </div>
               <div className="grid gap-2">
@@ -342,7 +342,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   maxLength={500}
                   rows={3}
                   placeholder="What should members use this community for?"
-                  className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:border-accent"
+                  className="field w-full resize-none"
                 />
               </div>
               <div>
@@ -382,7 +382,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
               type="button"
               onClick={step === 1 ? handleClose : () => setStep((prev) => prev - 1)}
               disabled={submitting}
-              className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+              className="modal-btn modal-btn-secondary"
             >
               {step === 1 ? "Cancel" : "Back"}
             </button>
@@ -391,7 +391,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 type="button"
                 onClick={() => setStep((prev) => prev + 1)}
                 disabled={!canContinue}
-                className="rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="modal-btn modal-btn-primary"
               >
                 Continue
               </button>
@@ -400,7 +400,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canContinue || submitting}
-                className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                className="modal-btn modal-btn-primary"
               >
                 {submitting && <Spinner size={14} className="text-accent-foreground" />}
                 {submitting ? "Creating..." : "Create Community"}

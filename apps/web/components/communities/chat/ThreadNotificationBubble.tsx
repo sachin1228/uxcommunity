@@ -6,8 +6,6 @@ import {
   MessageCircle,
   Lightbulb,
   Flag,
-  Share2,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
@@ -29,12 +27,10 @@ function categoryLabel(value: string): string {
 
 /** Icon shown in the thumbnail when there is no image attachment. */
 const CATEGORY_ICON: Record<string, LucideIcon> = {
-  question:      HelpCircle,
-  discussion:    MessageCircle,
-  idea:          Lightbulb,
-  feedback:      Flag,
-  referral:      Share2,
-  collaboration: Users,
+  question:   HelpCircle,
+  discussion: MessageCircle,
+  idea:       Lightbulb,
+  feedback:   Flag,
 };
 
 /** Picks the first image attachment from a thread, if any. */

@@ -101,7 +101,8 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="text-foreground-muted hover:text-foreground transition-colors mt-0.5"
+            aria-label="Close"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
           >
             <X strokeWidth={2.5} size={16} />
           </button>

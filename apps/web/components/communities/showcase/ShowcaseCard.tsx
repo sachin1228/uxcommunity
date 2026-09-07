@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  Heart,
-  MessageCircle,
-} from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -95,22 +93,22 @@ export function ShowcaseCard({
           aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
           aria-pressed={post.user_liked}
           aria-busy={likePending}
-          className="group/like inline-flex items-center gap-2"
+          className="group/like inline-flex cursor-pointer items-center gap-2"
         >
-          <Heart
-            size={20}
-            strokeWidth={2.5}
-            fill={post.user_liked ? "currentColor" : "none"}
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-red-500" : "text-foreground"}`}
+          <HeartIcon
+            size={16}
+            active={post.user_liked}
+            fill="none"
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}
           />
-          <span className="font-body text-sm font-semibold text-foreground">
+          <span className="font-body text-sm font-semibold text-foreground-subtle group-hover/like:text-white">
             {post.like_count}
           </span>
         </button>
 
         {post.allow_replies !== false && (
-        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
-          <MessageCircle strokeWidth={2.5} size={20} />
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+          <CommentIcon />
           {post.comment_count}
         </span>
         )}

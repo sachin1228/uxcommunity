@@ -189,7 +189,7 @@ export function MasterDataPage({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${title.toLowerCase()}…`}
-          className="w-full rounded-lg border border-border bg-surface pl-8 pr-8 py-2 font-body text-xs text-foreground placeholder:text-foreground-muted outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
+          className="field w-full pl-8 pr-8"
         />
         {search && (
           <button

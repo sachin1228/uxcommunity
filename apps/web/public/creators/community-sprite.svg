@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!--
+    Community icon sprite (served from /creators/community-sprite.svg).
+    Symbols inherit `currentColor` from the <use> site so icons follow
+    the text color of their parent (subtle gray, white on hover, etc.).
+  -->
+  <symbol id="comment-16" viewBox="0 0 16 16" overflow="visible">
+    <path d="M8 1.5 C4.416 1.5 1.5 4.117 1.5 7.333 C1.5 9.06 2.367 10.61 3.735 11.666 L3.335 13.956 A0.5 0.5 0 0 0 4.061 14.485 L6.689 13.132 C7.102 13.212 7.532 13.254 8 13.254 C11.584 13.254 14.5 10.637 14.5 7.421 C14.5 4.204 11.584 1.5 8 1.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>

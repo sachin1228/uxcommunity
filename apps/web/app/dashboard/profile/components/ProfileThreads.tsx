@@ -140,6 +140,17 @@ export function ProfileThreads({
       } catch { /* reconciled on next refresh */ }
     });
 
+    const unsubPoll = realtimeClient.on(room, "poll", (data) => {
+      const record = data as { thread_id?: string; user_id?: string; counts?: number[]; user_vote?: number | null } | null;
+      if (!record?.thread_id || !Array.isArray(record.counts)) return;
+      if (record.user_id === currentUserId) return;
+      setThreads((current) =>
+        current.map((thread) =>
+          thread.id !== record.thread_id ? thread : { ...thread, poll_vote_counts: record.counts },
+        ),
+      );
+    });
+
     const unsubLike = realtimeClient.on(room, "like", (data) => {
       const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
       if (!record?.thread_id) return;
@@ -158,6 +169,7 @@ export function ProfileThreads({
     realtimeClient.connect();
     return () => {
       unsubThread();
+      unsubPoll();
       unsubLike();
       unsubRoom();
     };
@@ -190,6 +202,21 @@ export function ProfileThreads({
   function handleSaveChanged(threadId: string, saved: boolean) {
     setThreads((current) =>
       current.map((t) => (t.id === threadId ? { ...t, user_saved: saved } : t)),
+    );
+  }
+
+  function handlePollVoteChanged(threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) {
+    setThreads((current) =>
+      current.map((t) =>
+        t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } : t,
+      ),
+    );
+    setSavedItems((current) =>
+      current.map((item) =>
+        item.type === "thread" && item.data.id === threadId
+          ? { ...item, data: { ...item.data, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } }
+          : item,
+      ),
     );
   }
 
@@ -310,6 +337,7 @@ export function ProfileThreads({
                   onUpdated={handleUpdated(thread.id, thread.community)}
                   onLikeChanged={handleLikeChanged}
                   onSaveChanged={handleSaveChanged}
+                  onPollVoteChanged={handlePollVoteChanged}
                   onDeleted={handleDeleted}
                   onOpen={() => router.push(`/dashboard/communities/${thread.community_id}/threads/${thread.id}`)}
                 />
@@ -406,6 +434,7 @@ export function ProfileThreads({
                         }
                         handleSaveChanged(threadId, saved);
                       }}
+                      onPollVoteChanged={handlePollVoteChanged}
                       onDeleted={(threadId) => {
                         setSavedItems((current) =>
                           current.filter((i) => !(i.type === "thread" && i.data.id === threadId)),

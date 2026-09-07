@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 const PAGE_SIZE = 30;
 
@@ -49,10 +50,32 @@ const loadFeedPage = unstable_cache(
     // pre-simplification mixed-content RPC installed. Community-public cards
     // remain part of the homepage, while old standalone event/resource/
     // showcase records are intentionally left out.
-    const items = (data ?? [])
+    let items = (data ?? [])
       .map(({ item }) => item)
       .filter(isHomeFeedItem)
       .map(normalizeHomeFeedItem);
+
+    // Attach poll vote totals so feed thread cards show live counts.
+    const threadObjects = items.filter((item): item is HomeFeedObject =>
+      isHomeFeedItem(item) && item._type === "thread",
+    );
+    if (threadObjects.length) {
+      const attached = await attachPollVotes(
+        db,
+        threadObjects as unknown as Array<Record<string, unknown>>,
+        userId,
+      );
+      const byId = new Map<string, HomeFeedObject>();
+      for (const row of attached) {
+        if (typeof row.id === "string") byId.set(row.id, row as unknown as HomeFeedObject);
+      }
+      items = items.map((item) =>
+        isHomeFeedItem(item) && item._type === "thread" && typeof item.id === "string" && byId.has(item.id)
+          ? byId.get(item.id)!
+          : item,
+      );
+    }
+
     const eventIds = items.flatMap((item) =>
       typeof item === "object" && item !== null && !Array.isArray(item)
         && item._type === "event" && typeof item.id === "string"

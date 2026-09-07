@@ -3,9 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
-  CornerDownRight, MessageSquare, MoreHorizontal, Send, Trash2,
+  CornerDownRight, MessageSquare, MoreHorizontal, Trash2,
 } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -13,6 +12,7 @@ import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CommentComposer, renderEmojiText } from "../CommentComposer";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -57,65 +57,18 @@ function CommentBox({
   onCancel?: () => void;
   autoFocus?: boolean;
 }) {
-  const [body, setBody] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => { if (autoFocus) ref.current?.focus(); }, [autoFocus]);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const text = body.trim();
-    if (!text) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/communities/${communityId}/resources/${resourceId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body: text, parent_id: parentId ?? null }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Failed to post comment.");
-      setBody("");
-      onPosted(data.comment as ResourceComment);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to post comment.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   return (
-    <form onSubmit={submit} className="space-y-2">
-      <textarea
-        ref={ref}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(e as unknown as React.FormEvent); }}
-        placeholder={placeholder ?? "Write a comment… (⌘↵ to post)"}
-        rows={parentId ? 2 : 3}
-        maxLength={5000}
-        className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
-      />
-      {error && <p className="font-body text-xs text-red-400">{error}</p>}
-      <div className="flex items-center gap-2">
-        {onCancel && (
-          <button type="button" onClick={onCancel} className="font-body text-xs text-foreground-subtle hover:text-foreground">
-            Cancel
-          </button>
-        )}
-        <button
-          type="submit"
-          disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? <Spinner size={12} className="text-white" /> : <Send strokeWidth={2.5} size={12} />}
-          {saving ? "Posting…" : "Post"}
-        </button>
-      </div>
-    </form>
+    <CommentComposer
+      communityId={communityId}
+      kind="resources"
+      targetId={resourceId}
+      parentId={parentId}
+      placeholder={placeholder}
+      maxLength={5000}
+      onPosted={(comment) => onPosted(comment as ResourceComment)}
+      onCancel={onCancel}
+      autoFocus={autoFocus}
+    />
   );
 }
 
@@ -200,7 +153,7 @@ function CommentRow({
             </div>
           )}
         </div>
-        <p className="mt-1 font-body text-sm text-foreground-muted whitespace-pre-wrap break-words">{comment.body}</p>
+        <p className="mt-1 font-body text-sm text-foreground-muted whitespace-pre-wrap break-words">{renderEmojiText(comment.body)}</p>
         {!isReply && (
           <button
             type="button"
@@ -246,7 +199,7 @@ interface Props {
   communityName: string;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
@@ -332,6 +285,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                 resource={resource}
                 currentUserId={currentUserId}
                 communityId={communityId}
+                communityName={communityName}
                 onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
                 onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
                 onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
@@ -340,7 +294,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
           </div>
 
           {/* Comments section */}
-          <div className={`mx-5 mt-6 md:mx-8 ${communityFeedLayout.detailCard}`}>
+          <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
             <div className="mb-4 flex items-center gap-2">
               <span className="font-display text-sm font-semibold text-foreground">
                 {totalComments} {totalComments === 1 ? "Comment" : "Comments"}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
+import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 
 export default async function EventDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
@@ -44,7 +45,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ]);
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
@@ -78,19 +79,23 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[40rem]">
-        <EventDetailClient
-          event={event}
-          initialRsvps={initialRsvps}
-          currentUserId={userId}
-          currentUserName={userRow?.name ?? ""}
-          currentUserAvatar={profileRow?.avatar_url ?? null}
-          communityId={communityId}
-          communityName={communityData?.name ?? "Community"}
-          showCommunityAttribution
-          backHref="/dashboard"
-          backLabel="Home"
-        />
+      <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
+        <div className="mx-auto w-full max-w-[40rem]">
+          <EventDetailClient
+            event={event}
+            initialRsvps={initialRsvps}
+            currentUserId={userId}
+            currentUserName={userRow?.name ?? ""}
+            currentUserAvatar={profileRow?.avatar_url ?? null}
+            communityId={communityId}
+            communityName={communityData?.name ?? "Community"}
+            communityImage={communityData?.image_url ?? null}
+            showCommunityAttribution
+            backHref="/dashboard"
+            backLabel="Home"
+          />
+        </div>
+        <HomeSidebar />
       </div>
     </div>
   );

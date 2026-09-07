@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
@@ -175,8 +176,9 @@ export function ResourceFormModal({
     >
       <form
         onSubmit={handleSubmit}
-        className="max-h-[min(820px,calc(100vh-2rem))] w-full max-w-xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+        className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-xl flex-col overflow-hidden"
       >
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="resource-form-title" className="font-display text-xl font-semibold text-foreground">
@@ -186,8 +188,8 @@ export function ResourceFormModal({
               {isEdit ? "Update the details of your resource." : "Share something useful with your community."}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-foreground-muted hover:text-foreground" aria-label="Close">
-            <X strokeWidth={2.5} size={20} />
+          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+            <X strokeWidth={2.5} size={16} />
           </button>
         </div>
 
@@ -204,7 +206,7 @@ export function ResourceFormModal({
               placeholder="What makes this resource worth sharing?"
               rows={4}
               required
-              className="w-full resize-y rounded-lg border border-border bg-surface-raised px-3 py-3 font-body text-sm leading-relaxed text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+              className="field w-full resize-y"
             />
           </label>
 
@@ -248,7 +250,7 @@ export function ResourceFormModal({
                 }}
                 placeholder="https://..."
                 type="url"
-                className="w-full rounded-lg border border-border bg-surface-raised px-3 py-2.5 pr-9 font-body text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-accent"
+                className="field w-full pr-9"
               />
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner
@@ -296,19 +298,13 @@ export function ResourceFormModal({
           ) : null}
 
           {/* Share publicly */}
-          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border bg-surface-raised px-4 py-3">
-            <span className="flex items-center gap-2.5">
-              <Globe strokeWidth={2.5} size={15} className="shrink-0 text-foreground-muted" />
-              <span>
-                <span className="block font-body text-sm font-medium text-foreground">Share publicly</span>
-                <span className="block font-body text-xs text-foreground-muted">Visible to everyone, not just community members.</span>
-              </span>
-            </span>
-            <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${isPublic ? "bg-accent" : "bg-border"}`}>
-              <input type="checkbox" checked={isPublic} onChange={(e) => setIsPublic(e.target.checked)} className="sr-only" />
-              <span className={`absolute top-1 h-4 w-4 rounded-full transition-transform ${isPublic ? "translate-x-6 bg-accent-foreground" : "translate-x-1 bg-white"}`} />
-            </span>
-          </label>
+          <ToggleRow
+            title="Share publicly"
+            description="Visible to everyone, not just community members."
+            checked={isPublic}
+            onChange={setIsPublic}
+            icon={<Globe strokeWidth={2.5} size={15} />}
+          />
         </div>
 
         {error && (
@@ -317,14 +313,16 @@ export function ResourceFormModal({
           </p>
         )}
 
-        <div className="mt-6 flex justify-end gap-3 border-t border-border pt-5">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2.5 font-body text-sm text-foreground-muted hover:text-foreground">
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
+          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="modal-btn modal-btn-primary"
           >
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}

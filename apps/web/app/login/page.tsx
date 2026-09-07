@@ -94,7 +94,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
                 placeholder="you@studio.com"
-                className="rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                className="field"
                 autoComplete="email"
                 required
               />
@@ -118,7 +118,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null); }}
                   placeholder="••••••••"
-                  className="w-full rounded-md border border-border bg-surface px-3.5 py-2.5 pr-10 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                  className="field w-full pr-10"
                   autoComplete="current-password"
                   required
                 />

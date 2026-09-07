@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadThreadDetail } from "@/lib/threads/load-thread-detail";
 import { ThreadDetailClient } from "@/components/communities/threads/ThreadDetailClient";
+import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
 
 export default async function ThreadDetailPage({ params }: { params: Promise<{ threadId: string }> }) {
   const session = await getSession();
@@ -28,22 +29,27 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 
   const { data: community } = await db
     .from("communities")
-    .select("name")
+    .select("name, image_url")
     .eq("id", communityId)
     .maybeSingle();
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[40rem]">
-        <ThreadDetailClient
-          thread={thread}
-          initialComments={comments}
-          currentUserId={userId}
-          communityId={communityId}
-          communityName={community?.name ?? "Community"}
-          backHref="/dashboard"
-          backLabel="Home"
-        />
+      <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
+        <div className="mx-auto w-full max-w-[40rem]">
+          <ThreadDetailClient
+            thread={thread}
+            initialComments={comments}
+            currentUserId={userId}
+            communityId={communityId}
+            communityName={community?.name ?? "Community"}
+            communityImage={community?.image_url ?? null}
+            showCommunityAttribution
+            backHref="/dashboard"
+            backLabel="Home"
+          />
+        </div>
+        <HomeSidebar />
       </div>
     </div>
   );

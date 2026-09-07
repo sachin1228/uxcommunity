@@ -4,10 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   CornerDownRight,
-  Send,
   Trash2,
 } from "lucide-react";
-import { Spinner } from "@/components/ui/Spinner";
 import { BackLink } from "@/components/ui/BackLink";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { realtimeClient } from "@/lib/realtime/client";
@@ -17,6 +15,7 @@ import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { CommentComposer, renderEmojiText } from "../CommentComposer";
 
 function Composer({
   communityId,
@@ -31,67 +30,17 @@ function Composer({
   onPosted: (comment: ShowcaseComment) => void;
   onCancel?: () => void;
 }) {
-  const [body, setBody] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!body.trim()) return;
-    setSaving(true);
-    setError(null);
-    const response = await fetch(
-      `/api/communities/${communityId}/showcase/${postId}/comments`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          body: body.trim(),
-          parent_id: parentId ?? null,
-        }),
-      },
-    );
-    const data = await response.json();
-    setSaving(false);
-    if (!response.ok) return setError(data.error ?? "Failed to post comment.");
-    setBody("");
-    onPosted(data.comment);
-  }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <textarea
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
-        rows={parentId ? 2 : 3}
-        maxLength={1000}
-        placeholder={
-          parentId ? "Write a reply…" : "Leave constructive feedback…"
-        }
-        className="w-full resize-none rounded-lg border border-border bg-surface-raised px-3 py-2.5 font-body text-sm text-foreground outline-none focus:border-accent"
-      />
-      {error && <p className="font-body text-xs text-red-400">{error}</p>}
-      <div className="flex items-center gap-2">
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="font-body text-xs text-foreground-muted"
-          >
-            Cancel
-          </button>
-        )}
-        <button
-          disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 font-body text-sm text-accent-foreground disabled:opacity-50"
-        >
-          {saving ? (
-            <Spinner size={13} className="text-white" />
-          ) : (
-            <Send strokeWidth={2.5} size={13} />
-          )}
-          Post
-        </button>
-      </div>
-    </form>
+    <CommentComposer
+      communityId={communityId}
+      kind="showcase"
+      targetId={postId}
+      parentId={parentId}
+      placeholder={parentId ? "Write a reply…" : "Leave constructive feedback…"}
+      maxLength={1000}
+      onPosted={(comment) => onPosted(comment as ShowcaseComment)}
+      onCancel={onCancel}
+    />
   );
 }
 
@@ -153,7 +102,7 @@ function CommentRow({
           )}
         </div>
         <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm text-foreground-muted">
-          {comment.body}
+          {renderEmojiText(comment.body)}
         </p>
         {!reply && (
           <button
@@ -197,6 +146,9 @@ export function ShowcaseDetailClient({
   initialComments,
   currentUserId,
   communityId,
+  communityName,
+  communityImage,
+  showCommunityAttribution = false,
   backHref,
   backLabel,
 }: {
@@ -204,6 +156,9 @@ export function ShowcaseDetailClient({
   initialComments: ShowcaseComment[];
   currentUserId: string;
   communityId: string;
+  communityName?: string;
+  communityImage?: string | null;
+  showCommunityAttribution?: boolean;
   backHref?: string;
   backLabel?: string;
 }) {
@@ -296,6 +251,8 @@ export function ShowcaseDetailClient({
           post={post}
           currentUserId={currentUserId}
           communityId={communityId}
+          communityName={showCommunityAttribution ? communityName : undefined}
+          communityImage={showCommunityAttribution ? communityImage : undefined}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}

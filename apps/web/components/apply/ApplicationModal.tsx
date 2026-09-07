@@ -76,7 +76,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
   }
 
   const inputClass =
-    "rounded-md border border-border bg-surface px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+    "field w-full";
 
   const fieldError = (key: string) =>
     fieldErrors[key]?.length ? (
@@ -100,7 +100,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           </p>
           <button
             onClick={handleClose}
-            className="mt-2 rounded-md bg-surface-raised px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised"
+            className="modal-btn modal-btn-secondary"
           >
             Close
           </button>
@@ -182,7 +182,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+            className="modal-btn modal-btn-primary mt-2 w-full"
           >
             {loading && <Spinner className="h-4 w-4 text-white" />}
             {loading ? "Submitting…" : "Submit Application"}

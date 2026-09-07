@@ -27,6 +27,13 @@
   --color-border:            #EAEAEA;
   --color-border-subtle:     #F5F5F5;
 
+  /* Field inputs — Geist-style ring fields (light theme) */
+  --color-field:            #FAFAFA;
+  --color-field-ring:       rgba(0, 0, 0, 0.16);
+  --color-field-ring-hover: rgba(0, 0, 0, 0.24);
+  --color-field-ring-focus: rgba(10, 10, 10, 0.55);
+  --color-field-halo:       rgba(10, 10, 10, 0.14);
+
   --color-signal:            #0A0A0A;
 
   --color-overlay:            #0A0A0A;
@@ -141,6 +148,10 @@
   --grid-line-color: rgba(0, 0, 0, 0.06);
   --grid-dot-color:  rgba(0, 0, 0, 0.12);
   --grid-size:       28px;
+
+  /* Modal surfaces — Geist panel ring + drop (light) */
+  --modal-ring: rgba(0, 0, 0, 0.05);
+  --modal-drop: rgba(0, 0, 0, 0.45);
 }
 
 /* ─── Dark mode ─────────────────────────────────────────────────────── */
@@ -171,6 +182,13 @@
     --color-border-subtle:     #1D1D21;  /* section dividers */
     --color-border-strong:     #2D2D34;  /* active components */
     --color-input-border:      #303036;  /* input fields */
+
+    /* Field inputs — Geist-style ring fields (dark theme) */
+    --color-field:            #151517;
+    --color-field-ring:       rgba(255, 255, 255, 0.14);
+    --color-field-ring-hover: rgba(255, 255, 255, 0.24);
+    --color-field-ring-focus: rgba(255, 255, 255, 0.60);
+    --color-field-halo:       rgba(255, 255, 255, 0.22);
 
     --color-signal:            #FFFFFF;
 
@@ -289,6 +307,10 @@
 
     --grid-line-color: rgba(255, 255, 255, 0.04);
     --grid-dot-color:  rgba(255, 255, 255, 0.08);
+
+    /* Modal surfaces — Geist panel ring + drop (dark) */
+    --modal-ring: rgba(255, 255, 255, 0.10);
+    --modal-drop: rgba(0, 0, 0, 0.60);
   }
 }
 
@@ -373,6 +395,133 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
+}
+
+/* ─── Field inputs (Geist-style) ───────────────────────────────────────
+   Applied through the `field` class on text-ish inputs, textareas and
+   selects. A borderless field with a neutral ring that strengthens on
+   hover and gains a soft halo on focus — colors adapt to light/dark. */
+@layer components {
+  .field {
+    width: 100%;
+    border: 0;
+    border-radius: var(--radius-md);
+    background-color: var(--color-field);
+    color: var(--color-foreground);
+    box-shadow: 0 0 0 1px var(--color-field-ring);
+    outline: none;
+    transition: box-shadow 150ms ease, background-color 150ms ease;
+  }
+
+  .field:hover {
+    box-shadow: 0 0 0 1px var(--color-field-ring-hover);
+  }
+
+  .field:focus,
+  .field:focus-visible {
+    box-shadow:
+      0 0 0 1px var(--color-field-ring-focus),
+      0 0 0 4px var(--color-field-halo);
+  }
+
+  .field::placeholder {
+    color: var(--color-foreground-subtle);
+  }
+
+  .field:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  input.field {
+    height: 32px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+
+  textarea.field {
+    padding: 8px 12px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  select.field {
+    height: 32px;
+    padding: 0 26px 0 12px;
+  }
+}
+
+/* ─── Modal surfaces + action buttons (Geist style, app theme) ────────
+   One skin shared by every dialog in the app: a borderless panel with a
+   hairline ring + soft elevated drop and the app's 12px radius (width,
+   height and scroll live on the element itself). Action buttons use the
+   compact 32px recipe from the thread composer footer. */
+@layer components {
+  .modal-panel {
+    border-radius: var(--radius-xl);
+    background-color: var(--color-surface);
+    box-shadow: 0 0 0 1px var(--modal-ring), 0 24px 70px -20px var(--modal-drop);
+  }
+
+  .modal-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body, ui-sans-serif, system-ui, sans-serif);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    outline: none;
+    transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+  }
+
+  .modal-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .modal-btn-secondary {
+    color: var(--color-foreground-muted);
+    box-shadow: inset 0 0 0 1px var(--color-border);
+  }
+
+  .modal-btn-secondary:hover:not(:disabled) {
+    color: var(--color-foreground);
+    background-color: var(--color-surface-raised);
+  }
+
+  .modal-btn-primary {
+    color: var(--color-accent-foreground);
+    background-color: var(--color-accent);
+  }
+
+  .modal-btn-primary:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
+  }
+
+  .modal-btn-danger {
+    color: #ffffff;
+    background-color: var(--ds-red-600);
+  }
+
+  .modal-btn-danger:hover:not(:disabled) {
+    background-color: var(--ds-red-800);
+  }
+
+  .modal-btn-danger-soft {
+    color: var(--ds-red-900);
+    background-color: color-mix(in srgb, var(--ds-red-600) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ds-red-600) 30%, transparent);
+  }
+
+  .modal-btn-danger-soft:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--ds-red-600) 18%, transparent);
+  }
 }
 
 /* ─── Custom scrollbar ───────────────────────────────────────────────── */

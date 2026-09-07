@@ -232,7 +232,7 @@ function DeleteConfirmDialog({
       onClick={(e) => { e.stopPropagation(); onCancel(); }}
     >
       <div
-        className="bg-[#1c1c1e] border border-white/[0.08] rounded-2xl shadow-2xl w-72 overflow-hidden"
+        className="modal-panel w-72 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">

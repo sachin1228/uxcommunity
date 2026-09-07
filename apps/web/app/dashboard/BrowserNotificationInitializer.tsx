@@ -80,16 +80,16 @@ export function BrowserNotificationInitializer() {
           aria-labelledby="notification-guide-title"
           aria-describedby="notification-guide-description"
         >
-          <button
-            type="button"
-            onClick={() => setShowGuide(false)}
-            className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            aria-label="Close notification instructions"
-          >
-            <X strokeWidth={2.5} className="size-5" aria-hidden="true" />
-          </button>
-
-          <div className="flex max-w-lg flex-col items-center gap-5 text-center">
+          <div className="modal-panel relative w-full max-w-lg p-8 flex flex-col items-center gap-5 text-center">
+            <button
+              type="button"
+              onClick={() => setShowGuide(false)}
+              className="absolute right-4 top-4 flex size-8 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              aria-label="Close notification instructions"
+            >
+              <X strokeWidth={2.5} size={16} aria-hidden="true" />
+            </button>
+          
             <div className="flex size-14 items-center justify-center rounded-full bg-surface-raised text-foreground shadow-lg">
               <MousePointer2 strokeWidth={2.5} className="size-7 -rotate-45" aria-hidden="true" />
             </div>

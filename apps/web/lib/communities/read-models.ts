@@ -14,6 +14,7 @@ import {
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "./dp";
+import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -213,7 +214,8 @@ export async function loadCommunityThreads(
       return { ok: false, status: 400, error: "Invalid cursor." };
     }
   }
-  const { data, error } = await callPerformanceRpc(createServiceClient(), "get_thread_list_page", {
+  const db = createServiceClient();
+  const { data, error } = await callPerformanceRpc(db, "get_thread_list_page", {
     p_community_id: communityId,
     p_user_id: userId,
     p_before: cursorCreatedAt,
@@ -223,7 +225,7 @@ export async function loadCommunityThreads(
   if (error?.code === "42501") return { ok: false, status: 403, error: "Not a member of this community." };
   if (error) return { ok: false, status: 500, error: "Failed to fetch threads." };
   const rows = (data ?? []) as Array<{ item: Record<string, unknown> }>;
-  const threads = rows.slice(0, 50).map(({ item }) => item);
+  const threads = await attachPollVotes(db, rows.slice(0, 50).map(({ item }) => item), userId);
   const last = threads.at(-1) as Record<string, unknown> | undefined;
   return {
     ok: true,

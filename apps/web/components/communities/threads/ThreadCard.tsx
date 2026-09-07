@@ -1,62 +1,26 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import {
-  Heart, Bookmark, Flag, MessageCircle,
+  Bookmark, Flag,
   MoreHorizontal, Paperclip, Pencil, Trash2,
 } from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 
 import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
-const URL_REGEX = /https?:\/\/[^\s<>"]+/g;
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-/** Render text with URLs highlighted in the accent color.
- *  isNested=true → uses <span onClick> to avoid <a> inside <a> (list card wrapper). */
-function renderWithLinks(text: string, isNested = false) {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  URL_REGEX.lastIndex = 0;
-  while ((match = URL_REGEX.exec(text)) !== null) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-    const url = match[0];
-    if (isNested) {
-      parts.push(
-        <span
-          key={match.index}
-          role="link"
-          tabIndex={0}
-          className="text-accent hover:underline break-all cursor-pointer"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); } }}
-        >
-          {url}
-        </span>
-      );
-    } else {
-      parts.push(
-        <a
-          key={match.index}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent hover:underline break-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {url}
-        </a>
-      );
-    }
-    lastIndex = match.index + url.length;
-  }
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-  return parts;
-}
+import { renderWithLinks } from "./renderWithLinks";
 import { EditThreadModal } from "./EditThreadModal";
-import { formatFullDate, formatRelativeDate } from "./threadShared";
+import { ThreadPollResult } from "./PollResult";
+import { ThreadImageCarousel } from "./ThreadImageCarousel";
+import { ThreadImageLightbox } from "./ThreadImageLightbox";
+import { formatRelativeDate, isThreadEdited } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -69,6 +33,7 @@ interface ThreadCardProps {
   onUpdated: (thread: CommunityThread) => void;
   onLikeChanged: (threadId: string, liked: boolean, newCount: number) => void;
   onSaveChanged: (threadId: string, saved: boolean) => void;
+  onPollVoteChanged?: (threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) => void;
   onDeleted: (threadId: string) => void;
   communityName?: string;
   communityImage?: string | null;
@@ -84,6 +49,7 @@ export function ThreadCard({
   onUpdated,
   onLikeChanged,
   onSaveChanged,
+  onPollVoteChanged,
   onDeleted,
   communityName,
   communityImage,
@@ -106,13 +72,66 @@ export function ThreadCard({
     latestLikeRef.current = { thread, onLikeChanged };
   });
   const [menuOpen, setMenuOpen]       = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]       = useState(false);
   const [reported, setReported]       = useState(false);
   const [interactionError, setInteractionError] = useState<string | null>(null);
+  const [pollVoteBusy, setPollVoteBusy] = useState(false);
+  const [pollVoteOverride, setPollVoteOverride] = useState<{ counts: number[]; userVote: number | null; undoUsed: boolean } | null>(null);
+  // Synchronous guard against overlapping vote/undo requests — state flushes
+  // async, so a second click in the same tick can't be stopped by pollVoteBusy.
+  const pollVoteBusyRef = useRef(false);
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [titleExpanded, setTitleExpanded] = useState(false);
+  const [titleOverflow, setTitleOverflow] = useState(false);
+  const [morePos, setMorePos] = useState<{ left: number; bottom: number } | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+
+  // Collapse long thread bodies to two lines on feed cards and offer a "…More" toggle.
+  // The toggle sits right after the LAST VISIBLE LINE of text (same line, same row) so it
+  // hugs the final word — even when the last clamped line is blank (e.g. a paragraph break
+  // lands on line 2). Re-measured on resize and once web fonts load.
+  useIsomorphicLayoutEffect(() => {
+    if (isDetail) return;
+    setTitleExpanded(false);
+    const el = titleRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      try {
+        setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
+        const box = el.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const rects = Array.from(range.getClientRects()).filter(
+          (r) => r.width > 0 && r.bottom <= box.bottom + 1,
+        );
+        const lastLine = rects[rects.length - 1];
+        if (!lastLine) return;
+        // Clamp so the toggle always fits inside the card (covers the tail on full lines).
+        const left = Math.min(lastLine.right - box.left, box.width - 64);
+        setMorePos({
+          left: Math.max(0, left),
+          bottom: Math.max(0, box.bottom - lastLine.bottom),
+        });
+      } catch {
+        setMorePos(null);
+      }
+    };
+
+    measure();
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+  }, [isDetail, thread.title]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -239,6 +258,11 @@ export function ThreadCard({
     saveCoalescerRef.current?.syncConfirmed(thread.user_saved);
   }, [thread.user_saved]);
 
+  // Reflect externally-confirmed totals (parent sync or realtime) once they land.
+  useEffect(() => {
+    setPollVoteOverride(null);
+  }, [thread.poll_vote_counts, thread.poll_user_vote, thread.poll_undo_used]);
+
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -251,10 +275,113 @@ export function ThreadCard({
     likeCoalescerRef.current?.toggle();
   }
 
+  async function handlePollVote(optionIndex: number) {
+    const currentPoll = thread.poll;
+    if (!currentPoll || pollVoteBusyRef.current) return;
+    const optionCount = currentPoll.options.length;
+    if (optionIndex < 0 || optionIndex >= optionCount) return;
+
+    // Votes are final: a user who already voted cannot vote again or change it.
+    const currentUserVote = pollVoteOverride ? pollVoteOverride.userVote : (thread.poll_user_vote ?? null);
+    if (currentUserVote !== null) return;
+
+    // Optimistic vote: flip to the results immediately (clicked option +1) and
+    // let the server round trip confirm or roll it back — no waiting spinner.
+    // The optimistic state stays local to this card; parents and realtime only
+    // ever receive server-confirmed totals so a failed vote can't poison the
+    // shared cache.
+    pollVoteBusyRef.current = true;
+    const optimisticCounts = displayedPollCounts.map((count, index) =>
+      index === optionIndex ? count + 1 : count,
+    );
+    setPollVoteOverride({ counts: optimisticCounts, userVote: optionIndex, undoUsed: displayedPollUndoUsed });
+
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ option_index: optionIndex }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        undo_used?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to record your vote.");
+      }
+      // Server-confirmed totals replace the optimistic ones.
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
+    } catch (error) {
+      // Roll back to the pre-vote state; the user can try again.
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to record your vote.");
+    } finally {
+      pollVoteBusyRef.current = false;
+    }
+  }
+
+  async function handlePollUndo() {
+    if (!thread.poll || pollVoteBusyRef.current) return;
+    pollVoteBusyRef.current = true;
+    setPollVoteBusy(true);
+    try {
+      const response = await dedupeFetch(
+        `/api/communities/${communityId}/threads/${thread.id}/poll`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "undo" }),
+        },
+        { cooldownMode: "exact" },
+      );
+      const result = (await response.json().catch(() => null)) as {
+        counts?: number[];
+        user_vote?: number | null;
+        undo_used?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !Array.isArray(result?.counts)) {
+        throw new Error(result?.error ?? "Failed to undo your vote.");
+      }
+      // Back to the pre-vote state with the one-time undo consumed.
+      setPollVoteOverride({ counts: result.counts, userVote: result.user_vote ?? null, undoUsed: result.undo_used === true });
+      onPollVoteChanged?.(thread.id, result.counts, result.user_vote ?? null, result.undo_used === true);
+    } catch (error) {
+      // Keep showing results — the vote stands until the server says otherwise.
+      setPollVoteOverride(null);
+      showInteractionError(error instanceof Error ? error.message : "Failed to undo your vote.");
+    } finally {
+      pollVoteBusyRef.current = false;
+      setPollVoteBusy(false);
+    }
+  }
+
   const authorName = thread.users?.name ?? "Member";
-  const dateLabel  = isDetail
-    ? formatFullDate(thread.created_at)
-    : formatRelativeDate(thread.created_at);
+  const dateLabel  = formatRelativeDate(thread.created_at);
+  const edited     = isThreadEdited(thread.created_at, thread.updated_at);
+
+  const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
+  const images = attachments.filter((a) => a.type.startsWith("image/"));
+  const files  = attachments.filter((a) => !a.type.startsWith("image/"));
+
+  const pollOptionCount = thread.poll?.options.length ?? 0;
+  const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
+    ? thread.poll_vote_counts
+    : thread.poll ? thread.poll.options.map(() => 0) : [];
+  const displayedPollCounts = pollVoteOverride?.counts ?? pollBaseCounts;
+  const displayedPollUserVote = pollVoteOverride
+    ? pollVoteOverride.userVote
+    : (thread.poll_user_vote ?? null);
+  const displayedPollUndoUsed = pollVoteOverride
+    ? pollVoteOverride.undoUsed
+    : (thread.poll_undo_used ?? false);
 
   const cardClassName = onOpen
     ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
@@ -262,14 +389,14 @@ export function ThreadCard({
 
   function handleCardClick(event: React.MouseEvent<HTMLElement>) {
     if (!onOpen) return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button']");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     onOpen();
   }
 
   function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (!onOpen || event.key !== "Enter") return;
-    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link']");
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button']");
     if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
     event.preventDefault();
     onOpen();
@@ -292,6 +419,7 @@ export function ThreadCard({
             createdAt={thread.created_at}
             dateLabel={dateLabel}
             dateInline
+            edited={edited}
             secondaryLabel={`Threads · ${category?.label ?? "Post"}`}
           />
 
@@ -366,21 +494,47 @@ export function ThreadCard({
 
         {/* ── Title ── */}
         {isDetail ? (
-          <h1 className="mt-4 font-display text-base font-semibold leading-snug text-foreground">
+          <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : (
-          <h3 className="mt-3 font-display text-sm font-semibold leading-snug text-foreground">
-            {renderWithLinks(thread.title, true)}
-          </h3>
+          <div className="relative">
+            <h3
+              ref={titleRef}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
+            >
+              {renderWithLinks(thread.title, true)}
+            </h3>
+            {/* "…More" right after the last visible word, on the same line. */}
+            {titleOverflow && !titleExpanded && morePos && (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
+                style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
+                className="absolute min-w-12 bg-background-subtle font-body text-sm font-medium leading-4 text-foreground-subtle transition-colors hover:text-accent"
+              >
+                …more
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ── Poll ── */}
+        {thread.poll && (
+          <ThreadPollResult
+            poll={thread.poll}
+            counts={displayedPollCounts}
+            userVote={displayedPollUserVote}
+            busy={pollVoteBusy}
+            canUndo={!displayedPollUndoUsed}
+            hideQuestion={thread.poll.question.trim() === thread.title.trim()}
+            onVote={(optionIndex) => void handlePollVote(optionIndex)}
+            onUndo={() => void handlePollUndo()}
+          />
         )}
 
         {/* ── Attachments ── */}
         {(() => {
-          const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
-          const images = attachments.filter((a) => a.type.startsWith("image/"));
-          const files  = attachments.filter((a) => !a.type.startsWith("image/"));
-
           const fileList = files.length > 0 ? (
             <div className="mt-3 space-y-1.5">
               {files.map((att) =>
@@ -407,87 +561,25 @@ export function ThreadCard({
 
           if (images.length === 0) return fileList;
 
-          function ImgWrap({ img, children, className }: { img: typeof images[0]; children: React.ReactNode; className?: string }) {
-            return isDetail ? (
-              <a href={img.url} target="_blank" rel="noopener noreferrer" className={className}>
-                {children}
-              </a>
-            ) : (
-              <div
-                role="link" tabIndex={0} className={className}
-                onClick={(e) => { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); window.open(img.url, "_blank", "noopener,noreferrer"); } }}
-              >
-                {children}
-              </div>
-            );
-          }
-
           let imageGrid: React.ReactNode = null;
 
           if (images.length === 1) {
             imageGrid = (
-              <ImgWrap img={images[0]} className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer">
-                <img src={images[0].url} alt={images[0].name} className="w-full object-cover max-h-[480px] transition-opacity hover:opacity-95" />
-              </ImgWrap>
-            );
-          } else if (images.length === 2) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-56 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="Open image viewer"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); }}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setLightboxIndex(0); } }}
+                className="mt-3 block overflow-hidden rounded-xl border border-border cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                {/* Native aspect ratio, capped at 480px tall — never cropped. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={images[0].url} alt={images[0].name} draggable={false} className="mx-auto block max-h-[480px] max-w-full w-auto transition-opacity hover:opacity-95" />
               </div>
             );
-          } else if (images.length === 3) {
-            imageGrid = (
-              <div className="mt-3 flex h-64 gap-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block flex-[2] overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="flex flex-1 flex-col gap-1">
-                  {images.slice(1).map((img) => (
-                    <ImgWrap key={img.url} img={img} className="block flex-1 overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
-          } else if (images.length === 4) {
-            imageGrid = (
-              <div className="mt-3 grid grid-cols-2 gap-1 overflow-hidden rounded-xl">
-                {images.map((img) => (
-                  <ImgWrap key={img.url} img={img} className="block overflow-hidden cursor-pointer">
-                    <img src={img.url} alt={img.name} className="h-44 w-full object-cover transition-opacity hover:opacity-95" />
-                  </ImgWrap>
-                ))}
-              </div>
-            );
-          } else {
-            const visible  = images.slice(1, 5);
-            const overflow = images.length - 5;
-            imageGrid = (
-              <div className="mt-3 space-y-1 overflow-hidden rounded-xl">
-                <ImgWrap img={images[0]} className="block overflow-hidden cursor-pointer">
-                  <img src={images[0].url} alt={images[0].name} className="h-52 w-full object-cover transition-opacity hover:opacity-95" />
-                </ImgWrap>
-                <div className="grid grid-cols-4 gap-1 h-28">
-                  {visible.map((img, i) => (
-                    <ImgWrap key={img.url} img={img} className="relative block overflow-hidden cursor-pointer">
-                      <img src={img.url} alt={img.name} className="h-full w-full object-cover transition-opacity hover:opacity-95" />
-                      {i === visible.length - 1 && overflow > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/55">
-                          <span className="font-display text-lg font-bold text-white">+{overflow}</span>
-                        </div>
-                      )}
-                    </ImgWrap>
-                  ))}
-                </div>
-              </div>
-            );
+          } else if (images.length > 1) {
+            imageGrid = <ThreadImageCarousel images={images} onImageClick={(i) => setLightboxIndex(i)} />;
           }
 
           return <>{imageGrid}{fileList}</>;
@@ -508,20 +600,20 @@ export function ThreadCard({
               onClick={handleLike}
               aria-label={thread.user_liked ? "Unlike" : "Like"}
               aria-pressed={thread.user_liked}
-              className="group/like flex items-center gap-2"
+              className="group/like flex cursor-pointer items-center gap-2"
             >
-              <Heart
-                size={20}
-                strokeWidth={2.5}
+              <HeartIcon
+                size={16}
+                active={thread.user_liked}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
-                    ? "fill-red-500 text-red-500"
-                    : "fill-none text-white"
+                    ? "text-[var(--ds-blue-700)]"
+                    : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-semibold tabular-nums ${
-                  thread.user_liked ? "text-red-500" : "text-white"
+                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >
                 {thread.like_count}
@@ -529,8 +621,8 @@ export function ThreadCard({
             </button>
 
             {/* Comments */}
-            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-white">
-              <MessageCircle size={20} strokeWidth={2.5} />
+            <span className="inline-flex items-center gap-1.5 font-body font-semibold text-xs text-foreground-subtle transition-colors duration-150 hover:text-white">
+              <CommentIcon />
               {thread.comment_count}
             </span>
           </div>
@@ -562,6 +654,19 @@ export function ThreadCard({
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
       />
+
+      {lightboxIndex !== null && (
+        <ThreadImageLightbox
+          thread={thread}
+          communityId={communityId}
+          currentUserId={currentUserId}
+          images={images}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onLikeToggle={() => likeCoalescerRef.current?.toggle()}
+          onUpdated={onUpdated}
+        />
+      )}
     </>
   );
 }

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Bookmark, BookmarkCheck, ExternalLink, Flag, Heart,
+  Bookmark, BookmarkCheck, ExternalLink, Flag,
   MoreHorizontal, Pencil, Trash2,
 } from "lucide-react";
+import { HeartIcon } from "../HeartIcon";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceFormModal } from "./ResourceFormModal";
@@ -359,9 +360,9 @@ export function ResourceCard({
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
-              <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <Heart size={20} strokeWidth={2.5} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "fill-red-500 text-red-500" : "fill-none text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-red-500" : "text-white"}`}>{resource.save_count}</span>
+              <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
