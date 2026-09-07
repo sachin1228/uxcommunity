@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { Bell, Briefcase, Compass, Gamepad2, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -78,8 +78,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
   const notificationsActive = isMatch("/dashboard/notifications", pathname);
-  // Hidden: "Chat with designers" is no longer shown in the sidebar.
-  // const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
+  const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
   return (
     <aside
@@ -183,7 +182,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="flex-1 truncate">Jobs</span>
             </Link>
           </li>
-          {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
             <Link
               href="/dashboard/chat-with-designers"
@@ -197,7 +195,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="flex-1 truncate">Chat with designers</span>
             </Link>
           </li>
-          */}
         </ul>
       </div>
 
