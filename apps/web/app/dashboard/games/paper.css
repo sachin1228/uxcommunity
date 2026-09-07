@@ -1,0 +1,127 @@
+/*
+ * Paper Wireframe Kit look — cream paper, ink strokes, dashed annotations,
+ * red markup, offset "sticker" shadows. Scoped to .paper-root so the rest of
+ * the app (dark/light theme) is untouched.
+ */
+.paper-root {
+  --paper: #f4edda;
+  --paper-deep: #ece1c5;
+  --paper-card: #fffdf4;
+  --paper-ink: #26221a;
+  --paper-muted: #837a66;
+  --paper-red: #d64545;
+  --paper-line: #d8cdae;
+  --paper-ink-shadow: rgba(38, 34, 26, 0.16);
+
+  min-height: 100%;
+  color: var(--paper-ink);
+  background-color: var(--paper);
+  background-image: radial-gradient(circle, rgba(38, 34, 26, 0.05) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+}
+
+.paper-panel {
+  background: var(--paper-card);
+  border: 2px solid var(--paper-ink);
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 var(--paper-ink-shadow);
+}
+
+.paper-panel-soft {
+  background: var(--paper-card);
+  border: 2px dashed var(--paper-line);
+  border-radius: 8px;
+}
+
+.pbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid var(--paper-ink);
+  border-radius: 6px;
+  padding: 9px 16px;
+  font: 600 13px/1 var(--ux-font-body, ui-sans-serif, system-ui, sans-serif);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  user-select: none;
+}
+.pbtn:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.pbtn-ink {
+  background: var(--paper-ink);
+  color: var(--paper);
+  box-shadow: 3px 3px 0 var(--paper-red);
+}
+.pbtn-ink:hover {
+  transform: translateY(-1px);
+}
+.pbtn-line {
+  background: var(--paper-card);
+  color: var(--paper-ink);
+}
+.pbtn-line:hover {
+  background: #fff;
+  transform: translateY(-1px);
+}
+.pbtn-dash {
+  background: transparent;
+  border-style: dashed;
+  color: var(--paper-muted);
+}
+.pbtn-dash:hover {
+  color: var(--paper-ink);
+}
+
+.pchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed var(--paper-ink);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font: 700 10px/1 var(--ux-font-body, ui-sans-serif, system-ui, sans-serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  background: var(--paper-card);
+}
+
+.pinput {
+  width: 100%;
+  border: 2px solid var(--paper-ink);
+  border-radius: 6px;
+  background: var(--paper-card);
+  padding: 10px 12px;
+  font: 700 16px/1.2 var(--ux-font-display, ui-sans-serif, system-ui, sans-serif);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--paper-ink);
+  outline: none;
+}
+.pinput::placeholder {
+  color: var(--paper-line);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.pinput:focus {
+  box-shadow: 0 0 0 3px rgba(214, 69, 69, 0.35);
+}
+
+.pstep {
+  display: flex;
+  gap: 12px;
+}
+.pstep-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+  height: 26px;
+  border: 2px solid var(--paper-ink);
+  border-radius: 50%;
+  background: var(--paper-card);
+  font: 800 12px/1 var(--ux-font-display, ui-sans-serif, system-ui, sans-serif);
+}
