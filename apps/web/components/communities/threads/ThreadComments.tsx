@@ -238,7 +238,7 @@ export function CommentBox({
             type="submit"
             disabled={saving || !body.trim()}
             aria-label={saving ? "Posting…" : "Post comment"}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--ds-green-500)] bg-[var(--ds-green-300)] text-white transition-colors hover:border-[var(--ds-green-600)] disabled:cursor-not-allowed disabled:border-[var(--ds-green-400)] disabled:bg-[var(--ds-green-400)]"
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--ds-blue-700)] text-white transition-colors hover:bg-[var(--ds-blue-800)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {saving ? <Spinner size={14} className="text-white" /> : <ArrowUp strokeWidth={2.5} size={18} />}
           </button>
