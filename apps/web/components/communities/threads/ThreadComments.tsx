@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CornerDownRight, MoreHorizontal, Paperclip, Smile, Trash2 } from "lucide-react";
+import { CornerDownRight, MoreHorizontal, Smile, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -209,16 +209,6 @@ export function CommentBox({
         {/* Action buttons — bottom-aligned so they stay pinned to the last
             input line as it grows */}
         <div className="flex shrink-0 items-center gap-2">
-          {/* Image attachment — visual placeholder for now, the comments API
-              doesn't accept attachments yet. */}
-          <button
-            type="button"
-            aria-hidden="true"
-            tabIndex={-1}
-            className="flex h-6 w-6 items-center justify-center rounded-lg border border-border bg-surface text-foreground-subtle transition-colors hover:text-foreground"
-          >
-            <Paperclip strokeWidth={2.5} size={14} />
-          </button>
           {/* Emoji picker — opens the shared Noto emoji grid */}
           <button
             type="button"
