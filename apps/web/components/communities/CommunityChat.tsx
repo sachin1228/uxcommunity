@@ -22,7 +22,7 @@ import {
   trackReactionIntent,
   type ReactionIntent,
 } from "@/lib/reaction-intent-coordinator";
-import { fmtDate } from "./chat/chatUtils";
+import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
 import { ChatInput } from "./chat/ChatInput";
@@ -910,6 +910,10 @@ export function CommunityChat({
       setError("Message cannot be empty.");
       return;
     }
+    if (content.length > MAX_MESSAGE_CHARS) {
+      setError(`Message is too long (max ${MAX_MESSAGE_CHARS} characters).`);
+      return;
+    }
 
     const originalContent = editingMessage.content;
     const messageId = editingMessage.id;
@@ -985,6 +989,8 @@ export function CommunityChat({
 
   const handleInputChange = useCallback(
     (value: string) => {
+      // No truncation — the composer shows an inline error + blocks send
+      // while the input is over MAX_MESSAGE_CHARS.
       setInput(value);
       setTyping(value.trim().length > 0);
     },

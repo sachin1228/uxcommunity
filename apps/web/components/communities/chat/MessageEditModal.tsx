@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { Check, CheckCheck, Smile, X } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import type { CachedMessage } from "@/lib/communities/cache";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, MAX_MESSAGE_CHARS } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 
 interface MessageEditModalProps {
@@ -87,8 +87,9 @@ export function MessageEditModal({
               ref={textareaRef}
               data-edit-message-input
               value={input}
+              maxLength={MAX_MESSAGE_CHARS}
               onChange={(event) => {
-                onChange(event.target.value);
+                onChange(event.target.value.slice(0, MAX_MESSAGE_CHARS));
                 event.target.style.height = "auto";
                 event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`;
               }}

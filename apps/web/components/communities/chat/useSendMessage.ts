@@ -10,6 +10,7 @@ import {
 import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
+import { MAX_MESSAGE_CHARS } from "./chatUtils";
 
 type Message = CachedMessage;
 
@@ -452,6 +453,11 @@ export function useSendMessage({
     const imagePreviewUrl = pendingImagePreview;
 
     if ((!content && !imageFile) || sending || sendLockRef.current) return;
+    // Final guard — the composer caps input, but never send over the limit.
+    if (content.length > MAX_MESSAGE_CHARS) {
+      setError(`Message is too long (max ${MAX_MESSAGE_CHARS} characters).`);
+      return;
+    }
 
     sendLockRef.current = true;
     setSending(true);
