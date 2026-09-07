@@ -208,47 +208,8 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
     };
   }, [room, me, handleRoster, colorOf]);
 
-  // ── UI sync pump: surface host / snapshot state into React at ~6 Hz ──
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      const host = hostRef.current;
-      if (host) {
-        phaseRef.current = host.phase;
-        setPhase(host.phase);
-        setClock(host.clock);
-        setWave(host.wave);
-        setCoreHp(Math.ceil(host.coreHp));
-        const sc: Record<string, number> = {};
-        const st: Record<string, PlayerStatus> = {};
-        for (const p of Object.values(host.players)) {
-          sc[p.id] = p.score;
-          st[p.id] = { hp: p.hp, alive: p.alive, respawnIn: p.respawnIn, score: p.score };
-        }
-        setScores(sc);
-        setStatuses(st);
-        const fresh = host.feed.filter((f) => f.seq > feedSeqRef.current);
-        if (fresh.length) {
-          feedSeqRef.current = Math.max(feedSeqRef.current, ...fresh.map((f) => f.seq));
-          setFeed((prev) => [...prev.slice(-30), ...fresh.map((f) => ({ id: f.seq, text: f.text, tone: f.tone }))]);
-        }
-      } else if (room && snapRef.current) {
-        const snap = snapRef.current.snap;
-        phaseRef.current = snap.phase;
-        setPhase(snap.phase);
-        setClock(snap.clock);
-        setWave(snap.wave);
-        setCoreHp(snap.coreHp);
-        setScores(snap.scores);
-        setStatuses(snap.players);
-        const fresh = snap.feed.filter((f) => f.seq > feedSeqRef.current);
-        if (fresh.length) {
-          feedSeqRef.current = Math.max(feedSeqRef.current, ...fresh.map((f) => f.seq));
-          setFeed((prev) => [...prev.slice(-30), ...fresh.map((f) => ({ id: f.seq, text: f.text, tone: f.tone }))]);
-        }
-      }
-    }, 160);
-    return () => window.clearInterval(id);
-  }, [room]);
+  // (React UI state is synced from inside the rAF loop below — the loop owns
+  //  all per-frame timing so a throttled setInterval can never freeze the UI.)
 
   // ── Canvas sizing ────────────────────────────────────────────────────
   useEffect(() => {
@@ -314,31 +275,33 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
   }, [code]);
 
   // ── Main loop ────────────────────────────────────────────────────────
-  // Driven by setInterval (not rAF) so the sim still steps when a browser
-  // throttles requestAnimationFrame (hidden/embedded tabs, preview panes).
-  const loopRun = useRef(false);
+  // Driven by requestAnimationFrame (NOT throttled in hidden/embedded tabs
+  // the way setInterval can be) with fixed-step wall-clock catch-up, so the
+  // sim advances the correct amount of real time in small 1/30s steps even
+  // when frames are delayed. No loopRun guard here: in React StrictMode dev
+  // the effect runs setup -> cleanup -> setup, and the cleanup cancels the
+  // first rAF, so each mount must start its own loop (a guard would leave
+  // the second setup with no loop at all — the sim would never step).
   useEffect(() => {
-    if (loopRun.current) return;
-    loopRun.current = true;
+    const SIM_STEP = 1 / 30;
     let last = performance.now();
     const rnd = () => Math.random();
 
-    const tick = () => {
-      const now = performance.now();
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
+    // One fixed 1/30s simulation step: move, host sim, bullets.
+    const stepSim = (dt: number) => {
+      const nowMs = performance.now();
       const room = roomRef.current;
-
-      // ── Self status: host from hostRef, guest from latest snapshot ──
       const host = hostRef.current;
       const snap = snapRef.current;
+
+      // Self status (host from hostRef, guest from latest snapshot).
       let meAlive = true;
       if (room) {
         const status = host?.players[me.id] ?? snap?.snap.players[me.id];
         if (status) meAlive = status.alive;
       }
-      const lastWasAlive = aliveStateRef.current.wasAlive;
-      if (meAlive && !lastWasAlive) {
+      const respawned = meAlive && !aliveStateRef.current.wasAlive;
+      if (respawned) {
         const spawn = spawnFor(seatOf(me.id));
         mePosRef.current = { x: spawn.x, y: spawn.y, angle: Math.atan2(ARENA.h / 2 - spawn.y, ARENA.w / 2 - spawn.x) };
         if (host?.players[me.id]) {
@@ -350,7 +313,7 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
       const phaseNow = host?.phase ?? snap?.snap.phase ?? "lobby";
       phaseRef.current = phaseNow;
 
-      // ── Local player: move + fire (disabled when dead/lobby) ──
+      // Local movement (fire/send are handled once per tick below).
       const interactive = meAlive && phaseNow !== "lobby" && phaseNow !== "victory" && phaseNow !== "defeat";
       if (interactive) {
         const k = keysRef.current;
@@ -361,8 +324,7 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
         if (k["a"] || k["arrowleft"]) ix -= 1;
         if (k["d"] || k["arrowright"]) ix += 1;
         const len = Math.hypot(ix, iy);
-        const moving = len > 0;
-        if (moving) {
+        if (len > 0) {
           const pos = moveWithCollisions(
             mePosRef.current.x,
             mePosRef.current.y,
@@ -382,6 +344,104 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
             mouseRef.current.x - mePosRef.current.x,
           );
         }
+      }
+
+      // Host simulation + own-position authority sync.
+      if (host) {
+        const self = host.players[me.id];
+        if (!self) addPlayer(host, me.id, me.handle);
+        else if (self.alive) {
+          self.x = mePosRef.current.x;
+          self.y = mePosRef.current.y;
+          self.angle = mePosRef.current.angle;
+        }
+        stepHost(host, dt, nowMs, rnd);
+        const s2 = host.players[me.id];
+        if (s2) {
+          aliveStateRef.current = { alive: s2.alive, wasAlive: s2.alive };
+          if (s2.alive) {
+            mePosRef.current.x = s2.x;
+            mePosRef.current.y = s2.y;
+            mePosRef.current.angle = s2.angle;
+          }
+        }
+      }
+
+      // Advance local bullets in this substep (hit-checks + claims).
+      const worldBots: BotWire[] = host
+        ? host.bots.map((b) => ({
+            id: b.id,
+            kind: b.kind,
+            x: b.x,
+            y: b.y,
+            vx: 0,
+            vy: 0,
+            hp: b.hp,
+            flash: b.hurtFlash > 0 ? 1 : 0,
+          }))
+        : snap
+          ? snap.snap.bots
+          : [];
+      const kept: BulletLocal[] = [];
+      for (const b of bulletsRef.current) {
+        b.age += dt;
+        if (b.age >= BULLET_LIFE) continue;
+        const nx = b.x + Math.cos(b.angle) * BULLET_SPEED * dt;
+        const ny = b.y + Math.sin(b.angle) * BULLET_SPEED * dt;
+        const off =
+          nx < 0 || nx > ARENA.w || ny < 0 || ny > ARENA.h ||
+          BUILDINGS.some((r) => bulletHitsRect(nx, ny, r));
+        if (off) continue;
+        let hit = false;
+        for (const bot of worldBots) {
+          if (bot.hp <= 0) continue;
+          const br = bot.kind === "runner" ? 11 : 15;
+          if (dist(nx, ny, bot.x, bot.y) < br + 4) {
+            hit = true;
+            if (b.ownerId === me.id) {
+              if (host) applyHit(host, me.id, bot.id);
+              else room?.sendHitClaim({ bulletId: bot.id, botId: bot.id });
+            }
+            break;
+          }
+        }
+        if (hit) continue;
+        b.x = nx;
+        b.y = ny;
+        kept.push(b);
+      }
+      bulletsRef.current = kept;
+    };
+
+    const tick = () => {
+      const now = performance.now();
+      const elapsed = Math.min(1, (now - last) / 1000);
+      last = now;
+
+      // Catch up in fixed 1/30s steps (≥1 real step always runs).
+      let remaining = Math.max(elapsed, SIM_STEP);
+      let guard = 0;
+      while (remaining > 0 && guard < 40) {
+        const dt = Math.min(SIM_STEP, remaining);
+        remaining -= dt;
+        guard += 1;
+        stepSim(dt);
+      }
+
+      const room = roomRef.current;
+      const host = hostRef.current;
+      const snap = snapRef.current;
+      const meAlive = aliveStateRef.current.alive;
+      const phaseNow = host?.phase ?? snap?.snap.phase ?? "lobby";
+
+      // One fire + movement broadcast per tick (wall-clock throttled so
+      // catch-up bursts don't spam the channel).
+      const interactive = meAlive && phaseNow !== "lobby" && phaseNow !== "victory" && phaseNow !== "defeat";
+      if (interactive) {
+        const k = keysRef.current;
+        const moving =
+          (k["w"] || k["s"] || k["arrowup"] || k["arrowdown"] ? 1 : 0) +
+          (k["a"] || k["d"] || k["arrowleft"] || k["arrowright"] ? 1 : 0) > 0;
         if (mouseRef.current.down && phaseNow === "wave" && now / 1000 - lastFireRef.current >= FIRE_INTERVAL) {
           lastFireRef.current = now / 1000;
           const a = mePosRef.current.angle;
@@ -405,39 +465,14 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
           });
         }
       }
-
-      // ── Host: simulate world ──
-      if (host) {
-        const self = host.players[me.id];
-        if (!self) addPlayer(host, me.id, me.handle);
-        else if (self.alive) {
-          self.x = mePosRef.current.x;
-          self.y = mePosRef.current.y;
-          self.angle = mePosRef.current.angle;
-        }
-        stepHost(host, dt, now, rnd);
-
-        // Keep our own position in sync with host authority.
-        const s2 = host.players[me.id];
-        if (s2) {
-          meAlive = s2.alive;
-          aliveStateRef.current = { alive: meAlive, wasAlive: meAlive };
-          if (s2.alive) {
-            mePosRef.current.x = s2.x;
-            mePosRef.current.y = s2.y;
-            mePosRef.current.angle = s2.angle;
-          }
-        }
-        // Broadcast snapshots while a round is running.
-        if (room && host.phase !== "lobby" && now / 1000 - lastSnapSendRef.current >= SNAP_INTERVAL) {
-          lastSnapSendRef.current = now / 1000;
-          const snapOut = snapshotFrom(host, lastSentSeqRef.current);
-          lastSentSeqRef.current = snapOut.seq;
-          room.sendSnapshot(snapOut);
-        }
+      if (host && room && host.phase !== "lobby" && now / 1000 - lastSnapSendRef.current >= SNAP_INTERVAL) {
+        lastSnapSendRef.current = now / 1000;
+        const snapOut = snapshotFrom(host, lastSentSeqRef.current);
+        lastSentSeqRef.current = snapOut.seq;
+        room.sendSnapshot(snapOut);
       }
 
-      // ── Bots available for rendering/hits ──
+      // ── Bots available for rendering ──
       const worldBots: BotWire[] = host
         ? host.bots.map((b) => ({
             id: b.id,
@@ -450,50 +485,13 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
             flash: b.hurtFlash > 0 ? 1 : 0,
           }))
         : snap
-          ? snap.snap.bots.map((b) => ({
-              ...b,
-              // Minor lead so fast bots don't render behind their real spot.
-              x: b.x + (b.vx || 0) * 0,
-              y: b.y + (b.vy || 0) * 0,
-            }))
+          ? snap.snap.bots
           : [];
-
-      // ── Local bullets: advance, collide, claim hits ──
-      const kept: BulletLocal[] = [];
-      for (const b of bulletsRef.current) {
-        b.age += dt;
-        if (b.age >= BULLET_LIFE) continue;
-        const nx = b.x + Math.cos(b.angle) * BULLET_SPEED * dt;
-        const ny = b.y + Math.sin(b.angle) * BULLET_SPEED * dt;
-        const off =
-          nx < 0 || nx > ARENA.w || ny < 0 || ny > ARENA.h ||
-          BUILDINGS.some((r) => bulletHitsRect(nx, ny, r));
-        if (off) continue;
-        let hit = false;
-        for (const bot of worldBots) {
-          if (bot.hp <= 0) continue;
-          const r = bot.kind === "runner" ? 11 : 15;
-          if (dist(nx, ny, bot.x, bot.y) < r + 4) {
-            hit = true;
-            if (b.ownerId === me.id) {
-              if (host) applyHit(host, me.id, bot.id);
-              else room?.sendHitClaim({ bulletId: bot.id, botId: bot.id });
-            }
-            break;
-          }
-        }
-        if (hit) continue;
-        b.x = nx;
-        b.y = ny;
-        kept.push(b);
-      }
-      bulletsRef.current = kept;
-
       // ── Remote players: ease toward their latest reported position ──
       const smooth = smoothRef.current;
       for (const [id, target] of Object.entries(remoteRef.current)) {
         const cur = smooth[id] ?? { x: target.x, y: target.y };
-        const k = Math.min(1, dt * 14);
+        const k = Math.min(1, elapsed * 14);
         smooth[id] = { x: cur.x + (target.x - cur.x) * k, y: cur.y + (target.y - cur.y) * k };
       }
       // Forget peers that left.
@@ -574,18 +572,56 @@ export function PaperArena({ me, room, code, onExit }: ArenaProps) {
         if (ctx && rect.width > 4) drawFrame(ctx, rect.width, rect.height, frame, now);
       }
 
-      // Rare UI flushes outside the interval (phase transitions).
-      if (now - lastUiPushRef.current > 1200) {
+      // Surface host / snapshot state into React at ~6 Hz (driven by rAF, so
+      // it advances even where background intervals are throttled).
+      if (now - lastUiPushRef.current >= 160) {
         lastUiPushRef.current = now;
-        if (host && host.phase !== phaseRef.current) {
+        if (host) {
           phaseRef.current = host.phase;
           setPhase(host.phase);
+          setClock(host.clock);
+          setWave(host.wave);
+          setCoreHp(Math.ceil(host.coreHp));
+          const sc: Record<string, number> = {};
+          const st: Record<string, PlayerStatus> = {};
+          for (const p of Object.values(host.players)) {
+            sc[p.id] = p.score;
+            st[p.id] = { hp: p.hp, alive: p.alive, respawnIn: p.respawnIn, score: p.score };
+          }
+          setScores(sc);
+          setStatuses(st);
+          const fresh = host.feed.filter((f) => f.seq > feedSeqRef.current);
+          if (fresh.length) {
+            feedSeqRef.current = Math.max(feedSeqRef.current, ...fresh.map((f) => f.seq));
+            setFeed((prev) => [...prev.slice(-30), ...fresh.map((f) => ({ id: f.seq, text: f.text, tone: f.tone }))]);
+          }
+        } else if (room && snap) {
+          phaseRef.current = snap.snap.phase;
+          setPhase(snap.snap.phase);
+          setClock(snap.snap.clock);
+          setWave(snap.snap.wave);
+          setCoreHp(snap.snap.coreHp);
+          setScores(snap.snap.scores);
+          setStatuses(snap.snap.players);
+          const fresh = snap.snap.feed.filter((f) => f.seq > feedSeqRef.current);
+          if (fresh.length) {
+            feedSeqRef.current = Math.max(feedSeqRef.current, ...fresh.map((f) => f.seq));
+            setFeed((prev) => [...prev.slice(-30), ...fresh.map((f) => ({ id: f.seq, text: f.text, tone: f.tone }))]);
+          }
         }
       }
     };
-    const handle = window.setInterval(tick, 16);
-    tick();
-    return () => window.clearInterval(handle);
+
+    // Drive the whole loop from requestAnimationFrame: it is NOT throttled in
+    // hidden/embedded tabs the way setInterval can be, and fixed-step catch-up
+    // keeps the simulation at the correct speed when frames are delayed.
+    let rafId = 0;
+    const loop = () => {
+      tick();
+      rafId = requestAnimationFrame(loop);
+    };
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
