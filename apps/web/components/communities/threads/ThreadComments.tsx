@@ -182,8 +182,8 @@ export function CommentBox({
   return (
     <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">
-      {/* ── Input row: avatar + text ── */}
-      <div className="flex w-full items-center gap-2">
+      {/* ── Single row: avatar · input · cancel · actions ── */}
+      <div className="flex w-full items-end gap-2">
         {currentUser && (
           <div className="hidden shrink-0 self-start sm:block">
             <Avatar name={currentUser.name} avatarUrl={currentUser.avatar_url} size="md" />
@@ -199,18 +199,16 @@ export function CommentBox({
           placeholder={placeholder ?? "Post your comment"}
           rows={1}
           maxLength={5000}
-          className="max-h-36 w-full resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
+          className="max-h-36 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
         />
-      </div>
-
-      {/* ── Footer: cancel + action buttons ── */}
-      <div className={`mt-1.5 flex w-full items-center gap-2 ${onCancel ? "justify-between" : "justify-end"}`}>
         {onCancel && (
-          <button type="button" onClick={onCancel} className="font-body text-xs text-foreground-subtle hover:text-foreground">
+          <button type="button" onClick={onCancel} className="shrink-0 pb-1 font-body text-xs text-foreground-subtle hover:text-foreground">
             Cancel
           </button>
         )}
-        <div className="flex items-center gap-2">
+        {/* Action buttons — bottom-aligned so they stay pinned to the last
+            input line as it grows */}
+        <div className="flex shrink-0 items-end gap-2">
           {/* Image attachment — visual placeholder for now, the comments API
               doesn't accept attachments yet. */}
           <button
@@ -228,7 +226,7 @@ export function CommentBox({
             onClick={() => setPickerOpen((open) => !open)}
             aria-label="Add emoji"
             aria-expanded={pickerOpen}
-            className={`mt-0.5 hidden h-6 w-6 items-center justify-center rounded-lg border transition-colors lg:flex ${
+            className={`hidden h-6 w-6 items-center justify-center rounded-lg border transition-colors lg:flex ${
               pickerOpen
                 ? "border-accent/40 bg-accent/10 text-accent"
                 : "border-border bg-surface text-foreground-subtle hover:text-foreground"
