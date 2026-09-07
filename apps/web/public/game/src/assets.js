@@ -66,7 +66,7 @@ function nearestInk(r, g, b) {
   let best = INK.BLUE, bestD = Infinity;
   for (const ink of [INK.BLUE, INK.RED, INK.BLACK, INK.ORANGE, INK.GREEN, INK.PINK]) {
     const c = INK_COLORS[ink];
-    const d = (c.x - r) ** 2 + (c.y - g) ** 2 + (c.z - b) ** 2;
+    const d = (c.r - r) ** 2 + (c.g - g) ** 2 + (c.b - b) ** 2;
     if (d < bestD) { bestD = d; best = ink; }
   }
   return best;

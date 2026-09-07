@@ -106,8 +106,8 @@ function buildDistrict(B, arena = false) {
   // solo keeps the tight old block; a match gets a far wider arena, a dome and a hanging playground
   const P = arena ? 68 : 55, T = 6, PH = arena ? 30 : 18, E = P - 3.8, D = P - 3;
   L.bounds.minX = -P; L.bounds.maxX = P; L.bounds.minZ = -P; L.bounds.maxZ = P;
-  box(0, -1, 0, 2 * P + T, 1, 2 * P + T);
-  box(0, 0, -P, 2 * P + T, PH, T); box(0, 0, P, 2 * P + T, PH, T); box(-P, 0, 0, T, PH, 2 * P + T); box(P, 0, 0, T, PH, 2 * P + T);
+  box(0, -1, 0, 2 * P + T, 1, 2 * P + T, { ink: INK.GRASS });
+  box(0, 0, -P, 2 * P + T, PH, T, { ink: INK.TAN }); box(0, 0, P, 2 * P + T, PH, T, { ink: INK.TAN }); box(-P, 0, 0, T, PH, 2 * P + T, { ink: INK.TAN }); box(P, 0, 0, T, PH, 2 * P + T, { ink: INK.TAN });
   if (!arena) {
     // solo: the walls carry on upward unseen and unhookable, so their tops are not a place to camp, and a lid closes the sky
     const NG = { noNav: true, noGrapple: true };
@@ -366,8 +366,8 @@ function buildMexico(B, arena = false) {
   }, { hp: 1, ink: PK });
 
   // ---------------- ground and the mesas around the edge ----------------
-  box(0, -1, 0, 2 * P + 10, 1, 2 * P + 10);
-  const mesa = (x, z, w, d) => { box(x, 0, z, w, 11, d); box(x + rand(-1.2, 1.2), 11, z + rand(-1.2, 1.2), w * 0.78, 7, d * 0.78); box(x + rand(-1, 1), 18, z + rand(-1, 1), w * 0.5, 5, d * 0.5); };
+  box(0, -1, 0, 2 * P + 10, 1, 2 * P + 10, { ink: INK.TAN });
+  const mesa = (x, z, w, d) => { box(x, 0, z, w, 11, d, { ink: INK.TAN }); box(x + rand(-1.2, 1.2), 11, z + rand(-1.2, 1.2), w * 0.78, 7, d * 0.78, { ink: INK.TAN }); box(x + rand(-1, 1), 18, z + rand(-1, 1), w * 0.5, 5, d * 0.5, { ink: INK.TAN }); };
   for (let i = -2; i <= 2; i++) { mesa(i * 24, -P, 19, 8); mesa(i * 24, P, 19, 8); mesa(-P, i * 24, 8, 19); mesa(P, i * 24, 8, 19); }
   // trails between the mesas are where the doodles come from
   for (let i = -2; i < 2; i++) { spawn(i * 24 + 12, 0, -P + 5); spawn(i * 24 + 12, 0, P - 5); spawn(-P + 5, 0, i * 24 + 12); spawn(P - 5, 0, i * 24 + 12); }

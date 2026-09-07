@@ -3,7 +3,7 @@
 // target (body, center, eye, hit spheres, takeDamage) so the rest of the game does not care
 // whether it is shooting at a bot or a friend.
 import * as THREE from 'three';
-import { makeInkMaterial, setFill, INK } from './render.js';
+import { makeInkMaterial, setFill, INK, shadows } from './render.js';
 import { buildHumanoid, buildWeaponProp } from './enemies.js';
 import { clamp, damp, angleLerp, wrapAngle } from './util.js';
 
@@ -41,7 +41,7 @@ export class RemotePlayer {
   _buildModel() {
     const model = buildHumanoid(this.mat, this.solid, this.T);
     this.root = model.root; this.parts = model.parts; this.J = model.J; this.face = model.face;
-    this.root.visible = false; this.ctx.scene.add(this.root); this.weaponIndex = -1;
+    this.root.visible = false; this.ctx.scene.add(this.root); shadows(this.root); this.weaponIndex = -1;
     // a name tag: a little flag above the head so you know who is who
     this.tagG = new THREE.Group(); this.root.add(this.tagG); this.tagG.position.y = 2.25;
     const flag = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.28, 0.02), makeInkMaterial({ ink: this.ink, fill: true, side: THREE.DoubleSide })); this.tagG.add(flag);

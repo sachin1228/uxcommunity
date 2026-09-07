@@ -1,6 +1,6 @@
 // Enemies: doodle humanoids (asdf-style stick figures with faces), flyers, bombers, shield bearers and a boss.
 import * as THREE from 'three';
-import { makeInkMaterial, setFill, INK } from './render.js';
+import { makeInkMaterial, setFill, INK, inkRGB, shadows } from './render.js';
 import { makeBody, SEE_THROUGH } from './physics.js';
 import { rand, randInt, clamp, damp, wrapAngle, angleLerp, choose, alignYAxis, TAU } from './util.js';
 import { audio } from './audio.js';
@@ -162,6 +162,7 @@ class Projectiles {
   constructor(mgr) {
     this.mgr = mgr; this.list = []; this.max = 240; this.onFire = null;
     this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), makeInkMaterial({ ink: INK.RED, fill: true }), this.max);
+    this.mesh.material.color.setRGB(1, 1, 1); // instanceColor carries the real ink hue
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.max * 3), 3);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.count = 0; mgr.ctx.scene.add(this.mesh);
   }
@@ -219,7 +220,7 @@ class Projectiles {
     for (let i = 0; i < n; i++) {
       const p = list[i]; const sp = p.vel.length(); _v.copy(p.vel).divideScalar(sp); _q.setFromUnitVectors(_up, _v);
       _s.set(p.thick, p.blast ? p.thick : clamp(sp * 0.02, 0.35, 0.9), p.thick); _m.compose(p.pos, _q, _s); this.mesh.setMatrixAt(i, _m);
-      const c = this.mesh.instanceColor.array; c[i * 3] = p.ink; c[i * 3 + 1] = 1; c[i * 3 + 2] = 0;
+      const col = inkRGB(p.ink); const c = this.mesh.instanceColor.array; c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b;
     }
     this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true; this.mesh.instanceColor.needsUpdate = true;
   }
@@ -260,7 +261,7 @@ export class EnemyManager {
       hitSpheres: model.hit.map(() => new THREE.Vector3()), fuseT: -1, shieldHp: T.shield ? 2 : 0, flyState: 'orbit', flyT: rand(0, 3), orbitDir: Math.random() < 0.5 ? 1 : -1, bossAtk: null, rootDetached: false };
     e.id = id ?? this.nextId++; this.byId.set(e.id, e);
     e.body.alwaysStep = true; if (T.flying) e.body.noSnap = true; e.root.position.copy(pos); e.root.scale.setScalar(0.001);
-    this.ctx.scene.add(e.root); this.enemies.push(e); this.alive++;
+    this.ctx.scene.add(e.root); shadows(e.root); this.enemies.push(e); this.alive++;
     if (this.onSpawn && !this.mirror) this.onSpawn(e);
     this.ctx.effects.strokeBurst(pos.clone().add(_v.set(0, 1, 0)), T.ink ?? INK.RED, T.boss ? 60 : 26, T.boss ? 10 : 6, { life: 0.5, size: 0.03 }); audio.spawn(pos);
     if (T.boss) { audio.bossRoar(pos); if (this.onBoss) this.onBoss(e); }

@@ -150,3 +150,4 @@ apps/web/next-env.d.ts
 __pycache__/
 *.pyc
 
+apps/web/public/game/hidden_alley.zip

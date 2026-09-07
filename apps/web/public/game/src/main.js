@@ -2,7 +2,7 @@
 // Online play is peer-to-peer: one player's browser hosts the lobby and keeps score, every
 // player runs their own body, and each one tells the others what it did.
 import * as THREE from 'three';
-import { InkRenderer, INK, makeInkMaterial } from './render.js';
+import { InkRenderer, INK, makeInkMaterial, shadows } from './render.js';
 import { World } from './physics.js';
 import { Input } from './input.js';
 import { buildLevel, LEVELS } from './level.js';
@@ -28,6 +28,7 @@ const world = new World();
 const knownMap = (k) => (LEVELS.some((m) => m.key === k) ? k : 'district');
 let mapKey = knownMap(localStorage.getItem('doodle_map') || 'district');
 let level = buildLevel(R.scene, world, mapKey, { arena: false });
+level.meshes.forEach(shadows);
 let nav = new NavGrid(world, level.bounds, 1).build();
 let loadedKey = mapKey, arenaLoaded = false;
 audio.setTune(mapKey === 'mexico' ? 'mexico' : 'district');
@@ -37,6 +38,7 @@ function setLevel(key, on, force = false) {
   for (const m of level.meshes) { R.scene.remove(m); if (m.geometry) m.geometry.dispose(); if (m.traverse) m.traverse((o) => { if (o !== m && o.geometry) o.geometry.dispose(); }); }
   level.animated.length = 0; world.clear();
   level = buildLevel(R.scene, world, key, { arena: on }); nav = new NavGrid(world, level.bounds, 1).build();
+  level.meshes.forEach(shadows);
   ctx.level = level; ctx.nav = nav; if (window.__game) { window.__game.level = level; window.__game.nav = nav; }
   audio.setTune(key === 'mexico' ? 'mexico' : 'district');
 }
