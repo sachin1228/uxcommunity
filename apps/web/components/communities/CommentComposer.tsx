@@ -101,7 +101,13 @@ export function CommentComposer<C = unknown>({
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ name: string; avatar_url: string | null } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerPos, setPickerPos] = useState<{ bottom: number; left: number } | null>(null);
+  const [pickerPos, setPickerPos] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const portalPickerRef = useRef<HTMLDivElement>(null);
@@ -120,16 +126,37 @@ export function CommentComposer<C = unknown>({
     };
   }, []);
 
-  // Position the picker directly above the emoji button, like the chat emoji
-  // picker — horizontally centered on the button.
+  // Smart placement for the picker, measured from the emoji button like the
+  // chat emoji picker but aware of the viewport edges:
+  //  • horizontal — centered on the button when it fits, otherwise shifted so
+  //    the panel stays fully on screen (toward whichever side has room);
+  //  • vertical   — opens above the button by default, flips below when there
+  //    is not enough room up top (composer near the top of a short viewport);
+  //  • height     — shrinks to the space available so it never gets clipped.
   const measureAndSetPos = useCallback(() => {
     const btn = emojiBtnRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
-    setPickerPos({
-      bottom: window.innerHeight - rect.top + 8,
-      left:   rect.left + rect.width / 2 - 170,
-    });
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const width = Math.max(220, Math.min(340, vw - 16));
+
+    // Horizontal — centre on the button, then pull back into the viewport.
+    let left = rect.left + rect.width / 2 - width / 2;
+    left = Math.max(8, Math.min(left, vw - width - 8));
+
+    // Vertical — pick the side with more room (tie → above, the default).
+    const roomAbove = rect.top - 8 - 8;
+    const roomBelow = vh - rect.bottom - 8 - 8;
+    const openAbove = roomAbove >= roomBelow;
+    const height = Math.max(96, Math.min(320, openAbove ? roomAbove : roomBelow));
+
+    if (openAbove) {
+      setPickerPos({ bottom: vh - rect.top + 8, left, width, height });
+    } else {
+      setPickerPos({ top: rect.bottom + 8, left, width, height });
+    }
   }, []);
 
   const openPicker = useCallback(() => {
@@ -303,23 +330,27 @@ export function CommentComposer<C = unknown>({
       {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
     </form>
 
-    {/* ── Emoji picker — portal at document.body, fixed above the emoji
-          button (centered on it), outside the form so its buttons never
-          submit the comment ── */}
+    {/* ── Emoji picker — portal at document.body, fixed relative to the emoji
+          button, smartly flipped/clamped to the viewport edges, outside the
+          form so its buttons never submit the comment ── */}
     {pickerOpen && pickerPos && typeof document !== "undefined" &&
       createPortal(
         <div
           ref={portalPickerRef}
           style={{
             position:  "fixed",
+            top:       pickerPos.top,
             bottom:    pickerPos.bottom,
             left:      pickerPos.left,
-            width:     340,
+            width:     pickerPos.width,
             zIndex:    9999,
             animation: "fadeSlideUp 150ms ease-out",
           }}
         >
-          <div className="flex h-[320px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md">
+          <div
+            className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md"
+            style={{ height: pickerPos.height }}
+          >
             <NotoEmojiGrid onSelect={insertEmoji} />
           </div>
         </div>,
