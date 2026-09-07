@@ -237,7 +237,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-raised text-foreground-muted transition-colors hover:text-foreground"
                 aria-label="Create community"
                 title="Create community"
               >
@@ -261,7 +261,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <button
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-raised text-foreground-muted transition-colors hover:text-foreground"
                 aria-label="Create community"
                 title="Create community"
               >
