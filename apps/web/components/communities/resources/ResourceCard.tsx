@@ -361,8 +361,8 @@ export function ResourceCard({
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
               <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
+                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
               </button>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>

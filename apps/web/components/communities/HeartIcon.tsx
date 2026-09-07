@@ -15,8 +15,8 @@ import { useEffect, useRef } from "react";
  *  - When it flips false → true (user taps like) the heart plays a quick
  *    pop — via the Web Animations API so it never fights the Tailwind
  *    hover scale, and never fires on initial mount.
- *  - The liked heart is filled with the design system's Geist blue
- *    (--ds-blue-700, theme-aware). It's applied via inline style because
+ *  - The liked heart is filled with the design system's like pink
+ *    (--like, rgb(249, 24, 128)). It's applied via inline style because
  *    `var()` is not valid inside SVG presentation attributes.
  */
 export function HeartIcon({
@@ -63,7 +63,7 @@ export function HeartIcon({
       fill={fill}
       className={className}
       aria-hidden="true"
-      style={active ? { display: "block", fill: "var(--ds-blue-700)" } : { display: "block" }}
+      style={active ? { display: "block", fill: "var(--like)" } : { display: "block" }}
     >
       <path
         d="M 4.706 1.75 C 6.455 1.75 7.681 2.984 8 4.645 C 8.319 2.984 9.545 1.75 11.294 1.75 C 13.341 1.75 15 3.44 15 5.524 C 15 11.802 8 14.75 8 14.75 L 8 14.75 L 8 14.75 C 8 14.75 1 11.802 1 5.524 C 1 3.44 2.659 1.75 4.706 1.75 Z"

@@ -99,7 +99,7 @@ export function ShowcaseCard({
             size={16}
             active={post.user_liked}
             fill="none"
-            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}
+            className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
           />
           <span className="font-body text-sm font-semibold text-foreground-subtle group-hover/like:text-white">
             {post.like_count}
