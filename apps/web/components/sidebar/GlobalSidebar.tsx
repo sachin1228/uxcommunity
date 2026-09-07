@@ -277,7 +277,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       </div>
 
       {/* Profile — pinned to the bottom of the sidebar */}
-      <div className="shrink-0 border-t border-border px-[13px] py-[11px]">
+      <div className="shrink-0 border-t border-border px-3 py-2.5">
         <ProfileDropdown variant="row" {...user} />
       </div>
     </aside>
