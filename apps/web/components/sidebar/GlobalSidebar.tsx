@@ -3,12 +3,13 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { useNotifications } from "@/lib/use-notifications";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
@@ -34,6 +35,7 @@ function isMatch(href: string, pathname: string) {
 export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const pathname = usePathname();
   const [createOpen, setCreateOpen] = useState(false);
+  const { unreadCount: notificationCount } = useNotifications(userId);
 
   const {
     communities,
@@ -68,10 +70,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
     !isMatch("/dashboard/communities", pathname) &&
     !isMatch("/dashboard/chat-with-designers", pathname) &&
     !isMatch("/dashboard/library", pathname) &&
-    !isMatch("/dashboard/jobs", pathname);
+    !isMatch("/dashboard/jobs", pathname) &&
+    !isMatch("/dashboard/notifications", pathname);
   const exploreActive = pathname === "/dashboard/communities";
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
+  const notificationsActive = isMatch("/dashboard/notifications", pathname);
   // Hidden: "Chat with designers" is no longer shown in the sidebar.
   // const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
@@ -150,6 +154,27 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/dashboard/notifications"
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
+                notificationsActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
+              <Bell strokeWidth={2.5} size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Notifications</span>
+              {notificationCount > 0 && (
+                <span
+                  className="min-w-4 rounded-full bg-red-500 px-1 text-center text-[8px] font-semibold leading-4 text-white"
+                  aria-label={`${notificationCount} unread notifications`}
+                >
+                  {notificationCount > 99 ? "99+" : notificationCount}
+                </span>
+              )}
             </Link>
           </li>
           <li>

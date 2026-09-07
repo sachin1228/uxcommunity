@@ -5,7 +5,6 @@ import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
 import { BrandLogo } from "@/components/ui/BrandLogo";
-import { NotificationBell } from "@/app/dashboard/NotificationBell";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 
 
@@ -77,7 +76,6 @@ export default async function DashboardLayout({
           />
         </div>
         <div className="flex h-full items-center gap-2">
-          <NotificationBell userId={userId} />
           <ProfileDropdown {...sidebarUser} />
         </div>
       </header>
