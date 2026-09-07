@@ -7,6 +7,7 @@ import type { ReplyPreview } from "@/lib/communities/cache";
 import { EmojiGifPicker } from "./EmojiGifPicker";
 import { LinkPreview } from "./LinkPreview";
 import { MentionSuggestions } from "./MentionSuggestions";
+import { MAX_MESSAGE_CHARS } from "./chatUtils";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 import type { MessageMention } from "@/lib/communities/cache";
 import {
@@ -431,13 +432,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ref={ref}
                   data-chat-input
                   value={input}
+                  maxLength={MAX_MESSAGE_CHARS}
                   onChange={(e) => {
-                    onChange(e.target.value);
+                    // Hard cap even beyond maxLength (IME/paste edge cases).
+                    const value = e.target.value.slice(0, MAX_MESSAGE_CHARS);
+                    onChange(value);
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
                     // After the value update the caret is at the end of what
                     // was just typed — re-evaluate the @query token.
-                    onComposerActivity?.(e.target.value, e.target.selectionStart);
+                    onComposerActivity?.(value, e.target.selectionStart);
                   }}
                   onKeyUp={(e) => {
                     // Arrow/Home/End/Backspace moves and IME commits don't fire
@@ -474,6 +478,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   {overlayContent}
                 </div>
               </div>
+
+              {/* Character counter — shown once the user is near the 500 limit */}
+              {input.length > 0 && input.length >= MAX_MESSAGE_CHARS - 50 && (
+                <span
+                  className={`shrink-0 mb-0.5 font-mono text-[10px] tabular-nums ${
+                    input.length >= MAX_MESSAGE_CHARS ? "text-red-400" : "text-foreground-muted/70"
+                  }`}
+                  aria-live="polite"
+                >
+                  {input.length}/{MAX_MESSAGE_CHARS}
+                </span>
+              )}
 
               {canSend && (
                 <button

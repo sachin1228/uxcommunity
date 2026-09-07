@@ -1,5 +1,8 @@
 // ─── Shared chat utilities ────────────────────────────────────────────────
 
+/** Maximum characters allowed in a chat message — the composer hard limit. */
+export const MAX_MESSAGE_CHARS = 500;
+
 export function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-IN", {
     hour: "2-digit",

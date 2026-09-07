@@ -22,7 +22,7 @@ import {
   trackReactionIntent,
   type ReactionIntent,
 } from "@/lib/reaction-intent-coordinator";
-import { fmtDate } from "./chat/chatUtils";
+import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 
 import { ChatInput } from "./chat/ChatInput";
@@ -862,7 +862,7 @@ export function CommunityChat({
   // ── Member @mentions (autocomplete + registry) ────────────────────────────
   const commitMentionText = useCallback(
     (text: string, caret: number) => {
-      setInput(text);
+      setInput(text.slice(0, MAX_MESSAGE_CHARS));
       setTyping(text.trim().length > 0);
       // Restore focus + caret after React re-renders the textarea value.
       requestAnimationFrame(() => {
@@ -908,6 +908,10 @@ export function CommunityChat({
     const content = input.trim();
     if (!content) {
       setError("Message cannot be empty.");
+      return;
+    }
+    if (content.length > MAX_MESSAGE_CHARS) {
+      setError(`Message is too long (max ${MAX_MESSAGE_CHARS} characters).`);
       return;
     }
 
@@ -968,16 +972,17 @@ export function CommunityChat({
       if (textarea) {
         const start = textarea.selectionStart ?? input.length;
         const end   = textarea.selectionEnd   ?? input.length;
-        const next  = input.slice(0, start) + emoji + input.slice(end);
+        const next  = (input.slice(0, start) + emoji + input.slice(end)).slice(0, MAX_MESSAGE_CHARS);
         setInput(next);
-        // Restore cursor after the inserted emoji
+        // Restore cursor after the inserted emoji (clamped to the limit)
         requestAnimationFrame(() => {
-          textarea.selectionStart = start + emoji.length;
-          textarea.selectionEnd   = start + emoji.length;
+          const caret = Math.min(start + emoji.length, MAX_MESSAGE_CHARS);
+          textarea.selectionStart = caret;
+          textarea.selectionEnd   = caret;
           textarea.focus();
         });
       } else {
-        setInput((prev) => prev + emoji);
+        setInput((prev) => (prev + emoji).slice(0, MAX_MESSAGE_CHARS));
       }
     },
     [input, inputRef, setInput],
@@ -985,7 +990,7 @@ export function CommunityChat({
 
   const handleInputChange = useCallback(
     (value: string) => {
-      setInput(value);
+      setInput(value.slice(0, MAX_MESSAGE_CHARS));
       setTyping(value.trim().length > 0);
     },
     [setInput, setTyping],
