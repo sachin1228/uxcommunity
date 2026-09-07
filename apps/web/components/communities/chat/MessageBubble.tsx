@@ -284,8 +284,6 @@ function MessageHoverActions({
   onMenuOpenChange,
   showReaction = true,
   showMenu = true,
-  insideBubble = false,
-  dotsVisible = false,
   canModerate = false,
 }: {
   msg: CachedMessage;
@@ -301,9 +299,6 @@ function MessageHoverActions({
   onMenuOpenChange: (open: boolean) => void;
   showReaction?: boolean;
   showMenu?: boolean;
-  insideBubble?: boolean;
-  /** Controls three-dot button visibility when insideBubble=true (proximity-based). */
-  dotsVisible?: boolean;
   /** Moderator may delete other members' messages. */
   canModerate?: boolean;
 }) {
@@ -343,18 +338,14 @@ function MessageHoverActions({
   // button's footprint so the bubble's available width doesn't change (and
   // the text doesn't re-wrap) the moment the message flips to "sent".
   if (msg.status === "sending") {
-    if (insideBubble || !showReaction) return null;
-    return <div aria-hidden className="w-7 h-7 shrink-0" />;
+    if (!showReaction) return null;
+    // Matches the footprint of both side buttons (emoji + more menu) so the
+    // bubble's available width doesn't change once the message flips to "sent".
+    return <div aria-hidden className="w-[58px] h-7 shrink-0" />;
   }
 
   return (
-    <div
-      className={
-        insideBubble
-          ? "contents"
-          : "flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150"
-      }
-    >
+    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150">
       {/* Emoji reaction button — only for non-deleted messages */}
       {showReaction && !isDeleted && (
         <div className="relative" ref={pickerRef}>
@@ -412,17 +403,12 @@ function MessageHoverActions({
 
       {/* Reply, copy, and delete menu */}
       {showMenu && (
-      <div className={insideBubble ? "absolute top-1 right-1 z-30" : "relative"}>
+      <div className="relative">
         <button
           ref={triggerBtnRef}
           onClick={(e) => { e.stopPropagation(); onMenuOpenChange(!menuOpen); }}
           className={`
             w-7 h-7 rounded-full flex items-center justify-center
-            ${insideBubble
-              ? (dotsVisible || menuOpen)
-                ? "opacity-100 pointer-events-auto"
-                : "opacity-0 pointer-events-none"
-              : ""}
             transition-opacity duration-150
             transition-colors duration-100
             ${isMe
@@ -825,27 +811,6 @@ export const MessageBubble = memo(function MessageBubble({
 }: MessageBubbleProps) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [nearBubble, setNearBubble] = useState(false);
-  const bubbleRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Show three-dot button when the mouse is anywhere over the bubble (with a
-   * small margin), plus a bit of runway on the reaction-button side so the
-   * dots stay visible while moving between the bubble and the emoji button.
-   * Using the full bubble rect (not just a fixed band near one edge) means
-   * wide, multi-line bubbles behave the same as short ones.
-   */
-  function handleRowMouseMove(e: React.MouseEvent) {
-    if (!bubbleRef.current) return;
-    const r = bubbleRef.current.getBoundingClientRect();
-    const PAD = 8;
-    const REACH = 48; // room for the reaction button beside the bubble
-    const minX = isMe ? r.left - REACH : r.left - PAD;
-    const maxX = isMe ? r.right + PAD : r.right + REACH;
-    const withinX = e.clientX >= minX && e.clientX <= maxX;
-    const withinY = e.clientY >= r.top - PAD && e.clientY <= r.bottom + PAD;
-    setNearBubble(withinX && withinY);
-  }
 
   const sender    = msg.users;
   const reactions = msg.reactions ?? [];
@@ -899,8 +864,6 @@ export const MessageBubble = memo(function MessageBubble({
         className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
           isMe ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}
-        onMouseMove={handleRowMouseMove}
-        onMouseLeave={() => setNearBubble(false)}
       >
         {/* Avatar column — hidden for own messages */}
         {!isMe && (
@@ -977,10 +940,7 @@ export const MessageBubble = memo(function MessageBubble({
                 data-side={isMe ? "right" : "left"}
               >
                 <div
-                  ref={bubbleRef}
-                  className={`relative select-none transition-shadow duration-150 ${
-                    menuOpen ? "ring-2 ring-white/20 ring-offset-2 ring-offset-transparent" : ""
-                  } ${
+                  className={`relative select-none ${
                     imageOnly
                       ? "flex flex-col items-start"
                       : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
@@ -1048,27 +1008,10 @@ export const MessageBubble = memo(function MessageBubble({
                       )}
                     </div>
                   )}
-                  <MessageHoverActions
-                    msg={msg}
-                    isMe={isMe}
-                    isDeleted={isDeleted}
-                    currentUserId={currentUserId}
-                    onReaction={onReaction}
-                    onReply={onReply}
-                    onEdit={onEdit}
-                    onCopy={onCopy}
-                    onDeleteClick={() => setDeleteConfirmOpen(true)}
-                    menuOpen={menuOpen}
-                    onMenuOpenChange={setMenuOpen}
-                    showReaction={false}
-                    insideBubble
-                    dotsVisible={nearBubble}
-                    canModerate={canModerate}
-                  />
                 </div>
                 <ReactionPills reactions={reactions} currentUserId={currentUserId} msgId={msg.id} onReaction={onReaction} />
               </div>
-              {/* Emoji reaction button to the right of bubble */}
+              {/* Emoji reaction + more-actions buttons to the right of bubble */}
               <MessageHoverActions
                 msg={msg}
                 isMe={isMe}
@@ -1081,7 +1024,6 @@ export const MessageBubble = memo(function MessageBubble({
                 onDeleteClick={() => setDeleteConfirmOpen(true)}
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
-                showMenu={false}
                 canModerate={canModerate}
               />
             </div>
