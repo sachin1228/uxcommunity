@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CornerDownRight, MoreHorizontal, Send, Trash2 } from "lucide-react";
+import { ArrowUp, CornerDownRight, MoreHorizontal, Paperclip, Smile, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { ThreadComment } from "./types";
@@ -26,6 +26,22 @@ export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarU
 
 // ── Comment Box ───────────────────────────────────────────────────────────────
 
+// Module-level cache for the current user's avatar — every composer (detail
+// page, lightbox, reply boxes) can share a single /api/auth/me round trip.
+let cachedMe: { name: string; avatar_url: string | null } | null | undefined;
+
+async function fetchCurrentUser(): Promise<{ name: string; avatar_url: string | null } | null> {
+  if (cachedMe !== undefined) return cachedMe;
+  try {
+    const res = await fetch("/api/auth/me");
+    const data = (await res.json().catch(() => null)) as { user?: { name?: string; avatar_url?: string | null } } | null;
+    cachedMe = data?.user?.name ? { name: data.user.name, avatar_url: data.user.avatar_url ?? null } : null;
+  } catch {
+    cachedMe = null;
+  }
+  return cachedMe;
+}
+
 export function CommentBox({
   communityId,
   threadId,
@@ -46,11 +62,30 @@ export function CommentBox({
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ name: string; avatar_url: string | null } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCurrentUser().then((user) => {
+      if (!cancelled) setCurrentUser(user);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Auto-grow the input (capped by max-h-36) like the reference composer.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [body]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,35 +111,69 @@ export function CommentBox({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-2">
-      <textarea
-        ref={ref}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(e as unknown as React.FormEvent);
-        }}
-        placeholder={placeholder ?? "Write a comment… (⌘↵ to post)"}
-        rows={parentId ? 2 : 3}
-        maxLength={5000}
-        className="field w-full resize-none"
-      />
-      {error && <p className="font-body text-xs text-red-400">{error}</p>}
-      <div className="flex items-center gap-2">
+    <form
+      onSubmit={submit}
+      className="group w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface"
+    >
+      {/* ── Input row: avatar + text ── */}
+      <div className="flex w-full items-center gap-2">
+        {currentUser && (
+          <div className="hidden shrink-0 self-start sm:block">
+            <Avatar name={currentUser.name} avatarUrl={currentUser.avatar_url} size="md" />
+          </div>
+        )}
+        <textarea
+          ref={ref}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit(e as unknown as React.FormEvent);
+          }}
+          placeholder={placeholder ?? "Post your comment"}
+          rows={1}
+          maxLength={5000}
+          className="max-h-36 w-full resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
+        />
+      </div>
+
+      {/* ── Footer: cancel + action buttons ── */}
+      <div className={`mt-1.5 flex w-full items-center gap-2 ${onCancel ? "justify-between" : "justify-end"}`}>
         {onCancel && (
           <button type="button" onClick={onCancel} className="font-body text-xs text-foreground-subtle hover:text-foreground">
             Cancel
           </button>
         )}
-        <button
-          type="submit"
-          disabled={saving || !body.trim()}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {saving ? <Spinner size={12} className="text-white" /> : <Send strokeWidth={2.5} size={12} />}
-          {saving ? "Posting…" : "Post"}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Visual placeholders for now — the comments API doesn't accept
+              attachments or emoji yet. */}
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            className="flex h-6 w-6 items-center justify-center rounded-lg border border-border bg-surface text-foreground-subtle transition-colors hover:text-foreground"
+          >
+            <Paperclip strokeWidth={2.5} size={14} />
+          </button>
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            className="mt-0.5 hidden h-6 w-6 items-center justify-center rounded-lg border border-border bg-surface text-foreground-subtle transition-colors hover:text-foreground lg:flex"
+          >
+            <Smile strokeWidth={2.5} size={16} />
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !body.trim()}
+            aria-label={saving ? "Posting…" : "Post comment"}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-[var(--ds-green-500)] bg-[var(--ds-green-300)] text-white transition-colors hover:border-[var(--ds-green-600)] disabled:cursor-not-allowed disabled:border-[var(--ds-green-400)] disabled:bg-[var(--ds-green-400)]"
+          >
+            {saving ? <Spinner size={14} className="text-white" /> : <ArrowUp strokeWidth={2.5} size={18} />}
+          </button>
+        </div>
       </div>
+
+      {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
     </form>
   );
 }
