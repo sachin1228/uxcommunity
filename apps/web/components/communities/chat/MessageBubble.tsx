@@ -285,6 +285,10 @@ function MessageHoverActions({
   showReaction = true,
   showMenu = true,
   canModerate = false,
+  animate = false,
+  /** Word count of the animated wave (capped at 24) — delays the hover
+   * buttons until after the message text has settled. */
+  waveIndex = 0,
 }: {
   msg: CachedMessage;
   isMe: boolean;
@@ -301,6 +305,10 @@ function MessageHoverActions({
   showMenu?: boolean;
   /** Moderator may delete other members' messages. */
   canModerate?: boolean;
+  /** Live-arrival entrance animation — hover buttons wait for the word wave. */
+  animate?: boolean;
+  /** Word count of the animated wave (capped at 24) for the entrance delay. */
+  waveIndex?: number;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -345,7 +353,12 @@ function MessageHoverActions({
   }
 
   return (
-    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150">
+    <div
+      className={`flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 ${
+        animate ? "chat-hover-actions-in" : ""
+      }`}
+      style={animate ? ({ "--i": waveIndex } as React.CSSProperties) : undefined}
+    >
       {/* Emoji reaction button — only for non-deleted messages */}
       {showReaction && !isDeleted && (
         <div className="relative" ref={pickerRef}>
@@ -641,6 +654,9 @@ function MessageContent({
   );
 
   let parts: React.ReactNode[];
+  // Number of words in the animated wave — used to delay the "Read more"
+  // button until after the last word has risen into place.
+  let animateWordCount = 0;
 
   if (animate) {
     // Split each plain-text segment on whitespace (keeping the whitespace so
@@ -684,6 +700,7 @@ function MessageContent({
         );
       }
     }
+    animateWordCount = wordIdx;
   } else {
     parts = [];
     let keyIdx = 0;
@@ -719,10 +736,13 @@ function MessageContent({
           type="button"
           onClick={(e) => { e.stopPropagation(); setCollapsed(false); }}
           className={`mt-1 font-body text-xs font-medium transition-colors ${
+            animate ? "chat-read-more-in" : ""
+          } ${
             isMe
               ? "text-accent-foreground/70 hover:text-accent-foreground"
               : "text-foreground-muted hover:text-foreground"
           }`}
+          style={animate ? ({ "--i": Math.min(animateWordCount, 24) } as React.CSSProperties) : undefined}
         >
           Read more
         </button>
@@ -844,6 +864,13 @@ export const MessageBubble = memo(function MessageBubble({
     : undefined;
   const isFirstInGroup = !isSameAuthor;
 
+  // Wave length for the entrance animation — the hover action buttons (and
+  // "Read more") wait for the last word before they can appear.
+  const waveIndex =
+    animate && msg.content
+      ? Math.min(msg.content.trim().split(/\s+/).filter(Boolean).length, 24)
+      : 0;
+
   const handleDeleteConfirm = () => {
     setDeleteConfirmOpen(false);
     onDelete(msg.id);
@@ -931,6 +958,8 @@ export const MessageBubble = memo(function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 canModerate={canModerate}
+                animate={animate}
+                waveIndex={waveIndex}
               />
             </div>
           ) : (
@@ -1029,6 +1058,8 @@ export const MessageBubble = memo(function MessageBubble({
                 menuOpen={menuOpen}
                 onMenuOpenChange={setMenuOpen}
                 canModerate={canModerate}
+                animate={animate}
+                waveIndex={waveIndex}
               />
             </div>
           )}

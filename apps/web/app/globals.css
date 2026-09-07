@@ -582,6 +582,25 @@ select:focus-visible {
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
 }
 
+@keyframes chat-read-more-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* "Read more" waits for the word wave to finish before fading in, so it
+   never appears ahead of the message text on animated (live) arrivals. */
+.chat-read-more-in {
+  animation: chat-read-more-in 300ms ease-out backwards;
+  animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms + 440ms);
+}
+
+/* Hover action buttons (emoji reaction + more menu) on animated bubbles wait
+   for the word wave too, so they never appear before the message settles. */
+.chat-hover-actions-in {
+  animation: chat-read-more-in 300ms ease-out backwards;
+  animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms + 440ms);
+}
+
 /* Message text is selectable; give the highlight enough contrast to read
    on both the blue (own) and raised (other) bubble backgrounds. */
 .chat-message-text::selection,
@@ -615,5 +634,7 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  .chat-word-in { animation-delay: 0ms !important; }
+  .chat-word-in,
+  .chat-read-more-in,
+  .chat-hover-actions-in { animation-delay: 0ms !important; }
 }
