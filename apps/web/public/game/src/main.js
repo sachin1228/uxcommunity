@@ -15,6 +15,7 @@ import { Net } from './net.js';
 import { HUD, CONTROLS_HTML } from './hud.js';
 import { audio } from './audio.js';
 import { rand, choose, clamp } from './util.js';
+import { preloadModels } from './assets.js';
 
 const canvas = document.getElementById('c');
 const R = new InkRenderer(canvas);
@@ -765,6 +766,9 @@ window.addEventListener('pagehide', () => { if (net.active) net.leave(); });
 // browsers only let audio start on a gesture; any press wakes the context if it went to sleep
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => { audio.init(); audio.resume(); }, { passive: true });
 hud.setDevice(input.usingGamepad); applySettings(); hud.setWeapon(player.weapon.name, player.weapon.hint); showStart();
+
+// Phase B: loads registered Blender models (silent no-op until entries exist).
+preloadModels();
 
 // ---------------- loop ----------------
 let last = performance.now(), boardToggle = false, lockTipT = 0.5, musicHealT = 2;
