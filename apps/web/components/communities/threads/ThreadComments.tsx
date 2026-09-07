@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CornerDownRight, MoreHorizontal, Smile, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -95,8 +96,10 @@ export function CommentBox({
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ name: string; avatar_url: string | null } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerPos, setPickerPos] = useState<{ bottom: number; left: number } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const portalPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
@@ -112,25 +115,65 @@ export function CommentBox({
     };
   }, []);
 
-  // Close the emoji picker on outside click or Escape.
+  // Position the picker above the composer, like the chat emoji picker.
+  const measureAndSetPos = useCallback(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    setPickerPos({
+      bottom: window.innerHeight - rect.top + 8,
+      left:   rect.left,
+    });
+  }, []);
+
+  const openPicker = useCallback(() => {
+    measureAndSetPos();
+    setPickerOpen(true);
+  }, [measureAndSetPos]);
+
+  const closePicker = useCallback(() => {
+    setPickerOpen(false);
+    setPickerPos(null);
+  }, []);
+
+  const togglePicker = useCallback(() => {
+    if (pickerOpen) closePicker();
+    else openPicker();
+  }, [pickerOpen, closePicker, openPicker]);
+
+  // Close the picker on Escape.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePicker();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [pickerOpen, closePicker]);
+
+  // Close the picker when clicking anywhere outside the picker and the emoji button.
   useEffect(() => {
     if (!pickerOpen) return;
     const onMouseDown = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null;
-      if (pickerRef.current?.contains(target)) return;
+      if (portalPickerRef.current?.contains(target)) return;
       if (target?.closest?.("[data-comment-emoji-toggle]")) return;
-      setPickerOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPickerOpen(false);
+      closePicker();
     };
     document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [pickerOpen, closePicker]);
+
+  // Re-measure on scroll or resize so the picker tracks the composer.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const update = () => measureAndSetPos();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
     return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
     };
-  }, [pickerOpen]);
+  }, [pickerOpen, measureAndSetPos]);
 
   // Auto-grow the input (capped by max-h-36) like the reference composer.
   useEffect(() => {
@@ -180,7 +223,7 @@ export function CommentBox({
   }
 
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
+    <div ref={anchorRef} className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">
       {/* ── Single row: avatar · input · cancel · actions ── */}
       <div className="flex w-full items-end gap-2">
@@ -213,7 +256,7 @@ export function CommentBox({
           <button
             type="button"
             data-comment-emoji-toggle
-            onClick={() => setPickerOpen((open) => !open)}
+            onClick={togglePicker}
             aria-label="Add emoji"
             aria-expanded={pickerOpen}
             className={`hidden h-6 w-6 items-center justify-center rounded-lg border transition-colors lg:flex ${
@@ -245,14 +288,29 @@ export function CommentBox({
       {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
     </form>
 
-    {/* ── Emoji picker (rendered outside the form so its buttons never submit) ── */}
-    {pickerOpen && (
-      <div ref={pickerRef} className="absolute left-0 right-0 top-full z-50 mt-2">
-        <div className="flex h-[400px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md">
-          <NotoEmojiGrid onSelect={insertEmoji} />
-        </div>
-      </div>
-    )}
+    {/* ── Emoji picker — portal at document.body, fixed above the composer
+          (same as the chat emoji picker), outside the form so its buttons
+          never submit the comment ── */}
+    {pickerOpen && pickerPos && typeof document !== "undefined" &&
+      createPortal(
+        <div
+          ref={portalPickerRef}
+          style={{
+            position:  "fixed",
+            bottom:    pickerPos.bottom,
+            left:      pickerPos.left,
+            width:     340,
+            zIndex:    9999,
+            animation: "fadeSlideUp 150ms ease-out",
+          }}
+        >
+          <div className="flex h-[440px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md">
+            <NotoEmojiGrid onSelect={insertEmoji} />
+          </div>
+        </div>,
+        document.body,
+      )
+    }
     </div>
   );
 }
