@@ -185,7 +185,7 @@ export function CommentBox({
       {/* ── Single row: avatar · input · cancel · actions ── */}
       <div className="flex w-full items-end gap-2">
         {currentUser && (
-          <div className="hidden shrink-0 self-start sm:block">
+          <div className="hidden shrink-0 self-center sm:block">
             <Avatar name={currentUser.name} avatarUrl={currentUser.avatar_url} size="md" />
           </div>
         )}
