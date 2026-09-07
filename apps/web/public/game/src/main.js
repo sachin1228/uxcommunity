@@ -15,7 +15,12 @@ import { Net } from './net.js';
 import { HUD, CONTROLS_HTML } from './hud.js';
 import { audio } from './audio.js';
 import { rand, choose, clamp } from './util.js';
-import { preloadModels } from './assets.js';
+import { preloadModels, registerModel } from './assets.js';
+
+// Weapon model registry — MUST run before the player (and its weapons) is
+// constructed, or each weapon's model swap looks up an unregistered key and
+// silently keeps the procedural mesh. Missing files fall back cleanly.
+for (const k of ['rifle', 'shotgun', 'revolver', 'sniper', 'katana']) registerModel('weapon.' + k, { path: 'models/' + k + '.glb' });
 
 const canvas = document.getElementById('c');
 const R = new InkRenderer(canvas);

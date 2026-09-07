@@ -1,6 +1,7 @@
 // First-person view models + firing logic: rifle, shotgun, revolver (hitscan) and katana.
 import * as THREE from 'three';
 import { makeInkMaterial, INK } from './render.js';
+import { cloneModel } from './assets.js';
 import { SEE_THROUGH } from './physics.js';
 import { rand, clamp, damp, lerp, Spring3, TAU } from './util.js';
 import { audio } from './audio.js';
@@ -24,6 +25,38 @@ function makeFlash(parent, x, y, z, scale) {
   g.add(new THREE.Mesh(star(7, 0.16, 0.06), fm)); const s2 = new THREE.Mesh(star(5, 0.11, 0.04), fm); s2.rotation.y = Math.PI / 2; g.add(s2);
   const s3 = new THREE.Mesh(star(5, 0.1, 0.04), fm); s3.rotation.x = Math.PI / 2; g.add(s3);
   g.position.set(x, y, z); g.scale.setScalar(scale); g.visible = false; parent.add(g); return g;
+}
+
+// Phase C: when a Blender-made model exists for this weapon (scripts/game-blender/
+// weapons.py -> public/game/models/*.glb), swap the procedural meshes for it. The
+// model carries the game-space coordinates exactly, and animated parts are
+// re-bound by name so reload/pump/bolt/cylinder/hand animations keep working.
+// Muzzle + eject empties ship inside the GLB; the muzzle flash is re-created on
+// the new anchor. Anything missing -> keep the procedural mesh, never break.
+async function swapWeaponModel(w) {
+  const model = await cloneModel('weapon.' + w.kind);
+  if (!model) return;
+  const find = (name) => { let hit = null; model.traverse((o) => { if (o.name === name) hit = o; }); return hit; };
+  if (w.kind === 'katana') {
+    const blade = find('blade'), tip = find('tip');
+    if (!blade || !tip) { console.warn('[models] katana.glb missing blade/tip — keeping procedural'); return; }
+    for (const c of [...w.root.children]) { w.root.remove(c); c.traverse?.((o) => { if (o.isMesh) o.geometry?.dispose(); }); }
+    w.root.add(model);
+    w.blade = blade; w.tip = tip;
+    w.makeSmears(); // blood smears stay procedural; rebuild them on the new blade
+    return;
+  }
+  const muzzle = find('muzzle'), eject = find('eject');
+  if (!muzzle || !eject) { console.warn('[models] ' + w.kind + '.glb missing muzzle/eject anchors — keeping procedural'); return; }
+  for (const c of [...w.root.children]) { w.root.remove(c); c.traverse?.((o) => { if (o.isMesh) o.geometry?.dispose(); }); }
+  w.root.add(model);
+  w.muzzle = muzzle; w.ejectPt = eject;
+  w.flash = makeFlash(w.muzzle, 0, 0, 0, 1);
+  if (w.magMesh) { const m = find('mag'); if (m) w.magMesh = m; }
+  if (w.foreEnd) { const m = find('foreEnd'); if (m) w.foreEnd = m; }
+  if (w.boltH) { const m = find('bolt'); if (m) w.boltH = m; }
+  if (w.cylGroup) { const m = find('cylinder'); if (m) w.cylGroup = m; }
+  if (w.handL) { const m = find('hand_L'); if (m) { w.handL = m; w.handLPos = m.position.clone(); } }
 }
 
 class ViewModel {
@@ -75,6 +108,7 @@ export class Gun extends ViewModel {
     this.fireT = 0; this.reloading = false; this.reloadT = 0; this.spreadCur = this.spread; this.flashT = 0; this.pumpT = 0; this.racked = false; this.needPump = false;
     this.mat = makeInkMaterial({ ink: INK.BLUE }); this.dark = makeInkMaterial({ ink: INK.BLACK }); this.red = makeInkMaterial({ ink: INK.RED, fill: true });
     this.build(); this.setSight(...this.sight);
+    swapWeaponModel(this);
   }
   get spreadPx() { return 5 + this.spreadCur * 900; }
   addAmmo(n) { this.reserve = Math.min(this.reserve + n, this.maxReserve); }
@@ -258,6 +292,7 @@ export class Katana extends ViewModel {
     this.blockPos = new THREE.Vector3(0.21, -0.31, -0.36); this.blockRot = new THREE.Vector3(1.40, 0.30, 1.24); this.deflectKick = 0;
     this.parrySwing = 0; this.parryDir = 1; this.bloodLevel = 0;
     this.build();
+    swapWeaponModel(this);
   }
   build() {
     const mat = makeInkMaterial({ ink: INK.BLUE }), dark = makeInkMaterial({ ink: INK.BLACK }); const g = this.root;
@@ -266,8 +301,13 @@ export class Katana extends ViewModel {
     for (let i = 0; i < 6; i++) bx(0.036, 0.04, 0.02, 0, 0, 0.02 + i * 0.045, mat, g);
     hand(mat, 0.0, -0.005, 0.05, g, [0.5, -0.5, 1]); hand(mat, 0.0, -0.005, 0.2, g, [-0.4, -0.7, 1]);
     this.tip = new THREE.Object3D(); this.tip.position.set(0, 0, -1.05); g.add(this.tip);
-    // Blood clings to the flat of the blade. Each streak is a ragged sliver built in the plane of
-    // the steel and inset inside its silhouette, so nothing ever hangs off an edge.
+    this.makeSmears();
+  }
+  // Blood clings to the flat of the blade. Each streak is a ragged sliver built in the plane of
+  // the steel and inset inside its silhouette, so nothing ever hangs off an edge. Rebuilt after
+  // a model swap so the smears always sit on whatever blade is currently equipped.
+  makeSmears() {
+    const g = this.root;
     const blood = makeInkMaterial({ ink: INK.RED, fill: true, side: THREE.DoubleSide });
     const BH = 0.0168, BX = 0.0067;                 // blade half height, and the face to sit on
     this.smears = [];
