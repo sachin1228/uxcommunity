@@ -862,7 +862,7 @@ export function CommunityChat({
   // ── Member @mentions (autocomplete + registry) ────────────────────────────
   const commitMentionText = useCallback(
     (text: string, caret: number) => {
-      setInput(text.slice(0, MAX_MESSAGE_CHARS));
+      setInput(text);
       setTyping(text.trim().length > 0);
       // Restore focus + caret after React re-renders the textarea value.
       requestAnimationFrame(() => {
@@ -972,17 +972,16 @@ export function CommunityChat({
       if (textarea) {
         const start = textarea.selectionStart ?? input.length;
         const end   = textarea.selectionEnd   ?? input.length;
-        const next  = (input.slice(0, start) + emoji + input.slice(end)).slice(0, MAX_MESSAGE_CHARS);
+        const next  = input.slice(0, start) + emoji + input.slice(end);
         setInput(next);
-        // Restore cursor after the inserted emoji (clamped to the limit)
+        // Restore cursor after the inserted emoji
         requestAnimationFrame(() => {
-          const caret = Math.min(start + emoji.length, MAX_MESSAGE_CHARS);
-          textarea.selectionStart = caret;
-          textarea.selectionEnd   = caret;
+          textarea.selectionStart = start + emoji.length;
+          textarea.selectionEnd   = start + emoji.length;
           textarea.focus();
         });
       } else {
-        setInput((prev) => (prev + emoji).slice(0, MAX_MESSAGE_CHARS));
+        setInput((prev) => prev + emoji);
       }
     },
     [input, inputRef, setInput],
@@ -990,7 +989,9 @@ export function CommunityChat({
 
   const handleInputChange = useCallback(
     (value: string) => {
-      setInput(value.slice(0, MAX_MESSAGE_CHARS));
+      // No truncation — the composer shows an inline error + blocks send
+      // while the input is over MAX_MESSAGE_CHARS.
+      setInput(value);
       setTyping(value.trim().length > 0);
     },
     [setInput, setTyping],

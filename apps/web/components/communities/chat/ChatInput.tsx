@@ -170,7 +170,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
-    const canSend = !!input.trim() || !!pendingImagePreview;
+    // Over the limit → hide the send button so the message can't be sent.
+    const overLimit = input.length > MAX_MESSAGE_CHARS;
+    const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
 
     // Mirror content for the visual overlay (plain text + emoji SVGs + blue
     // mention tokens). Color spans never change layout, so the overlay stays
@@ -432,10 +434,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ref={ref}
                   data-chat-input
                   value={input}
-                  maxLength={MAX_MESSAGE_CHARS}
                   onChange={(e) => {
-                    // Hard cap even beyond maxLength (IME/paste edge cases).
-                    const value = e.target.value.slice(0, MAX_MESSAGE_CHARS);
+                    // No maxLength: let the user keep typing past the limit so
+                    // the inline error below can show, then block sending.
+                    const value = e.target.value;
                     onChange(value);
                     e.target.style.height = "auto";
                     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
@@ -483,7 +485,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               {input.length > 0 && input.length >= MAX_MESSAGE_CHARS - 50 && (
                 <span
                   className={`shrink-0 mb-0.5 font-mono text-[10px] tabular-nums ${
-                    input.length >= MAX_MESSAGE_CHARS ? "text-red-400" : "text-foreground-muted/70"
+                    overLimit ? "text-red-400" : "text-foreground-muted/70"
                   }`}
                   aria-live="polite"
                 >
@@ -510,6 +512,16 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 </button>
               )}
             </div>{/* end input row */}
+
+            {/* Inline error — shown right in the input box while over the limit */}
+            {overLimit && (
+              <p
+                role="alert"
+                className="px-2 pb-1.5 font-body text-[11px] text-red-400"
+              >
+                Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove {input.length - MAX_MESSAGE_CHARS} to send.
+              </p>
+            )}
           </div>{/* end outer box */}
         </div>{/* end anchor */}
 
