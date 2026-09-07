@@ -98,7 +98,7 @@ export function CommentBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState<{ bottom: number; left: number } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const anchorRef = useRef<HTMLDivElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const portalPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,13 +115,16 @@ export function CommentBox({
     };
   }, []);
 
-  // Position the picker above the composer, like the chat emoji picker.
+  // Position the picker directly above the emoji button, like the chat emoji
+  // picker — right-aligned with the button so it never spills past the
+  // composer's right edge.
   const measureAndSetPos = useCallback(() => {
-    if (!anchorRef.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
+    const btn = emojiBtnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
     setPickerPos({
       bottom: window.innerHeight - rect.top + 8,
-      left:   rect.left,
+      left:   rect.right - 340,
     });
   }, []);
 
@@ -223,7 +226,7 @@ export function CommentBox({
   }
 
   return (
-    <div ref={anchorRef} className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
+    <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">
       {/* ── Single row: avatar · input · cancel · actions ── */}
       <div className="flex w-full items-end gap-2">
@@ -254,6 +257,7 @@ export function CommentBox({
         <div className="flex shrink-0 items-center gap-2">
           {/* Emoji picker — opens the shared Noto emoji grid */}
           <button
+            ref={emojiBtnRef}
             type="button"
             data-comment-emoji-toggle
             onClick={togglePicker}
@@ -288,8 +292,8 @@ export function CommentBox({
       {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
     </form>
 
-    {/* ── Emoji picker — portal at document.body, fixed above the composer
-          (same as the chat emoji picker), outside the form so its buttons
+    {/* ── Emoji picker — portal at document.body, fixed above the emoji
+          button (right-aligned with it), outside the form so its buttons
           never submit the comment ── */}
     {pickerOpen && pickerPos && typeof document !== "undefined" &&
       createPortal(
@@ -304,7 +308,7 @@ export function CommentBox({
             animation: "fadeSlideUp 150ms ease-out",
           }}
         >
-          <div className="flex h-[440px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md">
+          <div className="flex h-[320px] flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md">
             <NotoEmojiGrid onSelect={insertEmoji} />
           </div>
         </div>,
