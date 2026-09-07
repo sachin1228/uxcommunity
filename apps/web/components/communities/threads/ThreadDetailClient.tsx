@@ -14,7 +14,6 @@ import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
 import {
   fetchThreadResource,
-  getThreadResource,
   invalidateThreadResources,
   patchThreadResource,
   seedThreadResource,
@@ -54,10 +53,13 @@ export function ThreadDetailClient({
   const commentsUrl = `${detailUrl}/comments`;
   seedThreadResource(detailUrl, { thread: initialThread }, currentUserId);
   seedThreadResource(commentsUrl, { comments: initialComments }, currentUserId);
-  const cachedThread = getThreadResource<{ thread?: CommunityThread }>(detailUrl, currentUserId);
-  const cachedComments = getThreadResource<{ comments?: ThreadComment[] }>(commentsUrl, currentUserId);
-  const [thread, setThread] = useState(cachedThread?.thread ?? initialThread);
-  const [comments, setComments] = useState(cachedComments?.comments ?? initialComments);
+  // Initialize state purely from the server snapshot. The request cache is a
+  // mutable module-level store that can hold data from a previous client-side
+  // visit, so reading it during the initial render can make the client's first
+  // pass differ from the server HTML and trigger a hydration mismatch. The
+  // cache still feeds the mount-time revalidation below.
+  const [thread, setThread] = useState(initialThread);
+  const [comments, setComments] = useState(initialComments);
   const threadRef = useRef(thread);
   const commentsRef = useRef(comments);
   const isVisible = useDocumentVisible();
