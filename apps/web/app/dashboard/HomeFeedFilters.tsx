@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
-const FILTERS = ["Newest", "Trending", "Following"] as const;
+const FILTERS = ["Newest", "Trending"] as const;
 
 type Filter = (typeof FILTERS)[number];
 
