@@ -280,13 +280,13 @@ export function ThreadImageLightbox({
                   active={thread.user_liked}
                   className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                     thread.user_liked
-                      ? "text-[var(--ds-blue-700)]"
+                      ? "text-[var(--like)]"
                       : "fill-none text-foreground-subtle group-hover/like:text-white"
                   }`}
                 />
                 <span
                   className={`font-body text-sm font-semibold tabular-nums ${
-                    thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
+                    thread.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                   }`}
                 >
                   {thread.like_count}

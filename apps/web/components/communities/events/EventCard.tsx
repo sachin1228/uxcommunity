@@ -336,8 +336,8 @@ export function EventCard({
           aria-pressed={event.user_liked}
           className="group/like flex shrink-0 cursor-pointer items-center gap-2"
         >
-          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
+          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
         </button>
 
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">

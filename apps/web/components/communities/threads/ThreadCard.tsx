@@ -501,7 +501,7 @@ export function ThreadCard({
           <div className="relative">
             <h3
               ref={titleRef}
-              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
+              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
             >
               {renderWithLinks(thread.title, true)}
             </h3>
@@ -607,13 +607,13 @@ export function ThreadCard({
                 active={thread.user_liked}
                 className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${
                   thread.user_liked
-                    ? "text-[var(--ds-blue-700)]"
+                    ? "text-[var(--like)]"
                     : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               />
               <span
                 className={`font-body text-sm font-semibold tabular-nums ${
-                  thread.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"
+                  thread.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
                 }`}
               >
                 {thread.like_count}
