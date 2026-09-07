@@ -13,9 +13,12 @@ interface Props {
   email: string;
   avatarUrl: string | null;
   initial: string;
+  /** "icon" (default) — compact avatar button for bars; "row" — full-width row for the sidebar. */
+  variant?: "icon" | "row";
 }
 
-export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
+export function ProfileDropdown({ name, email, avatarUrl, initial, variant = "icon" }: Props) {
+  const isRow = variant === "row";
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { loggingOut, handleLogout } = useLogout();
@@ -28,17 +31,41 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
       <button
         ref={triggerRef}
         onClick={() => setOpen((v) => !v)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border focus:outline-none"
         aria-label="Profile menu"
+        aria-expanded={open}
+        className={
+          isRow
+            ? "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-[5px] py-1 text-left transition-colors hover:bg-surface-raised focus:outline-none"
+            : "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border focus:outline-none"
+        }
       >
         {avatarUrl ? (
-          <AvatarImg url={avatarUrl} name={name} size={28} className="h-7 w-7 rounded-full object-cover" />
+          <AvatarImg
+            url={avatarUrl}
+            name={name}
+            size={isRow ? 32 : 28}
+            className={isRow ? "h-8 w-8 shrink-0 rounded-full object-cover" : "h-7 w-7 rounded-full object-cover"}
+          />
         ) : (
-          <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center select-none">
-            <span className="font-display text-xs font-semibold text-accent-foreground">
+          <div
+            className={`flex shrink-0 items-center justify-center rounded-full bg-accent select-none ${
+              isRow ? "h-8 w-8" : "h-7 w-7"
+            }`}
+          >
+            <span className={`font-display font-semibold text-accent-foreground ${isRow ? "text-sm" : "text-xs"}`}>
               {initial}
             </span>
           </div>
+        )}
+        {isRow && (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-body text-sm font-medium leading-tight text-foreground">
+              {name}
+            </span>
+            <span className="mt-0.5 block truncate font-body text-[11px] leading-tight text-foreground-muted">
+              {email}
+            </span>
+          </span>
         )}
       </button>
 
@@ -47,7 +74,7 @@ export function ProfileDropdown({ name, email, avatarUrl, initial }: Props) {
         triggerRef={triggerRef}
         open={open}
         onClose={() => setOpen(false)}
-        align="right"
+        align={isRow ? "left" : "right"}
         className="w-48"
       >
         <div className="border-b border-border px-3.5 py-3">

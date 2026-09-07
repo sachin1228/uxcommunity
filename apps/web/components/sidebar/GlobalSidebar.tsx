@@ -10,6 +10,8 @@ import { useSidebarCommunities } from "@/components/communities/panel/useSidebar
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useNotifications } from "@/lib/use-notifications";
+import { BrandLogo } from "@/components/ui/BrandLogo";
+import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
 
@@ -98,6 +100,16 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       {!mobile && <BrowserNotificationInitializer />}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* Profile — avatar + dropdown, above the Workspace nav */}
+      <div className="border-b border-border px-[13px] pb-[11px] pt-[13px]">
+        {!mobile && (
+          <div className="mb-[11px] px-[5px]">
+            <BrandLogo iconClassName="h-5 w-5" wordmarkClassName="text-sm" />
+          </div>
+        )}
+        <ProfileDropdown variant="row" {...user} />
+      </div>
+
       {/* WORKSPACE nav */}
       <div className="px-[13px] pb-[9px] pt-[13px]">
         <p className="mb-[9px] px-[5px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
