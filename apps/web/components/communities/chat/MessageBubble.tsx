@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
@@ -12,7 +14,7 @@ import { LinkPreview } from "./LinkPreview";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
-import { ModalPortal } from "@/components/ui/Modal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 
 
@@ -68,10 +70,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[10px] font-semibold truncate ${isMe ? "text-primary-foreground opacity-80" : "text-muted-foreground"}`}>
         {reply.user_name}
       </p>
-      <p className={`font-body text-[11px] truncate ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+      <p className={`font-body text-[11px] truncate ${isMe ? "text-primary-foreground opacity-70" : "text-muted-foreground"}`}>
         {reply.content || "📷 Image"}
       </p>
     </div>
@@ -96,7 +98,7 @@ function ReactionPills({
       {reactions.map(({ emoji, user_ids }) => {
         const iMine = user_ids.includes(currentUserId);
         return (
-          <button
+          <Button variant="ghost"
             key={emoji}
             onClick={(e) => { e.stopPropagation(); onReaction(msgId, emoji); }}
             title={iMine ? "Remove reaction" : undefined}
@@ -111,7 +113,7 @@ function ReactionPills({
             {user_ids.length > 1 && (
               <span className="text-[10px] opacity-70">{user_ids.length}</span>
             )}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -146,7 +148,7 @@ function BubbleImage({
           ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
               isMe
                 ? "border-[var(--ds-blue-700)]"
-                : "border-border bg-surface-raised"
+                : "border-border bg-popover"
             }`
           : "relative"}
       >
@@ -179,13 +181,13 @@ function BubbleImage({
         <div className="absolute inset-0 flex items-center justify-center rounded-xl">
           <div className="relative w-12 h-12">
             <div className="absolute inset-0 rounded-full border-[3px] border-white/20 border-t-white animate-spin" />
-            <button
+            <Button variant="ghost"
               onClick={(e) => { e.stopPropagation(); onCancel?.(); }}
-              className="absolute inset-0 flex items-center justify-center text-white"
+              className="absolute inset-0 flex items-center justify-center"
               aria-label="Cancel upload"
             >
               <X strokeWidth={2.5} size={14} />
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -198,14 +200,14 @@ function BubbleImage({
 function RetryIndicator({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-1 shrink-0 self-center">
-      <button
+      <Button variant="destructive" size="icon"
         onClick={(e) => { e.stopPropagation(); onRetry(); }}
-        className="h-7 w-7 flex items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 active:scale-90 transition-all"
+        className="h-7 w-7 flex items-center justify-center active:scale-90 transition-all"
         aria-label="Retry sending"
         title="Tap to retry"
       >
         <RefreshCw strokeWidth={2.5} size={13} />
-      </button>
+      </Button>
       <span className="font-body text-[9px] text-red-400 leading-none">Retry</span>
     </div>
   );
@@ -224,44 +226,8 @@ function DeleteConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  // Close on backdrop click
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { e.stopPropagation(); onCancel(); }}
-    >
-      <div
-        className="modal-panel w-72 overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 pt-5 pb-4 border-b border-white/[0.06]">
-          <p className="font-body text-base font-semibold text-foreground text-center">
-            Delete message?
-          </p>
-          <p className="font-body text-xs text-foreground-muted text-center mt-1">
-            This will delete the message for everyone in this chat.
-          </p>
-        </div>
-
-        <div className="flex flex-col">
-          <button
-            onClick={(e) => { e.stopPropagation(); onConfirm(); }}
-            className="w-full px-5 py-3.5 font-body text-sm font-semibold text-red-400 hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
-          >
-            Delete for everyone
-          </button>
-          <div className="h-px bg-white/[0.06]" />
-          <button
-            onClick={(e) => { e.stopPropagation(); onCancel(); }}
-            className="w-full px-5 py-3.5 font-body text-sm text-foreground-muted hover:bg-white/[0.04] active:bg-white/[0.08] transition-colors text-center"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-    </ModalPortal>
+    <ConfirmDialog open onClose={onCancel} onConfirm={onConfirm} title="Delete message?" message="This will delete the message for everyone in this chat." confirmLabel="Delete for everyone" />
   );
 }
 
@@ -368,7 +334,7 @@ function MessageHoverActions({
               {REACTIONS.map(({ emoji, label, bg }) => {
                 const isActive = myEmoji === emoji;
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={label}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -387,33 +353,33 @@ function MessageHoverActions({
                     title={label}
                   >
                     <AnimatedEmoji emoji={emoji} size={20} />
-                  </button>
+                  </Button>
                 );
               })}
             </div>
           )}
-          <button
+          <Button variant="ghost"
             onClick={(e) => { e.stopPropagation(); setPickerOpen((v) => !v); }}
             className={`
               w-7 h-7 rounded-full flex items-center justify-center
               transition-colors duration-100
               ${pickerOpen
                 ? "bg-white/15 text-foreground"
-                : "text-foreground-muted hover:text-foreground hover:bg-white/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/10"
               }
             `}
             aria-label="React to message"
             title="React"
           >
             <Smile strokeWidth={2.5} size={14} />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Reply, copy, and delete menu */}
       {showMenu && (
       <div className={insideBubble ? "absolute top-1 right-1 z-30" : "relative"}>
-        <button
+        <Button variant="ghost"
           ref={triggerBtnRef}
           onClick={(e) => { e.stopPropagation(); onMenuOpenChange(!menuOpen); }}
           className={`
@@ -439,7 +405,7 @@ function MessageHoverActions({
           title="More actions"
         >
           <MoreHorizontal size={14} strokeWidth={2.5} />
-        </button>
+        </Button>
 
         {/* Portal dropdown — renders at document.body, above all stacking contexts */}
         <DropdownMenu
@@ -448,64 +414,64 @@ function MessageHoverActions({
           onClose={() => onMenuOpenChange(false)}
           align="right"
         >
-          <button
+          <Button variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
               onReply(msg);
               onMenuOpenChange(false);
             }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+            className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
             role="menuitem"
           >
-            <Reply strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+            <Reply strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
             <span>Reply</span>
-          </button>
+          </Button>
 
           {canCopy && (
-            <button
+            <Button variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 onCopy(msg);
                 onMenuOpenChange(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
               role="menuitem"
             >
-              <Copy strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+              <Copy strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Copy</span>
-            </button>
+            </Button>
           )}
 
           {isMe && canCopy && editAvailable && (
-            <button
+            <Button variant="ghost"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(msg);
                 onMenuOpenChange(false);
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-foreground hover:bg-white/[0.08] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
               role="menuitem"
             >
-              <Pencil strokeWidth={2.5} size={14} className="text-foreground-muted shrink-0" />
+              <Pencil strokeWidth={2.5} size={14} className="text-muted-foreground shrink-0" />
               <span>Edit</span>
-            </button>
+            </Button>
           )}
 
           {(isMe || canModerate) && (
             <>
               <div className="h-px bg-white/[0.08]" role="separator" />
-              <button
+              <Button variant="destructive"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteClick();
                   onMenuOpenChange(false);
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left transition-colors"
                 role="menuitem"
               >
                 <Trash2 strokeWidth={2.5} size={14} className="shrink-0" />
                 <span>{isMe ? "Delete" : "Delete for everyone"}</span>
-              </button>
+              </Button>
             </>
           )}
         </DropdownMenu>
@@ -572,7 +538,7 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
         rel="noopener noreferrer"
         onClick={(e) => e.stopPropagation()}
         className={`underline underline-offset-2 break-all ${
-          isMe ? "text-accent-foreground opacity-90 hover:opacity-100" : "text-foreground hover:opacity-80"
+          isMe ? "text-primary-foreground opacity-90 hover:opacity-100" : "text-foreground hover:opacity-80"
         }`}
       >
         {url}
@@ -590,8 +556,8 @@ function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
     <span
       className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
         isMe
-          ? "bg-black/25 text-accent-foreground"
-          : "bg-accent/15 text-accent"
+          ? "bg-black/25 text-primary-foreground"
+          : "bg-primary/15 text-primary"
       }`}
     >
       {text}</span>
@@ -685,7 +651,7 @@ function MessageContent({
     <>
       <div
         className={`chat-message-text font-body text-sm font-medium leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
-          isMe ? "text-accent-foreground" : "text-foreground"
+          isMe ? "text-primary-foreground" : "text-foreground"
         }`}
       >
         {parts}
@@ -730,20 +696,20 @@ function DeletedBubble({
       className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-          : "bg-surface-raised"
+          : "bg-popover"
         }`}
     >
       {isFirstInGroup && (
         <MessageBubbleTail
           side={isMe ? "right" : "left"}
-          className={isMe ? "text-[var(--ds-blue-700)]" : "text-surface-raised"}
+          className={isMe ? "text-[var(--ds-blue-700)]" : "text-popover"}
         />
       )}
-      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
-      <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
+      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-primary-foreground" : "shrink-0 text-muted-foreground"} />
+      <span className={`font-body text-xs ${isMe ? "text-primary-foreground" : "text-muted-foreground"}`}>
         {isMe ? "You deleted this message" : "This message was deleted"}
       </span>
-      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
+      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-primary-foreground opacity-60" : "text-muted-foreground"}`}>
         {fmtTime(createdAt)}
       </span>
     </div>
@@ -868,7 +834,7 @@ export const MessageBubble = memo(function MessageBubble({
         <div className="min-w-0 max-w-[65%]">
           {/* Sender name — hidden for the current user's own messages */}
           {showHeader && sender && !isDeleted && !isMe && (
-            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
+            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-muted-foreground">
               <span>{sender.name}</span>
             </p>
           )}
@@ -886,16 +852,16 @@ export const MessageBubble = memo(function MessageBubble({
                   <AnimatedEmoji emoji={msg.content} size={EMOJI_MESSAGE_SIZE} />
                   <div className="flex items-center gap-1 mt-0.5">
                     {msg.edited_at && (
-                      <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
+                      <span className="font-body text-[10px] text-muted-foreground/60">edited</span>
                     )}
-                    <span className="font-mono text-[10px] text-foreground-muted/70">
+                    <span className="font-mono text-[10px] text-muted-foreground/70">
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
-                      <Clock strokeWidth={2.5} size={10} className="text-foreground-muted/60 animate-pulse" />
+                      <Clock strokeWidth={2.5} size={10} className="text-muted-foreground/60 animate-pulse" />
                     )}
                     {isMe && (msg.status === "sent" || !msg.status) && (
-                      <CheckCheck strokeWidth={2.5} size={11} className="text-foreground-muted/70" />
+                      <CheckCheck strokeWidth={2.5} size={11} className="text-muted-foreground/70" />
                     )}
                     {isMe && msg.status === "failed" && (
                       <span className="text-[10px] text-red-400">!</span>
@@ -941,7 +907,7 @@ export const MessageBubble = memo(function MessageBubble({
                             ? msg.status === "failed"
                               ? "bg-red-500/80"
                               : "bg-[var(--ds-blue-700)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised"
+                            : "bg-popover"
                         }`
                   }`}
                 >
@@ -952,7 +918,7 @@ export const MessageBubble = memo(function MessageBubble({
                         ? msg.status === "failed"
                           ? "text-red-500/80"
                           : "text-[var(--ds-blue-700)]"
-                        : "text-surface-raised"}
+                        : "text-popover"}
                     />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
@@ -981,20 +947,20 @@ export const MessageBubble = memo(function MessageBubble({
                   {!imageOnly && (
                     <div className="flex items-center justify-end gap-1 mt-1">
                       {msg.edited_at && (
-                        <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
+                        <span className={`font-body text-[10px] ${isMe ? "text-primary-foreground opacity-50" : "text-muted-foreground"}`}>
                           edited
                         </span>
                       )}
                       <span className={`font-mono text-[10px] ${
-                        isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"
+                        isMe ? "text-primary-foreground opacity-60" : "text-muted-foreground"
                       }`}>
                         {fmtTime(msg.created_at)}
                       </span>
                       {isMe && msg.status === "sending" && (
-                        <Clock strokeWidth={2.5} size={10} className="text-accent-foreground opacity-60 animate-pulse" />
+                        <Clock strokeWidth={2.5} size={10} className="text-primary-foreground opacity-60 animate-pulse" />
                       )}
                       {isMe && (msg.status === "sent" || !msg.status) && (
-                        <CheckCheck strokeWidth={2.5} size={11} className="text-accent-foreground opacity-70" />
+                        <CheckCheck strokeWidth={2.5} size={11} className="text-primary-foreground opacity-70" />
                       )}
                       {isMe && msg.status === "failed" && (
                         <span className="text-[10px] text-red-200">!</span>

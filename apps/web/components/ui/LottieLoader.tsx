@@ -72,7 +72,7 @@ interface Props {
   communityType: string;
   /** Size of the animation container in pixels (default 120). */
   size?: number;
-  /** Tailwind class for fallback spinner (default "h-5 w-5 text-foreground-muted"). */
+  /** Tailwind class for fallback spinner (default "h-5 w-5 text-muted-foreground"). */
   spinnerClassName?: string;
   /**
    * Whether to render a fallback spinner when no Lottie is configured or still
@@ -85,7 +85,7 @@ export function LottieLoader({
   communityId,
   communityType,
   size = 120,
-  spinnerClassName = "h-5 w-5 text-foreground-muted",
+  spinnerClassName = "h-5 w-5 text-muted-foreground",
   showFallback = true,
 }: Props) {
   const [animationData, setAnimationData] = useState<object | null>(null);

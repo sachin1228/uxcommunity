@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
@@ -217,9 +219,9 @@ export function NotificationBell({ userId }: Props) {
   const emptyState = useMemo(
     () => (
       <div className="px-5 py-10 text-center">
-        <Bell strokeWidth={2.5} size={22} className="mx-auto mb-2 text-foreground-muted opacity-50" />
+        <Bell strokeWidth={2.5} size={22} className="mx-auto mb-2 text-muted-foreground opacity-50" />
         <p className="font-body text-sm font-medium text-foreground">No notifications yet</p>
-        <p className="mt-1 font-body text-xs text-foreground-muted">
+        <p className="mt-1 font-body text-xs text-muted-foreground">
           Threads, resources, events, replies, and @mentions will appear here.
         </p>
       </div>
@@ -229,13 +231,13 @@ export function NotificationBell({ userId }: Props) {
 
   return (
     <div className="relative">
-      <button
+      <Button variant="outline" size="icon"
         ref={triggerRef}
         type="button"
         aria-label={hasUnread ? `${unreadCount} unread notifications` : "Notifications"}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="relative flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:border-foreground-muted hover:bg-surface-raised hover:text-foreground"
+        className="relative flex h-8 w-8 items-center justify-center transition-colors"
       >
         <Bell size={15} strokeWidth={2.5} />
           {hasUnread && (
@@ -243,7 +245,7 @@ export function NotificationBell({ userId }: Props) {
             {visibleCount}
           </span>
         )}
-      </button>
+      </Button>
 
       <DropdownMenu
         triggerRef={triggerRef}
@@ -255,19 +257,19 @@ export function NotificationBell({ userId }: Props) {
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <p className="font-display text-sm font-semibold text-foreground">Notifications</p>
-            <p className="font-body text-[11px] text-foreground-muted">
+            <p className="font-body text-[11px] text-muted-foreground">
               {hasUnread ? `${unreadCount} unread` : "All caught up"}
             </p>
           </div>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={markAllRead}
             disabled={!hasUnread}
-            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-body text-[11px] text-foreground-muted hover:bg-white/[0.08] hover:text-foreground disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-2 py-1 disabled:opacity-40"
           >
             <CheckCheck strokeWidth={2.5} size={13} />
             Mark read
-          </button>
+          </Button>
         </div>
 
         <div className="max-h-[420px] overflow-y-auto">
@@ -294,7 +296,7 @@ export function NotificationBell({ userId }: Props) {
                     >
                       <span
                         className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                          unread ? "bg-accent-soft text-accent" : "bg-background-subtle text-foreground-muted"
+                          unread ? "bg-secondary text-primary" : "bg-muted text-muted-foreground"
                         }`}
                       >
                         <Icon size={15} strokeWidth={2.5} />
@@ -304,17 +306,17 @@ export function NotificationBell({ userId }: Props) {
                           <span className="line-clamp-2 flex-1 font-body text-sm font-medium leading-5 text-foreground">
                             {item.title}
                           </span>
-                          <span className="shrink-0 font-body text-[11px] text-foreground-subtle">
+                          <span className="shrink-0 font-body text-[11px] text-muted-foreground">
                             {formatRelativeTime(item.created_at)}
                           </span>
                         </span>
                         {item.body && (
-                          <span className="mt-0.5 line-clamp-2 block font-body text-xs leading-5 text-foreground-muted">
+                          <span className="mt-0.5 line-clamp-2 block font-body text-xs leading-5 text-muted-foreground">
                             {item.body}
                           </span>
                         )}
                       </span>
-                      {unread && <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />}
+                      {unread && <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />}
                     </Link>
                   </li>
                 );

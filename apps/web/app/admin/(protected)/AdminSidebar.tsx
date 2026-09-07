@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -52,11 +54,11 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <LayoutList strokeWidth={2.5} size={16} className={active("/admin") ? "text-accent" : ""} />
+        <LayoutList strokeWidth={2.5} size={16} className={active("/admin") ? "text-primary" : ""} />
         Applications
       </Link>
 
@@ -66,11 +68,11 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin/lottie-animations")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin/lottie-animations")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <Clapperboard strokeWidth={2.5} size={16} className={active("/admin/lottie-animations") ? "text-accent" : ""} />
+        <Clapperboard strokeWidth={2.5} size={16} className={active("/admin/lottie-animations") ? "text-primary" : ""} />
         Lottie Animations
       </Link>
 
@@ -80,11 +82,11 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin/communities")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin/communities")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-accent" : ""} />
+        <MessagesSquare strokeWidth={2.5} size={16} className={active("/admin/communities") ? "text-primary" : ""} />
         Communities
       </Link>
 
@@ -94,11 +96,11 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin/moderation")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin/moderation")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <ShieldCheck strokeWidth={2.5} size={16} className={active("/admin/moderation") ? "text-accent" : ""} />
+        <ShieldCheck strokeWidth={2.5} size={16} className={active("/admin/moderation") ? "text-primary" : ""} />
         Moderation
       </Link>
 
@@ -108,11 +110,11 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin/tools")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin/tools")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <Wrench strokeWidth={2.5} size={16} className={active("/admin/tools") ? "text-accent" : ""} />
+        <Wrench strokeWidth={2.5} size={16} className={active("/admin/tools") ? "text-primary" : ""} />
         Tools
       </Link>
 
@@ -122,31 +124,31 @@ export function AdminSidebar() {
         onClick={() => setPendingHref("/admin/load-test")}
         className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
           active("/admin/load-test")
-            ? "bg-surface-raised text-foreground"
-            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "text-muted-foreground hover:text-foreground hover:bg-popover"
         }`}
       >
-        <Gauge strokeWidth={2.5} size={16} className={active("/admin/load-test") ? "text-accent" : ""} />
+        <Gauge strokeWidth={2.5} size={16} className={active("/admin/load-test") ? "text-primary" : ""} />
         Load Test
       </Link>
 
       {/* Master Data accordion */}
       <div>
-        <button
+        <Button variant="ghost"
           onClick={() => setOpen((v) => !v)}
           className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
             masterGroupActive
-              ? "bg-surface-raised text-foreground"
-              : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              ? "bg-popover text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-popover"
           }`}
         >
-          <Database strokeWidth={2.5} size={16} className={masterGroupActive ? "text-accent" : ""} />
+          <Database strokeWidth={2.5} size={16} className={masterGroupActive ? "text-primary" : ""} />
           <span className="flex-1 text-left">Master Data</span>
           <ChevronDown
             size={14}
             className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           />
-        </button>
+        </Button>
 
         {open && (
           <div className="mt-1 ml-2 flex flex-col gap-1 border-l border-border pl-2">
@@ -157,11 +159,11 @@ export function AdminSidebar() {
                 onClick={() => setPendingHref(href)}
                 className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
                   active(href)
-                    ? "bg-surface-raised text-foreground"
-                    : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                    ? "bg-popover text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-popover"
                 }`}
               >
-                <Icon size={15} strokeWidth={2.5} className={active(href) ? "text-accent" : ""} />
+                <Icon size={15} strokeWidth={2.5} className={active(href) ? "text-primary" : ""} />
                 {label}
               </Link>
             ))}

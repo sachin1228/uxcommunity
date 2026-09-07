@@ -116,7 +116,7 @@ export function ProfileClient({
     <div className="mx-auto mt-8 max-w-4xl">
       <div className="mb-8">
         <h1 className="font-display text-2xl font-semibold text-foreground">Your Profile</h1>
-        <p className="mt-0.5 font-body text-sm text-foreground-muted">
+        <p className="mt-0.5 font-body text-sm text-muted-foreground">
           How you appear to others in the community
         </p>
       </div>

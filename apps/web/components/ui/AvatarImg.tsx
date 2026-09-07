@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/shadcn/avatar";
+import { cn } from "@/lib/utils";
 
 const GENERATED_PROFILE_PICTURE_PATTERNS = [
   /^boring:\/\//i,
@@ -40,32 +41,12 @@ export function AvatarImg({
   size = 40,
   className,
 }: AvatarImgProps) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-
-  if (!url || failedUrl === url || isGeneratedProfilePicture(url)) {
-    return (
-      <span
-        role="img"
-        aria-label={`${name}'s profile picture placeholder`}
-        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-body font-semibold text-accent ${className ?? ""}`}
-        style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.35)) }}
-      >
-        {initialsForName(name)}
-      </span>
-    );
-  }
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt={`${name}'s profile picture`}
-      width={size}
-      height={size}
-      loading="lazy"
-      decoding="async"
-      className={className}
-      onError={() => setFailedUrl(url)}
-    />
+    <Avatar className={cn("shrink-0", className)} style={{ width: size, height: size }}>
+      <AvatarImage src={url && !isGeneratedProfilePicture(url) ? url : undefined} alt={`${name}'s profile picture`} className="object-cover" />
+      <AvatarFallback role="img" aria-label={`${name}'s profile picture placeholder`} style={{ fontSize: Math.max(12, Math.round(size * 0.35)) }}>
+        {initialsForName(name)}
+      </AvatarFallback>
+    </Avatar>
   );
 }

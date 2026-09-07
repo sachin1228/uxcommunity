@@ -307,9 +307,9 @@ function SignupInner() {
         )}
 
         {tokenState.status === "invalid" && (
-          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
+          <div className="rounded-xl bg-card p-8 text-center shadow-card">
             <p className="font-display text-lg font-semibold text-foreground mb-2">Invalid link</p>
-            <p className="font-body text-sm text-foreground-muted">{tokenState.error}</p>
+            <p className="font-body text-sm text-muted-foreground">{tokenState.error}</p>
           </div>
         )}
 
@@ -365,14 +365,14 @@ function SignupInner() {
         )}
 
         {step === "done" && (
-          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft mx-auto mb-4">
+          <div className="rounded-xl bg-card p-8 text-center shadow-card">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary mx-auto mb-4">
               <span className="text-2xl">✓</span>
             </div>
             <h2 className="font-display text-xl font-semibold text-foreground mb-2">
               You&apos;re in!
             </h2>
-            <p className="font-body text-sm text-foreground-muted">Redirecting to your dashboard…</p>
+            <p className="font-body text-sm text-muted-foreground">Redirecting to your dashboard…</p>
           </div>
         )}
 

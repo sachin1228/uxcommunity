@@ -249,9 +249,9 @@ export const MessageList = memo(function MessageList({
             lottieData={displayCommunity?.lottie_data}
             name={displayCommunity?.name ?? ""}
             size={48}
-            className="bg-surface-raised"
+            className="bg-popover"
           />
-          <p className="font-body text-sm text-foreground-muted text-center">
+          <p className="font-body text-sm text-muted-foreground text-center">
             Welcome to{" "}
             <span className="font-medium text-foreground">
               {displayCommunity?.name ?? ""}
@@ -281,7 +281,7 @@ export const MessageList = memo(function MessageList({
             {/* Date divider */}
             {showDateDivider && (
               <div className="flex items-center justify-center py-3 px-5">
-                <span className="font-body text-[11px] text-foreground-muted bg-surface-raised rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
+                <span className="font-body text-[11px] text-muted-foreground bg-popover rounded-full px-3 py-0.5 shadow-[0_1px_6px_rgba(0,0,0,0.25)]">
                   {group.date}
                 </span>
               </div>

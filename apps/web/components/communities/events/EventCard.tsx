@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
@@ -49,18 +51,18 @@ function AvatarStack({
             <div
               key={rsvp.user_id}
               style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-              className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
+              className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-card bg-primary/15"
             >
               {rsvp.users?.avatar_url ? (
                 <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
+                <span className="font-display text-[10px] font-bold text-primary">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
           ))}
         </div>
       )}
-      <span className={`font-body text-[11px] ${safeCount > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
+      <span className={`font-body text-[11px] ${safeCount > 0 ? "text-muted-foreground" : "text-muted-foreground"}`}>
         {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
@@ -189,7 +191,7 @@ export function EventCard({
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
   const eventBody = (
-    <div className="relative overflow-hidden rounded-lg bg-surface-raised">
+    <div className="relative overflow-hidden rounded-lg bg-popover">
       <div className="flex min-h-52 flex-col md:flex-row">
         <div className="relative shrink-0 overflow-hidden bg-background md:h-52 md:w-auto">
           {event.cover_image_url ? (
@@ -208,27 +210,27 @@ export function EventCard({
                 <h3 className="line-clamp-2 text-balance font-display text-sm font-bold leading-snug text-foreground">{event.title}</h3>
               )}
               {event.description && (
-                <p className={`mt-1 font-body text-[11px] leading-4 text-foreground-muted ${isDetail ? "line-clamp-3 text-pretty" : "line-clamp-2"}`}>{event.description}</p>
+                <p className={`mt-1 font-body text-[11px] leading-4 text-muted-foreground ${isDetail ? "line-clamp-3 text-pretty" : "line-clamp-2"}`}>{event.description}</p>
               )}
             </div>
           </div>
 
           <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2">
-            <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-              <Calendar strokeWidth={2.5} size={13} className="shrink-0 text-accent" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1 font-body text-[11px] text-muted-foreground">
+              <Calendar strokeWidth={2.5} size={13} className="shrink-0 text-primary" aria-hidden="true" />
               {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {event.is_online ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+              <span className="inline-flex items-center gap-1 font-body text-[11px] text-muted-foreground">
                 <Video strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
                 {isDetail && event.meet_link ? (
-                  <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
+                  <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
                     Online (Google Meet) <ExternalLink strokeWidth={2.5} size={12} />
                   </a>
                 ) : event.meet_link ? "Online (Google Meet)" : "Online"}
               </span>
             ) : event.location ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+              <span className="inline-flex items-center gap-1 font-body text-[11px] text-muted-foreground">
                 <MapPin strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
                 <span className="truncate">{event.location}</span>
               </span>
@@ -237,29 +239,29 @@ export function EventCard({
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 md:flex-nowrap">
             <div className="border-r border-border pr-4">
-              <p className="font-body text-[10px] text-foreground-subtle">Hosted by</p>
+              <p className="font-body text-[10px] text-muted-foreground">Hosted by</p>
               <p className="mt-0.5 font-display text-xs font-semibold text-foreground">{authorName}</p>
             </div>
             <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
             <div className="ml-auto hidden shrink-0 md:block">
               {!past ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
-                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-primary/15 text-primary hover:bg-primary/25" : full ? "border border-border text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary"}`}
                 >
                   <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
+                </Button>
               ) : (
-                <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
+                <span className="font-body text-xs font-medium text-muted-foreground">This event has ended</span>
               )}
             </div>
           </div>
 
           {isDetail && event.max_attendees && (
-            <p className="mt-3 font-body text-xs text-foreground-subtle">
+            <p className="mt-3 font-body text-xs text-muted-foreground">
               {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
             </p>
           )}
@@ -268,24 +270,24 @@ export function EventCard({
           <div className="mt-auto flex items-end justify-between gap-3 pt-3 md:pt-0">
             <div className="md:hidden">
               {!past ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={handleJoin}
                   disabled={rsvpPending || full}
-                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-primary/15 text-primary hover:bg-primary/25" : full ? "border border-border text-muted-foreground" : "bg-primary text-primary-foreground hover:bg-primary"}`}
                 >
                   <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
                   {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
+                </Button>
               ) : (
-                <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
+                <span className="font-body text-sm font-medium text-muted-foreground">This event has ended</span>
               )}
             </div>
           </div>
         </div>
       </div>
 
-      <div className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${past ? "bg-foreground/10 text-foreground-muted" : "bg-emerald-500/15 text-emerald-400"}`}>
+      <div className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${past ? "bg-foreground/10 text-muted-foreground" : "bg-emerald-500/15 text-emerald-400"}`}>
         {past ? "Past" : "Upcoming"}
       </div>
     </div>
@@ -329,18 +331,18 @@ export function EventCard({
       <div className="mt-4">{eventBody}</div>
 
       <div className="mt-3 flex items-center justify-between gap-4">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
           aria-label={event.user_liked ? "Unlike event" : "Like event"}
           aria-pressed={event.user_liked}
           className="group/like flex shrink-0 cursor-pointer items-center gap-2"
         >
-          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
-        </button>
+          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`} />
+          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--ds-blue-700)]" : "text-muted-foreground group-hover/like:text-white"}`}>{event.like_count}</span>
+        </Button>
 
-        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-muted-foreground transition-colors duration-150 hover:text-white">
           <CommentIcon />
           {event.comment_count ?? 0}
         </span>

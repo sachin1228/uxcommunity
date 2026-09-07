@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect } from "react";
 import { ExternalLink, X } from "lucide-react";
@@ -91,21 +93,21 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
               <h2 className="font-display text-lg font-semibold text-foreground">{app.name}</h2>
               <ApplicationStatusBadge status={app.status} />
             </div>
-            <p className="font-body text-xs text-foreground-muted">{app.email}</p>
-            <p className="font-mono text-[10px] text-foreground-muted mt-0.5">
+            <p className="font-body text-xs text-muted-foreground">{app.email}</p>
+            <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
               Applied{" "}
               {new Date(app.created_at).toLocaleDateString("en-GB", {
                 day: "numeric", month: "short", year: "numeric",
               })}
             </p>
           </div>
-          <button
+          <Button variant="ghost" size="icon"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+            className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
           >
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         {/* External links */}
@@ -114,7 +116,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             href={app.linkedin_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
           >
             <ExternalLink strokeWidth={2.5} size={12} /> LinkedIn
           </a>
@@ -122,7 +124,7 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             href={app.portfolio_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 font-body text-xs text-muted-foreground hover:text-foreground hover:bg-popover transition-colors"
           >
             <ExternalLink strokeWidth={2.5} size={12} /> Portfolio
           </a>
@@ -134,10 +136,10 @@ export function ApplicationDetailModal({ app, onClose, onRefresh }: Props) {
             className={`rounded-md border px-3 py-2.5 ${
               actionWarning
                 ? "border-yellow-500/30 bg-yellow-500/5"
-                : "border-border bg-surface"
+                : "border-border bg-card"
             }`}
           >
-            <p className="font-body text-xs text-foreground-muted">{actionMsg}</p>
+            <p className="font-body text-xs text-muted-foreground">{actionMsg}</p>
           </div>
         )}
 

@@ -8,7 +8,7 @@ import { Users } from "lucide-react";
 export function CommunityIcon({
   size = 40,
   iconSize,
-  className = "bg-surface-raised",
+  className = "bg-popover",
 }: {
   /** Container diameter in px (square circle). */
   size?: number;
@@ -26,7 +26,7 @@ export function CommunityIcon({
       <Users
         size={iconSize ?? Math.round(size * 0.5)}
         strokeWidth={2.5}
-        className="text-foreground-muted"
+        className="text-muted-foreground"
       />
     </div>
   );

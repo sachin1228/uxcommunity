@@ -19,7 +19,7 @@ export default async function AdminProtectedLayout({
       <AdminTopbar />
 
       {/* Sidebar — starts below the topbar */}
-      <aside className="fixed top-11 bottom-0 left-0 flex w-[12rem] flex-col overflow-y-auto border-r border-border bg-surface">
+      <aside className="fixed top-11 bottom-0 left-0 flex w-[12rem] flex-col overflow-y-auto border-r border-border bg-card">
         <div className="px-3 py-3">
           <AdminSidebar />
         </div>

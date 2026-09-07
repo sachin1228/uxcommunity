@@ -67,7 +67,7 @@ export default async function DashboardLayout({
   const sidebarUser = { name, email, avatarUrl, initial };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background-subtle text-foreground">
+    <div className="flex h-screen flex-col overflow-hidden bg-muted text-foreground">
       <header className="flex h-[48px] shrink-0 items-center justify-between border-b border-border bg-background px-3 lg:px-5">
         <div className="flex min-w-0 items-center gap-2">
           <MobileSidebar userId={userId} user={sidebarUser} />

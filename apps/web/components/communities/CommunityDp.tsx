@@ -54,7 +54,7 @@ export function CommunityDp({
   lottieData,
   name,
   size = 40,
-  className = "bg-surface-raised",
+  className = "bg-popover",
 }: CommunityDpProps) {
   const [imgFailed, setImgFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);

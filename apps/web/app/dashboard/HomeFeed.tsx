@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState, useCallback } from "react";
 
@@ -240,7 +242,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     return (
       <div role="alert" className="flex flex-col items-center justify-center gap-2 py-20 text-center">
         <p className="font-body text-sm font-medium text-red-400">Couldn&apos;t load your feed</p>
-        <p className="max-w-sm font-body text-xs text-foreground-subtle">{error}</p>
+        <p className="max-w-sm font-body text-xs text-muted-foreground">{error}</p>
       </div>
     );
   }
@@ -253,8 +255,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   if (!visibleItems.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>
-        <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
+        <p className="font-body text-sm font-medium text-muted-foreground">No posts yet</p>
+        <p className="mt-1 max-w-xs font-body text-xs text-muted-foreground">
           When community members share threads, events, resources, or showcase
           work publicly, they&apos;ll appear here.
         </p>
@@ -286,7 +288,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
   }
 
   const cardClassName =
-    "relative z-0 overflow-hidden rounded-xl border border-border bg-background-subtle [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
+    "relative z-0 overflow-hidden rounded-xl border border-border bg-muted [&>article]:border-0 [&>article]:rounded-none [&>div>article]:border-0 [&>div>article]:rounded-none";
 
   return (
     <>
@@ -386,14 +388,14 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
 
     {hasMore && (
       <div className="flex justify-center border-t border-border py-6">
-        <button
+        <Button variant="outline"
           type="button"
           onClick={() => void loadMore()}
           disabled={loadingMore}
-          className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+          className="px-4 py-2 disabled:opacity-60"
         >
           {loadingMore ? "Loading…" : "Load older posts"}
-        </button>
+        </Button>
       </div>
     )}
 

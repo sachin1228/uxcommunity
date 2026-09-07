@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useRef, useState, useEffect } from "react";
 import {
@@ -8,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import type { CommunityThread, ThreadPollDraft, ThreadCategory } from "./types";
 import { THREAD_BODY_MAX_LENGTH } from "./types";
 import {
@@ -140,14 +143,7 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
   }
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-thread-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Modal open onClose={onClose} title="Edit Thread" titleHidden hideCloseButton maxWidth="max-w-[600px]" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         {...dropHandlers}
@@ -161,13 +157,13 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
               <h2 id="edit-thread-title" className="font-display text-xl font-semibold tracking-[-0.01em] text-foreground">
                 Edit Thread
               </h2>
-              <p className="mt-1 font-body text-[13px] text-foreground-muted">
+              <p className="mt-1 font-body text-[13px] text-muted-foreground">
                 Update the content, poll, images, or privacy of this thread
               </p>
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+            <Button variant="ghost" size="icon" type="button" onClick={onClose} aria-label="Close" className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors">
               <X strokeWidth={2.5} size={16} />
-            </button>
+            </Button>
           </div>
 
           {/* ── Composer — editing keeps the thread type: posts edit the text,
@@ -178,16 +174,16 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
             )
           ) : (
             <div className="relative">
-              <textarea
+              <Textarea
                 ref={textareaRef}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 maxLength={THREAD_BODY_MAX_LENGTH}
                 placeholder="What do you want to talk about?"
                 rows={4}
-                className="field w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
+                className="w-full resize-none overflow-hidden pb-6 pr-16 pt-3"
               />
-              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-foreground-subtle">
+              <span className="pointer-events-none absolute bottom-2 right-3 font-body text-[11px] tabular-nums text-muted-foreground">
                 {body.length}/{THREAD_BODY_MAX_LENGTH}
               </span>
             </div>
@@ -242,35 +238,34 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
 
         {/* ── Footer ── */}
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center rounded-md border border-border px-3 font-body text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground">
+          <Button variant="outline" type="button" onClick={onClose} className="inline-flex h-8 items-center justify-center px-3 transition-colors">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="default"
             type="submit"
             disabled={saving || uploading}
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-accent px-3 font-body text-[13px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-8 items-center justify-center gap-1.5 px-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Spinner size={14} className="text-white" />}
             {saving ? "Saving…" : "Save Changes"}
-          </button>
+          </Button>
         </div>
 
         {/* Drag-and-drop overlay — shown while files hover over the modal. */}
         {isDragging && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent/10"
+            className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-primary bg-primary/10"
           >
             <div className="flex flex-col items-center gap-2">
-              <ImageIcon strokeWidth={2.5} size={22} className="text-accent" />
-              <span className="font-body text-sm font-medium text-accent">
+              <ImageIcon strokeWidth={2.5} size={22} className="text-primary" />
+              <span className="font-body text-sm font-medium text-primary">
                 Drop images or files to attach
               </span>
             </div>
           </div>
         )}
       </form>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

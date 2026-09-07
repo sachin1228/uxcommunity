@@ -1,9 +1,12 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import {
   CommunityAdmin,
   ALL_PERMISSIONS,
@@ -123,54 +126,39 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
     }
   }
 
-  // Close on Escape + focus search on open
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    setTimeout(() => inputRef.current?.focus(), 50);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="modal-panel w-full max-w-lg flex flex-col overflow-hidden animate-in zoom-in-95 fade-in duration-150"
-        style={{ maxHeight: "min(80vh, 640px)" }}
-      >
+    <Modal open onClose={onClose} title="Add community admin" titleHidden hideCloseButton panelClassName="max-h-[min(80dvh,640px)] gap-0 overflow-hidden p-0" onOpenAutoFocus={(event) => { event.preventDefault(); inputRef.current?.focus(); }}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border shrink-0">
           <div>
             <h2 className="font-display text-base font-semibold text-foreground leading-none flex items-center gap-2">
-              <ShieldCheck strokeWidth={2.5} size={16} className="text-accent" /> Add community admin
+              <ShieldCheck strokeWidth={2.5} size={16} className="text-primary" /> Add community admin
             </h2>
-            <p className="font-body text-[11px] text-foreground-muted mt-1">
+            <p className="font-body text-[11px] text-muted-foreground mt-1">
               Pick a member of <span className="font-medium text-foreground">{communityName}</span> to promote.
               They get owner-style controls in the app — you can trim permissions afterwards.
             </p>
           </div>
-          <button
+          <Button variant="outline" size="icon"
             onClick={onClose}
-            className="h-8 w-8 shrink-0 flex items-center justify-center rounded-lg border border-border text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="h-8 w-8 shrink-0 flex items-center justify-center transition-colors"
             aria-label="Close"
           >
             <X strokeWidth={2.5} size={15} />
-          </button>
+          </Button>
         </div>
 
         {/* Search */}
         <div className="px-5 py-3 shrink-0">
           <div className="relative">
-            <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none" />
-            <input
+            <Search strokeWidth={2.5} size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <Input
               ref={inputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="field w-full pl-9 pr-3"
+              className="w-full pl-9 pr-3"
             />
           </div>
         </div>
@@ -190,7 +178,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
               <Spinner className="h-4 w-4" />
             </div>
           ) : members.length === 0 ? (
-            <p className="px-2 py-6 text-center font-body text-xs text-foreground-muted">
+            <p className="px-2 py-6 text-center font-body text-xs text-muted-foreground">
               {debouncedQ ? "No members match your search." : "This community has no members yet."}
             </p>
           ) : (
@@ -201,15 +189,15 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                 const isPromoted = promotedIds.has(member.user_id);
                 return (
                   <li key={member.user_id} className="flex items-center gap-3 px-2 py-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised border border-border font-body text-[11px] font-semibold text-foreground">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-popover border border-border font-body text-[11px] font-semibold text-foreground">
                       {initials(member.name)}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-sm font-medium text-foreground truncate leading-tight">{member.name}</p>
-                      <p className="font-body text-[11px] text-foreground-muted truncate">{member.email}</p>
+                      <p className="font-body text-[11px] text-muted-foreground truncate">{member.email}</p>
                     </div>
                     {isOwner ? (
-                      <span className="shrink-0 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-1 font-body text-[10px] font-semibold text-accent">
+                      <span className="shrink-0 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-1 font-body text-[10px] font-semibold text-primary">
                         Owner
                       </span>
                     ) : isAdmin ? (
@@ -217,10 +205,10 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         Admin
                       </span>
                     ) : (
-                      <button
+                      <Button variant="default"
                         onClick={() => handlePromote(member)}
                         disabled={busyUserId === member.user_id}
-                        className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-accent/30 bg-accent/10 px-3 py-1.5 font-body text-xs font-medium text-accent hover:bg-accent/20 transition-colors disabled:opacity-60"
+                        className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 transition-colors disabled:opacity-60"
                       >
                         {busyUserId === member.user_id ? (
                           <Spinner className="h-3 w-3" />
@@ -229,7 +217,7 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                         ) : (
                           "Add as admin"
                         )}
-                      </button>
+                      </Button>
                     )}
                   </li>
                 );
@@ -239,18 +227,16 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
 
           {!busy && hasMore && (
             <div className="px-2 pt-2">
-              <button
+              <Button variant="outline"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="w-full rounded-lg border border-border py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
+                className="w-full py-2 transition-colors disabled:opacity-50"
               >
                 {loadingMore ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${members.length} of ${total})`}
-              </button>
+              </Button>
             </div>
           )}
         </div>
-      </div>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

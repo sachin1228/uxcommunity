@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Search, X } from "lucide-react";
@@ -19,7 +22,7 @@ const PAGE_SIZE = 30;
 function RoleBadge({ role }: { role?: string }) {
   if (role === "owner") {
     return (
-      <span className="inline-flex items-center rounded-full bg-accent/10 border border-accent/20 px-2 py-0.5 font-body text-[10px] font-semibold text-accent">
+      <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 font-body text-[10px] font-semibold text-primary">
         Owner
       </span>
     );
@@ -107,12 +110,12 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface overflow-hidden">
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
       <div className="px-5 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-body text-xs font-semibold text-foreground">
             Members
-            <span className="ml-2 font-mono text-[11px] text-foreground-muted font-normal">
+            <span className="ml-2 font-mono text-[11px] text-muted-foreground font-normal">
               {hasQuery
                 ? `${total.toLocaleString()} match${total !== 1 ? "es" : ""}`
                 : memberCount > 20
@@ -120,7 +123,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
                   : memberCount}
             </span>
           </h2>
-          <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+          <p className="font-body text-[11px] text-muted-foreground mt-0.5">
             {hasQuery
               ? `Results for “${query.trim()}” — click a name for the full member profile.`
               : "Latest joiners — use search to find anyone in this community."}
@@ -131,23 +134,23 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
           <div className="relative w-full sm:w-72">
             <Search
               size={13}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
             />
-            <input
+            <Input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search members by name…"
-              className="field w-full pl-8 pr-8"
+              className="w-full pl-8 pr-8"
             />
             {query && (
-              <button
+              <Button variant="ghost"
                 onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-foreground-muted hover:text-foreground transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 transition-colors"
                 aria-label="Clear search"
               >
                 <X strokeWidth={2.5} size={12} />
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -160,7 +163,7 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
       ) : error && hasQuery ? (
         <p className="px-5 py-4 font-body text-xs text-red-400">{error}</p>
       ) : hasQuery && visibleRows && visibleRows.length === 0 ? (
-        <p className="px-5 py-8 text-center font-body text-xs text-foreground-muted">
+        <p className="px-5 py-8 text-center font-body text-xs text-muted-foreground">
           No members match “{query.trim()}”.
         </p>
       ) : hasQuery && visibleRows ? (
@@ -168,20 +171,20 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
           {visibleRows.map((m) => (
             <div
               key={m.user_id}
-              className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-surface-raised/60 transition-colors"
+              className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-popover/60 transition-colors"
             >
               <div className="min-w-0">
-                <button
+                <Button variant="ghost"
                   onClick={() => router.push(`/admin/users/${m.user_id}`)}
-                  className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
+                  className="transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
-                </button>
-                <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
+                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-muted-foreground" />
+                </Button>
+                <p className="font-body text-[11px] text-muted-foreground truncate">{m.email}</p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <RoleBadge role={m.role} />
-                <span className="font-body text-[11px] text-foreground-muted">
+                <span className="font-body text-[11px] text-muted-foreground">
                   Joined {fmtDate(m.joined_at)}
                 </span>
               </div>
@@ -189,26 +192,26 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
           ))}
         </div>
       ) : members.length === 0 ? (
-        <p className="px-5 py-6 font-body text-xs text-foreground-muted">No members yet.</p>
+        <p className="px-5 py-6 font-body text-xs text-muted-foreground">No members yet.</p>
       ) : (
         <div className="divide-y divide-border/70">
           {members.map((m) => (
             <div
               key={m.id}
-              className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-surface-raised/60 transition-colors"
+              className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-popover/60 transition-colors"
             >
               <div className="min-w-0">
-                <button
+                <Button variant="ghost"
                   onClick={() => router.push(`/admin/users/${m.id}`)}
-                  className="font-body text-xs font-medium text-foreground hover:text-accent transition-colors flex items-center gap-1"
+                  className="transition-colors flex items-center gap-1"
                 >
-                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-foreground-muted" />
-                </button>
-                <p className="font-body text-[11px] text-foreground-muted truncate">{m.email}</p>
+                  {m.name} <ExternalLink strokeWidth={2.5} size={10} className="text-muted-foreground" />
+                </Button>
+                <p className="font-body text-[11px] text-muted-foreground truncate">{m.email}</p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <RoleBadge role={m.role} />
-                <span className="font-body text-[11px] text-foreground-muted">
+                <span className="font-body text-[11px] text-muted-foreground">
                   Joined {fmtDate(m.joined_at)}
                 </span>
               </div>
@@ -219,13 +222,13 @@ export function CommunityMembersList({ members, memberCount, communityId }: Prop
 
       {hasQuery && visibleRows && hasMore && (
         <div className="border-t border-border/70 px-5 py-3">
-          <button
+          <Button variant="outline"
             onClick={loadMore}
             disabled={busy}
-            className="w-full rounded-lg border border-border py-2 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
+            className="w-full py-2 transition-colors disabled:opacity-50"
           >
             {busy ? <Spinner className="mx-auto h-3 w-3" /> : `Load more (${visibleRows.length} of ${total})`}
-          </button>
+          </Button>
         </div>
       )}
     </div>

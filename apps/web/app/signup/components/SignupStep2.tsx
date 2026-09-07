@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Spinner } from "@/components/ui/Spinner";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
@@ -37,7 +39,7 @@ export function SignupStep2({
       <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Complete your profile
       </h2>
-      <p className="font-body text-sm text-foreground-muted mb-7">Step 2 of 4</p>
+      <p className="font-body text-sm text-muted-foreground mb-7">Step 2 of 4</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
@@ -84,11 +86,11 @@ export function SignupStep2({
           />
         </div>
 
-        <button type="submit" disabled={loading}
-          className="mt-2 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed">
+        <Button variant="default" type="submit" disabled={loading}
+          className="mt-2 flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
           {loading && <Spinner className="h-4 w-4 text-white" />}
           {loading ? "Saving…" : "Continue →"}
-        </button>
+        </Button>
       </form>
     </div>
   );

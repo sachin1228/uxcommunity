@@ -72,7 +72,7 @@ export default function ApplyPage() {
 //   }
 //
 //   const inputClass =
-//     "rounded-md border border-border bg-background px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-foreground-muted focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 w-full";
+//     "rounded-md border border-border bg-background px-3.5 py-2.5 font-body text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 w-full";
 //
 //   const fieldError = (key: string) =>
 //     fieldErrors[key]?.length ? (
@@ -87,7 +87,7 @@ export default function ApplyPage() {
 //         {/* Back link */}
 //         <Link
 //           href="/login"
-//           className="mb-6 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground"
+//           className="mb-6 inline-flex items-center gap-1.5 font-body text-sm text-muted-foreground transition-colors hover:text-foreground"
 //         >
 //           <ArrowLeft strokeWidth={2.5} size={14} />
 //           Back to login
@@ -96,25 +96,25 @@ export default function ApplyPage() {
 //         {/* Brand */}
 //         <p className="mb-1 font-display text-xl font-semibold text-foreground">
 //           {APP_NAME}
-//           <span className="text-accent mx-1">/</span>
+//           <span className="text-primary mx-1">/</span>
 //         </p>
 //
 //         {/* Card */}
-//         <div className="rounded-xl border border-border bg-surface p-8 shadow-sm">
+//         <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
 //           {step === "success" ? (
 //             <div className="flex flex-col items-center gap-4 py-4 text-center">
-//               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+//               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
 //                 <span className="text-2xl">🎉</span>
 //               </div>
 //               <h2 className="font-display text-xl font-semibold text-foreground">
 //                 Application submitted!
 //               </h2>
-//               <p className="font-body text-sm text-foreground-muted leading-relaxed">
+//               <p className="font-body text-sm text-muted-foreground leading-relaxed">
 //                 Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
 //               </p>
 //               <Link
 //                 href="/login"
-//                 className="mt-2 rounded-md border border-border px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-surface-raised"
+//                 className="mt-2 rounded-md border border-border px-6 py-2.5 font-body text-sm font-medium text-foreground transition-colors hover:bg-popover"
 //               >
 //                 Back to login
 //               </Link>
@@ -124,7 +124,7 @@ export default function ApplyPage() {
 //               <h1 className="font-display text-2xl font-semibold text-foreground">
 //                 Apply to {APP_NAME}
 //               </h1>
-//               <p className="mt-1 font-body text-sm text-foreground-muted">
+//               <p className="mt-1 font-body text-sm text-muted-foreground">
 //                 Join a community of designers. We review every application manually — if approved, you'll get an invite by email.
 //               </p>
 //
@@ -204,7 +204,7 @@ export default function ApplyPage() {
 //                 <button
 //                   type="submit"
 //                   disabled={loading}
-//                   className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+//                   className="mt-1 flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary disabled:opacity-60 disabled:cursor-not-allowed"
 //                 >
 //                   {loading && <Spinner className="h-4 w-4 text-white" />}
 //                   {loading ? "Submitting…" : "Submit Application"}
@@ -214,11 +214,11 @@ export default function ApplyPage() {
 //           )}
 //         </div>
 //
-//         <p className="mt-6 text-center font-body text-sm text-foreground-muted">
+//         <p className="mt-6 text-center font-body text-sm text-muted-foreground">
 //           Already have an account?{" "}
 //           <Link
 //             href="/login"
-//             className="font-medium text-accent transition-colors hover:text-accent-hover"
+//             className="font-medium text-primary transition-colors hover:text-primary"
 //           >
 //             Log in
 //           </Link>

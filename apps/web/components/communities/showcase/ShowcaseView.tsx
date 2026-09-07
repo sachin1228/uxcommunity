@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/shadcn/native-select";
+
 
 import { useEffect, useMemo, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -143,7 +146,7 @@ export function ShowcaseView({
             <h2 className="font-display text-xl font-semibold text-foreground">
               Showcase
             </h2>
-            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-muted-foreground">
               Share what you&apos;re making, unpack your process, and get useful
               feedback from fellow designers.
             </p>
@@ -169,41 +172,41 @@ export function ShowcaseView({
               }[item.value];
 
               return (
-                <button
+                <Button variant="ghost"
                   key={item.value}
                   type="button"
                   onClick={() => setCategory(item.value)}
                   aria-pressed={category === item.value}
                   className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs ${
                     category === item.value
-                      ? "border-accent bg-accent/5 text-accent"
-                      : "border-border text-foreground-muted"
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
                   }`}
                 >
                   <Icon size={14} strokeWidth={2.5} />
                   {item.label}
-                </button>
+                </Button>
               );
             })}
             <div className="relative shrink-0">
               <CalendarClock
                 size={14}
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
-              <select
+              <NativeSelect
                 value={sort}
                 onChange={(event) =>
                   setSort(event.target.value as "newest" | "popular")
                 }
                 aria-label="Sort showcase posts"
-                className="h-8 appearance-none rounded-lg border border-border bg-surface-raised py-1 pl-8 pr-8 font-body text-xs text-foreground"
+                className="h-8 appearance-none py-1 pl-8 pr-8"
               >
-                <option value="newest">Newest first</option>
-                <option value="popular">Most discussed</option>
-              </select>
+                <NativeSelectOption value="newest">Newest first</NativeSelectOption>
+                <NativeSelectOption value="popular">Most discussed</NativeSelectOption>
+              </NativeSelect>
               <ChevronDown
                 size={14}
-                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted"
+                className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
               />
             </div>
           </div>
@@ -216,7 +219,7 @@ export function ShowcaseView({
             <Spinner size={28} />
           </div>
         ) : error ? (
-          <p className="py-24 text-center font-body text-sm text-foreground-muted">
+          <p className="py-24 text-center font-body text-sm text-muted-foreground">
             {error}
           </p>
         ) : !visible.length ? (
@@ -247,14 +250,14 @@ export function ShowcaseView({
             ))}
             {nextCursor && (
               <div className="flex justify-center py-6">
-                <button
+                <Button variant="outline"
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+                  className="px-4 py-2 disabled:opacity-60"
                 >
                   {loadingMore ? "Loading…" : "Load more"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

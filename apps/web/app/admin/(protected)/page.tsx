@@ -1,4 +1,9 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/shadcn/native-select";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { useState, useEffect, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
@@ -90,7 +95,7 @@ export default function AdminApplicationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h1 className="font-display text-xl font-semibold text-foreground">Applications</h1>
-        <span className="font-mono text-xs text-foreground-muted">{total} total</span>
+        <span className="font-mono text-xs text-muted-foreground">{total} total</span>
       </div>
 
       {/* Status tabs */}
@@ -99,22 +104,22 @@ export default function AdminApplicationsPage() {
           const count = counts[value];
           const isActive = statusFilter === value;
           return (
-            <button
+            <Button variant="ghost"
               key={value}
               onClick={() => { setStatusFilter(value); setSearch(""); }}
               className={`px-3.5 py-2 font-body text-xs font-medium transition-colors border-b-2 -mb-px ${
                 isActive
-                  ? "border-accent text-accent"
-                  : "border-transparent text-foreground-muted hover:text-foreground"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {label}
               <span className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
-                isActive ? "bg-accent/15 text-accent" : "bg-surface-raised text-foreground-muted"
+                isActive ? "bg-primary/15 text-primary" : "bg-popover text-muted-foreground"
               }`}>
                 {count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -124,127 +129,127 @@ export default function AdminApplicationsPage() {
         <div className="relative flex-1">
           <Search
             size={13}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
           />
-          <input
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or email…"
-            className="field w-full pl-8 pr-3"
+            className="w-full pl-8 pr-3"
           />
         </div>
-        <select
+        <NativeSelect
           value={tagFilter}
           onChange={(e) => setTagFilter(e.target.value)}
-          className="field"
+          className=""
         >
-          <option value="">All tags</option>
+          <NativeSelectOption value="">All tags</NativeSelectOption>
           {allTags.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
+            <NativeSelectOption key={t.id} value={t.id}>{t.name}</NativeSelectOption>
           ))}
-        </select>
+        </NativeSelect>
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden mb-3">
+      <div className="rounded-xl border border-border bg-card overflow-hidden mb-3">
         {loading ? (
           <div className="flex justify-center py-12">
             <Spinner className="h-4 w-4" />
           </div>
         ) : applications.length === 0 ? (
-          <p className="py-12 text-center font-body text-xs text-foreground-muted">
+          <p className="py-12 text-center font-body text-xs text-muted-foreground">
             No applications found.
           </p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border">
                 {["Name", "Email", "Status", "Tags", "Applied", ""].map((h) => (
-                  <th
+                  <TableHead
                     key={h}
-                    className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider"
+                    className="px-4 py-2.5 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider"
                   >
                     {h}
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {applications.map((app, idx) => (
-                <tr
+                <TableRow
                   key={app.id}
                   className={`${
-                    idx < applications.length - 1 ? "border-b border-border-subtle" : ""
+                    idx < applications.length - 1 ? "border-b border-border" : ""
                   } hover:bg-white/[0.03] transition-colors cursor-pointer`}
                   onClick={() => setSelectedApp(app)}
                 >
-                  <td className="px-4 py-2.5">
+                  <TableCell className="px-4 py-2.5">
                     <p className="font-body text-xs font-medium text-foreground">{app.name}</p>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <p className="font-body text-xs text-foreground-muted">{app.email}</p>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
+                    <p className="font-body text-xs text-muted-foreground">{app.email}</p>
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <ApplicationStatusBadge status={app.status} />
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <div className="flex flex-wrap gap-1">
                       {(app.application_tags ?? []).slice(0, 3).map((at) => (
                         <span
                           key={at.tag_id}
-                          className="rounded-full bg-surface-raised px-1.5 py-0.5 font-body text-[10px] text-foreground-muted"
+                          className="rounded-full bg-popover px-1.5 py-0.5 font-body text-[10px] text-muted-foreground"
                         >
                           {at.tags?.name}
                         </span>
                       ))}
                       {app.application_tags?.length > 3 && (
-                        <span className="font-mono text-[10px] text-foreground-muted">
+                        <span className="font-mono text-[10px] text-muted-foreground">
                           +{app.application_tags.length - 3}
                         </span>
                       )}
                     </div>
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <p className="font-mono text-[10px] text-foreground-muted whitespace-nowrap">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
+                    <p className="font-mono text-[10px] text-muted-foreground whitespace-nowrap">
                       {new Date(app.created_at).toLocaleDateString("en-GB", {
                         day: "numeric", month: "short", year: "numeric",
                       })}
                     </p>
-                  </td>
-                  <td className="px-4 py-2.5 text-right">
-                    <span className="font-body text-xs text-accent hover:text-accent-hover">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 text-right">
+                    <span className="font-body text-xs text-primary hover:text-primary">
                       View →
                     </span>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
       {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-body text-xs text-foreground-muted">
+          <p className="font-body text-xs text-muted-foreground">
             Page {page} of {totalPages}
           </p>
           <div className="flex gap-1.5">
-            <button
+            <Button variant="outline"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-2.5 py-1.5 transition-colors disabled:opacity-40"
             >
               <ChevronLeft strokeWidth={2.5} size={13} /> Prev
-            </button>
-            <button
+            </Button>
+            <Button variant="outline"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-40"
+              className="flex items-center gap-1 px-2.5 py-1.5 transition-colors disabled:opacity-40"
             >
               Next <ChevronRight strokeWidth={2.5} size={13} />
-            </button>
+            </Button>
           </div>
         </div>
       )}

@@ -8,7 +8,7 @@ import { EXPERIENCE_LABELS, AVATAR_SOURCE_LABELS } from "./userTypes";
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 py-3.5 border-b border-border last:border-0">
-      <span className="w-40 shrink-0 font-body text-sm text-foreground-muted">{label}</span>
+      <span className="w-40 shrink-0 font-body text-sm text-muted-foreground">{label}</span>
       <span className="font-body text-sm text-foreground">{value}</span>
     </div>
   );
@@ -25,14 +25,14 @@ export function UserInfoCard({ user, application, interests }: Props) {
   const avatarUrl = profile?.avatar_url;
 
   return (
-    <div className="rounded-xl border border-border bg-surface px-6 py-1">
+    <div className="rounded-xl border border-border bg-card px-6 py-1">
       {/* Profile picture */}
       <InfoRow
         label="Profile picture"
         value={
           avatarUrl ? (
             <div className="flex items-center gap-3">
-              <span className="h-10 w-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-surface-raised">
+              <span className="h-10 w-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-popover">
                 <AvatarImg
                   url={avatarUrl}
                   name={user.name}
@@ -40,14 +40,14 @@ export function UserInfoCard({ user, application, interests }: Props) {
                   className="h-10 w-10 rounded-full object-cover"
                 />
               </span>
-              <span className="text-foreground-muted text-xs">
+              <span className="text-muted-foreground text-xs">
                 {AVATAR_SOURCE_LABELS[profile?.avatar_source ?? ""] ??
                   profile?.avatar_source ??
                   ""}
               </span>
             </div>
           ) : (
-            <span className="text-foreground-muted">No avatar set</span>
+            <span className="text-muted-foreground">No avatar set</span>
           )
         }
       />
@@ -69,14 +69,14 @@ export function UserInfoCard({ user, application, interests }: Props) {
               {interests.map((i) => (
                 <span
                   key={i.id}
-                  className="inline-flex items-center rounded-full bg-accent/10 px-2 py-0.5 font-body text-xs text-accent"
+                  className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 font-body text-xs text-primary"
                 >
                   {i.name}
                 </span>
               ))}
             </div>
           ) : (
-            <span className="text-foreground-muted">—</span>
+            <span className="text-muted-foreground">—</span>
           )
         }
       />
@@ -96,7 +96,7 @@ export function UserInfoCard({ user, application, interests }: Props) {
               href={application.linkedin_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-accent hover:underline"
+              className="flex items-center gap-1 text-primary hover:underline"
             >
               {application.linkedin_url}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />
@@ -114,7 +114,7 @@ export function UserInfoCard({ user, application, interests }: Props) {
               href={application.portfolio_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1 text-accent hover:underline"
+              className="flex items-center gap-1 text-primary hover:underline"
             >
               {application.portfolio_url}
               <ExternalLink strokeWidth={2.5} size={11} className="shrink-0" />

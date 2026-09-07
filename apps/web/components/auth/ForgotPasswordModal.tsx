@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
@@ -60,28 +64,28 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
     <Modal open={open} onClose={handleClose} title="Reset your password" maxWidth="max-w-sm">
       {step === "sent" ? (
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
             <span className="text-2xl">✉️</span>
           </div>
           <div>
             <p className="font-body text-sm text-foreground font-medium mb-1">
               Check your inbox
             </p>
-            <p className="font-body text-sm text-foreground-muted leading-relaxed">
+            <p className="font-body text-sm text-muted-foreground leading-relaxed">
               If <span className="text-foreground">{email}</span> is
               registered, a reset link is on its way. It expires in 1 hour.
             </p>
           </div>
-          <button
+          <Button variant="outline"
             onClick={handleClose}
-            className="modal-btn modal-btn-secondary mt-2"
+            className="mt-2"
           >
             Close
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <p className="font-body text-sm text-foreground-muted -mt-2">
+          <p className="font-body text-sm text-muted-foreground -mt-2">
             Enter your email and we'll send you a link to set a new password.
           </p>
 
@@ -91,11 +95,11 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
             </div>
           )}
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               Email address
             </span>
-            <input
+            <Input
               type="email"
               value={email}
               onChange={(e) => {
@@ -108,16 +112,16 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
               autoFocus
               required
             />
-          </label>
+          </Label>
 
-          <button
+          <Button variant="default"
             type="submit"
             disabled={loading}
-            className="modal-btn modal-btn-primary w-full"
+            className="w-full"
           >
             {loading && <Spinner size={14} />}
             {loading ? "Sending…" : "Send reset link"}
-          </button>
+          </Button>
         </form>
       )}
     </Modal>

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -69,9 +71,9 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-2xl">
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-2xl">
         {/* Community avatar */}
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface-raised text-foreground-muted">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-border bg-popover text-muted-foreground">
           {community.image_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={community.image_url} alt="" className="h-full w-full object-cover" />
@@ -82,7 +84,7 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
         {/* Privacy badge */}
         <div className="mb-3 flex justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-xs text-foreground-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-body text-xs text-muted-foreground">
             {community.is_private ? (
               <><Lock strokeWidth={2.5} size={11} /> Private community</>
             ) : (
@@ -96,13 +98,13 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
           {community.name}
         </h1>
         {community.description && (
-          <p className="mt-2 text-center font-body text-sm leading-relaxed text-foreground-muted">
+          <p className="mt-2 text-center font-body text-sm leading-relaxed text-muted-foreground">
             {community.description}
           </p>
         )}
 
         {/* Member count */}
-        <p className="mt-3 flex items-center justify-center gap-1.5 font-body text-xs text-foreground-subtle">
+        <p className="mt-3 flex items-center justify-center gap-1.5 font-body text-xs text-muted-foreground">
           <Users strokeWidth={2.5} size={12} />
           {community.member_count.toLocaleString()} member{community.member_count !== 1 ? "s" : ""}
         </p>
@@ -110,17 +112,17 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         {/* CTA */}
         <div className="mt-7">
           {status === "joined" && (
-            <div className="flex items-center justify-center gap-2 rounded-xl bg-accent/10 py-3 text-accent">
+            <div className="flex items-center justify-center gap-2 rounded-xl bg-primary/10 py-3 text-primary">
               <Check strokeWidth={2.5} size={16} />
               <span className="font-body text-sm font-medium">Joined! Redirecting…</span>
             </div>
           )}
 
           {status === "requested" && (
-            <div className="rounded-xl border border-border bg-surface-raised p-4 text-center">
-              <Check strokeWidth={2.5} size={18} className="mx-auto mb-2 text-accent" />
+            <div className="rounded-xl border border-border bg-popover p-4 text-center">
+              <Check strokeWidth={2.5} size={18} className="mx-auto mb-2 text-primary" />
               <p className="font-body text-sm font-semibold text-foreground">Request sent</p>
-              <p className="mt-1 font-body text-xs text-foreground-muted">
+              <p className="mt-1 font-body text-xs text-muted-foreground">
                 The community owner will review your request.
               </p>
             </div>
@@ -128,25 +130,25 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
 
           {(status === "idle" || status === "loading" || status === "error") && (
             <>
-              <button
+              <Button variant="default"
                 onClick={handleJoin}
                 disabled={status === "loading"}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 py-3 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {status === "loading" ? (
-                  <><Spinner size={15} className="text-accent-foreground" /> Joining…</>
+                  <><Spinner size={15} className="text-primary-foreground" /> Joining…</>
                 ) : community.is_private ? (
                   <><Lock strokeWidth={2.5} size={14} /> Request to join</>
                 ) : (
                   <><MessageSquare strokeWidth={2.5} size={14} /> Join community</>
                 )}
-              </button>
+              </Button>
 
               {status === "error" && errorMsg && (
                 <p className="mt-3 text-center font-body text-xs text-red-400">{errorMsg}</p>
               )}
 
-              <p className="mt-4 text-center font-body text-xs text-foreground-subtle">
+              <p className="mt-4 text-center font-body text-xs text-muted-foreground">
                 {community.is_private
                   ? "The owner will approve your request before you can access the community."
                   : "You'll get instant access after joining."}

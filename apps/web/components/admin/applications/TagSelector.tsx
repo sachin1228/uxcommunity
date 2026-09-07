@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { Tag } from "lucide-react";
 import type { TagItem } from "./types";
@@ -21,17 +23,17 @@ export function TagSelector({ allTags, selectedTags, onToggle }: Props) {
         {allTags.map((tag) => {
           const active = selectedTags.includes(tag.id);
           return (
-            <button
+            <Button variant="ghost"
               key={tag.id}
               onClick={() => onToggle(tag.id)}
               className={`rounded-full px-2.5 py-0.5 font-body text-xs transition-colors ${
                 active
-                  ? "bg-accent text-accent-foreground"
-                  : "border border-border bg-surface text-foreground-muted hover:border-accent/40 hover:text-foreground"
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
               }`}
             >
               {tag.name}
-            </button>
+            </Button>
           );
         })}
       </div>

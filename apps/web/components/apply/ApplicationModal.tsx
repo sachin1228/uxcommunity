@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState } from "react";
 import { Modal } from "@/components/ui/Modal";
@@ -89,21 +93,21 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
     <Modal open={open} onClose={handleClose} title="Apply to uxcommunity" maxWidth="max-w-md">
       {step === "success" ? (
         <div className="flex flex-col items-center gap-4 py-4 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary">
             <span className="text-2xl">🎉</span>
           </div>
           <h3 className="font-display text-lg font-semibold text-foreground">
             Application submitted!
           </h3>
-          <p className="font-body text-sm text-foreground-muted leading-relaxed">
+          <p className="font-body text-sm text-muted-foreground leading-relaxed">
             Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
           </p>
-          <button
+          <Button variant="outline"
             onClick={handleClose}
-            className="modal-btn modal-btn-secondary"
+            className=""
           >
             Close
-          </button>
+          </Button>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -113,11 +117,11 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             </div>
           )}
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               Full Name
             </span>
-            <input
+            <Input
               type="text"
               name="name"
               value={form.name}
@@ -128,13 +132,13 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
               required
             />
             {fieldError("name")}
-          </label>
+          </Label>
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               Email Address
             </span>
-            <input
+            <Input
               type="email"
               name="email"
               value={form.email}
@@ -145,13 +149,13 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
               required
             />
             {fieldError("email")}
-          </label>
+          </Label>
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               LinkedIn Profile URL
             </span>
-            <input
+            <Input
               type="url"
               name="linkedin_url"
               value={form.linkedin_url}
@@ -161,13 +165,13 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
               required
             />
             {fieldError("linkedin_url")}
-          </label>
+          </Label>
 
-          <label className="flex flex-col gap-1.5">
+          <Label className="flex flex-col gap-1.5">
             <span className="font-body text-xs font-medium text-foreground">
               Portfolio URL
             </span>
-            <input
+            <Input
               type="url"
               name="portfolio_url"
               value={form.portfolio_url}
@@ -177,18 +181,18 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
               required
             />
             {fieldError("portfolio_url")}
-          </label>
+          </Label>
 
-          <button
+          <Button variant="default"
             type="submit"
             disabled={loading}
-            className="modal-btn modal-btn-primary mt-2 w-full"
+            className="mt-2 w-full"
           >
             {loading && <Spinner className="h-4 w-4 text-white" />}
             {loading ? "Submitting…" : "Submit Application"}
-          </button>
+          </Button>
 
-          <p className="text-center font-body text-xs text-foreground-muted">
+          <p className="text-center font-body text-xs text-muted-foreground">
             Join a curated community of designers — we review every application and send invitations to those who are approved.
           </p>
         </form>

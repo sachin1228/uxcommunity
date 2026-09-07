@@ -278,7 +278,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
               Members{community ? ` (${memberCount})` : ""}
             </h2>
             <span
-              className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted"
+              className="inline-flex items-center gap-1.5 font-body text-xs text-muted-foreground"
               aria-label={`${onlineCount} online`}
             >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
@@ -306,7 +306,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                 ))}
                 {overflow > 0 && (
                   <li
-                    className="relative -ml-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-surface-raised ring-2 ring-background font-body text-[11px] font-semibold text-foreground-muted"
+                    className="relative -ml-2.5 flex h-9 w-9 items-center justify-center rounded-full bg-popover ring-2 ring-background font-body text-[11px] font-semibold text-muted-foreground"
                     aria-label={`${overflow} more members`}
                   >
                     +{overflow}
@@ -318,7 +318,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                 {Array.from({ length: 5 }).map((_, index) => (
                   <span
                     key={index}
-                    className={`h-9 w-9 rounded-full bg-surface-raised ring-2 ring-background animate-pulse ${index > 0 ? "-ml-2.5" : ""}`}
+                    className={`h-9 w-9 rounded-full bg-popover ring-2 ring-background animate-pulse ${index > 0 ? "-ml-2.5" : ""}`}
                   />
                 ))}
               </div>
@@ -339,18 +339,18 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
           </h2>
           {community ? (
             <>
-              <p className="mt-3 font-body text-sm leading-relaxed text-foreground-muted">
+              <p className="mt-3 font-body text-sm leading-relaxed text-muted-foreground">
                 {description}
               </p>
               <div className="mt-4 flex flex-col gap-2">
                 {type === "city" && referenceName && (
-                  <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
-                    <MapPin strokeWidth={2.5} size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                  <div className="flex items-center gap-2 font-body text-sm text-muted-foreground">
+                    <MapPin strokeWidth={2.5} size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                     {referenceName}
                   </div>
                 )}
-                <div className="flex items-center gap-2 font-body text-sm text-foreground-muted">
-                  <Calendar strokeWidth={2.5} size={16} className="shrink-0 text-foreground-subtle" aria-hidden="true" />
+                <div className="flex items-center gap-2 font-body text-sm text-muted-foreground">
+                  <Calendar strokeWidth={2.5} size={16} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                   Created {fmtCreatedAt(community.created_at)}
                 </div>
               </div>
@@ -359,7 +359,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                   {tags.map((tag) => (
                     <span
                       key={tag}
-                      className="rounded-full border border-border px-3 py-1 font-body text-xs text-foreground-muted"
+                      className="rounded-full border border-border px-3 py-1 font-body text-xs text-muted-foreground"
                     >
                       {tag}
                     </span>
@@ -369,9 +369,9 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
             </>
           ) : (
             <div className="mt-3 flex flex-col gap-2" aria-hidden="true">
-              <span className="h-3.5 w-full rounded bg-surface-raised animate-pulse" />
-              <span className="h-3.5 w-11/12 rounded bg-surface-raised animate-pulse" />
-              <span className="h-3.5 w-2/3 rounded bg-surface-raised animate-pulse" />
+              <span className="h-3.5 w-full rounded bg-popover animate-pulse" />
+              <span className="h-3.5 w-11/12 rounded bg-popover animate-pulse" />
+              <span className="h-3.5 w-2/3 rounded bg-popover animate-pulse" />
             </div>
           )}
         </section>
@@ -391,17 +391,17 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
             <ol className="mt-4 flex flex-col gap-3">
               {rules.map((rule, index) => (
                 <li key={rule.id} className="flex items-start gap-3">
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-surface-raised font-mono text-xs font-semibold text-foreground-muted">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-popover font-mono text-xs font-semibold text-muted-foreground">
                     {index + 1}
                   </span>
-                  <span className="pt-0.5 font-body text-sm leading-relaxed text-foreground-muted">
+                  <span className="pt-0.5 font-body text-sm leading-relaxed text-muted-foreground">
                     {rule.rule_text}
                   </span>
                 </li>
               ))}
             </ol>
           ) : (
-            <p className="mt-3 font-body text-sm text-foreground-muted">
+            <p className="mt-3 font-body text-sm text-muted-foreground">
               No community rules have been added yet.
             </p>
           )}

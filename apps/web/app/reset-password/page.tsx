@@ -1,4 +1,8 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -78,7 +82,7 @@ function ResetPasswordInner() {
         <div className="mb-8 text-center">
           <span className="font-display text-xl font-semibold text-foreground">
             {APP_NAME}
-            <span className="text-accent mx-1">/</span>
+            <span className="text-primary mx-1">/</span>
           </span>
         </div>
 
@@ -89,16 +93,16 @@ function ResetPasswordInner() {
         )}
 
         {pageState === "invalid" && (
-          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
+          <div className="rounded-xl bg-card p-8 text-center shadow-card">
             <p className="font-display text-lg font-semibold text-foreground mb-2">
               Link invalid or expired
             </p>
-            <p className="font-body text-sm text-foreground-muted mb-6">
+            <p className="font-body text-sm text-muted-foreground mb-6">
               {error ?? "This password reset link is invalid or has already been used. Reset links expire after 1 hour."}
             </p>
             <a
               href="/login"
-              className="inline-block font-body text-sm text-accent hover:text-accent-hover transition-colors"
+              className="inline-block font-body text-sm text-primary hover:text-primary transition-colors"
             >
               ← Back to login
             </a>
@@ -106,11 +110,11 @@ function ResetPasswordInner() {
         )}
 
         {pageState === "form" && (
-          <div className="rounded-xl bg-surface p-8 shadow-card">
+          <div className="rounded-xl bg-card p-8 shadow-card">
             <h1 className="font-display text-2xl font-semibold text-foreground mb-1">
               Set new password
             </h1>
-            <p className="font-body text-sm text-foreground-muted mb-7">
+            <p className="font-body text-sm text-muted-foreground mb-7">
               Choose a strong password for your account.
             </p>
 
@@ -121,11 +125,11 @@ function ResetPasswordInner() {
                 </div>
               )}
 
-              <label className="flex flex-col gap-1.5">
+              <Label className="flex flex-col gap-1.5">
                 <span className="font-body text-xs font-medium text-foreground">
                   New password
                 </span>
-                <input
+                <Input
                   type="password"
                   value={password}
                   onChange={(e) => {
@@ -140,13 +144,13 @@ function ResetPasswordInner() {
                   required
                 />
                 {fieldError("password")}
-              </label>
+              </Label>
 
-              <label className="flex flex-col gap-1.5">
+              <Label className="flex flex-col gap-1.5">
                 <span className="font-body text-xs font-medium text-foreground">
                   Confirm new password
                 </span>
-                <input
+                <Input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => {
@@ -160,34 +164,34 @@ function ResetPasswordInner() {
                   required
                 />
                 {fieldError("confirm_password")}
-              </label>
+              </Label>
 
-              <button
+              <Button variant="default"
                 type="submit"
                 disabled={loading}
-                className="mt-1 flex items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed"
+                className="mt-1 flex items-center justify-center gap-2 py-2.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading && <Spinner className="h-4 w-4 text-white" />}
                 {loading ? "Updating password…" : "Update password"}
-              </button>
+              </Button>
             </form>
           </div>
         )}
 
         {pageState === "success" && (
-          <div className="rounded-xl bg-surface p-8 text-center shadow-card">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft mx-auto mb-4">
+          <div className="rounded-xl bg-card p-8 text-center shadow-card">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary mx-auto mb-4">
               <span className="text-2xl">✓</span>
             </div>
             <h2 className="font-display text-xl font-semibold text-foreground mb-2">
               Password updated
             </h2>
-            <p className="font-body text-sm text-foreground-muted mb-6">
+            <p className="font-body text-sm text-muted-foreground mb-6">
               Your password has been changed. You can now log in with your new password.
             </p>
             <a
               href="/login"
-              className="inline-block rounded-md bg-accent px-6 py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+              className="inline-block rounded-md bg-primary px-6 py-2.5 font-body text-sm font-medium text-primary-foreground transition-colors hover:bg-primary"
             >
               Go to login
             </a>

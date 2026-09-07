@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { APP_NAME, APP_TAGLINE } from "@uxcommunity/shared";
 import { NavigationGuard } from "@/components/ui/NavigationGuard";
 import { GlobalFetchGuard } from "@/components/ui/GlobalFetchGuard";
+import { SystemTheme } from "@/components/ui/SystemTheme";
 import "./globals.css";
 
 const geist = Geist({
@@ -50,8 +51,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
-  colorScheme: "dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -62,10 +66,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${geistMono.variable}`}
+      className={`${geist.variable} ${geistMono.variable} bg-background`}
       suppressHydrationWarning
     >
-      <body className="bg-background text-foreground antialiased">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.toggle('dark',window.matchMedia('(prefers-color-scheme: dark)').matches)" }} />
+      </head>
+      <body className="bg-background font-sans text-foreground antialiased">
+        <SystemTheme />
         <NavigationGuard />
         <GlobalFetchGuard />
         {children}

@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { memo, useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
@@ -117,13 +119,13 @@ export const CommunityRow = memo(function CommunityRow({
 
   return (
     <li>
-      <button
+      <Button variant="ghost"
         onClick={() => onClick(c.id)}
         onMouseEnter={handleMouseEnter}
         className={`flex w-full items-start gap-[11px] rounded-lg px-[9px] py-[9px] text-left transition-colors ${
           active
-            ? "bg-surface-raised text-foreground"
-            : "hover:bg-surface-raised"
+            ? "bg-popover text-foreground"
+            : "hover:bg-popover"
         }`}
       >
         <CommunityAvatar
@@ -142,17 +144,17 @@ export const CommunityRow = memo(function CommunityRow({
               {c.name}
             </span>
             {c.is_private && (
-              <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
+              <Lock strokeWidth={2.5} size={11} className="shrink-0 text-muted-foreground" aria-label="Private community" />
             )}
             {c.last_message && !typingText && (
-              <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
+              <span className="font-mono text-xs text-muted-foreground shrink-0 ml-auto">
                 {formatTime(c.last_message.created_at)}
               </span>
             )}
           </div>
 
           {/* Meta: member count + city */}
-          <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
+          <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-muted-foreground">
             <span> {fmtCount(c.member_count)} members</span>
             {c.type === "city" && c.reference_name && (
               <span>· {c.reference_name}</span>
@@ -163,13 +165,13 @@ export const CommunityRow = memo(function CommunityRow({
           <div className="flex items-start gap-1.5">
             {typingText ? (
               /* Typing — highest priority */
-              <p className="font-body text-[13px] text-accent truncate flex-1">
+              <p className="font-body text-[13px] text-primary truncate flex-1">
                 {typingText}
               </p>
 
             ) : lastReaction ? (
               /* Reaction preview: "You reacted 👍 to: "message"" */
-              <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
+              <p className="font-body text-[13px] text-muted-foreground truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
                 {lastReaction.isOwn ? " reacted " : " reacted "}
                 <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
@@ -179,7 +181,7 @@ export const CommunityRow = memo(function CommunityRow({
 
             ) : preview ? (
               /* Standard message preview */
-              <p className="font-body text-[13px] leading-5 truncate flex-1 text-foreground-muted">
+              <p className="font-body text-[13px] leading-5 truncate flex-1 text-muted-foreground">
                 {preview.prefix && (
                   <span className="font-medium">{preview.prefix}: </span>
                 )}
@@ -187,7 +189,7 @@ export const CommunityRow = memo(function CommunityRow({
               </p>
 
             ) : (
-              <p className="font-body text-[13px] text-foreground-muted flex-1">
+              <p className="font-body text-[13px] text-muted-foreground flex-1">
                 No messages yet
               </p>
             )}
@@ -200,7 +202,7 @@ export const CommunityRow = memo(function CommunityRow({
             )}
           </div>
         </div>
-      </button>
+      </Button>
     </li>
   );
 });

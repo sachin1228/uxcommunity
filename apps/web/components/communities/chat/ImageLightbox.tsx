@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Modal } from "@/components/ui/Modal";
+
 
 import { useCallback, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
@@ -72,17 +75,12 @@ export function ImageLightbox({
   // Keyboard navigation (Esc / arrows) + scroll lock while the viewer is open.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft") goPrev();
+      if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
     };
     document.addEventListener("keydown", onKey);
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
-    };
-  }, [onClose, goPrev, goNext]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [goPrev, goNext]);
 
   // Keep the active thumbnail in view when navigating.
   useEffect(() => {
@@ -99,12 +97,7 @@ export function ImageLightbox({
   if (!image) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex flex-col bg-[#1e1e1e]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Image viewer"
-    >
+    <Modal open onClose={onClose} title="Image viewer" titleHidden hideCloseButton maxWidth="max-w-[calc(100vw-2rem)]" panelClassName="h-[calc(100dvh-2rem)] max-h-none gap-0 overflow-hidden p-0">
       {/* ── Header: sender info + actions ───────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -117,41 +110,41 @@ export function ImageLightbox({
             <p className="font-body text-sm font-semibold text-foreground truncate">
               {image.user_name ?? "Unknown"}
             </p>
-            <p className="font-body text-[11px] text-foreground-muted">
+            <p className="font-body text-[11px] text-muted-foreground">
               {fmtDate(image.created_at)} at {fmtTime(image.created_at)}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
+          <Button variant="ghost" size="icon"
             onClick={() => downloadImage(image.url, fileNameForUrl(image.url))}
-            className="h-9 w-9 flex items-center justify-center rounded-full text-foreground hover:bg-white/10 transition-colors"
+            className="h-9 w-9 flex items-center justify-center transition-colors"
             aria-label="Download image"
             title="Download"
           >
             <Download strokeWidth={2.5} size={18} />
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost" size="icon"
             onClick={onClose}
-            className="h-9 w-9 flex items-center justify-center rounded-full text-foreground hover:bg-white/10 transition-colors"
+            className="h-9 w-9 flex items-center justify-center transition-colors"
             aria-label="Close viewer"
             title="Close"
           >
             <X strokeWidth={2.5} size={18} />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* ── Canvas: centered image + side navigation ────────────────────── */}
       <div className="relative flex-1 min-h-0 flex items-center justify-center px-16">
         {index > 0 && (
-          <button
+          <Button variant="ghost" size="icon"
             onClick={goPrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center transition-colors"
             aria-label="Previous image"
           >
             <ChevronLeft strokeWidth={2.5} size={22} />
-          </button>
+          </Button>
         )}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -161,13 +154,13 @@ export function ImageLightbox({
           draggable={false}
         />
         {index < images.length - 1 && (
-          <button
+          <Button variant="ghost" size="icon"
             onClick={goNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 flex items-center justify-center transition-colors"
             aria-label="Next image"
           >
             <ChevronRight strokeWidth={2.5} size={22} />
-          </button>
+          </Button>
         )}
       </div>
 
@@ -188,7 +181,7 @@ export function ImageLightbox({
         >
           <div className="flex items-center gap-2 w-max mx-auto px-4">
             {images.map((img, i) => (
-              <button
+              <Button variant="ghost"
                 key={`${img.url}-${i}`}
                 onClick={() => onNavigate(i)}
                 data-active={i === index}
@@ -206,11 +199,11 @@ export function ImageLightbox({
                   className="h-full w-full object-cover pointer-events-none"
                   draggable={false}
                 />
-              </button>
+              </Button>
             ))}
           </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }

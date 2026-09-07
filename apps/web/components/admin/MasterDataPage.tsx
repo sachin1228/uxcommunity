@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus, Search, X, ChevronRight, ImagePlus } from "lucide-react";
@@ -141,13 +145,13 @@ export function MasterDataPage({
       <div className="flex items-center justify-between mb-5">
         <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
         {!readOnly && (
-          <button
+          <Button variant="default"
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
           >
             <Plus strokeWidth={2.5} size={13} />
             Add {entity}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -156,24 +160,24 @@ export function MasterDataPage({
         {(["active", "inactive"] as const).map((tab) => {
           const count = items.filter((i) => (tab === "active" ? i.is_active : !i.is_active)).length;
           return (
-            <button
+            <Button variant="ghost"
               key={tab}
               onClick={() => { setActiveTab(tab); setSearch(""); }}
               className={`px-4 py-2 font-body text-xs font-medium capitalize transition-colors border-b-2 -mb-px ${
                 activeTab === tab
-                  ? "border-accent text-accent"
-                  : "border-transparent text-foreground-muted hover:text-foreground"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {tab}
               <span className={`ml-1.5 rounded-full px-1.5 py-0.5 font-mono text-[10px] ${
                 activeTab === tab
-                  ? "bg-accent/15 text-accent"
-                  : "bg-surface-raised text-foreground-muted"
+                  ? "bg-primary/15 text-primary"
+                  : "bg-popover text-muted-foreground"
               }`}>
                 {count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -182,71 +186,71 @@ export function MasterDataPage({
       <div className="relative mb-3">
         <Search
           size={13}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
         />
-        <input
+        <Input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${title.toLowerCase()}…`}
-          className="field w-full pl-8 pr-8"
+          className="w-full pl-8 pr-8"
         />
         {search && (
-          <button
+          <Button variant="ghost"
             onClick={() => setSearch("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-foreground"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2"
           >
             <X strokeWidth={2.5} size={12} />
-          </button>
+          </Button>
         )}
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-10">
             <Spinner className="h-4 w-4" />
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <p className="font-body text-xs text-foreground-muted">
+            <p className="font-body text-xs text-muted-foreground">
               No {entity.toLowerCase()}s yet.
             </p>
             {!readOnly && (
-              <button
+              <Button variant="default"
                 onClick={() => setModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground hover:bg-accent-hover transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
               >
                 <Plus strokeWidth={2.5} size={13} />Add your first {entity.toLowerCase()}
-              </button>
+              </Button>
             )}
           </div>
         ) : filtered.length === 0 ? (
-          <p className="py-10 text-center font-body text-xs text-foreground-muted">
+          <p className="py-10 text-center font-body text-xs text-muted-foreground">
             No results for &quot;{search}&quot;
           </p>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
+          <Table className="w-full">
+            <TableHeader>
+              <TableRow className="border-b border-border">
                 {/* 24px thumbnail + 32px horizontal cell padding — locking this
                     column wide enough keeps the table from squeezing the image. */}
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider w-14" />
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Name</th>
-                <th className="px-4 py-2 text-left font-body text-[10px] font-medium text-foreground-muted uppercase tracking-wider">Status</th>
-                <th className="px-4 py-2 w-6" />
-              </tr>
-            </thead>
-            <tbody>
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider w-14" />
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Name</TableHead>
+                <TableHead className="px-4 py-2 text-left font-body text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Status</TableHead>
+                <TableHead className="px-4 py-2 w-6" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filtered.map((item, idx) => (
-                <tr
+                <TableRow
                   key={item.id}
                   onClick={() => router.push(`${basePath}/${item.id}`)}
                   className={`cursor-pointer ${
-                    idx < filtered.length - 1 ? "border-b border-border-subtle" : ""
-                  } hover:bg-surface-raised transition-colors`}
+                    idx < filtered.length - 1 ? "border-b border-border" : ""
+                  } hover:bg-popover transition-colors`}
                 >
-                  <td className="px-4 py-2">
+                  <TableCell className="px-4 py-2">
                     {item.image_url ? (
                       // Master-data images are dark tiles with a light icon in the
                       // center — the bordered chip keeps them visible against the
@@ -254,49 +258,49 @@ export function MasterDataPage({
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        className="h-6 w-6 rounded border border-border bg-surface-raised object-cover"
+                        className="h-6 w-6 rounded border border-border bg-popover object-cover"
                       />
                     ) : (
-                      <div className="h-6 w-6 rounded border border-border bg-surface-raised flex items-center justify-center">
-                        <ImagePlus strokeWidth={2.5} size={11} className="text-foreground-muted" />
+                      <div className="h-6 w-6 rounded border border-border bg-popover flex items-center justify-center">
+                        <ImagePlus strokeWidth={2.5} size={11} className="text-muted-foreground" />
                       </div>
                     )}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <span
                       className={`font-body text-xs ${
                         item.is_active
                           ? "text-foreground"
-                          : "text-foreground-muted line-through"
+                          : "text-muted-foreground line-through"
                       }`}
                     >
                       {item.name}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5">
                     <span
                       className={`inline-flex items-center rounded-full px-1.5 py-0.5 font-mono text-[10px] font-medium ${
                         item.is_active
                           ? "bg-green-500/10 text-green-400"
-                          : "bg-surface-raised text-foreground-muted"
+                          : "bg-popover text-muted-foreground"
                       }`}
                     >
                       {item.is_active ? "Active" : "Inactive"}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5 w-6">
-                    <ChevronRight strokeWidth={2.5} size={13} className="text-foreground-muted" />
-                  </td>
-                </tr>
+                  </TableCell>
+                  <TableCell className="px-4 py-2.5 w-6">
+                    <ChevronRight strokeWidth={2.5} size={13} className="text-muted-foreground" />
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         )}
       </div>
 
       {/* Row count */}
       {!loading && tabItems.length > 0 && (
-        <p className="mt-2 text-right font-body text-[10px] text-foreground-muted">
+        <p className="mt-2 text-right font-body text-[10px] text-muted-foreground">
           {search ? `${filtered.length} of ${tabItems.length}` : tabItems.length}{" "}
           {entity.toLowerCase()}{tabItems.length !== 1 ? "s" : ""}
         </p>

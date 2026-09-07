@@ -1,7 +1,12 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+import { Input } from "@/components/ui/shadcn/input";
 
-import { createPortal } from "react-dom";
-import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
+
+import { Modal } from "@/components/ui/Modal";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "../threads/ThreadComposerControls";
@@ -42,11 +47,6 @@ export function ResourceFormModal({
   initialIsPublic = false,
 }: ResourceFormModalProps) {
   const isEdit = mode === "edit";
-  const mounted = useSyncExternalStore(
-    () => () => undefined,
-    () => true,
-    () => false,
-  );
 
   const [url, setUrl] = useState(resource?.url ?? "");
   const [description, setDescription] = useState(resource?.description ?? "");
@@ -120,12 +120,6 @@ export function ResourceFormModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!description.trim()) { setError("Description is required."); return; }
@@ -164,16 +158,8 @@ export function ResourceFormModal({
 
   const showPreview = !previewDismissed && (previewLoading || preview);
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="resource-form-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+  return (
+    <Modal open onClose={onClose} title={isEdit ? "Edit Resource" : "Share a Resource"} titleHidden hideCloseButton maxWidth="max-w-xl" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-xl flex-col overflow-hidden"
@@ -184,63 +170,63 @@ export function ResourceFormModal({
             <h2 id="resource-form-title" className="font-display text-xl font-semibold text-foreground">
               {isEdit ? "Edit Resource" : "Share a Resource"}
             </h2>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
+            <p className="mt-1 font-body text-sm text-muted-foreground">
               {isEdit ? "Update the details of your resource." : "Share something useful with your community."}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+          <Button variant="ghost" size="icon" type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-6 space-y-5">
           {/* Description */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="text-accent">*</span>
+          <Label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
+              Description <span className="text-primary">*</span>
             </span>
-            <textarea
+            <Textarea
               value={description}
               maxLength={2000}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What makes this resource worth sharing?"
               rows={4}
               required
-              className="field w-full resize-y"
+              className="w-full resize-y"
             />
-          </label>
+          </Label>
 
           {/* Resource type */}
           <fieldset>
-            <legend className="mb-2 font-body text-xs font-medium text-foreground-muted">
-              Type <span className="text-accent">*</span>
+            <legend className="mb-2 font-body text-xs font-medium text-muted-foreground">
+              Type <span className="text-primary">*</span>
             </legend>
             <div className="flex flex-wrap gap-2">
               {RESOURCE_TYPES.map((t) => (
-                <button
+                <Button variant="ghost"
                   key={t.value}
                   type="button"
                   onClick={() => setResourceType(t.value)}
                   className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
                     resourceType === t.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                   }`}
                 >
                   <ResourceTypeIcon type={t.value} size={11} />
                   {t.label}
-                </button>
+                </Button>
               ))}
             </div>
           </fieldset>
 
           {/* URL */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              URL <span className="text-accent">*</span>
+          <Label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
+              URL <span className="text-primary">*</span>
             </span>
             <div className="relative">
-              <input
+              <Input
                 value={url}
                 onChange={(e) => {
                   const nextUrl = e.target.value;
@@ -250,7 +236,7 @@ export function ResourceFormModal({
                 }}
                 placeholder="https://..."
                 type="url"
-                className="field w-full pr-9"
+                className="w-full pr-9"
               />
               <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
                 <Spinner
@@ -259,15 +245,15 @@ export function ResourceFormModal({
                 />
                 <Globe
                   size={14}
-                  className={`absolute inset-0 text-foreground-subtle transition-opacity duration-150 ${!previewLoading && isValidHttpUrl(url) && !preview ? "opacity-100" : "opacity-0"}`}
+                  className={`absolute inset-0 text-muted-foreground transition-opacity duration-150 ${!previewLoading && isValidHttpUrl(url) && !preview ? "opacity-100" : "opacity-0"}`}
                 />
               </div>
             </div>
-          </label>
+          </Label>
 
           {/* Figma detection banner */}
           {figmaLink && (
-            <div className="flex items-center gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-accent" role="status">
+            <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-primary" role="status">
               <Check strokeWidth={2.5} size={14} aria-hidden="true" />
               <span className="font-body text-xs font-medium">
                 {figmaLink.kind === "prototype" ? "Figma prototype detected — interactive preview enabled" : "Figma file detected"}
@@ -281,9 +267,9 @@ export function ResourceFormModal({
           ) : showPreview ? (
             <div className="relative">
               {previewLoading && !preview && (
-                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-surface-raised p-4">
+                <div className="flex items-center gap-2.5 rounded-xl border border-border bg-popover p-4">
                   <Spinner size={14} />
-                  <span className="font-body text-sm text-foreground-subtle">
+                  <span className="font-body text-sm text-muted-foreground">
                     {fromExistingRequest ? "Loading from existing request…" : "Loading preview…"}
                   </span>
                 </div>
@@ -316,20 +302,19 @@ export function ResourceFormModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
+          <Button variant="outline" type="button" onClick={onClose} className="">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="default"
             type="submit"
             disabled={saving}
-            className="modal-btn modal-btn-primary"
+            className=""
           >
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? (isEdit ? "Saving…" : "Sharing…") : (isEdit ? "Save Changes" : "Share Resource")}
-          </button>
+          </Button>
         </div>
       </form>
-    </div>,
-    document.body,
+    </Modal>
   );
 }

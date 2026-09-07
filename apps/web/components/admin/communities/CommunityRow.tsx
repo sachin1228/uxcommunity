@@ -1,4 +1,6 @@
 "use client";
+import { TableRow, TableCell } from "@/components/ui/shadcn/table";
+
 
 import { ChevronRight, Users, MessageSquare, Sparkles } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
@@ -34,14 +36,14 @@ interface Props {
 
 export function CommunityRow({ community: c, isLast, onClick }: Props) {
   return (
-    <tr
+    <TableRow
       onClick={onClick}
-      className={`cursor-pointer transition-colors hover:bg-surface-raised ${
+      className={`cursor-pointer transition-colors hover:bg-popover ${
         !isLast ? "border-b border-border" : ""
       }`}
     >
       {/* Name + avatar */}
-      <td className="px-4 py-3">
+      <TableCell className="px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="relative shrink-0">
             <CommunityDp
@@ -51,12 +53,12 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
               lottieData={c.lottie_data}
               name={c.name}
               size={32}
-              className="bg-surface-raised"
+              className="bg-popover"
             />
             {c.lottie_url && (
               <span
                 title="Animated display picture (Lottie)"
-                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-background"
               >
                 <Sparkles strokeWidth={2.5} size={9} />
               </span>
@@ -71,37 +73,37 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
             )}
           </div>
         </div>
-      </td>
+      </TableCell>
 
       {/* Type badge */}
-      <td className="px-4 py-3">
+      <TableCell className="px-4 py-3">
         <span
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-body text-[11px] font-medium ${
-            TYPE_COLORS[c.type] ?? "bg-surface-raised text-foreground-muted"
+            TYPE_COLORS[c.type] ?? "bg-popover text-muted-foreground"
           }`}
         >
           {TYPE_LABELS[c.type] ?? c.type}
         </span>
-      </td>
+      </TableCell>
 
       {/* Members */}
-      <td className="px-4 py-3 text-right">
-        <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
+      <TableCell className="px-4 py-3 text-right">
+        <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted-foreground">
           <Users strokeWidth={2.5} size={11} />
           {c.member_count.toLocaleString()}
         </span>
-      </td>
+      </TableCell>
 
       {/* Messages */}
-      <td className="px-4 py-3 text-right">
-        <span className="flex items-center justify-end gap-1 font-mono text-xs text-foreground-muted">
+      <TableCell className="px-4 py-3 text-right">
+        <span className="flex items-center justify-end gap-1 font-mono text-xs text-muted-foreground">
           <MessageSquare strokeWidth={2.5} size={11} />
           {c.message_count.toLocaleString()}
         </span>
-      </td>
+      </TableCell>
 
       {/* Status */}
-      <td className="px-4 py-3 text-right">
+      <TableCell className="px-4 py-3 text-right">
         <span
           className={`inline-flex items-center px-2 py-0.5 rounded-full font-body text-[11px] font-medium ${
             c.is_active
@@ -111,17 +113,17 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
         >
           {c.is_active ? "Active" : "Deactivated"}
         </span>
-      </td>
+      </TableCell>
 
       {/* Created */}
-      <td className="px-4 py-3 text-right font-body text-xs text-foreground-muted">
+      <TableCell className="px-4 py-3 text-right font-body text-xs text-muted-foreground">
         {fmtDate(c.created_at)}
-      </td>
+      </TableCell>
 
       {/* Chevron */}
-      <td className="px-4 py-3 text-right">
-        <ChevronRight strokeWidth={2.5} size={14} className="text-foreground-muted ml-auto" />
-      </td>
-    </tr>
+      <TableCell className="px-4 py-3 text-right">
+        <ChevronRight strokeWidth={2.5} size={14} className="text-muted-foreground ml-auto" />
+      </TableCell>
+    </TableRow>
   );
 }

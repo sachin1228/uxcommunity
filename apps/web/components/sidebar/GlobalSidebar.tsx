@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
@@ -96,7 +98,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       <div className="min-h-0 flex-1 overflow-y-auto">
       {/* WORKSPACE nav */}
       <div className="px-[13px] pb-[9px] pt-[13px]">
-        <p className="mb-[9px] px-[5px] font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
+        <p className="mb-[9px] px-[5px] font-body text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
           Workspace
         </p>
         <ul className="flex flex-col gap-[3px]">
@@ -105,8 +107,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard"
               className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 homeActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                  ? "bg-popover text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-popover"
               }`}
             >
               <Home strokeWidth={2.5} size={15} className="shrink-0" />
@@ -118,8 +120,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/communities"
               className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 exploreActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                  ? "bg-popover text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-popover"
               }`}
             >
               <Compass strokeWidth={2.5} size={15} className="shrink-0" />
@@ -131,8 +133,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/library"
               className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 libraryActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                  ? "bg-popover text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-popover"
               }`}
             >
               <Library strokeWidth={2.5} size={15} className="shrink-0" />
@@ -144,8 +146,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/jobs"
               className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 jobsActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                  ? "bg-popover text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-popover"
               }`}
             >
               <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
@@ -153,14 +155,14 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             </Link>
           </li>
           <li>
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => setCreateOpen(true)}
-              className="flex w-full cursor-pointer items-center gap-[11px] rounded-lg px-[11px] py-[7px] text-left font-body text-sm font-normal text-foreground-muted transition-colors hover:text-foreground hover:bg-surface-raised"
+              className="flex w-full cursor-pointer items-center gap-[11px] px-[11px] py-[7px] text-left font-normal transition-colors"
             >
               <Plus strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Start a community</span>
-            </button>
+            </Button>
           </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
           <li>
@@ -168,8 +170,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/chat-with-designers"
               className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
                 designersActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+                  ? "bg-popover text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-popover"
               }`}
             >
               <Gamepad2 size={15} className="shrink-0" />
@@ -189,42 +191,42 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
         ) : communities.length === 0 ? (
           <div>
             <div className="flex items-center justify-between px-5 pt-3 pb-1">
-              <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <span className="font-body text-[8px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={11} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <div className="px-4 py-6 text-center">
               <MessageSquare
                 size={24}
-                className="mx-auto text-foreground-muted mb-2 opacity-40"
+                className="mx-auto text-muted-foreground mb-2 opacity-40"
               />
-              <p className="font-body text-xs text-foreground-muted">No communities yet</p>
+              <p className="font-body text-xs text-muted-foreground">No communities yet</p>
             </div>
           </div>
         ) : (
           <div>
             <div className="flex items-center justify-between px-[17px] pb-[7px] pt-[9px]">
-              <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
+              <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Your Community
               </span>
-              <button
+              <Button variant="ghost" size="icon"
                 type="button"
                 onClick={() => setCreateOpen(true)}
-                className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white text-black transition-colors hover:bg-[#cccccc]"
+                className="flex h-[18px] w-[18px] items-center justify-center text-black transition-colors"
                 aria-label="Create community"
                 title="Create community"
               >
                 <Plus size={11} strokeWidth={2.5} />
-              </button>
+              </Button>
             </div>
             <ul className="flex flex-col gap-[3px] px-[13px]">
               {sorted.map((c) => (

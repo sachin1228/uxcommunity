@@ -1,9 +1,14 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useRef, useState } from "react";
 import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { Modal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
@@ -110,14 +115,7 @@ export function CreateEventModal({
   }
 
   return (
-    <ModalPortal>
-    <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-event-title"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
+    <Modal open onClose={onClose} title="Create Event" titleHidden hideCloseButton maxWidth="max-w-2xl" panelClassName="gap-0 overflow-hidden p-0">
       <form
         onSubmit={handleSubmit}
         className="modal-panel flex max-h-[min(800px,calc(100vh-2rem))] w-full max-w-2xl flex-col overflow-hidden"
@@ -129,132 +127,132 @@ export function CreateEventModal({
             <h2 id="create-event-title" className="font-display text-xl font-semibold text-foreground">
               Create Event
             </h2>
-            <p className="mt-1 font-body text-sm text-foreground-muted">
+            <p className="mt-1 font-body text-sm text-muted-foreground">
               Schedule something for your community.
             </p>
           </div>
-          <button type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground" aria-label="Close">
+          <Button variant="ghost" size="icon" type="button" onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center transition-colors" aria-label="Close">
             <X strokeWidth={2.5} size={16} />
-          </button>
+          </Button>
         </div>
 
         <div className="mt-6 space-y-5">
           {/* Cover image */}
           <div>
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Cover image <span className="font-normal text-foreground-subtle">(optional)</span>
+            <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
+              Cover image <span className="font-normal text-muted-foreground">(optional)</span>
             </span>
             <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleImageSelect} />
             {coverImageUrl ? (
-              <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border bg-surface-raised">
+              <div className="relative h-40 w-full overflow-hidden rounded-lg border border-border bg-popover">
                 <img src={coverImageUrl} alt="Cover" className="h-full w-full object-cover" />
-                <button
+                <Button variant="ghost" size="icon"
                   type="button"
                   onClick={() => setCoverImageUrl(null)}
-                  className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                  className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center"
                   aria-label="Remove cover image"
                 >
                   <X strokeWidth={2.5} size={12} />
-                </button>
+                </Button>
               </div>
             ) : (
-              <button
+              <Button variant="outline"
                 type="button"
                 disabled={imageUploading}
                 onClick={() => imageInputRef.current?.click()}
-                className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-surface-raised text-foreground-muted hover:border-accent/50 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-32 w-full flex-col items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {imageUploading ? <Spinner size={20} /> : <ImagePlus strokeWidth={2.5} size={20} />}
                 <span className="font-body text-xs">{imageUploading ? "Uploading…" : "Click to upload a cover image"}</span>
-                <span className="font-body text-[11px] text-foreground-subtle">JPEG, PNG, WebP or GIF · max 5 MB</span>
-              </button>
+                <span className="font-body text-[11px] text-muted-foreground">JPEG, PNG, WebP or GIF · max 5 MB</span>
+              </Button>
             )}
           </div>
 
           {/* Title */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Event name <span className="text-accent">*</span>
+          <Label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
+              Event name <span className="text-primary">*</span>
             </span>
             <div className="relative">
-              <input
+              <Input
                 value={title}
                 maxLength={120}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="What's the event called?"
-                className="field w-full pr-14"
+                className="w-full pr-14"
               />
-              <span className="absolute right-3 top-3 font-mono text-[10px] text-foreground-subtle">
+              <span className="absolute right-3 top-3 font-mono text-[10px] text-muted-foreground">
                 {title.length}/120
               </span>
             </div>
-          </label>
+          </Label>
 
           {/* Description */}
-          <label className="block">
-            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Description <span className="font-normal text-foreground-subtle">(optional)</span>
+          <Label className="block">
+            <span className="mb-1.5 block font-body text-xs font-medium text-muted-foreground">
+              Description <span className="font-normal text-muted-foreground">(optional)</span>
             </span>
-            <textarea
+            <Textarea
               value={description}
               maxLength={5000}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Tell people what to expect…"
               rows={4}
-              className="field w-full resize-y"
+              className="w-full resize-y"
             />
-          </label>
+          </Label>
 
           {/* Date + Time */}
           <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-accent">*</span>
+            <Label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-muted-foreground">
+                <Calendar strokeWidth={2.5} size={11} /> Start date <span className="text-primary">*</span>
               </span>
-              <input
+              <Input
                 type="date"
                 value={eventDate}
                 onChange={(e) => setEventDate(e.target.value)}
-                className="field w-full"
+                className="w-full"
               />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-accent">*</span>
+            </Label>
+            <Label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-muted-foreground">
+                <Clock strokeWidth={2.5} size={11} /> Start time <span className="text-primary">*</span>
               </span>
-              <input
+              <Input
                 type="time"
                 value={eventTime}
                 onChange={(e) => setEventTime(e.target.value)}
-                className="field w-full"
+                className="w-full"
               />
-            </label>
+            </Label>
           </div>
 
           {/* End Date + Time */}
           <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                End date <span className="font-normal text-foreground-subtle">(optional)</span>
+            <Label className="block">
+              <span className="mb-1.5 font-body text-xs font-medium text-muted-foreground">
+                End date <span className="font-normal text-muted-foreground">(optional)</span>
               </span>
-              <input
+              <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="field w-full"
+                className="w-full"
               />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 font-body text-xs font-medium text-foreground-muted">
-                End time <span className="font-normal text-foreground-subtle">(optional)</span>
+            </Label>
+            <Label className="block">
+              <span className="mb-1.5 font-body text-xs font-medium text-muted-foreground">
+                End time <span className="font-normal text-muted-foreground">(optional)</span>
               </span>
-              <input
+              <Input
                 type="time"
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="field w-full"
+                className="w-full"
               />
-            </label>
+            </Label>
           </div>
 
           {/* Online toggle */}
@@ -268,46 +266,46 @@ export function CreateEventModal({
 
           {/* Location / Meet link */}
           {isOnline ? (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-foreground-subtle">(optional)</span>
+            <Label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-muted-foreground">
+                <Video strokeWidth={2.5} size={11} /> Meeting link <span className="font-normal text-muted-foreground">(optional)</span>
               </span>
-              <input
+              <Input
                 type="url"
                 value={meetLink}
                 onChange={(e) => setMeetLink(e.target.value)}
                 placeholder="https://meet.google.com/…"
-                className="field w-full"
+                className="w-full"
               />
-            </label>
+            </Label>
           ) : (
-            <label className="block">
-              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-foreground-subtle">(optional)</span>
+            <Label className="block">
+              <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-muted-foreground">
+                <MapPin strokeWidth={2.5} size={11} /> Location <span className="font-normal text-muted-foreground">(optional)</span>
               </span>
-              <input
+              <Input
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="Address or venue name"
-                className="field w-full"
+                className="w-full"
               />
-            </label>
+            </Label>
           )}
 
           {/* Max attendees */}
-          <label className="block">
-            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-foreground-muted">
-              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-foreground-subtle">(optional — leave blank for unlimited)</span>
+          <Label className="block">
+            <span className="mb-1.5 flex items-center gap-1.5 font-body text-xs font-medium text-muted-foreground">
+              <Users strokeWidth={2.5} size={11} /> Max attendees <span className="font-normal text-muted-foreground">(optional — leave blank for unlimited)</span>
             </span>
-            <input
+            <Input
               type="number"
               min={1}
               value={maxAttendees}
               onChange={(e) => setMaxAttendees(e.target.value)}
               placeholder="e.g. 50"
-              className="field w-full"
+              className="w-full"
             />
-          </label>
+          </Label>
 
           {/* Make public toggle */}
           <ToggleRow
@@ -328,20 +326,19 @@ export function CreateEventModal({
         </div>
 
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border p-3">
-          <button type="button" onClick={onClose} className="modal-btn modal-btn-secondary">
+          <Button variant="outline" type="button" onClick={onClose} className="">
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button variant="default"
             type="submit"
             disabled={saving}
-            className="modal-btn modal-btn-primary"
+            className=""
           >
             {saving ? <Spinner size={15} className="text-white" /> : <Check strokeWidth={2.5} size={15} />}
             {saving ? "Creating…" : "Create Event"}
-          </button>
+          </Button>
         </div>
       </form>
-    </div>
-    </ModalPortal>
+    </Modal>
   );
 }

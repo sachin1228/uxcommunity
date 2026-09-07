@@ -1,4 +1,7 @@
 "use client";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { FileText } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -17,22 +20,22 @@ export function ReviewNotesEditor({ notes, saving, onChange, onSave }: Props) {
         <p className="font-body text-xs font-medium text-foreground mb-2 flex items-center gap-1.5">
           <FileText strokeWidth={2.5} size={12} /> Internal Review Notes
         </p>
-        <textarea
+        <Textarea
           value={notes}
           onChange={(e) => onChange(e.target.value)}
           rows={3}
           placeholder="Private notes — not visible to the applicant…"
-          className="field w-full resize-none"
+          className="w-full resize-none"
         />
       </div>
-      <button
+      <Button variant="ghost"
         onClick={onSave}
         disabled={saving}
-        className="flex items-center justify-center gap-2 rounded-md bg-surface-raised py-2 font-body text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:opacity-60"
+        className="flex items-center justify-center gap-2 py-2 transition-colors disabled:opacity-60"
       >
         {saving && <Spinner className="h-3 w-3" />}
         {saving ? "Saving…" : "Save Notes & Tags"}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function Spinner({ className = "", size }: { className?: string; size?: n
   const hasColorClass = /(^|\s)text-/.test(className);
   return (
     <svg
-      className={`animate-spin ${hasColorClass ? "" : "text-accent"} ${className}`}
+      className={`animate-spin ${hasColorClass ? "" : "text-primary"} ${className}`}
       xmlns="http://www.w3.org/2000/svg"
       fill="none"
       viewBox="0 0 24 24"

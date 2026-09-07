@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
@@ -40,11 +42,11 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
   return (
     <div
       ref={embedRef}
-      className={`overflow-hidden rounded-xl border border-border bg-surface-raised ${className}`}
+      className={`overflow-hidden rounded-xl border border-border bg-popover ${className}`}
     >
       <div className={`relative w-full ${compact ? "aspect-[4/3] sm:aspect-video" : "aspect-[4/3] md:aspect-video"}`}>
         {!loaded && (
-          <div className="absolute inset-0 flex items-center justify-center gap-2 text-foreground-muted">
+          <div className="absolute inset-0 flex items-center justify-center gap-2 text-muted-foreground">
             <Spinner size={16} />
             <span className="font-body text-sm">Loading Figma prototype…</span>
           </div>
@@ -62,11 +64,11 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
         />
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
-        <span className="font-body text-xs text-foreground-muted">Interactive prototype</span>
-        <button
+        <span className="font-body text-xs text-muted-foreground">Interactive prototype</span>
+        <Button variant="ghost"
           type="button"
           onClick={toggleFullscreen}
-          className="inline-flex min-h-8 items-center gap-1.5 font-body text-xs font-medium text-accent hover:text-accent-hover"
+          className="inline-flex min-h-8 items-center gap-1.5"
           aria-label={isFullscreen ? "Exit full screen" : "View prototype in full screen"}
         >
           {isFullscreen ? (
@@ -78,7 +80,7 @@ export function FigmaEmbed({ url, className = "", compact = false }: FigmaEmbedP
               View full screen <Maximize2 strokeWidth={2.5} size={12} />
             </>
           )}
-        </button>
+        </Button>
       </div>
     </div>
   );

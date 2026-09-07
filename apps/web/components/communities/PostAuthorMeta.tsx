@@ -25,11 +25,11 @@ export function PostAuthorMeta({
 
   return (
     <div className={`flex min-w-0 items-center gap-3 ${className}`}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/15">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15">
         {avatarUrl ? (
           <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
         ) : (
-          <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
+          <span className="font-display text-sm font-bold text-primary">{authorInitial}</span>
         )}
       </div>
       <div className="flex min-w-0 flex-col">
@@ -38,13 +38,13 @@ export function PostAuthorMeta({
             {authorName}
           </span>
           {dateInline && (
-            <span className="shrink-0 font-body text-[11px] font-semibold text-foreground-subtle">
+            <span className="shrink-0 font-body text-[11px] font-semibold text-muted-foreground">
               {relativeDate}
             </span>
           )}
         </div>
         {(secondaryLabel ?? (!dateInline ? relativeDate : null)) && (
-          <span className="font-body text-[11px] text-foreground-subtle font-semibold">
+          <span className="font-body text-[11px] text-muted-foreground font-semibold">
             {secondaryLabel ?? relativeDate}
           </span>
         )}

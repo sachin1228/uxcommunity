@@ -1,322 +1,203 @@
-/**
- * UX Community design system CSS custom properties.
- * Primary accent: white (dark) / black (light), Vercel-style.
- */
-
-/* ─── Light mode (default) ─────────────────────────────────────────── */
-:root {
-  color-scheme: light dark;
-
-  --color-background:        #FAFAFA;
-  --color-background-subtle: #F5F5F5;
-
-  --color-surface:           #FFFFFF;
-  --color-surface-raised:    #F5F5F5;
-
-  --color-foreground:        #0A0A0A;
-  --color-foreground-muted:  #525252;
-  --color-foreground-subtle: #737373;
-
-  /* Accent — inverted (Vercel): black primary in light mode */
-  --color-accent:            #0A0A0A;
-  --color-accent-rgb:        10 10 10;    /* RGB channels for opacity modifiers */
-  --color-accent-hover:      #333333;     /* darker hover shade */
-  --color-accent-soft:       #EBEBEB;     /* tinted bg */
-  --color-accent-foreground: #FFFFFF;
-
-  --color-border:            #EAEAEA;
-  --color-border-subtle:     #F5F5F5;
-
-  /* Field inputs — Geist-style ring fields (light theme) */
-  --color-field:            #FAFAFA;
-  --color-field-ring:       rgba(0, 0, 0, 0.16);
-  --color-field-ring-hover: rgba(0, 0, 0, 0.24);
-  --color-field-ring-focus: rgba(10, 10, 10, 0.55);
-  --color-field-halo:       rgba(10, 10, 10, 0.14);
-
-  --color-signal:            #0A0A0A;
-
-  --color-overlay:            #0A0A0A;
-  --color-overlay-raised:     #111111;
-  --color-overlay-elevated:   #1A1A1A;
-  --color-overlay-foreground: #EDEDED;
-  --color-overlay-muted:      #737373;
-
-  /* ─── Geist blue scale (light theme) ──────────────────────────── */
-  --ds-blue-100:  #f0f7ff;
-  --ds-blue-200:  #ebf5ff;
-  --ds-blue-300:  #e0f0ff;
-  --ds-blue-400:  #cce6ff;
-  --ds-blue-500:  #99ceff;
-  --ds-blue-600:  #52aeff;
-  --ds-blue-700:  #0072f5;
-  --ds-blue-800:  #0062d1;
-  --ds-blue-900:  #0068d6;
-  --ds-blue-1000: #00254d;
-
-  /* ─── Geist red scale (light theme) ──────────────────────────── */
-  --ds-red-100:  #fff0f0;
-  --ds-red-200:  #ffebeb;
-  --ds-red-300:  #ffe5e5;
-  --ds-red-400:  #fdd8d8;
-  --ds-red-500:  #f8b9b9;
-  --ds-red-600:  #f87275;
-  --ds-red-700:  #e5484d;
-  --ds-red-800:  #da2f35;
-  --ds-red-900:  #cb2a2f;
-  --ds-red-1000: #391417;
-
-  /* ─── Geist amber scale (light theme) ────────────────────────── */
-  --ds-amber-100:  #fff6e5;
-  --ds-amber-200:  #fff4d6;
-  --ds-amber-300:  #fef0cd;
-  --ds-amber-400:  #ffdd8f;
-  --ds-amber-500:  #ffc96b;
-  --ds-amber-600:  #f5b047;
-  --ds-amber-700:  #ffb224;
-  --ds-amber-800:  #ff990a;
-  --ds-amber-900:  #a35200;
-  --ds-amber-1000: #4e2009;
-
-  /* ─── Geist green scale (light theme) ────────────────────────── */
-  --ds-green-100:  #effbef;
-  --ds-green-200:  #ebfaeb;
-  --ds-green-300:  #daf6da;
-  --ds-green-400:  #c6f1c7;
-  --ds-green-500:  #99e69e;
-  --ds-green-600:  #6cda75;
-  --ds-green-700:  #45a557;
-  --ds-green-800:  #398e4a;
-  --ds-green-900:  #297a3a;
-  --ds-green-1000: #1b311e;
-
-  /* ─── Geist teal scale (light theme) ─────────────────────────── */
-  --ds-teal-100:  #eefcf9;
-  --ds-teal-200:  #e5faf6;
-  --ds-teal-300:  #d4f7f0;
-  --ds-teal-400:  #bef4eb;
-  --ds-teal-500:  #86ead9;
-  --ds-teal-600:  #45dec5;
-  --ds-teal-700:  #12a594;
-  --ds-teal-800:  #0d8c7d;
-  --ds-teal-900:  #067a6e;
-  --ds-teal-1000: #073c34;
-
-  /* ─── Geist purple scale (light theme) ───────────────────────── */
-  --ds-purple-100:  #f9f0ff;
-  --ds-purple-200:  #f9f1fe;
-  --ds-purple-300:  #f4e8fc;
-  --ds-purple-400:  #eddcf9;
-  --ds-purple-500:  #d5b1f1;
-  --ds-purple-600:  #bf89ec;
-  --ds-purple-700:  #8e4ec6;
-  --ds-purple-800:  #763da9;
-  --ds-purple-900:  #7820bc;
-  --ds-purple-1000: #2e004d;
-
-  /* ─── Geist pink scale (light theme) ─────────────────────────── */
-  --ds-pink-100:  #ffebf5;
-  --ds-pink-200:  #feecf2;
-  --ds-pink-300:  #fce3ec;
-  --ds-pink-400:  #f9d7e2;
-  --ds-pink-500:  #f5b8cc;
-  --ds-pink-600:  #ee87a7;
-  --ds-pink-700:  #ea3e83;
-  --ds-pink-800:  #df2670;
-  --ds-pink-900:  #bd2864;
-  --ds-pink-1000: #430a23;
-
-  --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
-  --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-  --shadow-card: 0 0 0 1px var(--color-border), 0 2px 4px rgb(0 0 0 / 0.04);
-
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   12px;
-  --radius-full: 9999px;
-
-  /* Home-feed filter switcher — light mirror of the reference palette. */
-  --filter-track:        #ECECF1;
-  --filter-pill:         #FFFFFF;
-  --filter-text-active:  #0A0A0A;
-  --filter-text-muted:   #6E6E78;
-  --filter-glow:         rgb(10 10 10 / 0.12);
-  --filter-focus:        #0A0A0A;
-
-  --grid-line-color: rgba(0, 0, 0, 0.06);
-  --grid-dot-color:  rgba(0, 0, 0, 0.12);
-  --grid-size:       28px;
-
-  /* Modal surfaces — Geist panel ring + drop (light) */
-  --modal-ring: rgba(0, 0, 0, 0.05);
-  --modal-drop: rgba(0, 0, 0, 0.45);
-}
-
-/* ─── Dark mode ─────────────────────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Backgrounds */
-    --color-background:        #09090B;
-    --color-background-subtle: #0E0E10;  /* sidebars */
-
-    --color-surface:           #121214;
-    --color-surface-raised:    #1B1B1F;  /* modals, dropdowns, popovers */
-    --color-surface-hover:     #17171A;  /* hover states */
-    --color-input-background:  #151517;  /* inputs & textareas */
-
-    --color-foreground:        #EDEDED;
-    --color-foreground-muted:  #737373;
-    --color-foreground-subtle: #525252;
-
-    /* Accent — white primary in dark mode (Vercel) */
-    --color-accent:            #FFFFFF;
-    --color-accent-rgb:        255 255 255;
-    --color-accent-hover:      #CCCCCC;
-    --color-accent-soft:       #1F1F23;
-    --color-accent-foreground: #000000;
-
-    /* Borders */
-    --color-border:            #202024;
-    --color-border-subtle:     #1D1D21;  /* section dividers */
-    --color-border-strong:     #2D2D34;  /* active components */
-    --color-input-border:      #303036;  /* input fields */
-
-    /* Field inputs — Geist-style ring fields (dark theme) */
-    --color-field:            #151517;
-    --color-field-ring:       rgba(255, 255, 255, 0.14);
-    --color-field-ring-hover: rgba(255, 255, 255, 0.24);
-    --color-field-ring-focus: rgba(255, 255, 255, 0.60);
-    --color-field-halo:       rgba(255, 255, 255, 0.22);
-
-    --color-signal:            #FFFFFF;
-
-    /* Navigation */
-    --color-nav-hover:         #17171A;
-    --color-nav-active:        #1F1F23;
-    --color-nav-active-hover:  #26262B;
-
-    /* Neutral buttons */
-    --color-button-secondary:        #1A1A1E;
-    --color-button-secondary-hover:  #232329;
-    --color-button-secondary-active: #2A2A31;
-
-    --color-overlay:            #09090B;
-    --color-overlay-raised:     #121214;
-    --color-overlay-elevated:   #1B1B1F;
-    --color-overlay-foreground: #EDEDED;
-    --color-overlay-muted:      #737373;
-
-    /* ─── Geist blue scale (dark theme) ─────────────────────────────── */
-    --ds-blue-100:  #0f1c2e;
-    --ds-blue-200:  #10233d;
-    --ds-blue-300:  #0f2f57;
-    --ds-blue-400:  #0d3868;
-    --ds-blue-500:  #0a4380;
-    --ds-blue-600:  #0090ff;
-    --ds-blue-700:  #0072f5;
-    --ds-blue-800:  #0062d1;
-    --ds-blue-900:  #52a8ff;
-    --ds-blue-1000: #ebf6ff;
-
-    /* ─── Geist red scale (dark theme) ────────────────────────────── */
-    --ds-red-100:  #2a1314;
-    --ds-red-200:  #3c1618;
-    --ds-red-300:  #561a1e;
-    --ds-red-400:  #671e21;
-    --ds-red-500:  #832126;
-    --ds-red-600:  #e5484d;
-    --ds-red-700:  #e5484d;
-    --ds-red-800:  #d93036;
-    --ds-red-900:  #ff6166;
-    --ds-red-1000: #feecee;
-
-    /* ─── Geist amber scale (dark theme) ──────────────────────────── */
-    --ds-amber-100:  #291800;
-    --ds-amber-200:  #331b00;
-    --ds-amber-300:  #4d2a00;
-    --ds-amber-400:  #573300;
-    --ds-amber-500:  #6b4105;
-    --ds-amber-600:  #e79d13;
-    --ds-amber-700:  #ffb224;
-    --ds-amber-800:  #ff990a;
-    --ds-amber-900:  #ff990a;
-    --ds-amber-1000: #fef3dc;
-
-    /* ─── Geist green scale (dark theme) ──────────────────────────── */
-    --ds-green-100:  #0b2212;
-    --ds-green-200:  #0f2e18;
-    --ds-green-300:  #12361b;
-    --ds-green-400:  #0c451b;
-    --ds-green-500:  #126426;
-    --ds-green-600:  #1a9338;
-    --ds-green-700:  #45a557;
-    --ds-green-800:  #398e4a;
-    --ds-green-900:  #62c073;
-    --ds-green-1000: #e5fbea;
-
-    /* ─── Geist teal scale (dark theme) ───────────────────────────── */
-    --ds-teal-100:  #04201b;
-    --ds-teal-200:  #062822;
-    --ds-teal-300:  #083a33;
-    --ds-teal-400:  #053d35;
-    --ds-teal-500:  #085e53;
-    --ds-teal-600:  #0c9784;
-    --ds-teal-700:  #12a594;
-    --ds-teal-800:  #0d8c7d;
-    --ds-teal-900:  #0ac7b4;
-    --ds-teal-1000: #e0faf4;
-
-    /* ─── Geist purple scale (dark theme) ─────────────────────────── */
-    --ds-purple-100:  #231528;
-    --ds-purple-200:  #2e1938;
-    --ds-purple-300:  #422154;
-    --ds-purple-400:  #4f2768;
-    --ds-purple-500:  #5f2e85;
-    --ds-purple-600:  #8e4ec6;
-    --ds-purple-700:  #8e4ec6;
-    --ds-purple-800:  #763da9;
-    --ds-purple-900:  #bf7af0;
-    --ds-purple-1000: #f8edfc;
-
-    /* ─── Geist pink scale (dark theme) ───────────────────────────── */
-    --ds-pink-100:  #28151d;
-    --ds-pink-200:  #3a1726;
-    --ds-pink-300:  #4f1c31;
-    --ds-pink-400:  #551b33;
-    --ds-pink-500:  #6c1e3e;
-    --ds-pink-600:  #b31957;
-    --ds-pink-700:  #ea3e83;
-    --ds-pink-800:  #df2670;
-    --ds-pink-900:  #f75f8f;
-    --ds-pink-1000: #feecf4;
-
-    --shadow-xs:   0 1px 2px 0 rgb(0 0 0 / 0.40);
-    --shadow-sm:   0 1px 3px 0 rgb(0 0 0 / 0.50), 0 1px 2px -1px rgb(0 0 0 / 0.40);
-    --shadow-md:   0 4px 6px -1px rgb(0 0 0 / 0.60), 0 2px 4px -2px rgb(0 0 0 / 0.48);
-    --shadow-card: 0 0 0 1px var(--color-border), 0 2px 8px rgb(0 0 0 / 0.50);
-
-    /* Home-feed filter switcher — reference palette (dark). */
-    --filter-track:        #161618;
-    --filter-pill:         #28282c;
-    --filter-text-active:  #FFFFFF;
-    --filter-text-muted:   #7c7c82;
-    --filter-glow:         rgb(255 255 255 / 0.18);
-    --filter-focus:        #FFFFFF;
-
-    --grid-line-color: rgba(255, 255, 255, 0.04);
-    --grid-dot-color:  rgba(255, 255, 255, 0.08);
-
-    /* Modal surfaces — Geist panel ring + drop (dark) */
-    --modal-ring: rgba(255, 255, 255, 0.10);
-    --modal-drop: rgba(0, 0, 0, 0.60);
-  }
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 63.9%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 3.9%;
+    --sidebar-primary: 0 0% 9%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 96.1%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 89.8%;
+    --sidebar-ring: 0 0% 63.9%;
+    --radius: 0.625rem;
+    --scrim: 0 0% 0%;
+  }
+
+  .dark {
+    color-scheme: dark;
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 89.8%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 18%;
+    --input: 0 0% 22%;
+    --ring: 0 0% 45.1%;
+    --sidebar-background: 0 0% 9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 89.8%;
+    --sidebar-primary-foreground: 0 0% 9%;
+    --sidebar-accent: 0 0% 14.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 0 0% 45.1%;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground font-sans; }
+}
+
+/* Transitional aliases keep unmigrated screens usable between commits. */
+:root {
+  --color-background: hsl(var(--background));
+  --color-background-subtle: hsl(var(--muted));
+  --color-surface: hsl(var(--card));
+  --color-surface-raised: hsl(var(--popover));
+  --color-surface-hover: hsl(var(--accent));
+  --color-input-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-foreground-muted: hsl(var(--muted-foreground));
+  --color-foreground-subtle: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--primary));
+  --color-accent-hover: hsl(var(--primary));
+  --color-accent-soft: hsl(var(--secondary));
+  --color-accent-foreground: hsl(var(--primary-foreground));
+  --color-border: hsl(var(--border));
+  --color-border-subtle: hsl(var(--border));
+  --color-border-strong: hsl(var(--input));
+  --color-input-border: hsl(var(--input));
+  --color-field: hsl(var(--background));
+  --color-field-ring: hsl(var(--input));
+  --color-field-ring-hover: hsl(var(--ring));
+  --color-field-ring-focus: hsl(var(--ring));
+  --color-field-halo: hsl(var(--ring));
+  --color-signal: hsl(var(--primary));
+  --color-nav-hover: hsl(var(--accent));
+  --color-nav-active: hsl(var(--accent));
+  --color-nav-active-hover: hsl(var(--secondary));
+  --color-button-secondary: hsl(var(--secondary));
+  --color-button-secondary-hover: hsl(var(--accent));
+  --color-button-secondary-active: hsl(var(--accent));
+  --color-overlay: hsl(var(--card));
+  --color-overlay-raised: hsl(var(--muted));
+  --color-overlay-elevated: hsl(var(--popover));
+  --color-overlay-foreground: hsl(var(--card-foreground));
+  --color-overlay-muted: hsl(var(--muted-foreground));
+  --ds-blue-100: hsl(var(--muted));
+  --ds-blue-200: hsl(var(--muted));
+  --ds-blue-300: hsl(var(--muted));
+  --ds-blue-400: hsl(var(--border));
+  --ds-blue-500: hsl(var(--border));
+  --ds-blue-600: hsl(var(--border));
+  --ds-blue-700: hsl(var(--foreground));
+  --ds-blue-800: hsl(var(--foreground));
+  --ds-blue-900: hsl(var(--foreground));
+  --ds-blue-1000: hsl(var(--foreground));
+  --ds-red-100: hsl(var(--destructive) / 0.1);
+  --ds-red-200: hsl(var(--destructive) / 0.1);
+  --ds-red-300: hsl(var(--destructive) / 0.1);
+  --ds-red-400: hsl(var(--destructive));
+  --ds-red-500: hsl(var(--destructive));
+  --ds-red-600: hsl(var(--destructive));
+  --ds-red-700: hsl(var(--destructive));
+  --ds-red-800: hsl(var(--destructive));
+  --ds-red-900: hsl(var(--destructive));
+  --ds-red-1000: hsl(var(--destructive));
+  --ds-amber-100: hsl(var(--muted));
+  --ds-amber-200: hsl(var(--muted));
+  --ds-amber-300: hsl(var(--muted));
+  --ds-amber-400: hsl(var(--border));
+  --ds-amber-500: hsl(var(--border));
+  --ds-amber-600: hsl(var(--border));
+  --ds-amber-700: hsl(var(--foreground));
+  --ds-amber-800: hsl(var(--foreground));
+  --ds-amber-900: hsl(var(--foreground));
+  --ds-amber-1000: hsl(var(--foreground));
+  --ds-green-100: hsl(var(--muted));
+  --ds-green-200: hsl(var(--muted));
+  --ds-green-300: hsl(var(--muted));
+  --ds-green-400: hsl(var(--border));
+  --ds-green-500: hsl(var(--border));
+  --ds-green-600: hsl(var(--border));
+  --ds-green-700: hsl(var(--foreground));
+  --ds-green-800: hsl(var(--foreground));
+  --ds-green-900: hsl(var(--foreground));
+  --ds-green-1000: hsl(var(--foreground));
+  --ds-teal-100: hsl(var(--muted));
+  --ds-teal-200: hsl(var(--muted));
+  --ds-teal-300: hsl(var(--muted));
+  --ds-teal-400: hsl(var(--border));
+  --ds-teal-500: hsl(var(--border));
+  --ds-teal-600: hsl(var(--border));
+  --ds-teal-700: hsl(var(--foreground));
+  --ds-teal-800: hsl(var(--foreground));
+  --ds-teal-900: hsl(var(--foreground));
+  --ds-teal-1000: hsl(var(--foreground));
+  --ds-purple-100: hsl(var(--muted));
+  --ds-purple-200: hsl(var(--muted));
+  --ds-purple-300: hsl(var(--muted));
+  --ds-purple-400: hsl(var(--border));
+  --ds-purple-500: hsl(var(--border));
+  --ds-purple-600: hsl(var(--border));
+  --ds-purple-700: hsl(var(--foreground));
+  --ds-purple-800: hsl(var(--foreground));
+  --ds-purple-900: hsl(var(--foreground));
+  --ds-purple-1000: hsl(var(--foreground));
+  --ds-pink-100: hsl(var(--muted));
+  --ds-pink-200: hsl(var(--muted));
+  --ds-pink-300: hsl(var(--muted));
+  --ds-pink-400: hsl(var(--border));
+  --ds-pink-500: hsl(var(--border));
+  --ds-pink-600: hsl(var(--border));
+  --ds-pink-700: hsl(var(--foreground));
+  --ds-pink-800: hsl(var(--foreground));
+  --ds-pink-900: hsl(var(--foreground));
+  --ds-pink-1000: hsl(var(--foreground));
+  --shadow-xs: 0 1px 2px hsl(var(--scrim) / 0.05);
+  --shadow-sm: 0 1px 2px hsl(var(--scrim) / 0.05);
+  --shadow-md: 0 4px 6px -1px hsl(var(--scrim) / 0.1);
+  --shadow-card: 0 1px 3px hsl(var(--scrim) / 0.1);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-full: 9999px;
+  --filter-track: hsl(var(--muted));
+  --filter-pill: hsl(var(--background));
+  --filter-text-active: hsl(var(--foreground));
+  --filter-text-muted: hsl(var(--muted-foreground));
+  --filter-glow: transparent;
+  --filter-focus: hsl(var(--ring));
+  --grid-line-color: hsl(var(--border) / 0.5);
+  --grid-dot-color: hsl(var(--border));
+  --grid-size: 28px;
+  --modal-ring: hsl(var(--border));
+  --modal-drop: hsl(var(--scrim) / 0.4);
+}
 
 html,
 body {

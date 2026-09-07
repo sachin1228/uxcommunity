@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -121,16 +123,16 @@ export default function CommunityAdminPermissionsPage() {
   if (notFound || !admin || !permissions) {
     return (
       <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <ShieldOff strokeWidth={2.5} size={24} className="text-foreground-muted/60" />
-        <p className="font-body text-sm text-foreground-muted">
+        <ShieldOff strokeWidth={2.5} size={24} className="text-muted-foreground/60" />
+        <p className="font-body text-sm text-muted-foreground">
           This member is not an admin of this community (or the community was removed).
         </p>
-        <button
+        <Button variant="ghost"
           onClick={() => router.push(`/admin/communities/${communityId}`)}
-          className="font-body text-xs text-accent hover:underline"
+          className="hover:underline"
         >
           Back to community
-        </button>
+        </Button>
       </div>
     );
   }
@@ -140,17 +142,17 @@ export default function CommunityAdminPermissionsPage() {
   return (
     <div className="flex w-full flex-col gap-6">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push(`/admin/communities/${communityId}`)}
-        className="flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors w-fit"
+        className="flex items-center gap-1.5 transition-colors w-fit"
       >
         <ArrowLeft strokeWidth={2.5} size={13} /> {communityName || "Community"}
-      </button>
+      </Button>
 
       {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-6 py-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card px-6 py-5">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised font-display text-lg font-semibold text-foreground">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border bg-popover font-display text-lg font-semibold text-foreground">
             {initials(admin.name)}
           </span>
           <div className="min-w-0">
@@ -160,34 +162,34 @@ export default function CommunityAdminPermissionsPage() {
                 <ShieldCheck strokeWidth={2.5} size={10} /> Community admin
               </span>
             </div>
-            <p className="font-body text-xs text-foreground-muted mt-0.5 truncate">{admin.email}</p>
-            <p className="font-body text-[11px] text-foreground-muted/80 mt-1">
+            <p className="font-body text-xs text-muted-foreground mt-0.5 truncate">{admin.email}</p>
+            <p className="font-body text-[11px] text-muted-foreground/80 mt-1">
               Admin of {communityName || "this community"} since {fmtDate(admin.granted_at)} · member since{" "}
               {fmtDate(admin.joined_at)}
             </p>
           </div>
         </div>
 
-        <button
+        <Button variant="default"
           onClick={handleSave}
           disabled={!dirty || saving}
-          className="inline-flex items-center gap-1.5 rounded-md bg-accent px-3.5 py-2 font-body text-xs font-medium text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 hover:opacity-90 transition-opacity disabled:opacity-40"
         >
-          {saving ? <Spinner className="h-3 w-3 text-accent-foreground" /> : <Save strokeWidth={2.5} size={12} />}
+          {saving ? <Spinner className="h-3 w-3 text-primary-foreground" /> : <Save strokeWidth={2.5} size={12} />}
           {saving ? "Saving…" : dirty ? "Save changes" : "Saved"}
-        </button>
+        </Button>
       </div>
 
       {/* Body: permissions + activity (left) | about + danger (right) */}
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           {/* Permissions */}
-          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
               <h2 className="font-body text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <ShieldCheck strokeWidth={2.5} size={14} className="text-accent" /> Permissions
+                <ShieldCheck strokeWidth={2.5} size={14} className="text-primary" /> Permissions
               </h2>
-              <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+              <p className="font-body text-[11px] text-muted-foreground mt-0.5">
                 These control what {firstName} can do in the app for this community.
                 Owners &amp; the platform always keep full control.
               </p>
@@ -212,36 +214,36 @@ export default function CommunityAdminPermissionsPage() {
                   <div key={key} className="flex items-center justify-between gap-6 px-5 py-4">
                     <div className="min-w-0">
                       <p className="font-body text-sm font-medium text-foreground">{label}</p>
-                      <p className="font-body text-[11px] text-foreground-muted mt-1 max-w-xl leading-relaxed">
+                      <p className="font-body text-[11px] text-muted-foreground mt-1 max-w-xl leading-relaxed">
                         {description}
                       </p>
                     </div>
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       role="switch"
                       aria-checked={checked}
                       aria-label={label}
                       onClick={() => togglePermission(key)}
-                      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/60 ${
+                      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors duration-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 ${
                         checked
-                          ? "bg-accent border-transparent"
-                          : "bg-surface-raised border-border"
+                          ? "bg-primary border-transparent"
+                          : "bg-popover border-border"
                       }`}
                     >
                       <span
                         aria-hidden="true"
                         className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full transition-all duration-200 ${
-                          checked ? "translate-x-5 bg-accent-foreground" : "translate-x-0 bg-foreground"
+                          checked ? "translate-x-5 bg-primary-foreground" : "translate-x-0 bg-foreground"
                         }`}
                       />
-                    </button>
+                    </Button>
                   </div>
                 );
               })}
             </div>
 
-            <div className="px-5 py-3 border-t border-border/70 bg-surface-raised/40">
-              <p className="font-body text-[11px] text-foreground-muted flex items-center gap-1.5">
+            <div className="px-5 py-3 border-t border-border/70 bg-popover/40">
+              <p className="font-body text-[11px] text-muted-foreground flex items-center gap-1.5">
                 <Check strokeWidth={2.5} size={11} className="text-green-400 shrink-0" />
                 Permissions apply instantly — their next action in the app is checked against these.
               </p>
@@ -255,29 +257,29 @@ export default function CommunityAdminPermissionsPage() {
         {/* Right rail */}
         <div className="flex min-w-0 flex-col gap-6">
           {/* About */}
-          <div className="rounded-xl border border-border bg-surface overflow-hidden">
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
               <h2 className="font-body text-sm font-semibold text-foreground">About</h2>
             </div>
             <div className="divide-y divide-border/70">
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <UserRound strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <UserRound strokeWidth={2.5} size={13} className="text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-body text-[11px] text-foreground-muted">Member of {communityName || "this community"}</p>
+                  <p className="font-body text-[11px] text-muted-foreground">Member of {communityName || "this community"}</p>
                   <p className="font-body text-xs text-foreground mt-0.5">since {fmtDate(admin.joined_at)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <CalendarDays strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <CalendarDays strokeWidth={2.5} size={13} className="text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-body text-[11px] text-foreground-muted">Admin since</p>
+                  <p className="font-body text-[11px] text-muted-foreground">Admin since</p>
                   <p className="font-body text-xs text-foreground mt-0.5">{fmtDate(admin.granted_at)}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <Clock3 strokeWidth={2.5} size={13} className="text-foreground-muted shrink-0" />
+                <Clock3 strokeWidth={2.5} size={13} className="text-muted-foreground shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-body text-[11px] text-foreground-muted">Permissions last changed</p>
+                  <p className="font-body text-[11px] text-muted-foreground">Permissions last changed</p>
                   <p className="font-body text-xs text-foreground mt-0.5">
                     {admin.updated_at ? fmtDateTime(admin.updated_at) : "Never"}
                   </p>
@@ -287,18 +289,18 @@ export default function CommunityAdminPermissionsPage() {
           </div>
 
           {/* Danger zone */}
-          <div className="rounded-xl border border-red-500/20 bg-surface overflow-hidden">
+          <div className="rounded-xl border border-red-500/20 bg-card overflow-hidden">
             <div className="px-5 py-4">
               <p className="font-body text-sm font-medium text-red-400">Remove admin rights</p>
-              <p className="font-body text-[11px] text-foreground-muted mt-1 leading-relaxed">
+              <p className="font-body text-[11px] text-muted-foreground mt-1 leading-relaxed">
                 {firstName} stays a regular member — they just lose the in-app management controls.
               </p>
-              <button
+              <Button variant="destructive"
                 onClick={() => setShowRemoveConfirm(true)}
-                className="mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors"
+                className="mt-4 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 transition-colors"
               >
                 <Trash2 strokeWidth={2.5} size={12} /> Remove admin
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -315,25 +317,25 @@ export default function CommunityAdminPermissionsPage() {
             <h2 className="font-display text-base font-semibold text-foreground mb-1 flex items-center gap-2">
               <ShieldOff strokeWidth={2.5} size={15} className="text-red-400" /> Remove {firstName}&apos;s admin rights?
             </h2>
-            <p className="font-body text-xs text-foreground-muted mb-5">
+            <p className="font-body text-xs text-muted-foreground mb-5">
               They will remain a member of <span className="text-foreground font-medium">{communityName}</span> but
               lose access to community settings, member management, and message moderation in the app.
             </p>
             <div className="flex gap-2">
-              <button
+              <Button variant="outline"
                 onClick={() => setShowRemoveConfirm(false)}
                 disabled={removing}
-                className="modal-btn modal-btn-secondary flex-1"
+                className="flex-1"
               >
                 <span className="inline-flex items-center gap-1"><X strokeWidth={2.5} size={11} /> Cancel</span>
-              </button>
-              <button
+              </Button>
+              <Button variant="destructive"
                 onClick={handleRemoveAdmin}
                 disabled={removing}
-                className="modal-btn modal-btn-danger-soft flex-1"
+                className="flex-1"
               >
                 {removing ? <Spinner className="h-3 w-3" /> : <ShieldOff strokeWidth={2.5} size={11} />} Remove admin
-              </button>
+              </Button>
             </div>
           </div>
         </div>

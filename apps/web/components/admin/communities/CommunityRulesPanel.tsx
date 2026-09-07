@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, Check, X, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
@@ -126,16 +129,16 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface px-5 py-4 flex flex-col gap-4">
+    <div className="rounded-xl border border-border bg-card px-5 py-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="font-body text-sm font-semibold text-foreground">Community Rules</h2>
         {!adding && (
-          <button
+          <Button variant="ghost"
             onClick={() => { setAdding(true); setNewText(""); setAddError(null); }}
-            className="flex items-center gap-1 font-body text-xs text-accent hover:text-accent/80 transition-colors"
+            className="flex items-center gap-1 transition-colors"
           >
             <Plus strokeWidth={2.5} size={13} /> Add rule
-          </button>
+          </Button>
         )}
       </div>
 
@@ -150,7 +153,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
       )}
 
       {!loading && rules.length === 0 && !adding && (
-        <p className="font-body text-xs text-foreground-muted">
+        <p className="font-body text-xs text-muted-foreground">
           No rules yet. Add the first one.
         </p>
       )}
@@ -159,34 +162,34 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
         {rules.map((rule, i) => (
           <li key={rule.id} className="flex items-start gap-2 group">
             {/* Order number */}
-            <span className="mt-0.5 shrink-0 w-5 font-mono text-[11px] text-foreground-muted text-right select-none">
+            <span className="mt-0.5 shrink-0 w-5 font-mono text-[11px] text-muted-foreground text-right select-none">
               {i + 1}.
             </span>
 
             {editingId === rule.id ? (
               <div className="flex-1 flex flex-col gap-1">
-                <textarea
+                <Textarea
                   autoFocus
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
                   rows={2}
-                  className="field w-full resize-none"
+                  className="w-full resize-none"
                 />
                 {editError && <p className="font-body text-[11px] text-red-400">{editError}</p>}
                 <div className="flex gap-2">
-                  <button
+                  <Button variant="default"
                     onClick={() => handleEditSave(rule.id)}
                     disabled={editLoading}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1 px-2 py-0.5 transition-colors disabled:opacity-50"
                   >
                     {editLoading ? <Spinner className="h-3 w-3" /> : <Check strokeWidth={2.5} size={11} />} Save
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     onClick={() => { setEditingId(null); setEditError(null); }}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
+                    className="flex items-center gap-1 px-2 py-0.5 transition-colors"
                   >
                     <X strokeWidth={2.5} size={11} /> Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -195,37 +198,37 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
                   {rule.rule_text}
                 </span>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button
+                  <Button variant="ghost"
                     onClick={() => handleMove(rule.id, "up")}
                     disabled={i === 0}
-                    className="p-0.5 text-foreground-muted hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move up"
                   >
                     <ChevronUp strokeWidth={2.5} size={12} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     onClick={() => handleMove(rule.id, "down")}
                     disabled={i === rules.length - 1}
-                    className="p-0.5 text-foreground-muted hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    className="p-0.5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title="Move down"
                   >
                     <ChevronDown strokeWidth={2.5} size={12} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     onClick={() => { setEditText(rule.rule_text); setEditingId(rule.id); setEditError(null); }}
-                    className="p-0.5 text-foreground-muted hover:text-foreground transition-colors"
+                    className="p-0.5 transition-colors"
                     title="Edit"
                   >
                     <Pencil strokeWidth={2.5} size={12} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     onClick={() => handleDelete(rule.id)}
                     disabled={deletingId === rule.id}
-                    className="p-0.5 text-foreground-muted hover:text-red-400 disabled:opacity-50 transition-colors"
+                    className="p-0.5 disabled:opacity-50 transition-colors"
                     title="Delete"
                   >
                     {deletingId === rule.id ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
-                  </button>
+                  </Button>
                 </div>
               </>
             )}
@@ -236,7 +239,7 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
       {/* Add new rule inline */}
       {adding && (
         <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-          <textarea
+          <Textarea
             autoFocus
             value={newText}
             onChange={(e) => setNewText(e.target.value)}
@@ -247,26 +250,26 @@ export function CommunityRulesPanel({ communityId }: CommunityRulesPanelProps) {
             placeholder="Describe the rule…"
             rows={2}
             maxLength={500}
-            className="field w-full resize-none"
+            className="w-full resize-none"
           />
           <div className="flex items-center justify-between">
-            <span className="font-mono text-[11px] text-foreground-muted">{newText.length}/500</span>
+            <span className="font-mono text-[11px] text-muted-foreground">{newText.length}/500</span>
             {addError && <p className="font-body text-[11px] text-red-400">{addError}</p>}
           </div>
           <div className="flex gap-2">
-            <button
+            <Button variant="default"
               onClick={handleAdd}
               disabled={addLoading || !newText.trim()}
-              className="flex items-center gap-1 px-2.5 py-1 rounded text-[11px] bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-2.5 py-1 transition-colors disabled:opacity-50"
             >
               {addLoading ? <Spinner className="h-3 w-3" /> : <Plus strokeWidth={2.5} size={11} />} Add rule
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               onClick={() => { setAdding(false); setAddError(null); setNewText(""); }}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-foreground-muted hover:text-foreground transition-colors"
+              className="flex items-center gap-1 px-2 py-0.5 transition-colors"
             >
               <X strokeWidth={2.5} size={11} /> Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

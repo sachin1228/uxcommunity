@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -217,7 +219,7 @@ export function ThreadsView({
         <div className={communityFeedLayout.pageHeaderMain}>
           <div className="min-w-0">
             <h2 className="font-display text-xl font-semibold text-foreground">Threads</h2>
-            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-foreground-muted">
+            <p className="mt-1 max-w-sm text-pretty font-body text-sm leading-5 text-muted-foreground">
               <span className="block">Start a discussion, share an idea, or ask your community</span>
               <span className="block">a question.</span>
             </p>
@@ -241,16 +243,16 @@ export function ThreadsView({
             }))].map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Button variant="ghost"
                   key={item.value}
                   type="button"
                   onClick={() => setFilter(item.value)}
                   aria-pressed={filter === item.value}
-                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-accent bg-accent/5 text-accent" : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"}`}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${filter === item.value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-muted-foreground hover:text-foreground"}`}
                 >
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -259,9 +261,9 @@ export function ThreadsView({
         {error && (
           <div className="mb-5 flex items-center justify-between rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="font-body text-sm text-red-400">{error}</p>
-            <button type="button" onClick={() => void fetchThreads()} className="font-body text-xs text-red-300 underline">
+            <Button variant="ghost" type="button" onClick={() => void fetchThreads()} className="underline">
               Try again
-            </button>
+            </Button>
           </div>
         )}
 
@@ -311,14 +313,14 @@ export function ThreadsView({
               ))}
               {hasMore && (
                 <div className="flex justify-center py-6">
-                  <button
+                  <Button variant="outline"
                     type="button"
                     onClick={() => void loadMore()}
                     disabled={loadingMore}
-                    className="rounded-lg border border-border px-4 py-2 font-body text-sm text-foreground hover:bg-surface-raised disabled:opacity-60"
+                    className="px-4 py-2 disabled:opacity-60"
                   >
                     {loadingMore ? "Loading…" : "Load more"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

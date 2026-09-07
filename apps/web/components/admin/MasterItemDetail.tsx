@@ -1,10 +1,13 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Check, X, ToggleLeft, ToggleRight, Trash2, ImagePlus, Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
-import { ModalPortal } from "@/components/ui/Modal";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/shadcn/alert-dialog";
 import { invalidateMasterCache } from "@/components/admin/MasterDataPage";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -29,7 +32,7 @@ interface MasterItemDetailProps {
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4 py-3 border-b border-border last:border-0">
-      <span className="w-36 shrink-0 font-body text-xs text-foreground-muted">{label}</span>
+      <span className="w-36 shrink-0 font-body text-xs text-muted-foreground">{label}</span>
       <span className="font-body text-xs text-foreground">{value}</span>
     </div>
   );
@@ -202,18 +205,18 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
   }
 
   if (loading) return <div className="flex justify-center py-24"><Spinner className="h-5 w-5" /></div>;
-  if (error || !item) return <div className="py-16 text-center font-body text-sm text-foreground-muted">{error ?? `${entity} not found.`}</div>;
+  if (error || !item) return <div className="py-16 text-center font-body text-sm text-muted-foreground">{error ?? `${entity} not found.`}</div>;
 
   return (
     <div className="max-w-xl">
       {/* Back */}
-      <button
+      <Button variant="ghost"
         onClick={() => router.push(listPath)}
-        className="mb-6 flex items-center gap-1.5 font-body text-xs text-foreground-muted hover:text-foreground transition-colors"
+        className="mb-6 flex items-center gap-1.5 transition-colors"
       >
         <ArrowLeft strokeWidth={2.5} size={13} />
         Back to {entity.toLowerCase()}s
-      </button>
+      </Button>
 
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
@@ -222,8 +225,8 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
           {item.image_url ? (
             <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-xl object-cover border border-border" />
           ) : (
-            <div className="h-16 w-16 rounded-xl border border-dashed border-border bg-surface-raised flex items-center justify-center">
-              <ImagePlus strokeWidth={2.5} size={20} className="text-foreground-muted" />
+            <div className="h-16 w-16 rounded-xl border border-dashed border-border bg-popover flex items-center justify-center">
+              <ImagePlus strokeWidth={2.5} size={20} className="text-muted-foreground" />
             </div>
           )}
         </div>
@@ -231,25 +234,25 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
         <div className="flex-1 min-w-0">
           {editing ? (
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 type="text"
                 value={editName}
                 onChange={(e) => { setEditName(e.target.value); setEditError(null); }}
                 autoFocus
-                className="field border-accent font-display text-xl font-semibold flex-1 min-w-0"
+                className="text-xl font-semibold flex-1 min-w-0"
               />
-              <button onClick={handleEditSave} disabled={editLoading} className="text-green-400 hover:text-green-300 transition-colors shrink-0" aria-label="Save">
+              <Button variant="ghost" onClick={handleEditSave} disabled={editLoading} className="text-green-400 transition-colors shrink-0" aria-label="Save">
                 {editLoading ? <Spinner className="h-4 w-4" /> : <Check strokeWidth={2.5} size={18} />}
-              </button>
-              <button onClick={() => { setEditing(false); setEditError(null); }} className="text-foreground-muted hover:text-foreground transition-colors shrink-0" aria-label="Cancel">
+              </Button>
+              <Button variant="ghost" onClick={() => { setEditing(false); setEditError(null); }} className="transition-colors shrink-0" aria-label="Cancel">
                 <X strokeWidth={2.5} size={18} />
-              </button>
+              </Button>
             </div>
           ) : (
             <h1 className="font-display text-2xl font-semibold text-foreground truncate">{item.name}</h1>
           )}
           <span className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] font-medium ${
-            item.is_active ? "bg-green-500/10 text-green-400" : "bg-surface-raised text-foreground-muted"
+            item.is_active ? "bg-green-500/10 text-green-400" : "bg-popover text-muted-foreground"
           }`}>
             {item.is_active ? "Active" : "Inactive"}
           </span>
@@ -261,44 +264,44 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
       )}
 
       {/* Info card */}
-      <div className="rounded-xl border border-border bg-surface px-5 mb-6">
+      <div className="rounded-xl border border-border bg-card px-5 mb-6">
         <InfoRow label="Name" value={item.name} />
         <InfoRow label="Status" value={
-          <span className={`font-medium ${item.is_active ? "text-green-400" : "text-foreground-muted"}`}>
+          <span className={`font-medium ${item.is_active ? "text-green-400" : "text-muted-foreground"}`}>
             {item.is_active ? "Active" : "Inactive"}
           </span>
         } />
         <InfoRow label="Image" value={
           item.image_url
-            ? <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline truncate block max-w-xs">View image ↗</a>
-            : <span className="text-foreground-muted">No image</span>
+            ? <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate block max-w-xs">View image ↗</a>
+            : <span className="text-muted-foreground">No image</span>
         } />
         <InfoRow label="Created" value={fmt(item.created_at)} />
         <InfoRow label="Last updated" value={fmt(item.updated_at)} />
       </div>
 
       {/* Actions */}
-      <div className="rounded-xl border border-border bg-surface divide-y divide-border">
+      <div className="rounded-xl border border-border bg-card divide-y divide-border">
 
         {/* Rename */}
         <div className="flex items-center justify-between px-5 py-3.5">
           <div>
             <p className="font-body text-xs font-medium text-foreground">Rename {entity}</p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">Update the display name</p>
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">Update the display name</p>
           </div>
-          <button
+          <Button variant="outline"
             onClick={() => { setEditing(true); setEditName(item.name); }}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
           >
             <Pencil strokeWidth={2.5} size={12} /> Edit
-          </button>
+          </Button>
         </div>
 
         {/* Image */}
         <div className="flex items-center justify-between px-5 py-3.5">
           <div>
             <p className="font-body text-xs font-medium text-foreground">Logo / Image</p>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+            <p className="font-body text-[11px] text-muted-foreground mt-0.5">
               {item.image_url ? "Replace or remove the current image" : "Upload a logo or image for this " + entity.toLowerCase()}
             </p>
             {imageError && <p className="font-body text-[11px] text-red-400 mt-1">{imageError}</p>}
@@ -309,20 +312,20 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             ) : (
               <>
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" onChange={handleImageChange} className="hidden" />
-                <button
+                <Button variant="outline"
                   onClick={() => imageInputRef.current?.click()}
-                  className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
                 >
                   <Upload strokeWidth={2.5} size={12} />
                   {item.image_url ? "Replace" : "Upload"}
-                </button>
+                </Button>
                 {item.image_url && (
-                  <button
+                  <Button variant="outline"
                     onClick={handleRemoveImage}
-                    className="rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground-muted hover:text-red-400 hover:border-red-500/30 transition-colors"
+                    className="px-3 py-1.5 transition-colors"
                   >
                     Remove
-                  </button>
+                  </Button>
                 )}
               </>
             )}
@@ -336,13 +339,13 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
               <p className="font-body text-xs font-medium text-foreground">
                 {item.is_active ? `Deactivate ${entity}` : `Activate ${entity}`}
               </p>
-              <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+              <p className="font-body text-[11px] text-muted-foreground mt-0.5">
                 {item.is_active
                   ? "Hide from dropdowns — existing profiles keep their reference"
                   : "Make available again in dropdowns"}
               </p>
             </div>
-            <button
+            <Button variant="ghost"
               onClick={handleToggle}
               disabled={toggleLoading}
               className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 font-body text-xs font-medium transition-colors disabled:opacity-60 ${
@@ -353,7 +356,7 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
             >
               {toggleLoading ? <Spinner className="h-3 w-3" /> : item.is_active ? <ToggleRight strokeWidth={2.5} size={14} /> : <ToggleLeft strokeWidth={2.5} size={14} />}
               {item.is_active ? "Deactivate" : "Activate"}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -362,52 +365,39 @@ export function MasterItemDetail({ entity, apiBase, listPath, responseKey, readO
           <div className="flex items-center justify-between px-5 py-3.5">
             <div>
               <p className="font-body text-xs font-medium text-red-400">Delete {entity}</p>
-              <p className="font-body text-[11px] text-foreground-muted mt-0.5">
+              <p className="font-body text-[11px] text-muted-foreground mt-0.5">
                 Permanently removed. Blocked if linked to a designer profile.
               </p>
             </div>
-            <button
+            <Button variant="destructive"
               onClick={() => setConfirmDelete(true)}
-              className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs font-medium text-red-400 hover:bg-red-500/10 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 transition-colors"
             >
               <Trash2 strokeWidth={2.5} size={12} /> Delete
-            </button>
+            </Button>
           </div>
         )}
       </div>
 
       {/* Delete confirm modal */}
-      {confirmDelete && (
-        <ModalPortal>
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="modal-panel w-full max-w-sm p-6">
-            <h2 className="font-display text-base font-semibold text-foreground mb-1">Delete &ldquo;{item.name}&rdquo;?</h2>
-            <p className="font-body text-xs text-foreground-muted mb-5">
+      <AlertDialog open={confirmDelete} onOpenChange={(open) => { if (!deleteLoading) { setConfirmDelete(open); setDeleteError(null); } }}>
+        <AlertDialogContent onEscapeKeyDown={(event) => { if (deleteLoading) event.preventDefault(); }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete &ldquo;{item.name}&rdquo;?</AlertDialogTitle>
+            <AlertDialogDescription>
               This is permanent and cannot be undone. If any designer profile references this {entity.toLowerCase()}, the delete will be blocked.
-            </p>
-            {deleteError && (
-              <p className="mb-4 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">{deleteError}</p>
-            )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setConfirmDelete(false); setDeleteError(null); }}
-                className="modal-btn modal-btn-secondary flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleteLoading}
-                className="modal-btn modal-btn-danger flex-1"
-              >
-                {deleteLoading ? <Spinner className="h-3 w-3" /> : <Trash2 strokeWidth={2.5} size={12} />}
-                Yes, delete
-              </button>
-            </div>
-          </div>
-        </div>
-        </ModalPortal>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading} aria-busy={deleteLoading}>
+              {deleteLoading ? <Spinner size={16} /> : <Trash2 data-icon="inline-start" />}
+              Yes, delete
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

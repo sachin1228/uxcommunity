@@ -269,7 +269,7 @@ export function ThreadDetailClient({
             <BackLink
               href={backHref}
               label={backLabel}
-              className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted hover:text-foreground"
+              className="mb-4 inline-flex items-center gap-1.5 font-body text-sm text-muted-foreground hover:text-foreground"
             />
           </div>
         )}
@@ -308,7 +308,7 @@ export function ThreadDetailClient({
               onPosted={handleCommentPosted}
             />
           ) : (
-            <div className="border-y border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
+            <div className="border-y border-border px-4 py-3 text-center font-body text-xs text-muted-foreground">
               Replies are closed for this thread.
             </div>
           )}

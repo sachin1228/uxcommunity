@@ -15,10 +15,10 @@ export const UnreadDivider = forwardRef<HTMLDivElement, UnreadDividerProps>(
           className="
             rounded-full
             border border-border
-            bg-surface-raised
+            bg-popover
             px-3 py-1
             font-body text-[11px] font-medium
-            text-foreground-muted
+            text-muted-foreground
             whitespace-nowrap
             shadow-sm
             select-none

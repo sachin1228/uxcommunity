@@ -1,19 +1,22 @@
 "use client";
+import { Label } from "@/components/ui/shadcn/label";
+import { Input } from "@/components/ui/shadcn/input";
+
 
 import { Linkedin, Globe } from "lucide-react";
 
 function SectionLabel({ num, label }: { num: string; label: string }) {
   return (
     <div className="flex items-center gap-3 mb-5">
-      <span className="font-mono text-[10px] font-bold text-accent bg-accent/10 border border-accent/20 px-2 py-0.5 rounded">{num}</span>
-      <span className="font-display text-xs font-semibold text-foreground-muted uppercase tracking-widest">{label}</span>
+      <span className="font-mono text-[10px] font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded">{num}</span>
+      <span className="font-display text-xs font-semibold text-muted-foreground uppercase tracking-widest">{label}</span>
       <div className="flex-1 h-px bg-border" />
     </div>
   );
 }
 
 const fieldCls =
-  "bg-transparent border-b border-border focus:border-accent outline-none text-foreground font-body text-sm transition-colors w-full pb-0.5 placeholder:text-foreground-subtle";
+  "bg-transparent border-b border-border focus:border-primary outline-none text-foreground font-body text-sm transition-colors w-full pb-0.5 placeholder:text-muted-foreground";
 
 interface ProfileLinksProps {
   linkedin: string;
@@ -29,14 +32,14 @@ export function ProfileLinks({
   onPortfolioChange,
 }: ProfileLinksProps) {
   return (
-    <div className="rounded-2xl border border-border bg-surface p-6 mb-5">
+    <div className="rounded-2xl border border-border bg-card p-6 mb-5">
       <SectionLabel num="02" label="Links" />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
         <div className="flex flex-col gap-1.5">
-          <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+          <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Linkedin strokeWidth={2.5} size={11} /> LinkedIn
-          </label>
-          <input
+          </Label>
+          <Input
             type="url"
             value={linkedin}
             onChange={(e) => onLinkedinChange(e.target.value)}
@@ -45,10 +48,10 @@ export function ProfileLinks({
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="font-body text-[11px] font-medium text-foreground-muted uppercase tracking-wider flex items-center gap-1.5">
+          <Label className="font-body text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
             <Globe strokeWidth={2.5} size={11} /> Portfolio
-          </label>
-          <input
+          </Label>
+          <Input
             type="url"
             value={portfolio}
             onChange={(e) => onPortfolioChange(e.target.value)}

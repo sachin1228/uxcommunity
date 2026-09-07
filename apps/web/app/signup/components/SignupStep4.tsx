@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useRef } from "react";
 import { Upload } from "lucide-react";
@@ -28,7 +30,7 @@ export function SignupStep4({
       <h2 className="mb-1 font-display text-2xl font-semibold text-foreground">
         Add a profile picture
       </h2>
-      <p className="mb-6 font-body text-sm text-foreground-muted">
+      <p className="mb-6 font-body text-sm text-muted-foreground">
         Step 4 of 4 · Optional
       </p>
 
@@ -52,37 +54,37 @@ export function SignupStep4({
           <img
             src={uploadPreviewUrl}
             alt="Profile picture preview"
-            className="size-20 rounded-full object-cover ring-2 ring-accent"
+            className="size-20 rounded-full object-cover ring-2 ring-primary"
           />
           <div className="flex flex-col gap-1">
             <p className="font-body text-sm font-medium text-foreground">Profile picture ready</p>
-            <p className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP</p>
-            <button
+            <p className="font-body text-xs text-muted-foreground">JPEG, PNG or WebP</p>
+            <Button variant="ghost"
               type="button"
               onClick={onRemoveUpload}
-              className="w-fit font-body text-xs text-foreground-muted transition-colors hover:text-red-500 dark:hover:text-red-400"
+              className="w-fit transition-colors dark:hover:text-red-400"
             >
               Remove picture
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
-        <button
+        <Button variant="outline"
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="mb-6 flex w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border py-10 text-foreground-muted transition-colors hover:border-accent hover:text-foreground"
+          className="mb-6 flex w-full flex-col items-center justify-center gap-3 py-10 transition-colors"
         >
           <Upload strokeWidth={2.5} aria-hidden="true" />
           <span className="font-body text-sm font-medium">Upload a profile picture</span>
-          <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 3 MB</span>
-        </button>
+          <span className="font-body text-xs text-muted-foreground">JPEG, PNG or WebP · max 3 MB</span>
+        </Button>
       )}
 
-      <button
+      <Button variant="default"
         type="button"
         onClick={onSave}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 py-2.5 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading && <Spinner className="size-4 text-white" />}
         {loading
@@ -90,7 +92,7 @@ export function SignupStep4({
           : uploadPreviewUrl
             ? "Save & go to dashboard →"
             : "Skip for now & go to dashboard →"}
-      </button>
+      </Button>
     </div>
   );
 }

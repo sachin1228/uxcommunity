@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+
 
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -81,7 +83,7 @@ export function ThreadImageCarousel({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: "pan-y" }}
-      className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
+      className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-card"
     >
       {/* Invisible sizing anchor — keeps the viewport height identical to the
           single-image layout so the thread never jumps while sliding. */}
@@ -145,7 +147,7 @@ export function ThreadImageCarousel({
       </div>
 
       {/* Previous */}
-      <button
+      <Button variant="ghost"
         type="button"
         aria-label="Previous image"
         onClick={goPrev}
@@ -154,10 +156,10 @@ export function ThreadImageCarousel({
         }`}
       >
         <ChevronLeft size={18} strokeWidth={2.5} />
-      </button>
+      </Button>
 
       {/* Next */}
-      <button
+      <Button variant="ghost"
         type="button"
         aria-label="Next image"
         onClick={goNext}
@@ -166,7 +168,7 @@ export function ThreadImageCarousel({
         }`}
       >
         <ChevronRight size={18} strokeWidth={2.5} />
-      </button>
+      </Button>
 
       {/* Pagination indicators (carousel dots) — one per image, clickable */}
       <div
@@ -177,20 +179,20 @@ export function ThreadImageCarousel({
         {images.map((img, dotIndex) => {
           const active = dotIndex === index;
           return (
-            <button
+            <Button variant="ghost" size="icon"
               key={img.url}
               type="button"
               aria-label={`Go to image ${dotIndex + 1} of ${images.length}`}
               aria-current={active ? "true" : undefined}
               onClick={() => setIndex(dotIndex)}
-              className="flex h-3 w-2.5 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className="flex h-3 w-2.5 items-center justify-center"
             >
               <span
                 className={`block h-1.5 w-1.5 rounded-full transition-colors duration-200 ${
                   active ? "bg-white" : "bg-white/40"
                 }`}
               />
-            </button>
+            </Button>
           );
         })}
       </div>

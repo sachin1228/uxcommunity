@@ -1,4 +1,7 @@
 "use client";
+import { Button } from "@/components/ui/shadcn/button";
+import { Textarea } from "@/components/ui/shadcn/textarea";
+
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
@@ -31,10 +34,10 @@ function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: str
   const initial = (name || "M").charAt(0).toUpperCase();
   const dim = size === "sm" ? "h-6 w-6 text-[9px]" : size === "lg" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
   return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
+    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-primary/15 flex items-center justify-center`}>
       {avatarUrl
         ? <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-        : <span className="font-display font-bold text-accent">{initial}</span>}
+        : <span className="font-display font-bold text-primary">{initial}</span>}
     </div>
   );
 }
@@ -122,7 +125,7 @@ function CommentNode({
     <div className={isReply ? "pl-8" : ""}>
       {isReply && (
         <div className="mb-1 flex items-center gap-1">
-          <CornerDownRight strokeWidth={2.5} size={11} className="text-foreground-subtle/40 shrink-0" />
+          <CornerDownRight strokeWidth={2.5} size={11} className="text-muted-foreground/40 shrink-0" />
         </div>
       )}
 
@@ -138,32 +141,32 @@ function CommentNode({
             <span className="font-body text-xs font-semibold text-foreground">
               {comment.users?.name ?? "Member"}
             </span>
-            <span className="font-body text-[11px] text-foreground-subtle">
+            <span className="font-body text-[11px] text-muted-foreground">
               {fmtRelative(comment.created_at)}
             </span>
 
             {/* ⋯ menu — own comments only */}
             {isOwn && (
               <div ref={menuRef} className="relative ml-auto shrink-0">
-                <button
+                <Button variant="ghost" size="icon"
                   type="button"
                   onClick={() => setMenuOpen((p) => !p)}
-                  className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
+                  className="flex h-5 w-5 items-center justify-center"
                   aria-label="Comment options"
                 >
                   <MoreHorizontal strokeWidth={2.5} size={13} />
-                </button>
+                </Button>
                 {menuOpen && (
-                  <div className="absolute right-0 top-6 z-30 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                    <button
+                  <div className="absolute right-0 top-6 z-30 min-w-[110px] rounded-lg border border-border bg-card py-1 shadow-lg">
+                    <Button variant="ghost"
                       type="button"
                       onClick={handleDelete}
                       disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                      className="flex w-full items-center gap-2 px-3 py-1.5 disabled:opacity-50"
                     >
                       {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
                       {deleting ? "Deleting…" : "Delete"}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -172,7 +175,7 @@ function CommentNode({
 
           {/* Body */}
           {comment.body && (
-            <p className="mt-1 font-body text-sm text-foreground-muted leading-relaxed whitespace-pre-wrap break-words">
+            <p className="mt-1 font-body text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
               {comment.body}
             </p>
           )}
@@ -190,21 +193,21 @@ function CommentNode({
 
           {/* Reply button — only on top-level comments */}
           {allowReply && (
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => { setReplyOpen((p) => !p); setReplyError(null); }}
-              className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
+              className="mt-1.5 inline-flex items-center gap-1"
             >
               <CornerDownRight strokeWidth={2.5} size={11} />
               Reply
-            </button>
+            </Button>
           )}
 
           {/* Inline reply composer */}
           {replyOpen && (
             <div className="mt-2">
               <form onSubmit={handleReply} className="space-y-2">
-                <textarea
+                <Textarea
                   ref={replyRef}
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
@@ -215,25 +218,25 @@ function CommentNode({
                   placeholder={`Write a reply…`}
                   rows={2}
                   maxLength={2000}
-                  className="field w-full resize-none"
+                  className="w-full resize-none"
                 />
                 {replyError && <p className="font-body text-[11px] text-red-400">{replyError}</p>}
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => { setReplyOpen(false); setReplyText(""); setReplyError(null); }}
-                    className="font-body text-xs text-foreground-subtle hover:text-foreground"
+                    className=""
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="default"
                     type="submit"
                     disabled={!replyText.trim() || replyPosting}
-                    className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2.5 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {replyPosting ? <Spinner size={11} className="text-white" /> : <Send strokeWidth={2.5} size={11} />}
                     {replyPosting ? "Posting…" : "Post"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -392,7 +395,7 @@ export function EventDetailClient({
           <BackLink
             href={backHref}
             label={backLabel}
-            className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
+            className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-muted-foreground transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
           />
         )}
         {/* Event post */}
@@ -431,24 +434,24 @@ export function EventDetailClient({
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
               { id: "attendees" as const, label: "Attendees", icon: <Users strokeWidth={2.5} size={14} />, count: event.rsvp_count },
             ]).map((tab) => (
-              <button
+              <Button variant="ghost"
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={`inline-flex items-center gap-2 px-4 pb-3 font-body text-sm font-medium transition-colors border-b-2 -mb-px ${
                   activeTab === tab.id
-                    ? "border-accent text-foreground"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab.icon}
                 {tab.label}
                 {tab.count > 0 && (
-                  <span className="inline-flex items-center justify-center rounded-full bg-surface-raised min-w-[1.25rem] h-5 px-1.5 font-body text-[10px] leading-none text-foreground-subtle">
+                  <span className="inline-flex items-center justify-center rounded-full bg-popover min-w-[1.25rem] h-5 px-1.5 font-body text-[10px] leading-none text-muted-foreground">
                     {tab.count}
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -457,8 +460,8 @@ export function EventDetailClient({
             <div className="mt-5 space-y-5">
               {/* Composer */}
               <form onSubmit={handlePostComment} className="space-y-2">
-                <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                  <textarea
+                <div className="overflow-hidden rounded-xl border border-border bg-card">
+                  <Textarea
                     ref={textareaRef}
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
@@ -469,19 +472,19 @@ export function EventDetailClient({
                     placeholder="Write a comment… (⌘↵ to post)"
                     rows={3}
                     maxLength={2000}
-                    className="w-full resize-none bg-transparent px-4 py-3.5 font-body text-sm text-foreground placeholder:text-foreground-subtle focus:outline-none"
+                    className="w-full resize-none bg-transparent px-4 py-3.5 text-sm"
                   />
                 </div>
                 {commentError && <p className="font-body text-xs text-red-400">{commentError}</p>}
                 <div className="flex justify-end">
-                  <button
+                  <Button variant="default"
                     type="submit"
                     disabled={!canPost}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {posting ? <Spinner size={13} className="text-white" /> : <Send strokeWidth={2.5} size={13} />}
                     {posting ? "Posting…" : "Post"}
-                  </button>
+                  </Button>
                 </div>
               </form>
 
@@ -552,7 +555,7 @@ export function EventDetailClient({
               ) : (
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {rsvps.map((r) => (
-                    <div key={r.user_id} className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
+                    <div key={r.user_id} className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5">
                       <Avatar name={r.users?.name ?? "M"} avatarUrl={r.users?.avatar_url ?? null} size="sm" />
                       <span className="truncate font-body text-xs text-foreground">{r.users?.name ?? "Member"}</span>
                     </div>
