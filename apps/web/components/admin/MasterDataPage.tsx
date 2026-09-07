@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Plus, Search, X, ChevronRight, ImagePlus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { useRouter } from "next/navigation";
@@ -41,6 +41,10 @@ interface MasterDataPageProps {
   responseKey?: string;
   /** Hides the Add button and empty-state CTA (for fixed enums like experience levels). */
   readOnly?: boolean;
+  /** Extra element rendered in the header row, next to the Add button (e.g. bulk actions). */
+  headerExtra?: React.ReactNode;
+  /** Incrementing counter that forces the list to re-fetch (e.g. after bulk updates). */
+  refreshSignal?: number;
 }
 
 export function MasterDataPage({
@@ -50,6 +54,8 @@ export function MasterDataPage({
   basePath,
   responseKey,
   readOnly,
+  headerExtra,
+  refreshSignal,
 }: MasterDataPageProps) {
   const router = useRouter();
   // Seed from cache synchronously — no spinner flash on revisit.
@@ -120,6 +126,16 @@ export function MasterDataPage({
     return () => { cancelled = true; };
   }, [load]);
 
+  // Bulk actions (e.g. city image fetch) bump refreshSignal when done so the
+  // list re-fetches and shows the new data without a page reload.
+  const prevRefreshSignal = useRef(refreshSignal);
+  useEffect(() => {
+    if (refreshSignal !== prevRefreshSignal.current) {
+      prevRefreshSignal.current = refreshSignal;
+      void load(true);
+    }
+  }, [refreshSignal, load]);
+
   const tabItems = useMemo(
     () => items.filter((i) => (activeTab === "active" ? i.is_active : !i.is_active)),
     [items, activeTab]
@@ -140,15 +156,18 @@ export function MasterDataPage({
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
-        {!readOnly && (
-          <button
-            onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
-          >
-            <Plus strokeWidth={2.5} size={13} />
-            Add {entity}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {headerExtra}
+          {!readOnly && (
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            >
+              <Plus strokeWidth={2.5} size={13} />
+              Add {entity}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
