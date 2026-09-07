@@ -103,15 +103,38 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       {!mobile && (
         <div className="flex items-center justify-between px-[13px] pb-[11px] pt-[13px]">
           <BrandLogo iconClassName="h-7 w-7" markOnly />
-          {/* Static search icon — functionality to come */}
-          <button
-            type="button"
-            aria-label="Search"
-            title="Search"
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-          >
-            <Search strokeWidth={2.5} size={16} />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* Notifications — opens the dedicated notifications page */}
+            <Link
+              href="/dashboard/notifications"
+              aria-label={notificationCount > 0 ? `${notificationCount} unread notifications` : "Notifications"}
+              title="Notifications"
+              className={`relative flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${
+                notificationsActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+              }`}
+            >
+              <Bell strokeWidth={2.5} size={16} />
+              {notificationCount > 0 && (
+                <span
+                  className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
+                  aria-hidden
+                >
+                  {notificationCount > 99 ? "99+" : notificationCount}
+                </span>
+              )}
+            </Link>
+            {/* Static search icon — functionality to come */}
+            <button
+              type="button"
+              aria-label="Search"
+              title="Search"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+            >
+              <Search strokeWidth={2.5} size={16} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -171,27 +194,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Briefcase strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Jobs</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href="/dashboard/notifications"
-              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
-                notificationsActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
-              }`}
-            >
-              <Bell strokeWidth={2.5} size={15} className="shrink-0" />
-              <span className="flex-1 truncate">Notifications</span>
-              {notificationCount > 0 && (
-                <span
-                  className="min-w-4 rounded-full bg-red-500 px-1 text-center text-[8px] font-semibold leading-4 text-white"
-                  aria-label={`${notificationCount} unread notifications`}
-                >
-                  {notificationCount > 99 ? "99+" : notificationCount}
-                </span>
-              )}
             </Link>
           </li>
           {/* Hidden: "Chat with designers" is no longer shown in the sidebar.
