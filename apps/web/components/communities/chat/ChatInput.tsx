@@ -287,7 +287,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // ── render ─────────────────────────────────────────────────────────────
 
     return (
-      <div className="px-4 pb-4 shrink-0">
+      <div className="px-4 pb-2.5 shrink-0">
         {error && (
           <p className="font-body text-xs text-red-400 mb-2 pl-1">{error}</p>
         )}
