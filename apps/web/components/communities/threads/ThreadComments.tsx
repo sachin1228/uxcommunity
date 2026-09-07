@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, CornerDownRight, MoreHorizontal, Paperclip, Smile, Trash2 } from "lucide-react";
+import { CornerDownRight, MoreHorizontal, Paperclip, Smile, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -237,10 +237,17 @@ export function CommentBox({
           <button
             type="submit"
             disabled={saving || !body.trim()}
-            aria-label={saving ? "Posting…" : "Post comment"}
-            className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--ds-blue-700)] text-white transition-colors hover:bg-[var(--ds-blue-800)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label="Send"
+            title="Send"
+            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-700)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-800)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? <Spinner size={14} className="text-white" /> : <ArrowUp strokeWidth={2.5} size={18} />}
+            {saving ? (
+              <Spinner size={14} className="text-white" />
+            ) : (
+              <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            )}
           </button>
         </div>
       </div>
