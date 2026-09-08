@@ -177,7 +177,7 @@ function CommentRow({
         )}
 
         <div className="min-w-0">
-          <header className="flex min-w-0 items-center gap-2 pr-8">
+          <header className="flex min-w-0 items-center gap-2">
             <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="xs" />
             <span className="truncate font-body text-[13px] font-semibold text-foreground">{name}</span>
             <span aria-hidden="true" className="text-foreground-subtle">•</span>
@@ -188,34 +188,33 @@ function CommentRow({
             >
               {formatRelativeDate(comment.created_at)}
             </time>
+            {isOwner && (
+              <div className="relative -mr-1 ml-auto shrink-0" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={() => setMenuOpen((p) => !p)}
+                  className="flex size-7 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                  aria-label="Comment options"
+                  aria-expanded={menuOpen}
+                >
+                  <MoreVertical strokeWidth={2} size={14} />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                      disabled={deleting}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
+                    >
+                      <Trash2 strokeWidth={2.5} size={11} />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </header>
-
-          {isOwner && (
-            <div className="absolute right-0 top-0" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((p) => !p)}
-                className="flex size-7 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                aria-label="Comment options"
-                aria-expanded={menuOpen}
-              >
-                <MoreVertical strokeWidth={2} size={14} />
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
-                    disabled={deleting}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                  >
-                    <Trash2 strokeWidth={2.5} size={11} />
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
 
           <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm leading-5 text-foreground">
             {renderEmojiText(comment.body)}
