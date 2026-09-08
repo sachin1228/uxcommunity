@@ -177,7 +177,7 @@ function ReadyPhase({
             <span className="font-medium text-foreground">
               {joinedCommunities === 1 ? "1 community" : `${joinedCommunities} communities`}
             </span>{" "}
-            — your city, sector and interests are all waiting for you.
+            — your communities are all waiting for you.
           </>
         ) : (
           "Your account is ready. Let's get you inside!"

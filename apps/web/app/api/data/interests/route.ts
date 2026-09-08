@@ -1,5 +1,5 @@
 /**
- * Public endpoint — returns active design interests for the signup form.
+ * Public endpoint — returns active design interests.
  * No auth required.
  */
 import { NextResponse } from "next/server";

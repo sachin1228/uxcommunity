@@ -8,11 +8,7 @@ import { compressAvatarClient } from "@/lib/image-client";
 import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
-import { SignupStep4 } from "./components/SignupStep4";
 import { SignupWelcome } from "./components/SignupWelcome";
-
-// Re-exported so profile page can import it from here (backward compat)
-export { INTEREST_EMOJIS } from "@/lib/interests";
 
 interface MasterItem { id: string; name: string; image_url?: string | null }
 
@@ -23,7 +19,7 @@ interface TokenState {
   applicantEmail?: string;
 }
 
-type Step = 1 | 2 | 3 | 4 | "done";
+type Step = 1 | 2 | 3 | "done";
 
 type WelcomeState =
   | { phase: "loading" }
@@ -80,17 +76,11 @@ function SignupInner() {
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
 
-  // Step 3 — Interests
-  const [interestOptions,     setInterestOptions]     = useState<{ id: string; name: string; image_url?: string | null }[]>([]);
-  const [selectedInterestIds, setSelectedInterestIds] = useState<string[]>([]);
-  const [step3Loading, setStep3Loading] = useState(false);
-  const [step3Error,   setStep3Error]   = useState<string | null>(null);
-
-  // Step 4 — Optional profile picture
+  // Step 3 — Optional profile picture
   const [uploadedBlob, setUploadedBlob] = useState<Blob | null>(null);
   const [uploadPreviewUrl, setUploadPreviewUrl] = useState<string | null>(null);
-  const [step4Loading, setStep4Loading] = useState(false);
-  const [step4Error, setStep4Error] = useState<string | null>(null);
+  const [step3Loading, setStep3Loading] = useState(false);
+  const [step3Error, setStep3Error] = useState<string | null>(null);
 
   // Signup-completion overlay: account setup runs in the background behind a
   // welcome animation, then hands off to the dashboard with a button.
@@ -122,15 +112,6 @@ function SignupInner() {
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
       fetch("/api/data/experience-levels").then((r) => r.json()).then((d) => setExperienceLevels(d.experience_levels ?? [])),
     ]).catch(() => {});
-  }, [step]);
-
-  // ── Load interests for step 3 ─────────────────────────────────────────────
-  useEffect(() => {
-    if (step !== 3) return;
-    fetch("/api/data/interests")
-      .then((r) => r.json())
-      .then((d) => setInterestOptions(d.interests ?? []))
-      .catch(() => {});
   }, [step]);
 
   // ── Step handlers ─────────────────────────────────────────────────────────
@@ -198,51 +179,37 @@ function SignupInner() {
     if (!step2.city_id)          { setStep2Error("Please select a city.");                setStep2Loading(false); return; }
     if (!step2.sector_id)        { setStep2Error("Please select an industry sector.");    setStep2Loading(false); return; }
     if (!step2.experience_level) { setStep2Error("Please select your experience level."); setStep2Loading(false); return; }
-    setStep3Error(null);
-    setSelectedInterestIds([]);
     setStep(3);
     setStep2Loading(false);
-  }
-
-  async function handleStep3() {
-    setStep3Loading(true);
-    setStep3Error(null);
-    setUploadedBlob(null);
-    if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-    setUploadPreviewUrl(null);
-    setStep4Error(null);
-    setStep(4);
-    setStep3Loading(false);
   }
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
-    setStep4Error(null);
+    setStep3Error(null);
     try {
       const compressed = await compressAvatarClient(file);
       if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
       setUploadedBlob(compressed.blob);
       setUploadPreviewUrl(URL.createObjectURL(compressed.blob));
     } catch {
-      setStep4Error("Failed to process image. Please try a different file.");
+      setStep3Error("Failed to process image. Please try a different file.");
     }
   }
 
-  async function handleStep4() {
+  async function handleStep3() {
     // Hand the user straight to the welcome overlay — the account + community
     // setup below runs in the background while they watch the animation.
     setWelcome({ phase: "loading" });
-    setStep4Error(null);
+    setStep3Error(null);
     // Let the overlay paint its first frame before starting the request.
     await new Promise((resolve) => setTimeout(resolve, 80));
-    setStep4Loading(true);
+    setStep3Loading(true);
     try {
       const payload = {
         identity: step1Identity(),
         profile: step2,
-        interest_ids: selectedInterestIds,
         ...(token ? { token } : {}),
         ...(uploadedBlob ? { avatar_source: "upload" as const } : {}),
       };
@@ -270,8 +237,8 @@ function SignupInner() {
         return;
       }
       // Communities are auto-joined server-side during /api/signup/avatar, so the
-      // sidebar shows the full list (General + city + sector + interests) the first
-      // time the dashboard loads.
+      // sidebar shows the full list (General + city + sector) the first time the
+      // dashboard loads.
       setWelcome({
         phase: "ready",
         joinedCommunities:
@@ -283,7 +250,7 @@ function SignupInner() {
         message: "Network error. Please try again.",
       });
     } finally {
-      setStep4Loading(false);
+      setStep3Loading(false);
     }
   }
 
@@ -339,29 +306,26 @@ function SignupInner() {
 
         {tokenState.status === "valid" && step === 3 && (
           <SignupStep3
-            options={interestOptions}
-            selected={selectedInterestIds}
-            onChange={setSelectedInterestIds}
+            uploadPreviewUrl={uploadPreviewUrl}
             loading={step3Loading}
             error={step3Error}
-            onContinue={handleStep3}
+            onFileSelect={handleFileSelect}
+            onRemoveUpload={() => {
+              setUploadedBlob(null);
+              if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+              setUploadPreviewUrl(null);
+            }}
+            onSkip={() => {
+              // Skipping discards a pending picture and finishes signup
+              // without one. handleStep3 builds its payload from state after
+              // the overlay paints, so these sync clears take effect.
+              setUploadedBlob(null);
+              if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+              setUploadPreviewUrl(null);
+              void handleStep3();
+            }}
+            onSave={handleStep3}
           />
-        )}
-
-        {tokenState.status === "valid" && step === 4 && (
-              <SignupStep4
-                uploadPreviewUrl={uploadPreviewUrl}
-                loading={step4Loading}
-                error={step4Error}
-                onFileSelect={handleFileSelect}
-                onRemoveUpload={() => {
-                  setUploadedBlob(null);
-                  if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
-                  setUploadPreviewUrl(null);
-                }}
-                onSave={handleStep4}
-              />
-
         )}
 
         {step === "done" && (
@@ -385,7 +349,7 @@ function SignupInner() {
           joinedCommunities={welcome.phase === "ready" ? welcome.joinedCommunities : 0}
           errorMessage={welcome.phase === "error" ? welcome.message : null}
           onGoToDashboard={goToDashboard}
-          onRetry={() => void handleStep4()}
+          onRetry={() => void handleStep3()}
           onClose={() => setWelcome(null)}
         />
       )}

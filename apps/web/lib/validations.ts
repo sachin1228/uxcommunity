@@ -69,7 +69,6 @@ export const signupStep2Schema = z.object({
 export const completeSignupSchema = z.object({
   identity: directSignupStep1Schema,
   profile: signupStep2Schema,
-  interest_ids: z.array(z.string().uuid()).max(5, "You can select up to 5 topics."),
   token: z.string().min(1).optional(),
   avatar_source: z.literal("upload").optional(),
   // Picture pre-uploaded via /api/signup/picture (moderated + on R2).
