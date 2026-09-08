@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowUpDown, ChevronDown, MessageSquare, MoreVertical, Plus, Smile, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, ChevronUp, MessageSquare, MoreVertical, Plus, Smile, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { Avatar, CommentComposer, renderEmojiText } from "./CommentComposer";
@@ -86,7 +86,7 @@ function ReactionBar({ comment, endpoint }: { comment: CommunityCommentBase; end
           aria-pressed={reaction.reacted}
           aria-label={`${reaction.emoji} reaction, ${reaction.count}`}
           onClick={() => void toggle(reaction.emoji)}
-          className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-sm transition-colors ${reaction.reacted ? "border-accent/30 bg-accent/10 text-foreground" : "border-transparent bg-surface-raised text-foreground-muted hover:border-border-strong hover:text-foreground"}`}
+          className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-2.5 font-body text-[13px] transition-colors ${reaction.reacted ? "border-[var(--ds-red-700)] bg-[var(--ds-red-100)] text-[var(--ds-red-900)]" : "border-transparent bg-surface-raised text-foreground-muted hover:border-border-strong hover:text-foreground"}`}
         >
           <span aria-hidden>{reaction.emoji}</span>
           <span className="tabular-nums">{reaction.count}</span>
@@ -96,17 +96,17 @@ function ReactionBar({ comment, endpoint }: { comment: CommunityCommentBase; end
         <button
           type="button"
           onClick={() => setPickerOpen((open) => !open)}
-          className="inline-flex h-8 items-center gap-1 rounded-full border border-border bg-surface px-2.5 text-foreground-muted shadow-sm transition-colors hover:border-border-strong hover:text-foreground"
+          className="inline-flex h-7 items-center gap-1 rounded-full border border-border bg-surface px-2 text-foreground-muted shadow-xs transition-colors hover:border-border-strong hover:text-foreground"
           aria-label="Add reaction"
           aria-expanded={pickerOpen}
         >
-          <Smile size={15} />
-          <Plus size={12} />
+          <Smile size={13} />
+          <Plus size={11} />
         </button>
         {pickerOpen && (
           <div className="absolute bottom-10 left-0 z-20 flex gap-1 rounded-full border border-border bg-surface p-1.5 shadow-lg">
             {COMMENT_REACTIONS.map((emoji) => (
-              <button key={emoji} type="button" onClick={() => void toggle(emoji)} className="flex size-8 items-center justify-center rounded-full text-base hover:bg-surface-raised" aria-label={`React with ${emoji}`}>
+              <button key={emoji} type="button" onClick={() => void toggle(emoji)} className="flex size-7 items-center justify-center rounded-full text-base hover:bg-surface-raised" aria-label={`React with ${emoji}`}>
                 {emoji}
               </button>
             ))}
@@ -114,20 +114,7 @@ function ReactionBar({ comment, endpoint }: { comment: CommunityCommentBase; end
         )}
       </div>
       {pending && <Spinner size={12} />}
-      {error && <span className="font-body text-xs text-destructive">Reactions are unavailable.</span>}
-    </div>
-  );
-}
-
-function ParticipantAvatars<C extends CommunityCommentBase>({ comment }: { comment: C }) {
-  const participants = [comment, ...((comment.replies ?? []) as C[])].slice(0, 4);
-  return (
-    <div className="flex items-center pl-1">
-      {participants.map((participant, index) => (
-        <div key={participant.id} className="-ml-1 rounded-full ring-2 ring-surface" style={{ zIndex: participants.length - index }}>
-          <Avatar name={participant.users?.name ?? "Community member"} avatarUrl={participant.users?.avatar_url ?? null} size="md" />
-        </div>
-      ))}
+      {error && <span className="font-body text-xs text-[var(--ds-red-800)]">Reactions are unavailable.</span>}
     </div>
   );
 }
@@ -173,54 +160,50 @@ function CommentItem<C extends CommunityCommentBase>({
   }
 
   return (
-    <article className={`group/comment relative ${isReply ? "rounded-2xl bg-surface-raised p-4" : ""}`}>
-      {isReply && (
-        <div className="mb-3">
-          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="md" />
-        </div>
-      )}
+    <article className={`group/comment relative ${isReply ? "rounded-xl bg-surface-raised p-3" : ""}`}>
       <div className="min-w-0">
         <header className="flex min-w-0 items-center gap-2 pr-8">
-          <span className="truncate font-body text-sm font-semibold text-foreground">{name}</span>
+          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="sm" />
+          <span className="truncate font-body text-[13px] font-semibold text-foreground">{name}</span>
           <span aria-hidden className="text-foreground-subtle">•</span>
-          <time dateTime={comment.created_at} title={absoluteDate(comment.created_at)} className="shrink-0 font-body text-sm text-foreground-muted">
+          <time dateTime={comment.created_at} title={absoluteDate(comment.created_at)} className="shrink-0 font-body text-[11px] text-foreground-muted">
             {hydrated ? relativeTime(comment.created_at) : absoluteDate(comment.created_at)}
           </time>
         </header>
         {comment.user_id === currentUserId && (
           <div className="absolute right-0 top-0">
-            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex size-8 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground" aria-label="Comment options" aria-expanded={menuOpen}>
-              <MoreVertical size={17} />
+            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex size-7 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-hover hover:text-foreground" aria-label="Comment options" aria-expanded={menuOpen}>
+              <MoreVertical size={14} />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 min-w-32 rounded-xl border border-border bg-surface p-1 shadow-lg">
-                <button type="button" onClick={() => { setMenuOpen(false); setConfirmDelete(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 font-body text-xs text-destructive hover:bg-surface-raised">
-                  <Trash2 size={14} /> Delete
+              <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface p-1 shadow-lg">
+                <button type="button" onClick={() => { setMenuOpen(false); setConfirmDelete(true); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 font-body text-xs text-[var(--ds-red-800)] hover:bg-surface-raised">
+                  <Trash2 size={12} /> Delete
                 </button>
               </div>
             )}
           </div>
         )}
-        {comment.body && <p className="mt-1.5 whitespace-pre-wrap break-words font-body text-sm leading-6 text-foreground">{renderEmojiText(comment.body)}</p>}
+        {comment.body && <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm leading-5 text-foreground">{renderEmojiText(comment.body)}</p>}
         {comment.image_url && (
           <a href={comment.image_url} target="_blank" rel="noopener noreferrer" className="mt-3 block w-fit">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={comment.image_url} alt="Comment attachment" className="max-h-48 rounded-xl border border-border object-cover" />
+            <img src={comment.image_url} alt="Comment attachment" className="max-h-36 rounded-lg border border-border object-cover" />
           </a>
         )}
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <ReactionBar comment={comment} endpoint={`${base}/reactions`} />
           {allowReplies && !isReply && (
             <>
               <span aria-hidden className="text-foreground-subtle">•</span>
-              <button type="button" onClick={() => setReplying((open) => !open)} className="inline-flex h-8 items-center rounded-full border border-border bg-surface px-4 font-body text-sm font-medium text-foreground shadow-sm transition-colors hover:border-border-strong hover:bg-surface-raised">
+              <button type="button" onClick={() => setReplying((open) => !open)} className="inline-flex h-7 items-center rounded-full border border-border bg-surface px-3.5 font-body text-xs font-medium text-foreground shadow-xs transition-colors hover:border-border-strong hover:bg-surface-raised">
                 Reply
               </button>
             </>
           )}
         </div>
         {replying && (
-          <div className="mt-3">
+          <div className="mt-2">
             <CommentComposer<C> communityId={communityId} kind={kind} targetId={targetId} parentId={comment.id} placeholder={`Reply to ${name}`} autoFocus onPosted={(created) => { onPosted(created); setReplying(false); }} onCancel={() => setReplying(false)} />
           </div>
         )}
@@ -266,57 +249,56 @@ export function CommentSection<C extends CommunityCommentBase>({
     : Date.parse(b.created_at) - Date.parse(a.created_at)), [comments, sort]);
 
   return (
-    <section aria-labelledby={`comments-${targetId}`} className={compact ? "" : "rounded-2xl border border-border bg-surface p-5 sm:p-6"}>
-      <h2 id={`comments-${targetId}`} className="font-display text-xl font-semibold tracking-tight text-foreground">Comments</h2>
+    <section aria-labelledby={`comments-${targetId}`} className={compact ? "" : "rounded-xl border border-border bg-surface p-4 sm:p-5"}>
+      <h2 id={`comments-${targetId}`} className="font-display text-base font-semibold tracking-tight text-foreground">Comments</h2>
 
-      <div className="mt-5">
+      <div className="mt-3">
         {allowReplies ? <CommentComposer<C> communityId={communityId} kind={kind} targetId={targetId} placeholder={placeholder ?? "Add comment"} maxLength={maxLength} onPosted={onPosted} /> : <p className="rounded-xl border border-border bg-background px-4 py-3 text-center font-body text-xs text-foreground-subtle">Replies are closed for this conversation.</p>}
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-foreground-muted">
-          <MessageSquare size={19} />
-          <span className="font-body text-sm tabular-nums">{total}</span>
+      <div className="mt-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5 text-foreground-muted">
+          <MessageSquare size={15} />
+          <span className="font-body text-xs tabular-nums">{total}</span>
         </div>
-        <label className="flex items-center gap-2 font-body text-sm font-semibold text-foreground">
-          <ArrowUpDown size={16} />
-          <span className="sr-only">Sort comments</span>
-          <select value={sort} onChange={(event) => setSort(event.target.value as CommentSort)} className="cursor-pointer appearance-none bg-transparent pr-5 font-body text-sm font-semibold text-foreground outline-none">
+        <label className="flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
+          <ArrowUpDown size={13} />
+          <select value={sort} onChange={(event) => setSort(event.target.value as CommentSort)} aria-label="Sort comments" className="cursor-pointer appearance-none bg-transparent pr-5 font-body text-xs font-semibold text-foreground outline-none">
             <option value="newest">Most recent</option>
             <option value="popular">Most popular</option>
           </select>
-          <ChevronDown size={14} className="-ml-6 pointer-events-none" />
+          <ChevronDown size={12} className="-ml-5 pointer-events-none" />
         </label>
       </div>
 
       {loading ? (
-        <div className="flex min-h-32 items-center justify-center" role="status"><Spinner size={22} /><span className="sr-only">Loading comments</span></div>
+        <div className="flex min-h-24 items-center justify-center" role="status"><Spinner size={18} /><span className="sr-only">Loading comments</span></div>
       ) : sorted.length === 0 ? (
-        <div className="flex min-h-36 flex-col items-center justify-center gap-2 text-center">
-          <span className="flex size-10 items-center justify-center rounded-full bg-surface-raised text-foreground-muted"><MessageSquare size={19} /></span>
-          <p className="font-body text-sm font-medium text-foreground">Start the conversation</p>
+        <div className="flex min-h-24 flex-col items-center justify-center gap-2 text-center">
+          <span className="flex size-8 items-center justify-center rounded-full bg-surface-raised text-foreground-muted"><MessageSquare size={15} /></span>
+          <p className="font-body text-[13px] font-medium text-foreground">Start the conversation</p>
           <p className="max-w-xs font-body text-xs leading-relaxed text-foreground-muted">Share a thought, ask a question, or leave some helpful feedback.</p>
         </div>
       ) : (
-        <div className="mt-6 flex flex-col gap-6">
+        <div className="mt-4 flex flex-col gap-4">
           {sorted.map((comment) => {
             const replies = (comment.replies ?? []) as C[];
             const open = expanded[comment.id] ?? replies.length <= 2;
             return (
-              <div key={comment.id} className="relative pl-10">
-                <span aria-hidden className="absolute left-[13px] top-3 size-2 rounded-full bg-foreground-muted" />
-                <span aria-hidden className="absolute bottom-0 left-4 top-5 border-l border-dashed border-foreground-subtle" />
-                <div className="mb-3">
-                  <ParticipantAvatars comment={comment} />
-                </div>
+              <div key={comment.id} className="relative pl-8">
+                <span aria-hidden className="absolute left-[11px] top-2.5 size-1.5 rounded-full bg-foreground-muted" />
+                <span aria-hidden className="absolute bottom-0 left-3.5 top-4 border-l border-dashed border-foreground-subtle" />
                 <CommentItem comment={comment} kind={kind} communityId={communityId} targetId={targetId} currentUserId={currentUserId} allowReplies={allowReplies} onPosted={onPosted} onDeleted={onDeleted} />
                 {replies.length > 0 && (
-                  <div className="mt-3">
-                    <button type="button" onClick={() => setExpanded((value) => ({ ...value, [comment.id]: !open }))} className="inline-flex h-8 items-center font-body text-sm font-semibold text-foreground transition-colors hover:text-foreground-muted">
+                  <div className="mt-2">
+                    <button type="button" onClick={() => setExpanded((value) => ({ ...value, [comment.id]: !open }))} className="inline-flex h-6 items-center gap-1 font-body text-xs font-semibold text-[var(--ds-blue-800)] transition-colors hover:text-[var(--ds-blue-900)]">
+                      {open
+                        ? <ChevronUp size={12} strokeWidth={2.5} className="shrink-0" />
+                        : <ChevronDown size={12} strokeWidth={2.5} className="shrink-0" />}
                       {open ? `Hide ${replies.length} ${replies.length === 1 ? "reply" : "replies"}` : `View ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`}
                     </button>
                     {open && (
-                      <div className="mt-3 flex flex-col gap-3">
+                      <div className="mt-2 flex flex-col gap-2">
                         {replies.map((reply) => <CommentItem key={reply.id} comment={reply} kind={kind} communityId={communityId} targetId={targetId} currentUserId={currentUserId} isReply allowReplies={false} onPosted={onPosted} onDeleted={onDeleted} />)}
                       </div>
                     )}

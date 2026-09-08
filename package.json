@@ -6,6 +6,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "patch-package",
     "dev": "npm run dev --workspace=apps/web",
     "dev:realtime": "npm run dev --workspace=apps/realtime",
     "build": "npm run build --workspace=apps/web",
@@ -36,6 +37,7 @@
     "lottie-react": "^2.4.1"
   },
   "devDependencies": {
+    "patch-package": "^8.0.1",
     "tsx": "^4.20.6"
   }
 }

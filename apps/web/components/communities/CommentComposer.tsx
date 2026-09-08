@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Bold, Italic, Link, Smile, Underline } from "lucide-react";
+import { Smile } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
@@ -27,7 +27,7 @@ export function renderEmojiText(text: string): ReactNode {
   while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
     parts.push(
-      <NotoEmojiSvg key={`e${m.index}`} emoji={m[0]} size={16} className="mx-0.5 align-middle" />,
+      <NotoEmojiSvg key={`e${m.index}`} emoji={m[0]} size={14} className="mx-0.5 align-middle" />,
     );
     last = m.index + m[0].length;
   }
@@ -39,7 +39,7 @@ export function renderEmojiText(text: string): ReactNode {
 
 export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" }) {
   const initial = name.charAt(0).toUpperCase();
-  const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
+  const dim = size === "sm" ? "h-5 w-5 text-[9px]" : "h-7 w-7 text-[11px]";
   return (
     <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
       {avatarUrl ? (
@@ -227,40 +227,11 @@ export function CommentComposer<C = unknown>({
   const remaining = maxLength - body.length;
 
   return (
-    <div className={`relative w-full rounded-2xl border bg-background shadow-sm transition-all duration-200 focus-within:border-[var(--ds-red-700)] focus-within:ring-4 focus-within:ring-[var(--ds-red-700)]/10 ${parentId ? "border-border p-3" : "border-[var(--ds-red-700)] p-4"}`}>
-    <form onSubmit={submit} className="w-full">
-      <textarea
-        ref={ref}
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-          if (e.key === "Escape" && onCancel) {
-            e.preventDefault();
-            onCancel();
-          } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            void submit(e as unknown as React.FormEvent);
-          }
-        }}
-        placeholder={placeholder ?? "Add comment"}
-        aria-label={parentId ? "Write a reply" : "Write a comment"}
-        rows={parentId ? 2 : 4}
-        maxLength={maxLength}
-        className={`max-h-40 w-full resize-none overflow-y-auto break-words bg-transparent font-body text-sm leading-6 text-foreground placeholder:text-foreground-muted focus:outline-none ${parentId ? "min-h-14" : "min-h-24"}`}
-      />
-
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-1 text-foreground-muted">
-          {!parentId && (
-            <>
-              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Bold"><Bold size={16} /></button>
-              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Italic"><Italic size={16} /></button>
-              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Underline"><Underline size={16} /></button>
-              <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Add link"><Link size={16} /></button>
-            </>
-          )}
+    <div className="relative w-full">
+    <div className="h-[52px] w-full rounded-xl border border-border bg-background px-2 shadow-sm transition-all duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
+    <form onSubmit={submit} className="flex h-full w-full items-center gap-1.5">
+        {/* Emoji control */}
+        <div className="flex shrink-0 items-center gap-0.5 text-foreground-muted">
           <button
             ref={emojiBtnRef}
             type="button"
@@ -268,32 +239,56 @@ export function CommentComposer<C = unknown>({
             onClick={togglePicker}
             aria-label="Add emoji"
             aria-expanded={pickerOpen}
-            className={`flex size-8 items-center justify-center rounded-lg transition-colors ${pickerOpen ? "bg-surface-raised text-foreground" : "hover:bg-surface-raised hover:text-foreground"}`}
+            className={`flex size-7 items-center justify-center rounded-lg transition-colors ${pickerOpen ? "bg-surface-raised text-foreground" : "hover:bg-surface-raised hover:text-foreground"}`}
           >
-            <Smile size={17} />
+            <Smile size={15} />
           </button>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+
+        {/* Single-line auto-growing input */}
+        <textarea
+          ref={ref}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+            if (e.key === "Escape" && onCancel) {
+              e.preventDefault();
+              onCancel();
+            } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void submit(e as unknown as React.FormEvent);
+            }
+          }}
+          placeholder={placeholder ?? "Add comment"}
+          aria-label={parentId ? "Write a reply" : "Write a comment"}
+          rows={1}
+          maxLength={maxLength}
+          className="h-full max-h-full w-full min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent py-4 font-body text-sm leading-5 text-foreground placeholder:text-foreground-muted focus:outline-none"
+        />
+
+        {/* Send */}
+        <div className="flex shrink-0 items-center gap-1.5">
           {onCancel && (
-            <button type="button" onClick={onCancel} className="h-9 rounded-full px-3 font-body text-sm text-foreground-muted hover:text-foreground">
+            <button type="button" onClick={onCancel} className="h-8 rounded-full px-3 font-body text-[13px] text-foreground-muted hover:text-foreground">
               Cancel
             </button>
           )}
           <button
             type="submit"
             disabled={saving || !body.trim()}
-            className="flex h-9 min-w-20 items-center justify-center rounded-full bg-[var(--ds-red-800)] px-5 font-body text-sm font-semibold text-[var(--color-overlay-foreground)] transition-colors hover:bg-[var(--ds-red-900)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? <Spinner size={14} className="text-[var(--color-overlay-foreground)]" /> : "Send"}
+            {saving ? <Spinner size={13} className="text-white" /> : "Send"}
           </button>
         </div>
-      </div>
-
-      <div className="mt-2 flex items-center justify-end">
-        {remaining <= 250 && <span className={`font-body text-[11px] tabular-nums ${remaining < 50 ? "text-destructive" : "text-foreground-subtle"}`}>{remaining} left</span>}
-      </div>
-      {error && <p className="mt-1.5 font-body text-xs text-destructive" role="alert">{error}</p>}
     </form>
+    </div>
+
+    <div className="mt-1 flex items-center justify-end">
+      {remaining <= 250 && <span className={`font-body text-[11px] tabular-nums ${remaining < 50 ? "text-[var(--ds-red-800)]" : "text-foreground-subtle"}`}>{remaining} left</span>}
+    </div>
+    {error && <p className="mt-1.5 font-body text-xs text-[var(--ds-red-800)]" role="alert">{error}</p>}
 
     {/* ── Emoji picker — portal at document.body, fixed relative to the emoji
           button, smartly flipped/clamped to the viewport edges, outside the

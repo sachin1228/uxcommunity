@@ -1,0 +1,100 @@
+diff --git a/node_modules/react-truncate-markup/es/index.js b/node_modules/react-truncate-markup/es/index.js
+index ac8adfd..83e500d 100644
+--- a/node_modules/react-truncate-markup/es/index.js
++++ b/node_modules/react-truncate-markup/es/index.js
+@@ -178,26 +178,29 @@ var TruncateMarkup = (_temp = _class = function (_React$Component) {
+     this.truncate();
+   };
+ 
+-  TruncateMarkup.prototype.UNSAFE_componentWillReceiveProps = function UNSAFE_componentWillReceiveProps(nextProps) {
+-    var _this2 = this;
++    TruncateMarkup.prototype.componentDidUpdate = function componentDidUpdate(prevProps) {
++    // Replace the deprecated UNSAFE_componentWillReceiveProps: reset truncation
++    // state whenever the content or line-height changes (patched via patch-package).
++    if (prevProps && (prevProps.children !== this.props.children || prevProps.lineHeight !== this.props.lineHeight)) {
++      var _this2 = this;
+ 
+-    this.shouldTruncate = false;
+-    this.latestThatFits = null;
++      this.shouldTruncate = false;
++      this.latestThatFits = null;
+ 
+-    this.setState({
+-      text: this.childrenWithRefMemo(nextProps.children)
+-    }, function () {
+-      if (!_this2.isValid) {
+-        return;
+-      }
++      this.setState({
++        text: this.childrenWithRefMemo(this.props.children)
++      }, function () {
++        if (!_this2.isValid) {
++          return;
++        }
+ 
+-      _this2.lineHeight = nextProps.lineHeight || getLineHeight(_this2.el);
+-      _this2.shouldTruncate = true;
+-      _this2.truncate();
+-    });
+-  };
++        _this2.lineHeight = _this2.props.lineHeight || getLineHeight(_this2.el);
++        _this2.shouldTruncate = true;
++        _this2.truncate();
++      });
++      return;
++    }
+ 
+-  TruncateMarkup.prototype.componentDidUpdate = function componentDidUpdate() {
+     if (this.shouldTruncate === false || this.isValid === false) {
+       return;
+     }
+diff --git a/node_modules/react-truncate-markup/lib/index.js b/node_modules/react-truncate-markup/lib/index.js
+index 00da1f0..0a2ff03 100644
+--- a/node_modules/react-truncate-markup/lib/index.js
++++ b/node_modules/react-truncate-markup/lib/index.js
+@@ -203,26 +203,29 @@ var TruncateMarkup = (_temp = _class = function (_React$Component) {
+     this.truncate();
+   };
+ 
+-  TruncateMarkup.prototype.UNSAFE_componentWillReceiveProps = function UNSAFE_componentWillReceiveProps(nextProps) {
+-    var _this2 = this;
++    TruncateMarkup.prototype.componentDidUpdate = function componentDidUpdate(prevProps) {
++    // Replace the deprecated UNSAFE_componentWillReceiveProps: reset truncation
++    // state whenever the content or line-height changes (patched via patch-package).
++    if (prevProps && (prevProps.children !== this.props.children || prevProps.lineHeight !== this.props.lineHeight)) {
++      var _this2 = this;
+ 
+-    this.shouldTruncate = false;
+-    this.latestThatFits = null;
++      this.shouldTruncate = false;
++      this.latestThatFits = null;
+ 
+-    this.setState({
+-      text: this.childrenWithRefMemo(nextProps.children)
+-    }, function () {
+-      if (!_this2.isValid) {
+-        return;
+-      }
++      this.setState({
++        text: this.childrenWithRefMemo(this.props.children)
++      }, function () {
++        if (!_this2.isValid) {
++          return;
++        }
+ 
+-      _this2.lineHeight = nextProps.lineHeight || (0, _lineHeight2.default)(_this2.el);
+-      _this2.shouldTruncate = true;
+-      _this2.truncate();
+-    });
+-  };
++        _this2.lineHeight = _this2.props.lineHeight || (0, _lineHeight2.default)(_this2.el);
++        _this2.shouldTruncate = true;
++        _this2.truncate();
++      });
++      return;
++    }
+ 
+-  TruncateMarkup.prototype.componentDidUpdate = function componentDidUpdate() {
+     if (this.shouldTruncate === false || this.isValid === false) {
+       return;
+     }
