@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useMemo, useState, useRef, useEffect, memo } from "react";
+import { Fragment, useId, useMemo, useState, useRef, useEffect, memo } from "react";
+import TruncateMarkup from "react-truncate-markup";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
@@ -536,12 +537,13 @@ function renderTextWithEmoji(text: string, key: string | number): React.ReactNod
   while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
     if (m.index > last) segments.push(text.slice(last, m.index));
     segments.push(
-      <AnimatedEmoji
-        key={`e-${m.index}`}
-        emoji={m[0]}
-        size={20}
-        className="inline-block align-middle mx-0.5"
-      />,
+      <TruncateMarkup.Atom key={`e-${m.index}`}>
+        <AnimatedEmoji
+          emoji={m[0]}
+          size={20}
+          className="inline-block align-middle mx-0.5"
+        />
+      </TruncateMarkup.Atom>,
     );
     last = m.index + m[0].length;
   }
@@ -619,34 +621,17 @@ function MessageContent({
 }) {
   const previewUrl = showPreview ? extractFirstUrl(content) : null;
   const [collapsed, setCollapsed] = useState(true);
-  const [showToggle, setShowToggle] = useState(false);
+  const textId = useId();
   const textRef = useRef<HTMLDivElement>(null);
+  const [fontRevision, setFontRevision] = useState(0);
 
-  // Only long messages get the toggle: compare the fully-laid-out (unclamped)
-  // text height against the clamped height. The line-clamp class stays on the
-  // element — we temporarily neutralise it with an inline style (inline styles
-  // override classes), measure, then clear it; reading clientHeight afterwards
-  // forces the browser to apply the clamp again synchronously.
+  // Width changes are handled by TruncateMarkup's ResizeObserver. Font swaps
+  // can change wrapping without changing that width, so remeasure those too.
   useEffect(() => {
-    const el = textRef.current;
-    if (!el || !collapsed) return;
-    const measure = () => {
-      el.style.webkitLineClamp = "unset";
-      // offsetHeight = pure layout height. scrollHeight includes the entrance
-      // word-wave animation's translated overflow, so while a message is still
-      // animating in (sending state) even a one-line reply would measure
-      // taller than the 5-line clamp and wrongly show the "Read more" toggle.
-      const natural = el.offsetHeight;
-      el.style.webkitLineClamp = "";
-      setShowToggle(natural > el.clientHeight + 1);
-    };
-    measure();
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(measure).catch(() => {});
-    }
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, [content, collapsed]);
+    const remeasure = () => setFontRevision((revision) => revision + 1);
+    document.fonts.addEventListener("loadingdone", remeasure);
+    return () => document.fonts.removeEventListener("loadingdone", remeasure);
+  }, []);
 
   // Mentions are matched against the raw text first (longest name wins), so
   // exactly the stored mentions become chips and everything else — including
@@ -678,7 +663,9 @@ function MessageContent({
             className="chat-word-in"
             style={{ "--i": i } as React.CSSProperties}
           >
-            <MentionChip text={segment.text} isMe={isMe} />
+            <TruncateMarkup.Atom>
+              <MentionChip text={segment.text} isMe={isMe} />
+            </TruncateMarkup.Atom>
           </span>,
         );
         continue;
@@ -710,7 +697,9 @@ function MessageContent({
     for (const segment of segments) {
       if (segment.mention) {
         parts.push(
-          <MentionChip key={keyIdx++} text={segment.text} isMe={isMe} />,
+          <TruncateMarkup.Atom key={keyIdx++}>
+            <MentionChip text={segment.text} isMe={isMe} />
+          </TruncateMarkup.Atom>,
         );
       } else if (segment.text) {
         parts.push(...renderRichChunk(segment.text, isMe, keyIdx));
@@ -719,37 +708,56 @@ function MessageContent({
     }
   }
 
-  // Literal class on purpose — Tailwind can't generate utilities from
-  // dynamic strings, so keep it in sync with COLLAPSED_LINES above.
-  const collapsedClass = collapsed ? "line-clamp-5" : "";
+  const text = (
+    <div
+      id={textId}
+      data-collapsed={collapsed || undefined}
+      ref={textRef}
+      tabIndex={-1}
+      className={`chat-message-text font-body text-sm font-normal leading-6 whitespace-pre-wrap break-words select-text cursor-text outline-none ${
+        isMe ? "text-accent-foreground" : "text-foreground"
+      }`}
+    >
+      <span style={{ display: "inline" }}>{parts}</span>
+    </div>
+  );
 
   return (
     <>
-      <div
-        ref={textRef}
-        className={`chat-message-text font-body text-sm font-normal leading-6 whitespace-pre-wrap break-words select-text cursor-text ${
-          isMe ? "text-accent-foreground" : "text-foreground"
-        } ${collapsedClass}`}
-      >
-        {parts}
-      </div>
       {/* Once expanded a message stays fully open — there is no collapse back. */}
-      {showToggle && collapsed && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); setCollapsed(false); }}
-          className={`mt-1 font-body text-xs font-medium transition-colors ${
-            animate ? "chat-read-more-in" : ""
-          } ${
-            isMe
-              ? "text-accent-foreground/70 hover:text-accent-foreground"
-              : "text-foreground-muted hover:text-foreground"
-          }`}
-          style={animate ? ({ "--i": Math.min(animateWordCount, 24) } as React.CSSProperties) : undefined}
+      {collapsed ? (
+        <TruncateMarkup
+          key={fontRevision}
+          lines={COLLAPSED_LINES}
+          ellipsis={
+            <span className="whitespace-nowrap">
+              {"\u2060… "}
+              <button
+                type="button"
+                aria-expanded={false}
+                aria-controls={textId}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCollapsed(false);
+                  requestAnimationFrame(() => textRef.current?.focus({ preventScroll: true }));
+                }}
+                className={`inline align-baseline font-body text-sm font-medium transition-colors rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                  animate ? "chat-read-more-in" : ""
+                } ${
+                  isMe
+                    ? "text-accent-foreground/70 hover:text-accent-foreground"
+                    : "text-foreground-muted hover:text-foreground"
+                }`}
+                style={animate ? ({ "--i": Math.min(animateWordCount, 24) } as React.CSSProperties) : undefined}
+              >
+                Read more
+              </button>
+            </span>
+          }
         >
-          Read more
-        </button>
-      )}
+          {text}
+        </TruncateMarkup>
+      ) : text}
       {previewUrl && <LinkPreview url={previewUrl} isMe={isMe} />}
     </>
   );

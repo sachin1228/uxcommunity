@@ -612,6 +612,12 @@ select:focus-visible {
   animation-delay: calc(min(var(--i, 0), 24) * 38ms + 70ms);
 }
 
+/* Let the final animated word wrap beside the inline action rather than
+   pushing it onto its own line. That word still fades in with the wave. */
+.chat-message-text[data-collapsed] > span > .chat-word-in:last-child {
+  display: inline;
+}
+
 @keyframes chat-read-more-in {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
