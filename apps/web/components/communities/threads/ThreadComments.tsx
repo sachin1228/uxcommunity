@@ -173,8 +173,8 @@ function CommentRow({
               aria-hidden="true"
               className={`absolute left-[14px] top-4 border-l border-dashed border-foreground-subtle ${isLast ? "bottom-2" : "-bottom-4"}`}
               style={{
-                maskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",
-                WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",
+                maskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
+                WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
               }}
             />
           </>
