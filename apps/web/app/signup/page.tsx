@@ -8,6 +8,7 @@ import { compressAvatarClient } from "@/lib/image-client";
 import { SignupStep1 } from "./components/SignupStep1";
 import { SignupStep2 } from "./components/SignupStep2";
 import { SignupStep3 } from "./components/SignupStep3";
+import { SignupStepper } from "./components/SignupStepper";
 import { SignupWelcome } from "./components/SignupWelcome";
 
 interface MasterItem { id: string; name: string; image_url?: string | null }
@@ -258,6 +259,13 @@ function SignupInner() {
     router.push("/dashboard");
   }
 
+  // Back navigation: every step's answers stay in state, and the step-1
+  // endpoints are validation-only (nothing is created until the final submit),
+  // so going back to edit earlier steps is always safe.
+  function goToStep(target: 1 | 2 | 3) {
+    if (target >= step || welcome) return;
+    setStep(target);
+  }
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <BrandLogo
@@ -266,6 +274,10 @@ function SignupInner() {
         wordmarkClassName="text-lg"
       />
       <div className="w-full max-w-md">
+
+        {tokenState.status === "valid" && step !== "done" && (
+          <SignupStepper current={step} />
+        )}
 
         {tokenState.status === "loading" && (
           <div className="flex justify-center py-16">
@@ -300,6 +312,7 @@ function SignupInner() {
             experienceLevels={experienceLevels}
             loading={step2Loading}
             error={step2Error}
+            onBack={() => goToStep(1)}
             onSubmit={handleStep2}
           />
         )}
@@ -324,6 +337,7 @@ function SignupInner() {
               setUploadPreviewUrl(null);
               void handleStep3();
             }}
+            onBack={() => goToStep(2)}
             onSave={handleStep3}
           />
         )}

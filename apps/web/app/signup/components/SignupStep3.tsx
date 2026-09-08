@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { SignupBackButton } from "./SignupStepper";
 
 interface SignupStep3Props {
   uploadPreviewUrl: string | null;
@@ -11,6 +12,7 @@ interface SignupStep3Props {
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveUpload: () => void;
   onSkip: () => void;
+  onBack: () => void;
   onSave: () => void;
 }
 
@@ -21,13 +23,17 @@ export function SignupStep3({
   onFileSelect,
   onRemoveUpload,
   onSkip,
+  onBack,
   onSave,
 }: SignupStep3Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="p-8">
-      <div className="flex items-start justify-between gap-3">
+      <div className="mb-2">
+        <SignupBackButton onClick={onBack} disabled={loading} />
+      </div>
+      <div className="mb-7 flex items-start justify-between gap-3">
         <h2 className="font-display text-2xl font-semibold text-foreground">
           Add a profile picture
         </h2>
@@ -40,9 +46,6 @@ export function SignupStep3({
           Skip
         </button>
       </div>
-      <p className="mb-6 font-body text-sm text-foreground-muted">
-        Step 3 of 3 · Optional
-      </p>
 
       {error && (
         <div className="mb-5 rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
@@ -86,7 +89,7 @@ export function SignupStep3({
         >
           <Upload strokeWidth={2.5} aria-hidden="true" />
           <span className="font-body text-sm font-medium">Upload a profile picture</span>
-          <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 3 MB</span>
+          <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP</span>
         </button>
       )}
 
