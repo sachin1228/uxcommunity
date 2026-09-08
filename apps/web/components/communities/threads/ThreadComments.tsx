@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpDown,
   ChevronDown,
-  ChevronUp,
   MessageSquare,
   MoreVertical,
   Plus,
@@ -25,6 +24,8 @@ export function CommentBox({
   threadId,
   parentId,
   placeholder,
+  initialBody,
+  submitLabel,
   onPosted,
   onCancel,
   autoFocus,
@@ -33,6 +34,10 @@ export function CommentBox({
   threadId: string;
   parentId?: string;
   placeholder?: string;
+  /** Seeded text (e.g. an `@Name ` mention when replying to a specific comment). */
+  initialBody?: string;
+  /** Label for the submit pill ("Send" by default, "Reply" in reply threads). */
+  submitLabel?: string;
   onPosted: (comment: ThreadComment) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
@@ -44,6 +49,8 @@ export function CommentBox({
       targetId={threadId}
       parentId={parentId}
       placeholder={placeholder}
+      initialBody={initialBody}
+      submitLabel={submitLabel}
       onPosted={(comment) => onPosted(comment as ThreadComment)}
       onCancel={onCancel}
       autoFocus={autoFocus}
@@ -58,6 +65,16 @@ function totalReactionCount(comment: ThreadComment) {
   return (comment.reactions ?? []).reduce((total, reaction) => total + reaction.count, 0);
 }
 
+/**
+ * Seed text for the reply composer: mentioning the author we're replying to,
+ * like LinkedIn — unless it's our own comment.
+ */
+function replyMention(target: ThreadComment, currentUserId: string): string | undefined {
+  const name = target.users?.name;
+  if (!name || target.user_id === currentUserId) return undefined;
+  return `@${name} `;
+}
+
 // ── Single comment row ────────────────────────────────────────────────────────
 
 function CommentRow({
@@ -68,6 +85,8 @@ function CommentRow({
   allowReplies,
   isReply,
   isLast,
+  replyTarget,
+  onReplyTargetChange,
   onDeleted,
   onReplied,
   onReactionToggled,
@@ -80,12 +99,15 @@ function CommentRow({
   isReply?: boolean;
   /** Last item in the list — its timeline connector stops early. */
   isLast?: boolean;
+  /** The comment the open reply composer is aimed at (lifted so only one composer exists per thread). */
+  replyTarget?: ThreadComment | null;
+  onReplyTargetChange?: (target: ThreadComment | null) => void;
   onDeleted: (id: string, parentId: string | null) => void;
   onReplied: (comment: ThreadComment) => void;
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
 }) {
-  const [replying, setReplying] = useState(false);
-  const [repliesOpen, setRepliesOpen] = useState(false);
+  // Replies are expanded by default (LinkedIn-style); "Collapse replies" folds them.
+  const [repliesOpen, setRepliesOpen] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -96,6 +118,20 @@ function CommentRow({
   const isOwner = comment.user_id === currentUserId;
   const name = comment.users?.name ?? "Member";
   const canReact = typeof onReactionToggled === "function";
+  const hasReplies = !isReply && comment.replies.length > 0;
+  // True on the top-level comment whose thread hosts the open reply composer
+  // (the target is either this comment itself or one of its replies).
+  const replyTargetId = replyTarget?.id ?? null;
+  const hostsReplyComposer = Boolean(
+    !isReply && replyTarget && (replyTarget.id === comment.id || replyTarget.parent_id === comment.id),
+  );
+  const activeReplyTarget = hostsReplyComposer ? replyTarget! : null;
+
+  /** Open the inline composer (anchored at the bottom of the thread) aimed at this comment. */
+  function startReply() {
+    onReplyTargetChange?.(replyTarget?.id === comment.id ? null : comment);
+    setRepliesOpen(true);
+  }
 
   // Close the options menu / reaction picker on outside click or Escape.
   useEffect(() => {
@@ -164,14 +200,16 @@ function CommentRow({
 
   return (
     <>
-      <article className={`group/comment relative ${isReply ? "rounded-xl bg-surface-raised p-3" : "pl-8"}`}>
-        {/* Timeline dot + dashed connector (top-level comments only) */}
+      <article className={`group/comment relative ${isReply ? "" : "pl-8"}`}>
+        {/* Timeline dot + dashed connector (top-level comments only). The
+            connector spans the whole thread — replies and composer included —
+            when the comment has any, like LinkedIn's continuous spine. */}
         {!isReply && (
           <>
             <span aria-hidden="true" className="absolute left-[11px] top-2.5 h-1.5 w-1.5 rounded-full bg-foreground-muted" />
             <span
               aria-hidden="true"
-              className={`absolute left-[14px] top-4 border-l border-dashed border-foreground-subtle ${isLast ? "bottom-2" : "-bottom-4"}`}
+              className={`absolute left-[14px] top-4 border-l border-dashed border-foreground-subtle ${hasReplies ? "bottom-1" : isLast ? "bottom-2" : "-bottom-4"}`}
               style={{
                 maskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
                 WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
@@ -278,46 +316,29 @@ function CommentRow({
               </>
             )}
 
-            {allowReplies && !isReply && (
+            {allowReplies && (
               <button
                 type="button"
-                onClick={() => setReplying((p) => !p)}
-                className="inline-flex h-7 items-center rounded-full border border-border bg-surface px-3.5 font-body text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-surface-raised"
+                onClick={startReply}
+                aria-pressed={replyTarget?.id === comment.id}
+                className={`inline-flex h-7 items-center rounded-full border px-3.5 font-body text-xs font-medium shadow-xs transition-colors ${
+                  replyTarget?.id === comment.id
+                    ? "border-[var(--ds-blue-800)] bg-[var(--ds-blue-800)]/10 text-[var(--ds-blue-800)]"
+                    : "border-border bg-surface text-foreground hover:bg-surface-raised"
+                }`}
               >
                 Reply
               </button>
             )}
           </div>
 
-          {replying && (
-            <div className="mt-2">
-              <CommentBox
-                communityId={communityId}
-                threadId={threadId}
-                parentId={comment.id}
-                placeholder="Write a reply…"
-                autoFocus
-                onPosted={(c) => { onReplied(c); setReplying(false); setRepliesOpen(true); }}
-                onCancel={() => setReplying(false)}
-              />
-            </div>
-          )}
-
-          {!isReply && comment.replies.length > 0 && (
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() => setRepliesOpen((p) => !p)}
-                className="inline-flex h-6 items-center gap-1 font-body text-xs font-semibold text-[var(--ds-blue-800)] transition-colors hover:text-[var(--ds-blue-900)]"
-                aria-expanded={repliesOpen}
-              >
-                {repliesOpen
-                  ? <ChevronUp strokeWidth={2.5} size={12} className="shrink-0" />
-                  : <ChevronDown strokeWidth={2.5} size={12} className="shrink-0" />}
-                {repliesOpen ? "Hide" : "View"} {comment.replies.length} {comment.replies.length === 1 ? "reply" : "replies"}
-              </button>
-              {repliesOpen && (
-                <div className="mt-2 flex flex-col gap-2">
+          {/* ── Reply thread (top-level comments only): flat replies on the
+                spine → "Collapse replies" → inline composer anchored at the
+                bottom, like LinkedIn ── */}
+          {!isReply && (hasReplies || hostsReplyComposer) && (
+            <div className="mt-3">
+              {hasReplies && repliesOpen && (
+                <div className="flex flex-col gap-3 pl-6">
                   {comment.replies.map((reply) => (
                     <CommentRow
                       key={reply.id}
@@ -325,13 +346,46 @@ function CommentRow({
                       communityId={communityId}
                       threadId={threadId}
                       currentUserId={currentUserId}
-                      allowReplies={false}
+                      allowReplies={allowReplies}
                       isReply
+                      replyTarget={replyTarget}
+                      onReplyTargetChange={onReplyTargetChange}
                       onDeleted={onDeleted}
                       onReplied={onReplied}
                       onReactionToggled={onReactionToggled}
                     />
                   ))}
+                </div>
+              )}
+
+              {hasReplies && (
+                <button
+                  type="button"
+                  onClick={() => setRepliesOpen((p) => !p)}
+                  className="mt-3 inline-flex items-center font-body text-xs font-semibold text-foreground transition-colors hover:text-foreground-muted"
+                  aria-expanded={repliesOpen}
+                >
+                  {repliesOpen
+                    ? "Collapse replies"
+                    : `View ${comment.replies.length} ${comment.replies.length === 1 ? "reply" : "replies"}`}
+                </button>
+              )}
+
+              {activeReplyTarget && (
+                <div className={hasReplies && repliesOpen ? "mt-3" : hasReplies ? "mt-3 pl-6" : "pl-6"}>
+                  <CommentBox
+                    key={activeReplyTarget.id}
+                    communityId={communityId}
+                    threadId={threadId}
+                    // One level of nesting: always reply into the top-level comment.
+                    parentId={comment.id}
+                    initialBody={replyMention(activeReplyTarget, currentUserId)}
+                    submitLabel="Reply"
+                    placeholder="Write a reply…"
+                    autoFocus
+                    onPosted={onReplied}
+                    onCancel={() => onReplyTargetChange?.(null)}
+                  />
                 </div>
               )}
             </div>
@@ -375,6 +429,8 @@ export function CommentsSection({
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
 }) {
   const [sort, setSort] = useState<"newest" | "popular">("newest");
+  // Which comment the single inline reply composer is aimed at (null = closed).
+  const [replyTarget, setReplyTarget] = useState<ThreadComment | null>(null);
 
   const sorted = useMemo(() => {
     const list = [...comments];
@@ -427,6 +483,8 @@ export function CommentsSection({
               currentUserId={currentUserId}
               allowReplies={allowReplies}
               isLast={index === sorted.length - 1}
+              replyTarget={replyTarget}
+              onReplyTargetChange={setReplyTarget}
               onDeleted={onDeleted}
               onReplied={onPosted}
               onReactionToggled={onReactionToggled}

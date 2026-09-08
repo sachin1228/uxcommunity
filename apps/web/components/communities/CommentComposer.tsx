@@ -90,6 +90,8 @@ export function CommentComposer<C = unknown>({
   onPosted,
   onCancel,
   autoFocus,
+  initialBody = "",
+  submitLabel = "Send",
   variant = "default",
 }: {
   communityId: string;
@@ -102,9 +104,13 @@ export function CommentComposer<C = unknown>({
   onPosted: (comment: C) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
+  /** Seeded text, e.g. an `@Name ` mention when replying to a specific comment. */
+  initialBody?: string;
+  /** Label for the submit pill (default "Send"). */
+  submitLabel?: string;
   variant?: "default" | "inline";
 }) {
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialBody);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{ name: string; avatar_url: string | null } | null>(null);
@@ -320,8 +326,8 @@ export function CommentComposer<C = unknown>({
                 disabled={saving || !body.trim()}
                 className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {saving ? <Spinner size={14} className="text-white" /> : "Send"}
-              </button>
+              {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
+            </button>
             </div>
           </form>
         </div>
