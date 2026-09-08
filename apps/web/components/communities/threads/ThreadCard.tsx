@@ -325,6 +325,7 @@ export function ThreadCard({
   const attachments = Array.isArray(thread.attachments) ? thread.attachments : [];
   const images = attachments.filter((a) => a.type.startsWith("image/"));
   const files  = attachments.filter((a) => !a.type.startsWith("image/"));
+  const collapsedTitleLines = attachments.length === 0 && !thread.poll ? 5 : 2;
 
   const pollOptionCount = thread.poll?.options.length ?? 0;
   const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
@@ -463,7 +464,7 @@ export function ThreadCard({
           </h3>
         ) : (
           <TruncateMarkup
-            lines={2}
+            lines={collapsedTitleLines}
             ellipsis={
               <span className="whitespace-nowrap">
                 {"\u2060… "}
