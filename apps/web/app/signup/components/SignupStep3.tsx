@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { Upload } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { SignupBackButton } from "./SignupStepper";
 
 interface SignupStep3Props {
   uploadPreviewUrl: string | null;
@@ -11,6 +12,7 @@ interface SignupStep3Props {
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveUpload: () => void;
   onSkip: () => void;
+  onBack: () => void;
   onSave: () => void;
 }
 
@@ -21,12 +23,16 @@ export function SignupStep3({
   onFileSelect,
   onRemoveUpload,
   onSkip,
+  onBack,
   onSave,
 }: SignupStep3Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="p-8">
+      <div className="mb-2">
+        <SignupBackButton onClick={onBack} disabled={loading} />
+      </div>
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-display text-2xl font-semibold text-foreground">
           Add a profile picture
@@ -41,7 +47,7 @@ export function SignupStep3({
         </button>
       </div>
       <p className="mb-6 font-body text-sm text-foreground-muted">
-        Step 3 of 3 · Optional
+        Optional — you can add one anytime from your profile.
       </p>
 
       {error && (

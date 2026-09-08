@@ -2,6 +2,7 @@
 
 import { Spinner } from "@/components/ui/Spinner";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { SignupBackButton } from "./SignupStepper";
 
 interface MasterItem { id: string; name: string; image_url?: string | null }
 
@@ -19,6 +20,7 @@ interface SignupStep2Props {
   experienceLevels: { id: string; slug: string; label: string; image_url: string | null }[];
   loading: boolean;
   error: string | null;
+  onBack: () => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -30,14 +32,17 @@ export function SignupStep2({
   experienceLevels,
   loading,
   error,
+  onBack,
   onSubmit,
 }: SignupStep2Props) {
   return (
     <div className="p-8">
-      <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
+      <div className="mb-2">
+        <SignupBackButton onClick={onBack} disabled={loading} />
+      </div>
+      <h2 className="font-display text-2xl font-semibold text-foreground mb-7">
         Complete your profile
       </h2>
-      <p className="font-body text-sm text-foreground-muted mb-7">Step 2 of 3</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
