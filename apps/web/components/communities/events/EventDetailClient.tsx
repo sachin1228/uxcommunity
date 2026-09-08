@@ -303,7 +303,7 @@ export function EventDetailClient({
 
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
       <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
         {/* ── Back link (homepage context only) ── */}
         {backHref && (
