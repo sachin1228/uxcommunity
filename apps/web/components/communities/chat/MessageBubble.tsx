@@ -128,7 +128,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup, onClick,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, onClick,
 }: {
   url: string;
   isMe: boolean;
@@ -137,7 +137,6 @@ function BubbleImage({
   standalone?: boolean;
   createdAt?: string;
   status?: CachedMessage["status"];
-  isFirstInGroup?: boolean;
   /** Opens the image in the full-screen viewer. */
   onClick?: () => void;
 }) {
@@ -151,11 +150,9 @@ function BubbleImage({
     >
       <div
         className={standalone
-          ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
-              isMe
-                ? "border-[var(--ds-blue-800)]"
-                : "border-border bg-surface-raised"
-            }`
+          ? // Media sits inside the bubble frame with a hair of its own
+            // rounding (WhatsApp-style); the tail/bg come from the bubble.
+            "relative overflow-hidden rounded-[8px]"
           : "relative"}
       >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -999,16 +996,18 @@ export const MessageBubble = memo(function MessageBubble({
                 data-side={isMe ? "right" : "left"}
               >
                 <div
-                  className={`relative select-none ${
-                    imageOnly
-                      ? "flex flex-col items-start"
-                      : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
-                          isMe
-                            ? msg.status === "failed"
-                              ? "bg-red-500/80"
-                              : "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised"
-                        }`
+                  className={`relative select-none rounded-[10px] ${
+                    isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""
+                  } shadow-sm ${
+                    isMe
+                      ? msg.status === "failed"
+                        ? "bg-red-500/80"
+                        : "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
+                      : "bg-surface-raised"
+                  } ${
+                    // Media bubbles keep a thin frame around the image
+                    // (WhatsApp-style); text bubbles use the roomier padding.
+                    imageOnly ? "p-1" : "px-3 pt-2 pb-1.5"
                   }`}
                 >
                   {isFirstInGroup && (
@@ -1022,10 +1021,15 @@ export const MessageBubble = memo(function MessageBubble({
                     />
                   )}
                   {/* Sender name inside the bubble, WhatsApp-style — colored per
-                      user (own messages skip it, matching WhatsApp). Shown above
-                      media too, like WhatsApp's image-album bubbles. */}
+                      user (own messages skip it, matching WhatsApp). On media
+                      bubbles the name carries its own padding since the bubble
+                      only wraps the image with a thin frame. */}
                   {!isMe && showHeader && sender && (
-                    <SenderName name={sender.name} userId={msg.user_id} />
+                    <SenderName
+                      name={sender.name}
+                      userId={msg.user_id}
+                      className={imageOnly ? "px-1.5 pt-1" : ""}
+                    />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
@@ -1036,7 +1040,6 @@ export const MessageBubble = memo(function MessageBubble({
                       standalone={imageOnly}
                       createdAt={msg.created_at}
                       status={msg.status}
-                      isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
                       onClick={() => onImageClick(imageUrl)}
                     />
