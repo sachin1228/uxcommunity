@@ -588,15 +588,13 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
   return parts;
 }
 
-/** Highlighted chip for a `@Name` mention inside a message bubble. */
+/** Highlighted `@Name` mention inside a message bubble — blue text, no chip bg.
+ *  On the sender's own blue bubble a light blue keeps it readable. */
 function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   return (
     <span
-      className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
-        isMe
-          ? "bg-black/25 text-accent-foreground"
-          : "bg-accent/15 text-accent"
-      }`}
+      className="inline-block max-w-full break-normal font-semibold"
+      style={{ color: isMe ? "var(--chat-mention-own)" : "var(--ds-blue-700)" }}
     >
       {text}</span>
   );
@@ -952,7 +950,7 @@ export const MessageBubble = memo(function MessageBubble({
                     {msg.edited_at && (
                       <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
                     )}
-                    <span className="font-mono text-[10px] text-foreground-muted/70">
+                    <span className="text-[10px] text-foreground-muted/70">
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
@@ -1056,7 +1054,7 @@ export const MessageBubble = memo(function MessageBubble({
                     </div>
                   )}
                   {!imageOnly && (
-                    <div className="flex items-center justify-end gap-1 mt-0">
+                    <div className={`flex items-center justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
                       {msg.edited_at && (
                         <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
                           edited

@@ -140,6 +140,10 @@
   --chat-name-5: var(--ds-green-800);
   --chat-name-6: var(--ds-red-700);
 
+  /* @mention text color inside the sender's own blue bubble — a light blue
+     that stays readable on --ds-blue-800 (WhatsApp-style outgoing mentions). */
+  --chat-mention-own: var(--ds-blue-500);
+
   /* Like / heart action — active (liked) state, X-style pink */
   --like: #F91880;  /* rgb(249, 24, 128) */
 
@@ -318,6 +322,8 @@
     --chat-name-4: var(--ds-amber-700);
     --chat-name-5: var(--ds-green-900);
     --chat-name-6: var(--ds-red-900);
+
+    --chat-mention-own: var(--ds-blue-900);
 
     /* Like / heart action — active (liked) state, X-style pink */
     --like: #F91880;  /* rgb(249, 24, 128) */
