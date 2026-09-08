@@ -126,6 +126,20 @@
   --ds-pink-900:  #bd2864;
   --ds-pink-1000: #430a23;
 
+  /* ─── Group-chat sender name colors ─────────────────────────────
+     7 theme-aware tokens for WhatsApp-style rotating sender names.
+     Indexed by a stable hash of the user id (see lib/communities/
+     user-color.ts). Light mode uses deeper stops for contrast on the
+     raised bubble surface; dark mode uses lighter stops. Kept in sync
+     with USER_NAME_COLOR_COUNT in user-color.ts. */
+  --chat-name-0: var(--ds-blue-700);
+  --chat-name-1: var(--ds-teal-800);
+  --chat-name-2: var(--ds-purple-700);
+  --chat-name-3: var(--ds-pink-700);
+  --chat-name-4: var(--ds-amber-900);
+  --chat-name-5: var(--ds-green-800);
+  --chat-name-6: var(--ds-red-700);
+
   /* Like / heart action — active (liked) state, X-style pink */
   --like: #F91880;  /* rgb(249, 24, 128) */
 
@@ -294,6 +308,16 @@
     --ds-pink-800:  #df2670;
     --ds-pink-900:  #f75f8f;
     --ds-pink-1000: #feecf4;
+
+    /* ─── Group-chat sender name colors (dark theme) ───────────────
+       Lighter stops so names stay readable on the dark raised bubble. */
+    --chat-name-0: var(--ds-blue-900);
+    --chat-name-1: var(--ds-teal-900);
+    --chat-name-2: var(--ds-purple-900);
+    --chat-name-3: var(--ds-pink-900);
+    --chat-name-4: var(--ds-amber-700);
+    --chat-name-5: var(--ds-green-900);
+    --chat-name-6: var(--ds-red-900);
 
     /* Like / heart action — active (liked) state, X-style pink */
     --like: #F91880;  /* rgb(249, 24, 128) */

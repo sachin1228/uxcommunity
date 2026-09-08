@@ -199,7 +199,7 @@ export async function DELETE(
  * Lightweight endpoint used by the realtime handler to fetch the reply preview
  * of a parent message that may not be in the local message cache.
  *
- * Returns: { id: string; content: string | null; image_url: string | null; user_name: string }
+ * Returns: { id: string; content: string | null; image_url: string | null; user_name: string; user_id: string | null }
  */
 export async function GET(
   _req: NextRequest,
@@ -246,5 +246,8 @@ export async function GET(
     content: (msg as any).content ?? null,
     image_url: (msg as any).image_url ?? null,
     user_name: user?.name ?? "Unknown",
+    // Parent author's id so the client can color the reply name consistently
+    // with the rest of the chat (see lib/communities/user-color.ts).
+    user_id: (msg as any).user_id ?? null,
   });
 }

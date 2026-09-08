@@ -14,6 +14,7 @@ import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { ModalPortal } from "@/components/ui/Modal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
+import { userColorVar } from "@/lib/communities/user-color";
 
 
 interface MessageBubbleProps {
@@ -59,6 +60,10 @@ function ReplyBubble({
   isMe: boolean;
   onReplyClick: (replyId: string) => void;
 }) {
+  // Reply names get the same per-user color as chat sender names — when the
+  // parent author's id is known (live replies, replies to own messages).
+  // History-built previews omit the id, so they fall back to neutral.
+  const nameColor = reply.user_id ? userColorVar(reply.user_id) : undefined;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
@@ -68,7 +73,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
+      <p
+        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+        style={nameColor && !isMe ? { color: nameColor } : undefined}
+      >
         {reply.user_name}
       </p>
       <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
@@ -772,15 +780,31 @@ function isEmojiOnly(text: string): boolean {
   return remainder.length === 0;
 }
 
+/** Colored sender-name row rendered inside bubbles, WhatsApp-style. */
+function SenderName({ name, userId, className = "" }: { name: string; userId: string | null; className?: string }) {
+  return (
+    <p
+      className={`font-body text-[11px] font-semibold leading-4 break-words ${className}`}
+      style={{ color: userColorVar(userId) }}
+    >
+      {name}
+    </p>
+  );
+}
+
 /** Placeholder shown for soft-deleted messages. */
 function DeletedBubble({
   isMe,
   createdAt,
   isFirstInGroup,
+  senderName,
+  senderId,
 }: {
   isMe: boolean;
   createdAt: string;
   isFirstInGroup: boolean;
+  senderName?: string | null;
+  senderId?: string | null;
 }) {
   return (
     <div
@@ -795,6 +819,9 @@ function DeletedBubble({
           side={isMe ? "right" : "left"}
           className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
         />
+      )}
+      {!isMe && senderName && (
+        <SenderName name={senderName} userId={senderId ?? null} className="mr-1" />
       )}
       <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
@@ -907,15 +934,14 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Content column */}
         <div className="min-w-0 max-w-[65%]">
-          {/* Sender name — hidden for the current user's own messages */}
-          {showHeader && sender && !isDeleted && !isMe && (
-            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
-              <span>{sender.name}</span>
-            </p>
-          )}
-
           {isDeleted ? (
-            <DeletedBubble isMe={isMe} createdAt={msg.created_at} isFirstInGroup={isFirstInGroup} />
+            <DeletedBubble
+              isMe={isMe}
+              createdAt={msg.created_at}
+              isFirstInGroup={isFirstInGroup}
+              senderName={sender?.name}
+              senderId={msg.user_id}
+            />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
@@ -994,6 +1020,12 @@ export const MessageBubble = memo(function MessageBubble({
                           : "text-[var(--ds-blue-800)]"
                         : "text-surface-raised"}
                     />
+                  )}
+                  {/* Sender name inside the bubble, WhatsApp-style — colored per
+                      user (own messages skip it, matching WhatsApp). Shown above
+                      media too, like WhatsApp's image-album bubbles. */}
+                  {!isMe && showHeader && sender && (
+                    <SenderName name={sender.name} userId={msg.user_id} className="mb-1" />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
