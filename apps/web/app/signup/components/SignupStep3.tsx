@@ -10,6 +10,7 @@ interface SignupStep3Props {
   error: string | null;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveUpload: () => void;
+  onSkip: () => void;
   onSave: () => void;
 }
 
@@ -19,15 +20,26 @@ export function SignupStep3({
   error,
   onFileSelect,
   onRemoveUpload,
+  onSkip,
   onSave,
 }: SignupStep3Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="p-8">
-      <h2 className="mb-1 font-display text-2xl font-semibold text-foreground">
-        Add a profile picture
-      </h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-display text-2xl font-semibold text-foreground">
+          Add a profile picture
+        </h2>
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={loading}
+          className="shrink-0 pt-1 font-body text-sm text-foreground-muted transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Skip
+        </button>
+      </div>
       <p className="mb-6 font-body text-sm text-foreground-muted">
         Step 3 of 3 · Optional
       </p>
@@ -85,11 +97,7 @@ export function SignupStep3({
         className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading && <Spinner className="size-4 text-white" />}
-        {loading
-          ? "Finishing signup…"
-          : uploadPreviewUrl
-            ? "Save & go to dashboard →"
-            : "Skip for now & go to dashboard →"}
+        {loading ? "Finishing signup…" : "Continue →"}
       </button>
     </div>
   );

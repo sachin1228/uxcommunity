@@ -315,6 +315,15 @@ function SignupInner() {
               if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
               setUploadPreviewUrl(null);
             }}
+            onSkip={() => {
+              // Skipping discards a pending picture and finishes signup
+              // without one. handleStep3 builds its payload from state after
+              // the overlay paints, so these sync clears take effect.
+              setUploadedBlob(null);
+              if (uploadPreviewUrl) URL.revokeObjectURL(uploadPreviewUrl);
+              setUploadPreviewUrl(null);
+              void handleStep3();
+            }}
             onSave={handleStep3}
           />
         )}
