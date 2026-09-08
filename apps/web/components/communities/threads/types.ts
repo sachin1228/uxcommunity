@@ -1,3 +1,5 @@
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
+
 /** Max body (title) length for threads — mirrors the DB column + API validation. */
 export const THREAD_BODY_MAX_LENGTH = 2000;
 
@@ -78,4 +80,8 @@ export interface ThreadComment {
   updated_at: string;
   users: { name: string; avatar_url: string | null } | null;
   replies: ThreadComment[];
+  /** Grouped emoji reactions on this comment (absent until the reactions migration is applied). */
+  reactions?: CommentReactionSummary[];
 }
+
+export type { CommentReactionSummary };

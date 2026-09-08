@@ -37,9 +37,9 @@ export function renderEmojiText(text: string): ReactNode {
   return parts;
 }
 
-export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" }) {
+export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "xs" | "sm" | "md" }) {
   const initial = name.charAt(0).toUpperCase();
-  const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
+  const dim = size === "xs" ? "h-5 w-5 text-[8px]" : size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
   return (
     <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
       {avatarUrl ? (
@@ -70,9 +70,15 @@ async function fetchCurrentUser(): Promise<{ name: string; avatar_url: string | 
 
 /**
  * The shared comment composer used by every comment section (threads,
- * resources, showcase, events). Single-row layout: avatar · auto-growing
- * input · Cancel (replies) · emoji picker · blue circular send button —
- * inside a rounded bordered box that brightens on focus.
+ * resources, showcase, events).
+ *
+ * Two variants:
+ *  • "default" — avatar · auto-growing input · Cancel (replies) · emoji picker
+ *    · blue circular send button inside a rounded bordered box.
+ *  • "inline"  — threads redesign: a 52px rounded field with the emoji picker
+ *    on the left, the input in the middle, and a blue "Send" pill on the
+ *    right (replies show a Cancel pill first). The field grows as the input
+ *    wraps and shows a focus halo.
  */
 export function CommentComposer<C = unknown>({
   communityId,
@@ -84,6 +90,7 @@ export function CommentComposer<C = unknown>({
   onPosted,
   onCancel,
   autoFocus,
+  variant = "default",
 }: {
   communityId: string;
   /** URL segment for the comments API, e.g. "threads" → …/threads/:targetId/comments */
@@ -95,6 +102,7 @@ export function CommentComposer<C = unknown>({
   onPosted: (comment: C) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
+  variant?: "default" | "inline";
 }) {
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
@@ -209,7 +217,7 @@ export function CommentComposer<C = unknown>({
     };
   }, [pickerOpen, measureAndSetPos]);
 
-  // Auto-grow the input (capped by max-h-36).
+  // Auto-grow the input (capped by the variant's max height).
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -256,6 +264,99 @@ export function CommentComposer<C = unknown>({
     }
   }
 
+  // ── Inline variant (threads redesign) ─────────────────────────────────────
+  if (variant === "inline") {
+    return (
+      <div className="relative w-full">
+        <div className="rounded-xl border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
+          <form onSubmit={submit} className="flex min-h-[52px] w-full items-center gap-1 px-2 py-1.5">
+            <button
+              ref={emojiBtnRef}
+              type="button"
+              data-comment-emoji-toggle
+              onClick={togglePicker}
+              aria-label="Add emoji"
+              aria-expanded={pickerOpen}
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                pickerOpen
+                  ? "bg-accent-soft text-accent"
+                  : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+              }`}
+            >
+              <Smile strokeWidth={2} size={18} />
+            </button>
+            <textarea
+              ref={ref}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                if (e.key === "Escape" && onCancel) {
+                  e.preventDefault();
+                  onCancel();
+                } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void submit(e as unknown as React.FormEvent);
+                }
+              }}
+              placeholder={placeholder ?? "Add comment"}
+              aria-label="Write a comment"
+              rows={1}
+              maxLength={maxLength}
+              className="max-h-28 min-h-8 min-w-0 flex-1 resize-none self-center overflow-y-auto break-words bg-transparent py-1.5 font-body text-sm leading-5 text-foreground placeholder:text-foreground-muted focus:outline-none"
+            />
+            <div className="flex shrink-0 items-center gap-1.5">
+              {onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="flex h-8 items-center rounded-full px-3 font-body text-[13px] font-semibold text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                >
+                  Cancel
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={saving || !body.trim()}
+                className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? <Spinner size={14} className="text-white" /> : "Send"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
+
+        {pickerOpen && pickerPos && typeof document !== "undefined" &&
+          createPortal(
+            <div
+              ref={portalPickerRef}
+              style={{
+                position:  "fixed",
+                top:       pickerPos.top,
+                bottom:    pickerPos.bottom,
+                left:      pickerPos.left,
+                width:     pickerPos.width,
+                zIndex:    9999,
+                animation: "fadeSlideUp 150ms ease-out",
+              }}
+            >
+              <div
+                className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-md"
+                style={{ height: pickerPos.height }}
+              >
+                <NotoEmojiGrid onSelect={insertEmoji} />
+              </div>
+            </div>,
+            document.body,
+          )
+        }
+      </div>
+    );
+  }
+
+  // ── Default variant (resources / showcase / events) ───────────────────────
   return (
     <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">

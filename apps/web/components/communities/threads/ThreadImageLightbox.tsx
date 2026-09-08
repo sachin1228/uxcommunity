@@ -12,7 +12,8 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type Th
 import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
-import { CommentBox, CommentRow } from "./ThreadComments";
+import { CommentsSection } from "./ThreadComments";
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { isThreadEdited } from "./threadShared";
 
@@ -123,6 +124,17 @@ export function ThreadImageLightbox({
           : comment)
         : list.filter((comment) => comment.id !== id);
     });
+  }
+
+  function handleReactionToggled(commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) {
+    setComments((current) => (current ?? []).map((comment) =>
+      parentId
+        ? comment.id === parentId
+          ? { ...comment, replies: comment.replies.map((reply) => (reply.id === commentId ? { ...reply, reactions } : reply)) }
+          : comment
+        : comment.id === commentId
+          ? { ...comment, reactions }
+          : comment));
   }
 
   // Keep the thread (and therefore the feed card / detail page) in sync with
@@ -298,7 +310,7 @@ export function ThreadImageLightbox({
               </span>
             </div>
 
-            {/* Comments */}
+            {/* Comments — same redesigned section as the thread detail page */}
             <div className="mt-5 border-t border-border pt-4">
               <h3 className="font-display text-sm font-semibold text-foreground">
                 Comments ({totalComments})
@@ -315,56 +327,23 @@ export function ThreadImageLightbox({
                 </p>
               )}
               {comments !== null && !commentsError && (
-                <>
-                  {thread.allow_replies ? (
-                    <div className="mt-3">
-                      <CommentBox
-                        communityId={communityId}
-                        threadId={thread.id}
-                        onPosted={handleCommentPosted}
-                      />
-                    </div>
-                  ) : (
-                    <div className="mt-3 border-y border-border px-3 py-2.5 text-center font-body text-xs text-foreground-subtle">
-                      Replies are closed for this thread.
-                    </div>
-                  )}
-
-                  {comments.length === 0 ? (
-                    <p className="mt-4 font-body text-xs text-foreground-subtle">
-                      No comments yet. Be the first!
-                    </p>
-                  ) : (
-                    <div className="mt-4 space-y-4">
-                      {comments.map((comment) => (
-                        <div key={comment.id} className="space-y-3">
-                          <CommentRow
-                            comment={comment}
-                            communityId={communityId}
-                            threadId={thread.id}
-                            currentUserId={currentUserId}
-                            allowReplies={thread.allow_replies}
-                            onDeleted={handleCommentDeleted}
-                            onReplied={handleCommentPosted}
-                          />
-                          {comment.replies.map((reply) => (
-                            <CommentRow
-                              key={reply.id}
-                              comment={reply}
-                              communityId={communityId}
-                              threadId={thread.id}
-                              currentUserId={currentUserId}
-                              allowReplies={false}
-                              isReply
-                              onDeleted={handleCommentDeleted}
-                              onReplied={handleCommentPosted}
-                            />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
+                <div className="mt-3">
+                  <CommentsSection
+                    communityId={communityId}
+                    threadId={thread.id}
+                    allowReplies={thread.allow_replies}
+                    comments={comments}
+                    currentUserId={currentUserId}
+                    onPosted={handleCommentPosted}
+                    onDeleted={handleCommentDeleted}
+                    onReactionToggled={handleReactionToggled}
+                    emptyState={
+                      <p className="mt-4 font-body text-xs text-foreground-subtle">
+                        No comments yet. Be the first!
+                      </p>
+                    }
+                  />
+                </div>
               )}
             </div>
           </div>
