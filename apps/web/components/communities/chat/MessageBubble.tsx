@@ -925,7 +925,7 @@ export const MessageBubble = memo(function MessageBubble({
       >
         {/* Avatar column — hidden for own messages */}
         {!isMe && (
-          <div className="w-7 shrink-0 mt-0.5">
+          <div className="w-7 shrink-0">
             {showHeader && sender && (
               <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
             )}
