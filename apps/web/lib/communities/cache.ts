@@ -23,6 +23,9 @@ export interface ReplyPreview {
   id: string;
   content: string;
   user_name: string;
+  /** Parent author's id when known — drives the reply-name color. History
+   * rows built by the SQL RPC omit it (the RPC only embeds the name). */
+  user_id?: string | null;
 }
 
 export interface CachedMessage {

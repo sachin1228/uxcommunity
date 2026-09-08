@@ -282,6 +282,7 @@ export function CommunityChat({
       id:        msg.id,
       content:   msg.content || (msg.image_url ? "📷 Image" : ""),
       user_name: msg.users?.name ?? "Unknown",
+      user_id:   msg.user_id,
     });
     // Focus input after setting reply
     setTimeout(() => {

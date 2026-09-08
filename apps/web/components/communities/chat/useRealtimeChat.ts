@@ -125,6 +125,7 @@ export function useRealtimeChat({
                   id:        parentInState.id,
                   content:   parentInState.content ?? "",
                   user_name: parentInState.users?.name ?? "Unknown",
+                  user_id:   parentInState.user_id,
                 };
               }
             }
@@ -165,14 +166,14 @@ export function useRealtimeChat({
 
             fetch(`/api/communities/${targetCommunityId}/messages/${targetReplyToId}`)
               .then((r) => (r.ok ? r.json() : null))
-              .then((preview: { id: string; content: string | null; user_name: string } | null) => {
+              .then((preview: { id: string; content: string | null; user_name: string; user_id: string | null } | null) => {
                 if (!preview) return;
                 setMessages((prev2) => {
                   const msg = prev2.find((m) => m.id === targetMsgId);
                   if (!msg || msg.reply_to) return prev2;
                   const next2 = prev2.map((m) =>
                     m.id === targetMsgId
-                      ? { ...m, reply_to: { id: preview.id, content: preview.content ?? "", user_name: preview.user_name } }
+                      ? { ...m, reply_to: { id: preview.id, content: preview.content ?? "", user_name: preview.user_name, user_id: preview.user_id ?? null } }
                       : m
                   );
                   msgCache.set(targetCommunityId, next2);

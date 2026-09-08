@@ -14,6 +14,7 @@ import { splitContentByMentions } from "@/lib/communities/mentions";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { ModalPortal } from "@/components/ui/Modal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
+import { userColorVar } from "@/lib/communities/user-color";
 
 
 interface MessageBubbleProps {
@@ -59,6 +60,10 @@ function ReplyBubble({
   isMe: boolean;
   onReplyClick: (replyId: string) => void;
 }) {
+  // Reply names get the same per-user color as chat sender names — when the
+  // parent author's id is known (live replies, replies to own messages).
+  // History-built previews omit the id, so they fall back to neutral.
+  const nameColor = reply.user_id ? userColorVar(reply.user_id) : undefined;
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
@@ -68,7 +73,10 @@ function ReplyBubble({
           : "bg-black/10 border-white/15 hover:bg-black/20"
         } transition-colors`}
     >
-      <p className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}>
+      <p
+        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+        style={nameColor && !isMe ? { color: nameColor } : undefined}
+      >
         {reply.user_name}
       </p>
       <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
@@ -120,7 +128,7 @@ function ReactionPills({
 
 /** Image rendered inside a message bubble. */
 function BubbleImage({
-  url, isMe, uploading, onCancel, standalone = false, createdAt, status, isFirstInGroup, onClick,
+  url, isMe, uploading, onCancel, standalone = false, createdAt, status, onClick,
 }: {
   url: string;
   isMe: boolean;
@@ -129,7 +137,6 @@ function BubbleImage({
   standalone?: boolean;
   createdAt?: string;
   status?: CachedMessage["status"];
-  isFirstInGroup?: boolean;
   /** Opens the image in the full-screen viewer. */
   onClick?: () => void;
 }) {
@@ -143,11 +150,9 @@ function BubbleImage({
     >
       <div
         className={standalone
-          ? `relative overflow-hidden ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : "rounded-[10px]"} border-2 ${
-              isMe
-                ? "border-[var(--ds-blue-800)]"
-                : "border-border bg-surface-raised"
-            }`
+          ? // Media sits inside the bubble frame with a hair of its own
+            // rounding (WhatsApp-style); the tail/bg come from the bubble.
+            "relative overflow-hidden rounded-[8px]"
           : "relative"}
       >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -158,9 +163,9 @@ function BubbleImage({
           e.stopPropagation();
           onClick?.();
         }}
-        className={`block max-w-full object-cover ${
-          standalone ? "" : "rounded-xl"
-        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
+        className={`block max-w-full object-cover rounded-[8px] ${
+          isMe ? "opacity-95" : ""
+        } ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
         draggable={false}
@@ -583,15 +588,13 @@ function renderRichChunk(chunk: string, isMe: boolean, keyBase: number): React.R
   return parts;
 }
 
-/** Highlighted chip for a `@Name` mention inside a message bubble. */
+/** Highlighted `@Name` mention inside a message bubble — blue text, no chip bg.
+ *  On the sender's own blue bubble a light blue keeps it readable. */
 function MentionChip({ text, isMe }: { text: string; isMe: boolean }) {
   return (
     <span
-      className={`inline-block max-w-full rounded-[5px] px-[3px] break-normal ${
-        isMe
-          ? "bg-black/25 text-accent-foreground"
-          : "bg-accent/15 text-accent"
-      }`}
+      className="inline-block max-w-full break-normal font-semibold"
+      style={{ color: isMe ? "var(--chat-mention-own)" : "var(--ds-blue-700)" }}
     >
       {text}</span>
   );
@@ -772,15 +775,31 @@ function isEmojiOnly(text: string): boolean {
   return remainder.length === 0;
 }
 
+/** Colored sender-name row rendered inside bubbles, WhatsApp-style. */
+function SenderName({ name, userId, className = "" }: { name: string; userId: string | null; className?: string }) {
+  return (
+    <p
+      className={`font-body text-xs font-semibold leading-4 break-words ${className}`}
+      style={{ color: userColorVar(userId) }}
+    >
+      {name}
+    </p>
+  );
+}
+
 /** Placeholder shown for soft-deleted messages. */
 function DeletedBubble({
   isMe,
   createdAt,
   isFirstInGroup,
+  senderName,
+  senderId,
 }: {
   isMe: boolean;
   createdAt: string;
   isFirstInGroup: boolean;
+  senderName?: string | null;
+  senderId?: string | null;
 }) {
   return (
     <div
@@ -795,6 +814,9 @@ function DeletedBubble({
           side={isMe ? "right" : "left"}
           className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
         />
+      )}
+      {!isMe && senderName && (
+        <SenderName name={senderName} userId={senderId ?? null} className="mr-1" />
       )}
       <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
       <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
@@ -898,7 +920,7 @@ export const MessageBubble = memo(function MessageBubble({
       >
         {/* Avatar column — hidden for own messages */}
         {!isMe && (
-          <div className="w-7 shrink-0 mt-0.5">
+          <div className="w-7 shrink-0">
             {showHeader && sender && (
               <ChatAvatar name={sender.name} url={sender.avatar_url} size={7} />
             )}
@@ -907,15 +929,14 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Content column */}
         <div className="min-w-0 max-w-[65%]">
-          {/* Sender name — hidden for the current user's own messages */}
-          {showHeader && sender && !isDeleted && !isMe && (
-            <p className="font-body text-[11px] font-semibold mb-1 ml-0.5 text-foreground-muted">
-              <span>{sender.name}</span>
-            </p>
-          )}
-
           {isDeleted ? (
-            <DeletedBubble isMe={isMe} createdAt={msg.created_at} isFirstInGroup={isFirstInGroup} />
+            <DeletedBubble
+              isMe={isMe}
+              createdAt={msg.created_at}
+              isFirstInGroup={isFirstInGroup}
+              senderName={sender?.name}
+              senderId={msg.user_id}
+            />
           ) : isEmojiMsg ? (
             /* ── Big emoji — no bubble background ── */
             <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
@@ -929,7 +950,7 @@ export const MessageBubble = memo(function MessageBubble({
                     {msg.edited_at && (
                       <span className="font-body text-[10px] text-foreground-muted/60">edited</span>
                     )}
-                    <span className="font-mono text-[10px] text-foreground-muted/70">
+                    <span className="text-[10px] text-foreground-muted/70">
                       {fmtTime(msg.created_at)}
                     </span>
                     {isMe && msg.status === "sending" && (
@@ -973,16 +994,18 @@ export const MessageBubble = memo(function MessageBubble({
                 data-side={isMe ? "right" : "left"}
               >
                 <div
-                  className={`relative select-none ${
-                    imageOnly
-                      ? "flex flex-col items-start"
-                      : `relative rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm ${
-                          isMe
-                            ? msg.status === "failed"
-                              ? "bg-red-500/80"
-                              : "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
-                            : "bg-surface-raised"
-                        }`
+                  className={`relative select-none rounded-[10px] ${
+                    isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""
+                  } shadow-sm ${
+                    isMe
+                      ? msg.status === "failed"
+                        ? "bg-red-500/80"
+                        : "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
+                      : "bg-surface-raised"
+                  } ${
+                    // Media bubbles keep a thin frame around the image
+                    // (WhatsApp-style); text-only bubbles use the roomier padding.
+                    imageUrl ? "p-1" : "px-3 pt-2 pb-1.5"
                   }`}
                 >
                   {isFirstInGroup && (
@@ -995,6 +1018,17 @@ export const MessageBubble = memo(function MessageBubble({
                         : "text-surface-raised"}
                     />
                   )}
+                  {/* Sender name inside the bubble, WhatsApp-style — colored per
+                      user (own messages skip it, matching WhatsApp). On media
+                      bubbles the name carries its own padding since the bubble
+                      only wraps the image with a thin frame. */}
+                  {!isMe && showHeader && sender && (
+                    <SenderName
+                      name={sender.name}
+                      userId={msg.user_id}
+                      className={imageUrl ? "mb-1 pl-1" : ""}
+                    />
+                  )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
                     <BubbleImage
@@ -1004,22 +1038,23 @@ export const MessageBubble = memo(function MessageBubble({
                       standalone={imageOnly}
                       createdAt={msg.created_at}
                       status={msg.status}
-                      isFirstInGroup={isFirstInGroup}
                       onCancel={() => onCancelSend(msg.id)}
                       onClick={() => onImageClick(imageUrl)}
                     />
                   )}
                   {msg.content && (
-                    <MessageContent
-                      content={msg.content}
-                      mentions={msg.mentions ?? []}
-                      isMe={isMe}
-                      showPreview={msg.status !== "failed"}
-                      animate={animate}
-                    />
+                    <div className={imageUrl ? "pl-1" : ""}>
+                      <MessageContent
+                        content={msg.content}
+                        mentions={msg.mentions ?? []}
+                        isMe={isMe}
+                        showPreview={msg.status !== "failed"}
+                        animate={animate}
+                      />
+                    </div>
                   )}
                   {!imageOnly && (
-                    <div className="flex items-center justify-end gap-1 mt-1">
+                    <div className={`flex items-center justify-end gap-1 mt-0 ${imageUrl ? "pr-1" : ""}`}>
                       {msg.edited_at && (
                         <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
                           edited
