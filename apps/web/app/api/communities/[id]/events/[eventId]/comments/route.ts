@@ -3,11 +3,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { enrichCommentReactions, nestAndSortComments } from "@/lib/communities/comment-reactions";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: Params,
 ) {
   let session;
@@ -47,8 +49,9 @@ export async function GET(
       ? { name: userMap[c.user_id].name, avatar_url: profileMap[c.user_id]?.avatar_url ?? null }
       : null,
   }));
-
-  return NextResponse.json({ comments });
+  const withReactions = await enrichCommentReactions(db, comments, "event_comment_id", session.userId!);
+  const sort = req.nextUrl.searchParams.get("sort") === "popular" ? "popular" : "newest";
+  return NextResponse.json({ comments: nestAndSortComments(withReactions, sort) });
 }
 
 export async function POST(
@@ -109,6 +112,8 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  void publishRealtimeBatch([{ room: realtimeRooms.eventComments(eventId), topic: "comment", data: { user_id: userId } }]);
 
   const href = eventHref(communityId, eventId);
   deferNotification({

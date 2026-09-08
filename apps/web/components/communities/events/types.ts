@@ -1,3 +1,5 @@
+import type { CommunityCommentBase } from "../comment-types";
+
 export interface CommunityEvent {
   id: string;
   community_id: string;
@@ -33,7 +35,7 @@ export interface EventRsvp {
   users: { name: string; avatar_url: string | null } | null;
 }
 
-export interface EventComment {
+export interface EventComment extends CommunityCommentBase {
   id: string;
   event_id: string;
   user_id: string;

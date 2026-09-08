@@ -1,3 +1,5 @@
+import type { CommunityCommentBase } from "../comment-types";
+
 export type ShowcaseCategory = "ui_ux" | "branding" | "illustration" | "motion" | "product" | "other";
 
 export const SHOWCASE_CATEGORIES: { value: ShowcaseCategory | "all"; label: string }[] = [
@@ -11,7 +13,7 @@ export interface ShowcasePost {
   author: { name: string; avatar_url: string | null };
 }
 
-export interface ShowcaseComment {
+export interface ShowcaseComment extends CommunityCommentBase {
   id: string; post_id: string; user_id: string; parent_id: string | null; body: string; created_at: string; updated_at: string;
   users: { name: string; avatar_url: string | null } | null;
   replies: ShowcaseComment[];

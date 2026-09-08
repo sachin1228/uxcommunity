@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferNotification, resourceHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { enrichCommentReactions, nestAndSortComments } from "@/lib/communities/comment-reactions";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -47,7 +48,7 @@ async function attachUsers(
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; resourceId: string }> },
 ) {
   let session;
@@ -85,16 +86,9 @@ export async function GET(
   }
 
   const withUsers = await attachUsers(db, (data ?? []) as Array<Record<string, unknown>>);
-
-  // Nest replies under their parent
-  const topLevel = withUsers.filter((c) => !c.parent_id);
-  const replies = withUsers.filter((c) => c.parent_id);
-  for (const reply of replies) {
-    const parent = topLevel.find((c) => c.id === reply.parent_id);
-    if (parent) (parent.replies as typeof withUsers).push(reply);
-  }
-
-  return NextResponse.json({ comments: topLevel });
+  const withReactions = await enrichCommentReactions(db, withUsers as Array<EnrichedRow & { id: string; created_at: string; parent_id: string | null }>, "resource_comment_id", session.userId!);
+  const sort = req.nextUrl.searchParams.get("sort") === "popular" ? "popular" : "newest";
+  return NextResponse.json({ comments: nestAndSortComments(withReactions, sort) });
 }
 
 export async function POST(

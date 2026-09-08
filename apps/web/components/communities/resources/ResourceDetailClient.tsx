@@ -13,6 +13,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { CommentComposer, renderEmojiText } from "../CommentComposer";
+import { CommentSection } from "../CommentSection";
 
 function formatRelativeDate(value: string) {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -271,8 +272,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     setResource((r) => ({ ...r, comment_count: Math.max(0, r.comment_count - 1) }));
   }
 
-  const totalComments = comments.reduce((acc, c) => acc + 1 + (c.replies?.length ?? 0), 0);
-
   return (
     <>
       <div className="flex-1 overflow-y-auto">
@@ -293,56 +292,16 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
               />
           </div>
 
-          {/* Comments section */}
-          <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
-            <div className="mb-4 flex items-center gap-2">
-              <span className="font-display text-sm font-semibold text-foreground">
-                {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            <CommentBox
+          <div className="mt-6">
+            <CommentSection
+              comments={comments}
               communityId={communityId}
-              resourceId={resource.id}
+              kind="resources"
+              targetId={resource.id}
+              currentUserId={currentUserId}
               onPosted={handleCommentPosted}
+              onDeleted={handleCommentDeleted}
             />
-
-            {comments.length > 0 && (
-              <div className="mt-6 space-y-5">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="space-y-3">
-                    <CommentRow
-                      comment={comment}
-                      communityId={communityId}
-                      resourceId={resource.id}
-                      currentUserId={currentUserId}
-                      onDeleted={handleCommentDeleted}
-                      onReplied={handleCommentPosted}
-                    />
-                    {(comment.replies ?? []).map((reply) => (
-                      <CommentRow
-                        key={reply.id}
-                        comment={reply}
-                        communityId={communityId}
-                        resourceId={resource.id}
-                        currentUserId={currentUserId}
-                        isReply
-                        onDeleted={handleCommentDeleted}
-                        onReplied={handleCommentPosted}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {comments.length === 0 && (
-              <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-                <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-              </div>
-            )}
           </div>
         </div>
       </div>

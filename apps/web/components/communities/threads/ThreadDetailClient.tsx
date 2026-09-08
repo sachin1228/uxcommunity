@@ -2,14 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { MessageSquare } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
-import { Avatar, CommentBox, CommentRow } from "./ThreadComments";
+import { CommentSection } from "../CommentSection";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
 import {
@@ -253,8 +252,6 @@ export function ThreadDetailClient({
     changeCommentCount(-removed);
   }
 
-  const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div
@@ -293,66 +290,17 @@ export function ThreadDetailClient({
             />
         </div>
 
-        {/* ── Comments section ── */}
-        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
-          <div className="mb-4 flex items-center gap-2">
-            <span className="font-display text-sm font-semibold text-foreground">
-              {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
-            </span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {/* New comment box */}
-          {thread.allow_replies ? (
-            <CommentBox
-              communityId={communityId}
-              threadId={thread.id}
-              onPosted={handleCommentPosted}
-            />
-          ) : (
-            <div className="border-y border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
-              Replies are closed for this thread.
-            </div>
-          )}
-
-          {/* Comment list */}
-          {comments.length > 0 && (
-            <div className="mt-6 space-y-5">
-              {comments.map((comment) => (
-                <div key={comment.id} className="space-y-3">
-                  <CommentRow
-                    comment={comment}
-                    communityId={communityId}
-                    threadId={thread.id}
-                    currentUserId={currentUserId}
-                    allowReplies={thread.allow_replies}
-                    onDeleted={handleCommentDeleted}
-                    onReplied={handleCommentPosted}
-                  />
-                  {comment.replies.map((reply) => (
-                    <CommentRow
-                      key={reply.id}
-                      comment={reply}
-                      communityId={communityId}
-                      threadId={thread.id}
-                      currentUserId={currentUserId}
-                      allowReplies={false}
-                      isReply
-                      onDeleted={handleCommentDeleted}
-                      onReplied={handleCommentPosted}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {comments.length === 0 && (
-            <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-              <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-              <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-            </div>
-          )}
+        <div className="mt-6">
+          <CommentSection
+            comments={comments}
+            communityId={communityId}
+            kind="threads"
+            targetId={thread.id}
+            currentUserId={currentUserId}
+            allowReplies={thread.allow_replies}
+            onPosted={handleCommentPosted}
+            onDeleted={handleCommentDeleted}
+          />
         </div>
       </div>
     </div>

@@ -256,11 +256,12 @@ export function CommentComposer<C = unknown>({
     }
   }
 
+  const remaining = maxLength - body.length;
+
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
+    <div className="relative w-full rounded-2xl border border-border bg-background p-2 shadow-sm transition-all duration-200 focus-within:border-accent/40 focus-within:bg-surface focus-within:shadow-md">
     <form onSubmit={submit} className="w-full">
-      {/* ── Single row: avatar · input · cancel · actions ── */}
-      <div className="flex w-full items-end gap-2">
+      <div className="flex w-full items-end gap-2.5">
         {currentUser && (
           <div className="hidden shrink-0 self-center sm:block">
             <Avatar name={currentUser.name} avatarUrl={currentUser.avatar_url} size="md" />
@@ -280,10 +281,11 @@ export function CommentComposer<C = unknown>({
               void submit(e as unknown as React.FormEvent);
             }
           }}
-          placeholder={placeholder ?? "Post your comment"}
-          rows={1}
+          placeholder={placeholder ?? "Share your thoughts…"}
+          aria-label={parentId ? "Write a reply" : "Write a comment"}
+          rows={parentId ? 1 : 2}
           maxLength={maxLength}
-          className="max-h-36 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
+          className="max-h-36 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 font-body text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
         />
         {onCancel && (
           <button type="button" onClick={onCancel} className="shrink-0 pb-1 font-body text-xs text-foreground-subtle hover:text-foreground">
@@ -327,7 +329,11 @@ export function CommentComposer<C = unknown>({
         </div>
       </div>
 
-      {error && <p className="mt-1.5 px-1 font-body text-xs text-red-400">{error}</p>}
+      <div className="flex items-center justify-between gap-3 px-1 pt-1">
+        <span className="font-body text-[11px] text-foreground-subtle">Press {"⌘"}/Ctrl + Enter to post</span>
+        {remaining <= 250 && <span className={`font-body text-[11px] tabular-nums ${remaining < 50 ? "text-destructive" : "text-foreground-subtle"}`}>{remaining} left</span>}
+      </div>
+      {error && <p className="mt-1.5 px-1 font-body text-xs text-destructive" role="alert">{error}</p>}
     </form>
 
     {/* ── Emoji picker — portal at document.body, fixed relative to the emoji

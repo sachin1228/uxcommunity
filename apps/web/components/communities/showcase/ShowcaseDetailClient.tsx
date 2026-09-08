@@ -16,6 +16,7 @@ import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { CommentComposer, renderEmojiText } from "../CommentComposer";
+import { CommentSection } from "../CommentSection";
 
 function Composer({
   communityId,
@@ -258,49 +259,25 @@ export function ShowcaseDetailClient({
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
-        {post.allow_replies !== false && (
-        <section className={`mt-6 ${communityFeedLayout.card}`}>
-          <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
-            {post.comment_count}{" "}
-            {post.comment_count === 1 ? "Comment" : "Comments"}
-          </h2>
-          <Composer
+        <div className="mt-6">
+          <CommentSection
+            comments={comments}
             communityId={communityId}
-            postId={post.id}
+            kind="showcase"
+            targetId={post.id}
+            currentUserId={currentUserId}
+            allowReplies={post.allow_replies !== false}
+            placeholder="Leave constructive feedback…"
+            maxLength={1000}
             onPosted={posted}
+            onDeleted={(id, parentId) => {
+              const found = parentId
+                ? comments.flatMap((comment) => comment.replies).find((comment) => comment.id === id)
+                : comments.find((comment) => comment.id === id);
+              if (found) deleted(found);
+            }}
           />
-          <div className="mt-6 flex flex-col gap-5">
-            {comments.map((comment) => (
-              <div key={comment.id} className="flex flex-col gap-3">
-                <CommentRow
-                  comment={comment}
-                  communityId={communityId}
-                  postId={post.id}
-                  currentUserId={currentUserId}
-                  onPosted={posted}
-                  onDeleted={deleted}
-                />
-                {comment.replies.map((reply) => (
-                  <CommentRow
-                    key={reply.id}
-                    comment={reply}
-                    communityId={communityId}
-                    postId={post.id}
-                    currentUserId={currentUserId}
-                    onPosted={posted}
-                    onDeleted={deleted}
-                  />
-                ))}
-              </div>
-            ))}
-            {!comments.length && (
-              <p className="text-center font-body text-sm text-foreground-muted">
-                No comments yet. Be the first!
-              </p>
-            )}
-          </div>
-        </section>
-        )}
+        </div>
       </div>
       {editing && (
         <CreateShowcaseModal

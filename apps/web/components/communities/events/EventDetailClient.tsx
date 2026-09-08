@@ -14,6 +14,7 @@ import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
 import { CommentComposer, renderEmojiText } from "../CommentComposer";
+import { CommentSection } from "../CommentSection";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -289,17 +290,15 @@ export function EventDetailClient({
 
   // ── Comment actions passed to CommentNode ──
 
-  const handleDeleteComment = useCallback((commentId: string) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
+  const handleDeleteComment = useCallback((commentId: string, parentId: string | null = null) => {
+    setComments((previous) => parentId
+      ? previous.map((comment) => comment.id === parentId
+        ? { ...comment, replies: (comment.replies ?? []).filter((reply) => reply.id !== commentId) }
+        : comment)
+      : previous.filter((comment) => comment.id !== commentId));
   }, []);
 
-  const handleReplyPosted = useCallback((comment: EventComment) => {
-    setComments((prev) => [...prev, comment]);
-  }, []);
-
-  // ── Flat lists for rendering (ThreadDetailClient-style) ──
-  const rootComments = comments.filter((c) => !c.parent_id);
-  const totalCommentCount = comments.length;
+  const rootComments = comments.filter((comment) => !comment.parent_id);
   const topLevelCount = rootComments.length;
 
 
@@ -373,70 +372,24 @@ export function EventDetailClient({
 
           {/* ── Discussion tab ──────────────────────────────────── */}
           {activeTab === "discussion" && (
-            <div className="mt-5 space-y-5">
-              {/* Composer */}
-              <CommentComposer
+            <div className="mt-5">
+              <CommentSection
+                comments={rootComments}
                 communityId={communityId}
                 kind="events"
                 targetId={event.id}
-                placeholder="Write a comment… (⌘↵ to post)"
+                currentUserId={currentUserId}
+                loading={commentsLoading}
+                placeholder="Share something with attendees…"
                 maxLength={2000}
-                onPosted={(comment) => setComments((prev) => [...prev, comment as EventComment])}
+                compact
+                onPosted={(comment) => setComments((previous) => comment.parent_id
+                  ? previous.map((parent) => parent.id === comment.parent_id
+                    ? { ...parent, replies: [...(parent.replies ?? []), comment] }
+                    : parent)
+                  : [...previous, { ...comment, replies: [] }])}
+                onDeleted={handleDeleteComment}
               />
-
-              {/* Comments heading */}
-              {!commentsLoading && (
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="font-display text-sm font-semibold text-foreground">
-                    {totalCommentCount} {totalCommentCount === 1 ? "Comment" : "Comments"}
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-              )}
-
-              {/* Comments list */}
-              {commentsLoading ? (
-                <div className="flex items-center justify-center border-t border-border py-12">
-                  <Spinner size={22} />
-                </div>
-              ) : rootComments.length === 0 ? (
-                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {rootComments.map((root) => {
-                    const replies = comments.filter((c) => c.parent_id === root.id);
-                    return (
-                      <div key={root.id} className="space-y-3">
-                        <CommentNode
-                          comment={root}
-                          currentUserId={currentUserId}
-                          communityId={communityId}
-                          eventId={event.id}
-                          allowReply
-                          onDelete={handleDeleteComment}
-                          onReplyPosted={handleReplyPosted}
-                        />
-                        {replies.map((reply) => (
-                          <CommentNode
-                            key={reply.id}
-                            comment={reply}
-                            currentUserId={currentUserId}
-                            communityId={communityId}
-                            eventId={event.id}
-                            isReply
-                            allowReply={false}
-                            onDelete={handleDeleteComment}
-                            onReplyPosted={handleReplyPosted}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 

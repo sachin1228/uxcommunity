@@ -1,3 +1,5 @@
+import type { CommunityCommentBase } from "../comment-types";
+
 /** Max body (title) length for threads — mirrors the DB column + API validation. */
 export const THREAD_BODY_MAX_LENGTH = 2000;
 
@@ -68,7 +70,7 @@ export interface ProfileThread extends CommunityThread {
   community: { name: string } | null;
 }
 
-export interface ThreadComment {
+export interface ThreadComment extends CommunityCommentBase {
   id: string;
   thread_id: string;
   user_id: string;

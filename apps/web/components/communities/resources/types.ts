@@ -1,3 +1,5 @@
+import type { CommunityCommentBase } from "../comment-types";
+
 export const RESOURCE_TYPES = [
   { value: "figma",       label: "Figma",        description: "Design files, prototypes, FigJam boards" },
   { value: "article",     label: "Article",       description: "Blog posts, tutorials, case studies" },
@@ -67,7 +69,7 @@ export interface CommunityResource {
   } | null;
 }
 
-export interface ResourceComment {
+export interface ResourceComment extends CommunityCommentBase {
   id: string;
   resource_id: string;
   user_id: string;

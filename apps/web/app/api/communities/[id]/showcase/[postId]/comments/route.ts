@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { enrichCommentReactions, nestAndSortComments } from "@/lib/communities/comment-reactions";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
   const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
@@ -25,15 +26,16 @@ async function enrich(db: ReturnType<typeof createServiceClient>, rows: Array<Re
   return rows.map((row) => ({ ...row, users: { name: names[row.user_id as string] ?? "Community member", avatar_url: avatars[row.user_id as string] ?? null }, replies: [] as Record<string, unknown>[] }));
 }
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
   const { id, postId } = await params; const db = createServiceClient();
   if (!(await access(db, id, postId, session.userId!))) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   const { data, error } = await db.from("showcase_comments").select("id, post_id, user_id, parent_id, body, created_at, updated_at").eq("post_id", postId).order("created_at");
   if (error) return NextResponse.json({ error: "Failed to load comments." }, { status: 500 });
-  const comments = await enrich(db, (data ?? []) as Array<Record<string, unknown>>); const top = comments.filter((comment) => !comment.parent_id);
-  for (const reply of comments.filter((comment) => comment.parent_id)) { const parent = top.find((comment) => comment.id === reply.parent_id); if (parent) parent.replies.push(reply); }
-  return NextResponse.json({ comments: top });
+  const comments = await enrich(db, (data ?? []) as Array<Record<string, unknown>>);
+  const withReactions = await enrichCommentReactions(db, comments as Array<Record<string, unknown> & { id: string; created_at: string; parent_id: string | null }>, "showcase_comment_id", session.userId!);
+  const sort = request.nextUrl.searchParams.get("sort") === "popular" ? "popular" : "newest";
+  return NextResponse.json({ comments: nestAndSortComments(withReactions, sort) });
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
