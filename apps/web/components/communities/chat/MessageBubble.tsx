@@ -1028,7 +1028,7 @@ export const MessageBubble = memo(function MessageBubble({
                     <SenderName
                       name={sender.name}
                       userId={msg.user_id}
-                      className={imageOnly ? "mb-1" : ""}
+                      className={imageOnly ? "mb-1 pl-1" : ""}
                     />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
