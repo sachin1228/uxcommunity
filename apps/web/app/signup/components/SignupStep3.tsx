@@ -93,12 +93,18 @@ export function SignupStep3({
       <button
         type="button"
         onClick={onSave}
-        disabled={loading}
+        disabled={loading || !uploadPreviewUrl}
         className="flex w-full items-center justify-center gap-2 rounded-md bg-accent py-2.5 font-body text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {loading && <Spinner className="size-4 text-white" />}
         {loading ? "Finishing signup…" : "Continue →"}
       </button>
+
+      {!uploadPreviewUrl && (
+        <p className="mt-3 text-center font-body text-xs text-foreground-muted">
+          Select a picture to continue — or use Skip to finish without one.
+        </p>
+      )}
     </div>
   );
 }
