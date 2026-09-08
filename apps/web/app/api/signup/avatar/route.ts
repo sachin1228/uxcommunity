@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { identity, profile, interest_ids, token } = parsed.data;
+  const { identity, profile, token } = parsed.data;
   const avatarSource = parsed.data.avatar_source ?? null;
   const preUploadedUrl = parsed.data.avatar_url ?? null;
 
@@ -139,7 +139,9 @@ export async function POST(request: NextRequest) {
     p_city_id: profile.city_id,
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,
-    p_interest_ids: [...new Set(interest_ids)],
+    // Interests are no longer collected during signup — members discover and
+    // join interest communities from Explore Communities instead.
+    p_interest_ids: [],
     p_avatar_url: profilePictureUrl,
     p_avatar_source: profilePictureUrl ? "upload" : null,
     p_invitation_token: token ?? null,
@@ -160,10 +162,10 @@ export async function POST(request: NextRequest) {
 
   const userId = data[0].user_id as string;
 
-  // Join every profile-based community (General + city + sector + interests)
-  // server-side so the sidebar shows the full list the first time the dashboard
-  // loads. Non-fatal if it fails — the dashboard layout retries exactly once via
-  // the designer_profiles.communities_auto_joined flag.
+  // Join every profile-based community (General + city + sector) server-side so
+  // the sidebar shows the full list the first time the dashboard loads.
+  // Non-fatal if it fails — the dashboard layout retries exactly once via the
+  // designer_profiles.communities_auto_joined flag.
   let joinedCommunities = 0;
   try {
     const joined = await autoJoinCommunities(userId);

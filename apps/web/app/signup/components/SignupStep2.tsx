@@ -37,7 +37,7 @@ export function SignupStep2({
       <h2 className="font-display text-2xl font-semibold text-foreground mb-1">
         Complete your profile
       </h2>
-      <p className="font-body text-sm text-foreground-muted mb-7">Step 2 of 4</p>
+      <p className="font-body text-sm text-foreground-muted mb-7">Step 2 of 3</p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && (
