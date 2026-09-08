@@ -89,7 +89,7 @@ export function SignupStep3({
         >
           <Upload strokeWidth={2.5} aria-hidden="true" />
           <span className="font-body text-sm font-medium">Upload a profile picture</span>
-          <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP · max 3 MB</span>
+          <span className="font-body text-xs text-foreground-muted">JPEG, PNG or WebP</span>
         </button>
       )}
 
