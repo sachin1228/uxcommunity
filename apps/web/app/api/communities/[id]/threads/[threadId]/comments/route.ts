@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -94,7 +95,10 @@ export async function GET(
     if (parent) (parent.replies as typeof withUsers).push(reply);
   }
 
-  return NextResponse.json({ comments: topLevel });
+  // Grouped emoji reactions per comment (empty lists when none / table missing)
+  const withReactions = await attachCommentReactions(db, topLevel, session.userId!);
+
+  return NextResponse.json({ comments: withReactions });
 }
 
 export async function POST(
@@ -201,6 +205,10 @@ export async function POST(
     });
   }
 
-  const [enriched] = await attachUsers(db, [inserted as Record<string, unknown>]);
+  const [enriched] = await attachCommentReactions(
+    db,
+    await attachUsers(db, [inserted as Record<string, unknown>]),
+    userId,
+  );
   return NextResponse.json({ comment: enriched }, { status: 201 });
 }

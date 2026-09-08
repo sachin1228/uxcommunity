@@ -9,7 +9,8 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
-import { Avatar, CommentBox, CommentRow } from "./ThreadComments";
+import { CommentsSection } from "./ThreadComments";
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
 import {
@@ -253,6 +254,14 @@ export function ThreadDetailClient({
     changeCommentCount(-removed);
   }
 
+  function handleReactionToggled(commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) {
+    writeComments((current) => parentId
+      ? current.map((comment) => comment.id === parentId
+        ? { ...comment, replies: comment.replies.map((reply) => (reply.id === commentId ? { ...reply, reactions } : reply)) }
+        : comment)
+      : current.map((comment) => (comment.id === commentId ? { ...comment, reactions } : comment)));
+  }
+
   const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
 
   return (
@@ -294,66 +303,32 @@ export function ThreadDetailClient({
         </div>
 
         {/* ── Comments section ── */}
-        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
-          <div className="mb-4 flex items-center gap-2">
-            <span className="font-display text-sm font-semibold text-foreground">
-              {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
-            </span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
-
-          {/* New comment box */}
-          {thread.allow_replies ? (
-            <CommentBox
+        <section
+          aria-labelledby="thread-comments-heading"
+          className={`mt-6 rounded-xl border border-border bg-surface p-4 sm:p-5`}
+        >
+          <h2 id="thread-comments-heading" className="font-display text-base font-semibold tracking-tight text-foreground">
+            Comments
+          </h2>
+          <div className="mt-3">
+            <CommentsSection
               communityId={communityId}
               threadId={thread.id}
+              allowReplies={thread.allow_replies}
+              comments={comments}
+              currentUserId={currentUserId}
               onPosted={handleCommentPosted}
-            />
-          ) : (
-            <div className="border-y border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
-              Replies are closed for this thread.
-            </div>
-          )}
-
-          {/* Comment list */}
-          {comments.length > 0 && (
-            <div className="mt-6 space-y-5">
-              {comments.map((comment) => (
-                <div key={comment.id} className="space-y-3">
-                  <CommentRow
-                    comment={comment}
-                    communityId={communityId}
-                    threadId={thread.id}
-                    currentUserId={currentUserId}
-                    allowReplies={thread.allow_replies}
-                    onDeleted={handleCommentDeleted}
-                    onReplied={handleCommentPosted}
-                  />
-                  {comment.replies.map((reply) => (
-                    <CommentRow
-                      key={reply.id}
-                      comment={reply}
-                      communityId={communityId}
-                      threadId={thread.id}
-                      currentUserId={currentUserId}
-                      allowReplies={false}
-                      isReply
-                      onDeleted={handleCommentDeleted}
-                      onReplied={handleCommentPosted}
-                    />
-                  ))}
+              onDeleted={handleCommentDeleted}
+              onReactionToggled={handleReactionToggled}
+              emptyState={
+                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {comments.length === 0 && (
-            <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-              <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-              <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-            </div>
-          )}
-        </div>
+              }
+            />
+          </div>
+        </section>
       </div>
     </div>
   );
