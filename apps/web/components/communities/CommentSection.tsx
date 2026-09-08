@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { ArrowUpDown, ChevronDown, MessageSquare, MoreVertical, Plus, Smile, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
@@ -14,6 +14,24 @@ import {
   type CommunityCommentBase,
 } from "./comment-types";
 
+const subscribeToHydration = () => () => {};
+
+function useHydrated() {
+  return useSyncExternalStore(subscribeToHydration, () => true, () => false);
+}
+
+function absoluteDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(new Date(value));
+}
+
 function relativeTime(value: string) {
   const seconds = Math.max(1, Math.floor((Date.now() - Date.parse(value)) / 1000));
   if (seconds < 60) return "just now";
@@ -23,7 +41,7 @@ function relativeTime(value: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(value));
 }
 
 function ReactionBar({ comment, endpoint }: { comment: CommunityCommentBase; endpoint: string }) {
@@ -139,6 +157,7 @@ function CommentItem<C extends CommunityCommentBase>({
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const hydrated = useHydrated();
   const name = comment.users?.name ?? "Community member";
   const base = `/api/communities/${communityId}/${kind}/${targetId}/comments/${comment.id}`;
 
@@ -164,7 +183,9 @@ function CommentItem<C extends CommunityCommentBase>({
         <header className="flex min-w-0 items-center gap-2 pr-8">
           <span className="truncate font-body text-sm font-semibold text-foreground">{name}</span>
           <span aria-hidden className="text-foreground-subtle">•</span>
-          <time dateTime={comment.created_at} title={new Date(comment.created_at).toLocaleString()} className="shrink-0 font-body text-sm text-foreground-muted">{relativeTime(comment.created_at)}</time>
+          <time dateTime={comment.created_at} title={absoluteDate(comment.created_at)} className="shrink-0 font-body text-sm text-foreground-muted">
+            {hydrated ? relativeTime(comment.created_at) : absoluteDate(comment.created_at)}
+          </time>
         </header>
         {comment.user_id === currentUserId && (
           <div className="absolute right-0 top-0">
