@@ -30,6 +30,7 @@
     "next": "latest",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-truncate-markup": "^5.1.2",
     "resend": "^4.0.0",
     "three": "^0.185.1",
     "zod": "^3.23.8"
