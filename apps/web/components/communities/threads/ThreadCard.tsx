@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
+import TruncateMarkup from "react-truncate-markup";
 import {
   Bookmark, Flag,
   MoreHorizontal, Paperclip, Pencil, Trash2,
@@ -12,8 +13,6 @@ import type { CommunityThread } from "./types";
 import { THREAD_CATEGORIES } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-
-const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 import { renderWithLinks } from "./renderWithLinks";
 import { EditThreadModal } from "./EditThreadModal";
@@ -86,52 +85,8 @@ export function ThreadCard({
   const interactionErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [titleExpanded, setTitleExpanded] = useState(false);
-  const [titleOverflow, setTitleOverflow] = useState(false);
-  const [morePos, setMorePos] = useState<{ left: number; bottom: number } | null>(null);
+  const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement | null>(null);
-
-  // Collapse long thread bodies to two lines on feed cards and offer a "…More" toggle.
-  // The toggle sits right after the LAST VISIBLE LINE of text (same line, same row) so it
-  // hugs the final word — even when the last clamped line is blank (e.g. a paragraph break
-  // lands on line 2). Re-measured on resize and once web fonts load.
-  useIsomorphicLayoutEffect(() => {
-    if (isDetail) return;
-    setTitleExpanded(false);
-    const el = titleRef.current;
-    if (!el) return;
-
-    const measure = () => {
-      try {
-        setTitleOverflow(el.scrollHeight - el.clientHeight > 1);
-        const box = el.getBoundingClientRect();
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const rects = Array.from(range.getClientRects()).filter(
-          (r) => r.width > 0 && r.bottom <= box.bottom + 1,
-        );
-        const lastLine = rects[rects.length - 1];
-        if (!lastLine) return;
-        // Clamp so the toggle always fits inside the card (covers the tail on full lines).
-        const left = Math.min(lastLine.right - box.left, box.width - 64);
-        setMorePos({
-          left: Math.max(0, left),
-          bottom: Math.max(0, box.bottom - lastLine.bottom),
-        });
-      } catch {
-        setMorePos(null);
-      }
-    };
-
-    measure();
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(measure).catch(() => {});
-    }
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(measure);
-      observer.observe(el);
-      return () => observer.disconnect();
-    }
-  }, [isDetail, thread.title]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -497,26 +452,47 @@ export function ThreadCard({
           <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
             {renderWithLinks(thread.title, false)}
           </h1>
+        ) : titleExpanded ? (
+          <h3
+            id={titleId}
+            ref={titleRef}
+            tabIndex={-1}
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+          >
+            {renderWithLinks(thread.title, true)}
+          </h3>
         ) : (
-          <div className="relative">
+          <TruncateMarkup
+            lines={2}
+            ellipsis={
+              <span className="whitespace-nowrap">
+                {"\u2060… "}
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  aria-controls={titleId}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setTitleExpanded(true);
+                    requestAnimationFrame(() => titleRef.current?.focus({ preventScroll: true }));
+                  }}
+                  className="inline rounded-sm align-baseline font-body text-sm font-medium text-foreground-subtle transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  Read more
+                </button>
+              </span>
+            }
+          >
             <h3
+              id={titleId}
               ref={titleRef}
-              className={`mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground ${titleExpanded ? "" : "line-clamp-2 text-clip"}`}
+              tabIndex={-1}
+              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
             >
               {renderWithLinks(thread.title, true)}
             </h3>
-            {/* "…More" right after the last visible word, on the same line. */}
-            {titleOverflow && !titleExpanded && morePos && (
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTitleExpanded(true); }}
-                style={{ left: `${morePos.left}px`, bottom: `${morePos.bottom}px` }}
-                className="absolute min-w-12 bg-background-subtle font-body text-sm font-medium leading-4 text-foreground-subtle transition-colors hover:text-accent"
-              >
-                …more
-              </button>
-            )}
-          </div>
+          </TruncateMarkup>
         )}
 
         {/* ── Poll ── */}
