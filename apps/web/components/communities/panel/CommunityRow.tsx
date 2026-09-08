@@ -3,6 +3,7 @@
 import { memo, useRef, useCallback } from "react";
 import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
+import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
@@ -41,19 +42,6 @@ function renderTextWithEmoji(text: string) {
     parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
   }
   return parts;
-}
-
-/** Absolute time — mirrors the mobile app: clock for today, "Yesterday",
- *  weekday within the last week, then a short date. */
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0)
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
 /** Formats the last-message text shown below the community name. */
@@ -145,9 +133,7 @@ export const CommunityRow = memo(function CommunityRow({
               <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
             )}
             {c.last_message && !typingText && (
-              <span className="font-mono text-xs text-foreground-muted shrink-0 ml-auto">
-                {formatTime(c.last_message.created_at)}
-              </span>
+              <SidebarTimestamp iso={c.last_message.created_at} />
             )}
           </div>
 
