@@ -450,7 +450,7 @@ export function ThreadCard({
 
         {/* ── Title ── */}
         {isDetail ? (
-          <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-semibold leading-snug text-foreground">
+          <h1 className="mt-4 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
             {renderWithLinks(thread.title, false)}
           </h1>
         ) : titleExpanded ? (
