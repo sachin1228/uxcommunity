@@ -163,9 +163,9 @@ function BubbleImage({
           e.stopPropagation();
           onClick?.();
         }}
-        className={`block max-w-full object-cover ${
-          standalone ? "" : "rounded-xl"
-        } ${isMe ? "opacity-95" : ""} ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
+        className={`block max-w-full object-cover rounded-[8px] ${
+          isMe ? "opacity-95" : ""
+        } ${uploading ? "opacity-50" : ""} ${onClick ? "cursor-pointer hover:opacity-80 transition-opacity" : ""}`}
         style={{ maxHeight: 300, width: "auto" }}
         loading="lazy"
         draggable={false}
@@ -1006,8 +1006,8 @@ export const MessageBubble = memo(function MessageBubble({
                       : "bg-surface-raised"
                   } ${
                     // Media bubbles keep a thin frame around the image
-                    // (WhatsApp-style); text bubbles use the roomier padding.
-                    imageOnly ? "p-1" : "px-3 pt-2 pb-1.5"
+                    // (WhatsApp-style); text-only bubbles use the roomier padding.
+                    imageUrl ? "p-1" : "px-3 pt-2 pb-1.5"
                   }`}
                 >
                   {isFirstInGroup && (
@@ -1028,7 +1028,7 @@ export const MessageBubble = memo(function MessageBubble({
                     <SenderName
                       name={sender.name}
                       userId={msg.user_id}
-                      className={imageOnly ? "mb-1 pl-1" : ""}
+                      className={imageUrl ? "mb-1 pl-1" : ""}
                     />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
