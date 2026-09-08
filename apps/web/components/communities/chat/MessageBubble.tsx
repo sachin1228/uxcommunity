@@ -784,7 +784,7 @@ function isEmojiOnly(text: string): boolean {
 function SenderName({ name, userId, className = "" }: { name: string; userId: string | null; className?: string }) {
   return (
     <p
-      className={`font-body text-[11px] font-semibold leading-4 break-words ${className}`}
+      className={`font-body text-xs font-semibold leading-4 break-words ${className}`}
       style={{ color: userColorVar(userId) }}
     >
       {name}
@@ -1025,7 +1025,7 @@ export const MessageBubble = memo(function MessageBubble({
                       user (own messages skip it, matching WhatsApp). Shown above
                       media too, like WhatsApp's image-album bubbles. */}
                   {!isMe && showHeader && sender && (
-                    <SenderName name={sender.name} userId={msg.user_id} className="mb-1" />
+                    <SenderName name={sender.name} userId={msg.user_id} />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
                   {imageUrl && (
