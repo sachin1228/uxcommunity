@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Smile } from "lucide-react";
+import { Bold, Italic, Link, Smile, Underline } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
@@ -52,28 +52,7 @@ export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarU
   );
 }
 
-// Module-level cache for the current user's avatar — every composer (detail
-// pages, lightbox, reply boxes) can share a single /api/auth/me round trip.
-let cachedMe: { name: string; avatar_url: string | null } | null | undefined;
-
-async function fetchCurrentUser(): Promise<{ name: string; avatar_url: string | null } | null> {
-  if (cachedMe !== undefined) return cachedMe;
-  try {
-    const res = await fetch("/api/auth/me");
-    const data = (await res.json().catch(() => null)) as { user?: { name?: string; avatar_url?: string | null } } | null;
-    cachedMe = data?.user?.name ? { name: data.user.name, avatar_url: data.user.avatar_url ?? null } : null;
-  } catch {
-    cachedMe = null;
-  }
-  return cachedMe;
-}
-
-/**
- * The shared comment composer used by every comment section (threads,
- * resources, showcase, events). Single-row layout: avatar · auto-growing
- * input · Cancel (replies) · emoji picker · blue circular send button —
- * inside a rounded bordered box that brightens on focus.
- */
+/** Shared comment composer used across community detail pages. */
 export function CommentComposer<C = unknown>({
   communityId,
   kind,
@@ -99,7 +78,6 @@ export function CommentComposer<C = unknown>({
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ name: string; avatar_url: string | null } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerPos, setPickerPos] = useState<{
     top?: number;
@@ -115,16 +93,6 @@ export function CommentComposer<C = unknown>({
   useEffect(() => {
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchCurrentUser().then((user) => {
-      if (!cancelled) setCurrentUser(user);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Smart placement for the picker, measured from the emoji button like the
   // chat emoji picker but aware of the viewport edges:
@@ -259,43 +227,40 @@ export function CommentComposer<C = unknown>({
   const remaining = maxLength - body.length;
 
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-background p-2 shadow-sm transition-all duration-200 focus-within:border-accent/40 focus-within:bg-surface focus-within:shadow-md">
+    <div className={`relative w-full rounded-2xl border bg-background shadow-sm transition-all duration-200 focus-within:border-[var(--ds-red-700)] focus-within:ring-4 focus-within:ring-[var(--ds-red-700)]/10 ${parentId ? "border-border p-3" : "border-[var(--ds-red-700)] p-4"}`}>
     <form onSubmit={submit} className="w-full">
-      <div className="flex w-full items-end gap-2.5">
-        {currentUser && (
-          <div className="hidden shrink-0 self-center sm:block">
-            <Avatar name={currentUser.name} avatarUrl={currentUser.avatar_url} size="md" />
-          </div>
-        )}
-        <textarea
-          ref={ref}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-            if (e.key === "Escape" && onCancel) {
-              e.preventDefault();
-              onCancel();
-            } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.preventDefault();
-              void submit(e as unknown as React.FormEvent);
-            }
-          }}
-          placeholder={placeholder ?? "Share your thoughts…"}
-          aria-label={parentId ? "Write a reply" : "Write a comment"}
-          rows={parentId ? 1 : 2}
-          maxLength={maxLength}
-          className="max-h-36 min-h-10 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent px-1 py-2 font-body text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
-        />
-        {onCancel && (
-          <button type="button" onClick={onCancel} className="shrink-0 pb-1 font-body text-xs text-foreground-subtle hover:text-foreground">
-            Cancel
-          </button>
-        )}
-        {/* Action buttons — bottom-aligned so they stay pinned to the last
-            input line as it grows */}
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Emoji picker — opens the shared Noto emoji grid */}
+      <textarea
+        ref={ref}
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+          if (e.key === "Escape" && onCancel) {
+            e.preventDefault();
+            onCancel();
+          } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            void submit(e as unknown as React.FormEvent);
+          }
+        }}
+        placeholder={placeholder ?? "Add comment"}
+        aria-label={parentId ? "Write a reply" : "Write a comment"}
+        rows={parentId ? 2 : 4}
+        maxLength={maxLength}
+        className={`max-h-40 w-full resize-none overflow-y-auto break-words bg-transparent font-body text-sm leading-6 text-foreground placeholder:text-foreground-muted focus:outline-none ${parentId ? "min-h-14" : "min-h-24"}`}
+      />
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1 text-foreground-muted">
+          {!parentId && (
+            <>
+              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Bold"><Bold size={16} /></button>
+              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Italic"><Italic size={16} /></button>
+              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Underline"><Underline size={16} /></button>
+              <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+              <button type="button" className="flex size-8 items-center justify-center rounded-lg hover:bg-surface-raised hover:text-foreground" aria-label="Add link"><Link size={16} /></button>
+            </>
+          )}
           <button
             ref={emojiBtnRef}
             type="button"
@@ -303,37 +268,31 @@ export function CommentComposer<C = unknown>({
             onClick={togglePicker}
             aria-label="Add emoji"
             aria-expanded={pickerOpen}
-            className={`hidden h-6 w-6 items-center justify-center rounded-lg border transition-colors lg:flex ${
-              pickerOpen
-                ? "border-accent/40 bg-accent/10 text-accent"
-                : "border-border bg-surface text-foreground-subtle hover:text-foreground"
-            }`}
+            className={`flex size-8 items-center justify-center rounded-lg transition-colors ${pickerOpen ? "bg-surface-raised text-foreground" : "hover:bg-surface-raised hover:text-foreground"}`}
           >
-            <Smile strokeWidth={2.5} size={16} />
+            <Smile size={17} />
           </button>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {onCancel && (
+            <button type="button" onClick={onCancel} className="h-9 rounded-full px-3 font-body text-sm text-foreground-muted hover:text-foreground">
+              Cancel
+            </button>
+          )}
           <button
             type="submit"
             disabled={saving || !body.trim()}
-            aria-label="Send"
-            title="Send"
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white transition-all duration-150 hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 min-w-20 items-center justify-center rounded-full bg-[var(--ds-red-800)] px-5 font-body text-sm font-semibold text-[var(--color-overlay-foreground)] transition-colors hover:bg-[var(--ds-red-900)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {saving ? (
-              <Spinner size={14} className="text-white" />
-            ) : (
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-[15px] w-[15px]" style={{ marginLeft: 1 }}>
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            )}
+            {saving ? <Spinner size={14} className="text-[var(--color-overlay-foreground)]" /> : "Send"}
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 px-1 pt-1">
-        <span className="font-body text-[11px] text-foreground-subtle">Press {"⌘"}/Ctrl + Enter to post</span>
+      <div className="mt-2 flex items-center justify-end">
         {remaining <= 250 && <span className={`font-body text-[11px] tabular-nums ${remaining < 50 ? "text-destructive" : "text-foreground-subtle"}`}>{remaining} left</span>}
       </div>
-      {error && <p className="mt-1.5 px-1 font-body text-xs text-destructive" role="alert">{error}</p>}
+      {error && <p className="mt-1.5 font-body text-xs text-destructive" role="alert">{error}</p>}
     </form>
 
     {/* ── Emoji picker — portal at document.body, fixed relative to the emoji
