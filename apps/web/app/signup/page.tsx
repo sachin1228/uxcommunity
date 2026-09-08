@@ -266,7 +266,6 @@ function SignupInner() {
     if (target >= step || welcome) return;
     setStep(target);
   }
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
       <BrandLogo
@@ -277,7 +276,7 @@ function SignupInner() {
       <div className="w-full max-w-md">
 
         {tokenState.status === "valid" && step !== "done" && (
-          <SignupStepper current={step} onStepClick={goToStep} />
+          <SignupStepper current={step} />
         )}
 
         {tokenState.status === "loading" && (
