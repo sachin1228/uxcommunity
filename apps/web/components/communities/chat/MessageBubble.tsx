@@ -1045,16 +1045,18 @@ export const MessageBubble = memo(function MessageBubble({
                     />
                   )}
                   {msg.content && (
-                    <MessageContent
-                      content={msg.content}
-                      mentions={msg.mentions ?? []}
-                      isMe={isMe}
-                      showPreview={msg.status !== "failed"}
-                      animate={animate}
-                    />
+                    <div className={imageUrl ? "pl-1" : ""}>
+                      <MessageContent
+                        content={msg.content}
+                        mentions={msg.mentions ?? []}
+                        isMe={isMe}
+                        showPreview={msg.status !== "failed"}
+                        animate={animate}
+                      />
+                    </div>
                   )}
                   {!imageOnly && (
-                    <div className="flex items-center justify-end gap-1 mt-1">
+                    <div className="flex items-center justify-end gap-1 mt-0">
                       {msg.edited_at && (
                         <span className={`font-body text-[10px] ${isMe ? "text-accent-foreground opacity-50" : "text-foreground-muted"}`}>
                           edited
