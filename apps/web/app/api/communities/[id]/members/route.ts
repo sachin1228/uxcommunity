@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
 
 function cleanDesignation(name: string): string {
   const clean = name.split("(")[0].trim();
@@ -195,19 +196,15 @@ export async function DELETE(
           .eq("user_id", nextOwner.user_id),
       ]);
     } else {
-      // Last member leaving — hard delete community and all child data
-      // Clean up tables not covered by CASCADE (text-based references)
-      await Promise.all([
-        db
-          .from("community_join_requests")
-          .delete()
-          .eq("community_id", communityId),
-        db
-          .from("lottie_settings")
-          .delete()
-          .eq("scope", "community")
-          .eq("scope_key", communityId),
-      ]);
+      // Last member leaving — hard delete community and all child data.
+      // Clean up tables not covered by CASCADE (text-based references).
+      await db
+        .from("community_join_requests")
+        .delete()
+        .eq("community_id", communityId);
+
+      // Collect R2 URLs BEFORE deleting: the cascade removes the child rows.
+      const urls = await collectCommunityMediaUrls(db, communityId);
 
       const { error: deleteErr } = await db
         .from("communities")
@@ -216,6 +213,14 @@ export async function DELETE(
 
       if (deleteErr) {
         return NextResponse.json({ error: "Failed to delete community." }, { status: 500 });
+      }
+
+      // R2 cleanup (lottie_settings rows + media objects no longer referenced
+      // anywhere). Never blocks the response — the orphan scan retries.
+      try {
+        await cleanupCommunityMedia(db, communityId, urls);
+      } catch (cleanupError) {
+        console.error("[leave community] R2 cleanup error:", cleanupError);
       }
 
       return NextResponse.json({ success: true, community_deleted: true });

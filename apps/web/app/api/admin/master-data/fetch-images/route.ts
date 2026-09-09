@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
+import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
 import { extensionForMime } from "@/lib/image-utils";
 import { shouldAutoFetchImage } from "@/lib/master-data/eligibility";
 import { MASTER_TABLES, type MasterTable } from "@/lib/master-data/master-tables";
@@ -108,22 +109,41 @@ export async function POST(request: NextRequest) {
   const ext = extensionForMime(image.contentType);
   const key = `master-data/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
+  let url: string;
   try {
-    const url = await uploadToR2(key, image.bytes, image.contentType);
-    const { data: updated, error: updateError } = await db
-      .from(TABLES[body.table].table)
-      // Cast matches the client's broken `never` payload type (repo baseline).
-      .update({ image_url: url } as never)
-      .eq("id", row.id)
-      .select("id, name, image_url, is_active, created_at, updated_at")
-      .single();
-
-    if (updateError) {
-      return NextResponse.json({ ok: false, error: "Failed to save image on item." });
-    }
-    revalidateTag("master-images", {});
-    return NextResponse.json({ ok: true, item: updated });
+    url = await uploadToR2(key, image.bytes, image.contentType);
   } catch {
     return NextResponse.json({ ok: false, error: "Failed to upload image." });
   }
+
+  const { data: updated, error: updateError } = await db
+    .from(TABLES[body.table].table)
+    // Cast matches the client's broken `never` payload type (repo baseline).
+    .update({ image_url: url } as never)
+    .eq("id", row.id)
+    .select("id, name, image_url, is_active, created_at, updated_at")
+    .single();
+
+  if (updateError || !updated) {
+    // DB write failed — don't leave the freshly uploaded object behind.
+    try {
+      await deleteR2AssetIfUnreferenced(db, url, MASTER_IMAGE_LOOKUPS);
+    } catch (cleanupError) {
+      console.error("[fetch-images] failed-upload cleanup error:", cleanupError);
+    }
+    return NextResponse.json({ ok: false, error: "Failed to save image on item." });
+  }
+
+  // The replacement succeeded — delete the previous image unless another row
+  // (community mirror or another master row) still references it.
+  if (row.image_url && row.image_url !== url) {
+    try {
+      await deleteR2AssetIfUnreferenced(db, row.image_url, MASTER_IMAGE_LOOKUPS);
+    } catch (cleanupError) {
+      console.error("[fetch-images] replaced-image cleanup error:", cleanupError);
+    }
+  }
+
+  revalidateTag("master-images", {});
+  return NextResponse.json({ ok: true, item: updated });
 }

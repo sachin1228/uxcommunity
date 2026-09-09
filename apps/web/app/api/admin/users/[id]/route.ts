@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 
 export async function GET(
   _request: NextRequest,
@@ -122,13 +123,20 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
-  // Fetch application_id + email before deleting — needed to clean up the
-  // application record so the email is free to reapply afterward.
+  // Fetch application_id + email + avatar before deleting — needed to clean
+  // up the application record (email free to reapply) and the R2 avatar.
   const { data: user } = await db
     .from("users")
     .select("application_id, email")
     .eq("id", id)
     .maybeSingle();
+  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  const { data: profile } = (await db
+    .from("designer_profiles")
+    .select("avatar_url")
+    .eq("user_id", id)
+    .maybeSingle()) as unknown as { data: { avatar_url: string | null } | null };
+  const avatarUrl = profile?.avatar_url ?? null;
 
   // 1. Delete designer profile
   await db.from("designer_profiles").delete().eq("user_id", id);
@@ -160,6 +168,21 @@ export async function DELETE(
       .from("applications")
       .delete()
       .eq("applicant_email", user.email.toLowerCase());
+  }
+
+  // Delete the uploaded avatar from R2 unless another row still references it.
+  if (avatarUrl) {
+    try {
+      const outcome = await deleteR2AssetIfUnreferenced(db, avatarUrl, [
+        { table: "designer_profiles", column: "avatar_url" },
+      ]);
+      if (outcome.status !== "deleted" && outcome.status !== "referenced") {
+        console.warn("[admin/users] avatar cleanup outcome:", outcome.status);
+      }
+    } catch (avatarCleanupError) {
+      // Non-fatal: re-run via the admin orphan scan (Tools → R2 storage health).
+      console.error("[admin/users] avatar cleanup error:", avatarCleanupError);
+    }
   }
 
   return NextResponse.json({ success: true });

@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { z } from "zod";
+import { cleanupMasterDataMedia, collectMasterMediaUrls } from "@/lib/r2-cleanup";
 
 const patchSchema = z.object({
   name:      z.string().min(1).max(100).optional(),
@@ -84,6 +85,10 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
+  // Collect every R2 URL the master row + its communities own BEFORE deleting
+  // (the rows are unrecoverable afterwards).
+  const urls = await collectMasterMediaUrls(db, "experience_level", "experience_levels", id);
+
   // Delete the master row first; only clean up the community if that succeeds.
   const { error } = await db.from("experience_levels").delete().eq("id", id);
   if (error) {
@@ -97,10 +102,18 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete experience level." }, { status: 500 });
   }
 
-  // Master row is gone — kick off community cleanup in the background so it
-  // doesn't add latency to the admin response. The orphan filter in
-  // /api/communities/all hides it from users immediately.
-  void db.from("communities").delete().eq("type", "experience_level").eq("reference_id", id);
-
-  return NextResponse.json({ success: true });
+  // Master row is gone — remove the linked communities (the orphan filter in
+  // /api/communities/all hides them from users immediately) and clean up every
+  // R2 object they owned. Best-effort: failures surface in logs and are
+  // re-run any time via the admin orphan scan (Tools → R2 storage health).
+  try {
+    const cleanup = await cleanupMasterDataMedia(db, "experience_level", "experience_levels", id, urls);
+    if (cleanup.failed.length > 0) {
+      console.error("[admin/experience-levels] R2 cleanup failures:", cleanup.failed);
+    }
+    return NextResponse.json({ success: true, r2: { deleted: cleanup.deleted.length, skipped: cleanup.skipped.length, failed: cleanup.failed.length } });
+  } catch (cleanupError) {
+    console.error("[admin/experience-levels] R2 cleanup error:", cleanupError);
+    return NextResponse.json({ success: true, r2: { error: "R2 cleanup failed; orphan scan will retry." } });
+  }
 }

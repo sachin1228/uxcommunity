@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "@/lib/communities/dp";
+import { cleanupCommunityMedia, collectCommunityMediaUrls } from "@/lib/r2-cleanup";
 
 // ── GET /api/admin/communities/[id] ─────────────────────────────────────────
 export async function GET(
@@ -154,7 +155,10 @@ export async function PATCH(
 }
 
 // ── DELETE /api/admin/communities/[id] ───────────────────────────────────────
-// Hard-deletes community + cascades to members + messages via FK.
+// Hard-deletes community + cascades to members/messages/threads/showcase/events
+// via FK, then cleans up every R2 object that belonged to the community (and is
+// no longer referenced anywhere). Community-scoped lottie_settings rows are
+// removed too (they are text-keyed, not covered by the FK cascade).
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -163,7 +167,25 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
+  // Collect every R2 URL the community owns BEFORE deleting: the FK cascade
+  // removes the child rows, so the URLs are unrecoverable afterwards.
+  const urls = await collectCommunityMediaUrls(db, id);
+
   const { error } = await db.from("communities").delete().eq("id", id);
   if (error) return NextResponse.json({ error: "Failed to delete community." }, { status: 500 });
-  return NextResponse.json({ success: true });
+
+  try {
+    const cleanup = await cleanupCommunityMedia(db, id, urls);
+    if (cleanup.failed.length > 0) {
+      console.error("[admin/communities] R2 cleanup failures:", cleanup.failed);
+    }
+    return NextResponse.json({
+      success: true,
+      r2: { deleted: cleanup.deleted.length, skipped: cleanup.skipped.length, failed: cleanup.failed.length },
+    });
+  } catch (cleanupError) {
+    // DB deletion already succeeded — never fail the request for R2 cleanup.
+    console.error("[admin/communities] R2 cleanup error:", cleanupError);
+    return NextResponse.json({ success: true, r2: { error: "R2 cleanup failed; orphan scan will retry." } });
+  }
 }

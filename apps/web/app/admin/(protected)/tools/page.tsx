@@ -330,8 +330,14 @@ export default function ToolsPage() {
                   </div>
                 )}
 
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-                  {r2Summary.orphans.slice(0, 20).map((item: any, i: number) => (
+                {r2Summary.potentialOrphans > r2Summary.orphans.length && (
+                  <p className="mt-2 font-body text-[11px] text-foreground-muted">
+                    Showing the first {r2Summary.orphans.length} of {r2Summary.potentialOrphans} — deleting processes all of them.
+                  </p>
+                )}
+
+                <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                  {r2Summary.orphans.map((item: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2">
                       <img
                         src={item.previewUrl}
@@ -356,6 +362,13 @@ export default function ToolsPage() {
                 <p className="font-body text-[11px] text-green-400">
                   Deleted {r2DeleteResult.deletedCount} orphan object(s). {r2DeleteResult.failedCount > 0 ? `${r2DeleteResult.failedCount} failed.` : ""}
                 </p>
+                {!!r2DeleteResult.graceSkipped && (
+                  <p className="mt-1 font-body text-[11px] text-amber-400">
+                    {r2DeleteResult.graceSkipped} skipped — uploaded less than 7 days ago, so the grace
+                    period protects them from deletion. They become deletable automatically 7 days after
+                    upload; scan again then.
+                  </p>
+                )}
               </div>
             )}
           </div>

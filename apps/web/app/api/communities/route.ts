@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { extensionForMime } from "@/lib/image-utils";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, parseR2Key, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -121,6 +121,15 @@ export async function POST(request: Request) {
     .single();
 
   if (communityError || !community) {
+    // The image was uploaded before the insert — remove it so a failed
+    // creation doesn't leave an unreferenced R2 object.
+    if (imageUrl) {
+      try {
+        await deleteFromR2(parseR2Key(imageUrl)!);
+      } catch (cleanupError) {
+        console.error("[community-create] failed-insert image cleanup error:", cleanupError);
+      }
+    }
     console.error("[community-create] insert failed:", communityError);
     return NextResponse.json({ error: "Failed to create community." }, { status: 500 });
   }
@@ -135,6 +144,13 @@ export async function POST(request: Request) {
 
   if (memberError) {
     await db.from("communities").delete().eq("id", community.id);
+    if (imageUrl) {
+      try {
+        await deleteFromR2(parseR2Key(imageUrl)!);
+      } catch (cleanupError) {
+        console.error("[community-create] failed-membership image cleanup error:", cleanupError);
+      }
+    }
     console.error("[community-create] owner membership failed:", memberError);
     return NextResponse.json({ error: "Failed to create community membership." }, { status: 500 });
   }

@@ -150,3 +150,4 @@ jobs:
         # --keep-vars: preserve any vars/secrets set in the Cloudflare
         # dashboard that aren't in .dev.vars (e.g. NEXT_PUBLIC_*).
         run: npx opennextjs-cloudflare deploy -- --keep-vars
+

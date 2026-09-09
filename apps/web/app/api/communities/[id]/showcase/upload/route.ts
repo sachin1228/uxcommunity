@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, uploadToR2 } from "@/lib/r2";
 import { extensionForMime } from "@/lib/image-utils";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -60,7 +60,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (poster instanceof File && poster.size > 0 && poster.size <= MAX_IMAGE_BYTES && IMAGE_TYPES.has(poster.type)) {
         const posterBody = Buffer.from(await poster.arrayBuffer());
         const posterKey = `${key}-poster.${extensionForMime(poster.type)}`;
-        posterUrl = await uploadToR2(posterKey, posterBody, poster.type);
+        try {
+          posterUrl = await uploadToR2(posterKey, posterBody, poster.type);
+        } catch (posterError) {
+          // The video upload succeeded but the poster failed — remove the
+          // video so a half-uploaded attachment doesn't accumulate.
+          console.error("[showcase upload] poster upload failed:", posterError);
+          try {
+            await deleteFromR2(key);
+          } catch (cleanupError) {
+            console.error("[showcase upload] failed-poster video cleanup error:", cleanupError);
+          }
+          return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
+        }
       }
     }
 
