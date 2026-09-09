@@ -717,11 +717,6 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
   schedule or automatically. The reference schema (`ALL_MEDIA_LOOKUPS`) lives in
   `packages/shared/src/r2-media.ts`, shared by the runtime cleanup and the
   admin audit so they can never disagree.
-- **Legacy media backfill** (one-time, admin-initiated): Admin → Tools →
-  Legacy media backfill (`/api/admin/r2-backfill`) retags pre-custom-domain
-  objects with the immutable cache header (CopyObject-in-place, HEAD-first
-  skip, keyset-cursor batching) and rewrites legacy `pub-*.r2.dev` DB URLs to
-  the custom domain. Safe because all upload keys are unique/versioned.
 
 ## Overlap Between Cloudflare and Vercel
 **FACT**: The app has BOTH Cloudflare Workers (primary) and Vercel (alternate) deployment configs. They do NOT overlap in production — only one is active. The Vercel config exists as an alternate deployment path. The CI/CD pipeline (`.github/workflows/deploy.yml`) deploys to Cloudflare.
