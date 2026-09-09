@@ -662,6 +662,7 @@ Logout:
 |---|---|---|---|
 | `uxcommunity-web` | `apps/web/wrangler.toml` | All HTTP requests | Next.js app (OpenNext) |
 | `uxcommunity-realtime` | `apps/realtime/wrangler.toml` | WebSocket + /publish | Realtime system |
+| `uxcommunity-cron` | `apps/cron/wrangler.toml` | Cron Trigger (Mon 03:15 UTC) | Weekly R2 orphan sweep |
 
 ## Durable Objects
 
@@ -710,6 +711,15 @@ User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media 
   them. See `apps/web/lib/r2-cleanup.ts` (reference lookups shared with the
   admin orphan audit) and `/api/admin/r2-audit` (scan + grace-period
   delete-orphans, default 7 days).
+- **Scheduled sweep**: the `uxcommunity-cron` worker (Cron Trigger, Monday
+  03:15 UTC) runs the same scan unattended — see `apps/cron/src/orphan-sweep.ts`.
+  It is DRY-RUN by default and logs a structured report; set the
+  `R2_ORPHAN_SWEEP_DELETE` secret to `true` to actually delete objects that are
+  confirmed orphaned and older than the grace period (`R2_ORPHAN_SWEEP_GRACE_DAYS`,
+  default 7). A manual trigger endpoint (`x-cron-secret` header) returns the
+  report as JSON for review. The reference schema (`ALL_MEDIA_LOOKUPS`) lives in
+  `packages/shared/src/r2-media.ts`, shared by the app, the admin audit, and the
+  sweep so they can never disagree.
 
 ## Overlap Between Cloudflare and Vercel
 **FACT**: The app has BOTH Cloudflare Workers (primary) and Vercel (alternate) deployment configs. They do NOT overlap in production — only one is active. The Vercel config exists as an alternate deployment path. The CI/CD pipeline (`.github/workflows/deploy.yml`) deploys to Cloudflare.

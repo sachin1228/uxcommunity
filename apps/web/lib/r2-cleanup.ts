@@ -1,14 +1,16 @@
 /**
- * Shared R2 media reference tracking + cleanup helpers.
+ * R2 media reference tracking + cleanup helpers (web app side).
  *
- * Every place that can remove a database record that owns R2 media uses the
- * lookups and collectors in this module so that:
+ * The reference schema itself (which DB columns hold R2 media URLs) lives in
+ * `@uxcommunity/shared` so the runtime cleanup, the admin orphan audit, and
+ * the scheduled orphan sweep (apps/cron) all agree on what counts as a
+ * reference. This module adds the Supabase-backed collection and deletion
+ * helpers used by the app's delete/replace paths.
  *
  *  1. Deleting an entity removes the R2 objects that belonged to it — but
  *     ONLY if nothing else references them (shared media is protected).
  *  2. The orphan audit (`/api/admin/r2-audit`) tracks exactly the same
- *     reference sources as the runtime cleanup, so it can never flag
- *     referenced objects as orphans.
+ *     reference sources as the runtime cleanup.
  *  3. Deletions are idempotent and retry-safe: an R2 delete is a no-op for
  *     missing keys, and any object that survives a failed cleanup is picked
  *     up by the next orphan scan (after the grace period).
@@ -16,103 +18,40 @@
 
 import "server-only";
 
+import {
+  ALL_MEDIA_LOOKUPS,
+  LOOKUP_ENTITY_TYPES,
+  MASTER_IMAGE_LOOKUPS,
+  MASTER_LOTTIE_LOOKUPS,
+  SHOWCASE_ATTACHMENT_LOOKUP,
+  SHOWCASE_POSTER_LOOKUP,
+  THREAD_ATTACHMENT_LOOKUP,
+  type MediaReferenceLookup,
+} from "@uxcommunity/shared";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  attachmentPosterUrls,
-  attachmentUrls,
   deleteR2AssetIfUnreferenced,
   getR2KeyFromUrl,
   getReferenceUrls,
-  type R2ReferenceLookup,
 } from "@/lib/r2";
 
 export type DbClient = ReturnType<typeof createServiceClient>;
 
-// URL extraction helpers live in lib/r2.ts (pure, testable) — re-exported
+// URL extraction + reference schema live in @uxcommunity/shared — re-exported
 // here so callers of this module have one import surface.
-export { attachmentPosterUrls, attachmentUrls } from "@/lib/r2";
-
-// ── Reference lookups — single source of truth ───────────────────────────────
-// Used by BOTH the runtime delete paths and the orphan audit.
-
-export const SHOWCASE_ATTACHMENT_LOOKUP: R2ReferenceLookup = {
-  table: "community_showcase_posts",
-  column: "attachments",
-  getUrls: attachmentUrls,
-};
-
-export const SHOWCASE_POSTER_LOOKUP: R2ReferenceLookup = {
-  table: "community_showcase_posts",
-  column: "attachments",
-  getUrls: attachmentPosterUrls,
-};
-
-export const THREAD_ATTACHMENT_LOOKUP: R2ReferenceLookup = {
-  table: "community_threads",
-  column: "attachments",
-  getUrls: attachmentUrls,
-};
-
-/** Master-data + community display pictures can be mirrored across rows, so a
- *  deletion must check every column that can hold the same object. */
-export const MASTER_IMAGE_LOOKUPS: R2ReferenceLookup[] = [
-  { table: "communities", column: "image_url" },
-  { table: "cities", column: "image_url" },
-  { table: "design_sectors", column: "image_url" },
-  { table: "design_interests", column: "image_url" },
-  { table: "experience_levels", column: "image_url" },
-];
-
-export const MASTER_LOTTIE_LOOKUPS: R2ReferenceLookup[] = [
-  { table: "communities", column: "lottie_url" },
-  { table: "cities", column: "lottie_url" },
-  { table: "design_sectors", column: "lottie_url" },
-  { table: "design_interests", column: "lottie_url" },
-  { table: "experience_levels", column: "lottie_url" },
-];
-
-/** Every column across the app that can hold an R2 media URL. */
-export const ALL_MEDIA_LOOKUPS: R2ReferenceLookup[] = [
-  { table: "designer_profiles", column: "avatar_url" },
-  { table: "communities", column: "image_url" },
-  { table: "communities", column: "lottie_url" },
-  { table: "cities", column: "image_url" },
-  { table: "cities", column: "lottie_url" },
-  { table: "design_sectors", column: "image_url" },
-  { table: "design_sectors", column: "lottie_url" },
-  { table: "design_interests", column: "image_url" },
-  { table: "design_interests", column: "lottie_url" },
-  { table: "experience_levels", column: "image_url" },
-  { table: "experience_levels", column: "lottie_url" },
-  { table: "community_messages", column: "image_url" },
-  { table: "community_events", column: "cover_image_url" },
-  { table: "community_showcase_posts", column: "image_url" },
+export {
+  ALL_MEDIA_LOOKUPS,
+  LOOKUP_ENTITY_TYPES,
+  MASTER_IMAGE_LOOKUPS,
+  MASTER_LOTTIE_LOOKUPS,
   SHOWCASE_ATTACHMENT_LOOKUP,
   SHOWCASE_POSTER_LOOKUP,
   THREAD_ATTACHMENT_LOOKUP,
-  { table: "lottie_settings", column: "lottie_url" },
-];
+  attachmentPosterUrls,
+  attachmentUrls,
+} from "@uxcommunity/shared";
 
-/** Human-readable entity type per lookup, for audit output. */
-export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
-  "designer_profiles.avatar_url": "profile",
-  "communities.image_url": "community",
-  "communities.lottie_url": "community",
-  "cities.image_url": "city",
-  "cities.lottie_url": "city",
-  "design_sectors.image_url": "sector",
-  "design_sectors.lottie_url": "sector",
-  "design_interests.image_url": "interest",
-  "design_interests.lottie_url": "interest",
-  "experience_levels.image_url": "experience_level",
-  "experience_levels.lottie_url": "experience_level",
-  "community_messages.image_url": "message",
-  "community_events.cover_image_url": "event",
-  "community_showcase_posts.image_url": "showcase",
-  "community_showcase_posts.attachments": "showcase",
-  "community_threads.attachments": "thread",
-  "lottie_settings.lottie_url": "lottie_setting",
-};
+export type { MediaReferenceLookup };
 
 export interface MediaReference {
   key: string;
@@ -129,7 +68,7 @@ function pushUniqueUrl(urls: string[], url: string | null | undefined): void {
   if (!urls.includes(url)) urls.push(url);
 }
 
-function pushLookupUrls(urls: string[], lookup: R2ReferenceLookup, value: unknown): void {
+function pushLookupUrls(urls: string[], lookup: MediaReferenceLookup, value: unknown): void {
   for (const candidate of getReferenceUrls(lookup, value)) {
     if (getR2KeyFromUrl(candidate)) pushUniqueUrl(urls, candidate);
   }
@@ -283,7 +222,7 @@ export interface R2CleanupResult {
 export async function deleteUnreferencedR2Urls(
   db: DbClient,
   urls: string[],
-  lookups: R2ReferenceLookup[],
+  lookups: MediaReferenceLookup[],
 ): Promise<R2CleanupResult> {
   const result: R2CleanupResult = { deleted: [], skipped: [], failed: [] };
 

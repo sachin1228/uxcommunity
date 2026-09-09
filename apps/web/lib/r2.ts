@@ -20,6 +20,11 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
+import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
+
+// Attachment URL extraction lives in the shared package so the app and the
+// scheduled orphan sweep (apps/cron) use the identical parsing logic.
+export { attachmentPosterUrls, attachmentUrls } from "@uxcommunity/shared";
 
 function getClient(): S3Client {
   const accountId = process.env.R2_ACCOUNT_ID;
@@ -66,21 +71,13 @@ export function getR2PublicBase(): string {
  * Returns null if the URL doesn't match this bucket's public base.
  */
 export function parseR2Key(url: string): string | null {
-  try {
-    const base = getPublicBase();
-    if (!url.startsWith(base + "/")) return null;
-    return url.slice(base.length + 1);
-  } catch {
-    return null;
-  }
+  return getR2KeyFromUrl(url);
 }
 
 export function getR2KeyFromUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
-    const base = getPublicBase();
-    if (!url.startsWith(base + "/")) return null;
-    return url.slice(base.length + 1);
+    return r2KeyFromUrl(url, getPublicBase());
   } catch {
     return null;
   }
@@ -242,28 +239,7 @@ export type R2ReferenceLookup = {
 };
 
 export function getReferenceUrls(lookup: R2ReferenceLookup, value: unknown): string[] {
-  if (lookup.getUrls) return lookup.getUrls(value);
-  return typeof value === "string" ? [value] : [];
-}
-
-/** Extract attachment URLs from a stored attachments JSON array. */
-export function attachmentUrls(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) =>
-      typeof item === "object" && item && typeof (item as Record<string, unknown>).url === "string"
-        ? ((item as Record<string, unknown>).url as string)
-        : ""
-    )
-    .filter(Boolean);
-}
-
-/** Extract video-poster URLs from a stored attachments JSON array. */
-export function attachmentPosterUrls(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => (typeof item === "object" && item ? (item as Record<string, unknown>).poster : null))
-    .filter((poster): poster is string => typeof poster === "string" && poster.length > 0);
+  return referenceUrlsFromValue(lookup, value);
 }
 
 export async function deleteOwnedR2AssetIfUnique(

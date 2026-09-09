@@ -1,0 +1,28 @@
+# Weekly R2 orphan sweep worker.
+#
+# Runs the same media-reference scan as the admin Tools page
+# (/api/admin/r2-audit) but unattended: lists every object in the media R2
+# bucket, compares it against every media-referencing column in the database
+# (schema shared via @uxcommunity/shared), and reports (and optionally
+# deletes) objects that are orphaned AND older than the grace period.
+#
+# Secrets (injected via `wrangler secret put` in production / CI):
+#   R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET_NAME /
+#   R2_PUBLIC_URL          — media bucket access (same values as the web app)
+#   SUPABASE_URL           — e.g. https://eauupthwlnarkauwifmw.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY — read-only reference queries (service role)
+#   CRON_SECRET            — shared secret for the manual trigger endpoint
+#   R2_ORPHAN_SWEEP_DELETE — set to "true" to actually delete eligible
+#                            orphans; anything else (or unset) = DRY RUN
+#   R2_ORPHAN_SWEEP_GRACE_DAYS — default 7
+name = "uxcommunity-cron"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# Monday 03:15 UTC. Deploys in dry-run mode by default — review the report in
+# `wrangler tail uxcommunity-cron` (or the manual trigger endpoint) before
+# setting R2_ORPHAN_SWEEP_DELETE=true.
+[triggers]
+crons = ["15 3 * * 1"]

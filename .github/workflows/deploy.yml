@@ -150,3 +150,38 @@ jobs:
         # --keep-vars: preserve any vars/secrets set in the Cloudflare
         # dashboard that aren't in .dev.vars (e.g. NEXT_PUBLIC_*).
         run: npx opennextjs-cloudflare deploy -- --keep-vars
+
+      # ── Cron worker (weekly R2 orphan sweep) ──────────────────────────────
+      # Runs Monday 03:15 UTC in DRY-RUN by default; set the
+      # R2_ORPHAN_SWEEP_DELETE secret to "true" to enable deletion of
+      # confirmed old orphans. CRON_SECRET only guards the manual trigger
+      # endpoint — the scheduled run works without it.
+      - name: Deploy cron worker
+        working-directory: apps/cron
+        run: npx wrangler deploy
+
+      - name: Set cron worker secrets
+        working-directory: apps/cron
+        run: |
+          for name in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY \
+            R2_BUCKET_NAME R2_PUBLIC_URL SUPABASE_SERVICE_ROLE_KEY CRON_SECRET; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              echo "$value" | npx wrangler secret put "$name"
+            fi
+          done
+          SUPABASE_URL="${SUPABASE_URL:-https://eauupthwlnarkauwifmw.supabase.co}"
+          echo "$SUPABASE_URL" | npx wrangler secret put SUPABASE_URL
+          echo "${R2_ORPHAN_SWEEP_DELETE:-false}" | npx wrangler secret put R2_ORPHAN_SWEEP_DELETE
+          echo "${R2_ORPHAN_SWEEP_GRACE_DAYS:-7}" | npx wrangler secret put R2_ORPHAN_SWEEP_GRACE_DAYS
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          R2_ORPHAN_SWEEP_DELETE: ${{ secrets.R2_ORPHAN_SWEEP_DELETE }}
+          R2_ORPHAN_SWEEP_GRACE_DAYS: ${{ secrets.R2_ORPHAN_SWEEP_GRACE_DAYS }}
