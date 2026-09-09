@@ -362,6 +362,13 @@ export default function ToolsPage() {
                 <p className="font-body text-[11px] text-green-400">
                   Deleted {r2DeleteResult.deletedCount} orphan object(s). {r2DeleteResult.failedCount > 0 ? `${r2DeleteResult.failedCount} failed.` : ""}
                 </p>
+                {!!r2DeleteResult.graceSkipped && (
+                  <p className="mt-1 font-body text-[11px] text-amber-400">
+                    {r2DeleteResult.graceSkipped} skipped — uploaded less than 7 days ago, so the grace
+                    period protects them from deletion. They become deletable automatically 7 days after
+                    upload; scan again then.
+                  </p>
+                )}
               </div>
             )}
           </div>
