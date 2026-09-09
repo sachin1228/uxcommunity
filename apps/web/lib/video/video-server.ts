@@ -17,7 +17,7 @@
  *     orphan scan never sees tombstones as live references.
  */
 
-import { deleteFromR2 } from "@/lib/r2";
+import { deleteFromR2, r2PublicUrl } from "@/lib/r2";
 import type { VideoProcessingMetrics, VideoStatus } from "./video-types";
 
 export const VIDEO_KEY_PREFIX = "media/videos";
@@ -29,23 +29,10 @@ export const videoKeys = {
   poster: (mediaId: string) => `${VIDEO_KEY_PREFIX}/posters/${mediaId}.jpg`,
 };
 
-/**
- * Sniffs the container family from the file's own bytes — never trust the
- * browser's MIME type or the filename. Returns null for anything that is not
- * an MP4/MOV/WebM.
- */
-export function sniffVideoContainer(bytes: Uint8Array): "mp4" | "mov" | "webm" | null {
-  if (bytes.length < 12) return null;
-  const isFtyp =
-    bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70;
-  if (isFtyp) {
-    const major = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
-    return /^qt\s\s/i.test(major) ? "mov" : "mp4";
-  }
-  const isEbml =
-    bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
-  return isEbml ? "webm" : null;
-}
+// Shared byte-level sniffing (packages/shared/src/video/container.ts) — used
+// by the web app and the server-side transcoder so both identify sources
+// identically without ever trusting the browser MIME type or filename.
+export { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
 
 /** Clamps a client-supplied numeric metadata field to a sane range. */
 export function clampNumber(value: unknown, min: number, max: number): number | null {
@@ -263,6 +250,20 @@ export async function patchPostsForMedia(
   return { patched };
 }
 
+// ── Server-side transcoder queue ─────────────────────────────────────────────
+//
+// The atomic claim/reclaim/count primitives and the shared failure marker
+// live in `@uxcommunity/shared` (packages/shared/src/video/queue.ts) so the
+// web app and the apps/transcoder worker operate on the SAME row-shape and
+// lease rules. Re-exported here so web routes keep a single import surface.
+
+export {
+  claimVideoJob,
+  reclaimExpiredVideoJobs,
+  countVideoQueue,
+  markVideoFailed,
+} from "@uxcommunity/shared";
+
 // ── Finalize state evaluation (pure, unit-tested) ───────────────────────────
 
 export type FinalizeStateEvaluation =
@@ -316,6 +317,96 @@ export function readyAttachment(row: VideoMediaRow): Record<string, unknown> {
     status: "ready",
     strategy: row.strategy ?? undefined,
   };
+}
+
+/**
+ * Marks a video ready: flips the row, patches owning posts, logs metrics.
+ * Shared by the client finalize route and the server transcoder's internal
+ * completion route so both paths produce identical rows/attachments.
+ */
+export async function markVideoReady(
+  db: Db,
+  mediaId: string,
+  input: {
+    processedUrl: string;
+    processedSize: number;
+    posterUrl?: string | null;
+    width?: number | null;
+    height?: number | null;
+    fps?: number | null;
+    durationMs?: number | null;
+    videoCodec?: string | null;
+    audioCodec?: string | null;
+    processingMs?: number | null;
+  },
+): Promise<{ ok: true; row: VideoMediaRow; patched: number } | { ok: false; error: string }> {
+  const current = await getVideoMedia(db, mediaId);
+  if (!current) return { ok: false, error: "Video not found." };
+
+  const processedKey = videoKeys.processed(mediaId);
+  const { data: updated, error: updateError } = await db
+    .from("video_media")
+    .update({
+      status: "ready",
+      processed_key: processedKey,
+      poster_key: input.posterUrl ?? current.poster_key,
+      processed_url: input.processedUrl,
+      poster_url: input.posterUrl ?? current.poster_url,
+      processed_size: input.processedSize,
+      width: input.width ?? current.width,
+      height: input.height ?? current.height,
+      fps: input.fps ?? current.fps,
+      duration_ms: input.durationMs ?? current.duration_ms,
+      video_codec: input.videoCodec ?? current.video_codec,
+      audio_codec: input.audioCodec ?? current.audio_codec,
+      attempts: (current.attempts ?? 0) + 1,
+      processing_ms: input.processingMs ?? current.processing_ms,
+      processed_at: new Date().toISOString(),
+      claimed_by: null,
+      claimed_at: null,
+    })
+    .eq("id", mediaId)
+    .select("*")
+    .single();
+  if (updateError || !updated) {
+    return { ok: false, error: updateError?.message ?? "Failed to mark video ready." };
+  }
+  const row = updated as VideoMediaRow;
+
+  const { patched } = await patchPostsForMedia(db, row.community_id ?? "", mediaId, {
+    url: input.processedUrl,
+    poster: input.posterUrl ?? null,
+    size: input.processedSize,
+  });
+
+  logVideoMetrics({
+    mediaId: row.id,
+    userId: row.user_id,
+    communityId: row.community_id ?? "",
+    strategy: row.strategy ?? "transcode",
+    status: "ready",
+    width: row.width,
+    height: row.height,
+    fps: row.fps,
+    durationMs: row.duration_ms,
+    videoCodec: row.video_codec,
+    audioCodec: row.audio_codec,
+    originalSize: row.original_size,
+    processedSize: row.processed_size,
+    compressionRatio: null,
+    attempts: row.attempts,
+    processingMs: row.processing_ms,
+    patched,
+  });
+
+  return { ok: true, row, patched };
+}
+
+
+
+/** Resolves the canonical public URL for a media's processed key. */
+export function processedUrlFor(mediaId: string): string {
+  return r2PublicUrl(videoKeys.processed(mediaId));
 }
 
 /** Structured processing metrics — the observability contract for the pipeline. */

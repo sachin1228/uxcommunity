@@ -27,51 +27,10 @@ import {
   type InputVideoTrack,
 } from "mediabunny";
 
-/**
- * True when the file starts with an MP4/MOV signature (`ftyp` box) — i.e. the
- * bytes themselves are what we think they are, regardless of the claimed MIME
- * type. Everything else (WebM, unknown, junk) is left untouched.
- */
-export function looksLikeMp4(bytes: Uint8Array): boolean {
-  if (bytes.length < 12) return false;
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const boxSize = view.getUint32(0);
-  if (boxSize < 8) return false;
-  return bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70; // "ftyp"
-}
-
-/** Box type (FourCC) at the given byte offset, or null when out of range. */
-function boxType(bytes: Uint8Array, offset: number): string | null {
-  if (offset + 8 > bytes.length) return null;
-  return String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
-}
-
-/**
- * True when the MP4 `moov` atom (the playback index the browser needs before
- * drawing a frame) appears within the first 1 KB of the file — the practical
- * definition of "faststart". `moov` at the end forces whole-file buffering.
- * Only used to skip re-uploading files that are already stream-friendly.
- */
-export function isFaststart(bytes: Uint8Array): boolean {
-  if (!looksLikeMp4(bytes)) return false;
-  // First box after `ftyp` (usually `free` or the metadata itself). If we see
-  // `mdat` (the mass of media data) before `moov`, the index is at the end.
-  let offset = 0;
-  while (offset + 8 <= bytes.length) {
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    const size = view.getUint32(offset);
-    const type = boxType(bytes, offset);
-    if (!type || size < 8) return false;
-    if (type === "moov") return true;
-    if (type === "mdat") return false;
-    if (size === 1) {
-      // 64-bit box size — not expected this early in a file; bail out.
-      return false;
-    }
-    offset += size;
-  }
-  return false;
-}
+// Byte-level MP4/WebM sniffing lives in @uxcommunity/shared (shared with the
+// server-side transcoder) — re-exported so the app's existing imports and
+// tests keep working.
+export { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
 
 export interface VideoProcessedResult {
   /** Remuxed, faststart MP4 (or the original file when remuxing was skipped). */

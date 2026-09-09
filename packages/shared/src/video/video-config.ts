@@ -100,6 +100,9 @@ export const VIDEO_PASSTHROUGH = {
 
 // ── Processing safety limits (platform-level, documented) ───────────────────
 
+/** How long a server transcoder may hold a claimed job before re-claim. */
+export const JOB_LEASE_MS = 10 * 60 * 1000;
+
 export const VIDEO_SAFETY = {
   /**
    * Maximum decode+encode throughput we allow in the browser worker:
@@ -116,18 +119,17 @@ export const VIDEO_SAFETY = {
 
 export const FFMPEG = {
   /**
-   * Version of the `@ffmpeg/core` wasm build loaded at runtime. Loaded from
-   * a CDN by default; self-host by setting NEXT_PUBLIC_FFMPEG_CORE_BASE_URL
-   * to a directory that serves ffmpeg-core.js + ffmpeg-core.wasm. The core
-   * is ~31 MB, so it is fetched lazily on the first transcode and cached by
-   * the browser.
+   * Version of the `@ffmpeg/core` wasm build served at runtime. The build is
+   * SELF-HOSTED at `/ffmpeg/` (apps/web/public/ffmpeg — see
+   * scripts/fetch-ffmpeg-core.sh, which pins SHA-256 checksums), so the
+   * pipeline never depends on a third-party CDN. Point
+   * NEXT_PUBLIC_FFMPEG_CORE_BASE_URL elsewhere (e.g. an R2 custom domain)
+   * to override. The core is ~32 MB, fetched lazily on the first transcode
+   * and cached by the browser.
    */
   coreVersion: "0.12.10",
   get coreBaseUrl(): string {
-    return (
-      process.env.NEXT_PUBLIC_FFMPEG_CORE_BASE_URL ??
-      `https://cdn.jsdelivr.net/npm/@ffmpeg/core@${FFMPEG.coreVersion}/dist/umd`
-    );
+    return process.env.NEXT_PUBLIC_FFMPEG_CORE_BASE_URL ?? "/ffmpeg";
   },
   get coreUrl(): string {
     return `${FFMPEG.coreBaseUrl}/ffmpeg-core.js`;

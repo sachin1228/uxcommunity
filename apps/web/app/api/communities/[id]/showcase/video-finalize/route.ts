@@ -9,13 +9,12 @@ import {
   deleteVideoMedia,
   evaluateFinalizeState,
   getVideoMedia,
-  logVideoMetrics,
-  patchPostsForMedia,
+  markVideoFailed,
+  markVideoReady,
+  readyAttachment,
   sniffVideoContainer,
   videoKeys,
-  type VideoMediaRow,
 } from "@/lib/video/video-server";
-import type { VideoProcessingMetrics, VideoStatus } from "@/lib/video/video-types";
 
 const POSTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -168,102 +167,36 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       posterUrl = r2PublicUrl(posterKey);
     }
 
-    // Mark ready. Only ever transitions FROM a non-ready state; a concurrent
-    // duplicate finalize that already flipped it will short-circuit above on
-    // its next read.
-    const { data: updated, error: updateError } = await db
-      .from("video_media")
-      .update({
-        status: "ready",
-        processed_key: processedKey,
-        poster_key: posterUrl ?? row.poster_key,
-        processed_url: processedUrl,
-        poster_url: posterUrl ?? row.poster_url,
-        processed_size: processedSize,
-        width: width ?? row.width,
-        height: height ?? row.height,
-        fps: fps ?? row.fps,
-        duration_ms: durationMs ?? row.duration_ms,
-        video_codec: videoCodec ?? row.video_codec,
-        audio_codec: audioCodec ?? row.audio_codec,
-        attempts: (row.attempts ?? 0) + 1,
-        processing_ms: processingMs ?? row.processing_ms,
-        processed_at: new Date().toISOString(),
-      })
-      .eq("id", mediaId)
-      .select("*")
-      .single();
-    if (updateError || !updated) {
-      throw updateError ?? new Error("video_media update failed");
-    }
-
-    // Server-side post patch — the composer tab may be gone.
-    const { patched } = await patchPostsForMedia(db, communityId, mediaId, {
-      url: processedUrl,
-      poster: posterUrl,
-      size: processedSize,
+    // Shared completion — identical rows/attachments for the client path and
+    // the server-side transcoder path.
+    const completed = await markVideoReady(db, mediaId, {
+      processedUrl,
+      processedSize,
+      posterUrl,
+      width,
+      height,
+      fps,
+      durationMs,
+      videoCodec,
+      audioCodec,
+      processingMs,
     });
-
-    logVideoMetrics(metricsPayload(row, "ready", {
-      width, height, fps, durationMs, videoCodec, audioCodec,
-      processedSize, processingMs, attempts: (row.attempts ?? 0) + 1, patched,
-    }));
+    if (!completed.ok) throw new Error(completed.error);
 
     return NextResponse.json({
       mediaId,
       status: "ready",
-      attachment: {
-        name: `video-${mediaId}.mp4`,
-        url: processedUrl,
-        type: "video/mp4",
-        size: processedSize,
-        ...(posterUrl ? { poster: posterUrl } : {}),
-        mediaId,
-        status: "ready",
-        strategy: row.strategy ?? undefined,
-      },
+      attachment: readyAttachment(completed.row),
     });
   } catch (error) {
     console.error("[video-finalize]", error);
     // Processing → failed: record enough to retry/debug, never stuck.
-    const { error: failError } = await db
-      .from("video_media")
-      .update({
-        status: "failed",
-        error_code: "finalize-failed",
-        error_message: error instanceof Error ? error.message.slice(0, 500) : "Finalize failed",
-        attempts: (row.attempts ?? 0) + 1,
-      })
-      .eq("id", mediaId);
-    if (failError) console.error("[video-finalize] failed-state update error:", failError);
-    logVideoMetrics(metricsPayload(row, "failed", { processingMs }));
+    await markVideoFailed(
+      db,
+      mediaId,
+      "finalize-failed",
+      error instanceof Error ? error.message : "Finalize failed",
+    );
     return NextResponse.json({ error: "Processing failed. Please try again." }, { status: 500 });
   }
-}
-
-function metricsPayload(
-  row: VideoMediaRow,
-  status: VideoStatus,
-  extra: Partial<VideoProcessingMetrics> = {},
-): VideoProcessingMetrics {
-  return {
-    mediaId: row.id,
-    userId: row.user_id,
-    communityId: row.community_id ?? "",
-    strategy: row.strategy ?? "transcode",
-    status,
-    width: extra.width ?? row.width,
-    height: extra.height ?? row.height,
-    fps: extra.fps ?? row.fps,
-    durationMs: extra.durationMs ?? row.duration_ms,
-    videoCodec: extra.videoCodec ?? row.video_codec,
-    audioCodec: extra.audioCodec ?? row.audio_codec,
-    originalSize: row.original_size,
-    processedSize: extra.processedSize ?? row.processed_size,
-    compressionRatio: null,
-    attempts: extra.attempts ?? row.attempts,
-    processingMs: extra.processingMs ?? row.processing_ms,
-    errorCode: extra.errorCode,
-    patched: extra.patched,
-  };
 }

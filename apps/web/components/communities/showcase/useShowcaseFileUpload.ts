@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { VIDEO_TYPES, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
+import { VIDEO_TYPES, QUEUED_FALLBACK_AFTER_MS, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, pollQueuedVideo, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
 import type { VideoDecision } from "@/lib/video/video-types";
 
 /** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 25 MB). */
@@ -152,18 +152,23 @@ export function useShowcaseFileUpload({
           if (VIDEO_TYPES.has(file.type)) {
             // ── Centralized video pipeline ────────────────────────────────
             // Probe → decide (passthrough / lossless remux / FFmpeg transcode)
-            // → upload original or canonical → encode in the FFmpeg worker
-            // (async, with progress) → finalize to ready.
+            // → upload original → server-side transcoder (async, polled) —
+            // with the in-browser FFmpeg worker as automatic fallback if no
+            // transcoder picks the job up in time.
             const prepared = await prepareVideoForPipeline(file);
             const response = await uploadVideo(communityId!, prepared);
             const attachment = response.attachment;
             setAttachments((current) => [...current, attachment]);
-            if (response.status === "uploaded" && attachment.mediaId) {
+            if (attachment.mediaId) {
               originalsRef.current.set(attachment.mediaId, {
                 file,
                 poster: prepared.poster,
               });
-              void runEncode(attachment, prepared.decision);
+              if (response.status === "queued") {
+                void awaitServerOrFallback(attachment, prepared.decision);
+              } else {
+                originalsRef.current.delete(attachment.mediaId);
+              }
             }
           } else {
             // ── Images: existing pipeline, unchanged ──────────────────────
@@ -193,37 +198,81 @@ export function useShowcaseFileUpload({
     [communityId, runEncode],
   );
 
+  /**
+   * Waits for the server-side transcoder; falls back to the in-browser
+   * FFmpeg worker when no worker completes the job within the grace period.
+   */
+  const awaitServerOrFallback = useCallback(
+    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
+      const mediaId = attachment.mediaId;
+      if (!mediaId || !communityId) return;
+      setAttachment(mediaId, { status: "processing" });
+      const result = await pollQueuedVideo(communityId, mediaId, {
+        timeoutMs: QUEUED_FALLBACK_AFTER_MS,
+      });
+      if (result.status === "ready" && result.attachment) {
+        setAttachment(mediaId, { ...result.attachment, status: "ready" });
+        originalsRef.current.delete(mediaId);
+        return;
+      }
+      if (result.status === "failed") {
+        setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
+        return;
+      }
+      if (result.status === "deleted") {
+        setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
+        return;
+      }
+      // Still queued/processing — no transcoder around (local dev, outage).
+      // Fall back to the in-browser FFmpeg wasm worker.
+      void runEncode(attachment, decision);
+    },
+    [communityId, runEncode, setAttachment],
+  );
+
   /** Retries a failed encode — the original is still in R2, no re-upload. */
   const retryAttachment = useCallback(
     (attachment: ShowcaseAttachment) => {
       if (!attachment.mediaId) return;
-      void runEncode(attachment, {
+      // Retry prefers the server-side transcoder again, then the wasm worker.
+      void awaitServerOrFallback(attachment, {
         strategy: "transcode",
         preset: attachment.preset ?? "slow",
         copyVideo: attachment.copyVideo,
         reason: "retry",
       });
     },
-    [runEncode],
+    [awaitServerOrFallback],
   );
 
-  // After an edit (initialAttachments change), resume any videos that were
-  // uploaded but never finalized — the original bytes are gone (page reload),
-  // so fall back to the lossless passthrough: the stored original becomes
-  // canonical with zero re-encode.
+  // After an edit (initialAttachments change), resume videos that never
+  // reached `ready`:
+  //   - `uploaded` (client-wasm era): original bytes are gone after a reload,
+  //     so the lossless passthrough promotes the stored original (zero
+  //     re-encode) via finalize.
+  //   - `queued` (server transcoder): the worker will complete + patch the
+  //     post server-side; just poll for the terminal state to refresh the UI.
   useEffect(() => {
-    const pending = initialAttachments.filter(
-      (item) => item.type.startsWith("video/") && item.status === "uploaded" && item.mediaId,
-    );
-    for (const item of pending) {
-      if (!communityId || !item.mediaId) continue;
-      void finalizeVideoPassthrough(communityId, item.mediaId).then((result) => {
-        if (result.status === "ready" && result.attachment) {
-          setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
-        }
-      }).catch(() => {
-        // Keep the placeholder state — the admin sweep cleans up leftovers.
-      });
+    for (const item of initialAttachments) {
+      if (!item.type.startsWith("video/") || !item.mediaId || !communityId) continue;
+      if (item.status === "uploaded") {
+        void finalizeVideoPassthrough(communityId, item.mediaId).then((result) => {
+          if (result.status === "ready" && result.attachment) {
+            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
+          }
+        }).catch(() => {
+          // Keep the placeholder state — the admin sweep cleans up leftovers.
+        });
+      } else if (item.status === "queued") {
+        void pollQueuedVideo(communityId, item.mediaId, { timeoutMs: 60_000 }).then((result) => {
+          if (result.status === "ready" && result.attachment) {
+            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
+          }
+        }).catch(() => {
+          // Still queued — keep the placeholder; the transcoder patches the
+          // post itself when it completes.
+        });
+      }
     }
   }, [initialAttachments, communityId, setAttachment]);
 

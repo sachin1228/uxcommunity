@@ -5,8 +5,12 @@
  * shapes) and the main-thread/worker boundary, so they live in one module.
  */
 
-/** Processing state machine — mirrors the `video_media.status` DB column. */
-export type VideoStatus = "uploaded" | "processing" | "ready" | "failed" | "deleted";
+/**
+ * Processing state machine — mirrors the `video_media.status` DB column.
+ * `queued` = the server-side transcoder service has been asked to process
+ * this upload (client-side wasm processing uses `uploaded` directly).
+ */
+export type VideoStatus = "uploaded" | "queued" | "processing" | "ready" | "failed" | "deleted";
 
 /**
  * How an upload enters the pipeline:

@@ -11,31 +11,50 @@ User
   ↓  pick video
 Probe (mediabunny + byte inspection) → decide strategy
   ↓
-Upload original (or canonical for passthrough)     POST /showcase/upload
-  ↓  video_media row created (status: uploaded|ready)
-FFmpeg worker (ffmpeg.wasm in a Web Worker)        ← only for transcodes
-  ↓  libx264 CRF 18, progress events
-Finalize (canonical MP4 + poster → R2)             POST /showcase/video-finalize
-  ↓  row → ready, owning post(s) patched server-side
+POST /showcase/upload  → original to R2, video_media row (status: queued)
+  ↓
+Server-side transcoder (apps/transcoder — NATIVE ffmpeg, libx264 CRF 18)
+  ↓  claims the job, downloads original, encodes, uploads canonical + poster
+POST /api/internal/video/complete  → row → ready, posts patched
+  ↓
 Serve the canonical MP4 (faststart → Range streaming)
+
+Fallback: if no transcoder is running, the client's ffmpeg.wasm worker
+encodes in-browser after a grace period and finalizes directly.
 ```
 
-### Why ffmpeg.wasm in the browser?
+### Two engines, one pipeline
 
 The web app deploys to **Cloudflare Workers via OpenNext**, which cannot run
-native ffmpeg/ffprobe binaries or child processes. The FFmpeg engine is
-therefore ffmpeg.wasm (`@ffmpeg/ffmpeg` + `@ffmpeg/core`, MIT) running in a
-dedicated Web Worker on the user's machine. It is the real FFmpeg — the same
-libx264 encoder, presets and CRF semantics — so the quality settings below
-apply exactly as written.
+native ffmpeg/ffprobe binaries or child processes, so the pipeline has two
+encode engines that share the SAME decision logic and the SAME argv builder
+(`@uxcommunity/shared`):
 
-- The ~31 MB wasm core is fetched lazily on the **first transcode only** and
-  cached by the browser. Sources that pass through never download it.
-- `@ffmpeg/core` (single-threaded build) needs no SharedArrayBuffer, so no
-  COOP/COEP headers are required.
-- Self-host the core by setting `NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` to a
-  directory serving `ffmpeg-core.js` + `ffmpeg-core.wasm`
-  (default: jsDelivr `@ffmpeg/core@0.12.10/dist/umd`).
+1. **Server-side transcoder** (`apps/transcoder`) — the primary path. A
+   small always-on container (Dockerfile included) with native ffmpeg
+   installed. It polls `video_media` for `queued` rows, claims them
+   atomically (any number of workers may run), encodes with the real
+   libx264, uploads the canonical MP4 + poster, and completes the job
+   through the web app's internal API (`Authorization: Bearer <API_SECRET>`,
+   the same pattern as the realtime worker). Survives the user closing the
+   tab; 5–20× faster than wasm; uniform quality and observability.
+2. **ffmpeg.wasm in a Web Worker** — the fallback when no transcoder is
+   running (e.g. local dev): after a grace period the client probes the
+   `queued` job's status, encodes in-browser and finalizes directly. The
+   state machine is identical, so the two paths are interchangeable.
+
+Passthrough/remux sources never touch either engine.
+
+### Self-hosted ffmpeg core
+
+The ~31 MB wasm core is **self-hosted at `/ffmpeg/`** (apps/web/public/ffmpeg
+— `scripts/fetch-ffmpeg-core.sh` pins the exact build with SHA-256
+checksums), so the fallback engine never depends on a third-party CDN. It is
+fetched lazily on the first in-browser transcode only and cached by the
+browser; sources that pass through never download it. Override the location
+with `NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` (e.g. an R2 custom domain).
+`@ffmpeg/core` (single-threaded build) needs no SharedArrayBuffer, so no
+COOP/COEP headers are required.
 
 ## ONE canonical video
 
@@ -61,8 +80,9 @@ ceiling is 12 Mbps (≤1080p) / 30 Mbps (>1080p), see `VIDEO_PASSTHROUGH`.
 
 ## FFmpeg configuration
 
-`apps/web/lib/video/video-config.ts` is the single source of truth; the
-exact argv is built by `buildEncodeArgs` (`video-encode.ts`):
+`packages/shared/src/video/video-config.ts` is the single source of truth
+(shared by the web app AND the transcoder service); the exact argv is built
+by `buildEncodeArgs` (`video-encode.ts`):
 
 ```
 ffmpeg -i input.mp4 -map 0:v:0
@@ -86,10 +106,27 @@ ffmpeg -i input.mp4 -map 0:v:0
 - **Faststart** — `+faststart` puts `moov` at the front for Range streaming;
   verified in tests (`isFaststart`).
 
-Before encoding, the worker probes the source with ffmpeg.wasm's built-in
-ffprobe (codec, dimensions, fps, pixel format, rotation, bitrate, audio) and
-refuses to guess when probing fails (`probe-failed` → the lossless original
-becomes canonical via an R2 copy — never a guessed encode).
+Before encoding, the engine probes the source (ffmpeg.wasm's built-in
+ffprobe in the browser; native ffprobe in the transcoder — codec,
+dimensions, fps, pixel format, rotation, bitrate, audio) and refuses to
+guess when probing fails (the lossless original becomes canonical via an R2
+copy — never a guessed encode).
+
+## Deploying the transcoder
+
+```bash
+docker build -f apps/transcoder/Dockerfile -t transcoder .   # from the repo root
+docker run --env-file apps/transcoder/.env.example transcoder
+```
+
+Required env (see `apps/transcoder/.env.example`): Supabase URL + service
+role, R2 credentials + bucket + public URL, the web app's `API_SECRET` and
+`APP_URL`. Run as many replicas as you like — claims are atomic and the
+processed key is media-ID derived, so duplicate/overlapping processing is
+impossible. Crashed workers' leases expire (`CLAIM_LEASE_MS`, default 10
+min) and another worker reclaims the job; per-job temp dirs under
+`TEMP_DIR` are removed on success and failure; a hard per-job timeout kills
+runaway encodes.
 
 ## R2 layout
 
@@ -112,10 +149,13 @@ media/videos/posters/{mediaId}.jpg       single feed thumbnail
 
 ## Database — `video_media`
 
-One row per upload. State machine: `uploaded → processing → ready`,
-`→ failed` (retry-safe), `→ deleted` (tombstone). The row records the
-original/processed/poster keys + URLs, probed metadata (width/height/fps/
-duration/codecs/sizes), attempts, processing time and error info.
+One row per upload. State machine:
+`uploaded → processing → ready`, `→ failed` (retry-safe), `→ deleted`
+(tombstone); **`queued`** = handed to the server-side transcoder (wasm
+fallback uses `uploaded` directly). The row records the original/processed/
+poster keys + URLs, probed metadata (width/height/fps/duration/codecs/
+sizes), attempts, processing time, error info and the claiming worker
+(`claimed_by`/`claimed_at` for lease-based crash recovery).
 
 Migration: `supabase/migrations/20260910120000_video_media.sql`.
 Deleted rows keep their keys (forensics) but null the URL columns, so the
@@ -174,11 +214,14 @@ stale-video counts.
 
 ## Testing
 
-- Unit (always in CI, `npm run test:video-pipeline`): probe parsing
-  (1080p/4K/60fps/portrait/square/silent/screen-recording/rotation/HDR),
-  encode-args building, strategy decisions (passthrough/remux/transcode/
-  copyVideo/safety), server lifecycle (idempotency, delete-during-processing,
-  retry, cleanup, sweep, attachment resolution, container sniffing).
+- Unit (always in CI, `npm run test:video-pipeline` + `npm run
+  test:transcoder`): probe parsing (1080p/4K/60fps/portrait/square/silent/
+  screen-recording/rotation/HDR), encode-args building, strategy decisions
+  (passthrough/remux/transcode/copyVideo/safety), server lifecycle
+  (idempotency, delete-during-processing, retry, cleanup, sweep, attachment
+  resolution, container sniffing), and the transcoder's queue primitives
+  (atomic claim, lease reclaim, failure recording) + byte/ffprobe probe
+  merging.
 - E2E (local, needs ffmpeg on PATH — `bash scripts/test-video-pipeline.sh`):
   generates 10 real sources and runs the exact worker argv, verifying with
   ffprobe that output preserves resolution, FPS, duration, aspect ratio and

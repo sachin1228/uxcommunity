@@ -20,6 +20,7 @@ import {
   DeleteObjectCommand,
   ListObjectsV2Command,
   CopyObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
@@ -172,6 +173,17 @@ export async function uploadToR2(
     })
   );
   return r2PublicUrl(key);
+}
+
+/** Returns true when an R2 object exists (used to verify canonical videos). */
+export async function r2ObjectExists(key: string): Promise<boolean> {
+  const client = getClient();
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

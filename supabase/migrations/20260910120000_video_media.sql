@@ -35,14 +35,20 @@ create table if not exists public.video_media (
     check (owner_type in ('showcase')),
 
   -- ── Processing state machine ──────────────────────────────
+  -- uploaded = client-side (wasm) processing; queued = the server-side
+  -- transcoder service has been asked to process this upload.
   status text not null default 'uploaded'
-    check (status in ('uploaded', 'processing', 'ready', 'failed', 'deleted')),
+    check (status in ('uploaded', 'queued', 'processing', 'ready', 'failed', 'deleted')),
   strategy text
     check (strategy in ('transcode', 'passthrough')),
   attempts integer not null default 0,
   processing_ms integer,
   error_code text,
   error_message text,
+  -- Server-side transcoder queue lease: which worker claimed the job and
+  -- when; a crashed worker's jobs are reclaimed once the lease expires.
+  claimed_by text,
+  claimed_at timestamptz,
 
   -- ── R2 object keys + public URLs ──────────────────────────
   original_key text not null,

@@ -23,6 +23,7 @@ import type {
   VideoDecision,
   VideoEncodeResult,
   VideoProbeResult,
+  VideoStatus,
 } from "./video-types";
 
 export interface PreparedVideo {
@@ -36,9 +37,19 @@ export interface PreparedVideo {
 
 export interface VideoUploadResponse {
   mediaId: string;
-  status: "uploaded" | "ready";
+  status: "queued" | "ready";
   attachment: ShowcaseAttachment;
 }
+
+/** How often the composer polls the server-side transcoder queue. */
+export const QUEUED_POLL_INTERVAL_MS = 2500;
+/**
+ * How long to wait for the server-side transcoder before falling back to the
+ * in-browser FFmpeg wasm worker (local dev without a transcoder, or a worker
+ * outage). The fallback keeps uploads moving; finalize is idempotent, so if
+ * the server worker finishes first the client's finalize short-circuits.
+ */
+export const QUEUED_FALLBACK_AFTER_MS = 60_000;
 
 export interface VideoFinalizeResponse {
   mediaId: string;
@@ -164,6 +175,58 @@ export async function finalizeVideo(
   const data = await response.json();
   if (!response.ok) throw new Error(data.error ?? "Processing failed.");
   return data as VideoFinalizeResponse;
+}
+
+/**
+ * Polls the server-side transcoder status for a queued video.
+ * Resolves with the current row state (and the canonical attachment when
+ * ready). Never throws for network hiccups — returns the last known state.
+ */
+export async function getVideoStatus(
+  communityId: string,
+  mediaId: string,
+): Promise<{ status: VideoStatus; attachment: ShowcaseAttachment | null }> {
+  const response = await fetch(
+  `/api/communities/${communityId}/showcase/video-status?mediaId=${encodeURIComponent(mediaId)}`,
+  );
+  const data = await response.json();
+  if (!response.ok) {
+    return { status: "uploaded", attachment: null };
+  }
+  return data as { status: VideoStatus; attachment: ShowcaseAttachment | null };
+}
+
+/**
+ * Waits for a queued video to reach a terminal state (ready / failed /
+ * deleted), polling until `timeoutMs` elapses. Returns the terminal
+ * attachment (ready) or null when the wait timed out.
+ */
+export async function pollQueuedVideo(
+  communityId: string,
+  mediaId: string,
+  opts: { intervalMs?: number; timeoutMs?: number; onProgress?: (status: VideoStatus) => void } = {},
+): Promise<{ status: VideoStatus; attachment: ShowcaseAttachment | null }> {
+  const intervalMs = opts.intervalMs ?? QUEUED_POLL_INTERVAL_MS;
+  const timeoutMs = opts.timeoutMs ?? QUEUED_FALLBACK_AFTER_MS;
+  const deadline = Date.now() + timeoutMs;
+
+  let last: { status: VideoStatus; attachment: ShowcaseAttachment | null } = {
+    status: "queued",
+    attachment: null,
+  };
+  while (Date.now() < deadline) {
+    try {
+      last = await getVideoStatus(communityId, mediaId);
+      opts.onProgress?.(last.status);
+      if (last.status !== "queued" && last.status !== "processing" && last.status !== "uploaded") {
+        return last;
+      }
+    } catch {
+      // Transient network error — keep polling until the deadline.
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  return last;
 }
 
 /**

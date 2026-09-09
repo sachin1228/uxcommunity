@@ -31,9 +31,9 @@ const PRESETS = new Set(["slow", "medium"]);
  *      directly at media/videos/processed/{mediaId}.mp4 as the canonical
  *      object for passthrough/remux strategies (zero re-encoding).
  *
- * Processing itself (FFmpeg wasm worker) runs asynchronously client-side;
- * this route never blocks on it. The row's status drives the composer UI:
- * `ready` (passthrough/remux) or `uploaded` (transcode → finalize later).
+ * Processing runs asynchronously and never blocks this route. The row's
+ * status drives the composer UI: `ready` (passthrough/remux) or `queued`
+ * (transcode → server-side transcoder, with client-side wasm fallback).
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
@@ -114,6 +114,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const mediaId = crypto.randomUUID();
   const transcode = effectiveStrategy === "transcode";
+  // Transcodes are processed by the server-side transcoder service
+  // (apps/transcoder): status `queued` until a worker claims + completes it.
+  // If no worker is running (local dev), the client falls back to its own
+  // FFmpeg wasm worker after a grace period and finalizes directly.
+  const initialStatus = transcode ? "queued" : "ready";
   const originalKey = videoKeys.original(mediaId);
   const processedKey = videoKeys.processed(mediaId);
   const posterKey = videoKeys.poster(mediaId);
@@ -144,7 +149,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         user_id: session.userId!,
         community_id: id,
         owner_type: "showcase",
-        status: transcode ? "uploaded" : "ready",
+        status: initialStatus,
         strategy: effectiveStrategy,
         original_key: transcode ? originalKey : processedKey,
         processed_key: transcode ? null : processedKey,
@@ -179,7 +184,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         mediaId,
-        status: transcode ? "uploaded" : "ready",
+        status: initialStatus,
         attachment: {
           name: file.name,
           url: transcode ? "" : r2PublicUrl(processedKey),
@@ -187,7 +192,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           size: file.size,
           ...(posterUrl ? { poster: posterUrl } : {}),
           mediaId,
-          status: transcode ? "uploaded" : "ready",
+          status: initialStatus,
           strategy: effectiveStrategy,
           preset,
           copyVideo,

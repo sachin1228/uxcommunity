@@ -25,7 +25,7 @@ export interface ShowcaseAttachmentInput {
   strategy?: string;
 }
 
-export const VIDEO_ATTACHMENT_STATUSES = new Set(["uploaded", "processing", "ready", "failed"]);
+export const VIDEO_ATTACHMENT_STATUSES = new Set(["uploaded", "queued", "processing", "ready", "failed"]);
 const MEDIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ShowcasePostInput {
