@@ -34,10 +34,14 @@ export function pixelFormatFor(probe: FfmpegProbeResult): string {
  * Builds the FFmpeg argv for one canonical encode. `copyVideo` (from the
  * decision) copies the H.264 stream bit-identically while re-encoding only
  * the audio — used for sources whose audio browsers can't play in MP4.
+ *
+ * `crf` is an optional quality override (used by the CRF benchmark and
+ * future policy tuning); it defaults to the configured `VIDEO_ENCODE.crf`.
  */
 export function buildEncodeArgs(
   probe: FfmpegProbeResult,
   decision: VideoDecision,
+  crf: number = VIDEO_ENCODE.crf,
 ): string[] {
   const args: string[] = ["-i", ENCODE_INPUT_NAME, "-map", "0:v:0"];
 
@@ -51,7 +55,7 @@ export function buildEncodeArgs(
       "-preset",
       decision.preset,
       "-crf",
-      String(VIDEO_ENCODE.crf),
+      String(crf),
       "-pix_fmt",
       pixelFormat,
     );

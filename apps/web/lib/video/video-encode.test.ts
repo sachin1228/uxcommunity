@@ -56,6 +56,14 @@ test("4K sources use the medium preset (CRF stays 18 — quality is never lowere
   assert.equal(args[crfIndex + 1], "18");
 });
 
+test("crf override changes only the -crf value (benchmark/policy tuning)", () => {
+  const args = buildEncodeArgs(probe(), decision(), 17);
+  const crfIndex = args.indexOf("-crf");
+  assert.equal(args[crfIndex + 1], "17");
+  const presetIndex = args.indexOf("-preset");
+  assert.equal(args[presetIndex + 1], "slow");
+});
+
 test("no audio track in the source → no audio mapping or AAC args (no silent track invented)", () => {
   const args = buildEncodeArgs(probe({ audioCodec: null, audioChannels: null }), decision());
   assert.ok(!args.includes("-c:a"));

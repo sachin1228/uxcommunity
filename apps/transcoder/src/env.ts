@@ -4,6 +4,8 @@
  * must never silently claim (and then fail) user uploads.
  */
 
+import { hostname } from "node:os";
+
 export interface TranscoderEnv {
   supabaseUrl: string;
   supabaseServiceRoleKey: string;
@@ -52,7 +54,7 @@ export function loadEnv(): TranscoderEnv {
     appUrl: required("APP_URL").replace(/\/+$/, ""),
     ffmpegPath: process.env.FFMPEG_PATH ?? "ffmpeg",
     ffprobePath: process.env.FFPROBE_PATH ?? "ffprobe",
-    workerId: process.env.WORKER_ID ?? `transcoder-${require("os").hostname()}`,
+    workerId: process.env.WORKER_ID ?? `transcoder-${hostname()}`,
     pollIntervalMs: number("POLL_INTERVAL_MS", 5000),
     jobBatchSize: number("JOB_BATCH_SIZE", 2),
     claimLeaseMs: number("CLAIM_LEASE_MS", 10 * 60 * 1000),

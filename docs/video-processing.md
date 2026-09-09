@@ -114,9 +114,11 @@ copy — never a guessed encode).
 
 ## Deploying the transcoder
 
+Full runbook: **docs/transcoder-deploy.md**. Short version:
+
 ```bash
 docker build -f apps/transcoder/Dockerfile -t transcoder .   # from the repo root
-docker run --env-file apps/transcoder/.env.example transcoder
+docker run --env-file apps/transcoder/.env.production transcoder
 ```
 
 Required env (see `apps/transcoder/.env.example`): Supabase URL + service
@@ -127,6 +129,21 @@ impossible. Crashed workers' leases expire (`CLAIM_LEASE_MS`, default 10
 min) and another worker reclaims the job; per-job temp dirs under
 `TEMP_DIR` are removed on success and failure; a hard per-job timeout kills
 runaway encodes.
+
+Each worker exposes **`GET /health`** (default port 9090): ffmpeg/ffprobe
+availability, Supabase and R2 connectivity, queue depth and job stats,
+returning 200 when healthy / 503 when degraded (container-probe friendly).
+Point the web app's `TRANSCODER_HEALTH_URL` (comma-separated) at the
+worker(s) to surface the same payload in **Admin → Tools → Video pipeline
+health**.
+
+## CRF benchmark
+
+Real measurements of CRF 17/18/19 on designer content (screen recordings,
+fine detail, animated gradients, 4K, 60fps): **docs/crf-benchmark-report.md**
+(reproduce with `bash scripts/benchmark-crf.sh`). Conclusion: CRF 18 stays
+the default (SSIM ≥ 0.996 on non-grainy content, 12–55% smaller); prefer
+CRF 17 over 19 for UI/screen-recording content with small text.
 
 ## R2 layout
 

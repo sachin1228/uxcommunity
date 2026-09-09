@@ -31,6 +31,7 @@ import {
 import { createR2Store } from "./r2";
 import { encodeJob } from "./encode";
 import { loadEnv } from "./env";
+import { startHealthServer, type WorkerStats } from "./health";
 
 const ENCODE_INPUT_NAME = "input.mp4";
 const ENCODE_OUTPUT_NAME = "output.mp4";
@@ -53,7 +54,11 @@ async function failJob(
  * Processes one claimed job end-to-end. All temp files live in a per-job
  * directory that is removed on every exit path.
  */
-async function processJob(db: SupabaseClient, row: VideoMediaRow): Promise<void> {
+async function processJob(
+  db: SupabaseClient,
+  row: VideoMediaRow,
+  stats: WorkerStats,
+): Promise<void> {
   const env = loadEnv();
   const mediaId = row.id;
   const tempDir = join(env.tempDir, mediaId);
@@ -120,6 +125,8 @@ async function processJob(db: SupabaseClient, row: VideoMediaRow): Promise<void>
 
     if (response.status === 410) {
       console.log(`[transcoder] job ${mediaId} discarded — content deleted while processing`);
+      stats.jobsProcessed += 1;
+      stats.lastJobAt = new Date().toISOString();
       return;
     }
     if (!response.ok) {
@@ -128,9 +135,14 @@ async function processJob(db: SupabaseClient, row: VideoMediaRow): Promise<void>
     }
 
     console.log(`[transcoder] job ${mediaId} done in ${Date.now() - startedAt}ms`);
+    stats.jobsProcessed += 1;
+    stats.lastJobAt = new Date().toISOString();
   } catch (error) {
     const detail = await failJob(db, mediaId, "transcoder-failed", error);
     console.error(`[transcoder] job ${mediaId} failed:`, detail);
+    stats.jobsFailed += 1;
+    stats.lastJobAt = new Date().toISOString();
+    stats.lastError = detail.slice(0, 500);
 
     // Remove partial objects THIS attempt wrote, so a truncated canonical
     // never lingers at the ready key. (See the flags above — objects from a
@@ -155,6 +167,17 @@ async function main(): Promise<void> {
     auth: { persistSession: false },
   });
 
+  // Live worker stats for the /health endpoint (in-memory only — the
+  // durable record is the video_media row).
+  const stats: WorkerStats = {
+    jobsProcessed: 0,
+    jobsFailed: 0,
+    lastJobAt: null,
+    lastError: null,
+    startedAt: Date.now(),
+  };
+  startHealthServer(env, db, stats);
+
   while (true) {
     try {
       // 1. Pick up jobs whose lease expired (a worker crashed mid-encode).
@@ -169,7 +192,7 @@ async function main(): Promise<void> {
         const row = await claimVideoJob(db, env.workerId);
         if (!row) break;
         processed += 1;
-        await processJob(db, row);
+        await processJob(db, row, stats);
       }
     } catch (error) {
       // Loop-level failures (DB down, bad env) must never kill the worker.
