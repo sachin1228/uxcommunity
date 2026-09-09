@@ -93,6 +93,7 @@ export function ShowcaseCard({
           <FeedVideo
             src={item.url}
             ariaLabel={post.title}
+            poster={item.poster}
             className="mx-auto block max-h-[480px] w-full object-contain"
           />
         </div>

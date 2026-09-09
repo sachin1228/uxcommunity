@@ -28,11 +28,14 @@ export function FeedVideo({
   ariaLabel,
   className,
   active = true,
+  poster,
 }: {
   src: string;
   ariaLabel?: string;
   className?: string;
   active?: boolean;
+  /** First-frame image shown until the first video frame decodes. */
+  poster?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const userPausedRef = useRef(false);
@@ -147,6 +150,7 @@ export function FeedVideo({
       muted
       playsInline
       preload="metadata"
+      poster={poster}
       className={className}
     />
   );

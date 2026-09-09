@@ -106,10 +106,20 @@ function MediaRow({
           className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised"
         >
           {item.type.startsWith("video/") ? (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
-              <Film strokeWidth={2.5} size={18} className="text-white" />
-              <span className="w-full truncate px-1 font-body text-[10px] text-white/70">{item.name}</span>
-            </div>
+            item.poster ? (
+              <div className="relative h-full w-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.poster} alt={item.name} className="h-full w-full object-cover" />
+                <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">
+                  <Film strokeWidth={2.5} size={18} fill="currentColor" />
+                </span>
+              </div>
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
+                <Film strokeWidth={2.5} size={18} className="text-white" />
+                <span className="w-full truncate px-1 font-body text-[10px] text-white/70">{item.name}</span>
+              </div>
+            )
           ) : (
             <img src={item.url} alt={item.name} className="h-full w-full object-cover" />
           )}

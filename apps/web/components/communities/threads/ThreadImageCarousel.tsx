@@ -9,6 +9,8 @@ interface CarouselImage {
   name: string;
   /** Optional MIME type — when it starts with video/, the slide renders a <video>. */
   type?: string;
+  /** Optional first-frame image shown while a video slide streams in. */
+  poster?: string;
 }
 
 /**
@@ -124,6 +126,7 @@ export function ThreadImageCarousel({
               src={img.url}
               ariaLabel={img.name}
               active={active}
+              poster={img.poster}
               className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
             />
           ) : (

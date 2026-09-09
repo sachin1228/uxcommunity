@@ -50,8 +50,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const extension = isImage ? extensionForMime(file.type) : videoExtension(file.type);
     const key = `showcase/${id}/${session.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
     const url = await uploadToR2(key, body, file.type);
+
+    // Optional first-frame poster for video attachments (generated client-side
+    // during preprocessing). Stored alongside the video, exposed on the
+    // attachment so feed cards can render it while the video streams in.
+    let posterUrl: string | undefined;
+    if (isVideo) {
+      const poster = form.get("poster");
+      if (poster instanceof File && poster.size > 0 && poster.size <= MAX_IMAGE_BYTES && IMAGE_TYPES.has(poster.type)) {
+        const posterBody = Buffer.from(await poster.arrayBuffer());
+        const posterKey = `${key}-poster.${extensionForMime(poster.type)}`;
+        posterUrl = await uploadToR2(posterKey, posterBody, poster.type);
+      }
+    }
+
     return NextResponse.json(
-      { url, attachment: { name: file.name, url, type: file.type, size: file.size } },
+      {
+        url,
+        attachment: {
+          name: file.name,
+          url,
+          type: file.type,
+          size: file.size,
+          ...(posterUrl ? { poster: posterUrl } : {}),
+        },
+      },
       { status: 201 },
     );
   } catch (error) {
