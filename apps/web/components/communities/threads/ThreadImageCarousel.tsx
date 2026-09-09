@@ -6,20 +6,24 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 interface CarouselImage {
   url: string;
   name: string;
+  /** Optional MIME type — when it starts with video/, the slide renders a <video>. */
+  type?: string;
 }
 
 /**
- * Inline image carousel for thread cards with 2+ images.
+ * Inline media carousel for cards with 2+ attachments.
  *
- * All images sit side by side in a horizontal track and the viewport slides
- * between them (translateX on the track), so Next moves the current image out
+ * All items sit side by side in a horizontal track and the viewport slides
+ * between them (translateX on the track), so Next moves the current item out
  * to the left while the next one enters from the right — and Previous does the
- * reverse. An invisible copy of the first image anchors the viewport height in
- * normal flow, so the surrounding thread layout never jumps. Swipe gestures
+ * reverse. An invisible copy of the first item anchors the viewport height in
+ * normal flow, so the surrounding card layout never jumps. Swipe gestures
  * work on touch devices without interfering with vertical scrolling.
  *
- * Clicking the visible image reports its index via `onImageClick` so the
- * parent can open the full-screen lightbox — images never open in a new tab.
+ * Image slides render <img>; video slides (items whose `type` starts with
+ * "video/") render an inline <video controls> instead. Clicking the visible
+ * image reports its index via `onImageClick` so the parent can open the
+ * full-screen lightbox — media never opens in a new tab.
  */
 export function ThreadImageCarousel({
   images,
@@ -101,8 +105,17 @@ export function ThreadImageCarousel({
       >
         {images.map((img, slideIndex) => {
           const active = slideIndex === index;
+          const isVideo = typeof img.type === "string" && img.type.startsWith("video/");
           // Native aspect ratio, capped at 480px tall — never cropped.
-          const inner = (
+          const inner = isVideo ? (
+            <video
+              src={img.url}
+              aria-label={img.name}
+              controls
+              preload="metadata"
+              className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
+            />
+          ) : (
             <img
               src={img.url}
               alt={img.name}
@@ -113,14 +126,20 @@ export function ThreadImageCarousel({
           return (
             <div
               key={img.url}
-              role="button"
-              tabIndex={active ? 0 : -1}
+              role={isVideo ? undefined : "button"}
+              tabIndex={!isVideo && active ? 0 : -1}
               aria-hidden={!active}
-              aria-label={active ? `Open image ${slideIndex + 1} of ${images.length}` : undefined}
+              aria-label={active && !isVideo ? `Open media ${slideIndex + 1} of ${images.length}` : undefined}
               className={`h-full w-full shrink-0 overflow-hidden ${
-                active ? "block cursor-pointer" : "pointer-events-none block"
+                active ? (isVideo ? "block" : "block cursor-pointer") : "pointer-events-none block"
               }`}
               onClick={(event) => {
+                // Videos play inline — only image slides open the lightbox, and
+                // the click must not bubble to a parent card navigation.
+                if (isVideo) {
+                  event.stopPropagation();
+                  return;
+                }
                 // A swipe ends in a click on touch devices — don't open after one.
                 if (suppressClickRef.current) {
                   event.preventDefault();
@@ -131,6 +150,7 @@ export function ThreadImageCarousel({
                 onImageClick(slideIndex);
               }}
               onKeyDown={(event) => {
+                if (isVideo) return;
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   event.stopPropagation();
