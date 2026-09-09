@@ -172,11 +172,6 @@ export default function LoginPage() {
             Sign up
           </Link>
         </p>
-
-        <p className="mt-4 text-center font-body text-[11px] text-foreground-subtle">
-          Administrator? Sign in with the admin account — you&apos;ll land in
-          the <Link href="/admin" className="underline transition-colors hover:text-foreground">admin dashboard</Link>.
-        </p>
       </section>
     </main>
   );
