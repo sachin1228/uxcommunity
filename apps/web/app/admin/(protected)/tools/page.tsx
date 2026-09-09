@@ -433,8 +433,14 @@ export default function ToolsPage() {
                   </div>
                 )}
 
-                <div className="mt-3 max-h-48 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-                  {r2Summary.orphans.slice(0, 20).map((item: any, i: number) => (
+                {r2Summary.potentialOrphans > r2Summary.orphans.length && (
+                  <p className="mt-2 font-body text-[11px] text-foreground-muted">
+                    Showing the first {r2Summary.orphans.length} of {r2Summary.potentialOrphans} — deleting processes all of them.
+                  </p>
+                )}
+
+                <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                  {r2Summary.orphans.map((item: any, i: number) => (
                     <div key={i} className="flex items-center gap-2 px-3 py-2">
                       <img
                         src={item.previewUrl}
