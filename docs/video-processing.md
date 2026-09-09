@@ -45,16 +45,28 @@ encode engines that share the SAME decision logic and the SAME argv builder
 
 Passthrough/remux sources never touch either engine.
 
-### Self-hosted ffmpeg core
+### Self-hosted ffmpeg core (served from R2)
 
-The ~31 MB wasm core is **self-hosted at `/ffmpeg/`** (apps/web/public/ffmpeg
-— `scripts/fetch-ffmpeg-core.sh` pins the exact build with SHA-256
-checksums), so the fallback engine never depends on a third-party CDN. It is
-fetched lazily on the first in-browser transcode only and cached by the
-browser; sources that pass through never download it. Override the location
-with `NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` (e.g. an R2 custom domain).
+The ~31 MB wasm core is **self-hosted and served from R2** so the fallback
+engine never depends on a third-party CDN. `scripts/fetch-ffmpeg-core.sh`
+pins the exact build with SHA-256 checksums into `scripts/ffmpeg-core/`
+(verified by a CI test), and `scripts/upload-ffmpeg-core.mjs` uploads it to
+the bucket as `ffmpeg-core/{ffmpeg-core.js,ffmpeg-core.wasm}` with immutable
+cache headers. The web app must set `NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` to
+the bucket's custom domain (e.g. `https://media.uxcommunity.in/ffmpeg-core`).
+
+Why R2 and not the Worker's own origin: Cloudflare caps Worker static
+assets at **25 MiB per file** and the wasm is ~31 MiB — the deploy fails
+with "Asset too large" (the preview workflow caught this; the old
+`public/ffmpeg` approach was removed for that reason).
+
+The core is fetched lazily on the first in-browser transcode only and
+cached by the browser; sources that pass through never download it.
 `@ffmpeg/core` (single-threaded build) needs no SharedArrayBuffer, so no
-COOP/COEP headers are required.
+COOP/COEP headers are required. When the env var is unset, the in-browser
+engine reports `engine-unavailable` and the pipeline falls back to the
+lossless passthrough of the original — the server-side transcoder remains
+the primary path.
 
 ## ONE canonical video
 

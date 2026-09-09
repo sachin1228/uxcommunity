@@ -3,9 +3,9 @@
  *
  * A dedicated Web Worker runs ffmpeg.wasm (real FFmpeg compiled to
  * WebAssembly) so the main thread never blocks during a transcode. The core
- * (~31 MB wasm) is fetched lazily on the first transcode from a CDN (or a
- * self-hosted base via NEXT_PUBLIC_FFMPEG_CORE_BASE_URL) and cached by the
- * browser.
+ * (~31 MB wasm) is fetched lazily on the first transcode from the
+ * self-hosted R2 origin (NEXT_PUBLIC_FFMPEG_CORE_BASE_URL — see
+ * scripts/upload-ffmpeg-core.mjs) and cached by the browser.
  *
  * Protocol (main thread ↔ this worker):
  *   in:  { type: "encode", id, file, decision }
@@ -105,6 +105,15 @@ async function handleEncode(request: EncodeRequest): Promise<void> {
   const logTail: string[] = [];
 
   try {
+    if (!FFMPEG.coreBaseUrl) {
+      postError(
+        id,
+        "engine-unavailable",
+        new Error("NEXT_PUBLIC_FFMPEG_CORE_BASE_URL is not configured"),
+        "Video processing couldn't start (engine unavailable).",
+      );
+      return;
+    }
     let instance: FFmpeg;
     try {
       instance = await getFfmpeg();

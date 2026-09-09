@@ -23,6 +23,11 @@ slower, tab-bound encodes, but never breaks.
 The `video_media` migration (`supabase/migrations/20260910120000_video_media.sql`)
 must be applied before first run.
 
+The in-browser ffmpeg core must be uploaded to R2 once
+(`node scripts/upload-ffmpeg-core.mjs` — see docs/video-processing.md) and
+`NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` set on the web app, so the wasm fallback
+works when this service is down.
+
 ## Environment variables
 
 All documented in `apps/transcoder/.env.example`. Required:

@@ -6,14 +6,14 @@ import { resolve } from "node:path";
 import { test } from "node:test";
 
 /**
- * Pins the SELF-HOSTED ffmpeg core served at /ffmpeg/ (see
- * scripts/fetch-ffmpeg-core.sh). If the committed wasm/js diverge from these
- * hashes, the pipeline would serve a tampered or stale core — this test
- * fails instead.
+ * Pins the SELF-HOSTED ffmpeg core (scripts/ffmpeg-core — the artifact
+ * uploaded to R2, see scripts/fetch-ffmpeg-core.sh + upload-ffmpeg-core.mjs).
+ * If the committed wasm/js diverge from these hashes, the pipeline would
+ * serve a tampered or stale core — this test fails instead.
  */
 
 // Relative to this test file (apps/web/lib/video) — independent of cwd.
-const CORE_DIR = resolve(fileURLToPath(new URL("../../public/ffmpeg", import.meta.url)));
+const CORE_DIR = resolve(fileURLToPath(new URL("../../../../scripts/ffmpeg-core", import.meta.url)));
 
 const PINNED = {
   "ffmpeg-core.js": "b266ab5b952555881dd6310663986994a182acb2b7ff25cf10a25f7a37ac2b21",

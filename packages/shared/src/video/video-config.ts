@@ -120,16 +120,21 @@ export const VIDEO_SAFETY = {
 export const FFMPEG = {
   /**
    * Version of the `@ffmpeg/core` wasm build served at runtime. The build is
-   * SELF-HOSTED at `/ffmpeg/` (apps/web/public/ffmpeg — see
-   * scripts/fetch-ffmpeg-core.sh, which pins SHA-256 checksums), so the
-   * pipeline never depends on a third-party CDN. Point
-   * NEXT_PUBLIC_FFMPEG_CORE_BASE_URL elsewhere (e.g. an R2 custom domain)
-   * to override. The core is ~32 MB, fetched lazily on the first transcode
-   * and cached by the browser.
+   * SELF-HOSTED and served from R2 (scripts/ffmpeg-core/ — see
+   * scripts/fetch-ffmpeg-core.sh, which pins SHA-256 checksums, and
+   * scripts/upload-ffmpeg-core.mjs, which uploads to the bucket). It is NOT
+   * served from the Worker's static assets: Cloudflare caps those at 25 MiB
+   * per file and the wasm is ~31 MiB (the deploy hard-fails).
+   *
+   * `NEXT_PUBLIC_FFMPEG_CORE_BASE_URL` must point at the R2-hosted core,
+   * e.g. https://media.uxcommunity.in/ffmpeg-core (serves ffmpeg-core.js +
+   * ffmpeg-core.wasm). When unset, the in-browser engine is unavailable and
+   * the pipeline falls back to the lossless passthrough of the original
+   * (the server-side transcoder is the primary path).
    */
   coreVersion: "0.12.10",
   get coreBaseUrl(): string {
-    return process.env.NEXT_PUBLIC_FFMPEG_CORE_BASE_URL ?? "/ffmpeg";
+    return process.env.NEXT_PUBLIC_FFMPEG_CORE_BASE_URL?.replace(/\/+$/, "") ?? "";
   },
   get coreUrl(): string {
     return `${FFMPEG.coreBaseUrl}/ffmpeg-core.js`;
