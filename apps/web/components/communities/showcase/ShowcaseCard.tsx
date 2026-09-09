@@ -66,6 +66,23 @@ export function ShowcaseCard({
   const stageLabel = SHOWCASE_STAGES.find((item) => item.value === post.stage)?.label ?? null;
   const media = mediaForPost(post);
 
+  // The card root is a clickable link; clicks on controls (carousel arrows,
+  // dots, lightbox triggers) must not also open the detail page.
+  function handleCardClick(event: React.MouseEvent<HTMLElement>) {
+    if (!onOpen) return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    onOpen();
+  }
+
+  function handleCardKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!onOpen || event.key !== "Enter") return;
+    const interactiveTarget = (event.target as Element | null)?.closest?.("button, a, [role='link'], [role='button'], video");
+    if (interactiveTarget && interactiveTarget !== event.currentTarget) return;
+    event.preventDefault();
+    onOpen();
+  }
+
   let mediaBlock: React.ReactNode = null;
   if (media.length === 1) {
     const item = media[0];
@@ -118,8 +135,8 @@ export function ShowcaseCard({
       <article
         tabIndex={onOpen ? 0 : undefined}
         role={onOpen ? "link" : undefined}
-        onClick={onOpen}
-        onKeyDown={onOpen ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
         className={`${communityFeedLayout.card} ${onOpen ? communityFeedLayout.cardInteractive : ""} ${onOpen ? "cursor-pointer" : ""}`}
       >
         <div className="flex items-start justify-between gap-4">
