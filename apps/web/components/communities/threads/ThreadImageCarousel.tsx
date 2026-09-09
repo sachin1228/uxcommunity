@@ -43,6 +43,11 @@ export function ThreadImageCarousel({
   const goPrev = () => setIndex((current) => Math.max(0, current - 1));
   const goNext = () => setIndex((current) => Math.min(images.length - 1, current + 1));
 
+  // The sizing anchor borrows the intrinsic dimensions of a real image; when
+  // the set is all videos there is no <img> to borrow from, so a 16:9 spacer
+  // stands in (videos letterbox inside it).
+  const anchorImage = images.find((img) => !(typeof img.type === "string" && img.type.startsWith("video/"))) ?? null;
+
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
     if (!touch) return;
@@ -80,7 +85,7 @@ export function ThreadImageCarousel({
     <div
       role="group"
       aria-roledescription="carousel"
-      aria-label="Thread images"
+      aria-label="Thread media"
       onKeyDown={handleKeyDown}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -88,14 +93,20 @@ export function ThreadImageCarousel({
       className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
     >
       {/* Invisible sizing anchor — keeps the viewport height identical to the
-          single-image layout so the thread never jumps while sliding. */}
-      <img
-        src={images[0].url}
-        alt=""
-        draggable={false}
-        aria-hidden
-        className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
-      />
+          single-image layout so the card never jumps while sliding. Must be a
+          real image (videos have no reliable intrinsic height before load); a
+          16:9 spacer takes over when the set is all videos. */}
+      {anchorImage ? (
+        <img
+          src={anchorImage.url}
+          alt=""
+          draggable={false}
+          aria-hidden
+          className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
+        />
+      ) : (
+        <div aria-hidden className="aspect-video w-full" />
+      )}
 
       {/* Slide track — images sit physically next to each other and the
           viewport translates between them (300ms ease-out, no bounce). */}
