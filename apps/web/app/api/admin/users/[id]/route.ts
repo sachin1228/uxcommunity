@@ -180,7 +180,7 @@ export async function DELETE(
         console.warn("[admin/users] avatar cleanup outcome:", outcome.status);
       }
     } catch (avatarCleanupError) {
-      // Non-fatal: the orphan sweep with grace period retries this object.
+      // Non-fatal: re-run via the admin orphan scan (Tools → R2 storage health).
       console.error("[admin/users] avatar cleanup error:", avatarCleanupError);
     }
   }

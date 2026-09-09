@@ -6,7 +6,7 @@ import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 // ── DELETE /api/admin/communities/messages ────────────────────────────────────
 // Deletes ALL messages across ALL communities. Admin only.
 // Also cleans up the R2 objects behind every message image (best-effort;
-// anything that survives is caught by the orphan sweep's grace period).
+// anything that survives can be re-run via the admin orphan scan).
 export async function DELETE() {
   try { await requireSession("admin"); } catch (e) { return e as Response; }
 

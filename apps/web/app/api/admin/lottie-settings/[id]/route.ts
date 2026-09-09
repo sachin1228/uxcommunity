@@ -38,7 +38,7 @@ export async function DELETE(
         { table: "experience_levels", column: "lottie_url" },
       ]);
     } catch (cleanupError) {
-      // Non-fatal — the orphan sweep retries.
+      // Non-fatal — re-run via the admin orphan scan (Tools → R2 storage health).
       console.error("[admin/lottie-settings] R2 cleanup error:", cleanupError);
     }
   }

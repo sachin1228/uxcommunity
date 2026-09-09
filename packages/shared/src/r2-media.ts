@@ -2,13 +2,10 @@
  * Shared R2 media reference schema — the single source of truth for which
  * database columns can hold R2 media URLs.
  *
- * Consumed by:
- *  - the web app (`apps/web/lib/r2.ts` / `lib/r2-cleanup.ts`) for runtime
- *    deletion and the admin orphan audit, and
- *  - the cron worker (`apps/cron`) for the scheduled orphan sweep.
- *
- * Keeping the schema here guarantees the scheduled sweep and the app can
- * never disagree about what counts as a reference.
+ * Consumed by the web app (`apps/web/lib/r2.ts` / `lib/r2-cleanup.ts`) for
+ * runtime deletion and the admin orphan audit, and by the shared-package
+ * unit tests. Keeping the schema in one place guarantees every consumer
+ * agrees on what counts as a reference.
  */
 
 export interface MediaReferenceLookup {

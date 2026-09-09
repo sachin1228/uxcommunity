@@ -3,9 +3,9 @@
  *
  * The reference schema itself (which DB columns hold R2 media URLs) lives in
  * `@uxcommunity/shared` so the runtime cleanup, the admin orphan audit, and
- * the scheduled orphan sweep (apps/cron) all agree on what counts as a
- * reference. This module adds the Supabase-backed collection and deletion
- * helpers used by the app's delete/replace paths.
+ * the unit tests all agree on what counts as a reference. This module adds
+ * the Supabase-backed collection and deletion helpers used by the app's
+ * delete/replace paths.
  *
  *  1. Deleting an entity removes the R2 objects that belonged to it — but
  *     ONLY if nothing else references them (shared media is protected).
@@ -217,7 +217,7 @@ export interface R2CleanupResult {
  * Deletes each URL from R2 only when no row in ANY of the reference lookups
  * still points at it. Shared media (referenced from multiple entities) is
  * skipped. Per-key failures are returned, never thrown, so callers can report
- * and the orphan sweep can retry later.
+ * them and re-run the cleanup via the admin orphan scan.
  */
 export async function deleteUnreferencedR2Urls(
   db: DbClient,

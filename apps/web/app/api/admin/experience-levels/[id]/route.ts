@@ -105,7 +105,7 @@ export async function DELETE(
   // Master row is gone — remove the linked communities (the orphan filter in
   // /api/communities/all hides them from users immediately) and clean up every
   // R2 object they owned. Best-effort: failures surface in logs and are
-  // retried by the orphan sweep's grace period.
+  // re-run any time via the admin orphan scan (Tools → R2 storage health).
   try {
     const cleanup = await cleanupMasterDataMedia(db, "experience_level", "experience_levels", id, urls);
     if (cleanup.failed.length > 0) {

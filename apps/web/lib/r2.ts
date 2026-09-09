@@ -22,8 +22,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
-// Attachment URL extraction lives in the shared package so the app and the
-// scheduled orphan sweep (apps/cron) use the identical parsing logic.
+// Attachment URL extraction lives in the shared package so the app, the
+// admin orphan audit, and the tests use the identical parsing logic.
 export { attachmentPosterUrls, attachmentUrls } from "@uxcommunity/shared";
 
 function getClient(): S3Client {
