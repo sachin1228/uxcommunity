@@ -86,6 +86,7 @@ export function ShowcaseMediaLightbox({
             {isVideo ? (
               <video
                 src={item.url}
+                poster={item.poster}
                 controls
                 autoPlay
                 className="max-h-full max-w-full rounded-sm object-contain shadow-2xl"
@@ -129,9 +130,19 @@ export function ShowcaseMediaLightbox({
                       }`}
                     >
                       {item.type.startsWith("video/") ? (
-                        <span className="flex h-full w-full items-center justify-center bg-neutral-900 text-white">
-                          <Play strokeWidth={2.5} size={16} fill="currentColor" />
-                        </span>
+                        item.poster ? (
+                          <span className="relative block h-full w-full">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={item.poster} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />
+                            <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                              <Play strokeWidth={2.5} size={16} fill="currentColor" />
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center bg-neutral-900 text-white">
+                            <Play strokeWidth={2.5} size={16} fill="currentColor" />
+                          </span>
+                        )
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img src={item.url} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />

@@ -15,6 +15,8 @@ export interface ShowcaseAttachmentInput {
   url: string;
   type: string;
   size: number;
+  /** First-frame image URL for video attachments (optional, videos only). */
+  poster?: string;
 }
 
 export interface ShowcasePostInput {
@@ -55,7 +57,14 @@ export function parseShowcaseBody(body: Record<string, unknown>): ParseShowcaseB
       const size = typeof record.size === "number" && Number.isFinite(record.size) ? record.size : 0;
       if (!url || !/^https?:\/\//.test(url) || url.length > 2048) return { ok: false, error: "Invalid attachment URL." };
       if (!SHOWCASE_MEDIA_TYPES.has(type)) return { ok: false, error: "Unsupported attachment type." };
-      attachments.push({ name, url, type, size });
+      // Posters ride along on video attachments (generated at upload time);
+      // only accept image URLs and only on videos.
+      let poster: string | undefined;
+      if (type.startsWith("video/") && typeof record.poster === "string" && record.poster.trim()) {
+        poster = record.poster.trim();
+        if (!/^https?:\/\//.test(poster) || poster.length > 2048) return { ok: false, error: "Invalid attachment poster URL." };
+      }
+      attachments.push(poster ? { name, url, type, size, poster } : { name, url, type, size });
     }
   }
 

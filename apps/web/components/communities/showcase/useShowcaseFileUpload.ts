@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
+import { processVideoForUpload } from "@/lib/video-client";
 
 /** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 25 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -68,14 +69,34 @@ export function useShowcaseFileUpload({
     try {
       const uploaded: ShowcaseAttachment[] = [];
       for (const file of files) {
-        const formData = new FormData();
-        let payload = file;
-        // Animated GIFs pass through untouched — compressing them would flatten
-        // the animation into a static frame. Videos upload as-is.
-        if (IMAGE_TYPES.has(file.type) && file.type !== "image/gif") {
-          try { payload = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
+        // Videos are made stream-friendly before upload: MOV→MP4, moov atom
+        // moved to the front (faststart, no re-encode), plus a first-frame
+        // poster so feed cards render instantly while the video streams in.
+        // Fails soft — falls back to the original file.
+        const prepared = VIDEO_TYPES.has(file.type) ? await processVideoForUpload(file) : null;
+        const payload = prepared?.file ?? file;
+
+        // Size caps apply to what actually gets uploaded (the processed file).
+        const capBytes = VIDEO_TYPES.has(file.type) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+        if (payload.size > capBytes) {
+          setError(
+            VIDEO_TYPES.has(file.type)
+              ? "Videos must be 25 MB or smaller."
+              : "Images must be 8 MB or smaller.",
+          );
+          return;
         }
-        formData.append("file", payload);
+
+        const formData = new FormData();
+        if (IMAGE_TYPES.has(file.type) && file.type !== "image/gif") {
+          let compressed = file;
+          try { compressed = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
+          formData.append("file", compressed);
+        } else {
+          formData.append("file", payload);
+        }
+        if (prepared?.poster) formData.append("poster", prepared.poster, "poster.jpg");
+
         const response = await fetch(
           `/api/communities/${communityId}/showcase/upload`,
           {

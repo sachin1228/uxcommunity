@@ -10,6 +10,14 @@ function attachmentUrls(value: unknown): string[] {
   return value.map((item) => (typeof item === "object" && item && typeof (item as Record<string, unknown>).url === "string" ? (item as Record<string, unknown>).url as string : "")).filter(Boolean);
 }
 
+/** Extract video-poster URLs from stored attachments (for R2 lookups). */
+function attachmentPosterUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "object" && item ? (item as Record<string, unknown>).poster : null))
+    .filter((poster): poster is string => typeof poster === "string" && poster.length > 0);
+}
+
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
   const query = db.from("community_showcase_posts").select("*").eq("id", postId);
   return query.eq("community_id", communityId).maybeSingle();
@@ -95,6 +103,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
     }
   }
+  // Posters live at their own R2 keys — orphan them when their video goes.
+  const previousPosters = attachmentPosterUrls((existing as Record<string, unknown>).attachments);
+  for (const posterUrl of previousPosters) {
+    if (!attachments.some((next) => next.poster === posterUrl)) {
+      await deleteR2AssetIfUnreferenced(db, posterUrl, [
+        { table: "community_showcase_posts", column: "attachments", getUrls: attachmentPosterUrls },
+      ]);
+    }
+  }
   if (shouldDeletePreviousR2Asset(existing.image_url ?? null, imageUrl) && existing.image_url) {
     await deleteOwnedR2AssetIfUnique(db, existing.image_url, [
       { table: "community_showcase_posts", column: "image_url" },
@@ -116,6 +133,11 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
   for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {
     await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
+  }
+  for (const posterUrl of attachmentPosterUrls((existing as Record<string, unknown>).attachments)) {
+    await deleteR2AssetIfUnreferenced(db, posterUrl, [
+      { table: "community_showcase_posts", column: "attachments", getUrls: attachmentPosterUrls },
+    ]);
   }
   await deleteR2AssetIfUnreferenced(db, existing.image_url, [
     { table: "community_showcase_posts", column: "image_url" },
