@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
+import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
 
-const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
+/** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
+function attachmentUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (typeof item === "object" && item && typeof (item as Record<string, unknown>).url === "string" ? (item as Record<string, unknown>).url as string : "")).filter(Boolean);
+}
 
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
   const query = db.from("community_showcase_posts").select("*").eq("id", postId);
@@ -76,15 +81,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only edit your own showcase posts." }, { status: 403 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : "";
-  const category = typeof body.category === "string" ? body.category : "";
-  const isPublic = body.is_public === true;
-  const allowReplies = body.allow_replies !== false;
-  if (!title || title.length > 120 || !imageUrl || imageUrl.length > 2048 || !CATEGORIES.has(category)) return NextResponse.json({ error: "One or more showcase fields are invalid." }, { status: 422 });
-  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, category, is_public: isPublic, allow_replies: allowReplies }).eq("id", postId).eq("user_id", userId).select("*").single();
+  const parsed = parseShowcaseBody(body);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+  const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
+  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).eq("id", postId).eq("user_id", userId).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
 
+  // Clean up R2 assets that are no longer part of the post (cover + attachments).
+  const previousAttachments = attachmentUrls((existing as Record<string, unknown>).attachments);
+  const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
+  for (const url of previousAttachments) {
+    if (!attachments.some((next) => next.url === url)) {
+      await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
+    }
+  }
   if (shouldDeletePreviousR2Asset(existing.image_url ?? null, imageUrl) && existing.image_url) {
     await deleteOwnedR2AssetIfUnique(db, existing.image_url, [
       { table: "community_showcase_posts", column: "image_url" },
@@ -103,6 +113,10 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
 
+  const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
+  for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {
+    await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
+  }
   await deleteR2AssetIfUnreferenced(db, existing.image_url, [
     { table: "community_showcase_posts", column: "image_url" },
   ]);

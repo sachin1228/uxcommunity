@@ -2,24 +2,29 @@
 
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { FeedVideo } from "@/components/communities/FeedVideo";
 
 interface CarouselImage {
   url: string;
   name: string;
+  /** Optional MIME type — when it starts with video/, the slide renders a <video>. */
+  type?: string;
 }
 
 /**
- * Inline image carousel for thread cards with 2+ images.
+ * Inline media carousel for cards with 2+ attachments.
  *
- * All images sit side by side in a horizontal track and the viewport slides
- * between them (translateX on the track), so Next moves the current image out
+ * All items sit side by side in a horizontal track and the viewport slides
+ * between them (translateX on the track), so Next moves the current item out
  * to the left while the next one enters from the right — and Previous does the
- * reverse. An invisible copy of the first image anchors the viewport height in
- * normal flow, so the surrounding thread layout never jumps. Swipe gestures
+ * reverse. An invisible copy of the first item anchors the viewport height in
+ * normal flow, so the surrounding card layout never jumps. Swipe gestures
  * work on touch devices without interfering with vertical scrolling.
  *
- * Clicking the visible image reports its index via `onImageClick` so the
- * parent can open the full-screen lightbox — images never open in a new tab.
+ * Image slides render <img>; video slides (items whose `type` starts with
+ * "video/") render an inline <video controls> instead. Clicking the visible
+ * image reports its index via `onImageClick` so the parent can open the
+ * full-screen lightbox — media never opens in a new tab.
  */
 export function ThreadImageCarousel({
   images,
@@ -38,6 +43,11 @@ export function ThreadImageCarousel({
   const hasNext = index < images.length - 1;
   const goPrev = () => setIndex((current) => Math.max(0, current - 1));
   const goNext = () => setIndex((current) => Math.min(images.length - 1, current + 1));
+
+  // The sizing anchor borrows the intrinsic dimensions of a real image; when
+  // the set is all videos there is no <img> to borrow from, so a 16:9 spacer
+  // stands in (videos letterbox inside it).
+  const anchorImage = images.find((img) => !(typeof img.type === "string" && img.type.startsWith("video/"))) ?? null;
 
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
@@ -76,7 +86,7 @@ export function ThreadImageCarousel({
     <div
       role="group"
       aria-roledescription="carousel"
-      aria-label="Thread images"
+      aria-label="Thread media"
       onKeyDown={handleKeyDown}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -84,14 +94,20 @@ export function ThreadImageCarousel({
       className="group relative mt-3 select-none overflow-hidden rounded-xl border border-border bg-surface"
     >
       {/* Invisible sizing anchor — keeps the viewport height identical to the
-          single-image layout so the thread never jumps while sliding. */}
-      <img
-        src={images[0].url}
-        alt=""
-        draggable={false}
-        aria-hidden
-        className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
-      />
+          single-image layout so the card never jumps while sliding. Must be a
+          real image (videos have no reliable intrinsic height before load); a
+          16:9 spacer takes over when the set is all videos. */}
+      {anchorImage ? (
+        <img
+          src={anchorImage.url}
+          alt=""
+          draggable={false}
+          aria-hidden
+          className="pointer-events-none block w-full max-h-[480px] object-contain opacity-0"
+        />
+      ) : (
+        <div aria-hidden className="aspect-video w-full" />
+      )}
 
       {/* Slide track — images sit physically next to each other and the
           viewport translates between them (300ms ease-out, no bounce). */}
@@ -101,8 +117,16 @@ export function ThreadImageCarousel({
       >
         {images.map((img, slideIndex) => {
           const active = slideIndex === index;
+          const isVideo = typeof img.type === "string" && img.type.startsWith("video/");
           // Native aspect ratio, capped at 480px tall — never cropped.
-          const inner = (
+          const inner = isVideo ? (
+            <FeedVideo
+              src={img.url}
+              ariaLabel={img.name}
+              active={active}
+              className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
+            />
+          ) : (
             <img
               src={img.url}
               alt={img.name}
@@ -113,14 +137,20 @@ export function ThreadImageCarousel({
           return (
             <div
               key={img.url}
-              role="button"
-              tabIndex={active ? 0 : -1}
+              role={isVideo ? undefined : "button"}
+              tabIndex={!isVideo && active ? 0 : -1}
               aria-hidden={!active}
-              aria-label={active ? `Open image ${slideIndex + 1} of ${images.length}` : undefined}
+              aria-label={active && !isVideo ? `Open media ${slideIndex + 1} of ${images.length}` : undefined}
               className={`h-full w-full shrink-0 overflow-hidden ${
-                active ? "block cursor-pointer" : "pointer-events-none block"
+                active ? (isVideo ? "block" : "block cursor-pointer") : "pointer-events-none block"
               }`}
               onClick={(event) => {
+                // Videos play inline — only image slides open the lightbox, and
+                // the click must not bubble to a parent card navigation.
+                if (isVideo) {
+                  event.stopPropagation();
+                  return;
+                }
                 // A swipe ends in a click on touch devices — don't open after one.
                 if (suppressClickRef.current) {
                   event.preventDefault();
@@ -131,6 +161,7 @@ export function ThreadImageCarousel({
                 onImageClick(slideIndex);
               }}
               onKeyDown={(event) => {
+                if (isVideo) return;
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   event.stopPropagation();

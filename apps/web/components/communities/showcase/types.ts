@@ -4,10 +4,39 @@ export const SHOWCASE_CATEGORIES: { value: ShowcaseCategory | "all"; label: stri
   { value: "all", label: "All work" }, { value: "ui_ux", label: "UI/UX" }, { value: "branding", label: "Branding" },
   { value: "illustration", label: "Illustration" }, { value: "motion", label: "Motion" }, { value: "product", label: "Product" }, { value: "other", label: "Other" },
 ];
+
+/** Max title (body) length — mirrors the DB column + API validation. */
+export const SHOWCASE_TITLE_MAX_LENGTH = 2000;
+
+/** Where the work is in the process — helps the community give the right feedback. */
+export type ShowcaseStage = "concept" | "wip" | "final" | "case_study";
+
+export const SHOWCASE_STAGES: { value: ShowcaseStage; label: string }[] = [
+  { value: "concept", label: "Concept" },
+  { value: "wip", label: "In progress" },
+  { value: "final", label: "Final" },
+  { value: "case_study", label: "Case study" },
+];
+
+/** How many media items (images + videos) a showcase post may carry. */
+export const SHOWCASE_MEDIA_MAX = 5;
+
+/** Uploaded image/video attachment — mirrors the thread attachment shape. */
+export interface ShowcaseAttachment {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
 export interface ShowcasePost {
   id: string; community_id: string; user_id: string; title: string;
   image_url: string; category: ShowcaseCategory; created_at: string; updated_at: string;
   is_public: boolean; allow_replies: boolean; like_count: number; comment_count: number; user_liked: boolean; user_saved: boolean;
+  /** Uploaded media (images + videos) rendered as a carousel. */
+  attachments: ShowcaseAttachment[];
+  /** Where the work is in the process. */
+  stage?: ShowcaseStage | null;
   author: { name: string; avatar_url: string | null };
 }
 

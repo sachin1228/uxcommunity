@@ -4,8 +4,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
-
-const CATEGORIES = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
+import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
 
 async function member(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
@@ -64,14 +63,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const limit = await rateLimit(`showcase:create:${userId}:60s`, 5, 60);
   if (!limit.success) return NextResponse.json({ error: "Too many posts. Try again shortly." }, { status: 429 });
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : "";
-  const category = typeof body.category === "string" ? body.category : "";
-  const isPublic = body.is_public === true;
-  const allowReplies = body.allow_replies !== false;
-  if (!title || title.length > 120 || !imageUrl || imageUrl.length > 2048) return NextResponse.json({ error: "Check the title and preview image." }, { status: 422 });
-  if (!CATEGORIES.has(category)) return NextResponse.json({ error: "Invalid category." }, { status: 422 });
-  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, category, is_public: isPublic, allow_replies: allowReplies }).select("*").single();
+  const parsed = parseShowcaseBody(body);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
+  const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
+  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }
