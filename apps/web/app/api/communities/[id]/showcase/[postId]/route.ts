@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
+import { deleteVideoMedia, resolveVideoAttachments } from "@/lib/video/video-server";
 
 /** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
 function attachmentUrls(value: unknown): string[] {
@@ -16,6 +17,32 @@ function attachmentPosterUrls(value: unknown): string[] {
   return value
     .map((item) => (typeof item === "object" && item ? (item as Record<string, unknown>).poster : null))
     .filter((poster): poster is string => typeof poster === "string" && poster.length > 0);
+}
+
+/** Extract centralized-pipeline media IDs from stored attachments. */
+function attachmentMediaIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "object" && item ? (item as Record<string, unknown>).mediaId : null))
+    .filter((mediaId): mediaId is string => typeof mediaId === "string" && mediaId.length > 0);
+}
+
+/**
+ * Deletes the video_media lifecycle rows (and their R2 objects) for any
+ * attachments being dropped from a post. Runs BEFORE the URL-based cleanup
+ * below so tombstones never hold the unreferenced check open.
+ */
+async function cleanupRemovedVideoMedia(
+  db: ReturnType<typeof createServiceClient>,
+  previous: unknown,
+  next: unknown,
+): Promise<void> {
+  const previousIds = attachmentMediaIds(previous);
+  const nextIds = attachmentMediaIds(next);
+  const removed = previousIds.filter((mediaId) => !nextIds.includes(mediaId));
+  for (const mediaId of removed) {
+    await deleteVideoMedia(db, mediaId);
+  }
 }
 
 async function getPost(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string) {
@@ -92,8 +119,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = parseShowcaseBody(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
   const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
-  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).eq("id", postId).eq("user_id", userId).select("*").single();
+
+  // Video attachments are resolved server-side (canonical URLs come from the
+  // video_media rows, never from the client).
+  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  const resolved = await resolveVideoAttachments(db, userId, id, attachments as unknown as Array<Record<string, unknown> & { mediaId?: string }>);
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 422 });
+
+  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, attachments: resolved.attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).eq("id", postId).eq("user_id", userId).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
+
+  // Videos dropped from the post are removed from R2 + tombstoned (BEFORE the
+  // URL cleanup so tombstones never block object deletion).
+  await cleanupRemovedVideoMedia(db, (existing as Record<string, unknown>).attachments, resolved.attachments);
 
   // Clean up R2 assets that are no longer part of the post (cover + attachments).
   const previousAttachments = attachmentUrls((existing as Record<string, unknown>).attachments);
@@ -127,8 +165,13 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { data: existing } = await getPost(db, id, postId);
   if (!existing) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   if (existing.user_id !== userId) return NextResponse.json({ error: "You can only delete your own showcase posts." }, { status: 403 });
+  const previousRow = existing as Record<string, unknown>;
   const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
+
+  // Centralized-pipeline videos: delete the lifecycle rows + all R2 objects
+  // (original, processed, poster) BEFORE the URL cleanup below.
+  await cleanupRemovedVideoMedia(db, previousRow.attachments, []);
 
   const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
   for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {

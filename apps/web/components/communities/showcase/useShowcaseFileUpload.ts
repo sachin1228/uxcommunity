@@ -5,24 +5,27 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { processVideoForUpload } from "@/lib/video-client";
+import { VIDEO_TYPES, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
+import type { VideoDecision } from "@/lib/video/video-types";
 
 /** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 25 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
-const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
 /**
- * Media intake for the "Share your work" composer. Mirrors the thread upload
- * hook (one path for the file picker and drag-and-drop, same client-side image
- * compression — animated GIFs pass through untouched) and extends it with
- * video support so a showcase can mix images and clips in one carousel.
+ * Media intake for the "Share your work" composer.
  *
- * The hook owns the attachment list: feed `addFiles` from both the hidden
- * <input type="file"> and drop events, spread `dropHandlers` onto the modal
- * form, and render `attachments` via the composer's media row.
+ * Images keep the existing flow (client-side WebP compression + moderated
+ * upload). Videos flow through the CENTRALIZED video pipeline:
+ *
+ *   upload original → (FFmpeg wasm worker encodes) → finalize → ready
+ *
+ * Each attachment carries its pipeline state so the composer can show
+ * Uploading… / Processing… (with progress) / Ready, and a failed encode can
+ * be retried WITHOUT re-uploading — the original stays in R2 and the worker
+ * simply runs again.
  */
 export function useShowcaseFileUpload({
   communityId,
@@ -35,6 +38,8 @@ export function useShowcaseFileUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  /** Per-media encode progress (0–100) for the composer UI. */
+  const [progress, setProgress] = useState<Record<string, number>>({});
 
   // Fresh copy for limit checks inside stable callbacks (a second drop lands
   // before re-render otherwise sees a stale list).
@@ -43,78 +48,184 @@ export function useShowcaseFileUpload({
     attachmentsRef.current = attachments;
   }, [attachments]);
 
+  /** Original file bytes + poster held for the encode step (transcodes only). */
+  const originalsRef = useRef(new Map<string, { file: File; poster: Blob | null }>());
+
   // dragenter/dragleave fire for every child element crossed; counting them
   // (instead of booleans) keeps the overlay steady while over nested nodes.
   const dragDepthRef = useRef(0);
 
-  const uploadFiles = useCallback(async (files: File[]) => {
-    if (attachmentsRef.current.length + files.length > SHOWCASE_MEDIA_MAX) {
-      setError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
-      return;
-    }
+  const setAttachment = useCallback((mediaId: string, patch: Partial<ShowcaseAttachment>) => {
+    setAttachments((current) =>
+      current.map((item) => (item.mediaId === mediaId ? { ...item, ...patch } : item)),
+    );
+  }, []);
 
-    for (const file of files) {
-      if (IMAGE_TYPES.has(file.type) && file.size > MAX_IMAGE_BYTES) {
-        setError("Images must be 8 MB or smaller.");
+  /**
+   * Runs the FFmpeg worker + finalize for one transcode attachment.
+   * Resumable: the original bytes live in `originalsRef` (or R2), so a failed
+   * encode never requires re-uploading.
+   */
+  const runEncode = useCallback(
+    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
+      const mediaId = attachment.mediaId;
+      const original = mediaId ? originalsRef.current.get(mediaId) : undefined;
+      if (!mediaId || !original || !communityId) {
+        if (mediaId) setAttachment(mediaId, { status: "failed" });
         return;
       }
-      if (VIDEO_TYPES.has(file.type) && file.size > MAX_VIDEO_BYTES) {
-        setError("Videos must be 25 MB or smaller.");
+      const startedAt = performance.now();
+      setAttachment(mediaId, { status: "processing", errorMessage: undefined });
+      setProgress((current) => ({ ...current, [mediaId]: 0 }));
+      try {
+        const result = await encodeVideo(
+          mediaId,
+          original.file,
+          decision,
+          (value) => setProgress((current) => ({ ...current, [mediaId]: value })),
+        );
+        const finalized = await finalizeVideo(
+          communityId,
+          mediaId,
+          result.file,
+          original.poster,
+          {
+            width: result.width,
+            height: result.height,
+            fps: result.fps,
+            durationMs: result.durationMs,
+            videoCodec: result.videoCodec,
+            audioCodec: result.audioCodec,
+          },
+          performance.now() - startedAt,
+        );
+        if (finalized.status === "deleted") {
+          // Post/media was deleted while processing — drop the attachment.
+          setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
+        } else if (finalized.attachment) {
+          setAttachment(mediaId, { ...finalized.attachment, status: "ready" });
+        }
+        originalsRef.current.delete(mediaId);
+        setProgress((current) => {
+          const next = { ...current };
+          delete next[mediaId];
+          return next;
+        });
+      } catch (err) {
+        console.error("[showcase video] encode failed:", err);
+        setAttachment(mediaId, {
+          status: "failed",
+          errorMessage: err instanceof Error ? err.message : "Video processing failed.",
+        });
+        setProgress((current) => {
+          const next = { ...current };
+          delete next[mediaId];
+          return next;
+        });
+      }
+    },
+    [communityId, setAttachment],
+  );
+
+  const uploadFiles = useCallback(
+    async (files: File[]) => {
+      if (attachmentsRef.current.length + files.length > SHOWCASE_MEDIA_MAX) {
+        setError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
         return;
       }
-    }
 
-    setUploading(true);
-    setError(null);
-    try {
-      const uploaded: ShowcaseAttachment[] = [];
       for (const file of files) {
-        // Videos are made stream-friendly before upload: MOV→MP4, moov atom
-        // moved to the front (faststart, no re-encode), plus a first-frame
-        // poster so feed cards render instantly while the video streams in.
-        // Fails soft — falls back to the original file.
-        const prepared = VIDEO_TYPES.has(file.type) ? await processVideoForUpload(file) : null;
-        const payload = prepared?.file ?? file;
-
-        // Size caps apply to what actually gets uploaded (the processed file).
-        const capBytes = VIDEO_TYPES.has(file.type) ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-        if (payload.size > capBytes) {
-          setError(
-            VIDEO_TYPES.has(file.type)
-              ? "Videos must be 25 MB or smaller."
-              : "Images must be 8 MB or smaller.",
-          );
+        if (IMAGE_TYPES.has(file.type) && file.size > MAX_IMAGE_BYTES) {
+          setError("Images must be 8 MB or smaller.");
           return;
         }
-
-        const formData = new FormData();
-        if (IMAGE_TYPES.has(file.type) && file.type !== "image/gif") {
-          let compressed = file;
-          try { compressed = compressedFile(await compressImage(file), file); } catch { /* keep original */ }
-          formData.append("file", compressed);
-        } else {
-          formData.append("file", payload);
+        if (VIDEO_TYPES.has(file.type) && file.size > MAX_VIDEO_BYTES) {
+          setError("Videos must be 25 MB or smaller.");
+          return;
         }
-        if (prepared?.poster) formData.append("poster", prepared.poster, "poster.jpg");
-
-        const response = await fetch(
-          `/api/communities/${communityId}/showcase/upload`,
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error ?? "Upload failed.");
-        uploaded.push(data.attachment as ShowcaseAttachment);
       }
-      setAttachments((current) => [...current, ...uploaded]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
-    } finally {
-      setUploading(false);
+
+      setUploading(true);
+      setError(null);
+      try {
+        for (const file of files) {
+          if (VIDEO_TYPES.has(file.type)) {
+            // ── Centralized video pipeline ────────────────────────────────
+            // Probe → decide (passthrough / lossless remux / FFmpeg transcode)
+            // → upload original or canonical → encode in the FFmpeg worker
+            // (async, with progress) → finalize to ready.
+            const prepared = await prepareVideoForPipeline(file);
+            const response = await uploadVideo(communityId!, prepared);
+            const attachment = response.attachment;
+            setAttachments((current) => [...current, attachment]);
+            if (response.status === "uploaded" && attachment.mediaId) {
+              originalsRef.current.set(attachment.mediaId, {
+                file,
+                poster: prepared.poster,
+              });
+              void runEncode(attachment, prepared.decision);
+            }
+          } else {
+            // ── Images: existing pipeline, unchanged ──────────────────────
+            let payload = file;
+            if (file.type !== "image/gif") {
+              try {
+                payload = compressedFile(await compressImage(file), file);
+              } catch { /* keep original */ }
+            }
+            const formData = new FormData();
+            formData.append("file", payload);
+            const response = await fetch(
+              `/api/communities/${communityId}/showcase/upload`,
+              { method: "POST", body: formData },
+            );
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error ?? "Upload failed.");
+            setAttachments((current) => [...current, data.attachment as ShowcaseAttachment]);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed.");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [communityId, runEncode],
+  );
+
+  /** Retries a failed encode — the original is still in R2, no re-upload. */
+  const retryAttachment = useCallback(
+    (attachment: ShowcaseAttachment) => {
+      if (!attachment.mediaId) return;
+      void runEncode(attachment, {
+        strategy: "transcode",
+        preset: attachment.preset ?? "slow",
+        copyVideo: attachment.copyVideo,
+        reason: "retry",
+      });
+    },
+    [runEncode],
+  );
+
+  // After an edit (initialAttachments change), resume any videos that were
+  // uploaded but never finalized — the original bytes are gone (page reload),
+  // so fall back to the lossless passthrough: the stored original becomes
+  // canonical with zero re-encode.
+  useEffect(() => {
+    const pending = initialAttachments.filter(
+      (item) => item.type.startsWith("video/") && item.status === "uploaded" && item.mediaId,
+    );
+    for (const item of pending) {
+      if (!communityId || !item.mediaId) continue;
+      void finalizeVideoPassthrough(communityId, item.mediaId).then((result) => {
+        if (result.status === "ready" && result.attachment) {
+          setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
+        }
+      }).catch(() => {
+        // Keep the placeholder state — the admin sweep cleans up leftovers.
+      });
     }
-  }, [communityId]);
+  }, [initialAttachments, communityId, setAttachment]);
 
   const addFiles = useCallback(
     (fileList: FileList | File[] | null) => {
@@ -124,9 +235,16 @@ export function useShowcaseFileUpload({
     [uploadFiles],
   );
 
-  const removeAttachment = useCallback((url: string) => {
-    setAttachments((current) => current.filter((a) => a.url !== url));
-  }, []);
+  const removeAttachment = useCallback(
+    (url: string, mediaId?: string) => {
+      setAttachments((current) => current.filter((a) => a.url !== url && a.mediaId !== mediaId));
+      if (mediaId) {
+        originalsRef.current.delete(mediaId);
+        if (communityId) void cancelVideo(communityId, mediaId);
+      }
+    },
+    [communityId],
+  );
 
   const hasFiles = (event: React.DragEvent) =>
     Array.from(event.dataTransfer?.types ?? []).includes("Files");
@@ -160,5 +278,16 @@ export function useShowcaseFileUpload({
 
   const dropHandlers = { onDragEnter, onDragOver, onDragLeave, onDrop };
 
-  return { attachments, removeAttachment, uploading, error, setError, addFiles, dropHandlers, isDragging };
+  return {
+    attachments,
+    removeAttachment,
+    uploading,
+    error,
+    setError,
+    addFiles,
+    dropHandlers,
+    isDragging,
+    progress,
+    retryAttachment,
+  };
 }

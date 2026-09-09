@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Play } from "lucide-react";
+import { Film, Loader2, Play } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import { communityFeedLayout } from "../feed-layout";
@@ -87,17 +87,39 @@ export function ShowcaseCard({
   let mediaBlock: React.ReactNode = null;
   if (media.length === 1) {
     const item = media[0];
+    const videoReady = item.type.startsWith("video/") && (item.status ?? "ready") === "ready";
     if (item.type.startsWith("video/")) {
-      mediaBlock = (
-        <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
-          <FeedVideo
-            src={item.url}
-            ariaLabel={post.title}
-            poster={item.poster}
-            className="mx-auto block max-h-[480px] w-full object-contain"
-          />
-        </div>
-      );
+      if (videoReady) {
+        mediaBlock = (
+          <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
+            <FeedVideo
+              src={item.url}
+              ariaLabel={post.title}
+              poster={item.poster}
+              className="mx-auto block max-h-[480px] w-full object-contain"
+            />
+          </div>
+        );
+      } else {
+        // Video is still in the pipeline (or failed) — never render a broken
+        // player; show a labeled placeholder instead.
+        const failed = item.status === "failed";
+        mediaBlock = (
+          <div className="mt-3 flex aspect-video w-full items-center justify-center gap-2 overflow-hidden rounded-xl border border-border bg-black/80">
+            {failed ? (
+              <>
+                <Film strokeWidth={2} size={20} className="text-foreground-subtle" />
+                <span className="font-body text-sm text-foreground-subtle">Video unavailable</span>
+              </>
+            ) : (
+              <>
+                <Loader2 strokeWidth={2} size={20} className="animate-spin text-foreground-muted" />
+                <span className="font-body text-sm text-foreground-muted">Processing video…</span>
+              </>
+            )}
+          </div>
+        );
+      }
     } else {
       mediaBlock = (
         <div
