@@ -19,6 +19,8 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
+  CopyObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
@@ -191,10 +193,12 @@ export interface R2ListedObject {
 
 /** List objects in the configured bucket, with optional pagination support.
  *  Sizes + last-modified timestamps are included so the orphan audit can
- *  report storage usage and enforce an age-based grace period. */
+ *  report storage usage and enforce an age-based grace period. `startAfter`
+ *  enables keyset pagination (resume listing after the given key). */
 export async function listR2ObjectKeys(
   prefix?: string,
   continuationToken?: string,
+  startAfter?: string,
 ): Promise<{ keys: string[]; objects: R2ListedObject[]; nextContinuationToken?: string; isTruncated: boolean }> {
   const client = getClient();
   const response = await client.send(
@@ -202,6 +206,7 @@ export async function listR2ObjectKeys(
       Bucket: getBucket(),
       Prefix: prefix,
       ContinuationToken: continuationToken,
+      StartAfter: startAfter,
       MaxKeys: 1000,
     }),
   );
@@ -227,6 +232,48 @@ export async function deleteFromR2(key: string): Promise<void> {
   const client = getClient();
   await client.send(
     new DeleteObjectCommand({ Bucket: getBucket(), Key: key })
+  );
+}
+
+/**
+ * Returns an object's Cache-Control metadata, or null when the object has
+ * none / does not exist. Used by the backfill to skip already-tagged objects.
+ */
+export async function headR2CacheControl(key: string): Promise<string | null> {
+  const client = getClient();
+  try {
+    const head = await client.send(
+      new HeadObjectCommand({ Bucket: getBucket(), Key: key }),
+    );
+    return head.CacheControl ?? null;
+  } catch {
+    return null; // vanished, or no metadata
+  }
+}
+
+/**
+ * Replaces an object's metadata in place (server-side copy onto itself) —
+ * used by the one-time backfill so pre-custom-domain objects carry the same
+ * immutable Cache-Control header new uploads get. Content is byte-identical;
+ * ContentType must be restated because REPLACE resets unstated metadata.
+ */
+export async function retagR2Object(
+  key: string,
+  contentType: string,
+  cacheControl: string,
+): Promise<void> {
+  const client = getClient();
+  const bucket = getBucket();
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      CopySource: `/${bucket}/${encodedKey}`,
+      Key: key,
+      ContentType: contentType,
+      CacheControl: cacheControl,
+      MetadataDirective: "REPLACE",
+    }),
   );
 }
 

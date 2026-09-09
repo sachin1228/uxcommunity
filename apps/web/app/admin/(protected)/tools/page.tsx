@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2, Database } from "lucide-react";
+import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2, Database, History } from "lucide-react";
 import type { RecompressResult } from "@/app/api/admin/recompress-images/route";
 import type { MigrateResult } from "@/app/api/admin/migrate-to-r2/route";
 import type { PurgeResult } from "@/app/api/admin/purge-supabase-storage/route";
@@ -54,6 +54,15 @@ export default function ToolsPage() {
   const [purgeStatus, setPurgeStatus] = useState<Status>("idle");
   const [purgeSummary, setPurgeSummary] = useState<PurgeSummary | null>(null);
   const [purgeError, setPurgeError] = useState<string | null>(null);
+
+  // ── Legacy media backfill state ──────────────────────────────────────────
+  const [backfillScanStatus, setBackfillScanStatus] = useState<Status>("idle");
+  const [backfillScan, setBackfillScan] = useState<any>(null);
+  const [backfillRetagStatus, setBackfillRetagStatus] = useState<Status>("idle");
+  const [backfillRetag, setBackfillRetag] = useState<any>(null);
+  const [backfillRewriteStatus, setBackfillRewriteStatus] = useState<Status>("idle");
+  const [backfillRewrite, setBackfillRewrite] = useState<any>(null);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
 
   // ── R2 audit state ──────────────────────────────────────────────────────
   const [r2Status, setR2Status] = useState<Status>("idle");
@@ -168,6 +177,100 @@ export default function ToolsPage() {
     } catch {
       setR2Error("Network error while deleting orphaned objects.");
       setR2DeleteStatus("error");
+    }
+  }
+
+  async function runBackfillScan() {
+    setBackfillScanStatus("running");
+    setBackfillScan(null);
+    setBackfillError(null);
+    try {
+      const res = await fetch("/api/admin/r2-backfill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "scan" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBackfillError(data.error ?? "Scan failed.");
+        setBackfillScanStatus("error");
+        return;
+      }
+      setBackfillScan(data);
+      setBackfillScanStatus("done");
+    } catch {
+      setBackfillError("Network error. Please try again.");
+      setBackfillScanStatus("error");
+    }
+  }
+
+  async function runBackfillRetag() {
+    setBackfillRetagStatus("running");
+    setBackfillRetag(null);
+    setBackfillError(null);
+    const totals = { processed: 0, retagged: 0, alreadyTagged: 0, failed: 0, done: false };
+    let startAfter: string | undefined;
+    try {
+      // Each call retags a batch; loop until the bucket is exhausted.
+      for (let i = 0; i < 50; i += 1) {
+        const res = await fetch("/api/admin/r2-backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "retag", startAfter, limit: 800 }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setBackfillError(data.error ?? "Retag failed.");
+          setBackfillRetagStatus("error");
+          return;
+        }
+        totals.processed += data.processed;
+        totals.retagged += data.retagged;
+        totals.alreadyTagged += data.alreadyTagged;
+        totals.failed += data.failed;
+        totals.done = !data.hasMore;
+        setBackfillRetag({ ...totals });
+        if (!data.hasMore) break;
+        startAfter = data.lastKey;
+      }
+      setBackfillRetagStatus("done");
+    } catch {
+      setBackfillError("Network error during retag.");
+      setBackfillRetagStatus("error");
+    }
+  }
+
+  async function runBackfillRewrite() {
+    setBackfillRewriteStatus("running");
+    setBackfillRewrite(null);
+    setBackfillError(null);
+    const totals = { rewrittenUrls: 0, updatedRows: 0, failed: 0, done: false };
+    try {
+      // Each call rewrites a fixed row budget; legacy rows shrink every pass,
+      // so looping until `complete` finishes the whole database.
+      for (let i = 0; i < 50; i += 1) {
+        const res = await fetch("/api/admin/r2-backfill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "rewrite", limit: 400 }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setBackfillError(data.error ?? "Rewrite failed.");
+          setBackfillRewriteStatus("error");
+          return;
+        }
+        totals.rewrittenUrls += data.rewrittenUrls;
+        totals.updatedRows += data.updatedRows;
+        totals.failed += data.failed;
+        totals.done = data.complete;
+        setBackfillRewrite({ ...totals });
+        if (data.complete) break;
+      }
+      setBackfillRewriteStatus("done");
+    } catch {
+      setBackfillError("Network error during rewrite.");
+      setBackfillRewriteStatus("error");
     }
   }
 
@@ -364,6 +467,139 @@ export default function ToolsPage() {
         {r2Status === "error" && r2Error && (
           <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
             <p className="font-body text-xs text-red-400">{r2Error}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Legacy media backfill ─────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
+            <History strokeWidth={2.5} size={18} className="text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-body text-sm font-semibold text-foreground">
+              Legacy media backfill (edge cache + URL rewrite)
+            </h2>
+            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+              One-time migrations for media uploaded before the CDN custom domain:
+              <span className="text-foreground"> Retag</span> adds the 1-year immutable edge-cache
+              header to every R2 object, and <span className="text-foreground">Rewrite</span> updates
+              database URLs from the old pub-*.r2.dev domain to the new one. Both are safe to run
+              multiple times — already-done work is skipped.
+            </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                onClick={runBackfillScan}
+                disabled={backfillScanStatus === "running"}
+                className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {backfillScanStatus === "running" ? (
+                  <>
+                    <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                    Scanning…
+                  </>
+                ) : (
+                  <>
+                    <Database strokeWidth={2.5} size={13} />
+                    {backfillScanStatus === "done" ? "Scan again" : "Scan legacy media"}
+                  </>
+                )}
+              </button>
+              <button
+                onClick={runBackfillRetag}
+                disabled={backfillRetagStatus === "running"}
+                className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {backfillRetagStatus === "running" ? (
+                  <>
+                    <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                    Retagging…
+                  </>
+                ) : (
+                  <>
+                    <History strokeWidth={2.5} size={13} />
+                    Retag R2 objects
+                  </>
+                )}
+              </button>
+              <button
+                onClick={runBackfillRewrite}
+                disabled={backfillRewriteStatus === "running"}
+                className="inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {backfillRewriteStatus === "running" ? (
+                  <>
+                    <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                    Rewriting…
+                  </>
+                ) : (
+                  <>
+                    <ArrowRightLeft strokeWidth={2.5} size={13} />
+                    Rewrite DB URLs
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {backfillScanStatus === "done" && backfillScan && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="flex flex-wrap gap-4">
+              <Stat icon={<Database strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={backfillScan.objectsScanned} label="objects listed" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={backfillScan.untaggedObjects} label="objects without cache header" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className="text-amber-400" />} value={backfillScan.legacyUrlsTotal} label="legacy DB URLs" />
+            </div>
+            {backfillScan.objectsListedTruncated && (
+              <p className="mt-2 font-body text-[11px] text-foreground-muted">
+                Listed the first {backfillScan.objectsScanned} objects — the retag step covers the whole bucket regardless.
+              </p>
+            )}
+            {backfillScan.legacyRefs?.length > 0 && (
+              <div className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-border divide-y divide-border">
+                {backfillScan.legacyRefs.map((r: any, i: number) => (
+                  <div key={i} className="px-3 py-2">
+                    <p className="font-body text-[11px] text-foreground">
+                      {TABLE_LABELS[r.table] ?? r.table} <span className="text-foreground-muted">· {r.column} · {r.rows} row(s) · {r.urls} URL(s)</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {backfillRetagStatus === "done" && backfillRetag && (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex flex-wrap gap-4">
+              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={backfillRetag.retagged} label="retagged" />
+              <Stat icon={<SkipForward strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={backfillRetag.alreadyTagged} label="already cached" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className={backfillRetag.failed > 0 ? "text-red-400" : "text-foreground-muted"} />} value={backfillRetag.failed} label="failed" />
+            </div>
+            <p className="mt-2 font-body text-[11px] text-foreground-muted">
+              {backfillRetag.done ? "Whole bucket processed." : "Stopped early — run again to continue."}
+            </p>
+          </div>
+        )}
+
+        {backfillRewriteStatus === "done" && backfillRewrite && (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex flex-wrap gap-4">
+              <Stat icon={<CheckCircle2 strokeWidth={2.5} size={13} className="text-green-400" />} value={backfillRewrite.rewrittenUrls} label="URLs rewritten" />
+              <Stat icon={<Database strokeWidth={2.5} size={13} className="text-foreground-muted" />} value={backfillRewrite.updatedRows} label="rows updated" />
+              <Stat icon={<AlertCircle strokeWidth={2.5} size={13} className={backfillRewrite.failed > 0 ? "text-red-400" : "text-foreground-muted"} />} value={backfillRewrite.failed} label="failed" />
+            </div>
+            <p className="mt-2 font-body text-[11px] text-foreground-muted">
+              {backfillRewrite.done ? "Database fully rewritten." : "Stopped early — run again to continue."}
+            </p>
+          </div>
+        )}
+
+        {backfillError && (
+          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <p className="font-body text-xs text-red-400">{backfillError}</p>
           </div>
         )}
       </div>

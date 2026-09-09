@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   }
 
   const storedMime = moderation.mime ?? file.type;
-  const key = `avatars/${session.userId}/${Date.now()}.${extensionForMime(storedMime)}`;
+  const key = `avatars/${session.userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extensionForMime(storedMime)}`;
 
   let publicUrl: string;
   try {
