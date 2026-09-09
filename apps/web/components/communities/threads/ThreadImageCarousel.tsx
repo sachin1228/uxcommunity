@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { FeedVideo } from "@/components/communities/FeedVideo";
 
 interface CarouselImage {
   url: string;
@@ -119,11 +120,10 @@ export function ThreadImageCarousel({
           const isVideo = typeof img.type === "string" && img.type.startsWith("video/");
           // Native aspect ratio, capped at 480px tall — never cropped.
           const inner = isVideo ? (
-            <video
+            <FeedVideo
               src={img.url}
-              aria-label={img.name}
-              controls
-              preload="metadata"
+              ariaLabel={img.name}
+              active={active}
               className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
             />
           ) : (

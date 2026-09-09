@@ -8,6 +8,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
+import { FeedVideo } from "@/components/communities/FeedVideo";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
 import { ThreadImageCarousel } from "../threads/ThreadImageCarousel";
 import { ShowcaseMediaLightbox } from "./ShowcaseMediaLightbox";
@@ -89,10 +90,9 @@ export function ShowcaseCard({
     if (item.type.startsWith("video/")) {
       mediaBlock = (
         <div className="mt-3 overflow-hidden rounded-xl border border-border bg-black">
-          <video
+          <FeedVideo
             src={item.url}
-            controls
-            preload="metadata"
+            ariaLabel={post.title}
             className="mx-auto block max-h-[480px] w-full object-contain"
           />
         </div>
