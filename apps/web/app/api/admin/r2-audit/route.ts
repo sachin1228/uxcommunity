@@ -1,93 +1,42 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteFromR2, getR2PublicBase, getR2KeyFromUrl, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
+import { deleteFromR2, getR2PublicBase, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
+import { collectAllMediaReferences } from "@/lib/r2-cleanup";
 
-interface TrackedReference {
+const DEFAULT_GRACE_DAYS = 7;
+
+interface R2ObjectInfo {
   key: string;
-  table: string;
-  column: string;
-  entityType: string;
-  entityId: string | null;
-  url: string | null;
+  size: number;
+  lastModified: string | null;
 }
 
-function normalizeObjectKey(value: unknown): string | null {
-  if (typeof value !== "string" || !value) return null;
-  return value.startsWith("http://") || value.startsWith("https://") ? null : value;
+/** Lists every object in the bucket with size + last-modified timestamps. */
+async function listAllObjects(): Promise<R2ObjectInfo[]> {
+  const objects: R2ObjectInfo[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const result = await listR2ObjectKeys(undefined, continuationToken);
+    for (const object of result.objects) {
+      objects.push(object);
+    }
+    if (result.isTruncated && result.nextContinuationToken) {
+      continuationToken = result.nextContinuationToken;
+    } else {
+      continuationToken = undefined;
+    }
+  } while (continuationToken);
+
+  return objects;
 }
 
-function coerceHttpUrl(value: unknown): string | null {
-  if (typeof value !== "string" || !value) return null;
-  return value.startsWith("http://") || value.startsWith("https://") ? value : null;
-}
-
-async function collectTrackedReferences(db: ReturnType<typeof createServiceClient>): Promise<TrackedReference[]> {
-  const references: TrackedReference[] = [];
-
-  const queries = [
-    { table: "designer_profiles", column: "avatar_url", entityType: "profile" },
-    { table: "communities", column: "image_url", entityType: "community" },
-    { table: "communities", column: "lottie_url", entityType: "community" },
-    { table: "cities", column: "image_url", entityType: "city" },
-    { table: "cities", column: "lottie_url", entityType: "city" },
-    { table: "design_sectors", column: "image_url", entityType: "sector" },
-    { table: "design_sectors", column: "lottie_url", entityType: "sector" },
-    { table: "design_interests", column: "image_url", entityType: "interest" },
-    { table: "design_interests", column: "lottie_url", entityType: "interest" },
-    { table: "experience_levels", column: "image_url", entityType: "experience_level" },
-    { table: "experience_levels", column: "lottie_url", entityType: "experience_level" },
-    { table: "community_messages", column: "image_url", entityType: "message" },
-    { table: "community_events", column: "cover_image_url", entityType: "event" },
-    { table: "community_showcase_posts", column: "image_url", entityType: "showcase" },
-  ];
-
-  for (const query of queries) {
-    const { data, error } = await db.from(query.table).select(`id, ${query.column}`).not(query.column, "is", null);
-    if (error) {
-      console.error("[r2-audit] reference query failed", { query, error });
-      continue;
-    }
-
-    for (const row of data ?? []) {
-      const url = coerceHttpUrl(row?.[query.column]);
-      if (!url) continue;
-      const key = getR2KeyFromUrl(url);
-      if (!key) continue;
-      references.push({
-        key,
-        table: query.table,
-        column: query.column,
-        entityType: query.entityType,
-        entityId: typeof row?.id === "string" ? row.id : null,
-        url,
-      });
-    }
-  }
-
-  const { data: threads, error: threadError } = await db.from("community_threads").select("id, attachments").not("attachments", "is", null);
-  if (!threadError) {
-    for (const row of threads ?? []) {
-      const attachments = Array.isArray(row?.attachments) ? row.attachments : [];
-      for (const attachment of attachments) {
-        if (!attachment || typeof attachment !== "object") continue;
-        const url = coerceHttpUrl((attachment as { url?: unknown }).url);
-        if (!url) continue;
-        const key = getR2KeyFromUrl(url);
-        if (!key) continue;
-        references.push({
-          key,
-          table: "community_threads",
-          column: "attachments",
-          entityType: "thread",
-          entityId: typeof row?.id === "string" ? row.id : null,
-          url,
-        });
-      }
-    }
-  }
-
-  return references;
+function ageDays(lastModified: string | null): number | null {
+  if (!lastModified) return null;
+  const age = Date.now() - new Date(lastModified).getTime();
+  if (Number.isNaN(age) || age < 0) return null;
+  return age / 86_400_000;
 }
 
 export async function GET() {
@@ -98,29 +47,13 @@ export async function GET() {
   }
 
   const db = createServiceClient();
-  const tracked = await collectTrackedReferences(db);
-  const seen = new Map<string, TrackedReference>();
+  const tracked = await collectAllMediaReferences(db);
+  const seen = new Map<string, (typeof tracked)[number]>();
   for (const item of tracked) {
     if (!seen.has(item.key)) seen.set(item.key, item);
   }
 
-  let continuationToken: string | undefined;
-  const r2Objects: Array<{ key: string; size: number }> = [];
-  let totalStorageBytes = 0;
-
-  do {
-    const result = await listR2ObjectKeys(undefined, continuationToken);
-    for (const key of result.keys) {
-      const size = 0;
-      r2Objects.push({ key, size });
-    }
-    if (result.isTruncated && result.nextContinuationToken) {
-      continuationToken = result.nextContinuationToken;
-    } else {
-      continuationToken = undefined;
-    }
-  } while (continuationToken);
-
+  const r2Objects = await listAllObjects();
   const keySet = new Set(r2Objects.map((entry) => entry.key));
   const trackedKeys = new Set(Array.from(seen.keys()));
 
@@ -129,6 +62,21 @@ export async function GET() {
   const validCount = [...trackedKeys].filter((key) => keySet.has(key)).length;
 
   const publicBase = getR2PublicBase();
+  const totalStorageBytes = r2Objects.reduce((sum, entry) => sum + entry.size, 0);
+  const orphanByKey = new Map(orphanKeys.map((key) => [key, r2Objects.find((o) => o.key === key)]));
+
+  const orphans = orphanKeys.slice(0, 200).map((key) => {
+    const object = orphanByKey.get(key);
+    const lastModified = object?.lastModified ?? null;
+    return {
+      key,
+      size: object?.size ?? 0,
+      lastModified,
+      ageDays: ageDays(lastModified),
+      status: "orphan",
+      previewUrl: `${publicBase}/${key}`,
+    };
+  });
 
   return NextResponse.json({
     totalObjects: r2Objects.length,
@@ -136,12 +84,8 @@ export async function GET() {
     validTrackedObjects: validCount,
     potentialOrphans: orphanKeys.length,
     brokenReferences: brokenReferences.length,
-    orphans: orphanKeys.slice(0, 200).map((key) => ({
-      key,
-      size: 0,
-      status: "orphan",
-      previewUrl: `${publicBase}/${key}`,
-    })),
+    graceDays: DEFAULT_GRACE_DAYS,
+    orphans,
     brokenReferenceDetails: brokenReferences.slice(0, 200).map((entry) => ({
       key: entry.key,
       table: entry.table,
@@ -152,7 +96,10 @@ export async function GET() {
       status: "missing_r2_object",
     })),
     totalStorageBytes,
-    orphanStorageBytes: 0,
+    orphanStorageBytes: orphanKeys.reduce(
+      (sum, key) => sum + (orphanByKey.get(key)?.size ?? 0),
+      0,
+    ),
     generatedAt: new Date().toISOString(),
   });
 }
@@ -177,10 +124,30 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "No valid orphan object keys were provided for deletion." }, { status: 400 });
       }
 
-      const tracked = await collectTrackedReferences(createServiceClient());
+      // Safety net: never delete objects that are still referenced in the DB.
+      const tracked = await collectAllMediaReferences(createServiceClient());
       const trackedKeys = new Set(tracked.map((reference) => reference.key));
       const protectedKeys = normalized.filter((key) => trackedKeys.has(key));
-      const deletableKeys = normalized.filter((key) => !trackedKeys.has(key));
+      let deletableKeys = normalized.filter((key) => !trackedKeys.has(key));
+
+      // Grace period: by default only delete objects older than the grace
+      // window, so an in-flight upload or a DB row created moments after the
+      // object cannot be deleted. `force: true` bypasses the age check (the
+      // reference check above still applies).
+      const force = payload?.force === true;
+      if (!force && deletableKeys.length > 0) {
+        const graceMs = (Number(payload?.graceDays) || DEFAULT_GRACE_DAYS) * 86_400_000;
+        const objects = await listAllObjects();
+        const lastModifiedByKey = new Map(objects.map((o) => [o.key, o.lastModified]));
+        const now = Date.now();
+        deletableKeys = deletableKeys.filter((key) => {
+          const lastModified = lastModifiedByKey.get(key);
+          if (!lastModified) return false; // unknown age — never delete
+          const age = now - new Date(lastModified).getTime();
+          return !Number.isNaN(age) && age >= graceMs;
+        });
+      }
+
       const failed = protectedKeys.map((key) => ({
         key,
         error: "Object is referenced by the database and was not deleted.",
@@ -202,6 +169,8 @@ export async function POST(request: Request) {
         total: normalized.length,
         deletedCount: deleted.length,
         failedCount: failed.length,
+        graceSkipped: normalized.length - deleted.length - failed.length - protectedKeys.length,
+        force,
       });
     }
 

@@ -146,7 +146,18 @@ export function shouldDeletePreviousR2Asset(
   return previousKey !== nextKey;
 }
 
-/** Upload a Buffer to R2 and return its public URL. */
+/**
+ * Upload a Buffer to R2 and return its public URL.
+ *
+ * Objects are tagged `public, max-age=31536000, immutable`. This is safe
+ * because every upload in the app uses a versioned/unique key (timestamp +
+ * random suffix or UUID), so a given URL never points at different content:
+ * when media changes, a new key is generated and the old object is deleted by
+ * the lifecycle cleanup. The immutable directive lets Cloudflare's CDN edge
+ * cache R2 responses (served via the bucket's custom domain) without
+ * revalidating, so cache HITs never touch R2. Range requests (video seeking)
+ * pass through the edge cache untouched.
+ */
 export async function uploadToR2(
   key: string,
   body: Buffer,
@@ -159,6 +170,7 @@ export async function uploadToR2(
       Key: key,
       Body: body,
       ContentType: contentType,
+      CacheControl: "public, max-age=31536000, immutable",
     })
   );
   return r2PublicUrl(key);
@@ -174,11 +186,19 @@ export async function downloadFromR2(key: string): Promise<Buffer> {
   return Buffer.from(await resp.Body.transformToByteArray());
 }
 
-/** List object keys in the configured bucket, with optional pagination support. */
+export interface R2ListedObject {
+  key: string;
+  size: number;
+  lastModified: string | null;
+}
+
+/** List objects in the configured bucket, with optional pagination support.
+ *  Sizes + last-modified timestamps are included so the orphan audit can
+ *  report storage usage and enforce an age-based grace period. */
 export async function listR2ObjectKeys(
   prefix?: string,
   continuationToken?: string,
-): Promise<{ keys: string[]; nextContinuationToken?: string; isTruncated: boolean }> {
+): Promise<{ keys: string[]; objects: R2ListedObject[]; nextContinuationToken?: string; isTruncated: boolean }> {
   const client = getClient();
   const response = await client.send(
     new ListObjectsV2Command({
@@ -189,12 +209,17 @@ export async function listR2ObjectKeys(
     }),
   );
 
-  const keys = (response.Contents ?? [])
-    .map((entry) => entry.Key)
-    .filter((key): key is string => Boolean(key));
+  const objects: R2ListedObject[] = (response.Contents ?? [])
+    .filter((entry): entry is NonNullable<typeof entry> & { Key: string } => Boolean(entry?.Key))
+    .map((entry) => ({
+      key: entry.Key,
+      size: entry.Size ?? 0,
+      lastModified: entry.LastModified ? new Date(entry.LastModified).toISOString() : null,
+    }));
 
   return {
-    keys,
+    keys: objects.map((entry) => entry.key),
+    objects,
     nextContinuationToken: response.NextContinuationToken,
     isTruncated: response.IsTruncated === true,
   };
@@ -216,9 +241,29 @@ export type R2ReferenceLookup = {
   getUrls?: (value: unknown) => string[];
 };
 
-function getReferenceUrls(lookup: R2ReferenceLookup, value: unknown): string[] {
+export function getReferenceUrls(lookup: R2ReferenceLookup, value: unknown): string[] {
   if (lookup.getUrls) return lookup.getUrls(value);
   return typeof value === "string" ? [value] : [];
+}
+
+/** Extract attachment URLs from a stored attachments JSON array. */
+export function attachmentUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) =>
+      typeof item === "object" && item && typeof (item as Record<string, unknown>).url === "string"
+        ? ((item as Record<string, unknown>).url as string)
+        : ""
+    )
+    .filter(Boolean);
+}
+
+/** Extract video-poster URLs from a stored attachments JSON array. */
+export function attachmentPosterUrls(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === "object" && item ? (item as Record<string, unknown>).poster : null))
+    .filter((poster): poster is string => typeof poster === "string" && poster.length > 0);
 }
 
 export async function deleteOwnedR2AssetIfUnique(

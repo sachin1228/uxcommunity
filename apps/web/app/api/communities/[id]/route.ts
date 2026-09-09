@@ -3,7 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
 import { extensionForMime } from "@/lib/image-utils";
-import { deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { MASTER_IMAGE_LOOKUPS } from "@/lib/r2-cleanup";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -62,11 +63,14 @@ export async function PATCH(
   const isOwner = managerStatus.isOwner;
 
   // Snapshot the current values so the activity trail records what changed.
-  const { data: before } = await db
+  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  const { data: before } = (await db
     .from("communities")
     .select("name, description, image_url, is_private, enabled_tabs")
     .eq("id", id)
-    .maybeSingle();
+    .maybeSingle()) as unknown as {
+    data: { name: string | null; description: string | null; image_url: string | null; is_private: boolean; enabled_tabs: string[] } | null;
+  };
 
   // Accept FormData (multipart, used when image may be included)
   let formData: FormData;
@@ -154,14 +158,15 @@ export async function PATCH(
 
     const previousUrl = before?.image_url ?? null;
     const nextUrl = updates.image_url ?? before?.image_url ?? null;
-    if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
-      await deleteOwnedR2AssetIfUnique(db, previousUrl, [
-        { table: "communities", column: "image_url" },
-        { table: "cities", column: "image_url" },
-        { table: "design_sectors", column: "image_url" },
-        { table: "design_interests", column: "image_url" },
-        { table: "experience_levels", column: "image_url" },
-      ]);
+    if (previousUrl && shouldDeletePreviousR2Asset(previousUrl, nextUrl)) {
+      // Replaced with a new image — delete the old one unless another row
+      // (e.g. a mirrored master-data row) still references it.
+      await deleteOwnedR2AssetIfUnique(db, previousUrl, MASTER_IMAGE_LOOKUPS);
+    } else if (removeImage && previousUrl) {
+      // Image removed entirely — the DB update already nulled it, so anything
+      // that still referenced it is gone; delete it from R2 unless another
+      // row still points at it.
+      await deleteR2AssetIfUnreferenced(db, previousUrl, MASTER_IMAGE_LOOKUPS);
     }
   }
 

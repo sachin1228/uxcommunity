@@ -2,9 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  attachmentPosterUrls,
+  attachmentUrls,
   collectR2Keys,
   shouldDeletePreviousR2Asset,
   getR2KeyFromUrl,
+  getReferenceUrls,
   normalizeR2DeleteKeys,
 } from "./r2";
 
@@ -52,4 +55,44 @@ test("normalizeR2DeleteKeys accepts only exact object keys and strips invalid in
     null,
     undefined,
   ]), ["avatars/user-1/a.png"]);
+});
+
+test("attachmentUrls extracts attachment URLs and ignores non-objects", () => {
+  const attachments = [
+    { name: "video.mp4", url: "https://media.example.com/showcase/v.mp4", type: "video/mp4", size: 100 },
+    { name: "poster", url: "https://media.example.com/showcase/p.webp", type: "image/webp", size: 10 },
+    null,
+    "not-an-object",
+    { name: "broken", size: 5 }, // no url
+  ];
+
+  assert.deepEqual(attachmentUrls(attachments), [
+    "https://media.example.com/showcase/v.mp4",
+    "https://media.example.com/showcase/p.webp",
+  ]);
+  assert.deepEqual(attachmentUrls(null), []);
+  assert.deepEqual(attachmentUrls("nope"), []);
+});
+
+test("attachmentPosterUrls extracts only poster fields", () => {
+  const attachments = [
+    { name: "video.mp4", url: "https://media.example.com/showcase/v.mp4", type: "video/mp4", size: 100, poster: "https://media.example.com/showcase/v-poster.webp" },
+    { name: "poster", url: "https://media.example.com/showcase/p.webp", type: "image/webp", size: 10 },
+    { name: "no-poster", url: "https://media.example.com/showcase/x.mp4", type: "video/mp4", size: 5 },
+  ];
+
+  assert.deepEqual(attachmentPosterUrls(attachments), [
+    "https://media.example.com/showcase/v-poster.webp",
+  ]);
+  assert.deepEqual(attachmentPosterUrls(null), []);
+});
+
+test("getReferenceUrls uses getUrls when provided, else scalar strings", () => {
+  const scalar = { table: "communities", column: "image_url" };
+  assert.deepEqual(getReferenceUrls(scalar, "https://x.example/a.png"), ["https://x.example/a.png"]);
+  assert.deepEqual(getReferenceUrls(scalar, null), []);
+  assert.deepEqual(
+    getReferenceUrls({ ...scalar, getUrls: attachmentUrls }, [{ url: "https://x.example/b.png" }]),
+    ["https://x.example/b.png"],
+  );
 });

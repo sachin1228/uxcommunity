@@ -87,7 +87,9 @@ export async function PATCH(
 
   let existingQuery = db
     .from("community_events")
-    .select("id, user_id")
+    // cover_image_url is fetched so replaced/removed covers can be cleaned up
+    // from R2 after the update.
+    .select("id, user_id, cover_image_url")
     .eq("id", eventId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
@@ -153,10 +155,17 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const previousUrl = existing?.cover_image_url ?? null;
-  const nextUrl = data?.cover_image_url ?? null;
-  if (shouldDeletePreviousR2Asset(previousUrl, nextUrl) && previousUrl) {
+  // Casts match the repo-wide untyped supabase-js baseline (see next.config.js).
+  const previousUrl = (existing as unknown as { cover_image_url?: string | null } | null)?.cover_image_url ?? null;
+  const nextUrl = (data as unknown as { cover_image_url?: string | null } | null)?.cover_image_url ?? null;
+  if (previousUrl && shouldDeletePreviousR2Asset(previousUrl, nextUrl)) {
+    // Cover replaced with a new image — delete the old one unless another
+    // event still references it.
     await deleteOwnedR2AssetIfUnique(db, previousUrl, [{ table: "community_events", column: "cover_image_url" }]);
+  } else if (previousUrl && nextUrl === null) {
+    // Cover removed entirely — the update already nulled it, so delete the
+    // object unless another row still references it.
+    await deleteR2AssetIfUnreferenced(db, previousUrl, [{ table: "community_events", column: "cover_image_url" }]);
   }
 
   void publishRealtimeBatch([

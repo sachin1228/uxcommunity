@@ -157,7 +157,9 @@ export async function PATCH(
   const db = createServiceClient();
   const publicScope = isPublicContentScope(communityId);
 
-  let existingQuery = db.from("community_threads").select("id, user_id, community_id, poll").eq("id", threadId);
+  // attachments is fetched so replaced/removed attachment URLs can be cleaned
+  // up from R2 after the update.
+  let existingQuery = db.from("community_threads").select("id, user_id, community_id, poll, attachments").eq("id", threadId);
   existingQuery = publicScope
     ? existingQuery.eq("is_public", true).is("community_id", null)
     : existingQuery.eq("community_id", communityId);
@@ -206,8 +208,10 @@ export async function PATCH(
     await db.from("thread_poll_votes").delete().eq("thread_id", threadId);
   }
 
-  const oldUrls = Array.isArray(existing.attachments)
-    ? (existing.attachments as Array<{ url?: string }>).map((attachment) => attachment?.url ?? null)
+  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  const existingRow = existing as unknown as { attachments?: unknown };
+  const oldUrls = Array.isArray(existingRow.attachments)
+    ? (existingRow.attachments as Array<{ url?: string }>).map((attachment) => attachment?.url ?? null)
     : [];
   const newUrls = Array.isArray(attachments)
     ? attachments.map((attachment) => attachment.url ?? null)

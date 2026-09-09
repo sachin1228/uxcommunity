@@ -567,8 +567,20 @@ All mobile API calls go through `lib/api.ts` which wraps `fetch()` with session 
 | Lottie animations | Cloudflare R2 | Yes (fetched server-side) |
 
 ## CDN Usage
-- **Cloudflare CDN**: Serves R2 public URLs via Cloudflare's edge network
+- **Cloudflare CDN**: Serves R2 public URLs via Cloudflare's edge network.
+  Uploads carry `Cache-Control: public, max-age=31536000, immutable` and are
+  edge-cached when served through a custom domain attached to the R2 bucket.
 - **next/image**: Used sparingly (16 transformations in 30 days). Configured for Supabase Storage + GIPHY CDN remote patterns.
+
+## Media security note
+- There is no private media store: everything in the media bucket is public
+  with unguessable, versioned keys; access control for community content
+  happens at the API layer (membership checks), not the storage layer, so the
+  shared public edge cache can never expose one user's media to another.
+- After an object is deleted from R2, an already-cached edge copy may stay
+  reachable for the rest of the immutable max-age (1 year). For strictly
+  time-sensitive removals, purge the URL via the Cloudflare API — this is not
+  done automatically because it would require a purge call per deleted object.
 
 ## Bandwidth Estimate per Image
 - Client compression to WebP: ~60-80% reduction from original
@@ -666,7 +678,38 @@ Logout:
 ## R2 Storage
 | Bucket | Purpose | Public URL |
 |---|---|---|
-| Configured via `R2_BUCKET_NAME` env | All image uploads | `R2_PUBLIC_URL/<key>` |
+| `uxcommunity-web-next-cache` (wrangler binding `NEXT_INC_CACHE_R2_BUCKET`) | Next.js incremental cache (ISR / unstable_cache) — REQUIRED by OpenNext; do NOT delete | internal (R2 binding, not public) |
+| Media bucket, configured via `R2_BUCKET_NAME` env (prod: `drafthub`) | All uploaded media: images, videos, audio, PDFs, attachments, avatars, master-data images, lottie | `R2_PUBLIC_URL/<key>` |
+
+### Media caching architecture (Cloudflare edge cache)
+
+```
+User ──▶ Cloudflare Edge Cache (CDN) ── cache MISS ──▶ R2 media bucket (origin)
+            │                                                     ▲
+            └──── cache HIT (never touches R2)                   │
+```
+
+- **Origin = R2** (single media bucket; no duplicate cache bucket, no Cache Reserve).
+- **Delivery = Cloudflare CDN edge**. Every upload is tagged `Cache-Control: public,
+  max-age=31536000, immutable` because all object keys are versioned/unique
+  (timestamp + random suffix or UUID), so a URL never changes content.
+- **Custom domain required**: `R2_PUBLIC_URL` must be a custom domain attached to
+  the bucket (e.g. `media.uxcommunity.in`). The `pub-*.r2.dev` dev URL bypasses
+  the CDN edge cache; responses still work but are never edge-cached.
+- **Videos/audio**: served directly from the R2 custom domain. HTTP Range /
+  `206 Partial Content` pass straight through the edge cache, so seeking,
+  scrubbing, resume and mobile playback are preserved. Nothing proxies media
+  through the Next.js worker except the download helper (`/api/image-download`),
+  which is only used for save-to-disk and does not stream video.
+- **Deleted objects**: deletion removes the R2 object; an already-cached edge
+  copy can remain until its max-age expires. Because keys are unguessable and
+  content is public-by-design, no per-object cache purge is issued (see the
+  security note below).
+- **Media lifecycle**: deleting an entity (post/thread/event/message/community/
+  user/master-data row) deletes its R2 objects when nothing else references
+  them. See `apps/web/lib/r2-cleanup.ts` (reference lookups shared with the
+  admin orphan audit) and `/api/admin/r2-audit` (scan + grace-period
+  delete-orphans, default 7 days).
 
 ## Overlap Between Cloudflare and Vercel
 **FACT**: The app has BOTH Cloudflare Workers (primary) and Vercel (alternate) deployment configs. They do NOT overlap in production — only one is active. The Vercel config exists as an alternate deployment path. The CI/CD pipeline (`.github/workflows/deploy.yml`) deploys to Cloudflare.

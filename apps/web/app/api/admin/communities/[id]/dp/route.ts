@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
-import { deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
 import { resolveCommunityDp } from "@/lib/communities/dp";
 
 const MAX_IMAGE_BYTES  = 5 * 1024 * 1024; // 5 MB — same as master-data uploads
@@ -145,6 +145,13 @@ export async function POST(
     .update(communityUpdate)
     .eq("id", id);
   if (communityError) {
+    // The upload already succeeded — remove it so a failed save doesn't leave
+    // an unreferenced R2 object.
+    try {
+      await deleteFromR2(uploadKey);
+    } catch (cleanupError) {
+      console.error("[community-dp] failed-save upload cleanup error:", cleanupError);
+    }
     console.error("[community-dp] community update failed:", communityError);
     return NextResponse.json({ error: "Failed to save display picture." }, { status: 500 });
   }

@@ -24,9 +24,25 @@ binding = "IMAGES"
 # feed RPC (~0.8–1.8s) and re-fetches Lottie payloads from R2 on each sidebar
 # load. Create the bucket once before deploying:
 #   wrangler r2 bucket create uxcommunity-web-next-cache
+#
+# NOTE — this is the NEXT.JS INCREMENTAL CACHE bucket, NOT the media bucket.
+# Media (images/videos/audio/PDFs/avatars/lottie) lives in a separate bucket
+# configured via the R2_BUCKET_NAME / R2_PUBLIC_URL secrets (the S3-compatible
+# client in lib/r2.ts). Do not merge the two: this bucket must stay for ISR /
+# unstable_cache; media must not be copied into it (no duplicate storage).
 [[r2_buckets]]
 binding = "NEXT_INC_CACHE_R2_BUCKET"
 bucket_name = "uxcommunity-web-next-cache"
+
+# ── Media delivery & edge caching ────────────────────────────────────────────
+# Uploaded media is stored in the R2 bucket named by the R2_BUCKET_NAME secret
+# and served from R2_PUBLIC_URL. All uploads are tagged
+# `Cache-Control: public, max-age=31536000, immutable` (keys are versioned), so
+# Cloudflare's CDN edge caches them. For the edge cache to actually engage,
+# R2_PUBLIC_URL MUST be a custom domain attached to the bucket in the Cloudflare
+# dashboard (e.g. https://media.uxcommunity.in), NOT the pub-*.r2.dev dev URL —
+# r2.dev responses bypass the CDN edge cache. R2 stays the origin/source of
+# truth; no extra cache bucket or Cache Reserve is used.
 
 # Non-secret, public-by-design values used at runtime by server code.
 # Secrets (SESSION_SECRET, SUPABASE_SERVICE_ROLE_KEY, REALTIME_URL,

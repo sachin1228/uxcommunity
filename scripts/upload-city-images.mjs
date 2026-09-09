@@ -73,6 +73,8 @@ async function uploadToR2(key, buf) {
     Key: key,
     Body: buf,
     ContentType: "image/jpeg",
+    // Keys are versioned (timestamp suffix) — safe to edge-cache as immutable.
+    CacheControl: "public, max-age=31536000, immutable",
   }));
   return `${PUBLIC_BASE}/${key}`;
 }

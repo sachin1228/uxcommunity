@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { masterDataSchema } from "@/lib/validations";
 import { z } from "zod";
+import { cleanupMasterDataMedia, collectMasterMediaUrls } from "@/lib/r2-cleanup";
 
 const patchSchema = masterDataSchema
   .extend({ is_active: z.boolean().optional() })
@@ -64,6 +65,10 @@ export async function DELETE(
   const { id } = await params;
   const db = createServiceClient();
 
+  // Collect every R2 URL the master row + its communities own BEFORE deleting
+  // (the rows are unrecoverable afterwards).
+  const urls = await collectMasterMediaUrls(db, "sector", "design_sectors", id);
+
   // Delete the master row first; only clean up the community if that succeeds.
   const { error } = await db.from("design_sectors").delete().eq("id", id);
   if (error) {
@@ -76,10 +81,18 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete sector." }, { status: 500 });
   }
 
-  // Master row is gone — kick off community cleanup in the background so it
-  // doesn't add latency to the admin response. The orphan filter in
-  // /api/communities/all hides it from users immediately.
-  void db.from("communities").delete().eq("type", "sector").eq("reference_id", id);
-
-  return NextResponse.json({ success: true });
+  // Master row is gone — remove the linked communities (the orphan filter in
+  // /api/communities/all hides them from users immediately) and clean up every
+  // R2 object they owned. Best-effort: failures surface in logs and are
+  // retried by the orphan sweep's grace period.
+  try {
+    const cleanup = await cleanupMasterDataMedia(db, "sector", "design_sectors", id, urls);
+    if (cleanup.failed.length > 0) {
+      console.error("[admin/sectors] R2 cleanup failures:", cleanup.failed);
+    }
+    return NextResponse.json({ success: true, r2: { deleted: cleanup.deleted.length, skipped: cleanup.skipped.length, failed: cleanup.failed.length } });
+  } catch (cleanupError) {
+    console.error("[admin/sectors] R2 cleanup error:", cleanupError);
+    return NextResponse.json({ success: true, r2: { error: "R2 cleanup failed; orphan scan will retry." } });
+  }
 }
