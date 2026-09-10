@@ -55,10 +55,10 @@ function runVersion(bin: string): Promise<string> {
       resolve("timed out");
     }, 10_000);
     child.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-      if (stdout.length > 512) {
-        child.kill();
-      }
+      // Cap collection but do NOT kill the child — a SIGTERM'd child reports
+      // exit code null, which used to poison the banner into "exit null: …"
+      // and fail isVersionOk on every real host.
+      if (stdout.length <= 512) stdout += chunk.toString();
     });
     child.on("error", (error) => {
       clearTimeout(timer);
@@ -81,9 +81,13 @@ async function checkSupabase(
   db: QueueDb,
 ): Promise<HealthCheck & { queue: { queued: number; processing: number } }> {
   try {
+    // NOTE: no `head: true` — HEAD responses carry no body, so PostgREST
+    // errors (e.g. missing table → PGRST205) cannot be parsed and silently
+    // report as error-free. A bodyless GET via limit(0) keeps counts exact
+    // AND surfaces real errors.
     const [queuedResult, processingResult] = await Promise.all([
-      db.from("video_media").select("id", { count: "exact", head: true }).eq("status", "queued"),
-      db.from("video_media").select("id", { count: "exact", head: true }).eq("status", "processing"),
+      db.from("video_media").select("id", { count: "exact" }).limit(0).eq("status", "queued"),
+      db.from("video_media").select("id", { count: "exact" }).limit(0).eq("status", "processing"),
     ]);
     const error = queuedResult.error ?? processingResult.error;
     if (error) {

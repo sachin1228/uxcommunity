@@ -54,6 +54,10 @@ export type QueueDb = { from: (table: string) => any };
  * when another worker got there first. Conditional update = atomic claim.
  */
 export async function claimVideoJob(db: QueueDb, workerId: string): Promise<VideoMediaRow | null> {
+  // `.limit(1)` — NOT `.single()`: single() errors (PGRST116) whenever MORE
+  // THAN ONE row is queued, which silently stalled the worker whenever two
+  // videos were queued at once. The conditional UPDATE stays atomic, so a
+  // row can never be claimed twice; limit(1) just takes one claim per call.
   const { data, error } = await db
     .from("video_media")
     .update({
@@ -63,9 +67,9 @@ export async function claimVideoJob(db: QueueDb, workerId: string): Promise<Vide
     })
     .eq("status", "queued")
     .select("*")
-    .single();
-  if (error || !data) return null;
-  return data as VideoMediaRow;
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  return data[0] as VideoMediaRow;
 }
 
 /**

@@ -127,6 +127,38 @@ export function useShowcaseFileUpload({
     [communityId, setAttachment],
   );
 
+  /**
+   * Waits for the server-side transcoder; falls back to the in-browser
+   * FFmpeg wasm worker when no worker completes the job within the grace period.
+   */
+  const awaitServerOrFallback = useCallback(
+    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
+      const mediaId = attachment.mediaId;
+      if (!mediaId || !communityId) return;
+      setAttachment(mediaId, { status: "processing" });
+      const result = await pollQueuedVideo(communityId, mediaId, {
+        timeoutMs: QUEUED_FALLBACK_AFTER_MS,
+      });
+      if (result.status === "ready" && result.attachment) {
+        setAttachment(mediaId, { ...result.attachment, status: "ready" });
+        originalsRef.current.delete(mediaId);
+        return;
+      }
+      if (result.status === "failed") {
+        setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
+        return;
+      }
+      if (result.status === "deleted") {
+        setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
+        return;
+      }
+      // Still queued/processing — no transcoder around (local dev, outage).
+      // Fall back to the in-browser FFmpeg wasm worker.
+      void runEncode(attachment, decision);
+    },
+    [communityId, runEncode, setAttachment],
+  );
+
   const uploadFiles = useCallback(
     async (files: File[]) => {
       if (attachmentsRef.current.length + files.length > SHOWCASE_MEDIA_MAX) {
@@ -195,39 +227,7 @@ export function useShowcaseFileUpload({
         setUploading(false);
       }
     },
-    [communityId, runEncode],
-  );
-
-  /**
-   * Waits for the server-side transcoder; falls back to the in-browser
-   * FFmpeg worker when no worker completes the job within the grace period.
-   */
-  const awaitServerOrFallback = useCallback(
-    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
-      const mediaId = attachment.mediaId;
-      if (!mediaId || !communityId) return;
-      setAttachment(mediaId, { status: "processing" });
-      const result = await pollQueuedVideo(communityId, mediaId, {
-        timeoutMs: QUEUED_FALLBACK_AFTER_MS,
-      });
-      if (result.status === "ready" && result.attachment) {
-        setAttachment(mediaId, { ...result.attachment, status: "ready" });
-        originalsRef.current.delete(mediaId);
-        return;
-      }
-      if (result.status === "failed") {
-        setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
-        return;
-      }
-      if (result.status === "deleted") {
-        setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-        return;
-      }
-      // Still queued/processing — no transcoder around (local dev, outage).
-      // Fall back to the in-browser FFmpeg wasm worker.
-      void runEncode(attachment, decision);
-    },
-    [communityId, runEncode, setAttachment],
+    [awaitServerOrFallback, communityId],
   );
 
   /** Retries a failed encode — the original is still in R2, no re-upload. */

@@ -21,7 +21,7 @@ export const SHOWCASE_STAGES: { value: ShowcaseStage; label: string }[] = [
 /** How many media items (images + videos) a showcase post may carry. */
 export const SHOWCASE_MEDIA_MAX = 5;
 
-export type VideoAttachmentStatus = "uploading" | "uploaded" | "processing" | "ready" | "failed";
+export type VideoAttachmentStatus = "uploading" | "uploaded" | "queued" | "processing" | "ready" | "failed";
 
 /** Uploaded image/video attachment — mirrors the thread attachment shape. */
 export interface ShowcaseAttachment {

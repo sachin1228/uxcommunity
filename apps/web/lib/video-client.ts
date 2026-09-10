@@ -30,7 +30,8 @@ import {
 // Byte-level MP4/WebM sniffing lives in @uxcommunity/shared (shared with the
 // server-side transcoder) — re-exported so the app's existing imports and
 // tests keep working.
-export { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
+import { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
+export { isFaststart, looksLikeMp4, sniffVideoContainer };
 
 export interface VideoProcessedResult {
   /** Remuxed, faststart MP4 (or the original file when remuxing was skipped). */
