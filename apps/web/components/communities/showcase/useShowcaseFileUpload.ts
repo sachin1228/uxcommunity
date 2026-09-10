@@ -6,13 +6,32 @@ import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import { VIDEO_TYPES, QUEUED_FALLBACK_AFTER_MS, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, pollQueuedVideo, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
+import { MAX_VIDEO_BYTES } from "@/lib/video/video-config";
 import type { VideoDecision } from "@/lib/video/video-types";
 
-/** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 25 MB). */
+/** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 50 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/**
+ * A video currently being uploaded (mediaId doesn't exist until the upload
+ * completes, so the composer tracks it by a client-generated key). Drives
+ * the in-flight upload tile: percent + elapsed + ETA.
+ */
+export interface InFlightUpload {
+  key: string;
+  name: string;
+  size: number;
+  /** Analyzing = probing/remuxing before bytes flow; uploading = XHR in flight. */
+  phase: "analyzing" | "uploading";
+  percent: number;
+  startedAt: number;
+  /** Seconds since the upload started (refreshed by the clock tick). */
+  elapsedSec: number;
+  /** Projected seconds remaining, when a progress rate is known. */
+  etaSec: number | null;
+}
 
 /**
  * Media intake for the "Share your work" composer.
@@ -40,6 +59,10 @@ export function useShowcaseFileUpload({
   const [isDragging, setIsDragging] = useState(false);
   /** Per-media encode progress (0–100) for the composer UI. */
   const [progress, setProgress] = useState<Record<string, number>>({});
+  /** In-flight uploads (before mediaId exists) — live loader tiles. */
+  const [uploads, setUploads] = useState<InFlightUpload[]>([]);
+  /** Validation failures (count/size) shown under the media input. */
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   // Fresh copy for limit checks inside stable callbacks (a second drop lands
   // before re-render otherwise sees a stale list).
@@ -47,6 +70,49 @@ export function useShowcaseFileUpload({
   useEffect(() => {
     attachmentsRef.current = attachments;
   }, [attachments]);
+
+  // uploadsRef is mutated synchronously (not via effect) so a second drop
+  // mid-upload sees the in-flight count immediately for the media cap check.
+  const uploadsRef = useRef<InFlightUpload[]>([]);
+  const uploadSeqRef = useRef(0);
+
+  const addUpload = useCallback((item: InFlightUpload) => {
+    uploadsRef.current = [...uploadsRef.current, item];
+    setUploads(uploadsRef.current);
+  }, []);
+
+  const updateUpload = useCallback((key: string, patch: Partial<InFlightUpload>) => {
+    uploadsRef.current = uploadsRef.current.map((item) =>
+      item.key === key ? { ...item, ...patch } : item,
+    );
+    setUploads(uploadsRef.current);
+  }, []);
+
+  const removeUpload = useCallback((key: string) => {
+    uploadsRef.current = uploadsRef.current.filter((item) => item.key !== key);
+    setUploads(uploadsRef.current);
+  }, []);
+
+  // While uploads are in flight, refresh the elapsed/ETA clocks every second
+  // (even when no new progress event has arrived) and re-render the tiles.
+  useEffect(() => {
+    if (uploads.length === 0) return;
+    const tick = () => {
+      const now = Date.now();
+      uploadsRef.current = uploadsRef.current.map((item) => {
+        const elapsedSec = Math.max(0, (now - item.startedAt) / 1000);
+        return {
+          ...item,
+          elapsedSec,
+          etaSec: item.percent > 0 ? (elapsedSec * (100 - item.percent)) / item.percent : null,
+        };
+      });
+      setUploads(uploadsRef.current);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [uploads.length]);
 
   /** Original file bytes + poster held for the encode step (transcodes only). */
   const originalsRef = useRef(new Map<string, { file: File; poster: Blob | null }>());
@@ -161,24 +227,28 @@ export function useShowcaseFileUpload({
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
-      if (attachmentsRef.current.length + files.length > SHOWCASE_MEDIA_MAX) {
-        setError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
+      if (
+        attachmentsRef.current.length + uploadsRef.current.length + files.length >
+        SHOWCASE_MEDIA_MAX
+      ) {
+        setMediaError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
         return;
       }
 
       for (const file of files) {
         if (IMAGE_TYPES.has(file.type) && file.size > MAX_IMAGE_BYTES) {
-          setError("Images must be 8 MB or smaller.");
+          setMediaError("Images must be 8 MB or smaller.");
           return;
         }
         if (VIDEO_TYPES.has(file.type) && file.size > MAX_VIDEO_BYTES) {
-          setError("Videos must be 25 MB or smaller.");
+          setMediaError("Videos must be 50 MB or smaller.");
           return;
         }
       }
 
       setUploading(true);
       setError(null);
+      setMediaError(null);
       try {
         for (const file of files) {
           if (VIDEO_TYPES.has(file.type)) {
@@ -187,20 +257,41 @@ export function useShowcaseFileUpload({
             // → upload original → server-side transcoder (async, polled) —
             // with the in-browser FFmpeg worker as automatic fallback if no
             // transcoder picks the job up in time.
-            const prepared = await prepareVideoForPipeline(file);
-            const response = await uploadVideo(communityId!, prepared);
-            const attachment = response.attachment;
-            setAttachments((current) => [...current, attachment]);
-            if (attachment.mediaId) {
-              originalsRef.current.set(attachment.mediaId, {
-                file,
-                poster: prepared.poster,
+            const uploadKey = `upload-${Date.now()}-${uploadSeqRef.current++}`;
+            addUpload({
+              key: uploadKey,
+              name: file.name,
+              size: file.size,
+              phase: "analyzing",
+              percent: 0,
+              startedAt: Date.now(),
+              elapsedSec: 0,
+              etaSec: null,
+            });
+            try {
+              const prepared = await prepareVideoForPipeline(file);
+              updateUpload(uploadKey, { phase: "uploading" });
+              const response = await uploadVideo(communityId!, prepared, (sent, total) => {
+                const percent = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+                updateUpload(uploadKey, { phase: "uploading", percent });
               });
-              if (response.status === "queued") {
-                void awaitServerOrFallback(attachment, prepared.decision);
-              } else {
-                originalsRef.current.delete(attachment.mediaId);
+              removeUpload(uploadKey);
+              const attachment = response.attachment;
+              setAttachments((current) => [...current, attachment]);
+              if (attachment.mediaId) {
+                originalsRef.current.set(attachment.mediaId, {
+                  file,
+                  poster: prepared.poster,
+                });
+                if (response.status === "queued") {
+                  void awaitServerOrFallback(attachment, prepared.decision);
+                } else {
+                  originalsRef.current.delete(attachment.mediaId);
+                }
               }
+            } catch (uploadErr) {
+              removeUpload(uploadKey);
+              throw uploadErr;
             }
           } else {
             // ── Images: existing pipeline, unchanged ──────────────────────
@@ -227,7 +318,7 @@ export function useShowcaseFileUpload({
         setUploading(false);
       }
     },
-    [awaitServerOrFallback, communityId],
+    [addUpload, updateUpload, removeUpload, awaitServerOrFallback, communityId],
   );
 
   /** Retries a failed encode — the original is still in R2, no re-upload. */
@@ -338,5 +429,7 @@ export function useShowcaseFileUpload({
     isDragging,
     progress,
     retryAttachment,
+    uploads,
+    mediaError,
   };
 }

@@ -11,7 +11,7 @@
  * quality loss) fixes this at upload time for every future viewer.
  *
  * Mediabunny is a pure-TypeScript browser toolkit: remuxing copies compressed
- * packets without re-encoding, so it's fast (seconds for a 25 MB clip) and
+ * packets without re-encoding, so it's fast (seconds for a 50 MB clip) and
  * uses the environment's own codec machinery (WebCodecs) rather than WASM.
  */
 

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // ── Video: centralized pipeline ──────────────────────────────────────────
 
   if (file.size > MAX_VIDEO_BYTES) {
-    return NextResponse.json({ error: "Videos must be 25 MB or smaller." }, { status: 422 });
+    return NextResponse.json({ error: "Videos must be 50 MB or smaller." }, { status: 422 });
   }
 
   // Actual file inspection — the browser's MIME type and filename are not

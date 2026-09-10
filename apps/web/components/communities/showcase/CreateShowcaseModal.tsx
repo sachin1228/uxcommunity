@@ -18,7 +18,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
-import { useShowcaseFileUpload } from "./useShowcaseFileUpload";
+import { useShowcaseFileUpload, type InFlightUpload } from "./useShowcaseFileUpload";
 import {
   SHOWCASE_CATEGORIES,
   SHOWCASE_MEDIA_MAX,
@@ -84,6 +84,43 @@ function ChipRow<T extends string>({
   );
 }
 
+function formatClock(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+/** In-flight upload tile — live percent + elapsed + ETA while bytes flow. */
+function UploadTile({ upload }: { upload: InFlightUpload }) {
+  return (
+    <div className="relative flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-border bg-surface-raised px-1.5 text-center">
+      <span className="w-full truncate px-1 font-body text-[10px] text-foreground-muted">{upload.name}</span>
+      {upload.phase === "analyzing" ? (
+        <>
+          <Spinner size={16} />
+          <span className="font-body text-[10px] text-foreground-subtle">Analyzing…</span>
+        </>
+      ) : (
+        <>
+          <span className="font-body text-[10px] font-medium tabular-nums text-foreground">
+            {upload.percent}%
+          </span>
+          <div className="h-1 w-full overflow-hidden rounded-full bg-border">
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-200"
+              style={{ width: `${upload.percent}%` }}
+            />
+          </div>
+          <span className="font-body text-[9px] tabular-nums text-foreground-subtle">
+            {formatClock(upload.elapsedSec)} ·
+            {upload.etaSec !== null ? ` ~${formatClock(upload.etaSec)} left` : " …"}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
 /**
  * Thumbnail row of uploaded media (images + videos) with remove + add tiles.
  *
@@ -92,6 +129,7 @@ function ChipRow<T extends string>({
  */
 function MediaRow({
   attachments,
+  uploads,
   uploading,
   progress,
   onRemove,
@@ -99,13 +137,14 @@ function MediaRow({
   onAddMore,
 }: {
   attachments: ShowcaseAttachment[];
+  uploads: InFlightUpload[];
   uploading: boolean;
   progress: Record<string, number>;
   onRemove: (url: string, mediaId?: string) => void;
   onRetry: (attachment: ShowcaseAttachment) => void;
   onAddMore: () => void;
 }) {
-  if (attachments.length === 0) return null;
+  if (attachments.length === 0 && uploads.length === 0) return null;
 
   return (
     <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
@@ -169,7 +208,11 @@ function MediaRow({
         );
       })}
 
-      {attachments.length < SHOWCASE_MEDIA_MAX && (
+      {uploads.map((upload) => (
+        <UploadTile key={upload.key} upload={upload} />
+      ))}
+
+      {attachments.length + uploads.length < SHOWCASE_MEDIA_MAX && (
         <button
           type="button"
           onClick={onAddMore}
@@ -221,6 +264,8 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
     isDragging,
     progress,
     retryAttachment,
+    uploads,
+    mediaError,
   } = useShowcaseFileUpload({ communityId, initialAttachments });
 
   // Auto-grow the title textarea like the thread composer.
@@ -329,7 +374,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                   className="sr-only"
                   onChange={handleFiles}
                 />
-                {attachments.length === 0 ? (
+                {attachments.length === 0 && uploads.length === 0 ? (
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
@@ -342,12 +387,18 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                 ) : (
                   <MediaRow
                     attachments={attachments}
+                    uploads={uploads}
                     uploading={uploading}
                     progress={progress}
                     onRemove={removeAttachment}
                     onRetry={retryAttachment}
                     onAddMore={() => fileRef.current?.click()}
                   />
+                )}
+                {mediaError && (
+                  <p role="status" className="mt-1.5 font-body text-xs text-red-400">
+                    {mediaError}
+                  </p>
                 )}
               </div>
 

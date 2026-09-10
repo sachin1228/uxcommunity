@@ -19,6 +19,7 @@ import type { ShowcaseAttachment } from "@/components/communities/showcase/types
 import { processVideoForUpload } from "@/lib/video-client";
 import { decideVideoStrategy, presetForDimensions } from "./video-decision";
 import { probeVideoFile } from "./video-probe";
+import { MAX_VIDEO_BYTES } from "./video-config";
 import type {
   VideoDecision,
   VideoEncodeResult,
@@ -58,8 +59,6 @@ export interface VideoFinalizeResponse {
   discarded?: boolean;
 }
 
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
-
 /** Video MIME types accepted by the pipeline (mirrors the upload route). */
 export const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
@@ -96,13 +95,19 @@ export async function prepareVideoForPipeline(file: File): Promise<PreparedVideo
   return { file: payload, poster: prepared.poster, probe, decision };
 }
 
-/** Uploads the (prepared) video to R2 and creates the `video_media` row. */
+/**
+ * Uploads the (prepared) video to R2 and creates the `video_media` row.
+ *
+ * Uses XHR (not fetch) so byte-level upload progress can be surfaced for the
+ * composer's loader — fetch exposes no upload-progress signal.
+ */
 export async function uploadVideo(
   communityId: string,
   prepared: PreparedVideo,
+  onProgress?: (sent: number, total: number) => void,
 ): Promise<VideoUploadResponse> {
   if (prepared.file.size > MAX_VIDEO_BYTES) {
-    throw new Error("Videos must be 25 MB or smaller.");
+    throw new Error("Videos must be 50 MB or smaller.");
   }
 
   const form = new FormData();
@@ -125,13 +130,31 @@ export async function uploadVideo(
     form.append("poster", prepared.poster, "poster.jpg");
   }
 
-  const response = await fetch(`/api/communities/${communityId}/showcase/upload`, {
-    method: "POST",
-    body: form,
+  return new Promise<VideoUploadResponse>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `/api/communities/${communityId}/showcase/upload`);
+    if (onProgress && xhr.upload) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(event.loaded, event.total);
+      };
+    }
+    xhr.onload = () => {
+      let data: { error?: string } & Partial<VideoUploadResponse>;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        reject(new Error("Upload failed."));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as VideoUploadResponse);
+      } else {
+        reject(new Error(data.error ?? "Upload failed."));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Upload failed. Check your connection."));
+    xhr.send(form);
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? "Upload failed.");
-  return data as VideoUploadResponse;
 }
 
 /**

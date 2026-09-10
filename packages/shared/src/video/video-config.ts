@@ -23,8 +23,8 @@
 /** Which container/encoding layouts we accept as uploads. */
 export const VIDEO_MIME_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 
-/** Upload cap for the ORIGINAL video (kept — matches the current product cap). */
-export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+/** Upload cap for the ORIGINAL video (matches the current product cap). */
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
 /**
  * Cap for the FINALIZE upload (the canonical processed MP4). The processed

@@ -234,7 +234,8 @@ stale-video counts.
 
 ## Safety limits (platform-level, configurable)
 
-- Original uploads ≤ 25 MB (unchanged product cap).
+- Original uploads ≤ 50 MB (product cap — the Next proxy body limit is
+  raised to match in `next.config.js`).
 - Encode throughput ≤ 3840×2160@30 px/s (4K@60 and above pass through
   losslessly instead of encoding).
 - Encode duration ≤ 10 min (longer sources pass through).
