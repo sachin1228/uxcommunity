@@ -9,8 +9,12 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
 const nextConfig = {
   // Video uploads ship the ORIGINAL to this route (cap: 50MB), so the Next
   // proxy's default 10MB body limit would truncate every big video. Match
-  // the app cap with headroom for multipart/form-data overhead.
-  middlewareClientMaxBodySize: "55mb",
+  // the app cap with headroom for multipart/form-data overhead. In Next 16
+  // this lives under `experimental` (the legacy top-level
+  // `middlewareClientMaxBodySize` is rejected by the config validator).
+  experimental: {
+    proxyClientMaxBodySize: "55mb",
+  },
 
   // Supabase-js has no generated types file in this project, which causes
   // tsc to infer `never` on every query result across the codebase. These
