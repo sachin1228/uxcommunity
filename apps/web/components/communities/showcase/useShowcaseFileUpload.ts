@@ -6,8 +6,8 @@ import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 import { VIDEO_TYPES, QUEUED_FALLBACK_AFTER_MS, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, pollQueuedVideo, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
-import { MAX_VIDEO_BYTES } from "@/lib/video/video-config";
-import type { VideoDecision } from "@/lib/video/video-types";
+import { FFMPEG, MAX_VIDEO_BYTES } from "@/lib/video/video-config";
+import type { VideoDecision, VideoStatus } from "@/lib/video/video-types";
 
 /** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 50 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -75,6 +75,20 @@ export function useShowcaseFileUpload({
   // mid-upload sees the in-flight count immediately for the media cap check.
   const uploadsRef = useRef<InFlightUpload[]>([]);
   const uploadSeqRef = useRef(0);
+
+  /** Active status-poll controllers — aborted on unmount or removal. */
+  const pollControllersRef = useRef(new Map<string, AbortController>());
+
+  // No zombie polling: abort every in-flight video-status poll when the
+  // composer unmounts (submit, cancel, navigation) so the server isn't
+  // spammed with requests from a closed modal.
+  useEffect(() => {
+    const controllers = pollControllersRef.current;
+    return () => {
+      for (const controller of controllers.values()) controller.abort();
+      controllers.clear();
+    };
+  }, []);
 
   const addUpload = useCallback((item: InFlightUpload) => {
     uploadsRef.current = [...uploadsRef.current, item];
@@ -195,32 +209,72 @@ export function useShowcaseFileUpload({
 
   /**
    * Waits for the server-side transcoder; falls back to the in-browser
-   * FFmpeg wasm worker when no worker completes the job within the grace period.
+   * FFmpeg wasm worker when no worker completes the job within the grace
+   * period AND the engine is available. Polling is cancellable — it stops
+   * when the composer unmounts or the attachment is removed.
    */
   const awaitServerOrFallback = useCallback(
     async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
       const mediaId = attachment.mediaId;
       if (!mediaId || !communityId) return;
+
+      const controller = new AbortController();
+      pollControllersRef.current.set(mediaId, controller);
+
       setAttachment(mediaId, { status: "processing" });
-      const result = await pollQueuedVideo(communityId, mediaId, {
-        timeoutMs: QUEUED_FALLBACK_AFTER_MS,
-      });
-      if (result.status === "ready" && result.attachment) {
-        setAttachment(mediaId, { ...result.attachment, status: "ready" });
-        originalsRef.current.delete(mediaId);
-        return;
+
+      const applyTerminal = (result: {
+        status: VideoStatus;
+        attachment: ShowcaseAttachment | null;
+      }): boolean => {
+        if (result.status === "ready" && result.attachment) {
+          setAttachment(mediaId, { ...result.attachment, status: "ready" });
+          originalsRef.current.delete(mediaId);
+          return true;
+        }
+        if (result.status === "failed") {
+          setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
+          return true;
+        }
+        if (result.status === "deleted") {
+          setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
+          return true;
+        }
+        return false;
+      };
+
+      try {
+        // Grace period: the transcoder normally claims a job within seconds.
+        const result = await pollQueuedVideo(communityId, mediaId, {
+          timeoutMs: QUEUED_FALLBACK_AFTER_MS,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        if (applyTerminal(result)) return;
+
+        if (FFMPEG.coreBaseUrl) {
+          // In-browser engine available — encode locally (local dev without
+          // a transcoder, or a worker outage).
+          void runEncode(attachment, decision);
+          return;
+        }
+
+        // No in-browser engine — the server-side transcoder is the ONLY path
+        // and it may legitimately be busy (4K jobs take minutes). Keep
+        // waiting at a slower cadence instead of failing a tile for something
+        // that will still complete server-side.
+        const waiting = await pollQueuedVideo(communityId, mediaId, {
+          intervalMs: 10_000,
+          timeoutMs: 15 * 60_000,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        applyTerminal(waiting);
+        // Still not terminal: leave the tile as "processing" — the server
+        // owns the row and patches any post referencing it on completion.
+      } finally {
+        pollControllersRef.current.delete(mediaId);
       }
-      if (result.status === "failed") {
-        setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
-        return;
-      }
-      if (result.status === "deleted") {
-        setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-        return;
-      }
-      // Still queued/processing — no transcoder around (local dev, outage).
-      // Fall back to the in-browser FFmpeg wasm worker.
-      void runEncode(attachment, decision);
     },
     [communityId, runEncode, setAttachment],
   );
@@ -355,13 +409,21 @@ export function useShowcaseFileUpload({
           // Keep the placeholder state — the admin sweep cleans up leftovers.
         });
       } else if (item.status === "queued") {
-        void pollQueuedVideo(communityId, item.mediaId, { timeoutMs: 60_000 }).then((result) => {
+        const controller = new AbortController();
+        pollControllersRef.current.set(item.mediaId, controller);
+        void pollQueuedVideo(communityId, item.mediaId, {
+          timeoutMs: 60_000,
+          signal: controller.signal,
+        }).then((result) => {
+          if (controller.signal.aborted) return;
           if (result.status === "ready" && result.attachment) {
             setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
           }
         }).catch(() => {
           // Still queued — keep the placeholder; the transcoder patches the
           // post itself when it completes.
+        }).finally(() => {
+          pollControllersRef.current.delete(item.mediaId!);
         });
       }
     }
@@ -379,6 +441,9 @@ export function useShowcaseFileUpload({
     (url: string, mediaId?: string) => {
       setAttachments((current) => current.filter((a) => a.url !== url && a.mediaId !== mediaId));
       if (mediaId) {
+        // Stop any in-flight status polling for this media immediately.
+        pollControllersRef.current.get(mediaId)?.abort();
+        pollControllersRef.current.delete(mediaId);
         originalsRef.current.delete(mediaId);
         if (communityId) void cancelVideo(communityId, mediaId);
       }

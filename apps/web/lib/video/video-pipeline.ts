@@ -221,13 +221,19 @@ export async function getVideoStatus(
 
 /**
  * Waits for a queued video to reach a terminal state (ready / failed /
- * deleted), polling until `timeoutMs` elapses. Returns the terminal
- * attachment (ready) or null when the wait timed out.
+ * deleted), polling until `timeoutMs` elapses or `signal` aborts (composer
+ * closed, attachment removed). Returns the last known state — callers must
+ * check `signal.aborted` and stop touching UI state when true.
  */
 export async function pollQueuedVideo(
   communityId: string,
   mediaId: string,
-  opts: { intervalMs?: number; timeoutMs?: number; onProgress?: (status: VideoStatus) => void } = {},
+  opts: {
+    intervalMs?: number;
+    timeoutMs?: number;
+    onProgress?: (status: VideoStatus) => void;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<{ status: VideoStatus; attachment: ShowcaseAttachment | null }> {
   const intervalMs = opts.intervalMs ?? QUEUED_POLL_INTERVAL_MS;
   const timeoutMs = opts.timeoutMs ?? QUEUED_FALLBACK_AFTER_MS;
@@ -238,6 +244,7 @@ export async function pollQueuedVideo(
     attachment: null,
   };
   while (Date.now() < deadline) {
+    if (opts.signal?.aborted) return last;
     try {
       last = await getVideoStatus(communityId, mediaId);
       opts.onProgress?.(last.status);
