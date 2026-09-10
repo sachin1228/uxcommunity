@@ -19,6 +19,8 @@ import {
   GetObjectCommand,
   DeleteObjectCommand,
   ListObjectsV2Command,
+  CopyObjectCommand,
+  HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
@@ -171,6 +173,37 @@ export async function uploadToR2(
     })
   );
   return r2PublicUrl(key);
+}
+
+/** Returns true when an R2 object exists (used to verify canonical videos). */
+export async function r2ObjectExists(key: string): Promise<boolean> {
+  const client = getClient();
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: getBucket(), Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Copies an R2 object to a new key server-side (no bytes through the app).
+ * Used by the video pipeline's passthrough fallback: when the FFmpeg engine
+ * cannot run, the lossless ORIGINAL becomes the canonical processed object
+ * via an in-bucket copy — zero quality loss, no double upload.
+ */
+export async function copyR2Object(sourceKey: string, destinationKey: string): Promise<void> {
+  const client = getClient();
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: getBucket(),
+      CopySource: `${getBucket()}/${sourceKey}`,
+      Key: destinationKey,
+      ContentType: "video/mp4",
+      CacheControl: "public, max-age=31536000, immutable",
+      MetadataDirective: "REPLACE",
+    })
+  );
 }
 
 /** Download an R2 object by key and return it as a Buffer. */

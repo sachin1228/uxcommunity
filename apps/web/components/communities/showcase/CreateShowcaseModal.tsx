@@ -84,55 +84,90 @@ function ChipRow<T extends string>({
   );
 }
 
-/** Thumbnail row of uploaded media (images + videos) with remove + add tiles. */
+/**
+ * Thumbnail row of uploaded media (images + videos) with remove + add tiles.
+ *
+ * Video tiles reflect the centralized pipeline state: uploading, processing
+ * (with % progress), failed (retryable without re-upload), or ready.
+ */
 function MediaRow({
   attachments,
   uploading,
+  progress,
   onRemove,
+  onRetry,
   onAddMore,
 }: {
   attachments: ShowcaseAttachment[];
   uploading: boolean;
-  onRemove: (url: string) => void;
+  progress: Record<string, number>;
+  onRemove: (url: string, mediaId?: string) => void;
+  onRetry: (attachment: ShowcaseAttachment) => void;
   onAddMore: () => void;
 }) {
   if (attachments.length === 0) return null;
 
   return (
     <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
-      {attachments.map((item) => (
-        <div
-          key={item.url}
-          className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised"
-        >
-          {item.type.startsWith("video/") ? (
-            item.poster ? (
-              <div className="relative h-full w-full">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={item.poster} alt={item.name} className="h-full w-full object-cover" />
-                <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">
-                  <Film strokeWidth={2.5} size={18} fill="currentColor" />
-                </span>
+      {attachments.map((item) => {
+        const isVideo = item.type.startsWith("video/");
+        const state = isVideo ? (item.status ?? "ready") : "ready";
+        const percent = item.mediaId ? progress[item.mediaId] : undefined;
+        return (
+          <div
+            key={item.url || item.mediaId || item.name}
+            className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised"
+          >
+            {state === "ready" ? (
+              isVideo ? (
+                item.poster ? (
+                  <div className="relative h-full w-full">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={item.poster} alt={item.name} className="h-full w-full object-cover" />
+                    <span className="absolute inset-0 flex items-center justify-center text-white drop-shadow">
+                      <Film strokeWidth={2.5} size={18} fill="currentColor" />
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
+                    <Film strokeWidth={2.5} size={18} className="text-white" />
+                    <span className="w-full truncate px-1 font-body text-[10px] text-white/70">{item.name}</span>
+                  </div>
+                )
+              ) : (
+                <img src={item.url} alt={item.name} className="h-full w-full object-cover" />
+              )
+            ) : state === "failed" ? (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-red-950/60 px-1 text-center">
+                <Film strokeWidth={2.5} size={16} className="text-red-300" />
+                <span className="w-full truncate px-1 font-body text-[10px] text-red-200">Processing failed</span>
+                <button
+                  type="button"
+                  onClick={() => onRetry(item)}
+                  className="rounded-full border border-red-300/40 px-2 py-0.5 font-body text-[10px] font-medium text-red-100 transition-colors hover:bg-red-300/10"
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
-                <Film strokeWidth={2.5} size={18} className="text-white" />
-                <span className="w-full truncate px-1 font-body text-[10px] text-white/70">{item.name}</span>
+                <Spinner size={16} />
+                <span className="w-full truncate px-1 font-body text-[10px] text-white/70">
+                  {percent !== undefined ? `Processing… ${percent}%` : "Processing…"}
+                </span>
               </div>
-            )
-          ) : (
-            <img src={item.url} alt={item.name} className="h-full w-full object-cover" />
-          )}
-          <button
-            type="button"
-            onClick={() => onRemove(item.url)}
-            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
-            aria-label={`Remove ${item.name}`}
-          >
-            <X strokeWidth={2.5} size={10} />
-          </button>
-        </div>
-      ))}
+            )}
+            <button
+              type="button"
+              onClick={() => onRemove(item.url, item.mediaId)}
+              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-black/80"
+              aria-label={`Remove ${item.name}`}
+            >
+              <X strokeWidth={2.5} size={10} />
+            </button>
+          </div>
+        );
+      })}
 
       {attachments.length < SHOWCASE_MEDIA_MAX && (
         <button
@@ -184,6 +219,8 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
     addFiles,
     dropHandlers,
     isDragging,
+    progress,
+    retryAttachment,
   } = useShowcaseFileUpload({ communityId, initialAttachments });
 
   // Auto-grow the title textarea like the thread composer.
@@ -306,7 +343,9 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                   <MediaRow
                     attachments={attachments}
                     uploading={uploading}
+                    progress={progress}
                     onRemove={removeAttachment}
+                    onRetry={retryAttachment}
                     onAddMore={() => fileRef.current?.click()}
                   />
                 )}

@@ -62,3 +62,69 @@ test("attachments without a poster keep parsing exactly as before", () => {
     assert.equal(first?.url, VIDEO);
   }
 });
+
+// ── Centralized video pipeline: mediaId / status attachments ────────────────
+
+const MEDIA_ID = "11111111-1111-1111-1111-111111111111";
+
+test("processing videos may carry a mediaId with an empty URL (post exists while encoding)", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status: "processing" },
+  ]));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    const first = parsed.value.attachments[0];
+    assert.equal(first?.mediaId, MEDIA_ID);
+    assert.equal(first?.status, "processing");
+    assert.equal(first?.url, "");
+  }
+});
+
+test("uploaded/failed processing states parse like processing", () => {
+  for (const status of ["uploaded", "failed"]) {
+    const parsed = parseShowcaseBody(baseBody([
+      { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status },
+    ]));
+    assert.equal(parsed.ok, true, `status ${status} should parse`);
+  }
+});
+
+test("ready videos still require a real URL", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status: "ready" },
+  ]));
+  assert.deepEqual(parsed, { ok: false, error: "Invalid attachment URL." });
+});
+
+test("empty URL without a mediaId is rejected", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, status: "processing" },
+  ]));
+  assert.deepEqual(parsed, { ok: false, error: "Invalid attachment URL." });
+});
+
+test("malformed media IDs are rejected", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: "../../etc/passwd", status: "processing" },
+  ]));
+  assert.equal(parsed.ok, false);
+});
+
+test("unknown statuses are dropped silently (treated as a plain attachment)", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "clip.mp4", url: VIDEO, type: "video/mp4", size: 1000, status: "nonsense" },
+  ]));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) assert.equal(parsed.value.attachments[0]?.status, undefined);
+});
+
+test("images ignore mediaId/status fields entirely", () => {
+  const parsed = parseShowcaseBody(baseBody([
+    { name: "shot.jpg", url: "https://media.example.com/a.jpg", type: "image/jpeg", size: 10, mediaId: MEDIA_ID, status: "processing" },
+  ]));
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) {
+    assert.equal(parsed.value.attachments[0]?.mediaId, undefined);
+    assert.equal(parsed.value.attachments[0]?.status, undefined);
+  }
+});

@@ -17,7 +17,16 @@ export interface ShowcaseAttachmentInput {
   size: number;
   /** First-frame image URL for video attachments (optional, videos only). */
   poster?: string;
+  /** Centralized video-pipeline media ID (video attachments only). */
+  mediaId?: string;
+  /** Pipeline state — `ready` URLs are playable; processing ones show a placeholder. */
+  status?: string;
+  /** Encode strategy chosen for this upload (informational, videos only). */
+  strategy?: string;
 }
+
+export const VIDEO_ATTACHMENT_STATUSES = new Set(["uploaded", "queued", "processing", "ready", "failed"]);
+const MEDIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ShowcasePostInput {
   title: string;
@@ -55,16 +64,40 @@ export function parseShowcaseBody(body: Record<string, unknown>): ParseShowcaseB
       const type = typeof record.type === "string" ? record.type : "";
       const name = typeof record.name === "string" ? record.name.slice(0, 255) : "Attachment";
       const size = typeof record.size === "number" && Number.isFinite(record.size) ? record.size : 0;
-      if (!url || !/^https?:\/\//.test(url) || url.length > 2048) return { ok: false, error: "Invalid attachment URL." };
       if (!SHOWCASE_MEDIA_TYPES.has(type)) return { ok: false, error: "Unsupported attachment type." };
+
+      const isVideo = type.startsWith("video/");
+      const mediaId =
+        isVideo && typeof record.mediaId === "string" && MEDIA_ID_RE.test(record.mediaId)
+          ? record.mediaId
+          : undefined;
+      const status =
+        isVideo && typeof record.status === "string" && VIDEO_ATTACHMENT_STATUSES.has(record.status)
+          ? record.status
+          : undefined;
+
+      // Ready videos carry a real URL. Videos still in the pipeline may carry
+      // an empty URL — the server resolves the canonical URL from video_media
+      // at finalize; the feed renders a placeholder until then.
+      if (!url || url.length > 2048) {
+        const processing = isVideo && mediaId && status && status !== "ready" && url === "";
+        if (!processing) return { ok: false, error: "Invalid attachment URL." };
+      } else if (!/^https?:\/\//.test(url)) {
+        return { ok: false, error: "Invalid attachment URL." };
+      }
+
       // Posters ride along on video attachments (generated at upload time);
       // only accept image URLs and only on videos.
       let poster: string | undefined;
-      if (type.startsWith("video/") && typeof record.poster === "string" && record.poster.trim()) {
+      if (isVideo && typeof record.poster === "string" && record.poster.trim()) {
         poster = record.poster.trim();
         if (!/^https?:\/\//.test(poster) || poster.length > 2048) return { ok: false, error: "Invalid attachment poster URL." };
       }
-      attachments.push(poster ? { name, url, type, size, poster } : { name, url, type, size });
+      attachments.push(
+        poster || mediaId || status
+          ? { name, url, type, size, poster, mediaId, status }
+          : { name, url, type, size },
+      );
     }
   }
 

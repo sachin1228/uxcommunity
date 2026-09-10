@@ -84,13 +84,29 @@ export function ShowcaseMediaLightbox({
               </button>
             )}
             {isVideo ? (
-              <video
-                src={item.url}
-                poster={item.poster}
-                controls
-                autoPlay
-                className="max-h-full max-w-full rounded-sm object-contain shadow-2xl"
-              />
+              (item.status ?? "ready") === "ready" ? (
+                <video
+                  src={item.url}
+                  poster={item.poster}
+                  controls
+                  autoPlay
+                  className="max-h-full max-w-full rounded-sm object-contain shadow-2xl"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-sm bg-black/60 px-10 py-16 text-white">
+                  {item.status === "failed" ? (
+                    <>
+                      <Play strokeWidth={2} size={28} className="text-white/50" />
+                      <span className="font-body text-sm text-white/70">Video unavailable</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                      <span className="font-body text-sm text-white/70">Processing video…</span>
+                    </>
+                  )}
+                </div>
+              )
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
@@ -130,7 +146,7 @@ export function ShowcaseMediaLightbox({
                       }`}
                     >
                       {item.type.startsWith("video/") ? (
-                        item.poster ? (
+                        (item.status ?? "ready") === "ready" && item.poster ? (
                           <span className="relative block h-full w-full">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={item.poster} alt="" className="pointer-events-none h-full w-full object-cover" draggable={false} />

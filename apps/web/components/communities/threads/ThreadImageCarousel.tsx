@@ -11,6 +11,12 @@ interface CarouselImage {
   type?: string;
   /** Optional first-frame image shown while a video slide streams in. */
   poster?: string;
+  /**
+   * Video-pipeline state. Videos that are not `ready` (still processing or
+   * failed) render a labeled placeholder instead of a broken <video>.
+   * Absent = legacy attachment = ready.
+   */
+  status?: string;
 }
 
 /**
@@ -47,9 +53,13 @@ export function ThreadImageCarousel({
   const goNext = () => setIndex((current) => Math.min(images.length - 1, current + 1));
 
   // The sizing anchor borrows the intrinsic dimensions of a real image; when
-  // the set is all videos there is no <img> to borrow from, so a 16:9 spacer
-  // stands in (videos letterbox inside it).
-  const anchorImage = images.find((img) => !(typeof img.type === "string" && img.type.startsWith("video/"))) ?? null;
+  // the set is all videos (or videos still processing) there is no <img> to
+  // borrow from, so a 16:9 spacer stands in (videos letterbox inside it).
+  const anchorImage = images.find(
+    (img) =>
+      !(typeof img.type === "string" && img.type.startsWith("video/")) &&
+      (img.status ?? "ready") === "ready",
+  ) ?? null;
 
   function handleTouchStart(event: React.TouchEvent) {
     const touch = event.touches[0];
@@ -120,15 +130,24 @@ export function ThreadImageCarousel({
         {images.map((img, slideIndex) => {
           const active = slideIndex === index;
           const isVideo = typeof img.type === "string" && img.type.startsWith("video/");
+          const videoReady = !isVideo || (img.status ?? "ready") === "ready";
           // Native aspect ratio, capped at 480px tall — never cropped.
           const inner = isVideo ? (
-            <FeedVideo
-              src={img.url}
-              ariaLabel={img.name}
-              active={active}
-              poster={img.poster}
-              className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
-            />
+            videoReady ? (
+              <FeedVideo
+                src={img.url}
+                ariaLabel={img.name}
+                active={active}
+                poster={img.poster}
+                className="mx-auto h-full max-h-[480px] w-auto max-w-full object-contain"
+              />
+            ) : (
+              <div className="mx-auto flex h-full max-h-[480px] w-full items-center justify-center gap-2 bg-black/80">
+                <span className="font-body text-sm text-foreground-muted">
+                  {img.status === "failed" ? "Video unavailable" : "Processing video…"}
+                </span>
+              </div>
+            )
           ) : (
             <img
               src={img.url}

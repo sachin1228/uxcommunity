@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2, Database } from "lucide-react";
+import { ImageDown, CheckCircle2, SkipForward, AlertCircle, RefreshCw, ArrowRightLeft, Trash2, Database, Activity } from "lucide-react";
 import type { RecompressResult } from "@/app/api/admin/recompress-images/route";
 import type { MigrateResult } from "@/app/api/admin/migrate-to-r2/route";
 import type { PurgeResult } from "@/app/api/admin/purge-supabase-storage/route";
@@ -62,6 +62,11 @@ export default function ToolsPage() {
   const [r2DeleteStatus, setR2DeleteStatus] = useState<Status>("idle");
   const [r2DeleteResult, setR2DeleteResult] = useState<any>(null);
   const [showR2DeleteConfirm, setShowR2DeleteConfirm] = useState(false);
+
+  // ── Transcoder health state ─────────────────────────────────────────────
+  const [healthStatus, setHealthStatus] = useState<Status>("idle");
+  const [healthSummary, setHealthSummary] = useState<any>(null);
+  const [healthError, setHealthError] = useState<string | null>(null);
 
   async function runRecompression() {
     setRecompressStatus("running");
@@ -141,6 +146,26 @@ export default function ToolsPage() {
     } catch {
       setR2Error("Network error. Please try again.");
       setR2Status("error");
+    }
+  }
+
+  async function runHealthCheck() {
+    setHealthStatus("running");
+    setHealthSummary(null);
+    setHealthError(null);
+    try {
+      const res = await fetch("/api/admin/transcoder-health");
+      const data = await res.json();
+      if (!res.ok) {
+        setHealthError(data.error ?? "An unexpected error occurred.");
+        setHealthStatus("error");
+        return;
+      }
+      setHealthSummary(data);
+      setHealthStatus("done");
+    } catch {
+      setHealthError("Network error. Please try again.");
+      setHealthStatus("error");
     }
   }
 
@@ -377,6 +402,136 @@ export default function ToolsPage() {
         {r2Status === "error" && r2Error && (
           <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
             <p className="font-body text-xs text-red-400">{r2Error}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Video pipeline health ────────────────────────────────────────── */}
+      <div className="rounded-xl border border-border bg-surface p-5">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft">
+            <Activity strokeWidth={2.5} size={18} className="text-accent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-body text-sm font-semibold text-foreground">Video pipeline health</h2>
+            <p className="mt-1 font-body text-xs text-foreground-muted leading-relaxed">
+              Reads the server-side transcoder(s) /health endpoint: ffmpeg/ffprobe
+              availability, Supabase and R2 connectivity, live queue depth, and
+              per-worker job stats. Configure <code className="rounded bg-surface-raised px-1 py-0.5 text-[10px]">TRANSCODER_HEALTH_URL</code>{" "}
+              (comma-separated for multiple workers) to enable.
+            </p>
+
+            <button
+              onClick={runHealthCheck}
+              disabled={healthStatus === "running"}
+              className="mt-4 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-1.5 font-body text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {healthStatus === "running" ? (
+                <>
+                  <RefreshCw strokeWidth={2.5} size={13} className="animate-spin" />
+                  Checking…
+                </>
+              ) : (
+                <>
+                  <Activity strokeWidth={2.5} size={13} />
+                  {healthStatus === "done" ? "Check again" : "Check transcoder health"}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {healthStatus === "done" && healthSummary && (
+          <div className="mt-5 border-t border-border pt-4">
+            {healthSummary.configured === false && (
+              <p className="font-body text-xs text-foreground-muted">
+                {healthSummary.hint ?? "TRANSCODER_HEALTH_URL is not configured."}
+              </p>
+            )}
+
+            {healthSummary.workers?.map((worker: any, i: number) => {
+              const checks = worker.payload?.checks;
+              const queue = worker.payload?.queue;
+              const stats = worker.payload?.stats;
+              return (
+                <div key={i} className="rounded-lg border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`h-2 w-2 shrink-0 rounded-full ${
+                          worker.ok ? "bg-green-400" : "bg-red-400"
+                        }`}
+                      />
+                      <span className="font-body text-xs font-semibold text-foreground truncate">
+                        {worker.payload?.workerId ?? worker.url}
+                      </span>
+                      {worker.payload?.status && (
+                        <span className="font-body text-[10px] uppercase tracking-wide text-foreground-muted">
+                          {worker.payload.status}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-body text-[10px] text-foreground-muted break-all">{worker.url}</span>
+                  </div>
+
+                  {checks && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {Object.entries(checks).map(([name, check]: [string, any]) => (
+                        <span
+                          key={name}
+                          title={check.detail ?? ""}
+                          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 font-body text-[10px] ${
+                            check.status === "ok"
+                              ? "border-green-500/20 bg-green-500/10 text-green-400"
+                              : "border-red-500/20 bg-red-500/10 text-red-400"
+                          }`}
+                        >
+                          {check.status === "ok"
+                            ? <CheckCircle2 strokeWidth={2.5} size={11} />
+                            : <AlertCircle strokeWidth={2.5} size={11} />}
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {(queue || stats) && (
+                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+                      {queue && (
+                        <span className="font-body text-[11px] text-foreground-muted">
+                          Queue: <span className="text-foreground">{queue.queued}</span> queued ·{" "}
+                          <span className="text-foreground">{queue.processing}</span> processing
+                        </span>
+                      )}
+                      {stats && (
+                        <span className="font-body text-[11px] text-foreground-muted">
+                          Jobs: <span className="text-foreground">{stats.jobsProcessed}</span> done ·{" "}
+                          <span className={stats.jobsFailed > 0 ? "text-red-400" : "text-foreground"}>{stats.jobsFailed}</span> failed ·{" "}
+                          up <span className="text-foreground">{stats.uptimeSeconds ?? 0}s</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {stats?.lastError && (
+                    <p className="mt-2 font-body text-[10px] text-red-400 break-all">
+                      Last error: {stats.lastError}
+                    </p>
+                  )}
+                  {worker.error && (
+                    <p className="mt-2 font-body text-[10px] text-red-400 break-all">
+                      {worker.error}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {healthStatus === "error" && healthError && (
+          <div className="mt-4 rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2">
+            <p className="font-body text-xs text-red-400">{healthError}</p>
           </div>
         )}
       </div>

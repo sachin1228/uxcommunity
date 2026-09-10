@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
+import { resolveVideoAttachments } from "@/lib/video/video-server";
 
 async function member(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
@@ -66,7 +67,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const parsed = parseShowcaseBody(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
   const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
-  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).select("*").single();
+
+  // Video attachments are resolved against video_media server-side: the
+  // canonical URL/poster come from the DB, never from the client, and
+  // processing videos ride along with a placeholder until finalize patches
+  // the post.
+  // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  const resolved = await resolveVideoAttachments(db, userId, id, attachments as unknown as Array<Record<string, unknown> & { mediaId?: string }>);
+  if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 422 });
+
+  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments: resolved.attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }

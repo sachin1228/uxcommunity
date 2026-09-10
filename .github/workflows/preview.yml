@@ -101,6 +101,10 @@ jobs:
         run: |
           WORKER="uxcommunity-web-preview-pr${{ github.event.pull_request.number }}"
           npx opennextjs-cloudflare build
+          # pipefail: without it, `cmd | tee` masks deploy failures (the
+          # pipeline reported success while "Asset too large" aborted the
+          # deploy — the preview stayed on an old version silently).
+          set -o pipefail
           npx opennextjs-cloudflare deploy -- --name "$WORKER" 2>&1 | tee /tmp/deploy.log
           URL=$(grep -oE "https://${WORKER}\.[a-z0-9-]+\.workers\.dev" /tmp/deploy.log | head -1)
           echo "worker=$WORKER" >> "$GITHUB_OUTPUT"

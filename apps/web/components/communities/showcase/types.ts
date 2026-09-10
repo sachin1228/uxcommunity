@@ -21,6 +21,8 @@ export const SHOWCASE_STAGES: { value: ShowcaseStage; label: string }[] = [
 /** How many media items (images + videos) a showcase post may carry. */
 export const SHOWCASE_MEDIA_MAX = 5;
 
+export type VideoAttachmentStatus = "uploading" | "uploaded" | "queued" | "processing" | "ready" | "failed";
+
 /** Uploaded image/video attachment — mirrors the thread attachment shape. */
 export interface ShowcaseAttachment {
   name: string;
@@ -29,6 +31,27 @@ export interface ShowcaseAttachment {
   size: number;
   /** First-frame JPEG shown while the video streams in (videos only). */
   poster?: string;
+  /** Centralized video-pipeline media ID (video attachments only). */
+  mediaId?: string;
+  /**
+   * Pipeline state for video attachments. `ready` videos are playable; any
+   * other state renders a placeholder while processing runs (or failed).
+   * Absent on legacy attachments — treated as ready.
+   */
+  status?: VideoAttachmentStatus;
+  /** Encode strategy chosen for this upload (informational). */
+  strategy?: "passthrough" | "remux" | "transcode";
+  /** x264 preset used for transcodes (informational). */
+  preset?: "slow" | "medium";
+  /** Audio-only re-encode (video copied) — informational. */
+  copyVideo?: boolean;
+  /** Human-readable failure detail (composer-local, never persisted). */
+  errorMessage?: string;
+}
+
+/** True when a video attachment is ready to render/play. */
+export function isVideoReady(attachment: ShowcaseAttachment): boolean {
+  return attachment.type.startsWith("video/") && (attachment.status ?? "ready") === "ready";
 }
 
 export interface ShowcasePost {
