@@ -1,36 +1,33 @@
 /**
  * Encoding decision logic — pure and unit-testable.
  *
- * Decides, per upload, whether the source is shipped as the canonical video
- * untouched (`passthrough`), losslessly remuxed (`remux` — container/index
- * fixes only, zero quality change), or genuinely re-encoded with libx264
- * (`transcode`).
+ * ⚠️ POLICY (2026-09): the pipeline NO LONGER ENCODES. Every upload ships
+ * as-is (`passthrough`) or gets a lossless container fix (`remux` — moov
+ * atom moved to the front for instant streaming; zero quality change, ~1s
+ * in the browser). `transcode` is never chosen.
  *
- * The guiding rule from the product spec: NEVER degrade an already-excellent
- * source. Re-encoding is only chosen when it is actually worth it:
+ * Rationale: the target audience is on 2019+ hardware, whose browsers and
+ * native players handle H.264, HEVC, VP9 and AV1 directly. Waiting minutes
+ * for a server re-encode was judged worse than the rare incompatibility.
  *
- *   - the container/codec isn't universally browser-playable (WebM, HEVC,
- *     ProRes, ...),
- *   - the file is not Range-stream friendly (moov at the end),
- *   - the bitrate is unreasonably high for the resolution (CRF 18 can shrink
- *     it with no visible loss), or
- *   - the audio can't play in MP4 (PCM/AC3 → video is copied bit-identically,
- *     only audio is re-encoded).
+ * What this means per source:
  *
- * Resolution, frame rate, aspect ratio and (unless incompatible) audio are
- * ALWAYS preserved. Videos are never upscaled or downscaled.
+ *   - WebM/MKV, HEVC, AV1, ProRes, high-bitrate H.264, PCM audio → shipped
+ *     untouched. Modern browsers and the Expo app's native players decode
+ *     them; old browsers may not (accepted trade-off).
+ *   - MOV with H.264, or an MP4 with moov at the end → losslessly remuxed
+ *     in the browser so Range streaming works everywhere.
+ *   - Already-optimal files → stored as-is.
+ *
+ * Re-enabling encoding: restore the previous revision of this file (git log)
+ * — the transcoder service, the encode-args builder and the client wasm
+ * worker were all left intact and re-activate automatically from the
+ * strategy this function returns.
+ *
+ * Resolution, frame rate, aspect ratio and audio are ALWAYS preserved.
  */
 
-import {
-  VIDEO_ENCODE,
-  VIDEO_PASSTHROUGH,
-  VIDEO_SAFETY,
-} from "./video-config";
 import type { VideoDecision, VideoProbeResult } from "./video-types";
-
-const H264_FAMILIES = new Set(["avc", "h264"]);
-/** Audio codecs every modern browser plays inside an MP4. */
-const MP4_COMPATIBLE_AUDIO = new Set(["aac", "mp3", "opus"]);
 
 /** Longest edge of the coded dimensions, or null when unknown. */
 export function longestEdge(probe: VideoProbeResult): number | null {
@@ -38,20 +35,16 @@ export function longestEdge(probe: VideoProbeResult): number | null {
   return Math.max(probe.width, probe.height);
 }
 
-/** Preset for a given resolution — slow ≤1080p, medium above (see config). */
+/** Preset for a given resolution — only meaningful if encoding is re-enabled. */
 export function presetForDimensions(probe: VideoProbeResult): "slow" | "medium" {
   const edge = longestEdge(probe) ?? 0;
-  return edge > VIDEO_ENCODE.highResolutionThreshold
-    ? VIDEO_ENCODE.presetHighResolution
-    : VIDEO_ENCODE.preset;
+  return edge > 1920 ? "medium" : "slow";
 }
 
 /** Pass-through bitrate ceiling for the given resolution. */
 export function maxPassThroughBitrateMbps(probe: VideoProbeResult): number {
   const edge = longestEdge(probe) ?? 0;
-  return edge > VIDEO_PASSTHROUGH.tierBoundaryPx
-    ? VIDEO_PASSTHROUGH.maxBitrateMbps4k
-    : VIDEO_PASSTHROUGH.maxBitrateMbps1080p;
+  return edge > 1920 ? 30 : 12;
 }
 
 /**
@@ -65,76 +58,15 @@ export function pixelsPerSecond(probe: VideoProbeResult): number | null {
 
 /**
  * Decides how the given source should enter the canonical pipeline.
- * Returns a passthrough decision for anything unprobeable or unsafe to
- * encode — the file ships as-is rather than risking a bad re-encode.
+ *
+ * Passthrough-only policy: everything ships untouched EXCEPT the two
+ * lossless remux cases (MOV container, non-faststart MP4) that make videos
+ * stream instantly instead of download-then-play.
  */
 export function decideVideoStrategy(probe: VideoProbeResult): VideoDecision {
-  const unknown = {
-    strategy: "passthrough" as const,
-    preset: "slow" as const,
-    reason: "could-not-probe",
-  };
-
   // Unprobeable or clearly not a video — ship untouched.
   if (probe.container === "unknown" || (!probe.videoCodec && !probe.durationMs)) {
-    return unknown;
-  }
-
-  const preset = presetForDimensions(probe);
-  const needsTranscodeForContainer =
-    probe.container === "webm" || probe.container === "mkv";
-  const codecIsNotH264 =
-    !probe.videoCodec || !H264_FAMILIES.has(probe.videoCodec.toLowerCase());
-
-  // ── Encode-safety gates come FIRST: anything above the platform limits is
-  //    passed through losslessly rather than risking a failed/huge encode.
-  if (needsTranscodeForContainer || codecIsNotH264) {
-    const rate = pixelsPerSecond(probe);
-    if (rate !== null && rate > VIDEO_SAFETY.maxPixelsPerSecond) {
-      return { strategy: "passthrough", preset: "slow", reason: "encode-safety-pixels-per-second" };
-    }
-    if (probe.durationMs !== null && probe.durationMs > VIDEO_SAFETY.maxEncodeDurationMs) {
-      return { strategy: "passthrough", preset: "slow", reason: "encode-safety-duration" };
-    }
-    if (needsTranscodeForContainer) {
-      return { strategy: "transcode", preset, reason: `container-${probe.container}` };
-    }
-    return { strategy: "transcode", preset, reason: `codec-${probe.videoCodec ?? "unknown"}` };
-  }
-
-  // From here on the video is H.264 in an MP4/MOV container.
-
-  // Audio that browsers can't play in MP4 → keep the video bit-identical,
-  // re-encode only the audio to AAC.
-  if (
-    probe.audioCodec &&
-    !MP4_COMPATIBLE_AUDIO.has(probe.audioCodec.toLowerCase())
-  ) {
-    return {
-      strategy: "transcode",
-      preset,
-      copyVideo: true,
-      reason: `audio-${probe.audioCodec}`,
-    };
-  }
-
-  // Unreasonably high bitrate for the resolution → CRF 18 re-encode.
-  if (
-    probe.bitrateMbps !== null &&
-    probe.bitrateMbps > maxPassThroughBitrateMbps(probe)
-  ) {
-    const rate = pixelsPerSecond(probe);
-    if (rate !== null && rate > VIDEO_SAFETY.maxPixelsPerSecond) {
-      return { strategy: "passthrough", preset: "slow", reason: "encode-safety-pixels-per-second" };
-    }
-    if (probe.durationMs !== null && probe.durationMs > VIDEO_SAFETY.maxEncodeDurationMs) {
-      return { strategy: "passthrough", preset: "slow", reason: "encode-safety-duration" };
-    }
-    return {
-      strategy: "transcode",
-      preset: presetForDimensions(probe),
-      reason: `high-bitrate-${probe.bitrateMbps.toFixed(1)}mbps`,
-    };
+    return { strategy: "passthrough", preset: "slow", reason: "could-not-probe" };
   }
 
   // MOV with H.264 → container-only fix (lossless remux to MP4).
@@ -147,5 +79,7 @@ export function decideVideoStrategy(probe: VideoProbeResult): VideoDecision {
     return { strategy: "remux", preset: "slow", reason: "not-faststart" };
   }
 
-  return { strategy: "passthrough", preset: "slow", reason: "already-optimal" };
+  // Everything else — WebM, MKV, HEVC, AV1, VP9, high bitrate, PCM audio,
+  // whatever — is stored as-is. 2019+ devices decode it natively.
+  return { strategy: "passthrough", preset: "slow", reason: "no-encode-policy" };
 }

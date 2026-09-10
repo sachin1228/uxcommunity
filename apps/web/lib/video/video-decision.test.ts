@@ -21,10 +21,12 @@ function probe(overrides: Partial<VideoProbeResult> = {}): VideoProbeResult {
   };
 }
 
+// ── No-encode policy (2026-09): nothing is ever re-encoded. ─────────────────
+
 test("already-optimal H.264 faststart MP4 passes through with ZERO re-encoding", () => {
   const decision = decideVideoStrategy(probe());
   assert.equal(decision.strategy, "passthrough");
-  assert.equal(decision.reason, "already-optimal");
+  assert.equal(decision.reason, "no-encode-policy");
 });
 
 test("standard 1080p MP4 (sane bitrate) passes through — quality first, no blind compression", () => {
@@ -44,85 +46,61 @@ test("MP4 with moov at the end is remuxed with faststart (lossless)", () => {
   assert.equal(decision.reason, "not-faststart");
 });
 
-test("WebM (VP9) is transcoded to H.264 with the slow preset", () => {
+test("POLICY: WebM (VP9) ships as-is — no encoding, modern clients decode it", () => {
   const decision = decideVideoStrategy(probe({ container: "webm", videoCodec: "vp9", bitrateMbps: 4 }));
-  assert.equal(decision.strategy, "transcode");
-  assert.equal(decision.reason, "container-webm");
-  assert.equal(decision.preset, "slow");
-  assert.equal(decision.copyVideo, undefined);
+  assert.equal(decision.strategy, "passthrough");
+  assert.equal(decision.reason, "no-encode-policy");
 });
 
-test("HEVC/ProRes sources are transcoded to H.264 (browser compatibility)", () => {
-  assert.equal(decideVideoStrategy(probe({ videoCodec: "hevc" })).strategy, "transcode");
-  assert.equal(decideVideoStrategy(probe({ videoCodec: "prores", container: "mov" })).strategy, "transcode");
+test("POLICY: HEVC/AV1/ProRes ship as-is — never transcoded", () => {
+  for (const [videoCodec, container, expected] of [
+    ["hevc", "mp4", "passthrough"],
+    ["av1", "mp4", "passthrough"],
+    ["prores", "mov", "remux"], // lossless container fix only
+    ["vp9", "webm", "passthrough"],
+  ] as const) {
+    const decision = decideVideoStrategy(probe({ videoCodec, container }));
+    assert.equal(decision.strategy, expected, `${videoCodec} must not be transcoded`);
+    assert.notEqual(decision.strategy, "transcode");
+  }
 });
 
-test("high-bitrate 1080p (screen-recording style) is compressed at CRF 18", () => {
+test("POLICY: high-bitrate sources are NOT compressed — the original ships untouched", () => {
   const decision = decideVideoStrategy(probe({ bitrateMbps: 40 }));
-  assert.equal(decision.strategy, "transcode");
-  assert.equal(decision.reason, "high-bitrate-40.0mbps");
-  assert.equal(decision.preset, "slow");
+  assert.equal(decision.strategy, "passthrough");
+  assert.equal(decision.reason, "no-encode-policy");
 });
 
-test("4K with a huge bitrate transcodes with the MEDIUM preset (CRF still 18)", () => {
+test("POLICY: 4K huge-bitrate ships as-is (no medium-preset encode anymore)", () => {
   const decision = decideVideoStrategy(probe({ width: 3840, height: 2160, fps: 30, bitrateMbps: 60 }));
-  assert.equal(decision.strategy, "transcode");
-  assert.equal(decision.preset, "medium");
-  assert.equal(presetForDimensions(probe({ width: 3840, height: 2160 })), "medium");
+  assert.equal(decision.strategy, "passthrough");
 });
 
-test("4K@30 stays 4K@30 — never downscaled", () => {
+test("4K@30 stays 4K@30 — the decision never contains scale instructions", () => {
   const decision = decideVideoStrategy(probe({ width: 3840, height: 2160, fps: 30, bitrateMbps: 60 }));
-  assert.equal(decision.strategy, "transcode");
-  // The decision never contains scale/resize instructions; resolution is
-  // preserved by construction (no scale filter is ever emitted).
   assert.ok(!JSON.stringify(decision).includes("scale"));
 });
 
 test("60fps sources keep 60fps (no fps conversion anywhere in the decision)", () => {
-  const decision = decideVideoStrategy(probe({ fps: 60, width: 1920, height: 1080, bitrateMbps: 30 }));
-  assert.equal(decision.strategy, "transcode");
-  assert.equal(decision.preset, "slow");
+  const decision = decideVideoStrategy(probe({ fps: 60, bitrateMbps: 30 }));
+  assert.equal(decision.strategy, "passthrough");
 });
 
-test("PCM audio in an H.264 source → video copied bit-identically, audio re-encoded", () => {
+test("POLICY: PCM audio is NOT re-encoded — file ships with its original audio", () => {
   const decision = decideVideoStrategy(probe({ container: "mov", audioCodec: "pcm_s16le", bitrateMbps: 8 }));
-  assert.equal(decision.strategy, "transcode");
-  assert.equal(decision.copyVideo, true);
-  assert.equal(decision.reason, "audio-pcm_s16le");
+  assert.equal(decision.strategy, "remux"); // container fix only, video+audio copied
+  assert.equal(decision.reason, "container-mov");
 });
 
-test("silent videos pass through when otherwise optimal (no audio invented)", () => {
+test("silent videos pass through (no audio invented)", () => {
   const decision = decideVideoStrategy(probe({ audioCodec: null }));
   assert.equal(decision.strategy, "passthrough");
 });
 
-test("unprobeable files pass through untouched rather than risking a bad encode", () => {
+test("unprobeable files pass through untouched", () => {
   const decision = decideVideoStrategy(probe({ container: "unknown", videoCodec: null, durationMs: null }));
   assert.equal(decision.strategy, "passthrough");
   assert.equal(decision.reason, "could-not-probe");
-});
-
-test("safety limits: 4K@60 never encodes — the lossless source becomes canonical", () => {
-  const decision = decideVideoStrategy(probe({ container: "webm", width: 3840, height: 2160, fps: 60 }));
-  assert.equal(decision.strategy, "passthrough");
-  assert.equal(decision.reason, "encode-safety-pixels-per-second");
-});
-
-test("safety limits: >10 minute sources pass through instead of encoding", () => {
-  const decision = decideVideoStrategy(probe({ bitrateMbps: 60, durationMs: 15 * 60 * 1000 }));
-  assert.equal(decision.strategy, "passthrough");
-  assert.equal(decision.reason, "encode-safety-duration");
-});
-
-test("safety limits apply to high-bitrate H.264 too", () => {
-  const decision = decideVideoStrategy(probe({ width: 3840, height: 2160, fps: 60, bitrateMbps: 90 }));
-  assert.equal(decision.strategy, "passthrough");
-});
-
-test("unknown bitrate is not judged — already-optimal files pass through", () => {
-  const decision = decideVideoStrategy(probe({ bitrateMbps: null }));
-  assert.equal(decision.strategy, "passthrough");
 });
 
 test("geometry helpers", () => {

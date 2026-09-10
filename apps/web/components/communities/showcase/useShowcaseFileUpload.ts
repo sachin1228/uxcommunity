@@ -22,8 +22,8 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 export type VideoActivityState =
   | "analyzing" // probing / lossless remux before any bytes flow
   | "uploading" // XHR upload of the original to R2 (percent + clock)
-  | "queued" // row created, waiting for the server-side transcoder
-  | "processing" // transcoder has claimed the job and is encoding
+  | "queued" // (legacy rows only) waiting for a server transcoder
+  | "processing" // (legacy rows only) server-side encode in flight
   | "fallback" // in-browser FFmpeg wasm encode (percent)
   | "finalizing" // upload of the processed MP4 + poster to R2
   | "ready"
@@ -53,15 +53,15 @@ export interface VideoActivity {
  * Media intake for the "Share your work" composer.
  *
  * Images keep the existing flow (client-side WebP compression + moderated
- * upload). Videos flow through the CENTRALIZED video pipeline:
+ * upload). Videos flow through the NO-ENCODE pipeline:
  *
- *   analyzing → uploading → queued → processing (server) | fallback (wasm)
- *   → finalizing → ready
+ *   analyzing → uploading → ready
+ *
+ * (The file ships as-is; a lossless remux may happen client-side during
+ * "analyzing". Legacy queued rows still poll for a terminal state.)
  *
  * Each video drives one `VideoActivity` feed entry (plus its attachment
- * tile), so failures surface with their exact error and a failed encode can
- * be retried WITHOUT re-uploading — the original stays in R2 and the worker
- * simply runs again.
+ * tile), so failures surface with their exact error.
  */
 export function useShowcaseFileUpload({
   communityId,
@@ -123,7 +123,7 @@ export function useShowcaseFileUpload({
       (item) => item.state === "analyzing" || item.state === "uploading",
     ).length;
 
-  /** Active status-poll controllers — aborted on unmount or removal. */
+  /** Active status-poll controllers (legacy queued rows) — aborted on unmount/removal. */
   const pollControllersRef = useRef(new Map<string, AbortController>());
 
   // No zombie polling: abort every in-flight video-status poll when the
@@ -237,10 +237,9 @@ export function useShowcaseFileUpload({
   );
 
   /**
-   * Waits for the server-side transcoder; falls back to the in-browser
-   * FFmpeg wasm worker when no worker completes the job within the grace
-   * period AND the engine is available. Polling is cancellable — it stops
-   * when the composer unmounts or the attachment is removed.
+   * Legacy path: a row still queued from before the no-encode policy (or if
+   * encoding is ever re-enabled). Polls for a terminal state, falling back
+   * to the in-browser wasm worker when available. Cancellable.
    */
   const awaitServerOrFallback = useCallback(
     async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
@@ -345,11 +344,8 @@ export function useShowcaseFileUpload({
       try {
         for (const file of files) {
           if (VIDEO_TYPES.has(file.type)) {
-            // ── Centralized video pipeline ────────────────────────────────
-            // Probe → decide (passthrough / lossless remux / FFmpeg transcode)
-            // → upload original → server-side transcoder (async, polled) —
-            // with the in-browser FFmpeg worker as automatic fallback if no
-            // transcoder picks the job up in time.
+            // ── No-encode video pipeline ──────────────────────────────────
+            // Probe → (lossless remux) → upload as-is → ready immediately.
             const activityKey = `video-${Date.now()}-${uploadSeqRef.current++}`;
             upsertActivity(activityKey, { name: file.name, state: "analyzing", percent: 0 });
             try {
@@ -362,19 +358,18 @@ export function useShowcaseFileUpload({
               const attachment = response.attachment;
               setAttachments((current) => [...current, attachment]);
               if (attachment.mediaId) {
-                // Rebind the feed entry to the mediaId so the async pipeline
-                // (poll / encode / finalize) can keep updating it.
+                // Rebind the feed entry to the mediaId so legacy-queue polls
+                // (should they ever apply) can keep updating it.
                 upsertActivity(attachment.mediaId, {
                   name: file.name,
                   state: response.status === "queued" ? "queued" : "ready",
                   percent: 100,
                 });
                 removeActivity(activityKey);
-                originalsRef.current.set(attachment.mediaId, {
-                  file,
-                  poster: prepared.poster,
-                });
                 if (response.status === "queued") {
+                  // Only possible on a stale server build — keep the legacy
+                  // wait path alive until it is redeployed everywhere.
+                  originalsRef.current.set(attachment.mediaId, { file, poster: prepared.poster });
                   void awaitServerOrFallback(attachment, prepared.decision);
                 } else {
                   originalsRef.current.delete(attachment.mediaId);

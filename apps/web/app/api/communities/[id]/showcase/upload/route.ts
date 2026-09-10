@@ -92,10 +92,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const preset = PRESETS.has(form.get("preset") as string) ? (form.get("preset") as "slow" | "medium") : "slow";
   const copyVideo = form.get("copyVideo") === "1";
 
-  // A passthrough/remux strategy is only valid for MP4/MOV containers — WebM
-  // always requires the transcode path (the client is told via the response).
-  const effectiveStrategy: VideoStrategy =
-    container === "webm" && strategy !== "transcode" ? "transcode" : strategy;
+  // No-encode policy: nothing is ever queued for a server transcoder. Any
+  // legacy "transcode" request is downgraded to a lossless passthrough —
+  // the bytes ship untouched and the row is ready immediately. (The client's
+  // decision function no longer emits "transcode" either.)
+  const effectiveStrategy: VideoStrategy = strategy === "transcode" ? "passthrough" : strategy;
 
   // Client-provided probe metadata, clamped server-side (never trusted raw).
   const width = clampNumber(form.get("width"), 16, 16384);
@@ -113,12 +114,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     : null;
 
   const mediaId = crypto.randomUUID();
-  const transcode = effectiveStrategy === "transcode";
-  // Transcodes are processed by the server-side transcoder service
-  // (apps/transcoder): status `queued` until a worker claims + completes it.
-  // If no worker is running (local dev), the client falls back to its own
-  // FFmpeg wasm worker after a grace period and finalizes directly.
-  const initialStatus = transcode ? "queued" : "ready";
+  // Everything is canonical the moment it lands: no queue, no transcoder.
+  const initialStatus = "ready";
   const originalKey = videoKeys.original(mediaId);
   const processedKey = videoKeys.processed(mediaId);
   const posterKey = videoKeys.poster(mediaId);
@@ -126,11 +123,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     // Upload R2 objects BEFORE creating the row, so a DB failure never
     // leaves a row pointing at nothing (failed uploads are deleted on error).
-    if (transcode) {
-      await uploadToR2(originalKey, body, file.type);
-    } else {
-      await uploadToR2(processedKey, body, "video/mp4");
-    }
+    // Content-type is the file's own — WebM/MOV play as-is on modern clients.
+    await uploadToR2(processedKey, body, file.type);
     let posterUrl: string | null = null;
     if (posterBytes && posterFile) {
       try {
@@ -138,7 +132,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         posterUrl = r2PublicUrl(posterKey);
       } catch (posterError) {
         console.error("[showcase upload] poster upload failed:", posterError);
-        await deleteFromR2(transcode ? originalKey : processedKey);
+        await deleteFromR2(processedKey);
         return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
       }
     }
@@ -155,11 +149,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         owner_type: "showcase",
         status: initialStatus,
         strategy: effectiveStrategy,
-        original_key: transcode ? originalKey : processedKey,
-        processed_key: transcode ? null : processedKey,
+        original_key: originalKey,
+        processed_key: processedKey,
         poster_key: posterUrl ? posterKey : null,
-        original_url: transcode ? r2PublicUrl(originalKey) : null,
-        processed_url: transcode ? null : r2PublicUrl(processedKey),
+        original_url: r2PublicUrl(originalKey),
+        processed_url: r2PublicUrl(processedKey),
         poster_url: posterUrl,
         width,
         height,
@@ -168,7 +162,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         video_codec: videoCodec,
         audio_codec: audioCodec,
         original_size: file.size,
-        processed_size: transcode ? null : file.size,
+        processed_size: file.size,
       })
       .select("*")
       .single();
@@ -177,7 +171,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       console.error("[showcase upload] video_media insert failed:", error);
       // Never leave the DB claiming a video exists without the R2 object.
       try {
-        await deleteFromR2(transcode ? originalKey : processedKey);
+        await deleteFromR2(processedKey);
         if (posterUrl) await deleteFromR2(posterKey);
       } catch (cleanupError) {
         console.error("[showcase upload] failed-insert cleanup error:", cleanupError);
@@ -191,8 +185,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         status: initialStatus,
         attachment: {
           name: file.name,
-          url: transcode ? "" : r2PublicUrl(processedKey),
-          type: "video/mp4",
+          url: r2PublicUrl(processedKey),
+          type: file.type,
           size: file.size,
           ...(posterUrl ? { poster: posterUrl } : {}),
           mediaId,
