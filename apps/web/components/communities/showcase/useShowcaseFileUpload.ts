@@ -139,11 +139,15 @@ export function useShowcaseFileUpload({
 
   // While a video is uploading, refresh the elapsed/ETA clocks every second
   // (even when no new progress event has arrived) and re-render the feed.
+  // NOTE: the effect depends on a BOOLEAN, not the activity array — every
+  // tick replaces the array, so an array dependency would re-run this effect
+  // each second (React "maximum update depth exceeded"). The boolean only
+  // flips when a clock-running item appears or all of them finish.
+  const hasClockingUpload = activity.some(
+    (item) => item.state === "analyzing" || item.state === "uploading",
+  );
   useEffect(() => {
-    const needsClock = activityRef.current.some(
-      (item) => item.state === "analyzing" || item.state === "uploading",
-    );
-    if (!needsClock) return;
+    if (!hasClockingUpload) return;
     const tick = () => {
       const now = Date.now();
       activityRef.current = activityRef.current.map((item) => {
@@ -160,7 +164,7 @@ export function useShowcaseFileUpload({
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [activity]);
+  }, [hasClockingUpload]);
 
   /** Original file bytes + poster held for the encode step (transcodes only). */
   const originalsRef = useRef(new Map<string, { file: File; poster: Blob | null }>());
