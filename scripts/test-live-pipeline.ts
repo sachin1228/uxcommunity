@@ -80,6 +80,7 @@ console.log(`[1] original uploaded to R2: ${originalKey} (${original.length} byt
   const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const userId = readFileSync("/tmp/transcoder-deploy/userid.txt", "utf8").trim();
   const { error } = await db.from("video_media").insert({
+  id: mediaId,
   user_id: userId,
   status: "queued",
   strategy: "transcode",

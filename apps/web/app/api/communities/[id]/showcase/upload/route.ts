@@ -146,6 +146,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { data: row, error } = await db
       .from("video_media")
       .insert({
+        // Explicit id: the row id MUST equal the mediaId returned to the
+        // client (and used for the R2 keys). Without it, Postgres auto-
+        // assigns its own UUID and every status poll 404s forever.
+        id: mediaId,
         user_id: session.userId!,
         community_id: id,
         owner_type: "showcase",
