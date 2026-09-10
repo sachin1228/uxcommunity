@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   Box,
+  Check,
   CircleEllipsis,
   Film,
   Globe,
@@ -18,7 +20,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
-import { useShowcaseFileUpload, type InFlightUpload } from "./useShowcaseFileUpload";
+import { useShowcaseFileUpload, type VideoActivity, type VideoActivityState } from "./useShowcaseFileUpload";
 import {
   SHOWCASE_CATEGORIES,
   SHOWCASE_MEDIA_MAX,
@@ -90,68 +92,95 @@ function formatClock(totalSeconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-/** In-flight upload tile — live percent + elapsed + ETA while bytes flow. */
-function UploadTile({ upload }: { upload: InFlightUpload }) {
+/** Human-readable message for every pipeline stage a video can be in. */
+const ACTIVITY_MESSAGES: Record<VideoActivityState, string> = {
+  analyzing: "Analyzing video…",
+  uploading: "Uploading to storage…",
+  queued: "Queued — waiting for the transcoder…",
+  processing: "Transcoding on the server…",
+  fallback: "Encoding in your browser…",
+  finalizing: "Uploading processed video…",
+  ready: "Ready — video processed successfully",
+  failed: "Failed",
+};
+
+/**
+ * Per-video pipeline feed shown BELOW the media tile row. Every stage is
+ * spelled out (uploading → queued → processing → ready) with progress where
+ * available, and failures show the actual error message.
+ */
+function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
+  if (items.length === 0) return null;
   return (
-    <div className="relative flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-xl border border-border bg-surface-raised px-1.5 text-center">
-      <span className="w-full truncate px-1 font-body text-[10px] text-foreground-muted">{upload.name}</span>
-      {upload.phase === "analyzing" ? (
-        <>
-          <Spinner size={16} />
-          <span className="font-body text-[10px] text-foreground-subtle">Analyzing…</span>
-        </>
-      ) : (
-        <>
-          <span className="font-body text-[10px] font-medium tabular-nums text-foreground">
-            {upload.percent}%
+    <ul className="mt-2 space-y-2 rounded-xl border border-border bg-surface-raised/60 p-3">
+      {items.map((item) => (
+        <li key={item.key} className="flex items-start gap-2.5">
+          <span className="mt-0.5 shrink-0">
+            {item.state === "ready" ? (
+              <Check size={14} strokeWidth={2.5} className="text-emerald-400" />
+            ) : item.state === "failed" ? (
+              <AlertCircle size={14} strokeWidth={2.5} className="text-red-400" />
+            ) : (
+              <Spinner size={14} />
+            )}
           </span>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-border">
-            <div
-              className="h-full rounded-full bg-accent transition-[width] duration-200"
-              style={{ width: `${upload.percent}%` }}
-            />
+          <div className="min-w-0 flex-1">
+            <p className="font-body text-xs text-foreground">
+              <span className="truncate">{item.name}</span>
+              <span className="text-foreground-muted"> — {ACTIVITY_MESSAGES[item.state]}</span>
+            </p>
+            {item.state === "failed" && item.error && (
+              <p className="mt-0.5 font-body text-xs text-red-400">{item.error}</p>
+            )}
+            {(item.state === "uploading" || item.state === "fallback") && (
+              <div className="mt-1 flex items-center gap-2">
+                <div className="h-1 flex-1 overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-accent transition-[width] duration-200"
+                    style={{ width: `${item.percent}%` }}
+                  />
+                </div>
+                <span className="shrink-0 font-body text-[10px] tabular-nums text-foreground-subtle">
+                  {item.state === "uploading"
+                    ? `${item.percent}% · ${formatClock(item.elapsedSec)} · ~${
+                        item.etaSec !== null ? `${formatClock(item.etaSec)} left` : "…"
+                      }`
+                    : `${item.percent}%`}
+                </span>
+              </div>
+            )}
           </div>
-          <span className="font-body text-[9px] tabular-nums text-foreground-subtle">
-            {formatClock(upload.elapsedSec)} ·
-            {upload.etaSec !== null ? ` ~${formatClock(upload.etaSec)} left` : " …"}
-          </span>
-        </>
-      )}
-    </div>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 /**
  * Thumbnail row of uploaded media (images + videos) with remove + add tiles.
- *
- * Video tiles reflect the centralized pipeline state: uploading, processing
- * (with % progress), failed (retryable without re-upload), or ready.
+ * Progress/status messaging lives in the activity feed below this row —
+ * tiles only show the media (or a quiet spinner while it processes).
  */
 function MediaRow({
   attachments,
-  uploads,
   uploading,
-  progress,
   onRemove,
   onRetry,
   onAddMore,
 }: {
   attachments: ShowcaseAttachment[];
-  uploads: InFlightUpload[];
   uploading: boolean;
-  progress: Record<string, number>;
   onRemove: (url: string, mediaId?: string) => void;
   onRetry: (attachment: ShowcaseAttachment) => void;
   onAddMore: () => void;
 }) {
-  if (attachments.length === 0 && uploads.length === 0) return null;
+  if (attachments.length === 0) return null;
 
   return (
     <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
       {attachments.map((item) => {
         const isVideo = item.type.startsWith("video/");
         const state = isVideo ? (item.status ?? "ready") : "ready";
-        const percent = item.mediaId ? progress[item.mediaId] : undefined;
         return (
           <div
             key={item.url || item.mediaId || item.name}
@@ -178,8 +207,8 @@ function MediaRow({
               )
             ) : state === "failed" ? (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-red-950/60 px-1 text-center">
-                <Film strokeWidth={2.5} size={16} className="text-red-300" />
-                <span className="w-full truncate px-1 font-body text-[10px] text-red-200">Processing failed</span>
+                <AlertCircle strokeWidth={2.5} size={16} className="text-red-300" />
+                <span className="w-full truncate px-1 font-body text-[10px] text-red-200">Failed</span>
                 <button
                   type="button"
                   onClick={() => onRetry(item)}
@@ -189,11 +218,8 @@ function MediaRow({
                 </button>
               </div>
             ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-black/80 px-1 text-center">
+              <div className="flex h-full w-full items-center justify-center bg-black/80">
                 <Spinner size={16} />
-                <span className="w-full truncate px-1 font-body text-[10px] text-white/70">
-                  {percent !== undefined ? `Processing… ${percent}%` : "Processing…"}
-                </span>
               </div>
             )}
             <button
@@ -208,11 +234,7 @@ function MediaRow({
         );
       })}
 
-      {uploads.map((upload) => (
-        <UploadTile key={upload.key} upload={upload} />
-      ))}
-
-      {attachments.length + uploads.length < SHOWCASE_MEDIA_MAX && (
+      {attachments.length < SHOWCASE_MEDIA_MAX && (
         <button
           type="button"
           onClick={onAddMore}
@@ -262,9 +284,8 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
     addFiles,
     dropHandlers,
     isDragging,
-    progress,
     retryAttachment,
-    uploads,
+    activity,
     mediaError,
   } = useShowcaseFileUpload({ communityId, initialAttachments });
 
@@ -308,6 +329,10 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
       setSaving(false);
     }
   }
+
+  const hasPendingUpload = activity.some(
+    (item) => item.state === "analyzing" || item.state === "uploading",
+  );
 
   return (
     <ModalPortal>
@@ -374,7 +399,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                   className="sr-only"
                   onChange={handleFiles}
                 />
-                {attachments.length === 0 && uploads.length === 0 ? (
+                {attachments.length === 0 && !hasPendingUpload ? (
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
@@ -387,14 +412,14 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                 ) : (
                   <MediaRow
                     attachments={attachments}
-                    uploads={uploads}
                     uploading={uploading}
-                    progress={progress}
                     onRemove={removeAttachment}
                     onRetry={retryAttachment}
                     onAddMore={() => fileRef.current?.click()}
                   />
                 )}
+                {/* Per-video pipeline status — every stage, with errors. */}
+                <VideoActivityFeed items={activity} />
                 {mediaError && (
                   <p role="status" className="mt-1.5 font-body text-xs text-red-400">
                     {mediaError}
