@@ -177,10 +177,10 @@ export function ShowcaseView({
                   type="button"
                   onClick={() => setCategory(item.value)}
                   aria-pressed={category === item.value}
-                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 font-body text-xs ${
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 font-body text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
                     category === item.value
-                      ? "border-accent bg-accent/5 text-accent"
-                      : "border-border text-foreground-muted"
+                      ? "bg-accent/15 text-foreground"
+                      : "bg-accent-soft text-foreground-muted hover:bg-accent/10 hover:text-foreground"
                   }`}
                 >
                   <Icon size={14} strokeWidth={2.5} />
