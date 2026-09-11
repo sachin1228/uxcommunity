@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore
 import { Check, Globe, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "../threads/ThreadComposerControls";
+import { filterChip } from "../filter-chip";
 import type { CommunityResource, ResourceType } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceTypeIcon } from "./resourceTypeIcons";
@@ -221,11 +222,7 @@ export function ResourceFormModal({
                   key={t.value}
                   type="button"
                   onClick={() => setResourceType(t.value)}
-                  className={`rounded-full border px-3 py-1.5 inline-flex items-center gap-1.5 font-body text-xs transition-colors ${
-                    resourceType === t.value
-                      ? "border-accent bg-accent/15 text-accent"
-                      : "border-border text-foreground-muted hover:border-accent/40 hover:text-foreground"
-                  }`}
+                  className={filterChip(resourceType === t.value)}
                 >
                   <ResourceTypeIcon type={t.value} size={11} />
                   {t.label}

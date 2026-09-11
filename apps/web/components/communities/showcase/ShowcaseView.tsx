@@ -19,6 +19,7 @@ import {
   type ShowcasePost,
 } from "./types";
 import { communityFeedLayout } from "../feed-layout";
+import { filterChip } from "../filter-chip";
 import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 
@@ -177,7 +178,7 @@ export function ShowcaseView({
                   type="button"
                   onClick={() => setCategory(item.value)}
                   aria-pressed={category === item.value}
-                  className={communityFeedLayout.filterChip(category === item.value)}
+                  className={filterChip(category === item.value)}
                 >
                   <Icon size={14} strokeWidth={2.5} />
                   {item.label}

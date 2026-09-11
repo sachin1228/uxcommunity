@@ -14,6 +14,7 @@ import {
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
+import { filterChip } from "../filter-chip";
 import { useShowcaseFileUpload, type VideoActivity, type VideoActivityState } from "./useShowcaseFileUpload";
 import { CATEGORY_ICONS } from "./categoryIcons";
 import {
@@ -377,11 +378,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                         type="button"
                         onClick={() => setCategory(item.value)}
                         aria-pressed={active}
-                        className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
-                          active
-                            ? "border-accent bg-accent/5 text-accent"
-                            : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"
-                        }`}
+                        className={filterChip(active)}
                       >
                         <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                         {item.label}
