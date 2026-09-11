@@ -13,7 +13,6 @@ import type { CommunityEvent, EventRsvp } from "@/components/communities/events/
 import type { CommunityResource } from "@/components/communities/resources/types";
 import type { ShowcasePost } from "@/components/communities/showcase/types";
 
-import { communityFeedLayout } from "@/components/communities/feed-layout";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
@@ -365,7 +364,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
         return group.items.map((resource) => (
           <li
             key={`resource-${resource.id}`}
-            className={`${cardClassName} ${communityFeedLayout.gutters} py-6`}
+            className={cardClassName}
           >
             <ResourceCard
               resource={{ ...resource, community_id: resource.community_id ?? "" }}
@@ -377,7 +376,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
               onSaveChanged={handleResourceSaveChanged}
               onBookmarkChanged={handleResourceBookmarkChanged}
               onDeleted={handleResourceDeleted}
-              hideDivider
+              onOpen={() => router.push(`/dashboard/resources/${resource.id}`)}
             />
           </li>
         ));

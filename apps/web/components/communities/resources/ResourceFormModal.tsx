@@ -2,7 +2,7 @@
 
 import { createPortal } from "react-dom";
 import { useState, useEffect, useRef, useCallback, useMemo, useSyncExternalStore } from "react";
-import { Check, Globe, X } from "lucide-react";
+import { Check, Globe, MessageCircle, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ToggleRow } from "../threads/ThreadComposerControls";
 import { filterChip } from "../filter-chip";
@@ -54,6 +54,7 @@ export function ResourceFormModal({
   // No default: a resource must carry a type the author actually chose.
   const [resourceType, setResourceType] = useState<ResourceType | null>(resource?.resource_type ?? null);
   const [isPublic, setIsPublic] = useState(resource?.is_public ?? initialIsPublic);
+  const [allowReplies, setAllowReplies] = useState(resource?.allow_replies ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const figmaLink = useMemo(() => parseFigmaUrl(url), [url]);
@@ -80,16 +81,13 @@ export function ResourceFormModal({
     try {
       const result = await fetchLinkPreview(rawUrl.trim());
       if (!ctrl.signal.aborted) {
+        // Only show the preview — never seed the description. The author writes
+        // "what makes this resource worth sharing?" themselves.
         setPreview(result.data);
-        if (result.data && !isEdit && !description.trim()) {
-          const previewDescription = result.data.description ?? result.data.title;
-          if (previewDescription) setDescription(previewDescription.slice(0, 2000));
-        }
       }
     } finally {
       if (!ctrl.signal.aborted) setPreviewLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch preview for the initial URL on mount (edit mode)
@@ -152,6 +150,7 @@ export function ResourceFormModal({
           description: description.trim(),
           resource_type: resourceType,
           is_public: isPublic,
+          allow_replies: allowReplies,
         }),
       });
       const data = await res.json();
@@ -296,14 +295,23 @@ export function ResourceFormModal({
             </div>
           ) : null}
 
-          {/* Share publicly */}
-          <ToggleRow
-            title="Share publicly"
-            description="Visible to everyone, not just community members."
-            checked={isPublic}
-            onChange={setIsPublic}
-            icon={<Globe strokeWidth={2.5} size={15} />}
-          />
+          {/* Toggles */}
+          <div className="divide-y divide-border">
+            <ToggleRow
+              title="Allow replies"
+              description="Other members can comment on this resource."
+              checked={allowReplies}
+              onChange={setAllowReplies}
+              icon={<MessageCircle strokeWidth={2.5} size={15} />}
+            />
+            <ToggleRow
+              title="Share publicly"
+              description="Visible to everyone, not just community members."
+              checked={isPublic}
+              onChange={setIsPublic}
+              icon={<Globe strokeWidth={2.5} size={15} />}
+            />
+          </div>
         </div>
 
         {error && (

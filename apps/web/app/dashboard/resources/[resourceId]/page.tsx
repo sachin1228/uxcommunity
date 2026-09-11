@@ -2,15 +2,15 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
+import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
 
 interface Props {
-  params: Promise<{ id: string; resourceId: string }>;
+  params: Promise<{ resourceId: string }>;
 }
 
 async function getResource(
   db: ReturnType<typeof createServiceClient>,
-  communityId: string,
   resourceId: string,
   userId: string,
 ): Promise<CommunityResource | null> {
@@ -18,7 +18,6 @@ async function getResource(
     .from("community_resources")
     .select("id, community_id, user_id, title, description, resource_type, url, is_public, allow_replies, created_at, updated_at")
     .eq("id", resourceId)
-    .eq("community_id", communityId)
     .maybeSingle();
 
   if (!data) return null;
@@ -96,36 +95,48 @@ export default async function ResourceDetailPage({ params }: Props) {
   const session = await getSession();
   if (!session || session.role !== "user") redirect("/login");
 
-  const { id: communityId, resourceId } = await params;
+  const { resourceId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
 
-  const { data: membership } = await db
-    .from("community_members")
-    .select("joined_at")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
+  const { data: row } = await db
+    .from("community_resources")
+    .select("community_id")
+    .eq("id", resourceId)
     .maybeSingle();
 
-  if (!membership) redirect(`/dashboard/communities/${communityId}`);
+  if (!row) redirect("/dashboard");
 
-  const [resource, comments, community] = await Promise.all([
-    getResource(db, communityId, resourceId, userId),
+  const communityId = row.community_id as string;
+
+  const [membership, resource, comments, community] = await Promise.all([
+    db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
+    getResource(db, resourceId, userId),
     getComments(db, resourceId),
-    db.from("communities").select("name").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ]);
 
-  if (!resource) redirect(`/dashboard/communities/${communityId}?tab=resources`);
+  if (!membership) redirect(`/dashboard/communities/${communityId}`);
+  if (!resource) redirect("/dashboard");
 
   return (
-    <ResourceDetailClient
-      resource={resource}
-      initialComments={comments}
-      currentUserId={userId}
-      communityId={communityId}
-      communityName={community.data?.name ?? "Community"}
-      backHref={`/dashboard/communities/${communityId}?tab=resources`}
-      backLabel="Resources"
-    />
+    <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
+        <div className="mx-auto w-full max-w-[40rem]">
+          <ResourceDetailClient
+            resource={resource}
+            initialComments={comments}
+            currentUserId={userId}
+            communityId={communityId}
+            communityName={community.data?.name ?? "Community"}
+            communityImage={community.data?.image_url ?? null}
+            showCommunityAttribution
+            backHref="/dashboard"
+            backLabel="Home"
+          />
+        </div>
+        <HomeSidebar />
+      </div>
+    </div>
   );
 }

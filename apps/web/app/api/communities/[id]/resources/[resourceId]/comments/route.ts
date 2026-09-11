@@ -112,7 +112,7 @@ export async function POST(
   // Fetch resource to check access in one query
   let resourceQuery = db
     .from("community_resources")
-    .select("id, user_id, title, is_public")
+    .select("id, user_id, title, is_public, allow_replies")
     .eq("id", resourceId)
   resourceQuery = publicScope
     ? resourceQuery.eq("is_public", true).is("community_id", null)
@@ -123,6 +123,10 @@ export async function POST(
   // Private resources require community membership to comment
   if (!resource.is_public && !publicScope && !(await isMember(db, communityId, userId))) {
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
+  }
+
+  if (resource.allow_replies === false) {
+    return NextResponse.json({ error: "Comments are turned off for this resource." }, { status: 403 });
   }
 
   const limit = await rateLimit(`resource-comment:create:${userId}:60s`, 20, 60);

@@ -17,6 +17,7 @@ import {
   Type,
   Wrench,
 } from "lucide-react";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -45,6 +46,7 @@ export function ResourcesView({
   currentUserId: string;
 }) {
   initRequestCache(currentUserId);
+  const router = useGuardedRouter();
   const requestUrl = `/api/communities/${communityId}/resources`;
   const cached = getCachedRequest<{ resources?: CommunityResource[]; nextCursor?: string | null }>(requestUrl, currentUserId);
   const [resources, setResources] = useState<CommunityResource[]>(() => cached?.resources ?? []);
@@ -264,21 +266,17 @@ export function ResourcesView({
         ) : (
           <div className={communityFeedLayout.cardList}>
             {filtered.map((resource) => (
-              <div
+              <ResourceCard
                 key={resource.id}
-                className={`${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}
-              >
-                <ResourceCard
-                  resource={resource}
-                  currentUserId={currentUserId}
-                  communityId={communityId}
-                  onUpdated={handleUpdated}
-                  onSaveChanged={handleSaveChanged}
-                  onBookmarkChanged={handleBookmarkChanged}
-                  onDeleted={handleDeleted}
-                  hideDivider
-                />
-              </div>
+                resource={resource}
+                currentUserId={currentUserId}
+                communityId={communityId}
+                onUpdated={handleUpdated}
+                onSaveChanged={handleSaveChanged}
+                onBookmarkChanged={handleBookmarkChanged}
+                onDeleted={handleDeleted}
+                onOpen={() => router.push(`/dashboard/communities/${communityId}/resources/${resource.id}`)}
+              />
             ))}
             {hasMore && (
               <div className="flex justify-center py-6">
