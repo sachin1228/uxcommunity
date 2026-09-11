@@ -1,14 +1,12 @@
 /**
  * Shared showcase post validation — used by the create (POST) and update
  * (PATCH) routes so both accept exactly the same rich body shape:
- * title, attachments (images + videos), stage, category, visibility and
- * reply toggles.
+ * title, attachments (images + videos), category, visibility and reply toggles.
  */
 
 import { SHOWCASE_CATEGORIES_SET } from "./showcase-categories";
 
 export { SHOWCASE_CATEGORIES_SET };
-export const SHOWCASE_STAGES_SET = new Set(["concept", "wip", "final", "case_study"]);
 export const SHOWCASE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime"]);
 export const SHOWCASE_MEDIA_MAX = 5;
 
@@ -37,7 +35,6 @@ export interface ShowcasePostInput {
   category: string;
   isPublic: boolean;
   allowReplies: boolean;
-  stage: string | null;
 }
 
 export type ParseShowcaseBodyResult =
@@ -106,8 +103,5 @@ export function parseShowcaseBody(body: Record<string, unknown>): ParseShowcaseB
   if (imageUrl && !/^https?:\/\//.test(imageUrl)) return { ok: false, error: "Invalid image URL." };
   if (imageUrl.length > 2048) return { ok: false, error: "Image URL is too long." };
 
-  const stage = typeof body.stage === "string" && body.stage ? body.stage : null;
-  if (stage && !SHOWCASE_STAGES_SET.has(stage)) return { ok: false, error: "Invalid stage." };
-
-  return { ok: true, value: { title, imageUrl, attachments, category, isPublic, allowReplies, stage } };
+  return { ok: true, value: { title, imageUrl, attachments, category, isPublic, allowReplies } };
 }

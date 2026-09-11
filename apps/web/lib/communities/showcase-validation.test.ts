@@ -28,6 +28,20 @@ test("legacy category values are rejected", () => {
   }
 });
 
+// ── Stage was removed from the composer (and the DB) ──────────────────────
+
+test("a stray stage field is ignored instead of persisted", () => {
+  const parsed = parseShowcaseBody({
+    title: "My work",
+    category: "motion_design",
+    attachments: [],
+    is_public: true,
+    stage: "final",
+  });
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) assert.equal("stage" in parsed.value, false);
+});
+
 test("video attachments accept and keep a valid poster URL", () => {
   const parsed = parseShowcaseBody(baseBody([
     { name: "clip.mp4", url: VIDEO, type: "video/mp4", size: 1000, poster: POSTER },

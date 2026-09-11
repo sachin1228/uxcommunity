@@ -65,11 +65,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const parsed = parseShowcaseBody(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
-  const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
+  const { title, imageUrl, attachments, category, isPublic, allowReplies } = parsed.value;
 
   // Videos are plain file uploads (stored directly by the upload route) —
   // attachments are persisted exactly as the validated client sent them.
-  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).select("*").single();
+  const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies }).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }

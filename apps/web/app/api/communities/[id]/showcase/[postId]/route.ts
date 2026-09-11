@@ -91,11 +91,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   let body: Record<string, unknown>; try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   const parsed = parseShowcaseBody(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 422 });
-  const { title, imageUrl, attachments, category, isPublic, allowReplies, stage } = parsed.value;
+  const { title, imageUrl, attachments, category, isPublic, allowReplies } = parsed.value;
 
   // Videos are plain file uploads — attachments are persisted exactly as the
   // validated client sent them.
-  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies, stage }).eq("id", postId).eq("user_id", userId).select("*").single();
+  const { data, error } = await db.from("community_showcase_posts").update({ title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies }).eq("id", postId).eq("user_id", userId).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to update showcase post." }, { status: 500 });
 
   // Clean up R2 assets that are no longer part of the post (cover + attachments).
