@@ -13,7 +13,7 @@
  * happened client-side, and a first-frame poster is captured for cards.
  */
 
-import { VIDEO_MIME_TYPES as VIDEO_MIME_TYPES_SET } from "@uxcommunity/shared";
+import { IMMUTABLE_CACHE_CONTROL, VIDEO_MIME_TYPES as VIDEO_MIME_TYPES_SET } from "@uxcommunity/shared";
 import { processVideoForUpload } from "@/lib/video-client";
 
 export { VIDEO_MIME_TYPES_SET as VIDEO_TYPES };
@@ -70,6 +70,10 @@ function putWithProgress(
     xhr.open("PUT", url);
     // Must match the signed Content-Type exactly — nothing else may be sent.
     xhr.setRequestHeader("Content-Type", contentType);
+    // Echo the Cache-Control that was signed into the presigned URL so the
+    // object is stored immutable and the CDN edge can cache it. The value
+    // must match the server's presign exactly or the signature check fails.
+    xhr.setRequestHeader("Cache-Control", IMMUTABLE_CACHE_CONTROL);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress?.(event.loaded, event.total);
     };

@@ -15,6 +15,18 @@ export interface MediaReferenceLookup {
   getUrls?: (value: unknown) => string[];
 }
 
+/**
+ * Cache-Control applied to every R2 media object. `immutable` is safe because
+ * all uploads use versioned/unique keys (timestamp + random suffix or UUID),
+ * so a URL never points at different content. It lets Cloudflare's CDN edge
+ * cache R2 responses without revalidating, so cache HITs never touch R2 and
+ * Range requests (video seeking) pass through the edge cache untouched.
+ *
+ * Shared here so the server (presign + proxy upload) and the browser
+ * (direct PUT, which must echo the signed header) can never drift apart.
+ */
+export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
 /** Extract attachment URLs from a stored attachments JSON array. */
 export function attachmentUrls(value: unknown): string[] {
   if (!Array.isArray(value)) return [];

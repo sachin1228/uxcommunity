@@ -23,7 +23,7 @@ import {
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
+import { attachmentPosterUrls, attachmentUrls, IMMUTABLE_CACHE_CONTROL, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
 // Attachment URL extraction lives in the shared package so the app, the
 // admin orphan audit, and the tests use the identical parsing logic.
@@ -165,6 +165,10 @@ export async function presignR2Put(
     Bucket: getBucket(),
     Key: key,
     ContentType: contentType,
+    // Signed into the URL, so the browser MUST echo this exact header value
+    // on the PUT (see putWithProgress in video-upload.ts). Without it the
+    // object is stored without a Cache-Control and misses CDN edge caching.
+    CacheControl: IMMUTABLE_CACHE_CONTROL,
   });
   return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
@@ -193,7 +197,7 @@ export async function uploadToR2(
       Key: key,
       Body: body,
       ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
+      CacheControl: IMMUTABLE_CACHE_CONTROL,
     })
   );
   return r2PublicUrl(key);
@@ -224,7 +228,7 @@ export async function copyR2Object(sourceKey: string, destinationKey: string): P
       CopySource: `${getBucket()}/${sourceKey}`,
       Key: destinationKey,
       ContentType: "video/mp4",
-      CacheControl: "public, max-age=31536000, immutable",
+      CacheControl: IMMUTABLE_CACHE_CONTROL,
       MetadataDirective: "REPLACE",
     })
   );
