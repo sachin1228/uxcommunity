@@ -5,27 +5,61 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { VIDEO_TYPES, QUEUED_FALLBACK_AFTER_MS, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, pollQueuedVideo, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
-import type { VideoDecision } from "@/lib/video/video-types";
+import { VIDEO_TYPES, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-upload";
+import { MAX_VIDEO_BYTES } from "@uxcommunity/shared";
 
-/** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 25 MB). */
+/** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 50 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/**
+ * Every stage a video goes through after being picked. Rendered as a
+ * human-readable feed below the media tiles, so the user always knows what
+ * is happening (and what failed, with the error).
+ */
+export type VideoActivityState =
+  | "analyzing" // probing / lossless remux before any bytes flow
+  | "uploading" // XHR upload of the original to R2 (percent + clock)
+  | "finalizing" // bytes delivered; server is writing to storage and responding
+  | "ready"
+  | "failed";
+
+/**
+ * One entry in the per-video activity feed. Keyed by a client-generated id
+ * until the upload completes, then rebound to the mediaId.
+ */
+export interface VideoActivity {
+  key: string;
+  name: string;
+  state: VideoActivityState;
+  /** 0–100 where the stage reports progress (upload). */
+  percent: number;
+  /** Byte-level transfer counts for the uploading stage (real speed/ETA). */
+  sentBytes: number;
+  totalBytes: number;
+  startedAt: number;
+  /** Seconds since the upload started (refreshed by the clock tick). */
+  elapsedSec: number;
+  /** Projected seconds remaining, when a progress rate is known. */
+  etaSec: number | null;
+  /** Human-readable failure detail (failed state only). */
+  error?: string;
+}
 
 /**
  * Media intake for the "Share your work" composer.
  *
  * Images keep the existing flow (client-side WebP compression + moderated
- * upload). Videos flow through the CENTRALIZED video pipeline:
+ * upload). Videos are PLAIN FILE UPLOADS:
  *
- *   upload original → (FFmpeg wasm worker encodes) → finalize → ready
+ *   analyzing → uploading → ready
  *
- * Each attachment carries its pipeline state so the composer can show
- * Uploading… / Processing… (with progress) / Ready, and a failed encode can
- * be retried WITHOUT re-uploading — the original stays in R2 and the worker
- * simply runs again.
+ * (The file ships as-is; a lossless remux may happen client-side during
+ * "analyzing". Nothing is ever queued or transcoded.)
+ *
+ * Each video drives one `VideoActivity` feed entry (plus its attachment
+ * tile), so failures surface with their exact error.
  */
 export function useShowcaseFileUpload({
   communityId,
@@ -38,8 +72,10 @@ export function useShowcaseFileUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  /** Per-media encode progress (0–100) for the composer UI. */
-  const [progress, setProgress] = useState<Record<string, number>>({});
+  /** Per-video feed shown below the media tiles. */
+  const [activity, setActivity] = useState<VideoActivity[]>([]);
+  /** Validation failures (count/size) shown under the media input. */
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   // Fresh copy for limit checks inside stable callbacks (a second drop lands
   // before re-render otherwise sees a stale list).
@@ -48,159 +84,155 @@ export function useShowcaseFileUpload({
     attachmentsRef.current = attachments;
   }, [attachments]);
 
-  /** Original file bytes + poster held for the encode step (transcodes only). */
-  const originalsRef = useRef(new Map<string, { file: File; poster: Blob | null }>());
+  // activityRef is mutated synchronously (not via effect) so a second drop
+  // mid-upload sees the in-flight count immediately for the media cap check.
+  const activityRef = useRef<VideoActivity[]>([]);
+  const uploadSeqRef = useRef(0);
+
+  const upsertActivity = useCallback((key: string, patch: Partial<VideoActivity>) => {
+    const existing = activityRef.current.find((item) => item.key === key);
+    let next: VideoActivity[];
+    if (existing) {
+      next = activityRef.current.map((item) => (item.key === key ? { ...item, ...patch } : item));
+    } else {
+      const base: VideoActivity = {
+        key,
+        name: patch.name ?? "Video",
+        state: "analyzing",
+        percent: 0,
+        sentBytes: 0,
+        totalBytes: 0,
+        startedAt: Date.now(),
+        elapsedSec: 0,
+        etaSec: null,
+      };
+      next = [...activityRef.current, { ...base, ...patch }];
+    }
+    activityRef.current = next;
+    setActivity(next);
+  }, []);
+
+  const removeActivity = useCallback((key: string) => {
+    activityRef.current = activityRef.current.filter((item) => item.key !== key);
+    setActivity(activityRef.current);
+  }, []);
+
+  /** Pre-attachment uploads (analyzing/uploading/finalizing) — these count toward the cap. */
+  const pendingUploadCount = () =>
+    activityRef.current.filter(
+      (item) =>
+        item.state === "analyzing" || item.state === "uploading" || item.state === "finalizing",
+    ).length;
+
+  // While a video is uploading, refresh the elapsed/ETA clocks every second
+  // (even when no new progress event has arrived) and re-render the feed.
+  // NOTE: the effect depends on a BOOLEAN, not the activity array — every
+  // tick replaces the array, so an array dependency would re-run this effect
+  // each second (React "maximum update depth exceeded"). The boolean only
+  // flips when a clock-running item appears or all of them finish.
+  const hasClockingUpload = activity.some(
+    (item) =>
+      item.state === "analyzing" || item.state === "uploading" || item.state === "finalizing",
+  );
+  useEffect(() => {
+    if (!hasClockingUpload) return;
+    const tick = () => {
+      const now = Date.now();
+      activityRef.current = activityRef.current.map((item) => {
+        if (item.state !== "analyzing" && item.state !== "uploading" && item.state !== "finalizing")
+          return item;
+        const elapsedSec = Math.max(0, (now - item.startedAt) / 1000);
+        // Byte-rate ETA: remaining bytes ÷ average transfer speed. Falls back
+        // to the percent-based projection before the first bytes tick in.
+        const speed = item.sentBytes > 0 && elapsedSec > 0 ? item.sentBytes / elapsedSec : 0;
+        const etaFromBytes =
+          item.totalBytes > item.sentBytes && speed > 0
+            ? (item.totalBytes - item.sentBytes) / speed
+            : null;
+        return {
+          ...item,
+          elapsedSec,
+          etaSec:
+            item.state === "uploading"
+              ? (etaFromBytes ??
+                  (item.percent > 0
+                    ? (elapsedSec * (100 - item.percent)) / item.percent
+                    : null))
+              : null,
+        };
+      });
+      setActivity(activityRef.current);
+    };
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [hasClockingUpload]);
 
   // dragenter/dragleave fire for every child element crossed; counting them
   // (instead of booleans) keeps the overlay steady while over nested nodes.
   const dragDepthRef = useRef(0);
 
-  const setAttachment = useCallback((mediaId: string, patch: Partial<ShowcaseAttachment>) => {
-    setAttachments((current) =>
-      current.map((item) => (item.mediaId === mediaId ? { ...item, ...patch } : item)),
-    );
-  }, []);
-
-  /**
-   * Runs the FFmpeg worker + finalize for one transcode attachment.
-   * Resumable: the original bytes live in `originalsRef` (or R2), so a failed
-   * encode never requires re-uploading.
-   */
-  const runEncode = useCallback(
-    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
-      const mediaId = attachment.mediaId;
-      const original = mediaId ? originalsRef.current.get(mediaId) : undefined;
-      if (!mediaId || !original || !communityId) {
-        if (mediaId) setAttachment(mediaId, { status: "failed" });
-        return;
-      }
-      const startedAt = performance.now();
-      setAttachment(mediaId, { status: "processing", errorMessage: undefined });
-      setProgress((current) => ({ ...current, [mediaId]: 0 }));
-      try {
-        const result = await encodeVideo(
-          mediaId,
-          original.file,
-          decision,
-          (value) => setProgress((current) => ({ ...current, [mediaId]: value })),
-        );
-        const finalized = await finalizeVideo(
-          communityId,
-          mediaId,
-          result.file,
-          original.poster,
-          {
-            width: result.width,
-            height: result.height,
-            fps: result.fps,
-            durationMs: result.durationMs,
-            videoCodec: result.videoCodec,
-            audioCodec: result.audioCodec,
-          },
-          performance.now() - startedAt,
-        );
-        if (finalized.status === "deleted") {
-          // Post/media was deleted while processing — drop the attachment.
-          setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-        } else if (finalized.attachment) {
-          setAttachment(mediaId, { ...finalized.attachment, status: "ready" });
-        }
-        originalsRef.current.delete(mediaId);
-        setProgress((current) => {
-          const next = { ...current };
-          delete next[mediaId];
-          return next;
-        });
-      } catch (err) {
-        console.error("[showcase video] encode failed:", err);
-        setAttachment(mediaId, {
-          status: "failed",
-          errorMessage: err instanceof Error ? err.message : "Video processing failed.",
-        });
-        setProgress((current) => {
-          const next = { ...current };
-          delete next[mediaId];
-          return next;
-        });
-      }
-    },
-    [communityId, setAttachment],
-  );
-
-  /**
-   * Waits for the server-side transcoder; falls back to the in-browser
-   * FFmpeg wasm worker when no worker completes the job within the grace period.
-   */
-  const awaitServerOrFallback = useCallback(
-    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
-      const mediaId = attachment.mediaId;
-      if (!mediaId || !communityId) return;
-      setAttachment(mediaId, { status: "processing" });
-      const result = await pollQueuedVideo(communityId, mediaId, {
-        timeoutMs: QUEUED_FALLBACK_AFTER_MS,
-      });
-      if (result.status === "ready" && result.attachment) {
-        setAttachment(mediaId, { ...result.attachment, status: "ready" });
-        originalsRef.current.delete(mediaId);
-        return;
-      }
-      if (result.status === "failed") {
-        setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
-        return;
-      }
-      if (result.status === "deleted") {
-        setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-        return;
-      }
-      // Still queued/processing — no transcoder around (local dev, outage).
-      // Fall back to the in-browser FFmpeg wasm worker.
-      void runEncode(attachment, decision);
-    },
-    [communityId, runEncode, setAttachment],
-  );
-
   const uploadFiles = useCallback(
     async (files: File[]) => {
-      if (attachmentsRef.current.length + files.length > SHOWCASE_MEDIA_MAX) {
-        setError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
+      if (
+        attachmentsRef.current.length + pendingUploadCount() + files.length >
+        SHOWCASE_MEDIA_MAX
+      ) {
+        setMediaError(`You can add up to ${SHOWCASE_MEDIA_MAX} images or videos.`);
         return;
       }
 
       for (const file of files) {
         if (IMAGE_TYPES.has(file.type) && file.size > MAX_IMAGE_BYTES) {
-          setError("Images must be 8 MB or smaller.");
+          setMediaError("Images must be 8 MB or smaller.");
           return;
         }
         if (VIDEO_TYPES.has(file.type) && file.size > MAX_VIDEO_BYTES) {
-          setError("Videos must be 25 MB or smaller.");
+          setMediaError("Videos must be 50 MB or smaller.");
           return;
         }
       }
 
       setUploading(true);
       setError(null);
+      setMediaError(null);
       try {
         for (const file of files) {
           if (VIDEO_TYPES.has(file.type)) {
-            // ── Centralized video pipeline ────────────────────────────────
-            // Probe → decide (passthrough / lossless remux / FFmpeg transcode)
-            // → upload original → server-side transcoder (async, polled) —
-            // with the in-browser FFmpeg worker as automatic fallback if no
-            // transcoder picks the job up in time.
-            const prepared = await prepareVideoForPipeline(file);
-            const response = await uploadVideo(communityId!, prepared);
-            const attachment = response.attachment;
-            setAttachments((current) => [...current, attachment]);
-            if (attachment.mediaId) {
-              originalsRef.current.set(attachment.mediaId, {
-                file,
-                poster: prepared.poster,
+            // ── Plain video upload ─────────────────────────────────────────
+            // Probe → (lossless remux) → upload as-is → ready immediately.
+            const activityKey = `video-${Date.now()}-${uploadSeqRef.current++}`;
+            upsertActivity(activityKey, { name: file.name, state: "analyzing", percent: 0 });
+            try {
+              const prepared = await prepareVideoForPipeline(file);
+              // Restart the clock here: elapsed (and therefore speed/ETA)
+              // should measure the byte transfer, not the analyzing phase.
+              upsertActivity(activityKey, { state: "uploading", startedAt: Date.now() });
+              const response = await uploadVideo(communityId!, prepared, (sent, total) => {
+                const percent = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
+                // 100% means the browser finished SENDING bytes; the server
+                // still has to write them to storage. Flip to an explicit
+                // indeterminate stage so "100%" never idles with a wrong label.
+                upsertActivity(activityKey,
+                  percent >= 100
+                    ? { state: "finalizing" }
+                    : { state: "uploading", percent, sentBytes: sent, totalBytes: total },
+                );
               });
-              if (response.status === "queued") {
-                void awaitServerOrFallback(attachment, prepared.decision);
-              } else {
-                originalsRef.current.delete(attachment.mediaId);
-              }
+              const attachment = response.attachment;
+              setAttachments((current) => [...current, attachment]);
+              upsertActivity(attachment.mediaId ?? activityKey, {
+                name: file.name,
+                state: "ready",
+                percent: 100,
+              });
+              removeActivity(activityKey);
+            } catch (uploadErr) {
+              // Per-video failure — surfaced in the feed with the real error.
+              upsertActivity(activityKey, {
+                state: "failed",
+                error: uploadErr instanceof Error ? uploadErr.message : "Upload failed.",
+              });
             }
           } else {
             // ── Images: existing pipeline, unchanged ──────────────────────
@@ -227,54 +259,8 @@ export function useShowcaseFileUpload({
         setUploading(false);
       }
     },
-    [awaitServerOrFallback, communityId],
+    [upsertActivity, removeActivity, communityId],
   );
-
-  /** Retries a failed encode — the original is still in R2, no re-upload. */
-  const retryAttachment = useCallback(
-    (attachment: ShowcaseAttachment) => {
-      if (!attachment.mediaId) return;
-      // Retry prefers the server-side transcoder again, then the wasm worker.
-      void awaitServerOrFallback(attachment, {
-        strategy: "transcode",
-        preset: attachment.preset ?? "slow",
-        copyVideo: attachment.copyVideo,
-        reason: "retry",
-      });
-    },
-    [awaitServerOrFallback],
-  );
-
-  // After an edit (initialAttachments change), resume videos that never
-  // reached `ready`:
-  //   - `uploaded` (client-wasm era): original bytes are gone after a reload,
-  //     so the lossless passthrough promotes the stored original (zero
-  //     re-encode) via finalize.
-  //   - `queued` (server transcoder): the worker will complete + patch the
-  //     post server-side; just poll for the terminal state to refresh the UI.
-  useEffect(() => {
-    for (const item of initialAttachments) {
-      if (!item.type.startsWith("video/") || !item.mediaId || !communityId) continue;
-      if (item.status === "uploaded") {
-        void finalizeVideoPassthrough(communityId, item.mediaId).then((result) => {
-          if (result.status === "ready" && result.attachment) {
-            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
-          }
-        }).catch(() => {
-          // Keep the placeholder state — the admin sweep cleans up leftovers.
-        });
-      } else if (item.status === "queued") {
-        void pollQueuedVideo(communityId, item.mediaId, { timeoutMs: 60_000 }).then((result) => {
-          if (result.status === "ready" && result.attachment) {
-            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
-          }
-        }).catch(() => {
-          // Still queued — keep the placeholder; the transcoder patches the
-          // post itself when it completes.
-        });
-      }
-    }
-  }, [initialAttachments, communityId, setAttachment]);
 
   const addFiles = useCallback(
     (fileList: FileList | File[] | null) => {
@@ -287,12 +273,9 @@ export function useShowcaseFileUpload({
   const removeAttachment = useCallback(
     (url: string, mediaId?: string) => {
       setAttachments((current) => current.filter((a) => a.url !== url && a.mediaId !== mediaId));
-      if (mediaId) {
-        originalsRef.current.delete(mediaId);
-        if (communityId) void cancelVideo(communityId, mediaId);
-      }
+      if (mediaId) removeActivity(mediaId);
     },
-    [communityId],
+    [removeActivity],
   );
 
   const hasFiles = (event: React.DragEvent) =>
@@ -336,7 +319,7 @@ export function useShowcaseFileUpload({
     addFiles,
     dropHandlers,
     isDragging,
-    progress,
-    retryAttachment,
+    activity,
+    mediaError,
   };
 }

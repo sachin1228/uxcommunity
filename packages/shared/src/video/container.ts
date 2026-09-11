@@ -1,7 +1,7 @@
 /**
- * Container sniffing — byte-level inspection shared by the web app and the
- * server-side transcoder so both identify sources identically without ever
- * trusting the browser MIME type or filename.
+ * Container sniffing — byte-level inspection shared by the web app client
+ * so it identifies sources without ever trusting the browser MIME type or
+ * filename.
  */
 
 /** True when the bytes start with an MP4/MOV signature (`ftyp` box). */

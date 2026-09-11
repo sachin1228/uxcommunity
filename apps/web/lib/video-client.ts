@@ -11,7 +11,7 @@
  * quality loss) fixes this at upload time for every future viewer.
  *
  * Mediabunny is a pure-TypeScript browser toolkit: remuxing copies compressed
- * packets without re-encoding, so it's fast (seconds for a 25 MB clip) and
+ * packets without re-encoding, so it's fast (seconds for a 50 MB clip) and
  * uses the environment's own codec machinery (WebCodecs) rather than WASM.
  */
 
@@ -27,9 +27,8 @@ import {
   type InputVideoTrack,
 } from "mediabunny";
 
-// Byte-level MP4/WebM sniffing lives in @uxcommunity/shared (shared with the
-// server-side transcoder) — re-exported so the app's existing imports and
-// tests keep working.
+// Byte-level MP4/WebM sniffing lives in @uxcommunity/shared — re-exported so
+// the app's existing imports and tests keep working.
 import { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
 export { isFaststart, looksLikeMp4, sniffVideoContainer };
 

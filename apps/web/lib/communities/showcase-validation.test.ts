@@ -67,26 +67,11 @@ test("attachments without a poster keep parsing exactly as before", () => {
 
 const MEDIA_ID = "11111111-1111-1111-1111-111111111111";
 
-test("processing videos may carry a mediaId with an empty URL (post exists while encoding)", () => {
+test("videos with a mediaId still require a real URL (plain uploads)", () => {
   const parsed = parseShowcaseBody(baseBody([
-    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status: "processing" },
+    { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status: "ready" },
   ]));
-  assert.equal(parsed.ok, true);
-  if (parsed.ok) {
-    const first = parsed.value.attachments[0];
-    assert.equal(first?.mediaId, MEDIA_ID);
-    assert.equal(first?.status, "processing");
-    assert.equal(first?.url, "");
-  }
-});
-
-test("uploaded/failed processing states parse like processing", () => {
-  for (const status of ["uploaded", "failed"]) {
-    const parsed = parseShowcaseBody(baseBody([
-      { name: "clip.mp4", url: "", type: "video/mp4", size: 0, mediaId: MEDIA_ID, status },
-    ]));
-    assert.equal(parsed.ok, true, `status ${status} should parse`);
-  }
+  assert.deepEqual(parsed, { ok: false, error: "Invalid attachment URL." });
 });
 
 test("ready videos still require a real URL", () => {

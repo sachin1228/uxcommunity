@@ -17,15 +17,15 @@ export interface ShowcaseAttachmentInput {
   size: number;
   /** First-frame image URL for video attachments (optional, videos only). */
   poster?: string;
-  /** Centralized video-pipeline media ID (video attachments only). */
+  /** Client-generated upload ID (videos only). */
   mediaId?: string;
-  /** Pipeline state — `ready` URLs are playable; processing ones show a placeholder. */
+  /** Upload state — `ready` URLs are playable; `failed` never persists. */
   status?: string;
   /** Encode strategy chosen for this upload (informational, videos only). */
   strategy?: string;
 }
 
-export const VIDEO_ATTACHMENT_STATUSES = new Set(["uploaded", "queued", "processing", "ready", "failed"]);
+export const VIDEO_ATTACHMENT_STATUSES = new Set(["ready", "failed"]);
 const MEDIA_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface ShowcasePostInput {
@@ -76,12 +76,9 @@ export function parseShowcaseBody(body: Record<string, unknown>): ParseShowcaseB
           ? record.status
           : undefined;
 
-      // Ready videos carry a real URL. Videos still in the pipeline may carry
-      // an empty URL — the server resolves the canonical URL from video_media
-      // at finalize; the feed renders a placeholder until then.
+      // Videos always carry a real URL — plain uploads are ready immediately.
       if (!url || url.length > 2048) {
-        const processing = isVideo && mediaId && status && status !== "ready" && url === "";
-        if (!processing) return { ok: false, error: "Invalid attachment URL." };
+        return { ok: false, error: "Invalid attachment URL." };
       } else if (!/^https?:\/\//.test(url)) {
         return { ok: false, error: "Invalid attachment URL." };
       }
