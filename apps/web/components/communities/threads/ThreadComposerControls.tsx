@@ -35,13 +35,14 @@ export function CategoryPicker({
   value,
   onChange,
 }: {
-  value: ThreadCategory;
+  /** Null until the author picks one — there is deliberately no default. */
+  value: ThreadCategory | null;
   onChange: (category: ThreadCategory) => void;
 }) {
   return (
     <div>
       <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-        Category
+        Category *
       </span>
       <div className="flex flex-wrap gap-2">
         {THREAD_CATEGORIES.map((item) => {

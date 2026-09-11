@@ -52,7 +52,8 @@ export function CreateThreadModal({
   const [body,            setBody]            = useState("");
   const [tab,             setTab]             = useState<ThreadComposerTab>("post");
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(null);
-  const [category,        setCategory]        = useState<ThreadCategory>("question");
+  // No default: a thread must carry a category the author actually chose.
+  const [category,        setCategory]        = useState<ThreadCategory | null>(null);
   const [allowReplies,    setAllowReplies]    = useState(true);
   const [isPublic,        setIsPublic]        = useState(false);
   const [saving,          setSaving]          = useState(false);
@@ -117,6 +118,11 @@ export function CreateThreadModal({
       }
       title = bodyToTitle(body);
       poll = null;
+    }
+
+    if (!category) {
+      setError("Pick a category for your thread.");
+      return;
     }
 
     const extractedLinks = [...new Set(body.match(/https?:\/\/[^\s<>"]+/g) ?? [])];

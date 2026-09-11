@@ -48,6 +48,7 @@ export function parseShowcaseBody(body: Record<string, unknown>): ParseShowcaseB
   const allowReplies = body.allow_replies !== false;
 
   if (!title || title.length > 2000) return { ok: false, error: "Add a title up to 2,000 characters." };
+  if (!category) return { ok: false, error: "Pick a category." };
   if (!SHOWCASE_CATEGORIES_SET.has(category)) return { ok: false, error: "Invalid category." };
 
   // Attachments: array of { name, url, type, size } — images and videos.

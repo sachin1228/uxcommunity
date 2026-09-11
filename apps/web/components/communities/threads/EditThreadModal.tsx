@@ -44,7 +44,8 @@ export function EditThreadModal({ thread, communityId, onClose, onUpdated }: Edi
 
   const [body,            setBody]            = useState(thread.title);
   const [pollDraft,       setPollDraft]       = useState<ThreadPollDraft | null>(() => pollToDraft(thread.poll));
-  const [category,        setCategory]        = useState<ThreadCategory>(thread.category);
+  // Edits start from the thread's own category — never a product default.
+  const [category,        setCategory]        = useState<ThreadCategory | null>(thread.category);
   const [allowReplies,    setAllowReplies]    = useState(thread.allow_replies);
   const [isPublic,        setIsPublic]        = useState(thread.is_public ?? false);
   const [saving,          setSaving]          = useState(false);

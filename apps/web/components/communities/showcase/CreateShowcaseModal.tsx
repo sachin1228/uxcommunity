@@ -200,7 +200,8 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
   const editing = Boolean(post);
 
   const [title, setTitle] = useState(post?.title ?? "");
-  const [category, setCategory] = useState<ShowcaseCategory>(post?.category ?? "product_design");
+  // No default: a post must carry a category the author actually chose.
+  const [category, setCategory] = useState<ShowcaseCategory | null>(post?.category ?? null);
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [allowReplies, setAllowReplies] = useState(post?.allow_replies ?? true);
   const [saving, setSaving] = useState(false);
@@ -245,6 +246,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!title.trim()) { setError("Tell the community what you made."); return; }
+    if (!category) { setError("Pick a category for your work."); return; }
     setSaving(true); setError(null);
     try {
       const response = await fetch(editing ? `/api/communities/${communityId}/showcase/${post!.id}` : `/api/communities/${communityId}/showcase`, {
@@ -367,7 +369,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
 
               {/* ── Category (chips, like threads) ── */}
               <div>
-                <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Category</span>
+                <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Category *</span>
                 <div className="flex flex-wrap gap-2">
                   {SHOWCASE_CATEGORY_OPTIONS.map((item) => {
                     const Icon = CATEGORY_ICONS[item.value];
