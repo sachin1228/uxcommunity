@@ -180,7 +180,7 @@ export function ShowcaseCard({
           />
         </div>
 
-        <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-semibold text-foreground">
+        <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal text-foreground">
           {post.title}
         </h2>
 
