@@ -123,22 +123,23 @@ export function ShowcaseView({
 
   async function remove(post: ShowcasePost) {
     deletedPostIdsRef.current.add(post.id);
-    const response = await fetch(
-      `/api/communities/${communityId}/showcase/${post.id}`,
-      { method: "DELETE" },
-    );
-    if (response.ok) {
-      setPosts((current) => {
-        const next = current.filter((item) => item.id !== post.id);
-        patchCachedRequest<{ posts?: ShowcasePost[] }>(
-          requestUrl,
-          (cachedPosts) => ({ ...cachedPosts, posts: next }),
-          currentUserId,
-        );
-        return next;
-      });
-    } else {
+    const previousPosts = posts;
+    const nextPosts = previousPosts.filter((item) => item.id !== post.id);
+
+    // Remove it optimistically so slow media cleanup on the API cannot keep the
+    // deleted card visible while the DELETE request is still in flight.
+    replacePosts(nextPosts);
+
+    try {
+      const response = await fetch(
+        `/api/communities/${communityId}/showcase/${post.id}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw new Error("Failed to delete showcase post");
+    } catch {
       deletedPostIdsRef.current.delete(post.id);
+      replacePosts(previousPosts);
+      setError("We couldn't delete that showcase post. Please try again.");
     }
   }
 
