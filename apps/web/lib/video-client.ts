@@ -46,10 +46,14 @@ export interface VideoProcessedResult {
  *  1. MOV (QuickTime) files are remuxed into MP4 — same codecs, browsers
  *     handle `.mov` poorly with Range streaming, and normalizing uploads to
  *     one container keeps the feed predictable.
- *  2. MP4s that don't start with `moov` are remuxed with
+ *  2. WebM files are remuxed into MP4 — screen recorders (Chrome, OBS, Loom)
+ *     emit WebM with its index at the end, so browsers buffer the whole file
+ *     before the first frame. Remuxing copies the VP8/VP9/AV1 packets into an
+ *     MP4 container (no re-encode) and moves the index to the front.
+ *  3. MP4s that don't start with `moov` are remuxed with
  *     `fastStart: 'in-memory'`, which copies packets and rewrites the index
  *     at the front — no re-encode, no quality loss.
- *  3. The first frame is decoded and captured as a JPEG poster so feed cards
+ *  4. The first frame is decoded and captured as a JPEG poster so feed cards
  *     can show something instantly while the video data streams in.
  *
  * Returns the original file untouched when anything fails (WASM-less codecs
@@ -61,7 +65,8 @@ export async function processVideoForUpload(file: File): Promise<VideoProcessedR
 
   const isQuickTime = file.type === "video/quicktime";
   const isMp4 = file.type === "video/mp4";
-  if (!isQuickTime && !isMp4) return result;
+  const isWebM = file.type === "video/webm";
+  if (!isQuickTime && !isMp4 && !isWebM) return result;
 
   try {
     const source = new Input({
@@ -75,7 +80,9 @@ export async function processVideoForUpload(file: File): Promise<VideoProcessedR
       result.poster = await capturePoster(videoTrack);
     }
 
-    const needsRemux = isQuickTime || !(await isFaststartMp4(file));
+    // MOV and WebM are always remuxed into MP4 (browsers stream them poorly);
+    // MP4 is remuxed only when its index (`moov`) sits at the end.
+    const needsRemux = isQuickTime || isWebM || !(await isFaststartMp4(file));
     if (!needsRemux) return result;
 
     const output = new Output({
@@ -91,8 +98,10 @@ export async function processVideoForUpload(file: File): Promise<VideoProcessedR
     result.file = remuxed;
     result.remuxed = true;
     return result;
-  } catch {
+  } catch (error) {
     // Codec/decoder unavailability or a malformed file — ship the original.
+    // Log it so a silently-slow upload is diagnosable instead of invisible.
+    console.warn("[video-client] faststart remux failed, uploading original:", error);
     return result;
   }
 }
