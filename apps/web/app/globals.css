@@ -469,19 +469,19 @@ select:focus-visible {
     cursor: not-allowed;
   }
 
-  input.field {
+  input:where(.field) {
     height: 32px;
     padding: 0 12px;
     font-size: 14px;
   }
 
-  textarea.field {
+  textarea:where(.field) {
     padding: 8px 12px;
     font-size: 14px;
     line-height: 1.5;
   }
 
-  select.field {
+  select:where(.field) {
     height: 32px;
     padding: 0 26px 0 12px;
   }
