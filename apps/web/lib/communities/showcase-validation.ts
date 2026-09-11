@@ -5,7 +5,9 @@
  * reply toggles.
  */
 
-export const SHOWCASE_CATEGORIES_SET = new Set(["ui_ux", "branding", "illustration", "motion", "product", "other"]);
+import { SHOWCASE_CATEGORIES_SET } from "./showcase-categories";
+
+export { SHOWCASE_CATEGORIES_SET };
 export const SHOWCASE_STAGES_SET = new Set(["concept", "wip", "final", "case_study"]);
 export const SHOWCASE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm", "video/quicktime"]);
 export const SHOWCASE_MEDIA_MAX = 5;

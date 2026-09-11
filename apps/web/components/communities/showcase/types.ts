@@ -1,8 +1,15 @@
-export type ShowcaseCategory = "ui_ux" | "branding" | "illustration" | "motion" | "product" | "other";
+import {
+  SHOWCASE_CATEGORY_OPTIONS,
+  type ShowcaseCategory,
+} from "@/lib/communities/showcase-categories";
 
+export { SHOWCASE_CATEGORY_OPTIONS };
+export type { ShowcaseCategory };
+
+/** "All work" + every category — drives the showcase filter row. */
 export const SHOWCASE_CATEGORIES: { value: ShowcaseCategory | "all"; label: string }[] = [
-  { value: "all", label: "All work" }, { value: "ui_ux", label: "UI/UX" }, { value: "branding", label: "Branding" },
-  { value: "illustration", label: "Illustration" }, { value: "motion", label: "Motion" }, { value: "product", label: "Product" }, { value: "other", label: "Other" },
+  { value: "all", label: "All work" },
+  ...SHOWCASE_CATEGORY_OPTIONS,
 ];
 
 /** Max title (body) length — mirrors the DB column + API validation. */

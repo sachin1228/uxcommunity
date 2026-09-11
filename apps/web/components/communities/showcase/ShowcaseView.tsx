@@ -3,22 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
-  Box,
   CalendarClock,
   ChevronDown,
-  CircleEllipsis,
   Image,
-  LayoutGrid,
-  Monitor,
-  PenTool,
-  Play,
   Plus,
-  Tag,
 } from "lucide-react";
 import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
+import { CATEGORY_ICONS } from "./categoryIcons";
 import {
   SHOWCASE_CATEGORIES,
   type ShowcaseCategory,
@@ -175,15 +169,7 @@ export function ShowcaseView({
             className={`${communityFeedLayout.pageHeaderFilters} flex items-center gap-2 overflow-x-auto pb-1`}
           >
             {SHOWCASE_CATEGORIES.map((item) => {
-              const Icon = {
-                all: LayoutGrid,
-                ui_ux: Monitor,
-                branding: Tag,
-                illustration: PenTool,
-                motion: Play,
-                product: Box,
-                other: CircleEllipsis,
-              }[item.value];
+              const Icon = CATEGORY_ICONS[item.value];
 
               return (
                 <button
