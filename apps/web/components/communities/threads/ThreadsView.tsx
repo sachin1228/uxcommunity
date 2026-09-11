@@ -19,6 +19,7 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadCategory } from "./
 import { CreateThreadModal } from "./CreateThreadModal";
 import { ThreadCard } from "./ThreadCard";
 import { communityFeedLayout } from "../feed-layout";
+import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
@@ -246,7 +247,7 @@ export function ThreadsView({
                   type="button"
                   onClick={() => setFilter(item.value)}
                   aria-pressed={filter === item.value}
-                  className={communityFeedLayout.filterChip(filter === item.value)}
+                  className={filterChip(filter === item.value)}
                 >
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}

@@ -20,6 +20,7 @@ import {
   type ThreadPollDraft,
 } from "./types";
 import { CATEGORY_ICONS } from "./categoryIcons";
+import { filterChip } from "../filter-chip";
 
 /**
  * Shared presentational pieces for the Create Thread and Edit Thread modals so
@@ -53,11 +54,7 @@ export function CategoryPicker({
               type="button"
               onClick={() => onChange(item.value)}
               aria-pressed={active}
-              className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
-                active
-                  ? "border-accent bg-accent/5 text-accent"
-                  : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"
-              }`}
+              className={filterChip(active)}
             >
               <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
               {item.label}

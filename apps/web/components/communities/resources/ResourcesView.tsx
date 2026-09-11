@@ -26,6 +26,7 @@ import { RESOURCE_TYPES } from "./types";
 import { ResourceFormModal } from "./ResourceFormModal";
 import { ResourceCard } from "./ResourceCard";
 import { communityFeedLayout } from "../feed-layout";
+import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
@@ -219,7 +220,7 @@ export function ResourcesView({
                   type="button"
                   onClick={() => setFilter(item.value)}
                   aria-pressed={filter === item.value}
-                  className={communityFeedLayout.filterChip(filter === item.value)}
+                  className={filterChip(filter === item.value)}
                 >
                   <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
                   {item.label}
