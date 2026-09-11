@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Film, Loader2, Play } from "lucide-react";
+import { Film, Loader2 } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import { communityFeedLayout } from "../feed-layout";
@@ -14,7 +14,6 @@ import { ThreadImageCarousel } from "../threads/ThreadImageCarousel";
 import { ShowcaseMediaLightbox } from "./ShowcaseMediaLightbox";
 import {
   SHOWCASE_CATEGORIES,
-  SHOWCASE_STAGES,
   type ShowcaseAttachment,
   type ShowcasePost,
 } from "./types";
@@ -64,7 +63,6 @@ export function ShowcaseCard({
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
-  const stageLabel = SHOWCASE_STAGES.find((item) => item.value === post.stage)?.label ?? null;
   const media = mediaForPost(post);
 
   // The card root is a clickable link; clicks on controls (carousel arrows,
@@ -168,7 +166,7 @@ export function ShowcaseCard({
             avatarUrl={post.author.avatar_url}
             createdAt={post.created_at}
             dateInline
-            secondaryLabel={`Showcase · ${categoryLabel}${stageLabel ? ` · ${stageLabel}` : ""}`}
+            secondaryLabel={`Showcase · ${categoryLabel}`}
           />
           <ShowcaseOptionsMenu
             saved={post.user_saved}
@@ -185,16 +183,6 @@ export function ShowcaseCard({
         </h2>
 
         {mediaBlock}
-
-        {/* ── Stage ── */}
-        {stageLabel && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex h-6 items-center gap-1 rounded-full border border-accent/30 bg-accent/5 px-2.5 font-body text-[11px] font-medium text-accent">
-              <Play strokeWidth={2.5} size={10} />
-              {stageLabel}
-            </span>
-          </div>
-        )}
 
         <div className="mt-3 flex items-center gap-4">
           <button

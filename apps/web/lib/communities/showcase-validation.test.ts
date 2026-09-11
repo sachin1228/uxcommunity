@@ -2,13 +2,45 @@ import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
 import { parseShowcaseBody } from "./showcase-validation.ts";
+// @ts-expect-error Node's type-stripping test runner requires an explicit TS extension.
+import { SHOWCASE_CATEGORY_OPTIONS } from "./showcase-categories.ts";
 
 const VIDEO = "https://media.example.com/showcase/c1/u1/123-abc.mp4";
 const POSTER = "https://media.example.com/showcase/c1/u1/123-abc.mp4-poster.jpg";
 
 function baseBody(attachments: unknown) {
-  return { title: "My work", category: "motion", attachments, is_public: true };
+  return { title: "My work", category: "motion_design", attachments, is_public: true };
 }
+
+// ── Category taxonomy ─────────────────────────────────────────────────────
+
+test("every shared showcase category is accepted", () => {
+  for (const option of SHOWCASE_CATEGORY_OPTIONS) {
+    const parsed = parseShowcaseBody({ title: "My work", category: option.value, attachments: [], is_public: true });
+    assert.equal(parsed.ok, true, `expected ${option.value} to be accepted`);
+  }
+});
+
+test("legacy category values are rejected", () => {
+  for (const legacy of ["ui_ux", "branding", "motion", "product"]) {
+    const parsed = parseShowcaseBody({ title: "My work", category: legacy, attachments: [], is_public: true });
+    assert.deepEqual(parsed, { ok: false, error: "Invalid category." });
+  }
+});
+
+// ── Stage was removed from the composer (and the DB) ──────────────────────
+
+test("a stray stage field is ignored instead of persisted", () => {
+  const parsed = parseShowcaseBody({
+    title: "My work",
+    category: "motion_design",
+    attachments: [],
+    is_public: true,
+    stage: "final",
+  });
+  assert.equal(parsed.ok, true);
+  if (parsed.ok) assert.equal("stage" in parsed.value, false);
+});
 
 test("video attachments accept and keep a valid poster URL", () => {
   const parsed = parseShowcaseBody(baseBody([

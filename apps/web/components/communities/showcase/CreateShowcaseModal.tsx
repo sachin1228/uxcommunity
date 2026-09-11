@@ -3,33 +3,26 @@
 import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
-  Box,
   Check,
-  CircleEllipsis,
   Film,
   Globe,
   ImagePlus,
   MessageCircle,
-  Monitor,
-  PenTool,
-  Play,
   Plus,
-  Tag,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
 import { useShowcaseFileUpload, type VideoActivity, type VideoActivityState } from "./useShowcaseFileUpload";
+import { CATEGORY_ICONS } from "./categoryIcons";
 import {
-  SHOWCASE_CATEGORIES,
+  SHOWCASE_CATEGORY_OPTIONS,
   SHOWCASE_MEDIA_MAX,
-  SHOWCASE_STAGES,
   SHOWCASE_TITLE_MAX_LENGTH,
   type ShowcaseAttachment,
   type ShowcaseCategory,
   type ShowcasePost,
-  type ShowcaseStage,
 } from "./types";
 
 interface Props {
@@ -39,51 +32,6 @@ interface Props {
   onCreated?: (post: ShowcasePost) => void;
   onUpdated?: (post: ShowcasePost) => void;
   post?: ShowcasePost;
-}
-
-const CATEGORY_ICONS: Record<ShowcaseCategory, typeof Monitor> = {
-  ui_ux: Monitor,
-  branding: Tag,
-  illustration: PenTool,
-  motion: Play,
-  product: Box,
-  other: CircleEllipsis,
-};
-
-/** Chip row used for categories and stages — same visual language as thread composers. */
-function ChipRow<T extends string>({
-  value,
-  onChange,
-  options,
-  allowClear = false,
-}: {
-  value: T | null;
-  onChange: (value: T | null) => void;
-  options: { value: T; label: string }[];
-  allowClear?: boolean;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((item) => {
-        const active = value === item.value;
-        return (
-          <button
-            key={item.value}
-            type="button"
-            onClick={() => onChange(active && allowClear ? null : item.value)}
-            aria-pressed={active}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
-              active
-                ? "border-accent bg-accent/5 text-accent"
-                : "border-border text-foreground-muted hover:border-foreground-subtle hover:text-foreground"
-            }`}
-          >
-            {item.label}
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 function formatClock(totalSeconds: number): string {
@@ -251,8 +199,7 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
   const editing = Boolean(post);
 
   const [title, setTitle] = useState(post?.title ?? "");
-  const [category, setCategory] = useState<ShowcaseCategory>(post?.category ?? "ui_ux");
-  const [stage, setStage] = useState<ShowcaseStage | null>(post?.stage ?? null);
+  const [category, setCategory] = useState<ShowcaseCategory>(post?.category ?? "product_design");
   const [isPublic, setIsPublic] = useState(initialIsPublic);
   const [allowReplies, setAllowReplies] = useState(post?.allow_replies ?? true);
   const [saving, setSaving] = useState(false);
@@ -306,7 +253,6 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
           title: title.trim(),
           attachments,
           category,
-          stage,
           is_public: isPublic,
           allow_replies: allowReplies,
         }),
@@ -422,14 +368,14 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
               <div>
                 <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">Category</span>
                 <div className="flex flex-wrap gap-2">
-                  {SHOWCASE_CATEGORIES.filter((item) => item.value !== "all").map((item) => {
-                    const Icon = CATEGORY_ICONS[item.value as ShowcaseCategory];
+                  {SHOWCASE_CATEGORY_OPTIONS.map((item) => {
+                    const Icon = CATEGORY_ICONS[item.value];
                     const active = category === item.value;
                     return (
                       <button
                         key={item.value}
                         type="button"
-                        onClick={() => setCategory(item.value as ShowcaseCategory)}
+                        onClick={() => setCategory(item.value)}
                         aria-pressed={active}
                         className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 font-body text-xs transition-colors ${
                           active
@@ -443,22 +389,6 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                     );
                   })}
                 </div>
-              </div>
-
-              {/* ── Stage ── */}
-              <div>
-                <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-                  Where is this in the process?
-                </span>
-                <ChipRow
-                  value={stage}
-                  onChange={setStage}
-                  options={SHOWCASE_STAGES}
-                  allowClear
-                />
-                <p className="mt-1 font-body text-[11px] text-foreground-subtle">
-                  Helps the community give feedback that matches your intent. Tap again to clear.
-                </p>
               </div>
 
               {/* ── Toggles ── */}
