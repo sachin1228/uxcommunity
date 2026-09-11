@@ -21,6 +21,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 export type VideoActivityState =
   | "analyzing" // probing / lossless remux before any bytes flow
   | "uploading" // XHR upload of the original to R2 (percent + clock)
+  | "finalizing" // bytes delivered; server is writing to storage and responding
   | "ready"
   | "failed";
 
@@ -111,10 +112,11 @@ export function useShowcaseFileUpload({
     setActivity(activityRef.current);
   }, []);
 
-  /** Pre-attachment uploads (analyzing/uploading) — these count toward the cap. */
+  /** Pre-attachment uploads (analyzing/uploading/finalizing) — these count toward the cap. */
   const pendingUploadCount = () =>
     activityRef.current.filter(
-      (item) => item.state === "analyzing" || item.state === "uploading",
+      (item) =>
+        item.state === "analyzing" || item.state === "uploading" || item.state === "finalizing",
     ).length;
 
   // While a video is uploading, refresh the elapsed/ETA clocks every second
@@ -124,19 +126,26 @@ export function useShowcaseFileUpload({
   // each second (React "maximum update depth exceeded"). The boolean only
   // flips when a clock-running item appears or all of them finish.
   const hasClockingUpload = activity.some(
-    (item) => item.state === "analyzing" || item.state === "uploading",
+    (item) =>
+      item.state === "analyzing" || item.state === "uploading" || item.state === "finalizing",
   );
   useEffect(() => {
     if (!hasClockingUpload) return;
     const tick = () => {
       const now = Date.now();
       activityRef.current = activityRef.current.map((item) => {
-        if (item.state !== "analyzing" && item.state !== "uploading") return item;
+        if (item.state !== "analyzing" && item.state !== "uploading" && item.state !== "finalizing")
+          return item;
         const elapsedSec = Math.max(0, (now - item.startedAt) / 1000);
         return {
           ...item,
           elapsedSec,
-          etaSec: item.percent > 0 ? (elapsedSec * (100 - item.percent)) / item.percent : null,
+          // Only the byte-transfer stage has a rate; analyzing/finalizing are
+          // indeterminate (no bar, no ETA).
+          etaSec:
+            item.state === "uploading" && item.percent > 0
+              ? (elapsedSec * (100 - item.percent)) / item.percent
+              : null,
         };
       });
       setActivity(activityRef.current);
@@ -186,7 +195,14 @@ export function useShowcaseFileUpload({
               upsertActivity(activityKey, { state: "uploading" });
               const response = await uploadVideo(communityId!, prepared, (sent, total) => {
                 const percent = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
-                upsertActivity(activityKey, { state: "uploading", percent });
+                // 100% means the browser finished SENDING bytes; the server
+                // still has to write them to storage. Flip to an explicit
+                // indeterminate stage so "100%" never idles with a wrong label.
+                upsertActivity(activityKey,
+                  percent >= 100
+                    ? { state: "finalizing" }
+                    : { state: "uploading", percent },
+                );
               });
               const attachment = response.attachment;
               setAttachments((current) => [...current, attachment]);

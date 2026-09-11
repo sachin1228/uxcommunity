@@ -96,6 +96,7 @@ function formatClock(totalSeconds: number): string {
 const ACTIVITY_MESSAGES: Record<VideoActivityState, string> = {
   analyzing: "Analyzing video…",
   uploading: "Uploading to storage…",
+  finalizing: "Finishing up on the server…",
   ready: "Ready — video uploaded",
   failed: "Failed",
 };
