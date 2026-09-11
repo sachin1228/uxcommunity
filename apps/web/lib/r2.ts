@@ -22,6 +22,7 @@ import {
   CopyObjectCommand,
   HeadObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { attachmentPosterUrls, attachmentUrls, referenceUrlsFromValue, r2KeyFromUrl } from "@uxcommunity/shared";
 
 // Attachment URL extraction lives in the shared package so the app, the
@@ -143,6 +144,29 @@ export function shouldDeletePreviousR2Asset(
 
   if (!previousKey || !nextKey) return false;
   return previousKey !== nextKey;
+}
+
+/**
+ * Pre-sign a one-shot PUT for direct browser→R2 uploads.
+ *
+ * The browser PUTs the file straight to storage against this short-lived
+ * URL — no bytes through the app — so client progress events measure the
+ * REAL transfer (the slow hop). Content-Type is pinned in the signature,
+ * the key is a server-generated UUID path, and nothing else is permitted;
+ * the browser never sees credentials.
+ */
+export async function presignR2Put(
+  key: string,
+  contentType: string,
+  expiresInSeconds = 600,
+): Promise<string> {
+  const client = getClient();
+  const command = new PutObjectCommand({
+    Bucket: getBucket(),
+    Key: key,
+    ContentType: contentType,
+  });
+  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
 
 /**
