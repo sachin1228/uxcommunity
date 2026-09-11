@@ -12,7 +12,7 @@ import { THREAD_CATEGORIES, type CommunityThread, type ThreadAttachment, type Th
 import { renderWithLinks } from "./renderWithLinks";
 import { ThreadPollResult } from "./PollResult";
 import { ModalPortal } from "@/components/ui/Modal";
-import { CommentsSection } from "./ThreadComments";
+import { CommentSection } from "../CommentSection";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { isThreadEdited } from "./threadShared";
@@ -328,9 +328,10 @@ export function ThreadImageLightbox({
               )}
               {comments !== null && !commentsError && (
                 <div className="mt-3">
-                  <CommentsSection
+                  <CommentSection
                     communityId={communityId}
-                    threadId={thread.id}
+                    kind="threads"
+                    targetId={thread.id}
                     allowReplies={thread.allow_replies}
                     comments={comments}
                     currentUserId={currentUserId}

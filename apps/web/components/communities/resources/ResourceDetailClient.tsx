@@ -1,193 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import {
-  CornerDownRight, MessageSquare, MoreHorizontal, Trash2,
-} from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CommentComposer, renderEmojiText } from "../CommentComposer";
-
-function formatRelativeDate(value: string) {
-  const elapsed = Date.now() - new Date(value).getTime();
-  const minutes = Math.max(1, Math.floor(elapsed / 60_000));
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
-function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" }) {
-  const initial = name.charAt(0).toUpperCase();
-  const dim = size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
-  return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
-      {avatarUrl ? (
-        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        <span className="font-display font-bold text-accent">{initial}</span>
-      )}
-    </div>
-  );
-}
-
-// ── Comment Box ────────────────────────────────────────────────────────────
-
-function CommentBox({
-  communityId,
-  resourceId,
-  parentId,
-  placeholder,
-  onPosted,
-  onCancel,
-  autoFocus,
-}: {
-  communityId: string;
-  resourceId: string;
-  parentId?: string;
-  placeholder?: string;
-  onPosted: (comment: ResourceComment) => void;
-  onCancel?: () => void;
-  autoFocus?: boolean;
-}) {
-  return (
-    <CommentComposer
-      communityId={communityId}
-      kind="resources"
-      targetId={resourceId}
-      parentId={parentId}
-      placeholder={placeholder}
-      maxLength={5000}
-      onPosted={(comment) => onPosted(comment as ResourceComment)}
-      onCancel={onCancel}
-      autoFocus={autoFocus}
-    />
-  );
-}
-
-// ── Single comment row ─────────────────────────────────────────────────────
-
-function CommentRow({
-  comment,
-  communityId,
-  resourceId,
-  currentUserId,
-  isReply,
-  onDeleted,
-  onReplied,
-}: {
-  comment: ResourceComment;
-  communityId: string;
-  resourceId: string;
-  currentUserId: string;
-  isReply?: boolean;
-  onDeleted: (id: string, parentId: string | null) => void;
-  onReplied: (comment: ResourceComment) => void;
-}) {
-  const [replying, setReplying] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const isOwner = comment.user_id === currentUserId;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
-
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      await fetch(`/api/communities/${communityId}/resources/${resourceId}/comments/${comment.id}`, { method: "DELETE" });
-      onDeleted(comment.id, comment.parent_id);
-    } finally {
-      setDeleting(false);
-      setMenuOpen(false);
-    }
-  }
-
-  const name = comment.users?.name ?? "Member";
-
-  return (
-    <>
-    <div className={`flex gap-2.5 ${isReply ? "pl-8" : ""}`}>
-      <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "sm" : "md"} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-body text-xs font-semibold text-foreground">{name}</span>
-          <span className="font-body text-[11px] text-foreground-subtle">{formatRelativeDate(comment.created_at)}</span>
-          {isOwner && (
-            <div className="relative ml-auto" ref={menuRef}>
-              <button
-                type="button"
-                onClick={() => setMenuOpen((p) => !p)}
-                className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
-                aria-label="Comment options"
-              >
-                <MoreHorizontal strokeWidth={2.5} size={13} />
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-6 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
-                    disabled={deleting}
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                  >
-                    <Trash2 strokeWidth={2.5} size={11} /> Delete
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <p className="mt-1 font-body text-sm text-foreground-muted whitespace-pre-wrap break-words">{renderEmojiText(comment.body)}</p>
-        {!isReply && (
-          <button
-            type="button"
-            onClick={() => setReplying((p) => !p)}
-            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
-          >
-            <CornerDownRight strokeWidth={2.5} size={11} /> Reply
-          </button>
-        )}
-        {replying && (
-          <div className="mt-2">
-            <CommentBox
-              communityId={communityId}
-              resourceId={resourceId}
-              parentId={comment.id}
-              placeholder="Write a reply…"
-              autoFocus
-              onPosted={(c) => { onReplied(c); setReplying(false); }}
-              onCancel={() => setReplying(false)}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-    <ConfirmDialog
-      open={confirmDelete}
-      title="Delete comment?"
-      message="This will permanently remove this comment. This cannot be undone."
-      onClose={() => setConfirmDelete(false)}
-      onConfirm={handleDelete}
-    />
-    </>
-  );
-}
+import { CommentSection } from "../CommentSection";
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -271,8 +93,6 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     setResource((r) => ({ ...r, comment_count: Math.max(0, r.comment_count - 1) }));
   }
 
-  const totalComments = comments.reduce((acc, c) => acc + 1 + (c.replies?.length ?? 0), 0);
-
   return (
     <>
       <div className="flex-1 overflow-y-auto">
@@ -295,54 +115,22 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
 
           {/* Comments section */}
           <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
-            <div className="mb-4 flex items-center gap-2">
-              <span className="font-display text-sm font-semibold text-foreground">
-                {totalComments} {totalComments === 1 ? "Comment" : "Comments"}
-              </span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-
-            <CommentBox
+            <CommentSection
               communityId={communityId}
-              resourceId={resource.id}
+              kind="resources"
+              targetId={resource.id}
+              allowReplies
+              comments={comments}
+              currentUserId={currentUserId}
               onPosted={handleCommentPosted}
+              onDeleted={handleCommentDeleted}
+              emptyState={
+                <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
+                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
+                </div>
+              }
             />
-
-            {comments.length > 0 && (
-              <div className="mt-6 space-y-5">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="space-y-3">
-                    <CommentRow
-                      comment={comment}
-                      communityId={communityId}
-                      resourceId={resource.id}
-                      currentUserId={currentUserId}
-                      onDeleted={handleCommentDeleted}
-                      onReplied={handleCommentPosted}
-                    />
-                    {(comment.replies ?? []).map((reply) => (
-                      <CommentRow
-                        key={reply.id}
-                        comment={reply}
-                        communityId={communityId}
-                        resourceId={resource.id}
-                        currentUserId={currentUserId}
-                        isReply
-                        onDeleted={handleCommentDeleted}
-                        onReplied={handleCommentPosted}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {comments.length === 0 && (
-              <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-                <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-              </div>
-            )}
           </div>
         </div>
       </div>

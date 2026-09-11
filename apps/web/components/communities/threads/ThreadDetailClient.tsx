@@ -9,7 +9,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
-import { CommentsSection } from "./ThreadComments";
+import { CommentSection } from "../CommentSection";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
@@ -311,9 +311,10 @@ export function ThreadDetailClient({
             Comments
           </h2>
           <div className="mt-3">
-            <CommentsSection
+            <CommentSection
               communityId={communityId}
-              threadId={thread.id}
+              kind="threads"
+              targetId={thread.id}
               allowReplies={thread.allow_replies}
               comments={comments}
               currentUserId={currentUserId}

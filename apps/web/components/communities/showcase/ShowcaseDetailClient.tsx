@@ -2,10 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import {
-  CornerDownRight,
-  Trash2,
-} from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { realtimeClient } from "@/lib/realtime/client";
@@ -15,131 +11,7 @@ import { CreateShowcaseModal } from "./CreateShowcaseModal";
 import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
-import { CommentComposer, renderEmojiText } from "../CommentComposer";
-
-function Composer({
-  communityId,
-  postId,
-  parentId,
-  onPosted,
-  onCancel,
-}: {
-  communityId: string;
-  postId: string;
-  parentId?: string;
-  onPosted: (comment: ShowcaseComment) => void;
-  onCancel?: () => void;
-}) {
-  return (
-    <CommentComposer
-      communityId={communityId}
-      kind="showcase"
-      targetId={postId}
-      parentId={parentId}
-      placeholder={parentId ? "Write a reply…" : "Leave constructive feedback…"}
-      maxLength={1000}
-      onPosted={(comment) => onPosted(comment as ShowcaseComment)}
-      onCancel={onCancel}
-    />
-  );
-}
-
-function CommentRow({
-  comment,
-  communityId,
-  postId,
-  currentUserId,
-  reply,
-  onPosted,
-  onDeleted,
-}: {
-  comment: ShowcaseComment;
-  communityId: string;
-  postId: string;
-  currentUserId: string;
-  reply?: boolean;
-  onPosted: (comment: ShowcaseComment) => void;
-  onDeleted: (comment: ShowcaseComment) => void;
-}) {
-  const [replying, setReplying] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  async function remove() {
-    const response = await fetch(
-      `/api/communities/${communityId}/showcase/${postId}/comments/${comment.id}`,
-      { method: "DELETE" },
-    );
-    if (response.ok) onDeleted(comment);
-  }
-  const name = comment.users?.name ?? "Community member";
-  return (
-    <>
-    <div className={`flex gap-3 ${reply ? "pl-8" : ""}`}>
-      {comment.users?.avatar_url ? (
-        <img
-          src={comment.users.avatar_url}
-          alt={name}
-          className="size-8 rounded-full object-cover"
-        />
-      ) : (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
-          {name[0]}
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-body text-xs font-semibold text-foreground">
-            {name}
-          </span>
-          {comment.user_id === currentUserId && (
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="ml-auto text-foreground-subtle hover:text-red-400"
-              aria-label="Delete comment"
-            >
-              <Trash2 strokeWidth={2.5} size={13} />
-            </button>
-          )}
-        </div>
-        <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm text-foreground-muted">
-          {renderEmojiText(comment.body)}
-        </p>
-        {!reply && (
-          <button
-            type="button"
-            onClick={() => setReplying(!replying)}
-            className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle"
-          >
-            <CornerDownRight strokeWidth={2.5} size={11} />
-            Reply
-          </button>
-        )}
-        {replying && (
-          <div className="mt-2">
-            <Composer
-              communityId={communityId}
-              postId={postId}
-              parentId={comment.id}
-              onPosted={(created) => {
-                onPosted(created);
-                setReplying(false);
-              }}
-              onCancel={() => setReplying(false)}
-            />
-          </div>
-        )}
-      </div>
-    </div>
-    <ConfirmDialog
-      open={confirmDelete}
-      title="Delete comment?"
-      message="This will permanently remove this comment. This cannot be undone."
-      onClose={() => setConfirmDelete(false)}
-      onConfirm={remove}
-    />
-    </>
-  );
-}
+import { CommentSection } from "../CommentSection";
 
 export function ShowcaseDetailClient({
   initialPost,
@@ -217,15 +89,15 @@ export function ShowcaseDetailClient({
     else setComments((values) => [...values, comment]);
     setPost((value) => ({ ...value, comment_count: value.comment_count + 1 }));
   }
-  function deleted(comment: ShowcaseComment) {
-    if (comment.parent_id)
+  function deleted(id: string, parentId: string | null) {
+    if (parentId)
       setComments((values) =>
         values.map((value) =>
-          value.id === comment.parent_id
+          value.id === parentId
             ? {
                 ...value,
                 replies: value.replies.filter(
-                  (reply) => reply.id !== comment.id,
+                  (reply) => reply.id !== id,
                 ),
               }
             : value,
@@ -233,7 +105,7 @@ export function ShowcaseDetailClient({
       );
     else
       setComments((values) =>
-        values.filter((value) => value.id !== comment.id),
+        values.filter((value) => value.id !== id),
       );
     void fetchComments();
   }
@@ -258,49 +130,28 @@ export function ShowcaseDetailClient({
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
         />
-        {post.allow_replies !== false && (
         <section className={`mt-6 ${communityFeedLayout.card}`}>
           <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
-            {post.comment_count}{" "}
-            {post.comment_count === 1 ? "Comment" : "Comments"}
+            Comments
           </h2>
-          <Composer
+          <CommentSection
             communityId={communityId}
-            postId={post.id}
+            kind="showcase"
+            targetId={post.id}
+            allowReplies={post.allow_replies !== false}
+            comments={comments}
+            currentUserId={currentUserId}
+            composerPlaceholder="Leave constructive feedback…"
+            composerMaxLength={1000}
             onPosted={posted}
-          />
-          <div className="mt-6 flex flex-col gap-5">
-            {comments.map((comment) => (
-              <div key={comment.id} className="flex flex-col gap-3">
-                <CommentRow
-                  comment={comment}
-                  communityId={communityId}
-                  postId={post.id}
-                  currentUserId={currentUserId}
-                  onPosted={posted}
-                  onDeleted={deleted}
-                />
-                {comment.replies.map((reply) => (
-                  <CommentRow
-                    key={reply.id}
-                    comment={reply}
-                    communityId={communityId}
-                    postId={post.id}
-                    currentUserId={currentUserId}
-                    onPosted={posted}
-                    onDeleted={deleted}
-                  />
-                ))}
-              </div>
-            ))}
-            {!comments.length && (
+            onDeleted={deleted}
+            emptyState={
               <p className="text-center font-body text-sm text-foreground-muted">
                 No comments yet. Be the first!
               </p>
-            )}
-          </div>
+            }
+          />
         </section>
-        )}
       </div>
       {editing && (
         <CreateShowcaseModal

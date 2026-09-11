@@ -11,47 +11,77 @@ import {
   Trash2,
 } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { CommentComposer, Avatar, renderEmojiText } from "../CommentComposer";
-import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
+import { CommentComposer, Avatar, renderEmojiText } from "./CommentComposer";
+import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { ALLOWED_COMMENT_REACTIONS } from "@/lib/communities/comment-reactions";
-import type { ThreadComment, CommentReactionSummary } from "./types";
-import { formatRelativeDate, formatFullDate } from "./threadShared";
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
+import { formatRelativeDate, formatFullDate } from "./threads/threadShared";
+
+/**
+ * Shared comment section used by every community content type (threads,
+ * showcase, resources, events). It renders the "threads card" design — a
+ * timeline spine, emoji reactions, a sort toolbar, and collapsible reply
+ * threads — and is generic over the comment shape so each content type can
+ * pass its own comment records.
+ */
+
+/** URL segment for the comments API, e.g. "threads" → …/threads/:targetId/comments */
+export type CommentKind = "threads" | "resources" | "showcase" | "events";
+
+/** Minimal comment shape every content type's comment satisfies. */
+export interface CommunityComment {
+  id: string;
+  user_id: string;
+  parent_id: string | null;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  users: { name: string; avatar_url: string | null } | null;
+  replies?: CommunityComment[];
+  reactions?: CommentReactionSummary[];
+  image_url?: string | null;
+}
 
 // ── Comment box (inline composer) ─────────────────────────────────────────────
 
-export function CommentBox({
+export function CommentBox<C>({
   communityId,
-  threadId,
+  kind,
+  targetId,
   parentId,
   placeholder,
   initialBody,
   submitLabel,
+  maxLength,
   onPosted,
   onCancel,
   autoFocus,
 }: {
   communityId: string;
-  threadId: string;
+  kind: CommentKind;
+  targetId: string;
   parentId?: string;
   placeholder?: string;
   /** Seeded text (e.g. an `@Name ` mention when replying to a specific comment). */
   initialBody?: string;
   /** Label for the submit pill ("Send" by default, "Reply" in reply threads). */
   submitLabel?: string;
-  onPosted: (comment: ThreadComment) => void;
+  maxLength?: number;
+  onPosted: (comment: C) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
 }) {
   return (
-    <CommentComposer
+    <CommentComposer<C>
       communityId={communityId}
-      kind="threads"
-      targetId={threadId}
+      kind={kind}
+      targetId={targetId}
       parentId={parentId}
       placeholder={placeholder}
       initialBody={initialBody}
       submitLabel={submitLabel}
-      onPosted={(comment) => onPosted(comment as ThreadComment)}
+      maxLength={maxLength}
+      onPosted={onPosted}
       onCancel={onCancel}
       autoFocus={autoFocus}
       variant="inline"
@@ -61,7 +91,7 @@ export function CommentBox({
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
 
-function totalReactionCount(comment: ThreadComment) {
+function totalReactionCount(comment: CommunityComment) {
   return (comment.reactions ?? []).reduce((total, reaction) => total + reaction.count, 0);
 }
 
@@ -69,7 +99,7 @@ function totalReactionCount(comment: ThreadComment) {
  * Seed text for the reply composer: mentioning the author we're replying to,
  * like LinkedIn — unless it's our own comment.
  */
-function replyMention(target: ThreadComment, currentUserId: string): string | undefined {
+function replyMention(target: CommunityComment, currentUserId: string): string | undefined {
   const name = target.users?.name;
   if (!name || target.user_id === currentUserId) return undefined;
   return `@${name} `;
@@ -77,10 +107,11 @@ function replyMention(target: ThreadComment, currentUserId: string): string | un
 
 // ── Single comment row ────────────────────────────────────────────────────────
 
-function CommentRow({
+function CommentRow<C extends CommunityComment>({
   comment,
   communityId,
-  threadId,
+  kind,
+  targetId,
   currentUserId,
   allowReplies,
   isReply,
@@ -91,19 +122,20 @@ function CommentRow({
   onReplied,
   onReactionToggled,
 }: {
-  comment: ThreadComment;
+  comment: C;
   communityId: string;
-  threadId: string;
+  kind: CommentKind;
+  targetId: string;
   currentUserId: string;
   allowReplies: boolean;
   isReply?: boolean;
   /** Last item in the list — its timeline connector stops early. */
   isLast?: boolean;
   /** The comment the open reply composer is aimed at (lifted so only one composer exists per thread). */
-  replyTarget?: ThreadComment | null;
-  onReplyTargetChange?: (target: ThreadComment | null) => void;
+  replyTarget?: C | null;
+  onReplyTargetChange?: (target: C | null) => void;
   onDeleted: (id: string, parentId: string | null) => void;
-  onReplied: (comment: ThreadComment) => void;
+  onReplied: (comment: C) => void;
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
 }) {
   // Replies are expanded by default (LinkedIn-style); "Collapse replies" folds them.
@@ -118,7 +150,7 @@ function CommentRow({
   const isOwner = comment.user_id === currentUserId;
   const name = comment.users?.name ?? "Member";
   const canReact = typeof onReactionToggled === "function";
-  const hasReplies = !isReply && comment.replies.length > 0;
+  const hasReplies = !isReply && (comment.replies ?? []).length > 0;
   // True on the top-level comment whose thread hosts the open reply composer
   // (the target is either this comment itself or one of its replies).
   const replyTargetId = replyTarget?.id ?? null;
@@ -159,7 +191,7 @@ function CommentRow({
   async function handleDelete() {
     setDeleting(true);
     try {
-      await fetch(`/api/communities/${communityId}/threads/${threadId}/comments/${comment.id}`, { method: "DELETE" });
+      await fetch(`/api/communities/${communityId}/${kind}/${targetId}/comments/${comment.id}`, { method: "DELETE" });
       onDeleted(comment.id, comment.parent_id);
     } finally {
       setDeleting(false);
@@ -179,7 +211,7 @@ function CommentRow({
       : [...current, { emoji, count: 1, reacted: true }];
     reactionPending.current = true;
     onReactionToggled(comment.id, comment.parent_id, optimistic);
-    fetch(`/api/communities/${communityId}/threads/${threadId}/comments/${comment.id}/reactions`, {
+    fetch(`/api/communities/${communityId}/${kind}/${targetId}/comments/${comment.id}/reactions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ emoji }),
@@ -262,6 +294,16 @@ function CommentRow({
             {renderEmojiText(comment.body)}
           </p>
 
+          {comment.image_url && (
+            <a href={comment.image_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
+              <img
+                src={comment.image_url}
+                alt="Attachment"
+                className="max-h-56 rounded-xl border border-border object-cover"
+              />
+            </a>
+          )}
+
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {canReact && (
               <>
@@ -339,12 +381,13 @@ function CommentRow({
             <div className="mt-3">
               {hasReplies && repliesOpen && (
                 <div className="flex flex-col gap-3 pl-6">
-                  {comment.replies.map((reply) => (
+                  {(comment.replies ?? []).map((reply) => (
                     <CommentRow
                       key={reply.id}
-                      comment={reply}
+                      comment={reply as C}
                       communityId={communityId}
-                      threadId={threadId}
+                      kind={kind}
+                      targetId={targetId}
                       currentUserId={currentUserId}
                       allowReplies={allowReplies}
                       isReply
@@ -367,7 +410,7 @@ function CommentRow({
                 >
                   {repliesOpen
                     ? "Collapse replies"
-                    : `View ${comment.replies.length} ${comment.replies.length === 1 ? "reply" : "replies"}`}
+                    : `View ${(comment.replies ?? []).length} ${(comment.replies ?? []).length === 1 ? "reply" : "replies"}`}
                 </button>
               )}
 
@@ -376,7 +419,8 @@ function CommentRow({
                   <CommentBox
                     key={activeReplyTarget.id}
                     communityId={communityId}
-                    threadId={threadId}
+                    kind={kind}
+                    targetId={targetId}
                     // One level of nesting: always reply into the top-level comment.
                     parentId={comment.id}
                     initialBody={replyMention(activeReplyTarget, currentUserId)}
@@ -406,31 +450,39 @@ function CommentRow({
 
 // ── Section: composer · count/sort toolbar · timeline list ────────────────────
 
-export function CommentsSection({
+export function CommentSection<C extends CommunityComment>({
   communityId,
-  threadId,
+  kind,
+  targetId,
   allowReplies,
   comments,
   currentUserId,
   emptyState,
+  composerPlaceholder,
+  composerMaxLength,
   onPosted,
   onDeleted,
   onReactionToggled,
 }: {
   communityId: string;
-  threadId: string;
+  kind: CommentKind;
+  targetId: string;
   allowReplies: boolean;
-  comments: ThreadComment[];
+  comments: C[];
   currentUserId: string;
   /** Shown in place of the list when there are no comments. */
   emptyState?: React.ReactNode;
-  onPosted: (comment: ThreadComment) => void;
+  /** Placeholder for the top-level composer (default "Add comment"). */
+  composerPlaceholder?: string;
+  /** Max length for the top-level composer (default 5000). */
+  composerMaxLength?: number;
+  onPosted: (comment: C) => void;
   onDeleted: (id: string, parentId: string | null) => void;
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
 }) {
   const [sort, setSort] = useState<"newest" | "popular">("newest");
   // Which comment the single inline reply composer is aimed at (null = closed).
-  const [replyTarget, setReplyTarget] = useState<ThreadComment | null>(null);
+  const [replyTarget, setReplyTarget] = useState<C | null>(null);
 
   const sorted = useMemo(() => {
     const list = [...comments];
@@ -440,15 +492,22 @@ export function CommentsSection({
     return list;
   }, [comments, sort]);
 
-  const total = comments.reduce((acc, comment) => acc + 1 + comment.replies.length, 0);
+  const total = comments.reduce((acc, comment) => acc + 1 + (comment.replies ?? []).length, 0);
 
   return (
     <div>
       {allowReplies ? (
-        <CommentBox communityId={communityId} threadId={threadId} onPosted={onPosted} />
+        <CommentBox
+          communityId={communityId}
+          kind={kind}
+          targetId={targetId}
+          placeholder={composerPlaceholder}
+          maxLength={composerMaxLength}
+          onPosted={onPosted}
+        />
       ) : (
         <div className="rounded-xl border border-border px-4 py-3 text-center font-body text-xs text-foreground-subtle">
-          Replies are closed for this thread.
+          Replies are closed.
         </div>
       )}
 
@@ -479,7 +538,8 @@ export function CommentsSection({
               key={comment.id}
               comment={comment}
               communityId={communityId}
-              threadId={threadId}
+              kind={kind}
+              targetId={targetId}
               currentUserId={currentUserId}
               allowReplies={allowReplies}
               isLast={index === sorted.length - 1}

@@ -1,31 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  CornerDownRight, MessageSquare, MoreHorizontal,
-  Trash2, Users,
-} from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { MessageSquare, Users } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
-import { CommentComposer, renderEmojiText } from "../CommentComposer";
+import { CommentSection } from "../CommentSection";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function fmtRelative(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
-}
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" | "lg" }) {
@@ -36,164 +21,6 @@ function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: str
       {avatarUrl
         ? <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
         : <span className="font-display font-bold text-accent">{initial}</span>}
-    </div>
-  );
-}
-
-// ─── CommentNode ─────────────────────────────────────────────────────────────
-
-interface CommentNodeProps {
-  comment: EventComment;
-  currentUserId: string;
-  communityId: string;
-  eventId: string;
-  isReply?: boolean;
-  /** Only top-level comments show the reply composer */
-  allowReply?: boolean;
-  onDelete: (id: string) => void;
-  onReplyPosted: (comment: EventComment) => void;
-}
-
-function CommentNode({
-  comment,
-  currentUserId,
-  communityId,
-  eventId,
-  isReply = false,
-  allowReply = true,
-  onDelete,
-  onReplyPosted,
-}: CommentNodeProps) {
-  const isOwn = comment.user_id === currentUserId;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [replyOpen, setReplyOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function outside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", outside);
-    return () => document.removeEventListener("mousedown", outside);
-  }, [menuOpen]);
-
-  async function handleDelete() {
-    setMenuOpen(false);
-    setDeleting(true);
-    try {
-      const res = await dedupeFetch(
-        `/api/communities/${communityId}/events/${eventId}/comments/${comment.id}`,
-        { method: "DELETE" },
-      );
-      if (res.ok) onDelete(comment.id);
-    } finally { setDeleting(false); }
-  }
-
-  return (
-    <div className={isReply ? "pl-8" : ""}>
-      {isReply && (
-        <div className="mb-1 flex items-center gap-1">
-          <CornerDownRight strokeWidth={2.5} size={11} className="text-foreground-subtle/40 shrink-0" />
-        </div>
-      )}
-
-      <div className="group flex gap-2.5">
-        <Avatar
-          name={comment.users?.name ?? "M"}
-          avatarUrl={comment.users?.avatar_url ?? null}
-          size={isReply ? "sm" : "md"}
-        />
-        <div className="flex-1 min-w-0">
-          {/* Header row */}
-          <div className="flex items-center gap-2">
-            <span className="font-body text-xs font-semibold text-foreground">
-              {comment.users?.name ?? "Member"}
-            </span>
-            <span className="font-body text-[11px] text-foreground-subtle">
-              {fmtRelative(comment.created_at)}
-            </span>
-
-            {/* ⋯ menu — own comments only */}
-            {isOwn && (
-              <div ref={menuRef} className="relative ml-auto shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((p) => !p)}
-                  className="flex h-5 w-5 items-center justify-center rounded text-foreground-subtle hover:text-foreground"
-                  aria-label="Comment options"
-                >
-                  <MoreHorizontal strokeWidth={2.5} size={13} />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-6 z-30 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-                    <button
-                      type="button"
-                      onClick={handleDelete}
-                      disabled={deleting}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
-                    >
-                      {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
-                      {deleting ? "Deleting…" : "Delete"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Body */}
-          {comment.body && (
-            <p className="mt-1 font-body text-sm text-foreground-muted leading-relaxed whitespace-pre-wrap break-words">
-              {renderEmojiText(comment.body)}
-            </p>
-          )}
-
-          {/* Image attachment */}
-          {comment.image_url && (
-            <a href={comment.image_url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
-              <img
-                src={comment.image_url}
-                alt="Attachment"
-                className="max-h-56 rounded-xl border border-border object-cover"
-              />
-            </a>
-          )}
-
-          {/* Reply button — only on top-level comments */}
-          {allowReply && (
-            <button
-              type="button"
-              onClick={() => setReplyOpen((p) => !p)}
-              className="mt-1.5 inline-flex items-center gap-1 font-body text-[11px] text-foreground-subtle hover:text-accent"
-            >
-              <CornerDownRight strokeWidth={2.5} size={11} />
-              Reply
-            </button>
-          )}
-
-          {/* Inline reply composer */}
-          {replyOpen && (
-            <div className="mt-2">
-              <CommentComposer
-                communityId={communityId}
-                kind="events"
-                targetId={eventId}
-                parentId={comment.id}
-                placeholder="Write a reply…"
-                maxLength={2000}
-                autoFocus
-                onPosted={(created) => {
-                  onReplyPosted(created as EventComment);
-                  setReplyOpen(false);
-                }}
-                onCancel={() => setReplyOpen(false)}
-              />
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -287,20 +114,28 @@ export function EventDetailClient({
   }, []);
 
 
-  // ── Comment actions passed to CommentNode ──
+  // ── Comment actions passed to CommentSection ──
 
-  const handleDeleteComment = useCallback((commentId: string) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
-  }, []);
-
-  const handleReplyPosted = useCallback((comment: EventComment) => {
+  const handleCommentPosted = useCallback((comment: EventComment) => {
     setComments((prev) => [...prev, comment]);
   }, []);
 
-  // ── Flat lists for rendering (ThreadDetailClient-style) ──
-  const rootComments = comments.filter((c) => !c.parent_id);
+  const handleDeleteComment = useCallback((id: string, _parentId: string | null) => {
+    setComments((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  // ── Flat list built into a tree for the shared comment section ──
+  const commentTree = useMemo(() => {
+    return comments
+      .filter((c) => !c.parent_id)
+      .map((root) => ({
+        ...root,
+        replies: comments.filter((c) => c.parent_id === root.id),
+      }));
+  }, [comments]);
+
   const totalCommentCount = comments.length;
-  const topLevelCount = rootComments.length;
+  const topLevelCount = commentTree.length;
 
 
   return (
@@ -373,69 +208,30 @@ export function EventDetailClient({
 
           {/* ── Discussion tab ──────────────────────────────────── */}
           {activeTab === "discussion" && (
-            <div className="mt-5 space-y-5">
-              {/* Composer */}
-              <CommentComposer
-                communityId={communityId}
-                kind="events"
-                targetId={event.id}
-                placeholder="Write a comment… (⌘↵ to post)"
-                maxLength={2000}
-                onPosted={(comment) => setComments((prev) => [...prev, comment as EventComment])}
-              />
-
-              {/* Comments heading */}
-              {!commentsLoading && (
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="font-display text-sm font-semibold text-foreground">
-                    {totalCommentCount} {totalCommentCount === 1 ? "Comment" : "Comments"}
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-              )}
-
-              {/* Comments list */}
+            <div className="mt-5">
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
                   <Spinner size={22} />
                 </div>
-              ) : rootComments.length === 0 ? (
-                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
-                </div>
               ) : (
-                <div className="space-y-5">
-                  {rootComments.map((root) => {
-                    const replies = comments.filter((c) => c.parent_id === root.id);
-                    return (
-                      <div key={root.id} className="space-y-3">
-                        <CommentNode
-                          comment={root}
-                          currentUserId={currentUserId}
-                          communityId={communityId}
-                          eventId={event.id}
-                          allowReply
-                          onDelete={handleDeleteComment}
-                          onReplyPosted={handleReplyPosted}
-                        />
-                        {replies.map((reply) => (
-                          <CommentNode
-                            key={reply.id}
-                            comment={reply}
-                            currentUserId={currentUserId}
-                            communityId={communityId}
-                            eventId={event.id}
-                            isReply
-                            allowReply={false}
-                            onDelete={handleDeleteComment}
-                            onReplyPosted={handleReplyPosted}
-                          />
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
+                <CommentSection
+                  communityId={communityId}
+                  kind="events"
+                  targetId={event.id}
+                  allowReplies
+                  comments={commentTree}
+                  currentUserId={currentUserId}
+                  composerPlaceholder="Write a comment…"
+                  composerMaxLength={2000}
+                  onPosted={handleCommentPosted}
+                  onDeleted={handleDeleteComment}
+                  emptyState={
+                    <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                      <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                      <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
+                    </div>
+                  }
+                />
               )}
             </div>
           )}
