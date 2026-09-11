@@ -50,7 +50,8 @@ export function ResourceFormModal({
 
   const [url, setUrl] = useState(resource?.url ?? "");
   const [description, setDescription] = useState(resource?.description ?? "");
-  const [resourceType, setResourceType] = useState<ResourceType>(resource?.resource_type ?? "article");
+  // No default: a resource must carry a type the author actually chose.
+  const [resourceType, setResourceType] = useState<ResourceType | null>(resource?.resource_type ?? null);
   const [isPublic, setIsPublic] = useState(resource?.is_public ?? initialIsPublic);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +130,7 @@ export function ResourceFormModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!description.trim()) { setError("Description is required."); return; }
+    if (!resourceType) { setError("Pick a resource type."); return; }
     if (!url.trim()) { setError("URL is required."); return; }
     if (!isValidHttpUrl(url.trim())) { setError("URL must start with http:// or https://"); return; }
 

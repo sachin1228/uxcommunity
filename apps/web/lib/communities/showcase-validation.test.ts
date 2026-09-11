@@ -21,6 +21,11 @@ test("every shared showcase category is accepted", () => {
   }
 });
 
+test("a missing category is rejected with a clear message", () => {
+  const parsed = parseShowcaseBody({ title: "My work", attachments: [], is_public: true });
+  assert.deepEqual(parsed, { ok: false, error: "Pick a category." });
+});
+
 test("legacy category values are rejected", () => {
   for (const legacy of ["ui_ux", "branding", "motion", "product"]) {
     const parsed = parseShowcaseBody({ title: "My work", category: legacy, attachments: [], is_public: true });

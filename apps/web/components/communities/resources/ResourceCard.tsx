@@ -304,7 +304,7 @@ export function ResourceCard({
         ) : (
           <>
             <a href={resource.url} target="_blank" rel="noopener noreferrer" className="block">
-              <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-semibold leading-snug text-foreground">{resource.description || resource.title}</h3>
+              <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
             </a>
             {hasFigmaPrototype ? (
               <FigmaEmbed url={resource.url} compact className="mt-4" />
