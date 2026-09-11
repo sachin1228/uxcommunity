@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   Box,
@@ -51,6 +51,7 @@ export function ShowcaseView({
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ShowcasePost | null>(null);
   const [deletingPost, setDeletingPost] = useState<ShowcasePost | null>(null);
+  const deletedPostIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +62,11 @@ export function ShowcaseView({
     )
       .then((data) => {
         if (!cancelled) {
-          setPosts(data.posts ?? []);
+          setPosts(
+            (data.posts ?? []).filter(
+              (post) => !deletedPostIdsRef.current.has(post.id),
+            ),
+          );
           setNextCursor(data.nextCursor ?? null);
         }
       })
@@ -117,12 +122,24 @@ export function ShowcaseView({
   }
 
   async function remove(post: ShowcasePost) {
-    const response = await fetch(
-      `/api/communities/${communityId}/showcase/${post.id}`,
-      { method: "DELETE" },
-    );
-    if (response.ok) {
-      replacePosts(posts.filter((item) => item.id !== post.id));
+    deletedPostIdsRef.current.add(post.id);
+    const previousPosts = posts;
+    const nextPosts = previousPosts.filter((item) => item.id !== post.id);
+
+    // Remove it optimistically so slow media cleanup on the API cannot keep the
+    // deleted card visible while the DELETE request is still in flight.
+    replacePosts(nextPosts);
+
+    try {
+      const response = await fetch(
+        `/api/communities/${communityId}/showcase/${post.id}`,
+        { method: "DELETE" },
+      );
+      if (!response.ok) throw new Error("Failed to delete showcase post");
+    } catch {
+      deletedPostIdsRef.current.delete(post.id);
+      replacePosts(previousPosts);
+      setError("We couldn't delete that showcase post. Please try again.");
     }
   }
 

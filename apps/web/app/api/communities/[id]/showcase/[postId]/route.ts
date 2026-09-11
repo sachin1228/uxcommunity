@@ -134,10 +134,6 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   const { error } = await db.from("community_showcase_posts").delete().eq("id", postId).eq("user_id", userId);
   if (error) return NextResponse.json({ error: "Failed to delete showcase post." }, { status: 500 });
 
-  // Centralized-pipeline videos: delete the lifecycle rows + all R2 objects
-  // (original, processed, poster) BEFORE the URL cleanup below.
-  await cleanupRemovedVideoMedia(db, previousRow.attachments, []);
-
   const attachmentLookups = [{ table: "community_showcase_posts", column: "attachments", getUrls: attachmentUrls }];
   for (const url of attachmentUrls((existing as Record<string, unknown>).attachments)) {
     await deleteR2AssetIfUnreferenced(db, url, attachmentLookups);
