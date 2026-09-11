@@ -31,7 +31,7 @@ export async function prepareVideoForPipeline(file: File): Promise<PreparedVideo
 
 export interface VideoUploadResponse {
   mediaId: string;
-  status: string;
+  status: "ready";
   attachment: {
     name: string;
     url: string;
@@ -39,7 +39,7 @@ export interface VideoUploadResponse {
     size: number;
     poster?: string;
     mediaId: string;
-    status: string;
+    status: "ready";
   };
 }
 

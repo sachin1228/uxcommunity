@@ -78,8 +78,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let posterUrl: string | null = null;
     if (posterBytes && posterFile) {
       try {
-        await uploadToR2(posterKey, posterBytes, posterFile.type);
-        posterUrl = posterKey;
+        // uploadToR2 returns the FULL public URL — store that, not the bare
+        // key. Clients render it directly (<img src>) and post validation
+        // requires an absolute https URL.
+        posterUrl = await uploadToR2(posterKey, posterBytes, posterFile.type);
       } catch (posterError) {
         // Poster is decorative — never fail the upload over it.
         console.error("[showcase upload] poster upload failed:", posterError);

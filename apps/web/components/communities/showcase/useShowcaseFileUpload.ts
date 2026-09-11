@@ -35,6 +35,9 @@ export interface VideoActivity {
   state: VideoActivityState;
   /** 0–100 where the stage reports progress (upload). */
   percent: number;
+  /** Byte-level transfer counts for the uploading stage (real speed/ETA). */
+  sentBytes: number;
+  totalBytes: number;
   startedAt: number;
   /** Seconds since the upload started (refreshed by the clock tick). */
   elapsedSec: number;
@@ -97,6 +100,8 @@ export function useShowcaseFileUpload({
         name: patch.name ?? "Video",
         state: "analyzing",
         percent: 0,
+        sentBytes: 0,
+        totalBytes: 0,
         startedAt: Date.now(),
         elapsedSec: 0,
         etaSec: null,
@@ -137,14 +142,22 @@ export function useShowcaseFileUpload({
         if (item.state !== "analyzing" && item.state !== "uploading" && item.state !== "finalizing")
           return item;
         const elapsedSec = Math.max(0, (now - item.startedAt) / 1000);
+        // Byte-rate ETA: remaining bytes ÷ average transfer speed. Falls back
+        // to the percent-based projection before the first bytes tick in.
+        const speed = item.sentBytes > 0 && elapsedSec > 0 ? item.sentBytes / elapsedSec : 0;
+        const etaFromBytes =
+          item.totalBytes > item.sentBytes && speed > 0
+            ? (item.totalBytes - item.sentBytes) / speed
+            : null;
         return {
           ...item,
           elapsedSec,
-          // Only the byte-transfer stage has a rate; analyzing/finalizing are
-          // indeterminate (no bar, no ETA).
           etaSec:
-            item.state === "uploading" && item.percent > 0
-              ? (elapsedSec * (100 - item.percent)) / item.percent
+            item.state === "uploading"
+              ? (etaFromBytes ??
+                  (item.percent > 0
+                    ? (elapsedSec * (100 - item.percent)) / item.percent
+                    : null))
               : null,
         };
       });
@@ -192,7 +205,9 @@ export function useShowcaseFileUpload({
             upsertActivity(activityKey, { name: file.name, state: "analyzing", percent: 0 });
             try {
               const prepared = await prepareVideoForPipeline(file);
-              upsertActivity(activityKey, { state: "uploading" });
+              // Restart the clock here: elapsed (and therefore speed/ETA)
+              // should measure the byte transfer, not the analyzing phase.
+              upsertActivity(activityKey, { state: "uploading", startedAt: Date.now() });
               const response = await uploadVideo(communityId!, prepared, (sent, total) => {
                 const percent = total > 0 ? Math.min(100, Math.round((sent / total) * 100)) : 0;
                 // 100% means the browser finished SENDING bytes; the server
@@ -201,7 +216,7 @@ export function useShowcaseFileUpload({
                 upsertActivity(activityKey,
                   percent >= 100
                     ? { state: "finalizing" }
-                    : { state: "uploading", percent },
+                    : { state: "uploading", percent, sentBytes: sent, totalBytes: total },
                 );
               });
               const attachment = response.attachment;

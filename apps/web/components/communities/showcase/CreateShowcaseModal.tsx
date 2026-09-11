@@ -92,6 +92,22 @@ function formatClock(totalSeconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+/** Average transfer speed over the upload so far, e.g. "4.2 MB/s". */
+function uploadSpeed(item: VideoActivity): string {
+  const elapsed = (Date.now() - item.startedAt) / 1000;
+  if (item.sentBytes <= 0 || elapsed <= 0) return "";
+  const mbPerSec = item.sentBytes / elapsed / (1024 * 1024);
+  return mbPerSec >= 1
+    ? `${mbPerSec.toFixed(1)} MB/s`
+    : `${Math.max(1, Math.round(mbPerSec * 1024))} KB/s`;
+}
+
 /** Human-readable message for every upload stage a video can be in. */
 const ACTIVITY_MESSAGES: Record<VideoActivityState, string> = {
   analyzing: "Analyzing video…",
@@ -138,7 +154,9 @@ function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
                   />
                 </div>
                 <span className="shrink-0 font-body text-[10px] tabular-nums text-foreground-subtle">
-                  {`${item.percent}% · ${formatClock(item.elapsedSec)} · ~${
+                  {`${formatBytes(item.sentBytes)} / ${formatBytes(item.totalBytes)} · ${
+                    item.percent
+                  }% · ${uploadSpeed(item) || "…"} · ~${
                     item.etaSec !== null ? `${formatClock(item.etaSec)} left` : "…"
                   }`}
                 </span>
