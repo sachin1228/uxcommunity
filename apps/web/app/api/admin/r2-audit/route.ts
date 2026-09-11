@@ -3,7 +3,6 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteFromR2, getR2PublicBase, listR2ObjectKeys, normalizeR2DeleteKeys } from "@/lib/r2";
 import { collectAllMediaReferences } from "@/lib/r2-cleanup";
-import { sweepAbandonedVideoMedia } from "@/lib/video/video-server";
 
 const DEFAULT_GRACE_DAYS = 7;
 
@@ -55,18 +54,13 @@ export async function GET() {
   }
 
   const r2Objects = await listAllObjects();
+
   const keySet = new Set(r2Objects.map((entry) => entry.key));
   const trackedKeys = new Set(Array.from(seen.keys()));
 
   const orphanKeys = [...keySet].filter((key) => !trackedKeys.has(key));
   const brokenReferences = [...seen.values()].filter((entry) => !keySet.has(entry.key));
   const validCount = [...trackedKeys].filter((key) => keySet.has(key)).length;
-
-  const { count: abandonedVideoCount } = await db
-    .from("video_media")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["uploaded", "processing", "failed"])
-    .lt("created_at", new Date(Date.now() - DEFAULT_GRACE_DAYS * 86_400_000).toISOString());
 
   const publicBase = getR2PublicBase();
   const totalStorageBytes = r2Objects.reduce((sum, entry) => sum + entry.size, 0);
@@ -107,7 +101,6 @@ export async function GET() {
       (sum, key) => sum + (orphanByKey.get(key)?.size ?? 0),
       0,
     ),
-    abandonedVideoCount: abandonedVideoCount ?? 0,
     generatedAt: new Date().toISOString(),
   });
 }
@@ -123,26 +116,6 @@ export async function POST(request: Request) {
     const payload = await request.json();
     if (payload?.action === "scan") {
       return GET();
-    }
-
-    if (payload?.action === "sweep-abandoned-videos") {
-      // Centralized video pipeline: uploads that never reached `ready` within
-      // the grace period (abandoned composers, closed tabs mid-encode, failed
-      // uploads) are deleted along with their R2 objects. Tombstoned rows are
-      // no longer references, so anything that survives is caught by the
-      // regular orphan pass afterwards.
-      const graceDays = Number(payload?.graceDays) || DEFAULT_GRACE_DAYS;
-      const result = await sweepAbandonedVideoMedia(createServiceClient(), {
-        olderThanMs: graceDays * 86_400_000,
-      });
-      return NextResponse.json({
-        action: "sweep-abandoned-videos",
-        graceDays,
-        swept: result.swept,
-        failed: result.failed,
-        sweptCount: result.swept.length,
-        failedCount: result.failed.length,
-      });
     }
 
     if (payload?.action === "delete-orphans") {

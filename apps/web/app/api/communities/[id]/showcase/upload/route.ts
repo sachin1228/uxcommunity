@@ -1,39 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
-import { deleteFromR2, r2PublicUrl, uploadToR2 } from "@/lib/r2";
+import { uploadToR2 } from "@/lib/r2";
 import { extensionForMime } from "@/lib/image-utils";
-import { VIDEO_MIME_TYPES, MAX_VIDEO_BYTES, MAX_POSTER_BYTES } from "@/lib/video/video-config";
-import {
-  clampCodec,
-  clampNumber,
-  sniffVideoContainer,
-  videoKeys,
-} from "@/lib/video/video-server";
-import type { VideoStrategy } from "@/lib/video/video-types";
+import { VIDEO_MIME_TYPES, MAX_VIDEO_BYTES, MAX_POSTER_BYTES } from "@uxcommunity/shared";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const POSTER_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-const STRATEGIES = new Set<VideoStrategy>(["passthrough", "remux", "transcode"]);
-const PRESETS = new Set(["slow", "medium"]);
 
 /**
  * POST /api/communities/[id]/showcase/upload
  *
  * The single entry point for showcase media (images + videos).
  *
- * Videos enter the centralized pipeline here:
- *   1. bytes are sniffed (container magic — never trust MIME/filename),
- *   2. a `video_media` row is created with the client's probe metadata,
- *   3. the file lands at media/videos/original/{mediaId} for transcodes, or
- *      directly at media/videos/processed/{mediaId}.mp4 as the canonical
- *      object for passthrough/remux strategies (zero re-encoding).
- *
- * Processing runs asynchronously and never blocks this route. The row's
- * status drives the composer UI: `ready` (passthrough/remux) or `queued`
- * (transcode → server-side transcoder, with client-side wasm fallback).
+ * Videos are PLAIN FILE UPLOADS: the bytes ship to R2 exactly as the client
+ * sent them (with the file's own content type) and the URL is returned
+ * immediately. No processing table, no queue, no transcoder, no polling.
+ * An optional client-generated poster (first frame JPEG) rides along.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   let session; try { session = await requireSession("user"); } catch (error) { return error as Response; }
@@ -72,41 +56,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  // ── Video: centralized pipeline ──────────────────────────────────────────
+  // ── Video: plain file upload ──────────────────────────────────────────────
 
   if (file.size > MAX_VIDEO_BYTES) {
     return NextResponse.json({ error: "Videos must be 50 MB or smaller." }, { status: 422 });
   }
 
-  // Actual file inspection — the browser's MIME type and filename are not
-  // trusted. The container must match what the magic bytes say.
-  const container = sniffVideoContainer(body);
-  if (!container) {
-    return NextResponse.json({ error: "This file is not a valid video." }, { status: 422 });
-  }
-
-  const strategyField = form.get("strategy");
-  const strategy: VideoStrategy = STRATEGIES.has(strategyField as VideoStrategy)
-    ? (strategyField as VideoStrategy)
-    : "transcode";
-  const preset = PRESETS.has(form.get("preset") as string) ? (form.get("preset") as "slow" | "medium") : "slow";
-  const copyVideo = form.get("copyVideo") === "1";
-
-  // No-encode policy: nothing is ever queued for a server transcoder. Any
-  // legacy "transcode" request is downgraded to a lossless passthrough —
-  // the bytes ship untouched and the row is ready immediately. (The client's
-  // decision function no longer emits "transcode" either.)
-  const effectiveStrategy: VideoStrategy = strategy === "transcode" ? "passthrough" : strategy;
-
-  // Client-provided probe metadata, clamped server-side (never trusted raw).
-  const width = clampNumber(form.get("width"), 16, 16384);
-  const height = clampNumber(form.get("height"), 16, 16384);
-  const fps = clampNumber(form.get("fps"), 1, 240);
-  const durationMs = clampNumber(form.get("durationMs"), 1, 24 * 60 * 60 * 1000);
-  const videoCodec = clampCodec(form.get("videoCodec"));
-  const audioCodec = clampCodec(form.get("audioCodec"));
-
-  // Poster (passthrough/remux only — transcodes carry theirs at finalize).
+  // Optional client-captured poster (first frame JPEG) for feed cards.
   const posterEntry = form.get("poster");
   const posterFile = posterEntry instanceof File ? posterEntry : null;
   const posterBytes = posterFile && posterFile.size > 0 && posterFile.size <= MAX_POSTER_BYTES && POSTER_TYPES.has(posterFile.type)
@@ -114,86 +70,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     : null;
 
   const mediaId = crypto.randomUUID();
-  // Everything is canonical the moment it lands: no queue, no transcoder.
-  const initialStatus = "ready";
-  const originalKey = videoKeys.original(mediaId);
-  const processedKey = videoKeys.processed(mediaId);
-  const posterKey = videoKeys.poster(mediaId);
+  const key = `media/videos/processed/${mediaId}${extensionForKey(file.type)}`;
+  const posterKey = `media/videos/posters/${mediaId}.jpg`;
 
   try {
-    // Upload R2 objects BEFORE creating the row, so a DB failure never
-    // leaves a row pointing at nothing (failed uploads are deleted on error).
-    // Content-type is the file's own — WebM/MOV play as-is on modern clients.
-    await uploadToR2(processedKey, body, file.type);
+    const url = await uploadToR2(key, body, file.type);
     let posterUrl: string | null = null;
     if (posterBytes && posterFile) {
       try {
         await uploadToR2(posterKey, posterBytes, posterFile.type);
-        posterUrl = r2PublicUrl(posterKey);
+        posterUrl = posterKey;
       } catch (posterError) {
+        // Poster is decorative — never fail the upload over it.
         console.error("[showcase upload] poster upload failed:", posterError);
-        await deleteFromR2(processedKey);
-        return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
       }
-    }
-
-    const { data: row, error } = await db
-      .from("video_media")
-      .insert({
-        // Explicit id: the row id MUST equal the mediaId returned to the
-        // client (and used for the R2 keys). Without it, Postgres auto-
-        // assigns its own UUID and every status poll 404s forever.
-        id: mediaId,
-        user_id: session.userId!,
-        community_id: id,
-        owner_type: "showcase",
-        status: initialStatus,
-        strategy: effectiveStrategy,
-        original_key: originalKey,
-        processed_key: processedKey,
-        poster_key: posterUrl ? posterKey : null,
-        original_url: r2PublicUrl(originalKey),
-        processed_url: r2PublicUrl(processedKey),
-        poster_url: posterUrl,
-        width,
-        height,
-        fps,
-        duration_ms: durationMs,
-        video_codec: videoCodec,
-        audio_codec: audioCodec,
-        original_size: file.size,
-        processed_size: file.size,
-      })
-      .select("*")
-      .single();
-
-    if (error || !row) {
-      console.error("[showcase upload] video_media insert failed:", error);
-      // Never leave the DB claiming a video exists without the R2 object.
-      try {
-        await deleteFromR2(processedKey);
-        if (posterUrl) await deleteFromR2(posterKey);
-      } catch (cleanupError) {
-        console.error("[showcase upload] failed-insert cleanup error:", cleanupError);
-      }
-      return NextResponse.json({ error: "Upload failed." }, { status: 500 });
     }
 
     return NextResponse.json(
       {
         mediaId,
-        status: initialStatus,
+        status: "ready",
         attachment: {
           name: file.name,
-          url: r2PublicUrl(processedKey),
+          url,
           type: file.type,
           size: file.size,
           ...(posterUrl ? { poster: posterUrl } : {}),
           mediaId,
-          status: initialStatus,
-          strategy: effectiveStrategy,
-          preset,
-          copyVideo,
+          status: "ready",
         },
       },
       { status: 201 },
@@ -201,5 +105,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     console.error("[showcase upload]", error);
     return NextResponse.json({ error: "Upload failed." }, { status: 500 });
+  }
+}
+
+/** File extension from the MIME type (falls back to a safe default). */
+function extensionForKey(mime: string): string {
+  switch (mime) {
+    case "video/mp4": return ".mp4";
+    case "video/webm": return ".webm";
+    case "video/quicktime": return ".mov";
+    default: return ".bin";
   }
 }

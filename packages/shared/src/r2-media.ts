@@ -111,12 +111,6 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   SHOWCASE_POSTER_LOOKUP,
   THREAD_ATTACHMENT_LOOKUP,
   { table: "lottie_settings", column: "lottie_url" },
-  // Centralized video pipeline — the lifecycle row owns the original,
-  // the canonical processed MP4, and the poster. Deleted rows null these
-  // columns (keys stay for forensics) so tombstones never block cleanup.
-  { table: "video_media", column: "original_url" },
-  { table: "video_media", column: "processed_url" },
-  { table: "video_media", column: "poster_url" },
 ];
 
 /** Human-readable entity type per lookup, for reports. */
@@ -138,7 +132,4 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "community_showcase_posts.attachments": "showcase",
   "community_threads.attachments": "thread",
   "lottie_settings.lottie_url": "lottie_setting",
-  "video_media.original_url": "video_media",
-  "video_media.processed_url": "video_media",
-  "video_media.poster_url": "video_media",
 };

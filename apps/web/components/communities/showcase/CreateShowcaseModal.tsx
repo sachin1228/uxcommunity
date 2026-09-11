@@ -92,22 +92,18 @@ function formatClock(totalSeconds: number): string {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-/** Human-readable message for every pipeline stage a video can be in. */
+/** Human-readable message for every upload stage a video can be in. */
 const ACTIVITY_MESSAGES: Record<VideoActivityState, string> = {
   analyzing: "Analyzing video…",
   uploading: "Uploading to storage…",
-  queued: "Queued — waiting for the transcoder…",
-  processing: "Transcoding on the server…",
-  fallback: "Encoding in your browser…",
-  finalizing: "Uploading processed video…",
-  ready: "Ready — video processed successfully",
+  ready: "Ready — video uploaded",
   failed: "Failed",
 };
 
 /**
- * Per-video pipeline feed shown BELOW the media tile row. Every stage is
- * spelled out (uploading → queued → processing → ready) with progress where
- * available, and failures show the actual error message.
+ * Per-video upload feed shown BELOW the media tile row. Every stage is
+ * spelled out (analyzing → uploading → ready) with progress where available,
+ * and failures show the actual error message.
  */
 function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
   if (items.length === 0) return null;
@@ -132,7 +128,7 @@ function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
             {item.state === "failed" && item.error && (
               <p className="mt-0.5 font-body text-xs text-red-400">{item.error}</p>
             )}
-            {(item.state === "uploading" || item.state === "fallback") && (
+            {item.state === "uploading" && (
               <div className="mt-1 flex items-center gap-2">
                 <div className="h-1 flex-1 overflow-hidden rounded-full bg-border">
                   <div
@@ -141,11 +137,9 @@ function VideoActivityFeed({ items }: { items: VideoActivity[] }) {
                   />
                 </div>
                 <span className="shrink-0 font-body text-[10px] tabular-nums text-foreground-subtle">
-                  {item.state === "uploading"
-                    ? `${item.percent}% · ${formatClock(item.elapsedSec)} · ~${
-                        item.etaSec !== null ? `${formatClock(item.etaSec)} left` : "…"
-                      }`
-                    : `${item.percent}%`}
+                  {`${item.percent}% · ${formatClock(item.elapsedSec)} · ~${
+                    item.etaSec !== null ? `${formatClock(item.etaSec)} left` : "…"
+                  }`}
                 </span>
               </div>
             )}
@@ -165,13 +159,11 @@ function MediaRow({
   attachments,
   uploading,
   onRemove,
-  onRetry,
   onAddMore,
 }: {
   attachments: ShowcaseAttachment[];
   uploading: boolean;
   onRemove: (url: string, mediaId?: string) => void;
-  onRetry: (attachment: ShowcaseAttachment) => void;
   onAddMore: () => void;
 }) {
   if (attachments.length === 0) return null;
@@ -180,15 +172,13 @@ function MediaRow({
     <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
       {attachments.map((item) => {
         const isVideo = item.type.startsWith("video/");
-        const state = isVideo ? (item.status ?? "ready") : "ready";
         return (
           <div
             key={item.url || item.mediaId || item.name}
             className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-raised"
           >
-            {state === "ready" ? (
-              isVideo ? (
-                item.poster ? (
+            {isVideo ? (
+              item.poster ? (
                   <div className="relative h-full w-full">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={item.poster} alt={item.name} className="h-full w-full object-cover" />
@@ -205,23 +195,7 @@ function MediaRow({
               ) : (
                 <img src={item.url} alt={item.name} className="h-full w-full object-cover" />
               )
-            ) : state === "failed" ? (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-red-950/60 px-1 text-center">
-                <AlertCircle strokeWidth={2.5} size={16} className="text-red-300" />
-                <span className="w-full truncate px-1 font-body text-[10px] text-red-200">Failed</span>
-                <button
-                  type="button"
-                  onClick={() => onRetry(item)}
-                  className="rounded-full border border-red-300/40 px-2 py-0.5 font-body text-[10px] font-medium text-red-100 transition-colors hover:bg-red-300/10"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-black/80">
-                <Spinner size={16} />
-              </div>
-            )}
+            }
             <button
               type="button"
               onClick={() => onRemove(item.url, item.mediaId)}
@@ -284,7 +258,6 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
     addFiles,
     dropHandlers,
     isDragging,
-    retryAttachment,
     activity,
     mediaError,
   } = useShowcaseFileUpload({ communityId, initialAttachments });
@@ -414,11 +387,10 @@ export function CreateShowcaseModal({ communityId, initialIsPublic = false, onCl
                     attachments={attachments}
                     uploading={uploading}
                     onRemove={removeAttachment}
-                    onRetry={retryAttachment}
                     onAddMore={() => fileRef.current?.click()}
                   />
                 )}
-                {/* Per-video pipeline status — every stage, with errors. */}
+                {/* Per-video upload status — every stage, with errors. */}
                 <VideoActivityFeed items={activity} />
                 {mediaError && (
                   <p role="status" className="mt-1.5 font-body text-xs text-red-400">

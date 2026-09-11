@@ -5,9 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ShowcaseAttachment } from "./types";
 import { SHOWCASE_MEDIA_MAX } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
-import { VIDEO_TYPES, QUEUED_FALLBACK_AFTER_MS, cancelVideo, encodeVideo, finalizeVideo, finalizeVideoPassthrough, pollQueuedVideo, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-pipeline";
-import { FFMPEG, MAX_VIDEO_BYTES } from "@/lib/video/video-config";
-import type { VideoDecision, VideoStatus } from "@/lib/video/video-types";
+import { VIDEO_TYPES, prepareVideoForPipeline, uploadVideo } from "@/lib/video/video-upload";
+import { MAX_VIDEO_BYTES } from "@uxcommunity/shared";
 
 /** Client-side caps — mirror the upload route (images ≤ 8 MB, videos ≤ 50 MB). */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -22,23 +21,18 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 export type VideoActivityState =
   | "analyzing" // probing / lossless remux before any bytes flow
   | "uploading" // XHR upload of the original to R2 (percent + clock)
-  | "queued" // (legacy rows only) waiting for a server transcoder
-  | "processing" // (legacy rows only) server-side encode in flight
-  | "fallback" // in-browser FFmpeg wasm encode (percent)
-  | "finalizing" // upload of the processed MP4 + poster to R2
   | "ready"
   | "failed";
 
 /**
  * One entry in the per-video activity feed. Keyed by a client-generated id
- * until the upload completes, then rebound to the mediaId so the async
- * pipeline (poll / encode / finalize) can keep updating it.
+ * until the upload completes, then rebound to the mediaId.
  */
 export interface VideoActivity {
   key: string;
   name: string;
   state: VideoActivityState;
-  /** 0–100 where the stage reports progress (upload / fallback). */
+  /** 0–100 where the stage reports progress (upload). */
   percent: number;
   startedAt: number;
   /** Seconds since the upload started (refreshed by the clock tick). */
@@ -53,12 +47,12 @@ export interface VideoActivity {
  * Media intake for the "Share your work" composer.
  *
  * Images keep the existing flow (client-side WebP compression + moderated
- * upload). Videos flow through the NO-ENCODE pipeline:
+ * upload). Videos are PLAIN FILE UPLOADS:
  *
  *   analyzing → uploading → ready
  *
  * (The file ships as-is; a lossless remux may happen client-side during
- * "analyzing". Legacy queued rows still poll for a terminal state.)
+ * "analyzing". Nothing is ever queued or transcoded.)
  *
  * Each video drives one `VideoActivity` feed entry (plus its attachment
  * tile), so failures surface with their exact error.
@@ -74,7 +68,7 @@ export function useShowcaseFileUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  /** Per-video pipeline feed shown below the media tiles. */
+  /** Per-video feed shown below the media tiles. */
   const [activity, setActivity] = useState<VideoActivity[]>([]);
   /** Validation failures (count/size) shown under the media input. */
   const [mediaError, setMediaError] = useState<string | null>(null);
@@ -123,20 +117,6 @@ export function useShowcaseFileUpload({
       (item) => item.state === "analyzing" || item.state === "uploading",
     ).length;
 
-  /** Active status-poll controllers (legacy queued rows) — aborted on unmount/removal. */
-  const pollControllersRef = useRef(new Map<string, AbortController>());
-
-  // No zombie polling: abort every in-flight video-status poll when the
-  // composer unmounts (submit, cancel, navigation) so the server isn't
-  // spammed with requests from a closed modal.
-  useEffect(() => {
-    const controllers = pollControllersRef.current;
-    return () => {
-      for (const controller of controllers.values()) controller.abort();
-      controllers.clear();
-    };
-  }, []);
-
   // While a video is uploading, refresh the elapsed/ETA clocks every second
   // (even when no new progress event has arrived) and re-render the feed.
   // NOTE: the effect depends on a BOOLEAN, not the activity array — every
@@ -166,156 +146,9 @@ export function useShowcaseFileUpload({
     return () => window.clearInterval(timer);
   }, [hasClockingUpload]);
 
-  /** Original file bytes + poster held for the encode step (transcodes only). */
-  const originalsRef = useRef(new Map<string, { file: File; poster: Blob | null }>());
-
   // dragenter/dragleave fire for every child element crossed; counting them
   // (instead of booleans) keeps the overlay steady while over nested nodes.
   const dragDepthRef = useRef(0);
-
-  const setAttachment = useCallback((mediaId: string, patch: Partial<ShowcaseAttachment>) => {
-    setAttachments((current) =>
-      current.map((item) => (item.mediaId === mediaId ? { ...item, ...patch } : item)),
-    );
-  }, []);
-
-  /**
-   * Runs the FFmpeg worker + finalize for one transcode attachment
-   * (the browser fallback path). Resumable: the original bytes live in
-   * `originalsRef` (or R2), so a failed encode never requires re-uploading.
-   */
-  const runEncode = useCallback(
-    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
-      const mediaId = attachment.mediaId;
-      const original = mediaId ? originalsRef.current.get(mediaId) : undefined;
-      if (!mediaId || !original || !communityId) {
-        if (mediaId) setAttachment(mediaId, { status: "failed" });
-        return;
-      }
-      const startedAt = performance.now();
-      setAttachment(mediaId, { status: "processing", errorMessage: undefined });
-      upsertActivity(mediaId, { state: "fallback", percent: 0 });
-      try {
-        const result = await encodeVideo(mediaId, original.file, decision, (value) => {
-          upsertActivity(mediaId, { state: "fallback", percent: value });
-        });
-        upsertActivity(mediaId, { state: "finalizing", percent: 100 });
-        const finalized = await finalizeVideo(
-          communityId,
-          mediaId,
-          result.file,
-          original.poster,
-          {
-            width: result.width,
-            height: result.height,
-            fps: result.fps,
-            durationMs: result.durationMs,
-            videoCodec: result.videoCodec,
-            audioCodec: result.audioCodec,
-          },
-          performance.now() - startedAt,
-        );
-        if (finalized.status === "deleted") {
-          // Post/media was deleted while processing — drop the attachment.
-          setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-          removeActivity(mediaId);
-        } else if (finalized.attachment) {
-          setAttachment(mediaId, { ...finalized.attachment, status: "ready" });
-          upsertActivity(mediaId, { state: "ready", percent: 100 });
-        } else {
-          upsertActivity(mediaId, { state: "ready", percent: 100 });
-        }
-        originalsRef.current.delete(mediaId);
-      } catch (err) {
-        console.error("[showcase video] encode failed:", err);
-        const message = err instanceof Error ? err.message : "Video processing failed.";
-        setAttachment(mediaId, { status: "failed", errorMessage: message });
-        upsertActivity(mediaId, { state: "failed", error: message });
-      }
-    },
-    [communityId, setAttachment, upsertActivity, removeActivity],
-  );
-
-  /**
-   * Legacy path: a row still queued from before the no-encode policy (or if
-   * encoding is ever re-enabled). Polls for a terminal state, falling back
-   * to the in-browser wasm worker when available. Cancellable.
-   */
-  const awaitServerOrFallback = useCallback(
-    async (attachment: ShowcaseAttachment, decision: VideoDecision) => {
-      const mediaId = attachment.mediaId;
-      if (!mediaId || !communityId) return;
-
-      const controller = new AbortController();
-      pollControllersRef.current.set(mediaId, controller);
-
-      setAttachment(mediaId, { status: "processing" });
-      upsertActivity(mediaId, { state: "queued" });
-
-      const applyTerminal = (result: {
-        status: VideoStatus;
-        attachment: ShowcaseAttachment | null;
-      }): boolean => {
-        if (result.status === "ready" && result.attachment) {
-          setAttachment(mediaId, { ...result.attachment, status: "ready" });
-          upsertActivity(mediaId, { state: "ready", percent: 100 });
-          originalsRef.current.delete(mediaId);
-          return true;
-        }
-        if (result.status === "failed") {
-          setAttachment(mediaId, { status: "failed", errorMessage: "Processing failed on the server." });
-          upsertActivity(mediaId, { state: "failed", error: "Processing failed on the server." });
-          return true;
-        }
-        if (result.status === "deleted") {
-          setAttachments((current) => current.filter((item) => item.mediaId !== mediaId));
-          removeActivity(mediaId);
-          return true;
-        }
-        return false;
-      };
-
-      try {
-        // Grace period: the transcoder normally claims a job within seconds.
-        const result = await pollQueuedVideo(communityId, mediaId, {
-          timeoutMs: QUEUED_FALLBACK_AFTER_MS,
-          signal: controller.signal,
-          onProgress: (status) => {
-            upsertActivity(mediaId, { state: status === "queued" ? "queued" : "processing" });
-          },
-        });
-        if (controller.signal.aborted) return;
-        if (applyTerminal(result)) return;
-
-        if (FFMPEG.coreBaseUrl) {
-          // In-browser engine available — encode locally (local dev without
-          // a transcoder, or a worker outage).
-          void runEncode(attachment, decision);
-          return;
-        }
-
-        // No in-browser engine — the server-side transcoder is the ONLY path
-        // and it may legitimately be busy (4K jobs take minutes). Keep
-        // waiting at a slower cadence instead of failing a job that will
-        // still complete server-side.
-        const waiting = await pollQueuedVideo(communityId, mediaId, {
-          intervalMs: 10_000,
-          timeoutMs: 15 * 60_000,
-          signal: controller.signal,
-          onProgress: (status) => {
-            upsertActivity(mediaId, { state: status === "queued" ? "queued" : "processing" });
-          },
-        });
-        if (controller.signal.aborted) return;
-        applyTerminal(waiting);
-        // Still not terminal: leave the entry as queued/processing — the
-        // server owns the row and patches any post referencing it.
-      } finally {
-        pollControllersRef.current.delete(mediaId);
-      }
-    },
-    [communityId, runEncode, setAttachment, upsertActivity, removeActivity],
-  );
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
@@ -344,7 +177,7 @@ export function useShowcaseFileUpload({
       try {
         for (const file of files) {
           if (VIDEO_TYPES.has(file.type)) {
-            // ── No-encode video pipeline ──────────────────────────────────
+            // ── Plain video upload ─────────────────────────────────────────
             // Probe → (lossless remux) → upload as-is → ready immediately.
             const activityKey = `video-${Date.now()}-${uploadSeqRef.current++}`;
             upsertActivity(activityKey, { name: file.name, state: "analyzing", percent: 0 });
@@ -357,26 +190,12 @@ export function useShowcaseFileUpload({
               });
               const attachment = response.attachment;
               setAttachments((current) => [...current, attachment]);
-              if (attachment.mediaId) {
-                // Rebind the feed entry to the mediaId so legacy-queue polls
-                // (should they ever apply) can keep updating it.
-                upsertActivity(attachment.mediaId, {
-                  name: file.name,
-                  state: response.status === "queued" ? "queued" : "ready",
-                  percent: 100,
-                });
-                removeActivity(activityKey);
-                if (response.status === "queued") {
-                  // Only possible on a stale server build — keep the legacy
-                  // wait path alive until it is redeployed everywhere.
-                  originalsRef.current.set(attachment.mediaId, { file, poster: prepared.poster });
-                  void awaitServerOrFallback(attachment, prepared.decision);
-                } else {
-                  originalsRef.current.delete(attachment.mediaId);
-                }
-              } else {
-                removeActivity(activityKey);
-              }
+              upsertActivity(attachment.mediaId ?? activityKey, {
+                name: file.name,
+                state: "ready",
+                percent: 100,
+              });
+              removeActivity(activityKey);
             } catch (uploadErr) {
               // Per-video failure — surfaced in the feed with the real error.
               upsertActivity(activityKey, {
@@ -409,74 +228,8 @@ export function useShowcaseFileUpload({
         setUploading(false);
       }
     },
-    [upsertActivity, removeActivity, awaitServerOrFallback, communityId],
+    [upsertActivity, removeActivity, communityId],
   );
-
-  /** Retries a failed encode — the original is still in R2, no re-upload. */
-  const retryAttachment = useCallback(
-    (attachment: ShowcaseAttachment) => {
-      if (!attachment.mediaId) return;
-      // Retry prefers the server-side transcoder again, then the wasm worker.
-      void awaitServerOrFallback(attachment, {
-        strategy: "transcode",
-        preset: attachment.preset ?? "slow",
-        copyVideo: attachment.copyVideo,
-        reason: "retry",
-      });
-    },
-    [awaitServerOrFallback],
-  );
-
-  // After an edit (initialAttachments change), resume videos that never
-  // reached `ready`:
-  //   - `uploaded` (client-wasm era): original bytes are gone after a reload,
-  //     so the lossless passthrough promotes the stored original (zero
-  //     re-encode) via finalize.
-  //   - `queued` (server transcoder): the worker will complete + patch the
-  //     post server-side; just poll for the terminal state to refresh the UI.
-  useEffect(() => {
-    for (const item of initialAttachments) {
-      if (!item.type.startsWith("video/") || !item.mediaId || !communityId) continue;
-      if (item.status === "uploaded") {
-        upsertActivity(item.mediaId, { name: item.name, state: "processing" });
-        void finalizeVideoPassthrough(communityId, item.mediaId).then((result) => {
-          if (result.status === "ready" && result.attachment) {
-            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
-            upsertActivity(item.mediaId!, { state: "ready", percent: 100 });
-          }
-        }).catch(() => {
-          // Keep the placeholder state — the admin sweep cleans up leftovers.
-        });
-      } else if (item.status === "queued") {
-        upsertActivity(item.mediaId, { name: item.name, state: "queued" });
-        const controller = new AbortController();
-        pollControllersRef.current.set(item.mediaId, controller);
-        void pollQueuedVideo(communityId, item.mediaId, {
-          timeoutMs: 60_000,
-          signal: controller.signal,
-          onProgress: (status) => {
-            upsertActivity(item.mediaId!, { state: status === "queued" ? "queued" : "processing" });
-          },
-        }).then((result) => {
-          if (controller.signal.aborted) return;
-          if (result.status === "ready" && result.attachment) {
-            setAttachment(item.mediaId!, { ...result.attachment, status: "ready" });
-            upsertActivity(item.mediaId!, { state: "ready", percent: 100 });
-          } else if (result.status === "failed") {
-            upsertActivity(item.mediaId!, {
-              state: "failed",
-              error: "Processing failed on the server.",
-            });
-          }
-        }).catch(() => {
-          // Still queued — keep the placeholder; the transcoder patches the
-          // post itself when it completes.
-        }).finally(() => {
-          pollControllersRef.current.delete(item.mediaId!);
-        });
-      }
-    }
-  }, [initialAttachments, communityId, setAttachment, upsertActivity]);
 
   const addFiles = useCallback(
     (fileList: FileList | File[] | null) => {
@@ -489,16 +242,9 @@ export function useShowcaseFileUpload({
   const removeAttachment = useCallback(
     (url: string, mediaId?: string) => {
       setAttachments((current) => current.filter((a) => a.url !== url && a.mediaId !== mediaId));
-      if (mediaId) {
-        // Stop any in-flight status polling for this media immediately.
-        pollControllersRef.current.get(mediaId)?.abort();
-        pollControllersRef.current.delete(mediaId);
-        originalsRef.current.delete(mediaId);
-        removeActivity(mediaId);
-        if (communityId) void cancelVideo(communityId, mediaId);
-      }
+      if (mediaId) removeActivity(mediaId);
     },
-    [communityId, removeActivity],
+    [removeActivity],
   );
 
   const hasFiles = (event: React.DragEvent) =>
@@ -542,7 +288,6 @@ export function useShowcaseFileUpload({
     addFiles,
     dropHandlers,
     isDragging,
-    retryAttachment,
     activity,
     mediaError,
   };

@@ -27,9 +27,8 @@ import {
   type InputVideoTrack,
 } from "mediabunny";
 
-// Byte-level MP4/WebM sniffing lives in @uxcommunity/shared (shared with the
-// server-side transcoder) — re-exported so the app's existing imports and
-// tests keep working.
+// Byte-level MP4/WebM sniffing lives in @uxcommunity/shared — re-exported so
+// the app's existing imports and tests keep working.
 import { isFaststart, looksLikeMp4, sniffVideoContainer } from "@uxcommunity/shared";
 export { isFaststart, looksLikeMp4, sniffVideoContainer };
 
