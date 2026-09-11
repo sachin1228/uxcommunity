@@ -14,35 +14,6 @@ export const RESOURCE_TYPES = [
 
 export type ResourceType = (typeof RESOURCE_TYPES)[number]["value"];
 
-export const RESOURCE_TAGS = [
-  "UI Design",
-  "UX Design",
-  "Figma",
-  "Design Systems",
-  "Typography",
-  "Color Theory",
-  "Branding",
-  "Illustration",
-  "Iconography",
-  "Motion Design",
-  "Prototyping",
-  "User Research",
-  "Accessibility",
-  "Mobile Design",
-  "Web Design",
-  "Product Design",
-  "Interaction Design",
-  "Components",
-  "Dark Mode",
-  "Responsive Design",
-  "Portfolio",
-  "Freelance",
-  "Free",
-  "Open Source",
-] as const;
-
-export type ResourceTag = (typeof RESOURCE_TAGS)[number];
-
 export interface CommunityResource {
   id: string;
   community_id: string;
@@ -51,7 +22,6 @@ export interface CommunityResource {
   description: string | null;
   resource_type: ResourceType;
   url: string;
-  tags: string[];
   is_public?: boolean;
   created_at: string;
   updated_at: string;

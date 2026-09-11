@@ -10,13 +10,6 @@ const RESOURCE_TYPES = new Set<ResourceType>([
   "font", "icon_pack", "color", "template", "inspiration", "other",
 ]);
 
-function normalizeTags(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 3) return null;
-  const tags = value.filter((t): t is string => typeof t === "string").map((t) => t.trim().replace(/^#/, "")).filter(Boolean);
-  if (tags.length !== value.length || tags.some((t) => t.length > 30)) return null;
-  return [...new Set(tags)].slice(0, 3);
-}
-
 async function enrichResource(
   db: ReturnType<typeof createServiceClient>,
   row: Record<string, unknown>,
@@ -68,7 +61,7 @@ export async function GET(
 
   let resourceQuery = db
     .from("community_resources")
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
     .eq("id", resourceId);
   resourceQuery = publicScope
     ? resourceQuery.eq("is_public", true).is("community_id", null)
@@ -114,21 +107,20 @@ export async function PATCH(
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
-  const tags = normalizeTags(body.tags);
   const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
   if (!url || url.length > 2048) return NextResponse.json({ error: "URL is required." }, { status: 422 });
   try { const u = new URL(url); if (!["http:", "https:"].includes(u.protocol)) throw new Error(); }
   catch { return NextResponse.json({ error: "URL must start with http:// or https://" }, { status: 422 }); }
-  if (!RESOURCE_TYPES.has(resourceType) || !tags) return NextResponse.json({ error: "One or more fields are invalid." }, { status: 422 });
+  if (!RESOURCE_TYPES.has(resourceType)) return NextResponse.json({ error: "One or more fields are invalid." }, { status: 422 });
   if (description && description.length > 2000) return NextResponse.json({ error: "Description must be 2000 characters or fewer." }, { status: 422 });
 
   const { data: updated, error } = await db
     .from("community_resources")
-    .update({ title, description, resource_type: resourceType, url, tags, is_public: isPublic })
+    .update({ title, description, resource_type: resourceType, url, is_public: isPublic })
     .eq("id", resourceId)
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
     .single();
 
   if (error || !updated) { console.error("[PATCH resource]", error); return NextResponse.json({ error: "Failed to update resource." }, { status: 500 }); }

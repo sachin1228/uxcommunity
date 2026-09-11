@@ -16,16 +16,6 @@ const RESOURCE_TYPES = new Set<ResourceType>([
   "font", "icon_pack", "color", "template", "inspiration", "other",
 ]);
 
-function normalizeTags(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 3) return null;
-  const tags = value
-    .filter((t): t is string => typeof t === "string")
-    .map((t) => t.trim().replace(/^#/, ""))
-    .filter(Boolean);
-  if (tags.length !== value.length || tags.some((t) => t.length > 30)) return null;
-  return [...new Set(tags)].slice(0, 3);
-}
-
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
   communityId: string,
@@ -138,7 +128,6 @@ export async function POST(
   const url = typeof body.url === "string" ? body.url.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
-  const tags = normalizeTags(body.tags);
   const isPublic = body.is_public === true;
 
   if (!title || title.length > 120) {
@@ -153,17 +142,14 @@ export async function POST(
   if (!RESOURCE_TYPES.has(resourceType)) {
     return NextResponse.json({ error: "Invalid resource type." }, { status: 422 });
   }
-  if (!tags) {
-    return NextResponse.json({ error: "Invalid tags." }, { status: 422 });
-  }
   if (description && description.length > 2000) {
     return NextResponse.json({ error: "Description must be 2000 characters or fewer." }, { status: 422 });
   }
 
   const { data: inserted, error } = await db
     .from("community_resources")
-    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, tags, is_public: isPublic })
-    .select("id, community_id, user_id, title, description, resource_type, url, tags, is_public, created_at, updated_at")
+    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, is_public: isPublic })
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
     .single();
 
   if (error || !inserted) {
