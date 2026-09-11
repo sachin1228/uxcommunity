@@ -7,7 +7,7 @@
  * the showcase upload route which lands them in R2 and returns the URL.
  */
 
-import { VIDEO_TYPES as VIDEO_MIME_TYPES_SET } from "@uxcommunity/shared";
+import { VIDEO_MIME_TYPES as VIDEO_MIME_TYPES_SET } from "@uxcommunity/shared";
 import { processVideoForUpload } from "@/lib/video-client";
 
 export { VIDEO_MIME_TYPES_SET as VIDEO_TYPES };
