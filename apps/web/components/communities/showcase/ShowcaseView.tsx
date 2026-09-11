@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import {
   Box,
@@ -51,6 +51,7 @@ export function ShowcaseView({
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<ShowcasePost | null>(null);
   const [deletingPost, setDeletingPost] = useState<ShowcasePost | null>(null);
+  const deletedPostIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +62,11 @@ export function ShowcaseView({
     )
       .then((data) => {
         if (!cancelled) {
-          setPosts(data.posts ?? []);
+          setPosts(
+            (data.posts ?? []).filter(
+              (post) => !deletedPostIdsRef.current.has(post.id),
+            ),
+          );
           setNextCursor(data.nextCursor ?? null);
         }
       })
@@ -117,12 +122,23 @@ export function ShowcaseView({
   }
 
   async function remove(post: ShowcasePost) {
+    deletedPostIdsRef.current.add(post.id);
     const response = await fetch(
       `/api/communities/${communityId}/showcase/${post.id}`,
       { method: "DELETE" },
     );
     if (response.ok) {
-      replacePosts(posts.filter((item) => item.id !== post.id));
+      setPosts((current) => {
+        const next = current.filter((item) => item.id !== post.id);
+        patchCachedRequest<{ posts?: ShowcasePost[] }>(
+          requestUrl,
+          (cachedPosts) => ({ ...cachedPosts, posts: next }),
+          currentUserId,
+        );
+        return next;
+      });
+    } else {
+      deletedPostIdsRef.current.delete(post.id);
     }
   }
 
