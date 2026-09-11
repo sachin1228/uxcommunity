@@ -300,11 +300,6 @@ export function ResourceCard({
             </a>
             {resource.description && <p className="mt-4 whitespace-pre-wrap font-body text-sm leading-relaxed text-foreground-muted">{resource.description}</p>}
             {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
-            {resource.tags.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {resource.tags.map((tag) => <span key={tag} className="font-body text-[11px] text-foreground-subtle">#{tag}</span>)}
-              </div>
-            )}
           </>
         ) : (
           <>
