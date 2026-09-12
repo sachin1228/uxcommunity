@@ -55,7 +55,7 @@ function AvatarStack({
         <div className="flex items-center" aria-label={`${safeCount} attendees`}>
           {visible.map((rsvp, index) => (
             <div
-              key={rsvp.user_id}
+              key={rsvp.user_id ?? `idx-${index}`}
               style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
               className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111] bg-accent/15"
             >
