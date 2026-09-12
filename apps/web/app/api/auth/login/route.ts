@@ -5,6 +5,7 @@ import { loginSchema } from "@/lib/validations";
 import { createSession, setSessionCookie } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { hashPassword, needsPasswordRehash } from "@/lib/auth/password";
+import { isSignupIncomplete } from "@/lib/auth/signup-status";
 
 type LoginUserRow = {
   id: string;
@@ -12,7 +13,7 @@ type LoginUserRow = {
   email: string;
   password_hash: string;
   is_blocked: boolean;
-  designer_profiles: { id: string; avatar_url: string | null } | null;
+  designer_profiles: { id: string } | null;
 };
 
 export async function POST(request: NextRequest) {
@@ -85,11 +86,13 @@ export async function POST(request: NextRequest) {
   // unhinted embed silently picks one that returns no rows. A missing profile
   // is only acted on AFTER a successful password check below, so the response
   // does not leak which emails exist.
+  //
+  // The profile's avatar_url is deliberately NOT selected: an uploaded picture
+  // is optional at signup, so it can never be part of the completeness check
+  // (see lib/auth/signup-status.ts).
   const { data: rawUser } = await db
     .from("users")
-    .select(
-      "id, name, email, password_hash, is_blocked, designer_profiles!user_id(id, avatar_url)"
-    )
+    .select("id, name, email, password_hash, is_blocked, designer_profiles!user_id(id)")
     .eq("email", normalizedEmail)
     .maybeSingle();
   const row = rawUser as unknown as LoginUserRow | null;
@@ -118,11 +121,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!profile || !profile.avatar_url) {
+  if (isSignupIncomplete(profile)) {
     return NextResponse.json(
       {
         error:
-          "Your account setup is incomplete. Please finish signing up using the invitation link sent to your email.",
+          "Your account setup is incomplete. Please contact support so we can finish setting it up.",
         incompleteSignup: true,
       },
       { status: 403 }

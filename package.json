@@ -16,7 +16,7 @@
     "deploy:realtime": "wrangler deploy --config apps/realtime/wrangler.toml",
     "lint": "npm run lint --workspace=apps/web",
     "test:interactions": "tsx --test apps/web/lib/boolean-intent-coalescer.test.ts",
-    "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts",
+    "test:signup": "tsx --test apps/web/lib/signup-completion.test.ts apps/web/lib/auth/signup-status.test.ts",
     "test:request-cache": "tsx --test apps/web/lib/request-cache.test.ts",
     "test:password": "tsx --test apps/web/lib/auth/password.test.ts",
     "test:dedupe": "tsx --test apps/web/lib/dedupe-fetch.test.ts apps/web/lib/navigation-guard.test.ts",
