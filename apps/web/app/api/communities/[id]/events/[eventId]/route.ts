@@ -142,6 +142,11 @@ export async function PATCH(
       ? body.cover_image_url.trim()
       : null;
   }
+  if ("accent_color" in body) {
+    patch.accent_color = typeof body.accent_color === "string" && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())
+      ? body.accent_color.trim().toLowerCase()
+      : null;
+  }
   if (typeof body.is_public === "boolean") patch.is_public = body.is_public;
 
   if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 422 });
@@ -150,7 +155,7 @@ export async function PATCH(
     .from("community_events")
     .update(patch)
     .eq("id", eventId)
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

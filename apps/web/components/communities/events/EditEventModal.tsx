@@ -5,6 +5,7 @@ import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } fro
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
+import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -46,6 +47,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
   const [meetLink, setMeetLink] = useState(event.meet_link ?? "");
   const [maxAttendees, setMaxAttendees] = useState(event.max_attendees ? String(event.max_attendees) : "");
   const [isPublic, setIsPublic] = useState(event.is_public ?? false);
+  const [accentColor, setAccentColor] = useState(event.accent_color ?? DEFAULT_EVENT_ACCENT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,6 +107,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
+          accent_color: accentColor,
           is_public: isPublic,
         }),
       });
@@ -283,6 +286,14 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
               placeholder="Leave blank for unlimited"
               className="field w-full" />
           </label>
+
+          {/* Accent color */}
+          <div>
+            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+              Card color <span className="font-normal text-foreground-subtle">(the main color of this event's ticket)</span>
+            </span>
+            <AccentColorPicker value={accentColor} onChange={setAccentColor} />
+          </div>
 
           <ToggleRow
             title="Share publicly"
