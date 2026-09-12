@@ -424,6 +424,24 @@ function notifySidebarMessageChanged(): void {
 }
 
 /**
+ * Fired when a community's live message cache is mutated from outside the chat
+ * component that renders it — most importantly a send that finishes after the
+ * user navigated away, because the community page unmounts behind the loading
+ * boundary and can no longer be reached through its `setMessages`.
+ */
+export const CHAT_MESSAGES_CHANGED_EVENT = "uxcommunity:chat-messages-changed";
+
+function notifyChatMessagesChanged(communityId: string): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent<{ communityId: string }>(CHAT_MESSAGES_CHANGED_EVENT, {
+        detail: { communityId },
+      }),
+    );
+  }
+}
+
+/**
  * Optimistically updates a community's last-message preview in the shared
  * sidebar cache when the current user sends a message, so the community jumps
  * to the top of the list instantly instead of waiting for the Realtime echo
@@ -619,6 +637,26 @@ export function seedCachedMessages(
   if (msgCache.get(communityId)?.length) return false;
   msgCache.set(communityId, messages);
   return true;
+}
+
+/**
+ * Applies a mutation to a community's live message cache and returns the
+ * result. The cache is the source of truth, so the mutation lands correctly
+ * even when the chat for that community is no longer mounted — a send that
+ * finishes after the user navigated away must still replace its optimistic
+ * bubble (and its revoked blob URL) with the stored message.
+ *
+ * Every write notifies the mounted chat via CHAT_MESSAGES_CHANGED_EVENT so its
+ * React state resyncs from the cache instead of keeping a stale view.
+ */
+export function updateCachedMessages(
+  communityId: string,
+  update: (messages: CachedMessage[]) => CachedMessage[],
+): CachedMessage[] {
+  const next = update(msgCache.get(communityId) ?? []);
+  msgCache.set(communityId, next);
+  notifyChatMessagesChanged(communityId);
+  return next;
 }
 
 export function evictIfNeeded(): void {

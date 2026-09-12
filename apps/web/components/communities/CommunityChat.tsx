@@ -876,7 +876,6 @@ export function CommunityChat({
     currentUserId,
     currentUserName,
     currentUserAvatar,
-    setMessages,
     setHideUnreadDivider,
     replyTo,
     onClearReply: handleClearReply,

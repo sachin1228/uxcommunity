@@ -7,6 +7,7 @@ import {
   msgFetchedAt,
   evictIfNeeded,
   META_STALE_MS,
+  CHAT_MESSAGES_CHANGED_EVENT,
   type CachedMessage,
   type CachedMeta,
 } from "@/lib/communities/cache";
@@ -89,6 +90,22 @@ export function useChatData({
   useEffect(() => {
     membersRef.current = members;
   }, [members]);
+
+  // ── Cache-first mutations that happen outside this component ─────────────
+  // A send keeps running after the user navigates away (the community page
+  // unmounts behind the loading boundary), so its optimistic bubble is
+  // reconciled directly in msgCache instead of through this unmounted
+  // setter. Resync this chat whenever the cache for its community changes.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ communityId?: string }>).detail;
+      if (detail?.communityId && detail.communityId !== communityId) return;
+      const cached = msgCache.get(communityId);
+      if (cached) setMessages(cached);
+    };
+    window.addEventListener(CHAT_MESSAGES_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(CHAT_MESSAGES_CHANGED_EVENT, handler);
+  }, [communityId]);
 
   // ── Seed state from cache or SSR props before first paint ────────────────
   useIsomorphicLayoutEffect(() => {

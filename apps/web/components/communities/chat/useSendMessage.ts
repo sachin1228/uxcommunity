@@ -6,6 +6,7 @@ import {
   patchSidebarLastMessage,
   restoreSidebarEntry,
   sidebarStore,
+  updateCachedMessages,
 } from "@/lib/communities/cache";
 import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
@@ -19,7 +20,6 @@ interface UseSendMessageOptions {
   currentUserId: string;
   currentUserName: string;
   currentUserAvatar: string | null;
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setHideUnreadDivider: (val: boolean) => void;
   replyTo: ReplyPreview | null;
   onClearReply: () => void;
@@ -40,7 +40,6 @@ export function useSendMessage({
   currentUserId,
   currentUserName,
   currentUserAvatar,
-  setMessages,
   setHideUnreadDivider,
   replyTo,
   onClearReply,
@@ -165,14 +164,10 @@ export function useSendMessage({
     // For text-only sends: no retry data stored, so remove immediately.
     const retryData = failedRetryDataRef.current.get(tempId);
     if (!retryData?.file) {
-      setMessages((prev) => {
-        const next = prev.filter((m) => m.id !== tempId);
-        msgCache.set(communityId, next);
-        return next;
-      });
+      updateCachedMessages(communityId, (prev) => prev.filter((m) => m.id !== tempId));
       failedRetryDataRef.current.delete(tempId);
     }
-  }, [communityId, setMessages]);
+  }, [communityId]);
 
   /**
    * Core send logic, shared by handleSend and handleRetrySend.
@@ -213,11 +208,7 @@ export function useSendMessage({
       mentions,
     };
 
-    setMessages((prev) => {
-      const next = [...prev, optimistic];
-      msgCache.set(communityId, next);
-      return next;
-    });
+    updateCachedMessages(communityId, (prev) => [...prev, optimistic]);
     // Bump the community to the top of the sidebar instantly. The chat shows
     // the optimistic bubble already, and the sidebar shouldn't wait for the
     // Realtime echo (DB insert → fan-out → WebSocket round trip) to reflect
@@ -348,7 +339,7 @@ export function useSendMessage({
         // bubble. (Preload resolves on failure too, so this can't hang.)
         if (imagePreload) await imagePreload;
 
-        setMessages((prev) => {
+        updateCachedMessages(communityId, (prev) => {
           // The server returns a bare insert (users: null, reply_to: null) to
           // avoid expensive post-insert DB fetches. Merge it over the optimistic
           // message so we preserve the sender's name/avatar and reply preview
@@ -369,38 +360,28 @@ export function useSendMessage({
 
           if (existing) {
             // Realtime beat the API response — update the existing real entry.
-            const next = prev
+            return prev
               .filter((m) => m.id !== tempId)
               .map((m) => m.id === message.id ? merged : m);
-            msgCache.set(communityId, next);
-            return next;
           }
 
-          const next = prev.map((m) => m.id === tempId ? merged : m);
-          msgCache.set(communityId, next);
-          return next;
+          return prev.map((m) => m.id === tempId ? merged : m);
         });
 
         // Sent successfully — clear retry data
         failedRetryDataRef.current.delete(tempId);
       } else if (res.status === 202) {
-        setMessages((prev) => {
-          const next = prev.filter((m) => m.id !== tempId);
-          msgCache.set(communityId, next);
-          return next;
-        });
+        updateCachedMessages(communityId, (prev) => prev.filter((m) => m.id !== tempId));
         rollbackSidebar();
 
         setError(data.error ?? "Your message has been sent for moderator review.");
         failedRetryDataRef.current.delete(tempId);
       } else {
-        setMessages((prev) => {
-          const next = prev.map((m) =>
+        updateCachedMessages(communityId, (prev) =>
+          prev.map((m) =>
             m.id === tempId ? { ...m, status: "failed" as const } : m
-          );
-          msgCache.set(communityId, next);
-          return next;
-        });
+          ),
+        );
         rollbackSidebar();
 
         setError(data.error ?? "Failed to send.");
@@ -410,39 +391,38 @@ export function useSendMessage({
         const retryData = failedRetryDataRef.current.get(tempId);
         if (retryData?.file) {
           // Image upload was cancelled — keep bubble in "failed" state for retry
-          setMessages((prev) => {
-            const next = prev.map((m) =>
+          updateCachedMessages(communityId, (prev) =>
+            prev.map((m) =>
               m.id === tempId ? { ...m, status: "failed" as const } : m
-            );
-            msgCache.set(communityId, next);
-            return next;
-          });
+            ),
+          );
         } else {
           // Text-only cancel — remove the optimistic message
-          setMessages((prev) => {
-            const next = prev.filter((m) => m.id !== tempId);
-            msgCache.set(communityId, next);
-            return next;
-          });
+          updateCachedMessages(communityId, (prev) => prev.filter((m) => m.id !== tempId));
           failedRetryDataRef.current.delete(tempId);
         }
         rollbackSidebar();
         return;
       }
 
-      setMessages((prev) => {
-        const next = prev.map((m) =>
+      updateCachedMessages(communityId, (prev) =>
+        prev.map((m) =>
           m.id === tempId ? { ...m, status: "failed" as const } : m
-        );
-        msgCache.set(communityId, next);
-        return next;
-      });
+        ),
+      );
       rollbackSidebar();
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       abortControllerRef.current = null;
-      // Revoke the blob URL now that upload is done (success, fail, or cancel)
-      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+      // Revoke the blob URL once nothing references it. A failed image bubble
+      // keeps the local preview so it can be retried, and revoking it there
+      // would leave the bubble showing a broken image.
+      if (imagePreviewUrl) {
+        const stillReferenced = (msgCache.get(communityId) ?? []).some(
+          (m) => m.image_url === imagePreviewUrl,
+        );
+        if (!stillReferenced) URL.revokeObjectURL(imagePreviewUrl);
+      }
     }
   }
 
@@ -501,11 +481,7 @@ export function useSendMessage({
     sendLockRef.current = true;
 
     // Remove the failed message before re-queueing
-    setMessages((prev) => {
-      const next = prev.filter((m) => m.id !== failedTempId);
-      msgCache.set(communityId, next);
-      return next;
-    });
+    updateCachedMessages(communityId, (prev) => prev.filter((m) => m.id !== failedTempId));
     failedRetryDataRef.current.delete(failedTempId);
 
     setSending(true);
@@ -529,7 +505,7 @@ export function useSendMessage({
       sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, setMessages]);
+  }, [communityId]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -564,11 +540,7 @@ export function useSendMessage({
       mentions: [],
     };
 
-    setMessages((prev) => {
-      const next = [...prev, optimistic];
-      msgCache.set(communityId, next);
-      return next;
-    });
+    updateCachedMessages(communityId, (prev) => [...prev, optimistic]);
     // Same instant sidebar bump as text/image sends.
     const prevSidebarEntry =
       sidebarStore.data?.communities.find((c) => c.id === communityId) ?? null;
@@ -614,7 +586,7 @@ export function useSendMessage({
         const message = data.message;
         if (!message) throw new Error("No message in response");
 
-        setMessages((prev) => {
+        updateCachedMessages(communityId, (prev) => {
           const optimistic = prev.find((m) => m.id === tempId);
           const merged: Message = {
             ...(optimistic ?? {}),
@@ -626,42 +598,34 @@ export function useSendMessage({
           };
 
           if (prev.some((m) => m.id === message.id)) {
-            const next = prev
+            return prev
               .filter((m) => m.id !== tempId)
               .map((m) => (m.id === message.id ? merged : m));
-            msgCache.set(communityId, next);
-            return next;
           }
-          const next = prev.map((m) => m.id === tempId ? merged : m);
-          msgCache.set(communityId, next);
-          return next;
+          return prev.map((m) => m.id === tempId ? merged : m);
         });
       } else {
-        setMessages((prev) => {
-          const next = prev.map((m) =>
+        updateCachedMessages(communityId, (prev) =>
+          prev.map((m) =>
             m.id === tempId ? { ...m, status: "failed" as const } : m,
-          );
-          msgCache.set(communityId, next);
-          return next;
-        });
+          ),
+        );
         rollbackSidebar();
         setError((data as { error?: string }).error ?? "Failed to send.");
       }
     } catch {
-      setMessages((prev) => {
-        const next = prev.map((m) =>
+      updateCachedMessages(communityId, (prev) =>
+        prev.map((m) =>
           m.id === tempId ? { ...m, status: "failed" as const } : m,
-        );
-        msgCache.set(communityId, next);
-        return next;
-      });
+        ),
+      );
       rollbackSidebar();
       setError("Network error.");
     } finally {
       sendLockRef.current = false;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, currentUserId, sending, setMessages]);
+  }, [communityId, currentUserId, sending]);
 
   return {
     input,

@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test, { afterEach } from "node:test";
 
-import { clearAllUserCaches, msgCache, seedCachedMessages } from "./cache";
+import {
+  CHAT_MESSAGES_CHANGED_EVENT,
+  clearAllUserCaches,
+  msgCache,
+  seedCachedMessages,
+  updateCachedMessages,
+} from "./cache";
 import {
   clearRequestCache,
   fetchAndHydrateCommunityBootstrap,
@@ -15,6 +21,7 @@ afterEach(() => {
   clearRequestCache();
   clearAllUserCaches();
   globalThis.fetch = originalFetch;
+  delete (globalThis as { window?: unknown }).window;
 });
 
 function message(overrides: Partial<CachedMessage> = {}): CachedMessage {
@@ -102,4 +109,61 @@ test("a bootstrap snapshot does not drop messages received after it was cached",
     msgCache.get("community-1")?.map((cached) => cached.id),
     ["message-1", "message-2"],
   );
+});
+
+test("updateCachedMessages mutates the cache and announces the community", () => {
+  const fakeWindow = new EventTarget();
+  (globalThis as { window?: EventTarget }).window = fakeWindow;
+  const announced: string[] = [];
+  const listener = (event: Event) => {
+    announced.push(
+      (event as CustomEvent<{ communityId: string }>).detail.communityId,
+    );
+  };
+  fakeWindow.addEventListener(CHAT_MESSAGES_CHANGED_EVENT, listener);
+
+  msgCache.set("community-1", [message()]);
+  const next = updateCachedMessages("community-1", (prev) => [
+    ...prev,
+    message({ id: "message-2" }),
+  ]);
+
+  assert.deepEqual(next.map((cached) => cached.id), ["message-1", "message-2"]);
+  assert.deepEqual(
+    msgCache.get("community-1")?.map((cached) => cached.id),
+    ["message-1", "message-2"],
+  );
+  assert.deepEqual(announced, ["community-1"]);
+});
+
+test("a finished send reconciles its optimistic bubble without a mounted chat", () => {
+  const blob = "blob:http://localhost/optimistic-preview";
+  msgCache.set("community-1", [
+    message({ id: "temp-1", image_url: blob, status: "sending" }),
+  ]);
+
+  // The chat unmounted mid-send, so only the cache can carry the result: the
+  // stored message replaces the optimistic bubble and its soon-revoked blob.
+  updateCachedMessages("community-1", (prev) =>
+    prev.map((cached) =>
+      cached.id === "temp-1"
+        ? { ...cached, id: "message-9", image_url: "https://cdn.test/photo.webp", status: "sent" as const }
+        : cached,
+    ),
+  );
+
+  const stored = msgCache.get("community-1") ?? [];
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0]?.id, "message-9");
+  assert.equal(stored[0]?.image_url, "https://cdn.test/photo.webp");
+});
+
+test("updateCachedMessages starts from an empty list for an uncached community", () => {
+  const next = updateCachedMessages("community-unknown", (prev) => [
+    ...prev,
+    message(),
+  ]);
+
+  assert.equal(next.length, 1);
+  assert.deepEqual(msgCache.get("community-unknown")?.map((c) => c.id), ["message-1"]);
 });
