@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Briefcase, Compass, Gamepad2, Home, Library, MessageSquare, Plus } from "lucide-react";
+import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -11,9 +11,13 @@ import { CreateCommunityModal } from "@/components/communities/CreateCommunityMo
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useNotifications } from "@/lib/use-notifications";
 import { BrandLogo } from "@/components/ui/BrandLogo";
+import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import { ProfileDropdown } from "@/app/dashboard/ProfileDropdown";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 import { BrowserNotificationInitializer } from "@/app/dashboard/BrowserNotificationInitializer";
+
+/** Where the beta notice sends members. */
+const WHATSAPP_COMMUNITY_URL = "https://chat.whatsapp.com/Cidu710nE4J1cXe91u4Eqe";
 
 interface SidebarUser {
   name: string;
@@ -69,7 +73,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const homeActive =
     isMatch("/dashboard", pathname) &&
     !isMatch("/dashboard/communities", pathname) &&
-    !isMatch("/dashboard/chat-with-designers", pathname) &&
     !isMatch("/dashboard/library", pathname) &&
     !isMatch("/dashboard/jobs", pathname) &&
     !isMatch("/dashboard/notifications", pathname);
@@ -77,7 +80,6 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const libraryActive = isMatch("/dashboard/library", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
   const notificationsActive = isMatch("/dashboard/notifications", pathname);
-  const designersActive = isMatch("/dashboard/chat-with-designers", pathname);
 
   return (
     <aside
@@ -181,20 +183,27 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               <span className="flex-1 truncate">Jobs</span>
             </Link>
           </li>
-          <li>
-            <Link
-              href="/dashboard/chat-with-designers"
-              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
-                designersActive
-                  ? "bg-surface-raised text-foreground"
-                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
-              }`}
-            >
-              <Gamepad2 size={15} className="shrink-0" />
-              <span className="flex-1 truncate">Chat with designers</span>
-            </Link>
-          </li>
         </ul>
+
+        {/* Beta notice — sits where the retired "Chat with designers" entry
+            used to, inviting members to the WhatsApp community. */}
+        <div className="mt-3 rounded-lg border border-[#25D366]/25 bg-[#25D366]/[0.08] px-[11px] py-[9px]">
+          <p className="flex items-center gap-[7px] font-body text-[11px] font-semibold text-[#25D366]">
+            <WhatsAppIcon size={13} className="shrink-0" />
+            We&apos;re in beta
+          </p>
+          <p className="mt-[5px] font-body text-[10px] leading-snug text-foreground-muted">
+            Join our WhatsApp group to help this application grow.
+          </p>
+          <a
+            href={WHATSAPP_COMMUNITY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-[7px] flex w-full items-center justify-center rounded-md bg-[#25D366] px-2 py-[6px] font-body text-[11px] font-semibold text-[#0b141a] transition-colors hover:bg-[#1ebe5b]"
+          >
+            Join now
+          </a>
+        </div>
       </div>
 
       {/* ALL — community list */}
