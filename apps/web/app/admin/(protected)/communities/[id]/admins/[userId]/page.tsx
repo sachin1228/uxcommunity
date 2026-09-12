@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CommunityActivityPanel } from "@/components/admin/communities/CommunityActivityPanel";
 import {
   PERMISSION_OPTIONS,
@@ -24,11 +25,6 @@ import {
   type CommunityPermissionKey,
 } from "@/components/admin/communities/communityTypes";
 import { fmtDate, fmtDateTime } from "@/components/admin/communities/communityTypes";
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "")).toUpperCase();
-}
 
 export default function CommunityAdminPermissionsPage() {
   const { id: communityId, userId } = useParams<{ id: string; userId: string }>();
@@ -150,9 +146,12 @@ export default function CommunityAdminPermissionsPage() {
       {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-6 py-5">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised font-display text-lg font-semibold text-foreground">
-            {initials(admin.name)}
-          </span>
+          <AvatarImg
+            url={null}
+            name={admin.name}
+            size={56}
+            className="h-14 w-14 shrink-0 rounded-full"
+          />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-xl font-semibold text-foreground truncate">{admin.name}</h1>

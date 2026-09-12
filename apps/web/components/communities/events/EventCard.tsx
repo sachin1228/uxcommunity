@@ -8,6 +8,7 @@ import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { usePendingMutation } from "@/lib/use-mutation";
@@ -141,13 +142,14 @@ function AvatarStack({
             <div
               key={rsvp.user_id ?? `idx-${index}`}
               style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111] bg-accent/15"
+              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111]"
             >
-              {rsvp.users?.avatar_url ? (
-                <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
-              ) : (
-                <span className="font-display text-[11px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
-              )}
+              <AvatarImg
+                url={rsvp.users?.avatar_url ?? null}
+                name={rsvp.users?.name ?? "Member"}
+                size={28}
+                className="size-full rounded-full object-cover"
+              />
             </div>
           ))}
         </div>

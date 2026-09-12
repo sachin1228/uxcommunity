@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search, ShieldCheck, X } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import {
   CommunityAdmin,
   ALL_PERMISSIONS,
@@ -18,11 +19,6 @@ interface Props {
 }
 
 const PAGE_SIZE = 30;
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "")).toUpperCase();
-}
 
 export function CommunityAdminSearchModal({ communityId, communityName, onClose, onPromoted }: Props) {
   const [query, setQuery] = useState("");
@@ -201,9 +197,12 @@ export function CommunityAdminSearchModal({ communityId, communityName, onClose,
                 const isPromoted = promotedIds.has(member.user_id);
                 return (
                   <li key={member.user_id} className="flex items-center gap-3 px-2 py-2.5">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-raised border border-border font-body text-[11px] font-semibold text-foreground">
-                      {initials(member.name)}
-                    </span>
+                    <AvatarImg
+                      url={null}
+                      name={member.name}
+                      size={36}
+                      className="h-9 w-9 shrink-0 rounded-full"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-sm font-medium text-foreground truncate leading-tight">{member.name}</p>
                       <p className="font-body text-[11px] text-foreground-muted truncate">{member.email}</p>

@@ -102,12 +102,6 @@ export default function UserDetailPage() {
   }
 
   const avatarUrl = user.designer_profiles?.avatar_url;
-  const initials = user.name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
 
   return (
     <div className="max-w-2xl">
@@ -123,20 +117,12 @@ export default function UserDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div className="flex items-center gap-4">
-          {avatarUrl ? (
-            <span className="h-16 w-16 shrink-0 rounded-full overflow-hidden ring-1 ring-border flex items-center justify-center bg-surface-raised">
-              <AvatarImg
-                url={avatarUrl}
-                name={user.name}
-                size={64}
-                className="h-16 w-16 rounded-full object-cover"
-              />
-            </span>
-          ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-surface-raised ring-1 ring-border font-display text-xl font-semibold text-foreground-muted select-none">
-              {initials}
-            </span>
-          )}
+          <AvatarImg
+            url={avatarUrl ?? null}
+            name={user.name}
+            size={64}
+            className="h-16 w-16 shrink-0 rounded-full object-cover ring-1 ring-border"
+          />
           <div>
             <h1 className="font-display text-2xl font-semibold text-foreground">{user.name}</h1>
             <span

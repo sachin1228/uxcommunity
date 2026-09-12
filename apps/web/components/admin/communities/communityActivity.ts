@@ -1,3 +1,4 @@
+import { nameInitials } from "@/lib/avatar";
 import type { CommunityActivityEntry } from "./communityTypes";
 
 /** Human-readable copy for each recorded management action. */
@@ -41,12 +42,7 @@ export function actorLabel(entry: CommunityActivityEntry): string {
 }
 
 export function actorInitials(name: string): string {
-  const clean = name.trim();
-  if (!clean) return "?";
-  const parts = clean.split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] ?? "" : "";
-  return (first + last).toUpperCase();
+  return nameInitials(name);
 }
 
 export function fmtActivityTime(iso: string): string {

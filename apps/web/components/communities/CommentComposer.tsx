@@ -7,6 +7,7 @@ import { Smile } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 
 /**
  * Matches a full emoji grapheme cluster (base + skin tone + keycap + ZWJ
@@ -37,18 +38,12 @@ export function renderEmojiText(text: string): ReactNode {
   return parts;
 }
 
+const AVATAR_PX = { xs: 20, sm: 24, md: 32 } as const;
+
 export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "xs" | "sm" | "md" }) {
-  const initial = name.charAt(0).toUpperCase();
-  const dim = size === "xs" ? "h-5 w-5 text-[8px]" : size === "sm" ? "h-6 w-6 text-[9px]" : "h-8 w-8 text-xs";
+  const px = AVATAR_PX[size];
   return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
-      {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-      ) : (
-        <span className="font-display font-bold text-accent">{initial}</span>
-      )}
-    </div>
+    <AvatarImg url={avatarUrl} name={name} size={px} className="shrink-0 object-cover" />
   );
 }
 

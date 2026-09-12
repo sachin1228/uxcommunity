@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { MessageSquare, Users } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
@@ -13,15 +14,12 @@ import { CommentSection } from "../CommentSection";
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
+const AVATAR_PX = { sm: 24, md: 32, lg: 40 } as const;
+
 function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" | "lg" }) {
-  const initial = (name || "M").charAt(0).toUpperCase();
-  const dim = size === "sm" ? "h-6 w-6 text-[9px]" : size === "lg" ? "h-10 w-10 text-sm" : "h-8 w-8 text-xs";
+  const px = AVATAR_PX[size];
   return (
-    <div className={`${dim} shrink-0 overflow-hidden rounded-full bg-accent/15 flex items-center justify-center`}>
-      {avatarUrl
-        ? <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-        : <span className="font-display font-bold text-accent">{initial}</span>}
-    </div>
+    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 object-cover" />
   );
 }
 
