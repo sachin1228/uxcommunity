@@ -319,6 +319,7 @@ export function EventCard({
   );
 
   return (
+    <>
     <article
       tabIndex={onOpen && !isDetail ? 0 : undefined}
       role={onOpen && !isDetail ? "link" : undefined}
@@ -422,18 +423,24 @@ export function EventCard({
         {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
 
-      {showEditModal && !past && (
-        <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
-      )}
-      <div onClick={(e) => e.stopPropagation()}>
-        <ConfirmDialog
-          open={confirmDelete}
-          title="Delete event?"
-          message="This will permanently remove this event. This cannot be undone."
-          onClose={() => setConfirmDelete(false)}
-          onConfirm={handleDelete}
-        />
-      </div>
     </article>
+
+    {/* Rendered outside the clickable card: the modal portals to document.body,
+        but React synthetic clicks still bubble through the React tree, so a
+        click inside the modal would otherwise trigger the card's onOpen and
+        navigate to the event view page. */}
+    {showEditModal && !past && (
+      <EditEventModal event={event} communityId={communityId} onClose={() => setShowEditModal(false)} onUpdated={onUpdated} />
+    )}
+    <div onClick={(e) => e.stopPropagation()}>
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete event?"
+        message="This will permanently remove this event. This cannot be undone."
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
+    </div>
+    </>
   );
 }
