@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
+import TruncateMarkup from "react-truncate-markup";
 import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
@@ -116,6 +117,10 @@ export function EventCard({
   const [rsvpError, setRsvpError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const descriptionId = useId();
+  const descriptionRef = useRef<HTMLParagraphElement | null>(null);
+  const description = event.description?.trim();
   const { toggleLike, toggleSave, savePending } = useEventInteractions({
     eventId: event.id,
     communityId,
@@ -206,9 +211,6 @@ export function EventCard({
                 <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
               ) : (
                 <h3 className="line-clamp-2 text-balance font-display text-sm font-bold leading-snug text-foreground">{event.title}</h3>
-              )}
-              {event.description && (
-                <p className={`mt-1 font-body text-[11px] leading-4 text-foreground-muted ${isDetail ? "line-clamp-3 text-pretty" : "line-clamp-2"}`}>{event.description}</p>
               )}
             </div>
           </div>
@@ -326,6 +328,52 @@ export function EventCard({
           </div>
         </div>
       )}
+      {/* ── Description — rendered like a thread card body ── */}
+      {description && (
+        isDetail || descriptionExpanded ? (
+          <p
+            id={descriptionId}
+            ref={descriptionRef}
+            tabIndex={-1}
+            className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+          >
+            {description}
+          </p>
+        ) : (
+          <TruncateMarkup
+            lines={2}
+            ellipsis={
+              <span className="whitespace-nowrap">
+                {"\u2060… "}
+                <button
+                  type="button"
+                  aria-expanded={false}
+                  aria-controls={descriptionId}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDescriptionExpanded(true);
+                    requestAnimationFrame(() => descriptionRef.current?.focus({ preventScroll: true }));
+                  }}
+                  className="inline rounded-sm align-baseline font-body text-sm font-medium text-foreground-subtle transition-colors hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  Read more
+                </button>
+              </span>
+            }
+          >
+            <p
+              id={descriptionId}
+              ref={descriptionRef}
+              tabIndex={-1}
+              className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
+            >
+              {description}
+            </p>
+          </TruncateMarkup>
+        )
+      )}
+
       <div className="mt-4">{eventBody}</div>
 
       <div className="mt-3 flex items-center justify-between gap-4">
