@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronRight, Plus, ShieldCheck, ShieldOff } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CommunityAdminSearchModal } from "./CommunityAdminSearchModal";
 import {
   type CommunityAdmin,
@@ -20,15 +21,6 @@ const PERM_CHIP: Record<CommunityPermissionKey, string> = {
 interface Props {
   communityId: string;
   communityName: string;
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .toUpperCase();
 }
 
 export function CommunityAdminsPanel({ communityId, communityName }: Props) {
@@ -134,9 +126,12 @@ export function CommunityAdminsPanel({ communityId, communityName }: Props) {
                   key={admin.user_id}
                   className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 hover:bg-surface-raised/60 transition-colors"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-surface-raised font-body text-xs font-semibold text-foreground">
-                    {initialsOf(admin.name)}
-                  </span>
+                  <AvatarImg
+                    url={null}
+                    name={admin.name}
+                    size={40}
+                    className="h-10 w-10 shrink-0 rounded-full"
+                  />
 
                   <div className="min-w-0 flex-1">
                     <p className="font-body text-sm font-medium text-foreground truncate">{admin.name}</p>

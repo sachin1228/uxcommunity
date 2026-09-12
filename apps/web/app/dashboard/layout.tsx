@@ -36,7 +36,6 @@ export default async function DashboardLayout({
   const email = user?.email ?? session.email ?? "";
   const avatarUrl =
     (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null;
-  const initial = name.charAt(0).toUpperCase();
   const userId = session.userId!;
 
   // One-time repair for members whose profile communities were never joined at
@@ -61,7 +60,7 @@ export default async function DashboardLayout({
     }
   }
 
-  const sidebarUser = { name, email, avatarUrl, initial };
+  const sidebarUser = { name, email, avatarUrl };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">

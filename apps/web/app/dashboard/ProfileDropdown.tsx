@@ -12,12 +12,11 @@ interface Props {
   name: string;
   email: string;
   avatarUrl: string | null;
-  initial: string;
   /** "icon" (default) — compact avatar button for bars; "row" — full-width row for the sidebar. */
   variant?: "icon" | "row";
 }
 
-export function ProfileDropdown({ name, email, avatarUrl, initial, variant = "icon" }: Props) {
+export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Props) {
   const isRow = variant === "row";
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -39,24 +38,12 @@ export function ProfileDropdown({ name, email, avatarUrl, initial, variant = "ic
             : "flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border focus:outline-none"
         }
       >
-        {avatarUrl ? (
-          <AvatarImg
-            url={avatarUrl}
-            name={name}
-            size={isRow ? 32 : 28}
-            className={isRow ? "h-8 w-8 shrink-0 rounded-full object-cover" : "h-7 w-7 rounded-full object-cover"}
-          />
-        ) : (
-          <div
-            className={`flex shrink-0 items-center justify-center rounded-full bg-accent select-none ${
-              isRow ? "h-8 w-8" : "h-7 w-7"
-            }`}
-          >
-            <span className={`font-display font-semibold text-accent-foreground ${isRow ? "text-sm" : "text-xs"}`}>
-              {initial}
-            </span>
-          </div>
-        )}
+        <AvatarImg
+          url={avatarUrl}
+          name={name}
+          size={isRow ? 32 : 28}
+          className={isRow ? "h-8 w-8 shrink-0 rounded-full object-cover" : "h-7 w-7 rounded-full object-cover"}
+        />
         {isRow && (
           <span className="min-w-0 flex-1">
             <span className="block truncate font-body text-sm font-medium leading-tight text-foreground">

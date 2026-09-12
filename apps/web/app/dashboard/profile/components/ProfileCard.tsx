@@ -40,15 +40,7 @@ export function ProfileCard({
         {/* Avatar */}
         <div className="flex flex-col items-center justify-center gap-2 px-5 py-4 shrink-0">
           <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-border bg-accent/20">
-            {avatarUrl ? (
-              <AvatarImg url={avatarUrl} name={name} size={56} className="w-14 h-14 object-cover" />
-            ) : (
-              <div className="w-14 h-14 flex items-center justify-center">
-                <span className="font-display text-xl font-bold text-accent">
-                  {name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
+            <AvatarImg url={avatarUrl} name={name} size={56} className="w-14 h-14 object-cover" />
           </div>
           <button
             onClick={onOpenAvatarPicker}

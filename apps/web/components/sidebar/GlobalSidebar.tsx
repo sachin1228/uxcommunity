@@ -19,7 +19,6 @@ interface SidebarUser {
   name: string;
   email: string;
   avatarUrl: string | null;
-  initial: string;
 }
 
 interface Props {

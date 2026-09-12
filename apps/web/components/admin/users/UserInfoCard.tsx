@@ -30,25 +30,19 @@ export function UserInfoCard({ user, application, interests }: Props) {
       <InfoRow
         label="Profile picture"
         value={
-          avatarUrl ? (
-            <div className="flex items-center gap-3">
-              <span className="h-10 w-10 shrink-0 rounded-full overflow-hidden flex items-center justify-center bg-surface-raised">
-                <AvatarImg
-                  url={avatarUrl}
-                  name={user.name}
-                  size={40}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              </span>
-              <span className="text-foreground-muted text-xs">
-                {AVATAR_SOURCE_LABELS[profile?.avatar_source ?? ""] ??
-                  profile?.avatar_source ??
-                  ""}
-              </span>
-            </div>
-          ) : (
-            <span className="text-foreground-muted">No avatar set</span>
-          )
+          <div className="flex items-center gap-3">
+            <AvatarImg
+              url={avatarUrl}
+              name={user.name}
+              size={40}
+              className="h-10 w-10 shrink-0 rounded-full object-cover"
+            />
+            <span className="text-foreground-muted text-xs">
+              {avatarUrl
+                ? (AVATAR_SOURCE_LABELS[profile?.avatar_source ?? ""] ?? profile?.avatar_source ?? "")
+                : "No avatar set"}
+            </span>
+          </div>
         }
       />
 

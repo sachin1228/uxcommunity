@@ -32,10 +32,12 @@ export function ThreadsView({
   communityId,
   currentUserId,
   onThreadCreated,
+  onThreadDeleted,
 }: {
   communityId: string;
   currentUserId: string;
   onThreadCreated?: (thread: CommunityThread) => void;
+  onThreadDeleted?: (threadId: string) => void;
 }) {
   initRequestCache(currentUserId);
   const router = useGuardedRouter();
@@ -186,6 +188,10 @@ export function ThreadsView({
 
   function handleDeleted(threadId: string) {
     writeCache((cur) => cur.filter((t) => t.id !== threadId));
+    // Mirror the local create callback: drop the thread's chat notification in
+    // the same frame instead of waiting for the realtime round trip (which
+    // never arrives in environments without a realtime worker).
+    onThreadDeleted?.(threadId);
   }
 
   // ── Load older threads (keyset pagination via ?cursor=createdAt|id) ──────

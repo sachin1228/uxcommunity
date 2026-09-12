@@ -11,8 +11,8 @@ interface ChatAvatarProps {
 export function ChatAvatar({ name, url, size = 8 }: ChatAvatarProps) {
   const px = size * 4;
 
-  // AvatarImg always renders something — either the stored avatar or a
-  // deterministic boring-avatar generated from the user's name.
+  // AvatarImg always renders something — either the stored picture or the
+  // shared name-initials fallback (same one used across the whole app).
   return (
     <AvatarImg
       url={url}

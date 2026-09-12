@@ -183,6 +183,14 @@ export function CommunityChat({
     });
   }, []);
 
+  // Symmetric with handleThreadCreated: when the creator deletes a thread from
+  // the Threads tab, its "created a new thread" bubble must disappear from chat
+  // immediately rather than lingering until (or forever without) the realtime
+  // thread-delete echo.
+  const handleThreadDeleted = useCallback((threadId: string) => {
+    setThreadEvents((prev) => prev.filter((event) => event.id !== threadId));
+  }, []);
+
   // Prime only first-render data. Secondary tabs fetch from their own cached
   // endpoints when mounted, so their work cannot delay the chat shell.
   useEffect(() => {
@@ -1246,6 +1254,7 @@ export function CommunityChat({
             communityId={communityId}
             currentUserId={currentUserId}
             onThreadCreated={handleThreadCreated}
+            onThreadDeleted={handleThreadDeleted}
           />
         ) : renderedTab === "events" ? (
           <EventsView communityId={communityId} currentUserId={currentUserId} />

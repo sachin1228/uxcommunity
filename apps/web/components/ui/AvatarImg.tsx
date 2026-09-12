@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { avatarBackground, nameInitials } from "@/lib/avatar";
 
 const GENERATED_PROFILE_PICTURE_PATTERNS = [
   /^boring:\/\//i,
@@ -15,30 +16,30 @@ export function isGeneratedProfilePicture(url: string | null | undefined): boole
   return Boolean(url && GENERATED_PROFILE_PICTURE_PATTERNS.some((pattern) => pattern.test(url)));
 }
 
-function initialsForName(name: string): string {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-
-  return initials || "U";
-}
-
 interface AvatarImgProps {
   url: string | null | undefined;
   name?: string;
   size?: number;
   className?: string;
+  /**
+   * Renders the initials fallback as a circle (default). Pass false for square
+   * frames (e.g. the profile polaroid) that supply their own rounding.
+   */
+  rounded?: boolean;
 }
 
+/**
+ * The single avatar renderer for the whole app. When there is no picture (or
+ * the stored one fails to load / is a retired generated avatar) it renders the
+ * member's initials on a deterministic color, so every surface — chat, cards,
+ * member lists, sidebars, admin — shows the same fallback.
+ */
 export function AvatarImg({
   url,
   name = "User",
   size = 40,
   className,
+  rounded = true,
 }: AvatarImgProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
@@ -47,10 +48,17 @@ export function AvatarImg({
       <span
         role="img"
         aria-label={`${name}'s profile picture placeholder`}
-        className={`inline-flex shrink-0 items-center justify-center rounded-full bg-accent-soft font-body font-semibold text-accent ${className ?? ""}`}
-        style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.35)) }}
+        className={`inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-body font-semibold text-white ${
+          rounded ? "rounded-full" : ""
+        } ${className ?? ""}`}
+        style={{
+          width: size,
+          height: size,
+          backgroundColor: avatarBackground(name),
+          fontSize: Math.max(10, Math.round(size * 0.38)),
+        }}
       >
-        {initialsForName(name)}
+        {nameInitials(name)}
       </span>
     );
   }

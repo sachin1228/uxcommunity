@@ -55,15 +55,13 @@ export function ProfileHero({
               style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.2)" }}
             >
               <div className="w-28 h-28 overflow-hidden rounded-sm bg-overlay-elevated">
-                {avatarUrl ? (
-                  <AvatarImg url={avatarUrl} name={name} size={112} className="w-28 h-28 object-cover" />
-                ) : (
-                  <div className="w-28 h-28 flex items-center justify-center bg-accent/20">
-                    <span className="font-display text-4xl font-bold text-accent">
-                      {name.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                )}
+                <AvatarImg
+                  url={avatarUrl}
+                  name={name}
+                  size={112}
+                  rounded={false}
+                  className="w-28 h-28 object-cover"
+                />
               </div>
             </div>
           </div>

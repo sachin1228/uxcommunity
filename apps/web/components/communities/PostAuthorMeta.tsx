@@ -1,3 +1,4 @@
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { formatRelativeDate } from "./threads/threadShared";
 
 interface PostAuthorMetaProps {
@@ -23,19 +24,17 @@ export function PostAuthorMeta({
   className = "",
 }: PostAuthorMetaProps) {
   const authorName = name ?? "Member";
-  const authorInitial = authorName.charAt(0).toUpperCase();
   const relativeDate = dateLabel ?? formatRelativeDate(createdAt);
   const editedSuffix = edited ? " · edited" : "";
 
   return (
     <div className={`flex min-w-0 items-center gap-3 ${className}`}>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent/15">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
-        ) : (
-          <span className="font-display text-sm font-bold text-accent">{authorInitial}</span>
-        )}
-      </div>
+      <AvatarImg
+        url={avatarUrl}
+        name={authorName}
+        size={40}
+        className="h-10 w-10 shrink-0 rounded-full object-cover"
+      />
       <div className="flex min-w-0 flex-col">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="truncate font-body text-sm font-semibold text-foreground">
