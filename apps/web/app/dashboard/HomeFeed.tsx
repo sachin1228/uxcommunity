@@ -140,6 +140,27 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     ));
   }, [updateItems]);
 
+  // The home feed has no realtime subscription, so the attendee avatar
+  // previews must be refetched once an RSVP settles — otherwise the current
+  // user's avatar never appears in the stack until the next full feed load.
+  const handleEventRsvpSettled = useCallback(async (item: FeedEvent) => {
+    if (!item.community_id) return;
+    try {
+      const response = await fetch(
+        `/api/communities/${item.community_id}/events/${item.id}/rsvp/list`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { rsvps?: EventRsvp[] };
+      updateItems((prev) => prev.map((it) =>
+        it._type === "event" && it.id === item.id
+          ? { ...it, rsvps: data.rsvps ?? [] }
+          : it
+      ));
+    } catch {
+      // Non-fatal — previews catch up on the next feed fetch.
+    }
+  }, [updateItems]);
+
   const handleEventLikeChanged = useCallback((id: string, liked: boolean, count: number) => {
     updateItems((prev) => prev.map((it) =>
       it._type === "event" && it.id === id
@@ -326,6 +347,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
                 onUpdated={handleEventUpdated}
                 onDeleted={handleEventDeleted}
                 onRsvpChanged={handleEventRsvpChanged}
+                onRsvpSettled={() => handleEventRsvpSettled(group.item)}
                 onLikeChanged={handleEventLikeChanged}
                 onSaveChanged={handleEventSaveChanged}
               />

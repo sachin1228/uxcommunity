@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
+import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 const PAGE_SIZE = 30;
@@ -98,8 +99,8 @@ const loadFeedPage = unstable_cache(
         : item,
     );
   },
-  ["home-feed"],
-  { revalidate: 10 },
+  ["home-feed", HOME_FEED_TAG],
+  { revalidate: 10, tags: [HOME_FEED_TAG] },
 );
 
 export async function GET(req: NextRequest) {
