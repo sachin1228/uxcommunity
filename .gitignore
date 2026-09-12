@@ -64,7 +64,7 @@ yarn-error.log*
 # =========================
 # Supabase
 # =========================
-supabase/.temp/
+**/supabase/.temp/
 supabase/.branches/
 
 # =========================

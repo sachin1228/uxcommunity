@@ -219,12 +219,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     // ── effects ────────────────────────────────────────────────────────────
 
-    // Reset dismissed URL state when the preview URL changes
-    useEffect(() => {
-      if (dismissedUrl && linkPreviewUrl !== dismissedUrl) {
-        setDismissedUrl(null);
-      }
-    }, [linkPreviewUrl, dismissedUrl]);
+    // No effect is needed to clear `dismissedUrl` when the preview URL changes:
+    // the render below already ignores a dismissal that belongs to a different
+    // URL (`linkPreviewUrl !== dismissedUrl`), so a stale value can never hide
+    // the preview for a new link.
 
     // Close picker on Escape
     useEffect(() => {

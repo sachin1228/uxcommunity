@@ -214,9 +214,23 @@ export function ThreadCard({
   }, [thread.user_saved]);
 
   // Reflect externally-confirmed totals (parent sync or realtime) once they land.
-  useEffect(() => {
+  //
+  // Adjusting during render instead of in an effect drops the optimistic
+  // override in the same commit — an effect would render the stale optimistic
+  // counts first and then re-render. Guarded by a stored previous value, this
+  // is React's documented "adjusting state when a prop changes" pattern.
+  const pollServerSignature = [
+    thread.poll_vote_counts?.join(",") ?? "",
+    thread.poll_user_vote ?? "",
+    thread.poll_undo_used ?? "",
+  ].join("|");
+  const [seenPollServerSignature, setSeenPollServerSignature] = useState(
+    pollServerSignature,
+  );
+  if (seenPollServerSignature !== pollServerSignature) {
+    setSeenPollServerSignature(pollServerSignature);
     setPollVoteOverride(null);
-  }, [thread.poll_vote_counts, thread.poll_user_vote, thread.poll_undo_used]);
+  }
 
   function handleSave(e: React.MouseEvent) {
     e.preventDefault();

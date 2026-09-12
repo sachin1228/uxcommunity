@@ -11,21 +11,22 @@ function ResetPasswordInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  const [pageState, setPageState] = useState<PageState>("loading");
+  // A token decides the initial view — a missing one means the link is invalid.
+  // (The full server-side check happens on submit.) Derived during render so
+  // the page never flashes its loading state before settling.
+  const [pageState, setPageState] = useState<PageState>(token ? "form" : "invalid");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
-  // Validate that a token was provided (full server-side validation happens on submit)
-  useEffect(() => {
-    if (!token) {
-      setPageState("invalid");
-    } else {
-      setPageState("form");
-    }
-  }, [token]);
+  // Re-derive if the token changes without the component remounting.
+  const [seenToken, setSeenToken] = useState(token);
+  if (seenToken !== token) {
+    setSeenToken(token);
+    setPageState(token ? "form" : "invalid");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

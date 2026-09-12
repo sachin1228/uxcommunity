@@ -80,8 +80,15 @@ export default function AdminApplicationsPage() {
       .catch(() => {});
   }, []);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(1); }, [statusFilter, search, tagFilter]);
+  // Reset to page 1 when the filters change. Adjusted during render rather than
+  // in an effect, so the fetch below never first fires a request for the *old*
+  // page with the *new* filters (which the effect version did).
+  const filterSignature = `${statusFilter}|${search}|${tagFilter}`;
+  const [seenFilterSignature, setSeenFilterSignature] = useState(filterSignature);
+  if (seenFilterSignature !== filterSignature) {
+    setSeenFilterSignature(filterSignature);
+    setPage(1);
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

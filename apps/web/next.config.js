@@ -16,11 +16,22 @@ const nextConfig = {
     proxyClientMaxBodySize: "55mb",
   },
 
-  // Supabase-js has no generated types file in this project, which causes
-  // tsc to infer `never` on every query result across the codebase. These
-  // are pre-existing schema-inference issues — not runtime bugs — and are
-  // fixed properly by running `supabase gen types typescript`. Until then,
-  // skip TS type-checking at build time so deployments are not blocked.
+  // The generated schema is committed (lib/supabase/database.types.ts) and
+  // wired into the service client with `createClient<Database>(...)`. That
+  // removed the ~618 `never` errors that previously made every `.select()`
+  // result unusable — the total fell from 767 to 89. Regenerate the schema
+  // with `npm run db:types` after a migration.
+  //
+  // The 89 that remain are genuine (argument narrowing, dynamic table names
+  // where `from()` takes a variable, a few column mismatches) rather than
+  // schema-inference noise. Keep skipping the check at build time until they
+  // are cleared, then set this to false so `next build` guards them again.
+  //
+  // NOTE: this flag only affects `next build`. `next dev` does not type-check
+  // at all (the checker lives in Next's build path), so this is NOT what keeps
+  // type errors out of the dev server. `npm run dev` therefore runs the dev
+  // server alongside `tsc --watch` (scripts/dev-with-typecheck.mjs) so the
+  // errors stay visible on localhost:3000 while developing.
   typescript: {
     ignoreBuildErrors: true,
   },

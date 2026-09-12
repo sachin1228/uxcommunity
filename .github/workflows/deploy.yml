@@ -151,3 +151,59 @@ jobs:
         # dashboard that aren't in .dev.vars (e.g. NEXT_PUBLIC_*).
         run: npx opennextjs-cloudflare deploy -- --keep-vars
 
+  # ── Advisory static analysis ────────────────────────────────────────────
+  # Reports TypeScript and ESLint problem counts on every push to main.
+  #
+  # This job is deliberately NON-BLOCKING. The repo carries a backlog of
+  # pre-existing errors — the bulk of the TypeScript ones are Supabase
+  # schema-inference errors caused by the missing generated types file (see
+  # apps/web/next.config.js) — so gating deploys on them would stop all work.
+  # Its job is to make the counts visible and stop them growing silently.
+  # Remove `continue-on-error` once both counts reach zero.
+  static-analysis:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript
+        working-directory: apps/web
+        shell: bash
+        run: |
+          # `set +e` because both tsc and grep exit non-zero on findings, and
+          # GitHub runs `shell: bash` steps with `-e`.
+          set +e
+          npx tsc --noEmit > /tmp/tsc.log 2>&1
+          total=$(grep -c 'error TS' /tmp/tsc.log)
+          {
+            echo "### TypeScript: ${total:-0} error(s)"
+            echo '```'
+            grep -oE 'error TS[0-9]+' /tmp/tsc.log | sort | uniq -c | sort -rn | head -10
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: ESLint
+        working-directory: apps/web
+        shell: bash
+        env:
+          # Stay well clear of the heap limit; the config also ignores build
+          # output, which is what used to blow this up locally.
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: |
+          set +e
+          npx eslint . > /tmp/eslint.log 2>&1
+          {
+            echo "### ESLint"
+            echo '```'
+            tail -3 /tmp/eslint.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+

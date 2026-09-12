@@ -306,7 +306,7 @@ export function EventCard({
             : "bg-[var(--accent)] text-stone-950 shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]"
       }`}
     >
-      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
+      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I&apos;m Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
     </button>
   ) : (
     <span className="font-display text-xs font-medium text-stone-500">This event has ended</span>
