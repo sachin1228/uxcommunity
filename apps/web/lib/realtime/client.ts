@@ -100,7 +100,8 @@ interface ConnectionState {
  *
  * Manages multiple WebSockets:
  *   - One per active community (for community-scoped rooms)
- *   - One for user-scoped rooms (notifications, profile, designers-studio)
+ *   - One per browser for user-scoped rooms (notifications, profile,
+ *     designers-studio), keyed `user:${userId}` so it lands on that user's DO
  *
  * Reference-counted lifecycle:
  *   on(room, topic, handler)  → increments topic refcount, subscribes if first
@@ -114,7 +115,7 @@ interface ConnectionState {
  *   - No presence handlers
  */
 class RealtimeClient {
-  /** connection key (room name or "user:global") → connection state */
+  /** connection key (community room name, or `user:${userId}`) → connection state */
   private connections = new Map<string, ConnectionState>();
   /** roomName → room subscription state */
   private rooms = new Map<string, RoomState>();
@@ -130,12 +131,66 @@ class RealtimeClient {
   private lifecycleBound = false;
 
   init(user: RealtimeUser): void {
+    const previousKey = this.userConnectionKey();
     this.user = user;
+
+    // The user-scoped socket is addressed by user id, and the server publishes
+    // user-scoped rooms to `user:${userId}`. If identity arrives (or changes)
+    // after such a socket already exists under the previous key, re-key it —
+    // otherwise this browser sits on a DO nobody publishes to and user-scoped
+    // events are silently dropped.
+    const nextKey = this.userConnectionKey();
+    if (previousKey !== nextKey) this.migrateConnection(previousKey, nextKey);
+
     // Store user on all existing connections
     for (const [, conn] of this.connections) {
       if (!conn.user) conn.user = user;
     }
     this.bindLifecycle();
+  }
+
+  /** Connection key for every non-community (user-scoped) room. */
+  private userConnectionKey(): string {
+    return this.user ? `user:${this.user.id}` : "user:global";
+  }
+
+  /**
+   * Move a user-scoped socket to a new connection key, replaying its local
+   * subscriptions on the replacement socket.
+   */
+  private migrateConnection(fromKey: string, toKey: string): void {
+    const previous = this.connections.get(fromKey);
+    if (!previous) return;
+
+    previous.manuallyClosed = true;
+    if (previous.reconnectTimer !== null) {
+      clearTimeout(previous.reconnectTimer);
+      previous.reconnectTimer = null;
+    }
+    this.stopHeartbeat(previous);
+    previous.pending = [];
+    if (previous.ws) {
+      this.detachSocket(previous.ws);
+      try { previous.ws.close(); } catch { /* ignore */ }
+      previous.ws = null;
+    }
+    previous.connected = false;
+    this.connections.delete(fromKey);
+
+    // Something still wanted a user socket — bring one up under the new key.
+    const stillWanted = [...this.rooms.values()].some(
+      (state) =>
+        !isCommunityRoom(state.room) &&
+        (state.subscribeRefs > 0 ||
+          state.topicRefs.size > 0 ||
+          state.presenceHandlers.size > 0),
+    );
+    if (stillWanted) {
+      const next = this.getOrCreateConnection(toKey);
+      next.user = this.user;
+      next.manuallyClosed = false;
+      this.openConnection(next);
+    }
   }
 
   /** Set the session JWT for authenticated WebSocket connections. */
@@ -438,12 +493,13 @@ class RealtimeClient {
 
   private getRoomConnection(room: string): ConnectionState {
     // Community-scoped rooms get their own connection keyed by room name
-    // User-scoped rooms share a connection keyed by "user:global"
     if (isCommunityRoom(room)) {
       return this.getOrCreateConnection(room);
     }
-    // For non-community rooms, use a shared "user" connection
-    return this.getOrCreateConnection("user:global");
+    // Every user-scoped room is multiplexed over one socket to that user's
+    // UserDO — the same instance the server publishes `notifications:${userId}`
+    // and `profile:${userId}` to.
+    return this.getOrCreateConnection(this.userConnectionKey());
   }
 
   // ── Subscription management (reference-counted) ──────────────────────────
@@ -533,7 +589,7 @@ class RealtimeClient {
         // Last handler removed — unsubscribe from server
         state.topicRefs.delete(topic);
         state.topicHandlers.delete(topic);
-        const conn = this.connections.get(isCommunityRoom(room) ? room : "user:global");
+        const conn = this.connections.get(isCommunityRoom(room) ? room : this.userConnectionKey());
         if (conn?.ws && conn.ws.readyState === WebSocket.OPEN) {
           this.sendToConnection(conn, { t: "unsubscribe", room, topic });
         }

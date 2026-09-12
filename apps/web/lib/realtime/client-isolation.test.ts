@@ -5,19 +5,27 @@ import test, { afterEach, beforeEach } from "node:test";
  * Isolation tests for RealtimeClient — proves:
  *
  * 1. Two RealtimeClient instances (simulating two browser tabs) have
- *    separate connections maps, so "user:global" is instance-local.
+ *    separate connections maps, so the user-scoped socket is instance-local.
  *
  * 2. Closing one community connection does not affect other community
- *    connections or the user:global connection on the same instance.
+ *    connections or the user-scoped socket on the same instance.
  *
  * 3. User A's user-scoped events cannot reach User B's instance.
  *
+ * CONTRACT (the server depends on this):
+ * - There is exactly ONE user-scoped socket per browser, keyed `user:${userId}`,
+ *   carrying every user-scoped room (notifications:*, profile:*,
+ *   designers-studio) as subscribe frames.
+ * - apps/realtime/src/index.ts resolveRoomTarget() publishes user-scoped rooms
+ *   to that same `user:${userId}` DO instance. If this key and the server's
+ *   target ever disagree, those publishes land in a Durable Object with no
+ *   sockets and are silently dropped.
+ *
  * FINDINGS:
- * - init() only sets user on EXISTING connections. If called before on()
- *   (which creates the connection), conn.user remains null.
- * - user:global is never removed by maybeRemoveConnection (by design:
- *   it persists for the tab lifetime).
- * - The second init() call wins if it runs after the connection is created.
+ * - The user-scoped socket is never removed by maybeRemoveConnection (by
+ *   design: it persists for the tab lifetime).
+ * - init() with a different identity re-keys the socket to that user's DO, so
+ *   a login or user switch cannot leave the browser on a stale instance.
  *
  * NOTE: These tests instantiate RealtimeClient directly (not the exported
  * singleton) to simulate two browser tabs.
@@ -47,6 +55,11 @@ function isManuallyClosed(client: any, key: string): boolean {
   return conn?.manuallyClosed === true;
 }
 
+/** Key of the single user-scoped socket — mirrors RealtimeClient.userConnectionKey(). */
+function userKey(client: any): string {
+  return client.user ? `user:${client.user.id}` : "user:global";
+}
+
 // ── Cleanup ────────────────────────────────────────────────────────────────
 
 let clientA: any;
@@ -66,7 +79,7 @@ afterEach(() => {
 // TEST 1: "user:global" is scoped to the individual RealtimeClient instance
 // ══════════════════════════════════════════════════════════════════════════
 
-test("user:global is instance-local — two RealtimeClient instances have separate connections", () => {
+test("user-scoped socket is keyed per user and is instance-local", () => {
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
   clientB.init({ id: "user-b", name: "Bob", avatar: null });
 
@@ -76,8 +89,8 @@ test("user:global is instance-local — two RealtimeClient instances have separa
   const keysA = getConnectionKeys(clientA);
   const keysB = getConnectionKeys(clientB);
 
-  assert.deepStrictEqual(keysA, ["user:global"]);
-  assert.deepStrictEqual(keysB, ["user:global"]);
+  assert.deepStrictEqual(keysA, ["user:user-a"]);
+  assert.deepStrictEqual(keysB, ["user:user-b"]);
 
   assert.notStrictEqual(
     (clientA as any).connections,
@@ -89,7 +102,7 @@ test("user:global is instance-local — two RealtimeClient instances have separa
   unsubB();
 });
 
-test("two instances' user:global connections are independent", () => {
+test("two instances' user-scoped connections are independent", () => {
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
   clientB.init({ id: "user-b", name: "Bob", avatar: null });
 
@@ -120,7 +133,7 @@ test("init() before on() persists the user onto connections created later", () =
   const unsub = clientA.on("notifications:user-a", "updates", () => {});
 
   assert.deepStrictEqual(
-    getUserOnConnection(clientA, "user:global"),
+    getUserOnConnection(clientA, userKey(clientA)),
     { id: "user-a", name: "Alice", avatar: null },
     "connections created after init() must carry the user so they send `join`",
   );
@@ -128,36 +141,57 @@ test("init() before on() persists the user onto connections created later", () =
   unsub();
 });
 
-test("first init() identity sticks on an existing connection; later init() does not overwrite it", () => {
+test("init() with a different identity re-keys the user socket to that user's DO", () => {
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
   const unsub = clientA.on("notifications:user-a", "updates", () => {});
 
-  // Second init — connection already has a user, so it is left untouched
+  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:user-a"]);
+
+  // A different identity must MOVE the socket: the server only publishes
+  // user-scoped rooms to `user:${userId}`, so staying on user-a would drop
+  // every event meant for user-c.
   clientA.init({ id: "user-c", name: "Charlie", avatar: null });
 
+  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:user-c"]);
   assert.deepStrictEqual(
-    getUserOnConnection(clientA, "user:global"),
-    { id: "user-a", name: "Alice", avatar: null },
-    "existing connection keeps its original identity",
+    getUserOnConnection(clientA, "user:user-c"),
+    { id: "user-c", name: "Charlie", avatar: null },
+    "the re-keyed connection carries the new identity so it sends `join`",
   );
 
   unsub();
 });
 
-test("init() after on() correctly sets user on existing connection", () => {
-  // Create connection first
+test("init() after on() re-keys the placeholder socket and attaches identity", () => {
+  // Connection created before any identity exists
   const unsub = clientA.on("notifications:user-a", "updates", () => {});
-  assert.strictEqual(getUserOnConnection(clientA, "user:global"), null);
+  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:global"]);
 
-  // Then init — should set user on existing connection
   clientA.init({ id: "user-a", name: "Alice", avatar: null });
+
+  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:user-a"]);
   assert.deepStrictEqual(
-    getUserOnConnection(clientA, "user:global"),
+    getUserOnConnection(clientA, "user:user-a"),
     { id: "user-a", name: "Alice", avatar: null },
-    "init() after on() correctly sets user",
+    "identity lands on the re-keyed connection",
   );
 
   unsub();
+});
+
+test("every user-scoped room multiplexes over ONE socket to the user's DO", () => {
+  clientA.init({ id: "user-a", name: "Alice", avatar: null });
+
+  const unsubNotif = clientA.on("notifications:user-a", "insert", () => {});
+  const unsubProfile = clientA.on("profile:user-a", "thread", () => {});
+  const unsubDesigners = clientA.on("designers-studio", "presence", () => {});
+
+  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:user-a"],
+    "three user-scoped rooms must share a single socket — one socket per room would miss the DO the server publishes to");
+
+  unsubNotif();
+  unsubProfile();
+  unsubDesigners();
 });
 
 test("destroy() clears all connections, allowing fresh init with new user", () => {
@@ -175,7 +209,7 @@ test("destroy() clears all connections, allowing fresh init with new user", () =
 
   assert.strictEqual(getConnectionCount(clientA), 1);
   assert.deepStrictEqual(
-    getUserOnConnection(clientA, "user:global"),
+    getUserOnConnection(clientA, userKey(clientA)),
     { id: "user-b", name: "Bob", avatar: null },
     "fresh connection after destroy() uses the latest init() identity",
   );
@@ -199,7 +233,7 @@ test("community connections are keyed by room name, not user:global", () => {
   unsubCommB();
 });
 
-test("closing community A does not affect community B or user:global", () => {
+test("closing community A does not affect community B or the user socket", () => {
   const unsubCommA = clientA.on("chat:community-a", "chat", () => {});
   const unsubCommB = clientA.on("chat:community-b", "chat", () => {});
   const unsubNotif = clientA.on("notifications:user-a", "updates", () => {});
@@ -209,27 +243,27 @@ test("closing community A does not affect community B or user:global", () => {
   unsubCommA();
 
   const keysAfter = getConnectionKeys(clientA).sort();
-  assert.deepStrictEqual(keysAfter, ["chat:community-b", "user:global"]);
+  assert.deepStrictEqual(keysAfter, ["chat:community-b", userKey(clientA)].sort());
   assert.strictEqual(getConnectionCount(clientA), 2);
 
   unsubCommB();
   unsubNotif();
 });
 
-test("FINDING: user:global is never removed by maybeRemoveConnection", () => {
+test("FINDING: the user socket is never removed by maybeRemoveConnection", () => {
   const unsubNotif = clientA.on("notifications:user-a", "updates", () => {});
   assert.strictEqual(getConnectionCount(clientA), 1);
 
   // Unsubscribe from the only user-scoped room
   unsubNotif();
 
-  // user:global persists (by design: maybeRemoveConnection returns early for non-community rooms)
+  // Persists by design: maybeRemoveConnection returns early for non-community rooms
   assert.strictEqual(getConnectionCount(clientA), 1,
-    "user:global persists even after all user-scoped rooms are unsubscribed");
-  assert.deepStrictEqual(getConnectionKeys(clientA), ["user:global"]);
+    "the user socket persists even after all user-scoped rooms are unsubscribed");
+  assert.deepStrictEqual(getConnectionKeys(clientA), [userKey(clientA)]);
 });
 
-test("closing user:global room does not remove the connection (by design) but does not affect community connections", () => {
+test("closing a user-scoped room does not remove the connection (by design) but does not affect community connections", () => {
   const unsubCommA = clientA.on("chat:community-a", "chat", () => {});
   const unsubNotif = clientA.on("notifications:user-a", "updates", () => {});
 
@@ -237,11 +271,11 @@ test("closing user:global room does not remove the connection (by design) but do
 
   unsubNotif();
 
-  // user:global persists because maybeRemoveConnection returns early for non-community rooms
+  // Persists because maybeRemoveConnection returns early for non-community rooms
   const keys = getConnectionKeys(clientA).sort();
-  assert.deepStrictEqual(keys, ["chat:community-a", "user:global"]);
+  assert.deepStrictEqual(keys, ["chat:community-a", userKey(clientA)].sort());
   assert.strictEqual(getConnectionCount(clientA), 2,
-    "user:global persists (by design: maybeRemoveConnection skips non-community rooms)");
+    "the user socket persists (by design: maybeRemoveConnection skips non-community rooms)");
 
   // But the community connection is unaffected
   unsubCommA();
@@ -259,7 +293,7 @@ test("close() marks all connections as manuallyClosed", () => {
   clientA.close();
 
   assert.strictEqual(isManuallyClosed(clientA, "chat:community-a"), true);
-  assert.strictEqual(isManuallyClosed(clientA, "user:global"), true);
+  assert.strictEqual(isManuallyClosed(clientA, userKey(clientA)), true);
 
   unsubComm();
   unsubNotif();
@@ -281,19 +315,19 @@ test("connect() after close() sets manuallyClosed to false", () => {
 // TEST 5: Mixed community + user-scoped rooms
 // ══════════════════════════════════════════════════════════════════════════
 
-test("User A: Community A → conn-A, Community B → conn-B, user:global → conn-C; closing A does not affect B or C", () => {
+test("User A: Community A → conn-A, Community B → conn-B, user socket → conn-C; closing A does not affect B or C", () => {
   const unsubCommA = clientA.on("chat:community-a", "chat", () => {});
   const unsubCommB = clientA.on("chat:community-b", "chat", () => {});
   const unsubNotif = clientA.on("notifications:user-a", "updates", () => {});
 
   assert.strictEqual(getConnectionCount(clientA), 3);
   const keysBefore = getConnectionKeys(clientA).sort();
-  assert.deepStrictEqual(keysBefore, ["chat:community-a", "chat:community-b", "user:global"]);
+  assert.deepStrictEqual(keysBefore, ["chat:community-a", "chat:community-b", userKey(clientA)].sort());
 
   unsubCommA();
 
   const keysAfter = getConnectionKeys(clientA).sort();
-  assert.deepStrictEqual(keysAfter, ["chat:community-b", "user:global"]);
+  assert.deepStrictEqual(keysAfter, ["chat:community-b", userKey(clientA)].sort());
   assert.strictEqual(getConnectionCount(clientA), 2);
 
   unsubCommB();

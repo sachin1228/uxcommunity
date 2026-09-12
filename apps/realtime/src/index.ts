@@ -1,7 +1,9 @@
 import { jwtVerify } from "jose";
 import type { Env } from "./env";
+import { resolveRoomTarget } from "./room-routing";
 export { UserDO } from "./user";
 export { Room } from "./room";
+export { resolveRoomTarget, USER_ROOM_PREFIXES } from "./room-routing";
 
 const SESSION_COOKIE = "uxcommunity_session";
 const LEGACY_SESSION_COOKIE = "draft_session";
@@ -47,7 +49,7 @@ function isCommunityRoom(room: string): boolean {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Redact sensitive query params from any logging
@@ -58,11 +60,17 @@ export default {
       return handleUpgrade(request, env, url);
     }
     if (url.pathname === "/publish") {
-      return handlePublish(request, env);
+      return handlePublish(request, env, ctx);
     }
     return new Response("Not found", { status: 404 });
   },
 };
+
+/**
+ * How many Durable Object deliveries to keep in flight. Bounded so a huge
+ * fan-out cannot spawn an unbounded number of simultaneous subrequests.
+ */
+const FANOUT_CONCURRENCY = 40;
 
 async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Response> {
   const room = url.searchParams.get("room");
@@ -102,7 +110,7 @@ async function handleUpgrade(request: Request, env: Env, url: URL): Promise<Resp
   return stub.fetch(forwarded);
 }
 
-async function handlePublish(request: Request, env: Env): Promise<Response> {
+async function handlePublish(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   if (request.headers.get("x-realtime-publish-secret") !== env.REALTIME_PUBLISH_SECRET) {
     return new Response("Forbidden", { status: 403 });
   }
@@ -135,23 +143,45 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
     return new Response("Missing room", { status: 400 });
   }
 
-  // Fan-out in chunks (each chunk runs its DO fetches in parallel).
-  const CHUNK = 40;
-  for (let i = 0; i < events.length; i += CHUNK) {
-    const chunk = events.slice(i, i + CHUNK);
-    await Promise.all(
-      chunk.map(async (event) => {
-        const isUserRoom = event.room.startsWith("user:");
-        const namespace = isUserRoom ? env.USER_DO : env.COMMUNITY_DO;
-        const id = namespace.idFromName(event.room);
-        const stub = namespace.get(id);
-        return stub.fetch(
-          new Request(request.url, {
+  // Fan out in the background at bounded concurrency. Returning before the
+  // fan-out finishes means a community-sized fan-out is never truncated by the
+  // caller's request timeout (the web app aborts /publish after 3s), and the
+  // caller's latency stays flat no matter how many rooms are targeted.
+  ctx.waitUntil(fanOutEvents(env, request.url, events));
+  return new Response("ok");
+}
+
+/**
+ * Deliver every event to its room's Durable Object.
+ *
+ * Implemented as a fixed pool of workers pulling from a shared cursor instead
+ * of sequential batches: earlier revisions awaited chunks of 40 one after
+ * another, so wall-clock time grew with `events.length` and later chunks sat
+ * idle behind earlier ones.
+ */
+async function fanOutEvents(
+  env: Env,
+  requestUrl: string,
+  events: Array<{ room: string; topic: string; data?: unknown; exclude_user?: string }>,
+): Promise<void> {
+  let cursor = 0;
+  const poolSize = Math.min(FANOUT_CONCURRENCY, events.length);
+
+  const workers = Array.from({ length: poolSize }, async () => {
+    while (cursor < events.length) {
+      const event = events[cursor++];
+      const { namespace, name } = resolveRoomTarget(env, event.room);
+      try {
+        const stub = namespace.get(namespace.idFromName(name));
+        await stub.fetch(
+          new Request(requestUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-realtime-publish-secret": env.REALTIME_PUBLISH_SECRET,
             },
+            // `room` stays the LOGICAL room: the DO filters deliveries by its
+            // own subscription table, which is keyed by logical room name.
             body: JSON.stringify({
               room: event.room,
               topic: event.topic,
@@ -160,9 +190,12 @@ async function handlePublish(request: Request, env: Env): Promise<Response> {
             }),
           }),
         );
-      }),
-    );
-  }
+      } catch (error) {
+        // Best-effort: a failed room must not stop the rest of the fan-out.
+        console.error("[realtime] publish fan-out failed", event.room, error);
+      }
+    }
+  });
 
-  return new Response("ok");
+  await Promise.all(workers);
 }

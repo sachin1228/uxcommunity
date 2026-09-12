@@ -191,23 +191,67 @@ export async function createNotification(
   return { ok: true };
 }
 
+/**
+ * PostgREST returns at most 1000 rows per request unless the range is paged,
+ * and it does so SILENTLY — no error, just a short page. An unpaged member read
+ * therefore stops notifying anyone past the 1,000th member of a community.
+ */
+const MEMBER_PAGE_SIZE = 1000;
+/** Rows per insert request — one giant insert fails wholesale on payload limits. */
+const NOTIFICATION_INSERT_CHUNK = 500;
+/** Recipients per /publish request, so a large fan-out isn't one huge body. */
+const NOTIFICATION_PUBLISH_CHUNK = 200;
+/** Hard stop so a pathological member table cannot loop forever. */
+const MAX_COMMUNITY_MEMBERS = 50_000;
+
+/**
+ * Read every member of a community, paging until the end.
+ *
+ * @returns the user ids, or null when the read failed (caller must not treat a
+ * failure as "nobody to notify", which would silently drop the whole fan-out).
+ */
+async function fetchCommunityMemberIds(
+  db: ReturnType<typeof createServiceClient>,
+  communityId: string,
+  actorId: string,
+): Promise<string[] | null> {
+  const ids: string[] = [];
+
+  for (let from = 0; from < MAX_COMMUNITY_MEMBERS; from += MEMBER_PAGE_SIZE) {
+    const { data, error } = await db
+      .from("community_members")
+      .select("user_id")
+      .eq("community_id", communityId)
+      .neq("user_id", actorId)
+      // Stable order is required for range pagination to be correct.
+      .order("user_id", { ascending: true })
+      .range(from, from + MEMBER_PAGE_SIZE - 1);
+
+    if (error) {
+      console.error("[notifications] community member lookup failed", error);
+      return null;
+    }
+
+    const page = (data ?? []) as Array<{ user_id: string }>;
+    for (const member of page) ids.push(member.user_id);
+    if (page.length < MEMBER_PAGE_SIZE) return ids;
+  }
+
+  console.warn(
+    `[notifications] community ${communityId} exceeded ${MAX_COMMUNITY_MEMBERS} members — fan-out truncated`,
+  );
+  return ids;
+}
+
 export async function notifyCommunityMembers(
   db: ReturnType<typeof createServiceClient>,
   input: CommunityNotificationInput,
 ) {
-  const { data, error } = await db
-    .from("community_members")
-    .select("user_id")
-    .eq("community_id", input.communityId)
-    .neq("user_id", input.actorId);
+  const memberIds = await fetchCommunityMemberIds(db, input.communityId, input.actorId);
+  if (!memberIds) return; // read failed — logged above
 
-  if (error) {
-    console.error("[notifications] community member lookup failed", error);
-    return;
-  }
-
-  const rows = (data ?? []).map((member) => ({
-    user_id: member.user_id,
+  const rows = memberIds.map((userId) => ({
+    user_id: userId,
     actor_id: input.actorId,
     community_id: input.communityId,
     type: input.type,
@@ -221,35 +265,54 @@ export async function notifyCommunityMembers(
 
   if (!rows.length) return;
 
-  const { data: insertedRows, error: insertError } = (await db
-    .from("notifications")
-    .insert(rows)
-    .select("id, user_id, type, title, body, href, read_at, created_at")) as unknown as {
-    data: Array<{
-      id: string;
-      user_id: string;
-      type: string;
-      title: string;
-      body: string | null;
-      href: string;
-      read_at: string | null;
-      created_at: string;
-    }> | null;
-    error: unknown;
+  type InsertedRow = {
+    id: string;
+    user_id: string;
+    type: string;
+    title: string;
+    body: string | null;
+    href: string;
+    read_at: string | null;
+    created_at: string;
   };
-  if (insertError) {
-    console.error("[notifications] bulk insert failed", insertError);
+
+  // Chunked so one oversized request cannot lose the whole batch: a failure
+  // now costs at most NOTIFICATION_INSERT_CHUNK recipients instead of all.
+  const insertedRows: InsertedRow[] = [];
+  for (let i = 0; i < rows.length; i += NOTIFICATION_INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + NOTIFICATION_INSERT_CHUNK);
+    const { data, error } = (await db
+      .from("notifications")
+      .insert(chunk)
+      .select("id, user_id, type, title, body, href, read_at, created_at")) as unknown as {
+      data: InsertedRow[] | null;
+      error: unknown;
+    };
+    if (error) {
+      console.error("[notifications] bulk insert failed", error);
+      continue;
+    }
+    if (data?.length) insertedRows.push(...data);
   }
 
   // Best-effort realtime fan-out to each recipient's bell dropdown.
-  if (insertedRows?.length) {
-    void publishRealtimeBatch(
-      insertedRows.map((row) => ({
-        room: realtimeRooms.notifications(row.user_id),
-        topic: "insert",
-        data: row,
-      })),
-    );
+  //
+  // One event per recipient is required by the current socket topology: every
+  // user's client is subscribed to `notifications:${userId}` on their own
+  // UserDO instance, and there is no room all community members share. The
+  // fan-out is chunked so a big community is not a single huge request, and
+  // sent sequentially to stay well inside Worker subrequest limits.
+  if (insertedRows.length) {
+    for (let i = 0; i < insertedRows.length; i += NOTIFICATION_PUBLISH_CHUNK) {
+      const chunk = insertedRows.slice(i, i + NOTIFICATION_PUBLISH_CHUNK);
+      await publishRealtimeBatch(
+        chunk.map((row) => ({
+          room: realtimeRooms.notifications(row.user_id),
+          topic: "insert",
+          data: row,
+        })),
+      );
+    }
   }
 }
 
