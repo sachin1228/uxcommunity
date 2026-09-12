@@ -72,6 +72,7 @@ async function withAuthorAndMeta(
       comment_count: Number(aggregate?.comment_count ?? 0),
       bookmark_count: Number(aggregate?.bookmark_count ?? 0),
       user_bookmarked: aggregate?.user_bookmarked === true,
+      allow_replies: Boolean(row.allow_replies),
     };
   });
 }

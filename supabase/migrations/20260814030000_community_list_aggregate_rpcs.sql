@@ -121,7 +121,8 @@ returns table (
   comment_count bigint,
   bookmark_count bigint,
   user_saved boolean,
-  user_bookmarked boolean
+  user_bookmarked boolean,
+  allow_replies boolean
 )
 language sql
 stable
@@ -153,17 +154,26 @@ as $$
     from public.resource_bookmarks as b
     where b.resource_id = any(coalesce(p_resource_ids, '{}'::uuid[]))
     group by b.resource_id
+  ),
+  resources as (
+    select r.id,
+      bool_or(r.allow_replies = true) as allow_replies
+    from public.community_resources r
+    where r.id = any(coalesce(p_resource_ids, '{}'::uuid[]))
+    group by r.id
   )
   select requested.id,
     coalesce(saves.save_count, 0),
     coalesce(comments.comment_count, 0),
     coalesce(bookmarks.bookmark_count, 0),
     coalesce(saves.user_saved, false),
-    coalesce(bookmarks.user_bookmarked, false)
+    coalesce(bookmarks.user_bookmarked, false),
+    coalesce(resources.allow_replies, false)
   from requested
   left join saves using (id)
   left join comments using (id)
-  left join bookmarks using (id);
+  left join bookmarks using (id)
+  left join resources using (id);
 $$;
 
 comment on function public.get_thread_list_aggregates(uuid, uuid[]) is
