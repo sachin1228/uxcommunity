@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 
 export async function POST(
   _req: NextRequest,
@@ -38,7 +40,16 @@ export async function POST(
 
   if (existing) {
     // Toggle off — remove RSVP
-    await db.from("event_rsvps").delete().eq("event_id", eventId).eq("user_id", userId);
+    const { error: deleteError } = await db
+      .from("event_rsvps")
+      .delete()
+      .eq("event_id", eventId)
+      .eq("user_id", userId);
+    if (deleteError) {
+      return NextResponse.json({ error: "Failed to update RSVP. Please try again." }, { status: 500 });
+    }
+    revalidateTag(HOME_FEED_TAG, { expire: 0 });
+
     void publishRealtimeBatch([
       { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
     ]);
@@ -54,7 +65,19 @@ export async function POST(
     }
   }
 
-  await db.from("event_rsvps").insert({ event_id: eventId, user_id: userId });
+  // Surface insert failures: a silent failure here made the client show
+  // "Going ✓" while nothing was persisted, so the state reverted on refresh.
+  const { error: insertError } = await db
+    .from("event_rsvps")
+    .insert({ event_id: eventId, user_id: userId });
+  if (insertError) {
+    return NextResponse.json({ error: "Failed to RSVP. Please try again." }, { status: 500 });
+  }
+
+  // Drop the cached home feed so it no longer serves the pre-RSVP snapshot
+  // (user_rsvped: false / stale rsvp_count) right after a successful RSVP.
+  revalidateTag(HOME_FEED_TAG, { expire: 0 });
+
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
   ]);
