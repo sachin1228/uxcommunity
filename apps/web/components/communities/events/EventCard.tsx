@@ -1,8 +1,23 @@
 "use client";
 
 import { useId, useRef, useState, type ReactNode } from "react";
+import { Fraunces, Courier_Prime } from "next/font/google";
 import TruncateMarkup from "react-truncate-markup";
-import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
+
+/** Print-style type for the paper ticket: old-style serif + typewriter mono. */
+const paperSerif = Fraunces({
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
+  variable: "--font-paper-serif",
+  display: "swap",
+});
+const paperMono = Courier_Prime({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-paper-mono",
+  display: "swap",
+});
+import { Calendar, Clock, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
@@ -25,10 +40,10 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
 }
 
-/** Uppercase micro-label used across the event ticket fields. */
+/** Uppercase micro-label used across the event ticket fields (ink on paper). */
 function TicketLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-subtle">
+    <span className="flex items-center gap-1.5 [font-family:var(--font-paper-mono),monospace] text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
       {icon}
       {children}
     </span>
@@ -57,18 +72,18 @@ function AvatarStack({
             <div
               key={rsvp.user_id}
               style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-              className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-surface bg-accent/15"
+              className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111] bg-accent/15"
             >
               {rsvp.users?.avatar_url ? (
                 <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
+                <span className="[font-family:var(--font-paper-serif),serif] text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
           ))}
         </div>
       )}
-      <span className={`font-body text-[11px] ${safeCount > 0 ? "text-foreground-muted" : "text-foreground-subtle"}`}>
+      <span className={`[font-family:var(--font-paper-serif),serif] text-[11px] italic ${safeCount > 0 ? "text-stone-400" : "text-stone-500"}`}>
         {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
@@ -205,20 +220,28 @@ export function EventCard({
       type="button"
       onClick={handleJoin}
       disabled={rsvpPending || full}
-      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-md border px-3 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
+        event.user_rsvped
+          ? "border-white/30 bg-stone-200 text-stone-900 hover:bg-white"
+          : full
+            ? "border-white/20 text-stone-500"
+            : "border-white/80 bg-stone-100 text-stone-900 shadow-[0_1px_0_rgba(0,0,0,0.4)] hover:bg-white"
+      }`}
     >
       <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
     </button>
   ) : (
-    <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
+    <span className="[font-family:var(--font-paper-serif),serif] text-xs font-medium italic text-stone-500">This event has ended</span>
   );
 
   const eventBody = (
-    <div className="relative overflow-hidden rounded-lg bg-surface-raised">
+    <div
+      className={`relative overflow-hidden rounded-lg border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_6px_rgba(0,0,0,0.5),inset_0_0_60px_rgba(0,0,0,0.55)] ${paperSerif.variable} ${paperMono.variable}`}
+    >
       <div className="flex min-h-52 flex-col sm:flex-row">
         {/* Poster — pinned left, kept at its natural aspect ratio */}
-        <div className="relative shrink-0 overflow-hidden bg-background">
+        <div className="relative shrink-0 overflow-hidden bg-[#0a0a0a]">
           {event.cover_image_url ? (
             <img
               src={event.cover_image_url}
@@ -231,33 +254,44 @@ export function EventCard({
         </div>
 
         {/* Everything else, right of the perforation */}
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-amber-400/60 px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-white/10 px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
           {/* Perforation notches, punched through the ticket edges */}
-          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-background" />
-          <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-background sm:hidden" />
-          <span aria-hidden="true" className="pointer-events-none absolute -bottom-1.5 -left-1.5 hidden size-3 rounded-full bg-background sm:block" />
+          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-[#171717]" />
+          <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-[#171717] sm:hidden" />
+          <span aria-hidden="true" className="pointer-events-none absolute -bottom-1.5 -left-1.5 hidden size-3 rounded-full bg-[#171717] sm:block" />
 
+          {/* Dark paper fibre speckle, kept subtle so text stays readable */}
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-[0.5] mix-blend-screen"
+            style={{
+              backgroundImage:
+                "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
+              backgroundSize: "7px 7px, 11px 11px",
+              backgroundPosition: "0 0, 3px 5px",
+            }}
+          />
 
-          <div className="min-w-0">
+          <div className="relative min-w-0">
             {isDetail ? (
-              <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
+              <h1 className="text-balance [font-family:var(--font-paper-serif),serif] text-lg font-bold leading-snug text-stone-50">{event.title}</h1>
             ) : (
-              <h3 className="line-clamp-2 text-balance font-display text-sm font-bold leading-snug text-foreground">{event.title}</h3>
+              <h3 className="line-clamp-2 text-balance [font-family:var(--font-paper-serif),serif] text-sm font-bold leading-snug text-stone-50">{event.title}</h3>
             )}
           </div>
 
-          <div className="mt-3 border-t border-dashed border-amber-400/60" />
+          <div className="relative mt-3 border-t border-dashed border-white/10" />
 
           {/* Ticket fields, boarding-pass style: label above value */}
-          <div className="my-3 grid grid-cols-2 gap-x-4 gap-y-3">
+          <div className="relative my-3 grid grid-cols-2 gap-x-4 gap-y-3">
             <div className="min-w-0">
-              <TicketLabel icon={<Calendar strokeWidth={2.5} size={12} className="shrink-0 text-accent" aria-hidden="true" />}>Date</TicketLabel>
-              <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">{fmtEventDate(event.event_date)}</p>
+              <TicketLabel icon={<Calendar strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />}>Date</TicketLabel>
+              <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{fmtEventDate(event.event_date)}</p>
             </div>
 
             <div className="min-w-0">
-              <TicketLabel>Time</TicketLabel>
-              <p className="mt-1 truncate font-mono text-xs tabular-nums text-foreground">
+              <TicketLabel icon={<Clock strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />}>Time</TicketLabel>
+              <p className="mt-1 truncate [font-family:var(--font-paper-mono),monospace] text-xs font-bold tabular-nums text-stone-200">
                 {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
               </p>
             </div>
@@ -267,18 +301,18 @@ export function EventCard({
                 <TicketLabel
                   icon={
                     event.is_online ? (
-                      <Video strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
+                      <Video strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />
                     ) : (
-                      <MapPin strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
+                      <MapPin strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />
                     )
                   }
                 >
                   Where
                 </TicketLabel>
-                <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">
+                <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">
                   {event.is_online ? (
                     isDetail && event.meet_link ? (
-                      <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-accent hover:underline">
+                      <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-stone-200 underline decoration-stone-200/40 underline-offset-2 hover:decoration-stone-200">
                         <span className="truncate">Online (Google Meet)</span>
                         <ExternalLink strokeWidth={2.5} size={12} className="shrink-0" />
                       </a>
@@ -296,18 +330,18 @@ export function EventCard({
 
             <div className="min-w-0">
               <TicketLabel>Hosted by</TicketLabel>
-              <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">{authorName}</p>
+              <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{authorName}</p>
             </div>
           </div>
 
           {isDetail && event.max_attendees && (
-            <p className="mt-3 font-body text-xs text-foreground-subtle">
+            <p className="relative mt-3 [font-family:var(--font-paper-serif),serif] text-xs italic text-stone-500">
               {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
             </p>
           )}
-          {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
+          {(error || rsvpError) && <p className="relative mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-3 flex flex-col gap-3 border-t border-dashed border-amber-400/60 pt-3 sm:mt-auto sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative mt-3 flex flex-col gap-3 border-t border-dashed border-white/10 pt-3 sm:mt-auto sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
             </div>
