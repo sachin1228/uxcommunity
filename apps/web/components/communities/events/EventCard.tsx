@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import { Calendar, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
@@ -17,15 +17,22 @@ import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
 
-function fmtEventDateTime(iso: string) {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-  const time = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
-  return `${date} • ${time}`;
+function fmtEventDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
+}
+
+/** Uppercase micro-label used across the event ticket fields. */
+function TicketLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
+  return (
+    <span className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-subtle">
+      {icon}
+      {children}
+    </span>
+  );
 }
 
 function isPast(iso: string) {
@@ -43,7 +50,7 @@ function AvatarStack({
   const visible = rsvps?.slice(0, 5) ?? [];
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex flex-wrap items-center gap-2.5">
       {visible.length > 0 && (
         <div className="flex items-center" aria-label={`${safeCount} attendees`}>
           {visible.map((rsvp, index) => (
@@ -193,70 +200,103 @@ export function EventCard({
   ];
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
+  const rsvpButton = !past ? (
+    <button
+      type="button"
+      onClick={handleJoin}
+      disabled={rsvpPending || full}
+      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+    >
+      <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
+      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
+    </button>
+  ) : (
+    <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
+  );
+
   const eventBody = (
     <div className="relative overflow-hidden rounded-lg bg-surface-raised">
-      <div className="flex min-h-52 flex-col md:flex-row">
-        <div className="relative shrink-0 overflow-hidden bg-background md:h-52 md:w-auto">
+      <div className="flex min-h-52 flex-col sm:flex-row">
+        {/* Poster — pinned left, kept at its natural aspect ratio */}
+        <div className="relative shrink-0 overflow-hidden bg-background">
           {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="block h-auto w-full md:h-52 md:w-auto md:max-w-[14rem]" />
+            <img
+              src={event.cover_image_url}
+              alt={event.title}
+              className="block h-auto w-full sm:w-auto sm:max-h-56 sm:max-w-[16rem]"
+            />
           ) : (
-            <div className={`h-40 w-full bg-gradient-to-br md:h-52 md:w-52 ${gradient}`} aria-hidden="true" />
+            <div className={`h-40 w-full bg-gradient-to-br sm:h-56 sm:w-56 ${gradient}`} aria-hidden="true" />
           )}
         </div>
 
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-3 py-3 md:border-l md:border-t-0 md:px-4">
-          <div className="flex items-start justify-between gap-3 pr-12">
+        {/* Everything else, right of the perforation */}
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
+          {/* Perforation notches, punched through the ticket edges */}
+          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-background" />
+          <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-background sm:hidden" />
+          <span aria-hidden="true" className="pointer-events-none absolute -bottom-1.5 -left-1.5 hidden size-3 rounded-full bg-background sm:block" />
+
+
+          <div className="min-w-0">
+            {isDetail ? (
+              <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
+            ) : (
+              <h3 className="line-clamp-2 text-balance font-display text-sm font-bold leading-snug text-foreground">{event.title}</h3>
+            )}
+          </div>
+
+          <div className="mt-3 border-t border-dashed border-border" />
+
+          {/* Ticket fields, boarding-pass style: label above value */}
+          <div className="my-3 grid grid-cols-2 gap-x-4 gap-y-3">
             <div className="min-w-0">
-              {isDetail ? (
-                <h1 className="text-balance font-display text-lg font-bold leading-snug text-foreground">{event.title}</h1>
-              ) : (
-                <h3 className="line-clamp-2 text-balance font-display text-sm font-bold leading-snug text-foreground">{event.title}</h3>
-              )}
+              <TicketLabel icon={<Calendar strokeWidth={2.5} size={12} className="shrink-0 text-accent" aria-hidden="true" />}>Date</TicketLabel>
+              <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">{fmtEventDate(event.event_date)}</p>
             </div>
-          </div>
 
-          <div className="mt-2 flex flex-col gap-1 border-b border-border pb-2">
-            <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-              <Calendar strokeWidth={2.5} size={13} className="shrink-0 text-accent" aria-hidden="true" />
-              {fmtEventDateTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
-            </span>
-            {event.is_online ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <Video strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
-                {isDetail && event.meet_link ? (
-                  <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-                    Online (Google Meet) <ExternalLink strokeWidth={2.5} size={12} />
-                  </a>
-                ) : event.meet_link ? "Online (Google Meet)" : "Online"}
-              </span>
-            ) : event.location ? (
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-foreground-muted">
-                <MapPin strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
-                <span className="truncate">{event.location}</span>
-              </span>
-            ) : null}
-          </div>
-
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 md:flex-nowrap">
-            <div className="border-r border-border pr-4">
-              <p className="font-body text-[10px] text-foreground-subtle">Hosted by</p>
-              <p className="mt-0.5 font-display text-xs font-semibold text-foreground">{authorName}</p>
+            <div className="min-w-0">
+              <TicketLabel>Time</TicketLabel>
+              <p className="mt-1 truncate font-mono text-xs tabular-nums text-foreground">
+                {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+              </p>
             </div>
-            <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
-            <div className="ml-auto hidden shrink-0 md:block">
-              {!past ? (
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={rsvpPending || full}
-                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
+
+            {(event.is_online || event.location) && (
+              <div className="min-w-0">
+                <TicketLabel
+                  icon={
+                    event.is_online ? (
+                      <Video strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
+                    ) : (
+                      <MapPin strokeWidth={2.5} size={12} className="shrink-0" aria-hidden="true" />
+                    )
+                  }
                 >
-                  <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
-                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
-              ) : (
-                <span className="font-body text-xs font-medium text-foreground-subtle">This event has ended</span>
-              )}
+                  Where
+                </TicketLabel>
+                <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">
+                  {event.is_online ? (
+                    isDetail && event.meet_link ? (
+                      <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-accent hover:underline">
+                        <span className="truncate">Online (Google Meet)</span>
+                        <ExternalLink strokeWidth={2.5} size={12} className="shrink-0" />
+                      </a>
+                    ) : event.meet_link ? (
+                      "Online (Google Meet)"
+                    ) : (
+                      "Online"
+                    )
+                  ) : (
+                    event.location
+                  )}
+                </p>
+              </div>
+            )}
+
+            <div className="min-w-0">
+              <TicketLabel>Hosted by</TicketLabel>
+              <p className="mt-1 truncate font-display text-xs font-semibold text-foreground">{authorName}</p>
             </div>
           </div>
 
@@ -267,28 +307,16 @@ export function EventCard({
           )}
           {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-auto flex items-end justify-between gap-3 pt-3 md:pt-0">
-            <div className="md:hidden">
-              {!past ? (
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={rsvpPending || full}
-                  className={`inline-flex min-h-8 items-center gap-1 rounded-md px-3 font-body text-[11px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${event.user_rsvped ? "bg-accent/15 text-accent hover:bg-accent/25" : full ? "border border-border text-foreground-subtle" : "bg-accent text-accent-foreground hover:bg-accent-hover"}`}
-                >
-                  <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
-                  {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
-                </button>
-              ) : (
-                <span className="font-body text-sm font-medium text-foreground-subtle">This event has ended</span>
-              )}
+          <div className="mt-3 flex flex-col gap-3 border-t border-dashed border-border pt-3 sm:mt-auto sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <TicketLabel>Going</TicketLabel>
+              <div className="mt-1">
+                <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
+              </div>
             </div>
+            <div className="shrink-0">{rsvpButton}</div>
           </div>
         </div>
-      </div>
-
-      <div className={`absolute right-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${past ? "bg-foreground/10 text-foreground-muted" : "bg-emerald-500/15 text-emerald-400"}`}>
-        {past ? "Past" : "Upcoming"}
       </div>
     </div>
   );
