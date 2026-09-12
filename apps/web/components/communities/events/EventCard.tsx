@@ -1,8 +1,8 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import TruncateMarkup from "react-truncate-markup";
-import { Calendar, Clock, ExternalLink, MapPin, Video } from "lucide-react";
+import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
@@ -16,6 +16,88 @@ import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
+
+// ─── Ticket outline with perforation notches (SVG) ─────────────────────────
+
+/**
+ * Geometry of the ticket outline in REAL PIXEL UNITS — critical, because the
+ * SVG is stretched with preserveAspectRatio="none": if the path were in an
+ * arbitrary viewBox, x and y would scale differently and the notches would
+ * render as ovals. In pixel units the scale is 1:1 and the semicircular
+ * cut-outs (cubic arcs) are perfect circles. r = notch radius.
+ */
+function ticketOutlinePath(
+  width: number,
+  height: number,
+  notchX: number | null,
+  r = 13,
+  corner = 16,
+): string {
+  const notch = notchX !== null
+    ? Math.min(Math.max(notchX, r + corner), width - r - corner)
+    : null;
+  const k = 0.5523 * r; // cubic control offset approximating a semicircle
+  const parts: string[] = [`M ${corner} 0`];
+
+  if (notch !== null) {
+    // Top edge up to the notch, then a perfect semicircular dip into the ticket.
+    parts.push(
+      `L ${notch - r} 0`,
+      `C ${notch - r} ${k} ${notch - k} ${r} ${notch} ${r}`,
+      `C ${notch + k} ${r} ${notch + r} ${k} ${notch + r} 0`,
+    );
+  }
+  parts.push(
+    `L ${width - corner} 0`,
+    `Q ${width} 0 ${width} ${corner}`,
+    `L ${width} ${height - corner}`,
+    `Q ${width} ${height} ${width - corner} ${height}`,
+  );
+  if (notch !== null) {
+    parts.push(
+      `L ${notch + r} ${height}`,
+      // Bottom notch: mirrored semicircular dip up into the ticket.
+      `C ${notch + r} ${height - k} ${notch + k} ${height - r} ${notch} ${height - r}`,
+      `C ${notch - k} ${height - r} ${notch - r} ${height - k} ${notch - r} ${height}`,
+    );
+  }
+  parts.push(
+    `L ${corner} ${height}`,
+    `Q 0 ${height} 0 ${height - corner}`,
+    `L 0 ${corner}`,
+    `Q 0 0 ${corner} 0`,
+    `Z`,
+  );
+  return parts.join(" ");
+}
+
+/** Overlay that strokes the ticket outline (same path as the clip). */
+function TicketOutlineBorder({
+  pathData,
+  width,
+  height,
+  stroke = "rgba(255,255,255,0.16)",
+  strokeWidth = 1.5,
+}: {
+  pathData: string;
+  width: number;
+  height: number;
+  stroke?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+    >
+      <path d={pathData} fill="none" stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+// ─── End ticket outline helpers ─────────────────────────────────────────────
 
 function fmtEventDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -49,6 +131,8 @@ function AvatarStack({
   const safeCount = Math.max(0, count);
   const visible = rsvps?.slice(0, 5) ?? [];
 
+  if (safeCount === 0) return null;
+
   return (
     <div className="flex flex-wrap items-center gap-2.5">
       {visible.length > 0 && (
@@ -57,18 +141,18 @@ function AvatarStack({
             <div
               key={rsvp.user_id ?? `idx-${index}`}
               style={{ marginLeft: index === 0 ? 0 : "-8px", zIndex: 10 - index }}
-              className="relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111] bg-accent/15"
+              className="relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-[#111111] bg-accent/15"
             >
               {rsvp.users?.avatar_url ? (
                 <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
+                <span className="font-display text-[11px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
           ))}
         </div>
       )}
-      <span className={`font-display text-[11px] ${safeCount > 0 ? "text-stone-400" : "text-stone-500"}`}>
+      <span className="font-display text-xs text-stone-400">
         {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
@@ -190,7 +274,6 @@ export function EventCard({
     }
   }
 
-  const authorName = event.users?.name ?? "Member";
   const full = event.max_attendees !== null && event.rsvp_count >= event.max_attendees && !event.user_rsvped;
   const gradients = [
     "from-violet-500/80 to-pink-500/80",
@@ -200,152 +283,227 @@ export function EventCard({
   ];
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
+  // Per-event accent color: drives the big date, going button, glow, and the
+  // stub's tinted gradient (accent mixed into dark, ~12% at top fading to 0).
+  const accent = event.accent_color ?? "#e8e14a";
+  const accentStyle = {
+    ["--accent" as string]: accent,
+    ["--accent-hover" as string]: `${accent}e6`,
+    ["--accent-glow" as string]: `${accent}40`,
+    ["--accent-tint" as string]: `${accent}1f`,
+  } as React.CSSProperties;
+
   const rsvpButton = !past ? (
     <button
       type="button"
       onClick={handleJoin}
       disabled={rsvpPending || full}
-      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-full px-3 font-mono text-[11px] font-bold uppercase tracking-widest transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
         event.user_rsvped
-          ? "bg-blue-600 text-white hover:bg-blue-500"
+          ? "bg-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/30"
           : full
             ? "border border-white/20 text-stone-500"
-            : "bg-blue-600 text-white shadow-[0_1px_2px_rgba(0,0,0,0.4)] hover:bg-blue-500"
+            : "bg-[var(--accent)] text-stone-950 shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]"
       }`}
     >
-      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
+      {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
     </button>
   ) : (
-    <span className="font-display text-xs font-medium italic text-stone-500">This event has ended</span>
+    <span className="font-display text-xs font-medium text-stone-500">This event has ended</span>
   );
 
   const startDate = new Date(event.event_date);
   const startDay = startDate.getDate();
   const startMonth = startDate.toLocaleString("en-IN", { month: "short" }).toUpperCase();
+  const startWeekday = startDate.toLocaleString("en-IN", { weekday: "short" }).toUpperCase();
+  const startYear = startDate.getFullYear();
+
+  // Measured ticket size — the SVG outline is generated from it so the notches
+  // and border always match the real rendered box. Defaults assume desktop.
+  const ticketRef = useRef<HTMLDivElement | null>(null);
+  const [ticketSize, setTicketSize] = useState({ width: 560, height: 260 });
+  const [desktopLayout, setDesktopLayout] = useState(true);
+
+  useEffect(() => {
+    const el = ticketRef.current;
+    if (!el) return;
+    // The stub sits beside the body at the Tailwind `lg` viewport breakpoint
+    // (1024px) — track the viewport, not the card width, so a wide card in a
+    // narrow viewport still gets the stacked (notchless) outline.
+    const media = typeof matchMedia !== "undefined" ? matchMedia("(min-width: 1024px)") : null;
+    const syncLayout = () => setDesktopLayout(media?.matches ?? true);
+    syncLayout();
+    media?.addEventListener("change", syncLayout);
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      setTicketSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(el);
+    return () => {
+      media?.removeEventListener("change", syncLayout);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Notch geometry, in REAL PIXELS matching the rendered box (the SVG stretches
+  // 1:1, so the cut-outs are perfect circles). On mobile the stub stacks below,
+  // so there is no seam — the outline is a plain rounded rect with no notches.
+  const STUB_PX = 152; // lg:w-[9.5rem]
+  const notchX = desktopLayout
+    ? Math.max(0, ticketSize.width - STUB_PX)
+    : null;
+  const outlinePath = ticketOutlinePath(ticketSize.width, ticketSize.height, notchX);
+  const clipId = useId().replace(/:/g, "");
+  const NOTCH_R = 13;
 
   const eventBody = (
     <div
-      className="relative overflow-hidden rounded-xl border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
+      ref={ticketRef}
+      className="relative bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
+      style={{
+        ...accentStyle,
+        clipPath: `url(#${clipId})`,
+        WebkitClipPath: `url(#${clipId})`,
+      }}
     >
-      <div className="flex flex-col sm:flex-row">
-        {/* Poster — pinned left, with the start date stamped on its corner */}
-        <div className="relative shrink-0 overflow-hidden bg-[#0a0a0a] p-4">
-          {event.cover_image_url ? (
-            <img
-              src={event.cover_image_url}
-              alt={event.title}
-              className="block h-auto w-full sm:h-56 sm:w-auto sm:max-w-[15rem]"
-            />
-          ) : (
-            <div className={`h-40 w-full bg-gradient-to-br sm:h-56 sm:w-56 ${gradient}`} aria-hidden="true" />
-          )}
+      {/* Clip: the ticket outline including the semicircular notches. */}
+      <svg aria-hidden="true" className="absolute h-0 w-0">
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            <path d={outlinePath} />
+          </clipPath>
+        </defs>
+      </svg>
+
+      <div className="flex flex-col lg:flex-row">
+        {/* ── Panel 1: poster, rounded and inset like a mounted print ── */}
+        <div className="relative shrink-0 p-3 lg:w-[13rem]">
+          <div className="relative overflow-hidden rounded-lg">
+            {event.cover_image_url ? (
+              <img
+                src={event.cover_image_url}
+                alt={event.title}
+                className="block h-auto w-full"
+              />
+            ) : (
+              <div className={`h-44 w-full bg-gradient-to-br lg:h-48 ${gradient}`} aria-hidden="true" />
+            )}
+            {/* Location caption pinned to the poster's bottom edge */}
+            {event.location && (
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-3">
+                <p className="flex items-center gap-1.5 font-display text-sm font-semibold text-white">
+                  <MapPin strokeWidth={2.5} size={14} className="shrink-0" aria-hidden="true" />
+                  <span className="truncate">{event.location}</span>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Everything else, right of the perforation */}
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-white/15 sm:border-l sm:border-t-0">
-          {/* Perforation notches, punched through the ticket edges */}
-          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-[#171717]" />
-          <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-[#171717] sm:hidden" />
-          <span aria-hidden="true" className="pointer-events-none absolute -bottom-1.5 -left-1.5 hidden size-3 rounded-full bg-[#171717] sm:block" />
-
-          {/* Dark paper fibre speckle, kept subtle so text stays readable */}
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.5] mix-blend-screen"
-            style={{
-              backgroundImage:
-                "radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)",
-              backgroundSize: "7px 7px, 11px 11px",
-              backgroundPosition: "0 0, 3px 5px",
-            }}
-          />
-
-          <div className="relative flex min-w-0 flex-1 flex-col px-4 py-4">
-            {/* Date stamp chip, top-right of the black ticket section */}
-            <div className="absolute right-4 top-5 flex flex-col items-center rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 backdrop-blur-sm">
-              <span className="font-display text-base font-bold leading-none text-stone-50">{startDay}</span>
-              <span className="mt-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-stone-300">{startMonth}</span>
-            </div>
-
-            {/* Title — right padding keeps it clear of the date stamp */}
-            <div className="relative min-w-0 pr-16 sm:pr-16">
-              {isDetail ? (
-                <h1 className="text-balance font-display text-sm font-bold leading-snug text-stone-50">{event.title}</h1>
-              ) : (
-                <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-stone-50">{event.title}</h3>
-              )}
-            </div>
-
-            {/* Location / Online line */}
-            {(event.is_online || event.location) && (
-              <p className="relative mt-2 flex min-w-0 items-center gap-1.5 font-display text-[13px] font-medium text-stone-300">
-                {event.is_online ? (
-                  <Video strokeWidth={2.5} size={13} className="shrink-0 text-stone-500" aria-hidden="true" />
-                ) : (
-                  <MapPin strokeWidth={2.5} size={13} className="shrink-0 text-stone-500" aria-hidden="true" />
-                )}
-                <span className="truncate">
-                  {event.is_online ? (
-                    isDetail && event.meet_link ? (
-                      <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-stone-200 underline decoration-stone-200/40 underline-offset-2 hover:decoration-stone-200">
-                        <span className="truncate">Online (Google Meet)</span>
-                        <ExternalLink strokeWidth={2.5} size={12} className="shrink-0" />
-                      </a>
-                    ) : event.meet_link ? (
-                      "Online (Google Meet)"
-                    ) : (
-                      "Online"
-                    )
-                  ) : (
-                    event.location
-                  )}
-                </span>
-              </p>
+        {/* ── Panel 2: title, meta — the ticket body ── */}
+        <div className="relative flex min-w-0 flex-1 flex-col px-4 py-4">
+          {/* Title */}
+          <div className="relative min-w-0">
+            {isDetail ? (
+              <h1 className="text-balance font-display text-lg font-bold leading-snug text-stone-50">{event.title}</h1>
+            ) : (
+              <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-stone-50">{event.title}</h3>
             )}
-
-            {/* Date · time row — below location */}
-            <p className="relative mt-3 flex flex-wrap items-center gap-x-2 font-mono text-[11px] font-bold uppercase tracking-wide text-stone-400">
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar strokeWidth={2.5} size={11} className="shrink-0" aria-hidden="true" />
-                {fmtEventDate(event.event_date)}
-              </span>
-              <span aria-hidden="true" className="text-stone-600">•</span>
-              <span className="inline-flex items-center gap-1.5">
-                <Clock strokeWidth={2.5} size={11} className="shrink-0" aria-hidden="true" />
-                {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
-              </span>
-            </p>
-
-            {/* Hosted by — with the host's avatar */}
-            <div className="relative mt-4 flex min-w-0 items-center gap-2">
-              <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
-                {event.users?.avatar_url ? (
-                  <img src={event.users.avatar_url} alt="" className="size-full object-cover" />
-                ) : (
-                  <span className="font-display text-[9px] font-bold text-stone-300">{authorName.charAt(0).toUpperCase()}</span>
-                )}
-              </span>
-              <TicketLabel>Hosted by</TicketLabel>
-              <span className="truncate font-display text-xs font-semibold text-stone-50">{authorName}</span>
-            </div>
-
-            {event.max_attendees && (
-              <p className="relative mt-3 font-display text-xs text-stone-500">
-                {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
-              </p>
-            )}
-            {(error || rsvpError) && <p className="relative mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
           </div>
 
-          {/* Footer strip — attendees on the left, RSVP on the right */}
-          <div className="relative mt-auto flex flex-col gap-3 border-t border-dashed border-white/15 bg-white/[0.03] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
+          {/* Date / time / location stacked rows */}
+          <div className="relative mt-3 flex flex-col items-start gap-1.5 font-body text-xs font-medium text-stone-200">
+            <span className="inline-flex items-center gap-1.5">
+              <Calendar strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+              {fmtEventDate(event.event_date)}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+              {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+            </span>
+            {(event.is_online || event.location) && (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                {event.is_online ? (
+                  <Video strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                ) : (
+                  <MapPin strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                )}
+                <span className="truncate">
+                  {event.is_online
+                    ? isDetail && event.meet_link
+                      ? <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="text-stone-200 underline decoration-stone-200/40 underline-offset-2 hover:decoration-stone-200">Online (Google Meet)</a>
+                      : "Online"
+                    : event.location}
+                </span>
+              </span>
+            )}
+            {event.max_attendees && (
+              <span className="inline-flex items-center gap-1.5">
+                <Users strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
+                <span className={event.max_attendees - event.rsvp_count > 0 ? "" : "text-stone-500"}>
+                  {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* Going count */}
+          <div className="relative mt-4 flex min-w-0 items-center gap-2">
+            <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
+          </div>
+
+          {(error || rsvpError) && <p className="relative mt-2 font-body text-xs text-destructive">{error || rsvpError}</p>}
+        </div>
+
+        {/* ── Panel 3: perforated stub with the big date + going button ── */}
+        <div
+          className="relative shrink-0 bg-[#111111] lg:w-[9.5rem]"
+          style={{ backgroundImage: "linear-gradient(to bottom, var(--accent-tint), transparent 70%)" }}
+        >
+
+          <div className="flex h-full flex-col items-center justify-center gap-3.5 px-3 py-5">
+            {/* Big date block */}
+            <div className="text-center">
+              <p className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-stone-300">{startWeekday}</p>
+              <p className="font-display text-5xl font-bold leading-none text-[var(--accent)]">{startDay}</p>
+              <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-stone-300">{startMonth} {startYear}</p>
             </div>
-            <div className="shrink-0">{rsvpButton}</div>
+
+            <div className="h-px w-4/5 bg-white/10" />
+
+            <div className="w-full">{rsvpButton}</div>
           </div>
         </div>
       </div>
+
+      {/* Outer border strokes the same path the content is clipped to, so it
+          follows the notches continuously — no border across the cut-outs. */}
+      <TicketOutlineBorder pathData={outlinePath} width={ticketSize.width} height={ticketSize.height} />
+
+      {/* Vertical perforation: dashed line between the notch tangent points
+          (y = r … height − r), only in the side-by-side layout. */}
+      {desktopLayout && notchX !== null && (
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+          viewBox={`0 0 ${ticketSize.width} ${ticketSize.height}`}
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={notchX}
+            y1={NOTCH_R}
+            x2={notchX}
+            y2={ticketSize.height - NOTCH_R}
+            stroke="rgba(255,255,255,0.22)"
+            strokeWidth={1.5}
+            strokeDasharray="5 6"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
     </div>
   );
 

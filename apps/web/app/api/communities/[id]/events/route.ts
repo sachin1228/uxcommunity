@@ -227,6 +227,10 @@ export async function POST(
     : null;
   const isPublic = body.is_public === true;
 
+  const accentColor = typeof body.accent_color === "string" && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())
+    ? body.accent_color.trim().toLowerCase()
+    : null;
+
   const { data, error } = await db
     .from("community_events")
     .insert({
@@ -241,9 +245,10 @@ export async function POST(
       meet_link: meetLink,
       max_attendees: maxAttendees,
       cover_image_url: rawCoverImageUrl,
+      accent_color: accentColor,
       is_public: isPublic,
     })
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, is_public, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

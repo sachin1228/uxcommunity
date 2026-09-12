@@ -5,6 +5,7 @@ import { Calendar, Check, Clock, Globe, ImagePlus, MapPin, Users, Video, X } fro
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { ToggleRow } from "../threads/ThreadComposerControls";
+import { AccentColorPicker, DEFAULT_EVENT_ACCENT } from "./AccentColorPicker";
 import type { CommunityEvent } from "./types";
 import { compressImage, compressedFile } from "@/lib/image-client";
 
@@ -35,6 +36,7 @@ export function CreateEventModal({
   const [meetLink, setMeetLink] = useState("");
   const [maxAttendees, setMaxAttendees] = useState("");
   const [isPublic, setIsPublic] = useState(initialIsPublic);
+  const [accentColor, setAccentColor] = useState(DEFAULT_EVENT_ACCENT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,6 +97,7 @@ export function CreateEventModal({
           meet_link: meetLink.trim() || null,
           max_attendees: maxAttendees ? Number(maxAttendees) : null,
           cover_image_url: coverImageUrl,
+          accent_color: accentColor,
           is_public: isPublic,
         }),
       });
@@ -312,6 +315,14 @@ export function CreateEventModal({
               className="field w-full"
             />
           </label>
+
+          {/* Accent color */}
+          <div>
+            <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
+              Card color <span className="font-normal text-foreground-subtle">(the main color of this event's ticket)</span>
+            </span>
+            <AccentColorPicker value={accentColor} onChange={setAccentColor} />
+          </div>
 
           {/* Make public toggle */}
           <ToggleRow
