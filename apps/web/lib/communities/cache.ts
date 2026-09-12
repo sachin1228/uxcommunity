@@ -599,6 +599,28 @@ function evictCommunityState(communityId: string): void {
   }
 }
 
+/**
+ * Seeds the live message cache from a server snapshot (the bootstrap's first
+ * message page) without ever overwriting messages already cached locally.
+ *
+ * `msgCache` is the realtime-maintained source of truth while the user is in a
+ * community, whereas the request-cached bootstrap snapshot can be up to 15
+ * minutes old. Replacing the live cache with that snapshot on a community
+ * switch replayed pre-fetch state — dropping the user's own reaction and even
+ * the message bubble carrying it — until a full page reload refetched the
+ * server. The snapshot is only applied when there is nothing local to lose.
+ *
+ * @returns true when the snapshot was applied.
+ */
+export function seedCachedMessages(
+  communityId: string,
+  messages: CachedMessage[],
+): boolean {
+  if (msgCache.get(communityId)?.length) return false;
+  msgCache.set(communityId, messages);
+  return true;
+}
+
 export function evictIfNeeded(): void {
   // BoundedCommunityMap evicts synchronously on every write. Keep this export
   // for callers compiled against the previous cache API.

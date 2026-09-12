@@ -144,6 +144,7 @@ jobs:
         run: |
           npx tsx --tsconfig tsconfig.json --test lib/read-manager.test.ts
           npx tsx --test lib/request-cache.test.ts
+          npx tsx --tsconfig tsconfig.json --test lib/communities/message-cache.test.ts
 
       - name: Deploy web worker
         working-directory: apps/web

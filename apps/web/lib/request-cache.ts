@@ -85,6 +85,23 @@ export function getCachedRequest<T>(url: string, userId?: string): T | undefined
   return entries.get(canonicalRequestKey(url, userId))?.value as T | undefined
 }
 
+/**
+ * True when `url` already has an entry inside its stale window, i.e. the next
+ * `fetchJsonCached` call for it will be served without a network round trip.
+ *
+ * Callers use this to decide whether a response is a fresh server read or a
+ * replay of an older snapshot before writing it into a live, realtime-backed
+ * cache.
+ */
+export function hasFreshRequestCache(
+  url: string,
+  staleMs: number,
+  userId?: string,
+): boolean {
+  const cached = entries.get(canonicalRequestKey(url, userId))
+  return Boolean(cached && Date.now() - cached.fetchedAt < staleMs)
+}
+
 function getBootstrapBackedRequest(url: string): BootstrapBackedRequest | null {
   const parsed = new URL(url, "http://uxcommunity.local")
   const match = parsed.pathname.match(
