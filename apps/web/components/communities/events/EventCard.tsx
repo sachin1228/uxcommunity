@@ -201,12 +201,14 @@ export function EventCard({
   ];
   const gradient = gradients[event.id.charCodeAt(0) % gradients.length];
 
-  // Per-event accent color: drives the big date, going button, and their glow.
+  // Per-event accent color: drives the big date, going button, glow, and the
+  // stub's tinted gradient (accent mixed into dark, ~12% at top fading to 0).
   const accent = event.accent_color ?? "#e8e14a";
   const accentStyle = {
     ["--accent" as string]: accent,
     ["--accent-hover" as string]: `${accent}e6`,
     ["--accent-glow" as string]: `${accent}40`,
+    ["--accent-tint" as string]: `${accent}1f`,
   } as React.CSSProperties;
 
   const rsvpButton = !past ? (
@@ -320,7 +322,10 @@ export function EventCard({
         </div>
 
         {/* ── Panel 3: perforated stub with the big date + going button ── */}
-        <div className="relative shrink-0 border-t border-dashed border-white/20 bg-gradient-to-b from-[#1a1a16] to-[#111111] lg:w-[9.5rem] lg:border-l lg:border-t-0">
+        <div
+          className="relative shrink-0 border-t border-dashed border-white/20 bg-[#111111] lg:w-[9.5rem] lg:border-l lg:border-t-0"
+          style={{ backgroundImage: "linear-gradient(to bottom, var(--accent-tint), transparent 70%)" }}
+        >
           {/* Perforation notches where the stub meets the body */}
           <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 z-10 size-3 rounded-full bg-[#171717] max-lg:hidden" />
           <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -bottom-1.5 z-10 size-3 rounded-full bg-[#171717] max-lg:hidden" />
