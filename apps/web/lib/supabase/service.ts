@@ -1,16 +1,24 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "./database.types";
 
 /**
  * Service-role Supabase client.
  * Bypasses Row Level Security — use ONLY on the server.
  * Never import this in Client Components.
  *
+ * Typed with the generated schema from `lib/supabase/database.types.ts`
+ * (regenerate with `npm run db:types` after a migration). This generic is
+ * load-bearing: without it supabase-js cannot infer what a query returns and
+ * every `.select()` result collapses to `never`.
+ *
  * Module-level singleton: reused across warm serverless invocations so we
  * don't pay client-construction overhead on every request.
  */
-let _client: ReturnType<typeof createClient> | null = null;
+type ServiceClient = SupabaseClient<Database>;
 
-export function createServiceClient() {
+let _client: ServiceClient | null = null;
+
+export function createServiceClient(): ServiceClient {
   if (_client) return _client;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,7 +30,7 @@ export function createServiceClient() {
     );
   }
 
-  _client = createClient(url, key, {
+  _client = createClient<Database>(url, key, {
     auth: { persistSession: false },
   });
 
