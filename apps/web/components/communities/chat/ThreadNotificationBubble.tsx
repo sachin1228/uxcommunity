@@ -48,7 +48,11 @@ export function ThreadNotificationBubble({
 }: ThreadNotificationBubbleProps) {
   const sender  = event.users;
   const isMe    = event.user_id === currentUserId;
-  const name    = isMe ? "You" : (sender?.name ?? "Someone");
+  // The avatar must always key off the real display name — "You" is only the
+  // label. Otherwise the fallback renders "Y" (and its color) for the author's
+  // own threads instead of their initials.
+  const senderName = sender?.name ?? "Someone";
+  const name    = isMe ? "You" : senderName;
   const timeAgo = fmtTimeAgo(event.created_at);
   const imgUrl  = thumbnailUrl(event);
   const label   = categoryLabel(event.category);
@@ -60,7 +64,7 @@ export function ThreadNotificationBubble({
       {/* Avatar column */}
       <div className="w-7 shrink-0 mt-0.5">
         {sender && (
-          <ChatAvatar name={name} url={sender.avatar_url} size={7} />
+          <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
         )}
       </div>
 
