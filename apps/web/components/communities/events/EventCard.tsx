@@ -17,7 +17,7 @@ const paperMono = Courier_Prime({
   variable: "--font-paper-mono",
   display: "swap",
 });
-import { Calendar, Clock, ExternalLink, MapPin, UserPlus, Video } from "lucide-react";
+import { Calendar, Clock, ExternalLink, MapPin, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
@@ -220,33 +220,36 @@ export function EventCard({
       type="button"
       onClick={handleJoin}
       disabled={rsvpPending || full}
-      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-md border px-3 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-full px-4 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
         event.user_rsvped
-          ? "border-white/30 bg-stone-200 text-stone-900 hover:bg-white"
+          ? "bg-blue-600 text-white hover:bg-blue-500"
           : full
-            ? "border-white/20 text-stone-500"
-            : "border-white/80 bg-stone-100 text-stone-900 shadow-[0_1px_0_rgba(0,0,0,0.4)] hover:bg-white"
+            ? "border border-white/20 text-stone-500"
+            : "bg-blue-600 text-white shadow-[0_1px_2px_rgba(0,0,0,0.4)] hover:bg-blue-500"
       }`}
     >
-      <UserPlus strokeWidth={2.5} size={14} aria-hidden="true" />
       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
     </button>
   ) : (
     <span className="[font-family:var(--font-paper-serif),serif] text-xs font-medium italic text-stone-500">This event has ended</span>
   );
 
+  const startDate = new Date(event.event_date);
+  const startDay = startDate.getDate();
+  const startMonth = startDate.toLocaleString("en-IN", { month: "short" }).toUpperCase();
+
   const eventBody = (
     <div
-      className={`relative overflow-hidden rounded-lg border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_6px_rgba(0,0,0,0.5),inset_0_0_60px_rgba(0,0,0,0.55)] ${paperSerif.variable} ${paperMono.variable}`}
+      className={`relative overflow-hidden rounded-xl border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)] ${paperSerif.variable} ${paperMono.variable}`}
     >
-      <div className="flex min-h-52 flex-col sm:flex-row">
-        {/* Poster — pinned left, kept at its natural aspect ratio */}
+      <div className="flex flex-col sm:flex-row">
+        {/* Poster — pinned left, with the start date stamped on its corner */}
         <div className="relative shrink-0 overflow-hidden bg-[#0a0a0a]">
           {event.cover_image_url ? (
             <img
               src={event.cover_image_url}
               alt={event.title}
-              className="block h-auto w-full sm:w-auto sm:max-h-56 sm:max-w-[16rem]"
+              className="block h-auto w-full sm:h-56 sm:w-auto sm:max-w-[15rem]"
             />
           ) : (
             <div className={`h-40 w-full bg-gradient-to-br sm:h-56 sm:w-56 ${gradient}`} aria-hidden="true" />
@@ -254,7 +257,7 @@ export function EventCard({
         </div>
 
         {/* Everything else, right of the perforation */}
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-white/10 px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-white/15 sm:border-l sm:border-t-0">
           {/* Perforation notches, punched through the ticket edges */}
           <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-[#171717]" />
           <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-[#171717] sm:hidden" />
@@ -272,44 +275,31 @@ export function EventCard({
             }}
           />
 
-          <div className="relative min-w-0">
-            {isDetail ? (
-              <h1 className="text-balance [font-family:var(--font-paper-serif),serif] text-lg font-bold leading-snug text-stone-50">{event.title}</h1>
-            ) : (
-              <h3 className="line-clamp-2 text-balance [font-family:var(--font-paper-serif),serif] text-sm font-bold leading-snug text-stone-50">{event.title}</h3>
-            )}
-          </div>
-
-          <div className="relative mt-3 border-t border-dashed border-white/10" />
-
-          {/* Ticket fields, boarding-pass style: label above value */}
-          <div className="relative my-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            <div className="min-w-0">
-              <TicketLabel icon={<Calendar strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />}>Date</TicketLabel>
-              <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{fmtEventDate(event.event_date)}</p>
+          <div className="relative flex min-w-0 flex-1 flex-col px-4 py-4">
+            {/* Date stamp chip, top-right of the black ticket section */}
+            <div className="absolute right-4 top-4 flex flex-col items-center rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 backdrop-blur-sm">
+              <span className="[font-family:var(--font-paper-serif),serif] text-base font-bold leading-none text-stone-50">{startDay}</span>
+              <span className="mt-0.5 [font-family:var(--font-paper-mono),monospace] text-[9px] font-bold uppercase tracking-widest text-stone-300">{startMonth}</span>
             </div>
 
-            <div className="min-w-0">
-              <TicketLabel icon={<Clock strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />}>Time</TicketLabel>
-              <p className="mt-1 truncate [font-family:var(--font-paper-mono),monospace] text-xs font-bold tabular-nums text-stone-200">
-                {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
-              </p>
+            {/* Title — right padding keeps it clear of the date stamp */}
+            <div className="relative min-w-0 pr-16 sm:pr-16">
+              {isDetail ? (
+                <h1 className="text-balance [font-family:var(--font-paper-serif),serif] text-xl font-bold leading-snug text-stone-50">{event.title}</h1>
+              ) : (
+                <h3 className="line-clamp-2 text-balance [font-family:var(--font-paper-serif),serif] text-base font-bold leading-snug text-stone-50">{event.title}</h3>
+              )}
             </div>
 
+            {/* Location / Online line */}
             {(event.is_online || event.location) && (
-              <div className="min-w-0">
-                <TicketLabel
-                  icon={
-                    event.is_online ? (
-                      <Video strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />
-                    ) : (
-                      <MapPin strokeWidth={2.5} size={12} className="shrink-0 text-stone-400" aria-hidden="true" />
-                    )
-                  }
-                >
-                  Where
-                </TicketLabel>
-                <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">
+              <p className="relative mt-2 flex min-w-0 items-center gap-1.5 [font-family:var(--font-paper-serif),serif] text-[13px] font-medium text-stone-300">
+                {event.is_online ? (
+                  <Video strokeWidth={2.5} size={13} className="shrink-0 text-stone-500" aria-hidden="true" />
+                ) : (
+                  <MapPin strokeWidth={2.5} size={13} className="shrink-0 text-stone-500" aria-hidden="true" />
+                )}
+                <span className="truncate">
                   {event.is_online ? (
                     isDetail && event.meet_link ? (
                       <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1 text-stone-200 underline decoration-stone-200/40 underline-offset-2 hover:decoration-stone-200">
@@ -324,24 +314,46 @@ export function EventCard({
                   ) : (
                     event.location
                   )}
-                </p>
-              </div>
+                </span>
+              </p>
             )}
 
-            <div className="min-w-0">
+            {/* Date · time row — below location */}
+            <p className="relative mt-3 flex flex-wrap items-center gap-x-2 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide text-stone-400">
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar strokeWidth={2.5} size={11} className="shrink-0" aria-hidden="true" />
+                {fmtEventDate(event.event_date)}
+              </span>
+              <span aria-hidden="true" className="text-stone-600">•</span>
+              <span className="inline-flex items-center gap-1.5">
+                <Clock strokeWidth={2.5} size={11} className="shrink-0" aria-hidden="true" />
+                {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+              </span>
+            </p>
+
+            {/* Hosted by — with the host's avatar */}
+            <div className="relative mt-4 flex min-w-0 items-center gap-2">
+              <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/10">
+                {event.users?.avatar_url ? (
+                  <img src={event.users.avatar_url} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="[font-family:var(--font-paper-serif),serif] text-[9px] font-bold text-stone-300">{authorName.charAt(0).toUpperCase()}</span>
+                )}
+              </span>
               <TicketLabel>Hosted by</TicketLabel>
-              <p className="mt-1 truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{authorName}</p>
+              <span className="truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{authorName}</span>
             </div>
+
+            {isDetail && event.max_attendees && (
+              <p className="relative mt-3 [font-family:var(--font-paper-serif),serif] text-xs italic text-stone-500">
+                {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
+              </p>
+            )}
+            {(error || rsvpError) && <p className="relative mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
           </div>
 
-          {isDetail && event.max_attendees && (
-            <p className="relative mt-3 [font-family:var(--font-paper-serif),serif] text-xs italic text-stone-500">
-              {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
-            </p>
-          )}
-          {(error || rsvpError) && <p className="relative mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
-
-          <div className="relative mt-3 flex flex-col gap-3 border-t border-dashed border-white/10 pt-3 sm:mt-auto sm:flex-row sm:items-center sm:justify-between">
+          {/* Footer strip — attendees on the left, RSVP on the right */}
+          <div className="relative mt-auto flex flex-col gap-3 border-t border-dashed border-white/15 bg-white/[0.03] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
             </div>
