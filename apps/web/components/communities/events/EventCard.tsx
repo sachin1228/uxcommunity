@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
@@ -16,6 +16,88 @@ import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
+
+// ─── Ticket outline with perforation notches (SVG) ─────────────────────────
+
+/**
+ * Geometry of the ticket outline in REAL PIXEL UNITS — critical, because the
+ * SVG is stretched with preserveAspectRatio="none": if the path were in an
+ * arbitrary viewBox, x and y would scale differently and the notches would
+ * render as ovals. In pixel units the scale is 1:1 and the semicircular
+ * cut-outs (cubic arcs) are perfect circles. r = notch radius.
+ */
+function ticketOutlinePath(
+  width: number,
+  height: number,
+  notchX: number | null,
+  r = 13,
+  corner = 16,
+): string {
+  const notch = notchX !== null
+    ? Math.min(Math.max(notchX, r + corner), width - r - corner)
+    : null;
+  const k = 0.5523 * r; // cubic control offset approximating a semicircle
+  const parts: string[] = [`M ${corner} 0`];
+
+  if (notch !== null) {
+    // Top edge up to the notch, then a perfect semicircular dip into the ticket.
+    parts.push(
+      `L ${notch - r} 0`,
+      `C ${notch - r} ${k} ${notch - k} ${r} ${notch} ${r}`,
+      `C ${notch + k} ${r} ${notch + r} ${k} ${notch + r} 0`,
+    );
+  }
+  parts.push(
+    `L ${width - corner} 0`,
+    `Q ${width} 0 ${width} ${corner}`,
+    `L ${width} ${height - corner}`,
+    `Q ${width} ${height} ${width - corner} ${height}`,
+  );
+  if (notch !== null) {
+    parts.push(
+      `L ${notch + r} ${height}`,
+      // Bottom notch: mirrored semicircular dip up into the ticket.
+      `C ${notch + r} ${height - k} ${notch + k} ${height - r} ${notch} ${height - r}`,
+      `C ${notch - k} ${height - r} ${notch - r} ${height - k} ${notch - r} ${height}`,
+    );
+  }
+  parts.push(
+    `L ${corner} ${height}`,
+    `Q 0 ${height} 0 ${height - corner}`,
+    `L 0 ${corner}`,
+    `Q 0 0 ${corner} 0`,
+    `Z`,
+  );
+  return parts.join(" ");
+}
+
+/** Overlay that strokes the ticket outline (same path as the clip). */
+function TicketOutlineBorder({
+  pathData,
+  width,
+  height,
+  stroke = "rgba(255,255,255,0.16)",
+  strokeWidth = 1.5,
+}: {
+  pathData: string;
+  width: number;
+  height: number;
+  stroke?: string;
+  strokeWidth?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-20 h-full w-full"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+    >
+      <path d={pathData} fill="none" stroke={stroke} strokeWidth={strokeWidth} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+// ─── End ticket outline helpers ─────────────────────────────────────────────
 
 function fmtEventDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
@@ -236,11 +318,66 @@ export function EventCard({
   const startWeekday = startDate.toLocaleString("en-IN", { weekday: "short" }).toUpperCase();
   const startYear = startDate.getFullYear();
 
+  // Measured ticket size — the SVG outline is generated from it so the notches
+  // and border always match the real rendered box. Defaults assume desktop.
+  const ticketRef = useRef<HTMLDivElement | null>(null);
+  const [ticketSize, setTicketSize] = useState({ width: 560, height: 260 });
+  const [desktopLayout, setDesktopLayout] = useState(true);
+
+  useEffect(() => {
+    const el = ticketRef.current;
+    if (!el) return;
+    // The stub sits beside the body at the Tailwind `lg` viewport breakpoint
+    // (1024px) — track the viewport, not the card width, so a wide card in a
+    // narrow viewport still gets the stacked (notchless) outline.
+    const media = typeof matchMedia !== "undefined" ? matchMedia("(min-width: 1024px)") : null;
+    const syncLayout = () => setDesktopLayout(media?.matches ?? true);
+    syncLayout();
+    media?.addEventListener("change", syncLayout);
+
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (!rect) return;
+      setTicketSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(el);
+    return () => {
+      media?.removeEventListener("change", syncLayout);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Notch geometry, in REAL PIXELS matching the rendered box (the SVG stretches
+  // 1:1, so the cut-outs are perfect circles). On mobile the stub stacks below,
+  // so there is no seam — the outline is a plain rounded rect with no notches.
+  const STUB_PX = 152; // lg:w-[9.5rem]
+  const notchX = desktopLayout
+    ? Math.max(0, ticketSize.width - STUB_PX)
+    : null;
+  const outlinePath = ticketOutlinePath(ticketSize.width, ticketSize.height, notchX);
+  const clipId = useId().replace(/:/g, "");
+  const NOTCH_R = 13;
+
   const eventBody = (
     <div
-      className="relative overflow-hidden rounded-xl border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
-      style={accentStyle}
+      ref={ticketRef}
+      className="relative bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
+      style={{
+        ...accentStyle,
+        clipPath: `url(#${clipId})`,
+        WebkitClipPath: `url(#${clipId})`,
+      }}
     >
+      {/* Clip: the ticket outline including the semicircular notches. */}
+      <svg aria-hidden="true" className="absolute h-0 w-0">
+        <defs>
+          <clipPath id={clipId} clipPathUnits="userSpaceOnUse">
+            <path d={outlinePath} />
+          </clipPath>
+        </defs>
+      </svg>
+
       <div className="flex flex-col lg:flex-row">
         {/* ── Panel 1: poster, rounded and inset like a mounted print ── */}
         <div className="relative shrink-0 p-3 lg:w-[13rem]">
@@ -323,12 +460,9 @@ export function EventCard({
 
         {/* ── Panel 3: perforated stub with the big date + going button ── */}
         <div
-          className="relative shrink-0 border-t border-dashed border-white/20 bg-[#111111] lg:w-[9.5rem] lg:border-l lg:border-t-0"
+          className="relative shrink-0 bg-[#111111] lg:w-[9.5rem]"
           style={{ backgroundImage: "linear-gradient(to bottom, var(--accent-tint), transparent 70%)" }}
         >
-          {/* Perforation notches where the stub meets the body */}
-          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 z-10 size-3 rounded-full bg-[#171717] max-lg:hidden" />
-          <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -bottom-1.5 z-10 size-3 rounded-full bg-[#171717] max-lg:hidden" />
 
           <div className="flex h-full flex-col items-center justify-center gap-3.5 px-3 py-5">
             {/* Big date block */}
@@ -344,6 +478,32 @@ export function EventCard({
           </div>
         </div>
       </div>
+
+      {/* Outer border strokes the same path the content is clipped to, so it
+          follows the notches continuously — no border across the cut-outs. */}
+      <TicketOutlineBorder pathData={outlinePath} width={ticketSize.width} height={ticketSize.height} />
+
+      {/* Vertical perforation: dashed line between the notch tangent points
+          (y = r … height − r), only in the side-by-side layout. */}
+      {desktopLayout && notchX !== null && (
+        <svg
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+          viewBox={`0 0 ${ticketSize.width} ${ticketSize.height}`}
+          preserveAspectRatio="none"
+        >
+          <line
+            x1={notchX}
+            y1={NOTCH_R}
+            x2={notchX}
+            y2={ticketSize.height - NOTCH_R}
+            stroke="rgba(255,255,255,0.22)"
+            strokeWidth={1.5}
+            strokeDasharray="5 6"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      )}
     </div>
   );
 
