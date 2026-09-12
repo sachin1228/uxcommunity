@@ -60,7 +60,7 @@ export async function GET() {
     resourceIds.length
       ? db
           .from("community_resources")
-          .select("id, community_id, user_id, title, description, resource_type, url, tags, created_at, updated_at, communities(name)")
+          .select("id, community_id, user_id, title, description, resource_type, url, allow_replies, created_at, updated_at, communities(name)")
           .in("id", resourceIds)
           .order("created_at", { ascending: false })
       : { data: [] },

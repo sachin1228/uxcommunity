@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Bookmark, BookmarkCheck, ExternalLink, Flag,
+  Bookmark, Flag,
   MoreHorizontal, Pencil, Trash2,
 } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
+import { CommentIcon } from "../CommentIcon";
 import type { CommunityResource } from "./types";
 import { RESOURCE_TYPES } from "./types";
 import { ResourceFormModal } from "./ResourceFormModal";
@@ -58,9 +59,8 @@ interface ResourceCardProps {
   onSaveChanged: (resourceId: string, saved: boolean, newCount: number) => void;
   onBookmarkChanged: (resourceId: string, bookmarked: boolean, newCount: number) => void;
   onDeleted: (resourceId: string) => void;
-  variant?: "list" | "detail";
-  edgeToEdgeDivider?: boolean;
-  hideDivider?: boolean;
+  /** Opens the resource detail (where the comment section lives). Card-wide click target. */
+  onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
 }
@@ -73,17 +73,14 @@ export function ResourceCard({
   onSaveChanged,
   onBookmarkChanged,
   onDeleted,
-  variant = "list",
-  edgeToEdgeDivider = false,
-  hideDivider = false,
+  onOpen,
   communityName,
   communityImage,
 }: ResourceCardProps) {
-  const isDetail = variant === "detail";
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
   const isOwner = resource.user_id === currentUserId;
   const hasFigmaPrototype = getFigmaEmbedUrl(resource.url) !== null;
-  const linkPreview = useLinkPreview(resource.url, !hasFigmaPrototype && !isDetail);
+  const linkPreview = useLinkPreview(resource.url, !hasFigmaPrototype);
 
   const latestSaveRef = useRef({ resource, onSaveChanged });
   const initialSavedRef = useRef(resource.user_saved);
@@ -230,18 +227,16 @@ export function ResourceCard({
         type="button"
         onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen((open) => !open); }}
         aria-label="Resource options"
-        className={`flex items-center justify-center text-foreground-subtle hover:bg-surface-raised hover:text-foreground ${isDetail ? "h-8 w-8 rounded-lg border border-border" : "h-7 w-7 rounded-md"}`}
+        className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle hover:bg-surface-raised hover:text-foreground"
       >
         <MoreHorizontal strokeWidth={2.5} size={15} />
       </button>
       {menuOpen && (
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-          {!isDetail && (
-            <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-              <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
-              {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
-            </button>
-          )}
+          <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+            <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
+            {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
+          </button>
           {isOwner ? (
             <>
               <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setMenuOpen(false); setShowEditModal(true); }} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
@@ -263,7 +258,13 @@ export function ResourceCard({
 
   return (
     <>
-      <article className={isDetail ? communityFeedLayout.detailCard : `group cursor-pointer ${hideDivider ? "py-0" : edgeToEdgeDivider ? communityFeedLayout.dividerBottom : `${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}`}>
+      <article
+        tabIndex={onOpen ? 0 : undefined}
+        role={onOpen ? "link" : undefined}
+        onClick={onOpen ? onOpen : undefined}
+        onKeyDown={onOpen ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
+        className={`group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}
+      >
         <div className="flex items-start justify-between gap-3">
           <PostAuthorMeta
             name={resource.users?.name}
@@ -272,40 +273,12 @@ export function ResourceCard({
             dateInline
             secondaryLabel={`Resources · ${typeInfo?.label ?? "Post"}`}
           />
-          {isDetail ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSave}
-                aria-busy={saveBusy}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-body text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${resource.user_saved ? "border-accent/40 bg-accent/10 text-accent" : "border-border text-foreground-muted hover:border-accent/40 hover:text-accent"}`}
-              >
-                {resource.user_saved ? <BookmarkCheck strokeWidth={2.5} size={13} /> : <Bookmark strokeWidth={2.5} size={13} />}
-                {resource.user_saved ? "Saved" : "Save"}
-                <span className="font-mono text-[10px]">{resource.save_count}</span>
-              </button>
-              <a href={resource.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 font-body text-sm font-medium text-accent-foreground hover:bg-accent-hover">
-                <ExternalLink strokeWidth={2.5} size={13} />Open
-              </a>
-              {optionsMenu}
-            </div>
-          ) : optionsMenu}
+          {optionsMenu}
         </div>
 
-        {isDetail ? (
-          <>
-            <h1 className="mt-3 font-display text-lg font-semibold leading-snug text-foreground">{resource.title}</h1>
-            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-body text-xs text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent">
-              <ExternalLink strokeWidth={2.5} size={11} />{getDomain(resource.url)}
-            </a>
-            {resource.description && <p className="mt-4 whitespace-pre-wrap font-body text-sm leading-relaxed text-foreground-muted">{resource.description}</p>}
-            {hasFigmaPrototype && <FigmaEmbed url={resource.url} className="mt-4" />}
-          </>
-        ) : (
-          <>
-            <a href={resource.url} target="_blank" rel="noopener noreferrer" className="block">
-              <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
-            </a>
+        <>
+            {/* Card body → opens the resource view; only the link-preview block below is an external link. */}
+            <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
             {hasFigmaPrototype ? (
               <FigmaEmbed url={resource.url} compact className="mt-4" />
             ) : linkPreview && (linkPreview.title || linkPreview.description || linkPreview.image) ? (
@@ -313,6 +286,7 @@ export function ResourceCard({
                 href={resource.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={(event) => event.stopPropagation()}
                 className="mt-4 flex items-start gap-4 overflow-hidden rounded-xl border border-border bg-surface-raised p-4 transition-opacity duration-150 hover:opacity-90 active:opacity-75"
               >
                 <div className="min-w-0 flex-1">
@@ -355,14 +329,21 @@ export function ResourceCard({
               </a>
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
-              <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-                <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
-              </button>
+              <div className="flex shrink-0 items-center gap-4">
+                <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+                  <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+                  <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
+                </button>
+                {resource.allow_replies !== false && (
+                  <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+                    <CommentIcon />
+                    {resource.comment_count ?? 0}
+                  </span>
+                )}
+              </div>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
-          </>
-        )}
+        </>
       </article>
       {showEditModal && (
         <ResourceFormModal mode="edit" resource={resource} communityId={communityId} onClose={() => setShowEditModal(false)} onSaved={(updated) => { onUpdated(updated); setShowEditModal(false); }} />

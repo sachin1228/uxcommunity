@@ -72,6 +72,7 @@ async function withAuthorAndMeta(
       comment_count: Number(aggregate?.comment_count ?? 0),
       bookmark_count: Number(aggregate?.bookmark_count ?? 0),
       user_bookmarked: aggregate?.user_bookmarked === true,
+      allow_replies: Boolean(row.allow_replies),
     };
   });
 }
@@ -129,6 +130,7 @@ export async function POST(
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
   const isPublic = body.is_public === true;
+  const allowReplies = body.allow_replies !== false;
 
   if (!title || title.length > 120) {
     return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
@@ -148,8 +150,8 @@ export async function POST(
 
   const { data: inserted, error } = await db
     .from("community_resources")
-    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, is_public: isPublic })
-    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
+    .insert({ community_id: communityId, user_id: userId, title, description, resource_type: resourceType, url, is_public: isPublic, allow_replies: allowReplies })
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, allow_replies, created_at, updated_at")
     .single();
 
   if (error || !inserted) {

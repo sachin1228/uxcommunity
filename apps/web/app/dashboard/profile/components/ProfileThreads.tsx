@@ -397,6 +397,7 @@ export function ProfileThreads({
                   onSaveChanged={handleResourceSaveChanged}
                   onBookmarkChanged={handleResourceBookmarkChanged}
                   onDeleted={handleResourceDeleted}
+                  onOpen={() => router.push(`/dashboard/communities/${resource.community_id}/resources/${resource.id}`)}
                 />
               ))}
             </div>
@@ -548,6 +549,7 @@ export function ProfileThreads({
                           current.filter((i) => !(i.type === "resource" && i.data.id === resourceId)),
                         )
                       }
+                      onOpen={() => router.push(`/dashboard/communities/${resource.community_id}/resources/${resource.id}`)}
                     />
                   );
                 }

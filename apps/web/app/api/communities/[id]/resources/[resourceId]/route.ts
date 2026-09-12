@@ -61,7 +61,7 @@ export async function GET(
 
   let resourceQuery = db
     .from("community_resources")
-    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, allow_replies, created_at, updated_at")
     .eq("id", resourceId);
   resourceQuery = publicScope
     ? resourceQuery.eq("is_public", true).is("community_id", null)
@@ -108,6 +108,7 @@ export async function PATCH(
   const description = typeof body.description === "string" ? body.description.trim() || null : null;
   const resourceType = body.resource_type as ResourceType;
   const isPublic = body.is_public === true;
+  const allowReplies = body.allow_replies !== false;
 
   if (!title || title.length > 120) return NextResponse.json({ error: "Title is required and must be 120 characters or fewer." }, { status: 422 });
   if (!url || url.length > 2048) return NextResponse.json({ error: "URL is required." }, { status: 422 });
@@ -118,9 +119,9 @@ export async function PATCH(
 
   const { data: updated, error } = await db
     .from("community_resources")
-    .update({ title, description, resource_type: resourceType, url, is_public: isPublic })
+    .update({ title, description, resource_type: resourceType, url, is_public: isPublic, allow_replies: allowReplies })
     .eq("id", resourceId)
-    .select("id, community_id, user_id, title, description, resource_type, url, is_public, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, resource_type, url, is_public, allow_replies, created_at, updated_at")
     .single();
 
   if (error || !updated) { console.error("[PATCH resource]", error); return NextResponse.json({ error: "Failed to update resource." }, { status: 500 }); }

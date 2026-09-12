@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { MessageSquare } from "lucide-react";
+import { BackLink } from "@/components/ui/BackLink";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
@@ -19,9 +20,15 @@ interface Props {
   currentUserId: string;
   communityId: string;
   communityName: string;
+  communityImage?: string | null;
+  /** Shows "in <community>" under the resource — used on the top-level (home) view. */
+  showCommunityAttribution?: boolean;
+  /** When provided, renders a back link above the resource (e.g. community tab context). */
+  backHref?: string;
+  backLabel?: string;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, backHref, backLabel = "Resources" }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
@@ -97,29 +104,34 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
     <>
       <div className="flex-1 overflow-y-auto">
         <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
+          {backHref && (
+            <BackLink
+              href={backHref}
+              label={backLabel}
+              className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
+            />
+          )}
 
-          {/* Resource card */}
-          <div className={communityFeedLayout.detailSection}>
-              <ResourceCard
-                variant="detail"
-                resource={resource}
-                currentUserId={currentUserId}
-                communityId={communityId}
-                communityName={communityName}
-                onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
-                onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
-                onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
-                onDeleted={() => router.push(`/dashboard/communities/${communityId}?tab=resources`)}
-              />
-          </div>
+          {/* Resource card — rendered exactly like the resources feed card */}
+          <ResourceCard
+            resource={resource}
+            currentUserId={currentUserId}
+            communityId={communityId}
+            communityName={showCommunityAttribution ? communityName : undefined}
+            communityImage={communityImage}
+            onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
+            onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
+            onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
+            onDeleted={() => router.push(`/dashboard/communities/${communityId}?tab=resources`)}
+          />
 
           {/* Comments section */}
-          <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
+          <div className={`mt-6 ${communityFeedLayout.card}`}>
             <CommentSection
               communityId={communityId}
               kind="resources"
               targetId={resource.id}
-              allowReplies
+              allowReplies={resource.allow_replies !== false}
               comments={comments}
               currentUserId={currentUserId}
               onPosted={handleCommentPosted}
