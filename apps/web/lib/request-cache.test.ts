@@ -7,6 +7,7 @@ import {
   fetchAndHydrateCommunityBootstrap,
   fetchJsonCached,
   getCachedRequest,
+  hasFreshRequestCache,
   initRequestCache,
   invalidateRequest,
   patchCachedRequest,
@@ -360,6 +361,23 @@ test("hydrates a secondary community collection from bootstrap", async () => {
   ])
 
   assert.deepEqual(calls, ["/api/communities/community-a/bootstrap"])
+})
+
+test("reports whether a URL will be served from its fresh request cache", async () => {
+  globalThis.fetch = (async () => new Response(
+    JSON.stringify({ ok: true }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  )) as typeof fetch
+
+  const bootstrap = "/api/communities/community-a/bootstrap"
+
+  assert.equal(hasFreshRequestCache(bootstrap, 60_000, "user-a"), false)
+  await fetchJsonCached(bootstrap, { staleMs: 60_000 }, "user-a")
+  assert.equal(hasFreshRequestCache(bootstrap, 60_000, "user-a"), true)
+  // Outside the stale window the next read refetches, so the snapshot the
+  // caller already holds is not what will be written back.
+  assert.equal(hasFreshRequestCache(bootstrap, 0, "user-a"), false)
+  assert.equal(hasFreshRequestCache(bootstrap, 60_000, "user-b"), false)
 })
 
 test("patches and invalidates only the requested user key", async () => {
