@@ -193,7 +193,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             We&apos;re in beta
           </p>
           <p className="mt-[5px] font-body text-[10px] leading-snug text-foreground-muted">
-            This product is still early, so tell us what to build next.
+            This is my side project. Join our WhatsApp group if you want to
+            provide feedback on this app.
           </p>
           <a
             href={WHATSAPP_COMMUNITY_URL}
