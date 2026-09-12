@@ -1,22 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type ReactNode } from "react";
-import { Fraunces, Courier_Prime } from "next/font/google";
 import TruncateMarkup from "react-truncate-markup";
-
-/** Print-style type for the paper ticket: old-style serif + typewriter mono. */
-const paperSerif = Fraunces({
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-  variable: "--font-paper-serif",
-  display: "swap",
-});
-const paperMono = Courier_Prime({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-paper-mono",
-  display: "swap",
-});
 import { Calendar, Clock, ExternalLink, MapPin, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
@@ -43,7 +28,7 @@ function fmtTime(iso: string) {
 /** Uppercase micro-label used across the event ticket fields (ink on paper). */
 function TicketLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
-    <span className="flex items-center gap-1.5 [font-family:var(--font-paper-mono),monospace] text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
+    <span className="flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-stone-500">
       {icon}
       {children}
     </span>
@@ -77,13 +62,13 @@ function AvatarStack({
               {rsvp.users?.avatar_url ? (
                 <img src={rsvp.users.avatar_url} alt={rsvp.users.name} className="size-full object-cover" />
               ) : (
-                <span className="[font-family:var(--font-paper-serif),serif] text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
+                <span className="font-display text-[10px] font-bold text-accent">{(rsvp.users?.name ?? "M").charAt(0).toUpperCase()}</span>
               )}
             </div>
           ))}
         </div>
       )}
-      <span className={`[font-family:var(--font-paper-serif),serif] text-[11px] italic ${safeCount > 0 ? "text-stone-400" : "text-stone-500"}`}>
+      <span className={`font-display text-[11px] ${safeCount > 0 ? "text-stone-400" : "text-stone-500"}`}>
         {safeCount} {safeCount === 1 ? "person" : "people"} going
       </span>
     </div>
@@ -220,7 +205,7 @@ export function EventCard({
       type="button"
       onClick={handleJoin}
       disabled={rsvpPending || full}
-      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-full px-4 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`inline-flex min-h-8 w-full items-center justify-center gap-1 rounded-full px-4 font-mono text-[11px] font-bold uppercase tracking-wide transition-colors sm:w-auto disabled:cursor-not-allowed disabled:opacity-50 ${
         event.user_rsvped
           ? "bg-blue-600 text-white hover:bg-blue-500"
           : full
@@ -231,7 +216,7 @@ export function EventCard({
       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : "Attend"}
     </button>
   ) : (
-    <span className="[font-family:var(--font-paper-serif),serif] text-xs font-medium italic text-stone-500">This event has ended</span>
+    <span className="font-display text-xs font-medium italic text-stone-500">This event has ended</span>
   );
 
   const startDate = new Date(event.event_date);
@@ -240,11 +225,11 @@ export function EventCard({
 
   const eventBody = (
     <div
-      className={`relative overflow-hidden rounded-xl border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)] ${paperSerif.variable} ${paperMono.variable}`}
+      className="relative overflow-hidden rounded-xl border border-white/10 bg-[#111111] text-stone-200 shadow-[0_2px_10px_rgba(0,0,0,0.45),inset_0_0_60px_rgba(0,0,0,0.55)]"
     >
       <div className="flex flex-col sm:flex-row">
         {/* Poster — pinned left, with the start date stamped on its corner */}
-        <div className="relative shrink-0 overflow-hidden bg-[#0a0a0a]">
+        <div className="relative shrink-0 overflow-hidden bg-[#0a0a0a] p-4">
           {event.cover_image_url ? (
             <img
               src={event.cover_image_url}
@@ -277,23 +262,23 @@ export function EventCard({
 
           <div className="relative flex min-w-0 flex-1 flex-col px-4 py-4">
             {/* Date stamp chip, top-right of the black ticket section */}
-            <div className="absolute right-4 top-4 flex flex-col items-center rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 backdrop-blur-sm">
-              <span className="[font-family:var(--font-paper-serif),serif] text-base font-bold leading-none text-stone-50">{startDay}</span>
-              <span className="mt-0.5 [font-family:var(--font-paper-mono),monospace] text-[9px] font-bold uppercase tracking-widest text-stone-300">{startMonth}</span>
+            <div className="absolute right-4 top-5 flex flex-col items-center rounded-lg border border-white/20 bg-black/70 px-2.5 py-1.5 backdrop-blur-sm">
+              <span className="font-display text-base font-bold leading-none text-stone-50">{startDay}</span>
+              <span className="mt-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-stone-300">{startMonth}</span>
             </div>
 
             {/* Title — right padding keeps it clear of the date stamp */}
             <div className="relative min-w-0 pr-16 sm:pr-16">
               {isDetail ? (
-                <h1 className="text-balance [font-family:var(--font-paper-serif),serif] text-xl font-bold leading-snug text-stone-50">{event.title}</h1>
+                <h1 className="text-balance font-display text-sm font-bold leading-snug text-stone-50">{event.title}</h1>
               ) : (
-                <h3 className="line-clamp-2 text-balance [font-family:var(--font-paper-serif),serif] text-base font-bold leading-snug text-stone-50">{event.title}</h3>
+                <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-stone-50">{event.title}</h3>
               )}
             </div>
 
             {/* Location / Online line */}
             {(event.is_online || event.location) && (
-              <p className="relative mt-2 flex min-w-0 items-center gap-1.5 [font-family:var(--font-paper-serif),serif] text-[13px] font-medium text-stone-300">
+              <p className="relative mt-2 flex min-w-0 items-center gap-1.5 font-display text-[13px] font-medium text-stone-300">
                 {event.is_online ? (
                   <Video strokeWidth={2.5} size={13} className="shrink-0 text-stone-500" aria-hidden="true" />
                 ) : (
@@ -319,7 +304,7 @@ export function EventCard({
             )}
 
             {/* Date · time row — below location */}
-            <p className="relative mt-3 flex flex-wrap items-center gap-x-2 [font-family:var(--font-paper-mono),monospace] text-[11px] font-bold uppercase tracking-wide text-stone-400">
+            <p className="relative mt-3 flex flex-wrap items-center gap-x-2 font-mono text-[11px] font-bold uppercase tracking-wide text-stone-400">
               <span className="inline-flex items-center gap-1.5">
                 <Calendar strokeWidth={2.5} size={11} className="shrink-0" aria-hidden="true" />
                 {fmtEventDate(event.event_date)}
@@ -337,15 +322,15 @@ export function EventCard({
                 {event.users?.avatar_url ? (
                   <img src={event.users.avatar_url} alt="" className="size-full object-cover" />
                 ) : (
-                  <span className="[font-family:var(--font-paper-serif),serif] text-[9px] font-bold text-stone-300">{authorName.charAt(0).toUpperCase()}</span>
+                  <span className="font-display text-[9px] font-bold text-stone-300">{authorName.charAt(0).toUpperCase()}</span>
                 )}
               </span>
               <TicketLabel>Hosted by</TicketLabel>
-              <span className="truncate [font-family:var(--font-paper-serif),serif] text-xs font-semibold text-stone-50">{authorName}</span>
+              <span className="truncate font-display text-xs font-semibold text-stone-50">{authorName}</span>
             </div>
 
-            {isDetail && event.max_attendees && (
-              <p className="relative mt-3 [font-family:var(--font-paper-serif),serif] text-xs italic text-stone-500">
+            {event.max_attendees && (
+              <p className="relative mt-3 font-display text-xs text-stone-500">
                 {event.max_attendees - event.rsvp_count > 0 ? `${event.max_attendees - event.rsvp_count} spots remaining` : "No spots remaining"}
               </p>
             )}
