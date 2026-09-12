@@ -231,7 +231,7 @@ export function EventCard({
         </div>
 
         {/* Everything else, right of the perforation */}
-        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-border px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
+        <div className="relative flex min-w-0 flex-1 flex-col border-t border-dashed border-amber-400/60 px-3 py-3 sm:border-l sm:border-t-0 md:px-4">
           {/* Perforation notches, punched through the ticket edges */}
           <span aria-hidden="true" className="pointer-events-none absolute -left-1.5 -top-1.5 size-3 rounded-full bg-background" />
           <span aria-hidden="true" className="pointer-events-none absolute -right-1.5 -top-1.5 size-3 rounded-full bg-background sm:hidden" />
@@ -246,7 +246,7 @@ export function EventCard({
             )}
           </div>
 
-          <div className="mt-3 border-t border-dashed border-border" />
+          <div className="mt-3 border-t border-dashed border-amber-400/60" />
 
           {/* Ticket fields, boarding-pass style: label above value */}
           <div className="my-3 grid grid-cols-2 gap-x-4 gap-y-3">
@@ -307,12 +307,9 @@ export function EventCard({
           )}
           {(error || rsvpError) && <p className="mt-3 font-body text-xs text-destructive">{error || rsvpError}</p>}
 
-          <div className="mt-3 flex flex-col gap-3 border-t border-dashed border-border pt-3 sm:mt-auto sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-3 flex flex-col gap-3 border-t border-dashed border-amber-400/60 pt-3 sm:mt-auto sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
-              <TicketLabel>Going</TicketLabel>
-              <div className="mt-1">
-                <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
-              </div>
+              <AvatarStack rsvps={attendeePreviews} count={event.rsvp_count} />
             </div>
             <div className="shrink-0">{rsvpButton}</div>
           </div>
