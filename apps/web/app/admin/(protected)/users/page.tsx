@@ -45,7 +45,14 @@ export default function UsersPage() {
   }, [page, search]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
-  useEffect(() => { setPage(1); }, [search]);
+
+  // Reset to page 1 when the search changes. Adjusted during render rather than
+  // in an effect, so the fetch above never first fires for the old page.
+  const [seenSearch, setSeenSearch] = useState(search);
+  if (seenSearch !== search) {
+    setSeenSearch(search);
+    setPage(1);
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 

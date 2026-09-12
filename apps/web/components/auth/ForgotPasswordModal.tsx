@@ -82,7 +82,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <p className="font-body text-sm text-foreground-muted -mt-2">
-            Enter your email and we'll send you a link to set a new password.
+            Enter your email and we&apos;ll send you a link to set a new password.
           </p>
 
           {error && (

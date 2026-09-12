@@ -194,9 +194,13 @@ export function useScrollAndUnread({
   }, []);
 
   // ── Reset showScrollToBottom on community change ──────────────────────────
-  useEffect(() => {
+  // Adjusted during render so the previous community's scroll indicator is
+  // never painted for the newly selected one.
+  const [seenScrollCommunityId, setSeenScrollCommunityId] = useState(communityId);
+  if (seenScrollCommunityId !== communityId) {
+    setSeenScrollCommunityId(communityId);
     setShowScrollToBottom(false);
-  }, [communityId]);
+  }
 
   // ── Derived unread values ─────────────────────────────────────────────────
   const realMessages = useMemo(

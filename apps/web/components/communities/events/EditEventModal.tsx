@@ -290,7 +290,7 @@ export function EditEventModal({ event, communityId, onClose, onUpdated }: EditE
           {/* Accent color */}
           <div>
             <span className="mb-1.5 block font-body text-xs font-medium text-foreground-muted">
-              Card color <span className="font-normal text-foreground-subtle">(the main color of this event's ticket)</span>
+              Card color <span className="font-normal text-foreground-subtle">(the main color of this event&apos;s ticket)</span>
             </span>
             <AccentColorPicker value={accentColor} onChange={setAccentColor} />
           </div>

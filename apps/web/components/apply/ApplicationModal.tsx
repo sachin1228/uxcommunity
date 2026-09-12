@@ -96,7 +96,7 @@ export function ApplicationModal({ open, onClose }: ApplicationModalProps) {
             Application submitted!
           </h3>
           <p className="font-body text-sm text-foreground-muted leading-relaxed">
-            Thanks for applying! We review every application manually and will reach out with an invitation if you're approved.
+            Thanks for applying! We review every application manually and will reach out with an invitation if you&apos;re approved.
           </p>
           <button
             onClick={handleClose}

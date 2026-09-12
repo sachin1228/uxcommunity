@@ -13,7 +13,7 @@
  * show/hide toggling that would cause hydration mismatches.
  */
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 interface DropdownMenuProps {
@@ -39,9 +39,14 @@ export function DropdownMenu({
   className = "",
 }: DropdownMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  // Only render on the client — prevents SSR/hydration mismatch.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  // Only render on the client — prevents SSR/hydration mismatch. Same
+  // server/client snapshot pair Modal and ResourceFormModal use, so no effect
+  // and no extra render pass are needed.
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
 
   /** Reposition the menu relative to the trigger while keeping it in view. */
   const reposition = useCallback(() => {
