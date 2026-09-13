@@ -14,6 +14,7 @@ import {
   revalidateSidebarCommunities,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
+import { isExploreVisible, type ExploreTab } from "@/lib/communities/explore-list";
 
 type Community = CachedExploreCommunity;
 
@@ -25,7 +26,7 @@ const TABS = [
   { label: "All",        value: "all"              },
   { label: "Interest",   value: "interest"          },
   { label: "Member-led", value: "user"              },
-] as const;
+] as const satisfies ReadonlyArray<{ label: string; value: ExploreTab }>;
 
 type TabValue = typeof TABS[number]["value"];
 
@@ -167,6 +168,12 @@ export default function CommunitiesIndexPage() {
   const [search, setSearch]       = useState("");
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg]   = useState<string | null>(null);
+  // Communities joined during this visit. Their cards are exempt from the
+  // "hide what you have already joined" rule so the click has a visible result;
+  // a fresh page load starts from the server's list and hides them again.
+  const [justJoinedIds, setJustJoinedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
   const load = useCallback(() => {
     if (exploreStore.data && Date.now() - exploreStore.data.fetchedAt < EXPLORE_STALE_MS) {
@@ -232,6 +239,7 @@ export default function CommunitiesIndexPage() {
         // The membership row exists now, so the sidebar may fetch it. Waiting
         // for the write matters: refreshing from the click handler would return
         // the pre-join list and the joined community would never appear.
+        setJustJoinedIds((prev) => new Set(prev).add(communityId));
         revalidateSidebarCommunities();
       }
     } catch {
@@ -256,6 +264,12 @@ export default function CommunitiesIndexPage() {
       prev.map((c) => c.id === communityId ? { ...c, joined: false, ...patch } : c),
     );
     patchExploreCommunity(communityId, { joined: false, ...patch });
+    setJustJoinedIds((prev) => {
+      if (!prev.has(communityId)) return prev;
+      const next = new Set(prev);
+      next.delete(communityId);
+      return next;
+    });
     if (error) {
       setErrorMsg(error);
       setTimeout(() => setErrorMsg(null), 4000);
@@ -264,15 +278,9 @@ export default function CommunitiesIndexPage() {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
-  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level", "job_title"]);
-
-  const filtered = communities.filter((c) => {
-    if (c.joined) return false;
-    if (HIDDEN_TYPES.has(c.type)) return false;
-    const matchesTab    = activeTab === "all" || c.type === activeTab;
-    const matchesSearch = c.name.toLowerCase().includes(search.trim().toLowerCase());
-    return matchesTab && matchesSearch;
-  });
+  const filtered = communities.filter((c) =>
+    isExploreVisible(c, activeTab, search, justJoinedIds),
+  );
 
   const isAllTab    = activeTab === "all";
   const recommended = isAllTab ? filtered.filter((c) => c.can_join) : [];
