@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { city_id, sector_id, experience_level } = parsed.data;
+  const { city_id, sector_id, experience_level, job_title } = parsed.data;
   const db = createServiceClient();
 
   // Check if profile already exists
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
     city_id,
     sector_id,
     experience_level,
+    job_title,
   });
 
   if (error) {

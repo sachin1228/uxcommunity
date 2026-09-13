@@ -7,6 +7,7 @@ export const MASTER_TABLES = [
   "design_sectors",
   "design_interests",
   "experience_levels",
+  "job_titles",
 ] as const;
 
 export type MasterTable = (typeof MASTER_TABLES)[number];

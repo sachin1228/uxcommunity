@@ -10,6 +10,7 @@ interface Step2State {
   city_id: string;
   sector_id: string;
   experience_level: string;
+  job_title: string;
 }
 
 interface SignupStep2Props {
@@ -18,6 +19,7 @@ interface SignupStep2Props {
   cities: MasterItem[];
   sectors: MasterItem[];
   experienceLevels: { id: string; slug: string; label: string; image_url: string | null }[];
+  jobTitles: { id: string; slug: string; label: string; image_url: string | null }[];
   loading: boolean;
   error: string | null;
   onBack: () => void;
@@ -30,6 +32,7 @@ export function SignupStep2({
   cities,
   sectors,
   experienceLevels,
+  jobTitles,
   loading,
   error,
   onBack,
@@ -74,6 +77,18 @@ export function SignupStep2({
             value={state.sector_id}
             onChange={(v) => onChange({ sector_id: v })}
             placeholder="Select a sector"
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <span className="font-body text-xs font-medium text-foreground">
+            Job Title <span className="text-red-400">*</span>
+          </span>
+          <SearchableSelect
+            options={jobTitles.map((j) => ({ value: j.slug, label: j.label, imageUrl: j.image_url }))}
+            value={state.job_title}
+            onChange={(v) => onChange({ job_title: v })}
+            placeholder="Select your job title"
           />
         </div>
 

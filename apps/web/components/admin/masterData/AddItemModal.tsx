@@ -108,7 +108,13 @@ export function AddItemModal({ entity, apiBase, onClose, onAdded }: Props) {
               type="text"
               value={addName}
               onChange={(e) => { setAddName(e.target.value); setAddError(null); }}
-              placeholder={`e.g. ${entity === "City" ? "Pune" : "SaaS & Software"}`}
+              placeholder={`e.g. ${
+                entity === "City"
+                  ? "Pune"
+                  : entity === "Job Title"
+                    ? "Brand Designer"
+                    : "SaaS & Software"
+              }`}
               className="field w-full"
             />
           </div>

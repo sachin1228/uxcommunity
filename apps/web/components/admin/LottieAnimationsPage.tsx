@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Clapperboard, RefreshCcw, X, Layers, Sparkles, TrendingUp, Globe, MapPin } from "lucide-react";
+import { Clapperboard, RefreshCcw, X, Layers, Sparkles, TrendingUp, Globe, MapPin, BadgeCheck } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { invalidateLottieCache } from "@/components/ui/LottieLoader";
 import { AnimationSlot, type LottieSetting } from "@/components/admin/lottie/AnimationSlot";
@@ -17,6 +17,7 @@ const TYPE_CONFIG: {
   { key: "sector",           label: "Industry",   Icon: Layers     },
   { key: "interest",         label: "Interest",   Icon: Sparkles   },
   { key: "experience_level", label: "Experience", Icon: TrendingUp },
+  { key: "job_title",        label: "Job Title",  Icon: BadgeCheck },
   { key: "city",             label: "City",       Icon: MapPin     },
 ];
 

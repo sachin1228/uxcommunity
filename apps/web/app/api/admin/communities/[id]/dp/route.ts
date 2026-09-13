@@ -14,6 +14,7 @@ const MASTER_TABLE: Record<string, { table: string; idCol: string }> = {
   sector:           { table: "design_sectors",    idCol: "id" },
   interest:         { table: "design_interests",  idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
+  job_title:        { table: "job_titles",        idCol: "id" },
 };
 
 const DP_REFERENCE_LOOKUPS = [
@@ -27,6 +28,8 @@ const DP_REFERENCE_LOOKUPS = [
   { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "image_url" },
   { table: "experience_levels", column: "lottie_url" },
+  { table: "job_titles", column: "image_url" },
+  { table: "job_titles", column: "lottie_url" },
 ];
 
 // ── POST /api/admin/communities/[id]/dp ──────────────────────────────────────
@@ -249,6 +252,7 @@ export async function DELETE(
       { table: "design_sectors", column: "lottie_url" },
       { table: "design_interests", column: "lottie_url" },
       { table: "experience_levels", column: "lottie_url" },
+      { table: "job_titles", column: "lottie_url" },
     ]);
   }
 

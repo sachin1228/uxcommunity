@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 
+/**
+ * GET /api/admin/signup-attempts
+ *
+ * Emails that passed signup step 1 but never produced an account. Rows flip to
+ * `status = 'completed'` from /api/signup/avatar, so this only ever returns the
+ * drop-offs.
+ */
 export async function GET(request: NextRequest) {
   try {
     await requireSession("admin");
@@ -16,16 +23,10 @@ export async function GET(request: NextRequest) {
 
   const db = createServiceClient();
 
-  let query = db
-    .from("users")
-    .select(
-      `id, name, email, is_blocked, created_at,
-       designer_profiles(id, experience_level, job_title, avatar_url, avatar_source,
-         cities(name), design_sectors(name)
-       )`,
-      { count: "exact" }
-    )
-    .order("created_at", { ascending: false })
+  let query = (db.from("signup_attempts") as any)
+    .select("id, email, name, flow, application_id, started_at, resume_email_sent_at", { count: "exact" })
+    .eq("status", "started")
+    .order("started_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
 
   if (search) {
@@ -34,9 +35,12 @@ export async function GET(request: NextRequest) {
 
   const { data, error, count } = await query;
   if (error) {
-    console.error("[admin/users] GET error:", error);
-    return NextResponse.json({ error: "Failed to fetch users." }, { status: 500 });
+    console.error("[admin/signup-attempts] GET error:", error);
+    return NextResponse.json({ error: "Failed to fetch incomplete signups." }, { status: 500 });
   }
 
-  return NextResponse.json({ users: data, total: count ?? 0 });
+  return NextResponse.json({
+    attempts: (data ?? []) as Array<Record<string, unknown>>,
+    total: count ?? 0,
+  });
 }

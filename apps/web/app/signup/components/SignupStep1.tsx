@@ -17,6 +17,8 @@ interface SignupStep1Props {
   loading: boolean;
   error: string | null;
   fieldErrors: Record<string, string[]>;
+  /** Informational banner (e.g. arriving from a resume-signup email). */
+  notice?: string | null;
   onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -50,6 +52,7 @@ export function SignupStep1({
   loading,
   error,
   fieldErrors,
+  notice,
   onSubmit,
 }: SignupStep1Props) {
   const [showPassword, setShowPassword] = useState(false);
@@ -62,6 +65,12 @@ export function SignupStep1({
       </h2>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        {notice && (
+          <div className="rounded-md border border-accent/30 bg-accent/10 px-4 py-3">
+            <p className="font-body text-sm text-foreground">{notice}</p>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3">
             <p className="font-body text-sm text-red-500 dark:text-red-400">{error}</p>

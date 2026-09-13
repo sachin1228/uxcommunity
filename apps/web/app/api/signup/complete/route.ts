@@ -6,6 +6,7 @@ import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
+import { recordSignupAttempt } from "@/lib/signup-attempts";
 
 export async function POST(request: NextRequest) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -71,6 +72,15 @@ export async function POST(request: NextRequest) {
       { status: 409 }
     );
   }
+
+  // Record the funnel entry so an invited applicant who abandons is visible in
+  // Admin → Incomplete Signups. Best-effort, never blocks signup.
+  await recordSignupAttempt({
+    email,
+    name,
+    flow: "invitation",
+    applicationId: invitation.application_id,
+  });
 
   // Step one is validation-only. The invitation remains reusable until step four commits.
   return NextResponse.json({ success: true });

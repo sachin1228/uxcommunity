@@ -14,6 +14,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
+import { markSignupCompleted } from "@/lib/signup-attempts";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -139,6 +140,7 @@ export async function POST(request: NextRequest) {
     p_city_id: profile.city_id,
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,
+    p_job_title: profile.job_title,
     // Interests are no longer collected during signup — members discover and
     // join interest communities from Explore Communities instead.
     p_interest_ids: [],
@@ -162,6 +164,10 @@ export async function POST(request: NextRequest) {
 
   const userId = data[0].user_id as string;
 
+  // The account exists now — clear the email from the incomplete-signups view.
+  // Best-effort: the account is already created, so a tracking failure is silent.
+  await markSignupCompleted(identity.email, userId);
+
   // Join every profile-based community (General + city + sector) server-side so
   // the sidebar shows the full list the first time the dashboard loads.
   // Non-fatal if it fails — the dashboard layout retries exactly once via the
@@ -174,12 +180,13 @@ export async function POST(request: NextRequest) {
     console.error("[signup/avatar] auto-join error:", autoJoinError);
   }
 
-  if (token) {
-    try {
-      await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
-    } catch (emailError) {
-      console.error("[signup/avatar] welcome email error:", emailError);
-    }
+  // The account now exists, so send the welcome email for BOTH invitation and
+  // direct signups. Non-fatal: a mail-provider failure must never fail the
+  // signup the member just completed.
+  try {
+    await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
+  } catch (emailError) {
+    console.error("[signup/avatar] welcome email error:", emailError);
   }
 
   const sessionToken = await createSession({

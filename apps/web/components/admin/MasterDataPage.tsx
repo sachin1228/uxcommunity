@@ -100,6 +100,7 @@ export function MasterDataPage({
                data.sectors ??
                data.interests ??
                data.experience_levels ??
+               data.job_titles ??
                [])
         ) as MasterItem[];
       })

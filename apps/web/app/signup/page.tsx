@@ -48,15 +48,21 @@ function SignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
+  // Resume link emailed from Admin → Incomplete Signups (no invitation token).
+  const resumeToken = searchParams.get("resume") ?? "";
 
-  // When there is no token we go straight into direct-signup mode
-  const directMode = !token;
+  // With neither an invitation nor a resume link we open direct signup at once.
+  const directMode = !token && !resumeToken;
 
   const [tokenState, setTokenState] = useState<TokenState>(() =>
     directMode
-      ? { status: "valid" }          // no token → open direct signup immediately
+      ? { status: "valid" }          // nothing to validate → open signup immediately
       : { status: "loading" }
   );
+
+  // Set when arriving from a resume email: identity is prefilled and the member
+  // only needs to choose a password before continuing.
+  const [resumeNotice, setResumeNotice] = useState<string | null>(null);
 
   // Step 1
   const [step1, setStep1] = useState({
@@ -71,8 +77,9 @@ function SignupInner() {
   const [cities,          setCities]          = useState<MasterItem[]>([]);
   const [sectors,         setSectors]         = useState<MasterItem[]>([]);
   const [experienceLevels, setExperienceLevels] = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
+  const [jobTitles,        setJobTitles]        = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
   const [step2, setStep2] = useState({
-    city_id: "", sector_id: "", experience_level: "",
+    city_id: "", sector_id: "", experience_level: "", job_title: "",
   });
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
@@ -90,6 +97,31 @@ function SignupInner() {
   // ── Validate token (skipped in direct-signup mode) ───────────────────────
   useEffect(() => {
     if (directMode) return;
+
+    // Resume link: prefill the identity and keep the member on step 1, because
+    // passwords are never stored — they must pick one to continue.
+    if (resumeToken) {
+      fetch(`/api/signup/resume?token=${encodeURIComponent(resumeToken)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.valid) {
+            const { first_name, last_name } = splitFullName(d.name ?? "");
+            setStep1((p) => ({ ...p, email: d.email ?? "", first_name, last_name }));
+            setResumeNotice(
+              "Welcome back — your details are saved. Choose a password to finish setting up your account."
+            );
+            setTokenState({ status: "valid" });
+            setStep(1);
+          } else {
+            setTokenState({ status: "invalid", error: d.error ?? "This link is invalid." });
+          }
+        })
+        .catch(() =>
+          setTokenState({ status: "invalid", error: "Failed to validate this link. Please try again." })
+        );
+      return;
+    }
+
     fetch(`/api/signup/validate?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -103,7 +135,7 @@ function SignupInner() {
         }
       })
       .catch(() => setTokenState({ status: "invalid", error: "Failed to validate invitation. Please try again." }));
-  }, [token, directMode]);
+  }, [token, resumeToken, directMode]);
 
   // ── Load dropdowns for step 2 ─────────────────────────────────────────────
   useEffect(() => {
@@ -112,6 +144,7 @@ function SignupInner() {
       fetch("/api/data/cities")   .then((r) => r.json()).then((d) => setCities(d.cities ?? [])),
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
       fetch("/api/data/experience-levels").then((r) => r.json()).then((d) => setExperienceLevels(d.experience_levels ?? [])),
+      fetch("/api/data/job-titles").then((r) => r.json()).then((d) => setJobTitles(d.job_titles ?? [])),
     ]).catch(() => {});
   }, [step]);
 
@@ -133,8 +166,9 @@ function SignupInner() {
     setStep1Error(null);
     setStep1FieldErrors({});
     try {
-      // Direct-signup mode uses a separate endpoint that doesn't require a token
-      const endpoint = directMode ? "/api/signup/direct" : "/api/signup/complete";
+      // Invitation signups post to the token endpoint; direct and resumed
+      // signups both use the token-free endpoint.
+      const endpoint = token ? "/api/signup/complete" : "/api/signup/direct";
       const issues: Record<string, string[]> = {};
       if (!step1.first_name.trim()) issues.first_name = ["Name is required."];
       if (!step1.last_name.trim())  issues.last_name  = ["Surname is required."];
@@ -143,7 +177,7 @@ function SignupInner() {
         return;
       }
       const identity = step1Identity();
-      const body = directMode ? identity : { ...identity, token };
+      const body = token ? { ...identity, token } : identity;
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,6 +214,7 @@ function SignupInner() {
     if (!step2.city_id)          { setStep2Error("Please select a city.");                setStep2Loading(false); return; }
     if (!step2.sector_id)        { setStep2Error("Please select an industry sector.");    setStep2Loading(false); return; }
     if (!step2.experience_level) { setStep2Error("Please select your experience level."); setStep2Loading(false); return; }
+    if (!step2.job_title)        { setStep2Error("Please select a job title.");            setStep2Loading(false); return; }
     setStep(3);
     setStep2Loading(false);
   }
@@ -299,6 +334,7 @@ function SignupInner() {
             loading={step1Loading}
             error={step1Error}
             fieldErrors={step1FieldErrors}
+            notice={resumeNotice}
             onSubmit={handleStep1}
           />
         )}
@@ -310,6 +346,7 @@ function SignupInner() {
             cities={cities}
             sectors={sectors}
             experienceLevels={experienceLevels}
+            jobTitles={jobTitles}
             loading={step2Loading}
             error={step2Error}
             onBack={() => goToStep(1)}

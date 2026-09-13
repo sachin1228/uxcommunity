@@ -199,6 +199,65 @@ export async function sendWelcomeEmail(
   });
 }
 
+export async function sendResumeSignupEmail(
+  to: string,
+  name: string,
+  token: string
+): Promise<void> {
+  const link = `${getAppUrl()}/signup?resume=${token}`;
+
+  await getResend().emails.send({
+    from: getFrom(),
+    to,
+    subject: `Finish setting up your ${APP_NAME} account`,
+    html: `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#161413;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#F5F2F0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161413;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#1B1918;border:1px solid #262220;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="padding:32px 40px 0;background:#1B1918;">
+            <p style="margin:0;font-size:20px;font-weight:600;color:#F5F2F0;">
+              ${APP_NAME}<span style="color:#888888;">/</span>
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px;">
+            <h1 style="margin:0 0 8px;font-size:26px;font-weight:600;color:#F5F2F0;">
+              Welcome back, ${name}!
+            </h1>
+            <p style="margin:0 0 24px;font-size:15px;color:#7B7B7B;line-height:1.6;">
+              You started creating your ${APP_NAME} account but did not finish. Your details are still saved — pick up where you left off and you'll be in within a minute.
+            </p>
+            <a href="${link}"
+               style="display:inline-block;padding:12px 28px;background:#000000;color:#fff;font-size:15px;font-weight:500;border-radius:8px;text-decoration:none;">
+              Finish my signup
+            </a>
+            <p style="margin:24px 0 0;font-size:13px;color:#7B7B7B;">
+              This link expires in ${process.env.INVITATION_EXPIRY_DAYS ?? 7} days. If you did not start signing up, you can ignore this email.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px;border-top:1px solid #262220;">
+            <p style="margin:0;font-size:12px;color:#5A5A5A;">
+              © ${new Date().getFullYear()} ${APP_NAME}. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+    `.trim(),
+  });
+}
+
 export async function sendRejectionEmail(
   to: string,
   name: string

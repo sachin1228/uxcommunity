@@ -23,6 +23,7 @@ const TYPE_TABS = [
   { label: "Industry", value: "sector" },
   { label: "Interest", value: "interest" },
   { label: "Experience", value: "experience_level" },
+  { label: "Job Title", value: "job_title" },
   { label: "City", value: "city" },
 ] as const;
 
