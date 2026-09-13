@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, ChevronLeft, ChevronRight, X, Mail } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, X, Send } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 
 interface SignupAttempt {
@@ -11,7 +11,13 @@ interface SignupAttempt {
   flow: "direct" | "invitation";
   application_id: string | null;
   started_at: string;
+  resume_email_sent_at: string | null;
 }
+
+type RowStatus =
+  | { state: "sending" }
+  | { state: "sent" }
+  | { state: "error"; message: string };
 
 const FLOW_LABELS: Record<string, string> = {
   direct: "Direct",
@@ -24,6 +30,8 @@ export default function IncompleteSignupsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  // Per-row state for the "send resume link" action.
+  const [rowStatus, setRowStatus] = useState<Record<string, RowStatus>>({});
 
   const PAGE_SIZE = 25;
 
@@ -46,6 +54,33 @@ export default function IncompleteSignupsPage() {
   useEffect(() => { setPage(1); }, [search]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  async function sendResumeLink(id: string) {
+    setRowStatus((prev) => ({ ...prev, [id]: { state: "sending" } }));
+    try {
+      const res = await fetch(`/api/admin/signup-attempts/${id}/resume`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRowStatus((prev) => ({
+          ...prev,
+          [id]: { state: "error", message: data.error ?? "Failed to send the email." },
+        }));
+        return;
+      }
+      setRowStatus((prev) => ({ ...prev, [id]: { state: "sent" } }));
+      // Reflect the send time locally so the row shows it without a refetch.
+      setAttempts((prev) =>
+        prev.map((a) =>
+          a.id === id ? { ...a, resume_email_sent_at: new Date().toISOString() } : a
+        )
+      );
+    } catch {
+      setRowStatus((prev) => ({
+        ...prev,
+        [id]: { state: "error", message: "Network error. Please try again." },
+      }));
+    }
+  }
 
   return (
     <div>
@@ -132,6 +167,14 @@ export default function IncompleteSignupsPage() {
                   </td>
                   <td className="px-4 py-2.5">
                     <p className="font-body text-xs text-foreground-muted">{attempt.email}</p>
+                    {attempt.resume_email_sent_at && (
+                      <p className="font-body text-[10px] text-foreground-subtle mt-0.5">
+                        Link sent{" "}
+                        {new Date(attempt.resume_email_sent_at).toLocaleDateString("en-IN", {
+                          day: "numeric", month: "short",
+                        })}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-2.5">
                     <span
@@ -153,14 +196,28 @@ export default function IncompleteSignupsPage() {
                     </p>
                   </td>
                   <td className="px-4 py-2.5 text-right">
-                    <a
-                      href={`mailto:${attempt.email}?subject=${encodeURIComponent(
-                        "Finish setting up your UX Community account"
-                      )}`}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors"
-                    >
-                      <Mail strokeWidth={2.5} size={12} /> Email
-                    </a>
+                    <div className="flex flex-col items-end gap-1">
+                      <button
+                        onClick={() => sendResumeLink(attempt.id)}
+                        disabled={rowStatus[attempt.id]?.state === "sending"}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 font-body text-xs text-foreground-muted hover:text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {rowStatus[attempt.id]?.state === "sending" ? (
+                          <Spinner className="h-3 w-3" />
+                        ) : (
+                          <Send strokeWidth={2.5} size={12} />
+                        )}
+                        {rowStatus[attempt.id]?.state === "sent" ? "Send again" : "Send link"}
+                      </button>
+                      {rowStatus[attempt.id]?.state === "sent" && (
+                        <span className="font-body text-[10px] text-green-400">Resume email sent</span>
+                      )}
+                      {rowStatus[attempt.id]?.state === "error" && (
+                        <span className="font-body text-[10px] text-red-400 max-w-[180px] text-right">
+                          {(rowStatus[attempt.id] as Extract<RowStatus, { state: "error" }>).message}
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

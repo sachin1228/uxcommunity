@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const db = createServiceClient();
 
   let query = (db.from("signup_attempts") as any)
-    .select("id, email, name, flow, application_id, started_at", { count: "exact" })
+    .select("id, email, name, flow, application_id, started_at, resume_email_sent_at", { count: "exact" })
     .eq("status", "started")
     .order("started_at", { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
