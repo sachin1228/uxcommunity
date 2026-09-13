@@ -7,6 +7,7 @@ import { CommunityRow } from "./panel/CommunityRow";
 import { CreateCommunityModal } from "./CreateCommunityModal";
 import { useSidebarCommunities } from "./panel/useSidebarCommunities";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
+import { sortSidebarCommunities } from "@/lib/communities/sidebar-sort";
 import { fetchAndHydrateCommunityBootstrap } from "@/lib/request-cache";
 
 export function CommunitiesPanel({ userId }: { userId: string }) {
@@ -21,13 +22,9 @@ export function CommunitiesPanel({ userId }: { userId: string }) {
     router,
   } = useSidebarCommunities(userId);
 
-  const sorted = [...communities].sort((a, b) => {
-    const ta = a.last_message?.created_at ?? "";
-    const tb = b.last_message?.created_at ?? "";
-    if (tb > ta) return 1;
-    if (ta > tb) return -1;
-    return a.name.localeCompare(b.name);
-  });
+  // One shared ordering with GlobalSidebar so the same list never disagrees
+  // about which community belongs at the top.
+  const sorted = sortSidebarCommunities(communities);
 
   // Prefetch bootstrap data on hover so clicking is instant (cache hit).
   const prefetchCommunity = useCallback(

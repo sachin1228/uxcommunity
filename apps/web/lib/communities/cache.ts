@@ -210,19 +210,48 @@ export function clearAllUserCaches(): void {
 
 // ─── Cache-invalidation helpers (join / leave) ────────────────────────────────
 
-export function invalidateOnJoin(communityId: string): void {
-  if (exploreStore.data) {
-    exploreStore.data = {
-      ...exploreStore.data,
-      communities: exploreStore.data.communities.map((c) =>
-        c.id === communityId ? { ...c, joined: true } : c
-      ),
-    };
-  }
-  sidebarStore.data     = null;
-  sidebarStore.inflight = null;
+/**
+ * Patches one community inside the Explore projection — the optimistic join,
+ * its rollback, and the "request sent" state for a private community.
+ *
+ * Only the module-level `exploreStore` is touched; the caller's React state is
+ * its own concern. A no-op when Explore was never fetched.
+ */
+export function patchExploreCommunity(
+  communityId: string,
+  patch: Partial<CachedExploreCommunity>,
+): void {
+  if (!exploreStore.data) return;
+  exploreStore.data = {
+    ...exploreStore.data,
+    communities: exploreStore.data.communities.map((c) =>
+      c.id === communityId ? { ...c, ...patch } : c
+    ),
+  };
+}
+
+/**
+ * Drops the cached joined-communities list so the sidebar refetches, while
+ * LEAVING `sidebarStore.data` intact.
+ *
+ * The rows already on screen stay rendered (the panel does not flip back to a
+ * spinner) and the refetch result lands on top of them. This is what a
+ * membership change must use once the write has committed: clearing the store
+ * instead makes the sidebar issue its request from the click handler, i.e.
+ * before the membership row exists — the reply then describes the pre-join
+ * list, and the community the member just joined is missing until the stale
+ * window expires.
+ */
+export function revalidateSidebarCommunities(): void {
   invalidateRequest("/api/communities");
   notifySidebarChanged();
+}
+
+export function invalidateOnJoin(communityId: string): void {
+  patchExploreCommunity(communityId, { joined: true });
+  sidebarStore.data     = null;
+  sidebarStore.inflight = null;
+  revalidateSidebarCommunities();
 }
 
 export function invalidateCommunitiesList(): void {

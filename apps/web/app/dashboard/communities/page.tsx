@@ -10,7 +10,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import {
   exploreStore,
   EXPLORE_STALE_MS,
-  invalidateOnJoin,
+  patchExploreCommunity,
+  revalidateSidebarCommunities,
   type CachedExploreCommunity,
 } from "@/lib/communities/cache";
 
@@ -207,56 +208,57 @@ export default function CommunitiesIndexPage() {
     setJoiningId(communityId);
     setErrorMsg(null);
 
-    // Optimistic update
+    // Optimistic update — the card switches to "Joined" while the write is in
+    // flight, and the joined community is mirrored into the Explore cache so a
+    // return to this page inside the stale window still shows it as joined.
     setCommunities((prev) =>
       prev.map((c) => c.id === communityId ? { ...c, joined: true } : c),
     );
-    // Notify sidebar immediately so it starts re-fetching
-    invalidateOnJoin(communityId);
+    patchExploreCommunity(communityId, { joined: true });
 
     try {
       const res = await dedupeFetch(`/api/communities/${communityId}/join`, { method: "POST" });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        // Roll back optimistic update on failure
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false } : c,
-            ),
-          };
-        }
-        setErrorMsg(data.error ?? "Failed to join. Please try again.");
-        setTimeout(() => setErrorMsg(null), 4000);
+        rollbackJoin(communityId, {}, data.error ?? "Failed to join. Please try again.");
       } else if (data.status === "requested") {
-        // Private community — request sent, not yet a member
-        setCommunities((prev) =>
-          prev.map((c) => c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c),
-        );
-        if (exploreStore.data) {
-          exploreStore.data = {
-            ...exploreStore.data,
-            communities: exploreStore.data.communities.map((c) =>
-              c.id === communityId ? { ...c, joined: false, has_pending_request: true } : c,
-            ),
-          };
-        }
+        // Private community — request sent, not yet a member, so the sidebar
+        // stays untouched: there is no membership row to show yet.
+        rollbackJoin(communityId, { has_pending_request: true });
         setErrorMsg("Request sent! Waiting for owner approval.");
         setTimeout(() => setErrorMsg(null), 4000);
+      } else {
+        // The membership row exists now, so the sidebar may fetch it. Waiting
+        // for the write matters: refreshing from the click handler would return
+        // the pre-join list and the joined community would never appear.
+        revalidateSidebarCommunities();
       }
     } catch {
-      setCommunities((prev) =>
-        prev.map((c) => c.id === communityId ? { ...c, joined: false } : c),
-      );
-      setErrorMsg("Network error. Please try again.");
-      setTimeout(() => setErrorMsg(null), 4000);
+      rollbackJoin(communityId, {}, "Network error. Please try again.");
     } finally {
       setJoiningId(null);
+    }
+  }
+
+  /**
+   * Undoes an optimistic join in both the rendered list and the Explore cache
+   * (the request failed, or the community only accepted a request): the card
+   * goes back to an actionable state instead of claiming a membership that
+   * does not exist.
+   */
+  function rollbackJoin(
+    communityId: string,
+    patch: Partial<Community>,
+    error?: string,
+  ) {
+    setCommunities((prev) =>
+      prev.map((c) => c.id === communityId ? { ...c, joined: false, ...patch } : c),
+    );
+    patchExploreCommunity(communityId, { joined: false, ...patch });
+    if (error) {
+      setErrorMsg(error);
+      setTimeout(() => setErrorMsg(null), 4000);
     }
   }
 
