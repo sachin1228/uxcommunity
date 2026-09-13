@@ -36,6 +36,7 @@ export async function DELETE(
         { table: "design_sectors", column: "lottie_url" },
         { table: "design_interests", column: "lottie_url" },
         { table: "experience_levels", column: "lottie_url" },
+        { table: "job_titles", column: "lottie_url" },
       ]);
     } catch (cleanupError) {
       // Non-fatal — re-run via the admin orphan scan (Tools → R2 storage health).

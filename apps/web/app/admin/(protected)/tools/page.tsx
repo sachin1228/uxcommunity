@@ -35,6 +35,7 @@ const TABLE_LABELS: Record<string, string> = {
   design_sectors:    "Industry",
   design_interests:  "Interests",
   experience_levels: "Experience",
+  job_titles:        "Job Titles",
   communities:       "Communities",
   designer_profiles: "Profile Pictures",
 };

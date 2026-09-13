@@ -10,6 +10,7 @@ import { requireSession } from "@/lib/auth/session";
  *  - sector                     → user's sector_id must match community reference_id
  *  - city                       → user's city_id must match community reference_id
  *  - experience_level           → user's experience_level slug must resolve to matching reference_id
+ *  - job_title                  → user's job_title slug must resolve to matching reference_id
  *
  * For private communities, a join request is created instead of direct membership.
  */
@@ -42,7 +43,7 @@ export async function POST(
   if (!FREE_TYPES.has(community.type)) {
     const { data: profile } = await db
       .from("designer_profiles")
-      .select("city_id, sector_id, experience_level")
+      .select("city_id, sector_id, experience_level, job_title")
       .eq("user_id", userId)
       .maybeSingle();
 
@@ -59,6 +60,13 @@ export async function POST(
         .eq("slug", profile.experience_level)
         .maybeSingle();
       allowed = expLevel?.id === community.reference_id;
+    } else if (community.type === "job_title" && profile?.job_title) {
+      const { data: jobTitle } = await db
+        .from("job_titles")
+        .select("id")
+        .eq("slug", profile.job_title)
+        .maybeSingle();
+      allowed = jobTitle?.id === community.reference_id;
     }
 
     if (!allowed) {
@@ -66,6 +74,7 @@ export async function POST(
         sector:           "industry",
         city:             "city",
         experience_level: "experience level",
+        job_title:        "job title",
       };
       return NextResponse.json(
         {

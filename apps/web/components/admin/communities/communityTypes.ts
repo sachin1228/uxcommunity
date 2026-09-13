@@ -114,6 +114,7 @@ export const TYPE_LABELS: Record<string, string> = {
   sector:           "Industry",
   interest:         "Interest",
   experience_level: "Experience",
+  job_title:        "Job Title",
   general:          "General",
   user:             "Member",
 };
@@ -124,6 +125,7 @@ export const TYPE_COLORS_WITH_BORDER: Record<string, string> = {
   sector:           "bg-purple-500/10 text-purple-400 border-purple-500/20",
   interest:         "bg-pink-500/10 text-pink-400 border-pink-500/20",
   experience_level: "bg-green-500/10 text-green-400 border-green-500/20",
+  job_title:        "bg-orange-500/10 text-orange-400 border-orange-500/20",
   general:          "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
 };
 
@@ -133,6 +135,7 @@ export const TYPE_COLORS: Record<string, string> = {
   sector:           "bg-purple-500/10 text-purple-400",
   interest:         "bg-pink-500/10 text-pink-400",
   experience_level: "bg-green-500/10 text-green-400",
+  job_title:        "bg-orange-500/10 text-orange-400",
   general:          "bg-cyan-500/10 text-cyan-400",
   user:             "bg-amber-500/10 text-amber-400",
 };

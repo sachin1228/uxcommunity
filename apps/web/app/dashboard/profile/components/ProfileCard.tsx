@@ -2,7 +2,7 @@
 
 import {
   Camera, Mail, Calendar,
-  MapPin, Layers, Star, Lock,
+  MapPin, Layers, Star, Lock, BadgeCheck,
   Linkedin, Globe,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
@@ -19,6 +19,7 @@ interface ProfileCardProps {
   city: string | null;
   sector: string | null;
   experienceLevel: string | null;
+  jobTitle: string | null;
   linkedin: string;
   portfolio: string;
   onLinkedinChange: (v: string) => void;
@@ -28,7 +29,7 @@ interface ProfileCardProps {
 export function ProfileCard({
   name, email, avatarUrl, memberSince,
   onOpenAvatarPicker,
-  city, sector, experienceLevel,
+  city, sector, experienceLevel, jobTitle,
   linkedin, portfolio, onLinkedinChange, onPortfolioChange,
 }: ProfileCardProps) {
   return (
@@ -119,6 +120,11 @@ export function ProfileCard({
         {sector && (
           <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
             <Layers strokeWidth={2.5} size={10} className="text-accent shrink-0" />{sector}
+          </span>
+        )}
+        {jobTitle && (
+          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
+            <BadgeCheck strokeWidth={2.5} size={10} className="text-accent shrink-0" />{jobTitle}
           </span>
         )}
         {experienceLevel && (

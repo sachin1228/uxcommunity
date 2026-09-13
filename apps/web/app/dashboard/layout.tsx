@@ -26,7 +26,7 @@ export default async function DashboardLayout({
     db
       .from("designer_profiles")
       .select(
-        "avatar_url, city_id, sector_id, experience_level, communities_auto_joined"
+        "avatar_url, city_id, sector_id, experience_level, job_title, communities_auto_joined"
       )
       .eq("user_id", session.userId!)
       .maybeSingle(),
@@ -46,11 +46,12 @@ export default async function DashboardLayout({
     city_id?: string | null;
     sector_id?: string | null;
     experience_level?: string | null;
+    job_title?: string | null;
     communities_auto_joined?: boolean | null;
   } | null;
   const autoJoined = Boolean(profileRow?.communities_auto_joined);
   const hasProfilePicks = Boolean(
-    profileRow?.city_id || profileRow?.sector_id || profileRow?.experience_level
+    profileRow?.city_id || profileRow?.sector_id || profileRow?.experience_level || profileRow?.job_title
   );
   if (!autoJoined && hasProfilePicks) {
     try {

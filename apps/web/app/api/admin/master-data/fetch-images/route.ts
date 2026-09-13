@@ -14,6 +14,7 @@ const TABLES: Record<MasterTable, { table: string }> = {
   design_sectors: { table: "design_sectors" },
   design_interests: { table: "design_interests" },
   experience_levels: { table: "experience_levels" },
+  job_titles: { table: "job_titles" },
 };
 
 function isMasterTable(value: unknown): value is MasterTable {

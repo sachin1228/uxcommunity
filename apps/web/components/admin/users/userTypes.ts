@@ -2,6 +2,10 @@
 
 export interface UserProfile {
   experience_level: string;
+  /** Job title slug stored on the profile. */
+  job_title?: string | null;
+  /** Admin-managed display name for `job_title`, resolved by the API. */
+  job_title_name?: string | null;
   avatar_url?: string | null;
   avatar_source?: string | null;
   cities: { name: string } | null;

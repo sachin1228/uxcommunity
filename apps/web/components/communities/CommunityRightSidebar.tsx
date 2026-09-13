@@ -47,6 +47,7 @@ const TYPE_LABELS: Record<string, string> = {
   sector: "Industry",
   interest: "Interest",
   experience_level: "Experience",
+  job_title: "Job Title",
 };
 
 const MAX_AVATARS = 6;
@@ -62,6 +63,8 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
       return `Designers who share a passion for ${name}.`;
     case "experience_level":
       return `A space for ${name} designers to connect and share.`;
+    case "job_title":
+      return `Connect with fellow ${name}s and share your work.`;
     case "general":
       return "The default community for every UX Community designer.";
     case "user":

@@ -102,6 +102,8 @@ async function findSupabaseStorageReferences(db: ReturnType<typeof createService
     ["design_interests", "lottie_url"],
     ["experience_levels", "image_url"],
     ["experience_levels", "lottie_url"],
+    ["job_titles", "image_url"],
+    ["job_titles", "lottie_url"],
     ["community_messages", "image_url"],
     ["community_events", "cover_image_url"],
     ["community_showcase_posts", "image_url"],

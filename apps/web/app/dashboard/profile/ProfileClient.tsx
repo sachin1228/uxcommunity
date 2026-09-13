@@ -17,6 +17,7 @@ interface Props {
   city: string | null;
   sector: string | null;
   experienceLevel: string | null;
+  jobTitle: string | null;
   initialLinkedIn: string;
   initialPortfolio: string;
   initialBio: string;
@@ -34,6 +35,7 @@ export function ProfileClient({
   city,
   sector,
   experienceLevel,
+  jobTitle,
   initialLinkedIn,
   initialPortfolio,
   initialThreads,
@@ -130,6 +132,7 @@ export function ProfileClient({
         city={city}
         sector={sector}
         experienceLevel={experienceLevel}
+        jobTitle={jobTitle}
         linkedin={linkedin}
         portfolio={portfolio}
         onLinkedinChange={setLinkedin}

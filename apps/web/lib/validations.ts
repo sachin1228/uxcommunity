@@ -64,6 +64,8 @@ export const signupStep2Schema = z.object({
   // No longer validated against a hardcoded enum — the experience_levels table
   // (managed via the admin panel) is the source of truth. Any non-empty slug is valid.
   experience_level: z.string().min(1, "Please select an experience level"),
+  // Same approach for job titles — the job_titles table is the source of truth.
+  job_title: z.string().min(1, "Please select a job title"),
 });
 
 export const completeSignupSchema = z.object({

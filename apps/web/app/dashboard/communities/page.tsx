@@ -262,7 +262,7 @@ export default function CommunitiesIndexPage() {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
 
-  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level"]);
+  const HIDDEN_TYPES = new Set(["sector", "city", "experience_level", "job_title"]);
 
   const filtered = communities.filter((c) => {
     if (c.joined) return false;

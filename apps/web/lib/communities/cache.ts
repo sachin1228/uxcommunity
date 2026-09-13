@@ -110,7 +110,7 @@ export interface SidebarLastReaction {
 export interface CachedSidebarCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
   image_url: string | null;
   lottie_url?: string | null;
   lottie_format?: "json" | "dotlottie" | null;
@@ -160,7 +160,7 @@ export const SIDEBAR_STALE_MS = 60_000;
 export interface CachedExploreCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
   image_url: string | null;
   lottie_url?: string | null;
   lottie_format?: "json" | "dotlottie" | null;

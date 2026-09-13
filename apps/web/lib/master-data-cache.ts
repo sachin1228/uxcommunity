@@ -19,6 +19,7 @@ export const TABLE_LOOKUP: Record<string, { table: string; idCol: string }> = {
   sector:           { table: "design_sectors",    idCol: "id" },
   interest:         { table: "design_interests",  idCol: "id" },
   experience_level: { table: "experience_levels", idCol: "id" },
+  job_title:        { table: "job_titles",        idCol: "id" },
 };
 
 /**

@@ -21,7 +21,7 @@ export async function GET(
     .select(`
       id, name, email, is_blocked, created_at, application_id,
       designer_profiles (
-        experience_level, avatar_url, avatar_source,
+        experience_level, job_title, avatar_url, avatar_source,
         cities ( name ),
         design_sectors ( name )
       )
@@ -34,6 +34,22 @@ export async function GET(
     .from("user_interests")
     .select("design_interests ( id, name )")
     .eq("user_id", id);
+
+  // Resolve the job title slug to its admin-managed display name. The profile
+  // column stores a slug (no PostgREST embed), so look it up explicitly.
+  const profileRow = user?.designer_profiles as
+    | { job_title?: string | null }
+    | null
+    | undefined;
+  let jobTitleName: string | null = null;
+  if (profileRow?.job_title) {
+    const { data: jobTitle } = await db
+      .from("job_titles")
+      .select("name")
+      .eq("slug", profileRow.job_title)
+      .maybeSingle();
+    jobTitleName = jobTitle?.name ?? null;
+  }
 
   if (error) {
     console.error("[admin/users] GET error:", error);
@@ -73,7 +89,19 @@ export async function GET(
     totalCommunities > 0 &&
     userCommunities >= totalCommunities;
 
-  return NextResponse.json({ user, application, interests, memberOfAllCommunities });
+  return NextResponse.json({
+    user: user
+      ? {
+          ...user,
+          designer_profiles: user.designer_profiles
+            ? { ...(user.designer_profiles as Record<string, unknown>), job_title_name: jobTitleName }
+            : user.designer_profiles,
+        }
+      : user,
+    application,
+    interests,
+    memberOfAllCommunities,
+  });
 }
 
 export async function PATCH(

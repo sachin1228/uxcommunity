@@ -81,6 +81,7 @@ export const MASTER_IMAGE_LOOKUPS: MediaReferenceLookup[] = [
   { table: "design_sectors", column: "image_url" },
   { table: "design_interests", column: "image_url" },
   { table: "experience_levels", column: "image_url" },
+  { table: "job_titles", column: "image_url" },
 ];
 
 export const MASTER_LOTTIE_LOOKUPS: MediaReferenceLookup[] = [
@@ -89,6 +90,7 @@ export const MASTER_LOTTIE_LOOKUPS: MediaReferenceLookup[] = [
   { table: "design_sectors", column: "lottie_url" },
   { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "lottie_url" },
+  { table: "job_titles", column: "lottie_url" },
 ];
 
 /** Every column across the app that can hold an R2 media URL. */
@@ -104,6 +106,8 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   { table: "design_interests", column: "lottie_url" },
   { table: "experience_levels", column: "image_url" },
   { table: "experience_levels", column: "lottie_url" },
+  { table: "job_titles", column: "image_url" },
+  { table: "job_titles", column: "lottie_url" },
   { table: "community_messages", column: "image_url" },
   { table: "community_events", column: "cover_image_url" },
   { table: "community_showcase_posts", column: "image_url" },
@@ -126,6 +130,8 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "design_interests.lottie_url": "interest",
   "experience_levels.image_url": "experience_level",
   "experience_levels.lottie_url": "experience_level",
+  "job_titles.image_url": "job_title",
+  "job_titles.lottie_url": "job_title",
   "community_messages.image_url": "message",
   "community_events.cover_image_url": "event",
   "community_showcase_posts.image_url": "showcase",

@@ -31,6 +31,7 @@ const MASTER_TABLES: { table: string; column: string }[] = [
   { table: "design_sectors",    column: "image_url" },
   { table: "design_interests",  column: "image_url" },
   { table: "experience_levels", column: "image_url" },
+  { table: "job_titles",        column: "image_url" },
   { table: "communities",       column: "image_url" },
 ];
 

@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
     p_city_id: profile.city_id,
     p_sector_id: profile.sector_id,
     p_experience_level: profile.experience_level,
+    p_job_title: profile.job_title,
     // Interests are no longer collected during signup — members discover and
     // join interest communities from Explore Communities instead.
     p_interest_ids: [],

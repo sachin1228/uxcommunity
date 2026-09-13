@@ -2,7 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 /**
  * Auto-join a user to every community implied by their profile:
- * General (always) + city + sector + experience level + each design interest.
+ * General (always) + city + sector + experience level + job title + each design interest.
  *
  * The catch-all "Other" options (cities / sectors / interests named "Other")
  * intentionally do NOT produce a dedicated community — those members already
@@ -21,7 +21,7 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
   const { data: profile } = await db
     .from("designer_profiles")
     .select(`
-      city_id, sector_id, experience_level,
+      city_id, sector_id, experience_level, job_title,
       cities(name, image_url),
       design_sectors(name, image_url)
     `)
@@ -35,7 +35,7 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
     .eq("user_id", userId);
 
   type CommunitySpec = {
-    type: "city" | "sector" | "interest" | "experience_level";
+    type: "city" | "sector" | "interest" | "experience_level" | "job_title";
     reference_id: string;
     name: string;
     image_url: string | null;
@@ -85,6 +85,24 @@ export async function autoJoinCommunities(userId: string): Promise<string[]> {
         reference_id: (expLevel as { id: string }).id,
         name: (expLevel as { name: string }).name,
         image_url: (expLevel as { image_url: string | null }).image_url ?? null,
+      });
+    }
+  }
+
+  if (profile?.job_title) {
+    // Look up the job title by slug — use the admin-managed `name` directly
+    const { data: jobTitle } = await db
+      .from("job_titles")
+      .select("id, name, image_url")
+      .eq("slug", profile.job_title)
+      .maybeSingle();
+
+    if (jobTitle && !isCatchAll((jobTitle as { name: string }).name)) {
+      specs.push({
+        type: "job_title",
+        reference_id: (jobTitle as { id: string }).id,
+        name: (jobTitle as { name: string }).name,
+        image_url: (jobTitle as { image_url: string | null }).image_url ?? null,
       });
     }
   }

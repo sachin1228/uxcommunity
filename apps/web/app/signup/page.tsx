@@ -71,8 +71,9 @@ function SignupInner() {
   const [cities,          setCities]          = useState<MasterItem[]>([]);
   const [sectors,         setSectors]         = useState<MasterItem[]>([]);
   const [experienceLevels, setExperienceLevels] = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
+  const [jobTitles,        setJobTitles]        = useState<{ id: string; slug: string; label: string; image_url: string | null }[]>([]);
   const [step2, setStep2] = useState({
-    city_id: "", sector_id: "", experience_level: "",
+    city_id: "", sector_id: "", experience_level: "", job_title: "",
   });
   const [step2Loading, setStep2Loading] = useState(false);
   const [step2Error,   setStep2Error]   = useState<string | null>(null);
@@ -112,6 +113,7 @@ function SignupInner() {
       fetch("/api/data/cities")   .then((r) => r.json()).then((d) => setCities(d.cities ?? [])),
       fetch("/api/data/sectors")  .then((r) => r.json()).then((d) => setSectors(d.sectors ?? [])),
       fetch("/api/data/experience-levels").then((r) => r.json()).then((d) => setExperienceLevels(d.experience_levels ?? [])),
+      fetch("/api/data/job-titles").then((r) => r.json()).then((d) => setJobTitles(d.job_titles ?? [])),
     ]).catch(() => {});
   }, [step]);
 
@@ -180,6 +182,7 @@ function SignupInner() {
     if (!step2.city_id)          { setStep2Error("Please select a city.");                setStep2Loading(false); return; }
     if (!step2.sector_id)        { setStep2Error("Please select an industry sector.");    setStep2Loading(false); return; }
     if (!step2.experience_level) { setStep2Error("Please select your experience level."); setStep2Loading(false); return; }
+    if (!step2.job_title)        { setStep2Error("Please select a job title.");            setStep2Loading(false); return; }
     setStep(3);
     setStep2Loading(false);
   }
@@ -310,6 +313,7 @@ function SignupInner() {
             cities={cities}
             sectors={sectors}
             experienceLevels={experienceLevels}
+            jobTitles={jobTitles}
             loading={step2Loading}
             error={step2Error}
             onBack={() => goToStep(1)}
