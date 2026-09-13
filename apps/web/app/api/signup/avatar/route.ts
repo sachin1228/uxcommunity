@@ -175,12 +175,13 @@ export async function POST(request: NextRequest) {
     console.error("[signup/avatar] auto-join error:", autoJoinError);
   }
 
-  if (token) {
-    try {
-      await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
-    } catch (emailError) {
-      console.error("[signup/avatar] welcome email error:", emailError);
-    }
+  // The account now exists, so send the welcome email for BOTH invitation and
+  // direct signups. Non-fatal: a mail-provider failure must never fail the
+  // signup the member just completed.
+  try {
+    await sendWelcomeEmail(identity.email.toLowerCase(), identity.name);
+  } catch (emailError) {
+    console.error("[signup/avatar] welcome email error:", emailError);
   }
 
   const sessionToken = await createSession({
