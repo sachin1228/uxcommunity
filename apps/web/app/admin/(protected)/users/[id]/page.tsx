@@ -19,6 +19,7 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [memberOfAll, setMemberOfAll] = useState(false);
   const [allCommunitiesLoading, setAllCommunitiesLoading] = useState(false);
@@ -77,9 +78,20 @@ export default function UserDetailPage() {
   async function handleDelete() {
     if (!user) return;
     setActionLoading("delete");
+    setDeleteError(null);
     try {
-      await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/users/${user.id}`, { method: "DELETE" });
+      // Never navigate on a failed delete: the API returns 500 without having
+      // removed everything, and silently redirecting made a failed deletion
+      // look like it worked.
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error ?? "Failed to delete this account. Nothing was removed.");
+        return;
+      }
       router.push("/admin/users");
+    } catch {
+      setDeleteError("Network error. The account was not deleted.");
     } finally {
       setActionLoading(null);
     }
@@ -220,10 +232,17 @@ export default function UserDetailPage() {
               Delete account?
             </h2>
             <p className="font-body text-sm text-foreground-muted mb-6">
-              This will permanently remove{" "}
+              This permanently removes{" "}
               <span className="text-foreground font-medium">{user.name}</span>{" "}
-              ({user.email}) and all their data. This cannot be undone.
+              ({user.email}), their profile, applications and memberships. Any
+              community they own is handed to its longest-standing member, or
+              deleted if nobody is left. This cannot be undone.
             </p>
+            {deleteError && (
+              <p className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 font-body text-xs text-red-400">
+                {deleteError}
+              </p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => setConfirmDelete(false)}

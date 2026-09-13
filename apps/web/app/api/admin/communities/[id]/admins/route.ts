@@ -18,7 +18,7 @@ export async function GET(
   const db = createServiceClient();
 
   const [{ data: community }, { data: memberships }, { data: permsRows }] = await Promise.all([
-    db.from("communities").select("id, name, owner_id").eq("id", id).maybeSingle(),
+    db.from("communities").select("id, name, type").eq("id", id).maybeSingle(),
     db
       .from("community_members")
       .select("user_id, joined_at")
@@ -67,7 +67,7 @@ export async function GET(
   });
 
   return NextResponse.json({
-    community: { id: community.id, name: community.name, is_app_created: community.owner_id == null },
+    community: { id: community.id, name: community.name, is_app_created: community.type !== "user" },
     admins,
   });
 }
@@ -96,16 +96,16 @@ export async function POST(
 
   const { data: community } = await db
     .from("communities")
-    .select("id, name, owner_id")
+    .select("id, name, type")
     .eq("id", id)
     .maybeSingle();
 
   if (!community) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
-  // Admins apply to communities the platform runs (no member owner). Owned
-  // communities already have an owner who manages them in the app.
-  if (community.owner_id != null) {
+  // Admins apply to communities the platform runs. Member-led communities
+  // already have an owner who manages them in the app.
+  if (community.type === "user") {
     return NextResponse.json(
       { error: "Admins can only be added to app-created communities." },
       { status: 400 },

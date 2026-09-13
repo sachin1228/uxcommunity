@@ -77,6 +77,10 @@ export async function GET() {
     // Set when a member created the community (type "user"); null for the
     // communities the uxcommunity app creates itself (general/city/sector/...).
     owner_id:      c.owner_id ?? null,
+    // Derived from the community type rather than `owner_id is null`: an
+    // ownerless member-led community is a bug, not a platform community, and
+    // must not be presented as one.
+    is_app_created: c.type !== "user",
     is_active:     c.is_active ?? true,
     created_at:    c.created_at,
     member_count:  memberCountMap[c.id]  ?? 0,

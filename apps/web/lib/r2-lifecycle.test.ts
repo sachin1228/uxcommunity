@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { ALL_MEDIA_LOOKUPS, LOOKUP_ENTITY_TYPES } from "@uxcommunity/shared";
+
 import {
   attachmentPosterUrls,
   attachmentUrls,
@@ -85,6 +87,35 @@ test("attachmentPosterUrls extracts only poster fields", () => {
     "https://media.example.com/showcase/v-poster.webp",
   ]);
   assert.deepEqual(attachmentPosterUrls(null), []);
+});
+
+test("every column that can hold an R2 URL is tracked by the orphan audit", () => {
+  // Regression guard: a media column missing from this list is invisible to
+  // the reference check, so the orphan audit classifies its live objects as
+  // orphans and deletes them after the grace period.
+  const tracked = new Set(ALL_MEDIA_LOOKUPS.map((lookup) => `${lookup.table}.${lookup.column}`));
+
+  for (const required of [
+    "designer_profiles.avatar_url",
+    "communities.image_url",
+    "communities.lottie_url",
+    "community_messages.image_url",
+    "community_threads.attachments",
+    "community_showcase_posts.image_url",
+    "community_showcase_posts.attachments",
+    "community_events.cover_image_url",
+    "event_comments.image_url",
+    "lottie_settings.lottie_url",
+  ]) {
+    assert.ok(tracked.has(required), `${required} must be tracked as an R2 media reference`);
+  }
+});
+
+test("every tracked media reference has a human-readable entity type", () => {
+  for (const lookup of ALL_MEDIA_LOOKUPS) {
+    const key = `${lookup.table}.${lookup.column}`;
+    assert.ok(LOOKUP_ENTITY_TYPES[key], `${key} is missing from LOOKUP_ENTITY_TYPES`);
+  }
 });
 
 test("getReferenceUrls uses getUrls when provided, else scalar strings", () => {

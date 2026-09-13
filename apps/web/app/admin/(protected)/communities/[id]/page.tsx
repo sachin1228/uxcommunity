@@ -213,7 +213,7 @@ export default function CommunityDetailPage() {
     );
   }
 
-  const appCreated = community.is_app_created ?? community.owner_id == null;
+  const appCreated = community.is_app_created ?? community.type !== "user";
 
   const tabs: TabDef[] = [
     { id: "overview", label: "Overview", icon: LayoutGrid },
