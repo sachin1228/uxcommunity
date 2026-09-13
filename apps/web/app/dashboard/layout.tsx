@@ -65,13 +65,13 @@ export default async function DashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden bg-background-subtle text-foreground">
-      {/* Mobile nav trigger — floats because there is no topbar anymore */}
-      <div className="fixed left-2 top-2 z-40 lg:hidden">
+      {/* Narrow-viewport nav trigger — floats because there is no topbar anymore */}
+      <div className="fixed left-2 top-2 z-40 min-[500px]:hidden">
         <MobileSidebar userId={userId} user={sidebarUser} />
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        <div className="hidden h-full lg:block">
+        <div className="hidden h-full min-[500px]:block">
           <GlobalSidebar userId={userId} user={sidebarUser} />
         </div>
 

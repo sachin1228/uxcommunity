@@ -40,7 +40,7 @@ export function MobileSidebar({ userId, user }: Props) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent lg:hidden"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent min-[500px]:hidden"
         aria-label="Open navigation menu"
         aria-expanded={open}
         aria-controls="mobile-dashboard-navigation"
@@ -49,7 +49,7 @@ export function MobileSidebar({ userId, user }: Props) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-50 min-[500px]:hidden">
           <button
             type="button"
             className="absolute inset-0 bg-background/80 backdrop-blur-sm"
