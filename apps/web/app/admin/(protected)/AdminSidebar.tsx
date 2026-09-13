@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, ShieldCheck, Gauge } from "lucide-react";
+import { LayoutList, MapPin, Layers, Database, ChevronDown, Users, Sparkles, TrendingUp, BadgeCheck, Clapperboard, Wrench, MessagesSquare, ShieldCheck, Gauge, UserX } from "lucide-react";
 
 function isMatch(href: string, pathname: string) {
   return href === "/admin"
@@ -59,6 +59,20 @@ export function AdminSidebar() {
       >
         <LayoutList strokeWidth={2.5} size={16} className={active("/admin") ? "text-accent" : ""} />
         Applications
+      </Link>
+
+      {/* Incomplete Signups */}
+      <Link
+        href="/admin/signup-attempts"
+        onClick={() => setPendingHref("/admin/signup-attempts")}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2 font-body text-xs transition-colors ${
+          active("/admin/signup-attempts")
+            ? "bg-surface-raised text-foreground"
+            : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+        }`}
+      >
+        <UserX strokeWidth={2.5} size={16} className={active("/admin/signup-attempts") ? "text-accent" : ""} />
+        Incomplete Signups
       </Link>
 
       {/* Loading Animations */}

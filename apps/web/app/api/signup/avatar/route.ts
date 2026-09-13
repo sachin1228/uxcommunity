@@ -14,6 +14,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { hashPassword } from "@/lib/auth/password";
 import { completeSignupSchema } from "@/lib/validations";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
+import { markSignupCompleted } from "@/lib/signup-attempts";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -162,6 +163,10 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = data[0].user_id as string;
+
+  // The account exists now — clear the email from the incomplete-signups view.
+  // Best-effort: the account is already created, so a tracking failure is silent.
+  await markSignupCompleted(identity.email, userId);
 
   // Join every profile-based community (General + city + sector) server-side so
   // the sidebar shows the full list the first time the dashboard loads.
