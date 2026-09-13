@@ -50,7 +50,10 @@ export async function getSidebarCommunities(userId: string) {
     .from("communities")
     .select("id, name, type, image_url, reference_id, is_private, enabled_tabs, owner_id, created_at, lottie_url, lottie_format")
     .in("id", rows.map((row) => row.community_id))
-    .eq("is_active", true);
+    .eq("is_active", true)
+    // Member-led communities without an owner are orphans from a deleted
+    // account — never surface them, even if a stale membership row survives.
+    .or("type.neq.user,owner_id.not.is.null");
   if (error) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
 
   const byType: Record<string, { id: string; reference_id: string }[]> = {};

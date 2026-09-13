@@ -53,7 +53,10 @@ export async function POST(
   if (error || !community) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
-  if (community.owner_id) {
+  // Member-led communities own their picture in-app; only platform
+  // communities can have it replaced here. Keyed off the type, so a
+  // member-led community that lost its owner is still treated as member-led.
+  if (community.type === "user") {
     return NextResponse.json(
       { error: "Only app-created communities can replace the display picture." },
       { status: 422 }
@@ -219,7 +222,7 @@ export async function DELETE(
   if (error || !community) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
-  if (community.owner_id) {
+  if (community.type === "user") {
     return NextResponse.json(
       { error: "Only app-created communities can change the display picture." },
       { status: 422 }

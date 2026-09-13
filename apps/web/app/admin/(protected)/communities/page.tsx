@@ -73,12 +73,15 @@ export default function AdminCommunitiesPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // "App-created" is a property of the community TYPE, not of whether an owner
+  // happens to be set: a member-led community left ownerless by a deleted
+  // account must stay listed as member-led instead of posing as a platform one.
   const appCreated = useMemo(
-    () => communities.filter((c) => c.owner_id == null),
+    () => communities.filter((c) => c.is_app_created ?? c.type !== "user"),
     [communities]
   );
   const memberCreated = useMemo(
-    () => communities.filter((c) => c.owner_id != null),
+    () => communities.filter((c) => !(c.is_app_created ?? c.type !== "user")),
     [communities]
   );
 

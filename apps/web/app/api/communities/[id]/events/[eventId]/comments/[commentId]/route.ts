@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
+import { ALL_MEDIA_LOOKUPS } from "@/lib/r2-cleanup";
 
 type Params = { params: Promise<{ id: string; eventId: string; commentId: string }> };
 
@@ -17,7 +19,7 @@ export async function DELETE(
 
   const { data: existing } = await db
     .from("event_comments")
-    .select("id, user_id")
+    .select("id, user_id, image_url")
     .eq("id", commentId)
     .eq("event_id", eventId)
     .maybeSingle();
@@ -27,6 +29,17 @@ export async function DELETE(
 
   const { error } = await db.from("event_comments").delete().eq("id", commentId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Reclaim the comment's image now that the row is gone. Checked against
+  // every media column, so an object still used elsewhere is kept. Non-fatal:
+  // the admin orphan audit retries anything that fails here.
+  if (existing.image_url) {
+    try {
+      await deleteR2AssetIfUnreferenced(db, existing.image_url, ALL_MEDIA_LOOKUPS);
+    } catch (cleanupError) {
+      console.error("[event-comments] image cleanup error:", cleanupError);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }

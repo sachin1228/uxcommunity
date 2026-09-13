@@ -108,7 +108,9 @@ export async function GET(
       message_count: message_count ?? 0,
       members,
       messages,
-      is_app_created: community.owner_id == null,
+      // Derived from the type: an ownerless member-led community is an orphan
+      // (a bug), never a platform community.
+      is_app_created: community.type !== "user",
     },
   });
 }

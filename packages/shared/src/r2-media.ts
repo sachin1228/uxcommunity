@@ -109,6 +109,10 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   { table: "job_titles", column: "image_url" },
   { table: "job_titles", column: "lottie_url" },
   { table: "community_messages", column: "image_url" },
+  // Event comment images are uploaded to the same bucket and rendered in the
+  // event discussion. They must be tracked here or the orphan audit treats
+  // every live comment image as an orphan and deletes it after the grace period.
+  { table: "event_comments", column: "image_url" },
   { table: "community_events", column: "cover_image_url" },
   { table: "community_showcase_posts", column: "image_url" },
   SHOWCASE_ATTACHMENT_LOOKUP,
@@ -133,6 +137,7 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "job_titles.image_url": "job_title",
   "job_titles.lottie_url": "job_title",
   "community_messages.image_url": "message",
+  "event_comments.image_url": "event_comment",
   "community_events.cover_image_url": "event",
   "community_showcase_posts.image_url": "showcase",
   "community_showcase_posts.attachments": "showcase",

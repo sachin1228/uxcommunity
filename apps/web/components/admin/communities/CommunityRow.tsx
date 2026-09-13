@@ -14,6 +14,8 @@ export interface CommunityListItem {
   lottie_data?: unknown;
   /** Set when a member created the community — null for app-created ones. */
   owner_id: string | null;
+  /** True for the communities the platform auto-creates (type !== "user"). */
+  is_app_created?: boolean;
   is_active: boolean;
   member_count: number;
   message_count: number;
