@@ -9,7 +9,6 @@ import {
   applyReactionInsert,
   markSidebarReactionRemoved,
   patchSidebarReaction,
-  seedCachedMessages,
   sidebarStore,
   metaCache,
   msgCache,
@@ -49,11 +48,9 @@ import { useMemberMentions } from "./chat/useMemberMentions";
 import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import {
-  COMMUNITY_BOOTSTRAP_STALE_MS,
   fetchAndHydrateCommunityBootstrap,
   fetchJsonCached,
   getCachedRequest,
-  hasFreshRequestCache,
   initRequestCache,
   setCachedRequest,
   type CommunityBootstrap,
@@ -220,17 +217,6 @@ export function CommunityChat({
       return () => { cancelled = true; };
     }
 
-    // A bootstrap served from its 15-minute request cache describes a past
-    // state; a freshly fetched one is an authoritative server read. Only the
-    // latter may replace the live cache — replaying the former on a community
-    // switch dropped the user's own reaction (and the bubble carrying it) and
-    // any message received since the snapshot was taken.
-    const bootstrapIsCached = hasFreshRequestCache(
-      `/api/communities/${communityId}/bootstrap`,
-      COMMUNITY_BOOTSTRAP_STALE_MS,
-      currentUserId,
-    );
-
     void fetchAndHydrateCommunityBootstrap(communityId, currentUserId)
       .then((data) => {
         if (cancelled) return;
@@ -246,9 +232,7 @@ export function CommunityChat({
           members: communityData.members,
           fetchedAt,
         });
-        const messages = messageData.messages ?? [];
-        if (bootstrapIsCached) seedCachedMessages(communityId, messages);
-        else msgCache.set(communityId, messages);
+        msgCache.set(communityId, messageData.messages ?? []);
         msgFetchedAt.set(communityId, fetchedAt);
       })
       .catch(() => {})
@@ -876,6 +860,7 @@ export function CommunityChat({
     currentUserId,
     currentUserName,
     currentUserAvatar,
+    setMessages,
     setHideUnreadDivider,
     replyTo,
     onClearReply: handleClearReply,
