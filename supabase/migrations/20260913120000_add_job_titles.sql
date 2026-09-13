@@ -47,14 +47,11 @@ create trigger trg_job_titles_updated_at
   for each row execute function public.set_job_titles_updated_at();
 
 alter table public.job_titles enable row level security;
-do $ begin
-  if not exists (
-    select 1 from pg_policies
-    where tablename = 'job_titles' and policyname = 'public_read'
-  ) then
-    execute 'create policy "public_read" on public.job_titles for select using (true)';
-  end if;
-end $;
+
+-- `drop … if exists` + create keeps this idempotent on re-run without a
+-- DO/PL-pgSQL block.
+drop policy if exists "public_read" on public.job_titles;
+create policy "public_read" on public.job_titles for select using (true);
 
 -- ─── 2. designer_profiles.job_title ─────────────────────────
 -- Nullable: profiles created before this migration keep working until the
