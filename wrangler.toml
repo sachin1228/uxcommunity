@@ -25,3 +25,10 @@ new_sqlite_classes = ["UserDO"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = []
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
