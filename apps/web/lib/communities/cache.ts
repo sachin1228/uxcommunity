@@ -366,14 +366,21 @@ export function patchSidebarReaction(
   }
   if (!sidebarStore.data) return;
 
+  const patch = (community: CachedSidebarCommunity) =>
+    community.id === communityId ? { ...community, lastReaction } : community;
+
   sidebarStore.data = {
     ...sidebarStore.data,
-    communities: sidebarStore.data.communities.map((community) =>
-      community.id === communityId
-        ? { ...community, lastReaction }
-        : community
-    ),
+    communities: sidebarStore.data.communities.map(patch),
   };
+  // Mirror into the request cache so a stale-window replay can't resurrect a
+  // pre-reaction preview (same rationale as patchSidebarLastMessage).
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (current) => ({
+      communities: current.communities.map(patch),
+    }),
+  );
   notifySidebarReactionChanged();
 }
 

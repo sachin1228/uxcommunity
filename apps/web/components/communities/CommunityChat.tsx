@@ -39,6 +39,7 @@ import { ShowcaseView } from "./showcase/ShowcaseView";
 import { CommunitySettingsView } from "./CommunitySettingsView";
 import { Modal } from "@/components/ui/Modal";
 import { useChatData } from "./chat/useChatData";
+import { useChatLoadError } from "./chat/useChatLoadError";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
@@ -329,6 +330,7 @@ export function CommunityChat({
   }, []);
 
   // ── Data fetching + message state ─────────────────────────────────────────
+  const chatLoadError = useChatLoadError(communityId);
   const {
     community,
     setCommunity,
@@ -344,7 +346,14 @@ export function CommunityChat({
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,
-  } = useChatData({ communityId, currentUserId, initialMeta, initialMessages });
+  } = useChatData({
+    communityId,
+    currentUserId,
+    initialMeta,
+    initialMessages,
+    onLoadError: chatLoadError.reportError,
+    retryToken: chatLoadError.retryToken,
+  });
 
   const handleReactionToggled = useCallback(
     (msgId: string, reactions: MessageReaction[]) => {
@@ -1370,6 +1379,20 @@ export function CommunityChat({
               overflowAnchor: "none",
             }}
           >
+            {chatLoadError.error ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <p className="max-w-xs text-sm text-foreground-muted">
+                  {chatLoadError.error}
+                </p>
+                <button
+                  type="button"
+                  onClick={chatLoadError.retry}
+                  className="rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-surface-raised"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
             <MessageList
               grouped={grouped}
               threadEvents={threadEvents}
@@ -1398,6 +1421,7 @@ export function CommunityChat({
               onDelete={handleDelete}
               onImageClick={handleImageClick}
             />
+            )}
           </div>
 
           {/* Static footer — separate from the scroll body, never overlapped */}

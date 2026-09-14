@@ -63,6 +63,10 @@ interface UseChatDataOptions {
   onSeedLastReadAt?: (val: string | null) => void;
   /** Called once hasMounted should be set to true (first layout effect). */
   onMounted?: () => void;
+  /** Called when the initial hydration fails so completely that nothing could be rendered. */
+  onLoadError?: (message: string) => void;
+  /** Bump to re-run the mount hydration after a failure (retry). */
+  retryToken?: number;
 }
 
 export function useChatData({
@@ -72,6 +76,8 @@ export function useChatData({
   initialMessages,
   onSeedLastReadAt,
   onMounted,
+  onLoadError,
+  retryToken = 0,
 }: UseChatDataOptions) {
   const [community,           setCommunity]          = useState<Community | null>(null);
   const [members,             setMembers]            = useState<Member[]>([]);
@@ -338,6 +344,23 @@ export function useChatData({
         setInitialMessagesReady(true);
       }
 
+      // A network failure used to be swallowed and rendered as the "Be the
+      // first to say something" empty state — indistinguishable from a
+      // healthy but message-less community. When NOTHING was hydrated (no
+      // meta, no message page), surface an explicit error the user can retry.
+      // A genuinely empty community still caches its empty message page, so
+      // msgCache.has(...) is true and this stays silent for it.
+      if (
+        !cancelled &&
+        communityIdRef.current === communityId &&
+        !metaCache.has(communityId) &&
+        !msgCache.has(communityId)
+      ) {
+        onLoadError?.(
+          "Couldn't load this community's chat. Check your connection and try again."
+        );
+      }
+
       // Incremental catch-up for messages that landed while the user was in
       // another community. The sidebar keeps this community's chat socket
       // alive, so no reconnect fires when they switch back — without this the
@@ -354,7 +377,7 @@ export function useChatData({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId]);
+  }, [communityId, retryToken]);
 
   return {
     community,

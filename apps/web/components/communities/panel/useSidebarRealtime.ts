@@ -7,6 +7,7 @@ import {
   sidebarStore,
   type CachedSidebarCommunity,
 } from "@/lib/communities/cache";
+import { patchCachedRequest } from "@/lib/request-cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { noteCommunityActivity, scheduleMarkRead } from "@/lib/communities/read-manager";
 import { notifyIncomingCommunityMessage } from "@/lib/communities/message-notifications";
@@ -48,6 +49,20 @@ function applyUpdate(
       })),
     };
   }
+  // Mirror into the /api/communities request cache too. The cache entry is
+  // re-stamped as "fresh" by every mark-read patch (patchCachedRequest), so
+  // if realtime previews only lived in the store, the next load() within the
+  // stale window replayed the pre-message snapshot and visually demoted the
+  // community that had just received a message. Keeping the cache current is
+  // what makes cache-hit replays safe; sidebar-merge.ts guards the rest.
+  patchCachedRequest<{ communities: CachedSidebarCommunity[] }>(
+    "/api/communities",
+    (current) => ({
+      communities: current.communities.map((c) =>
+        c.id === communityId ? patch(c) : c
+      ),
+    }),
+  );
   return updated;
 }
 
