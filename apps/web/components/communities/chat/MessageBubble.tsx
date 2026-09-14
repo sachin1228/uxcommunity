@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useId, useMemo, useState, useRef, useEffect, memo } from "react";
+import { Fragment, useId, useMemo, useState, useRef, useEffect, useCallback, memo } from "react";
 import TruncateMarkup from "react-truncate-markup";
 import { Clock, CheckCheck, X, RefreshCw, Reply, Copy, Smile, Trash2, Ban, MoreHorizontal, Pencil } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";

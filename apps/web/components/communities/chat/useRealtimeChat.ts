@@ -14,7 +14,7 @@ type Message = CachedMessage;
 interface UseRealtimeChatOptions {
   communityId: string;
   currentUserId: string;
-  fetchMessages: (after?: string) => Promise<void>;
+  fetchMessages: (after?: string, force?: boolean) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
   membersRef: MutableRefObject<Member[]>;

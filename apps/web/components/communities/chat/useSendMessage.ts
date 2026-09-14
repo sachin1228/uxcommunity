@@ -462,7 +462,8 @@ export function useSendMessage({
           failedRetryDataRef.current.delete(tempId);
         }
         rollbackSidebar();
-        return;
+        // Abort before confirmation: nothing was sent, report nothing.
+        return { sentCommunityId: null, message: null };
       }
 
       setMessages((prev) => {
@@ -531,15 +532,16 @@ export function useSendMessage({
       // UI. Commit the confirmed row into the message cache directly — it is
       // keyed by community id — so the message is never lost. (No abort: the
       // POST already returned 201, so the message exists server-side.)
+      const confirmed = result.message;
       if (
         result.sentCommunityId &&
         result.sentCommunityId !== communityId &&
-        result.message
+        confirmed
       ) {
         const cached = msgCache.get(result.sentCommunityId) ?? [];
-        if (!cached.some((m) => m.id === result.message.id)) {
+        if (!cached.some((m) => m.id === confirmed.id)) {
           const withoutTemp = cached.filter((m) => m.id !== tempId);
-          const next = [...withoutTemp, result.message].sort(
+          const next = [...withoutTemp, confirmed].sort(
             (a, b) =>
               new Date(a.created_at).getTime() -
               new Date(b.created_at).getTime(),

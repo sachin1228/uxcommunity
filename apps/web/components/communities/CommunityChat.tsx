@@ -937,7 +937,19 @@ export function CommunityChat({
     if (saved) {
       setInputRaw(saved.input);
       setReplyTo(saved.replyTo);
+    } else {
+      // No draft for the incoming community: clear the outgoing community's
+      // composer state, otherwise its text and reply preview bleed into the
+      // new community until the first keystroke overwrites them.
+      setInputRaw("");
+      setReplyTo(null);
     }
+    // An in-progress edit belongs to the outgoing community; keeping it would
+    // make "Save" PATCH the old community's message id against the new
+    // community's URL. Cancel the edit instead of risking a cross-community
+    // update. Reset the textarea height to match handleCancelEdit.
+    setEditingMessage(null);
+    if (inputRef.current) inputRef.current.style.height = "24px";
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [communityId]);
 
