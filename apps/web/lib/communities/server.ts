@@ -1,43 +1,19 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { resolveCommunityDp } from "./dp";
-import { loadCommunityManagerStatus } from "./manager-role";
 import type { CachedMeta } from "./cache";
 
 /**
- * Strip year-range suffixes and singularize experience level names for display.
- * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- *      "Heads of Design"                 → "Head of Design"
- */
-function cleanDesignation(name: string): string {
-  const clean = name.split("(")[0].trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
-
-export interface SSRCommunitySections {
-  threads?: unknown;
-  events?: unknown;
-  resources?: unknown;
-  showcase?: unknown;
-  members?: unknown;
-  rules?: unknown;
-}
-
-export interface SSRCommunityMeta {
-  meta: CachedMeta;
-  lastReadAt: string | null;
-  currentUserName: string;
-}
-
-/**
  * Lightweight server snapshot for the community chat page: just the community
- * read model + top members — enough to paint the header and the info panel on
- * the first server render. Messages and tab sections hydrate client-side from
- * the request cache (revisits) or a fresh bootstrap fetch (with the Lottie
- * loader in the chat while it loads), so navigation never blocks on the full
- * read model.
+ * read model — enough to paint the header (name, DP, member count) on the
+ * first server render. Members, permissions and messages hydrate client-side
+ * from the request cache (revisits) or a fresh bootstrap fetch, so navigation
+ * never blocks on secondary data.
+ *
+ * Latency profile: exactly TWO database round trips, issued in parallel.
+ * The pre-slim version ran ~10 queries across four sequential waves
+ * (top-member profiles → experience levels → manager status) and embedded the
+ * Lottie animation payload into the RSC response; all of that arrives with the
+ * client-side /bootstrap fetch instead.
  */
 export async function fetchCommunityMetaSSR(
   communityId: string,
@@ -45,93 +21,54 @@ export async function fetchCommunityMetaSSR(
 ): Promise<SSRCommunityMeta | null> {
   const db = createServiceClient();
 
-  const [
-    { data: membership },
-    { data: community },
-    { count: memberCount },
-    { data: memberRows },
-    { data: currentUser },
-  ] = await Promise.all([
+  const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id, lottie_url, lottie_format").eq("id", communityId).maybeSingle(),
-    db.from("community_members").select("*", { count: "exact", head: true }).eq("community_id", communityId),
-    db.from("community_members").select("user_id, joined_at").eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
+    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
   ]);
 
   if (!membership || !community) return null;
 
-  const dp = await resolveCommunityDp({
-    type: community.type,
-    reference_id: community.reference_id,
-    image_url: (community as any).image_url ?? null,
-    lottie_url: (community as any).lottie_url ?? null,
-    lottie_format: (community as any).lottie_format ?? null,
-    embedLottie: true,
-  });
-
-  // Top members for the info panel.
-  const memberUserIds = (memberRows ?? []).map((m) => m.user_id);
-  const [{ data: memberUsers }, { data: memberProfiles }] = memberUserIds.length
-    ? await Promise.all([
-        db.from("users").select("id, name").in("id", memberUserIds),
-        db.from("designer_profiles").select("user_id, avatar_url, experience_level").in("user_id", memberUserIds),
-      ])
-    : [
-        { data: [] as { id: string; name: string }[] },
-        { data: [] as { user_id: string; avatar_url: string | null; experience_level: string | null }[] },
-      ];
-
-  // Resolve experience level slugs in one batch query.
-  const allSlugs = [...new Set((memberProfiles ?? []).map((p: any) => p.experience_level).filter(Boolean) as string[])];
-  const expLevelMap: Record<string, string> = {};
-  if (allSlugs.length) {
-    const { data: levels } = await db.from("experience_levels").select("slug, name").in("slug", allSlugs);
-    for (const l of levels ?? []) expLevelMap[l.slug] = cleanDesignation(l.name);
-  }
-
-  const memberUserMap    = Object.fromEntries((memberUsers ?? []).map((u) => [u.id, u.name]));
-  const memberProfileMap = Object.fromEntries((memberProfiles ?? []).map((p: any) => [p.user_id, p]));
-  const members: CachedMeta["members"] = (memberRows ?? []).map((m) => {
-    const p = memberProfileMap[m.user_id];
-    return {
-      user_id: m.user_id,
-      users: memberUserMap[m.user_id]
-        ? {
-            name:        memberUserMap[m.user_id],
-            avatar_url:  p?.avatar_url ?? null,
-            designation: p?.experience_level ? (expLevelMap[p.experience_level] ?? null) : null,
-          }
-        : null,
-    };
-  });
-
-  // Role + effective permissions let the chat chrome show owner-style
-  // settings/membership controls for platform-appointed community admins.
-  const managerStatus = await loadCommunityManagerStatus(db, communityId, userId);
-
   const meta: CachedMeta = {
     community: {
       id: community.id, name: community.name, type: community.type,
-      member_count: memberCount ?? 0, image_url: dp.image_url,
-      lottie_url: dp.lottie_url,
-      lottie_format: dp.lottie_format,
-      lottie_data: dp.lottie_data,
+      // member_count streams in with /bootstrap; omitting it here lets the
+      // header fall back to the sidebar entry's count for the first paint.
+      member_count: 0,
+      image_url: (community as any).image_url ?? null,
       description: (community as any).description ?? null,
       created_at: (community as any).created_at ?? undefined,
       owner_id: (community as any).owner_id ?? null,
       is_private: (community as any).is_private ?? false,
       enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "events", "resources"],
-      current_user_role: managerStatus?.role ?? "member",
-      current_user_permissions: managerStatus?.permissions ?? null,
+      // Role/permissions are not fetched server-side any more; bootstrap
+      // overwrites them client-side moments later.
+      current_user_role: null,
+      current_user_permissions: null,
     },
-    members,
+    members: [],
     fetchedAt: Date.now(),
   };
 
   return {
     meta,
     lastReadAt: (membership as unknown as { last_read_at: string | null }).last_read_at ?? null,
-    currentUserName: currentUser?.name ?? "Someone",
+    currentUserName: currentUser?.name ?? null,
   };
+}
+
+export interface SSRCommunityMeta {
+  meta: CachedMeta;
+  lastReadAt: string | null;
+  currentUserName: string | null;
+}
+
+/** Kept for the CommunityChat prop contract; sections now always hydrate client-side. */
+export interface SSRCommunitySections {
+  threads?: unknown;
+  events?: unknown;
+  resources?: unknown;
+  showcase?: unknown;
+  members?: unknown;
+  rules?: unknown;
 }

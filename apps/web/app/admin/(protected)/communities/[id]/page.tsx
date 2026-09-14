@@ -10,8 +10,6 @@ import {
   Users,
   MessageSquare,
   ImagePlus,
-  Clapperboard,
-  Eraser,
   LayoutGrid,
   ScrollText,
   ShieldCheck,
@@ -81,14 +79,13 @@ export default function CommunityDetailPage() {
   const [editDescLoading, setEditDescLoading] = useState(false);
   const [editDescError, setEditDescError] = useState<string | null>(null);
 
-  // Display picture replacement state
-  const [dpBusy, setDpBusy] = useState<"image" | "lottie" | "remove" | null>(null);
+  // Display picture replacement state (animated DPs were removed)
+  const [dpBusy, setDpBusy] = useState<"image" | null>(null);
   const [dpError, setDpError] = useState<string | null>(null);
   const [dpSuccess, setDpSuccess] = useState<string | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const lottieInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleDpUpload(kind: "image" | "lottie", file: File) {
+  async function handleDpUpload(kind: "image", file: File) {
     setDpBusy(kind);
     setDpError(null);
     setDpSuccess(null);
@@ -101,7 +98,7 @@ export default function CommunityDetailPage() {
       if (!res.ok) { setDpError(data.error ?? "Upload failed."); return; }
       const c = data.community;
       setCommunity((prev) =>
-        prev ? { ...prev, image_url: c.image_url, lottie_url: c.lottie_url, lottie_format: c.lottie_format, lottie_data: c.lottie_data } : prev
+        prev ? { ...prev, image_url: c.image_url } : prev
       );
       setDpSuccess(
         data.master_synced
@@ -113,28 +110,6 @@ export default function CommunityDetailPage() {
     } finally {
       setDpBusy(null);
       if (imageInputRef.current) imageInputRef.current.value = "";
-      if (lottieInputRef.current) lottieInputRef.current.value = "";
-    }
-  }
-
-  async function handleRemoveAnimation() {
-    setDpBusy("remove");
-    setDpError(null);
-    setDpSuccess(null);
-    try {
-      const res = await fetch(`/api/admin/communities/${id}/dp`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) { setDpError(data.error ?? "Failed to remove animation."); return; }
-      setCommunity((prev) => (prev ? { ...prev, ...data.community } : prev));
-      setDpSuccess(
-        data.master_synced
-          ? "Animation removed — synced to master data."
-          : "Animation removed."
-      );
-    } catch {
-      setDpError("Network error.");
-    } finally {
-      setDpBusy(null);
     }
   }
 
@@ -253,9 +228,6 @@ export default function CommunityDetailPage() {
           <div className="rounded-full ring-4 ring-surface">
             <CommunityDp
               imageUrl={community.image_url}
-              lottieUrl={community.lottie_url}
-              lottieFormat={community.lottie_format}
-              lottieData={community.lottie_data}
               name={community.name}
               size={76}
               className="bg-surface-raised"
@@ -464,21 +436,13 @@ export default function CommunityDetailPage() {
               <div className="rounded-xl border border-border bg-surface p-5">
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="font-display text-sm font-semibold text-foreground">Display picture</h2>
-                  {community.lottie_url && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 text-accent px-2 py-0.5 font-body text-[10px] font-medium">
-                      <Clapperboard strokeWidth={2.5} size={10} /> Animated
-                    </span>
-                  )}
                 </div>
                 <p className="font-body text-[11px] text-foreground-muted mb-4">
-                  Replace with a static image or a Lottie animation. Applies everywhere in the app.
+                  Replace with a static image. Applies everywhere in the app.
                 </p>
                 <div className="flex items-center gap-4">
                   <CommunityDp
                     imageUrl={community.image_url}
-                    lottieUrl={community.lottie_url}
-                    lottieFormat={community.lottie_format}
-                    lottieData={community.lottie_data}
                     name={community.name}
                     size={64}
                     className="bg-surface-raised"
@@ -494,26 +458,6 @@ export default function CommunityDetailPage() {
                         <ImagePlus strokeWidth={2.5} size={13} />
                         {dpBusy === "image" ? <Spinner className="h-3 w-3" /> : "Upload image"}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => lottieInputRef.current?.click()}
-                        disabled={dpBusy !== null}
-                        className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-body text-xs text-foreground hover:bg-surface-raised transition-colors disabled:opacity-50"
-                      >
-                        <Clapperboard strokeWidth={2.5} size={13} />
-                        {dpBusy === "lottie" ? <Spinner className="h-3 w-3" /> : "Upload Lottie"}
-                      </button>
-                      {community.lottie_url && (
-                        <button
-                          type="button"
-                          onClick={handleRemoveAnimation}
-                          disabled={dpBusy !== null}
-                          className="flex items-center gap-1.5 rounded-md border border-red-500/30 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                        >
-                          <Eraser strokeWidth={2.5} size={13} />
-                          {dpBusy === "remove" ? <Spinner className="h-3 w-3" /> : "Remove animation"}
-                        </button>
-                      )}
                     </div>
                     <input
                       ref={imageInputRef}
@@ -523,16 +467,6 @@ export default function CommunityDetailPage() {
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         if (f) handleDpUpload("image", f);
-                      }}
-                    />
-                    <input
-                      ref={lottieInputRef}
-                      type="file"
-                      accept=".lottie,.json,application/json"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleDpUpload("lottie", f);
                       }}
                     />
                     {dpError && (

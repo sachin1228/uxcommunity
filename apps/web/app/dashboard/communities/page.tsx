@@ -73,9 +73,6 @@ function CommunityCard({
           {/* Avatar */}
           <CommunityDp
             imageUrl={c.image_url}
-            lottieUrl={c.lottie_url}
-            lottieFormat={c.lottie_format}
-            lottieData={c.lottie_data}
             name={c.name}
             size={36}
             className="bg-surface"

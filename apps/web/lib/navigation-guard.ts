@@ -28,6 +28,8 @@ export interface RouterLike {
   push: (href: string) => void;
   replace: (href: string) => void;
   back: () => void;
+  /** Optional: warms the client-side RSC cache without navigating. */
+  prefetch?: (href: string) => void;
 }
 
 export const NAVIGATION_LOCK_MS = 800;
@@ -172,6 +174,8 @@ export interface NavigationGuard {
   replace: (href: string) => void;
   /** Navigates back unless a back navigation is already pending. */
   back: () => void;
+  /** Warms the client-side RSC cache for `href` without navigating. */
+  prefetch: (href: string) => void;
 }
 
 /** Creates a guard bound to a router instance (works outside React too). */
@@ -189,6 +193,11 @@ export function createNavigationGuard(
     },
     back() {
       if (allowBack()) router.back();
+    },
+    // Prefetches are passive — they never trigger a route transition, so the
+    // lock does not apply. Next.js dedupes in-flight prefetches per route.
+    prefetch(href: string) {
+      router.prefetch?.(href);
     },
   };
 }

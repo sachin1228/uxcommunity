@@ -18,9 +18,6 @@ interface Community {
   name: string;
   type: string;
   image_url: string | null;
-  lottie_url?: string | null;
-  lottie_format?: "json" | "dotlottie" | null;
-  lottie_data?: unknown;
 }
 
 interface DateGroup {
@@ -244,9 +241,6 @@ export const MessageList = memo(function MessageList({
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <CommunityDp
             imageUrl={displayCommunity?.image_url ?? null}
-            lottieUrl={displayCommunity?.lottie_url}
-            lottieFormat={displayCommunity?.lottie_format}
-            lottieData={displayCommunity?.lottie_data}
             name={displayCommunity?.name ?? ""}
             size={48}
             className="bg-surface-raised"
