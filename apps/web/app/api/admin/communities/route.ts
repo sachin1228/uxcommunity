@@ -15,7 +15,7 @@ export async function GET() {
 
   const { data: communities, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at, lottie_url, lottie_format")
+    .select("id, name, type, image_url, reference_id, owner_id, is_active, created_at")
     .order("type")
     .order("name");
 
@@ -24,18 +24,13 @@ export async function GET() {
   }
   if (!communities?.length) return NextResponse.json({ communities: [] });
 
-  // Resolve the display picture per community (image + lottie from master).
-  // The animation payload is embedded so table rows can play it inline — R2
-  // URLs are not browser-fetchable.
+  // Resolve the display picture per community (image from master data).
   const dps = await Promise.all(
     communities.map((c) =>
       resolveCommunityDp({
         type: c.type,
         reference_id: c.reference_id,
         image_url: c.image_url ?? null,
-        lottie_url: c.lottie_url ?? null,
-        lottie_format: c.lottie_format ?? null,
-        embedLottie: true,
       })
     )
   );
@@ -70,9 +65,9 @@ export async function GET() {
     name:          c.name,
     type:          c.type,
     image_url:     dps[i].image_url,
-    lottie_url:    dps[i].lottie_url,
-    lottie_format: dps[i].lottie_format,
-    lottie_data:   dps[i].lottie_data,
+    lottie_url:    null,
+    lottie_format: null,
+    lottie_data:   null,
     reference_id:  c.reference_id,
     // Set when a member created the community (type "user"); null for the
     // communities the uxcommunity app creates itself (general/city/sector/...).

@@ -30,13 +30,59 @@ import type { MentionCandidate } from "@/lib/communities/mentions";
 import { MessageList } from "./chat/MessageList";
 import { ImageLightbox, type LightboxImage } from "./chat/ImageLightbox";
 import { MessageEditModal } from "./chat/MessageEditModal";
-import { ThreadsView } from "./threads/ThreadsView";
+import dynamic from "next/dynamic";
 import type { CommunityThread } from "./threads/types";
-import { EventsView } from "./events/EventsView";
-import { ResourcesView } from "./resources/ResourcesView";
-import { MembersView } from "./members/MembersView";
-import { ShowcaseView } from "./showcase/ShowcaseView";
-import { CommunitySettingsView } from "./CommunitySettingsView";
+
+// Tab views are loaded on first open: the chat shell (what a community switch
+// actually paints) stops parsing/hydrating five large views it never shows.
+// Each keeps its own loading fallback so an opened tab shows a centered
+// spinner exactly where its content will appear. (next/dynamic requires an
+// inline options object literal per call — Next 16 validates it statically.)
+const ThreadsView = dynamic(() => import("./threads/ThreadsView").then((m) => m.ThreadsView), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  ),
+});
+const EventsView = dynamic(() => import("./events/EventsView").then((m) => m.EventsView), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  ),
+});
+const ResourcesView = dynamic(() => import("./resources/ResourcesView").then((m) => m.ResourcesView), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  ),
+});
+const MembersView = dynamic(() => import("./members/MembersView").then((m) => m.MembersView), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  ),
+});
+const ShowcaseView = dynamic(() => import("./showcase/ShowcaseView").then((m) => m.ShowcaseView), {
+  ssr: false,
+  loading: () => (
+    <div className="flex-1 flex items-center justify-center">
+      <Spinner className="h-5 w-5" />
+    </div>
+  ),
+});
+const CommunitySettingsView = dynamic(
+  () => import("./CommunitySettingsView").then((m) => m.CommunitySettingsView),
+  { ssr: false },
+);
+import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { useChatData } from "./chat/useChatData";
 import { useChatLoadError } from "./chat/useChatLoadError";
@@ -1231,9 +1277,6 @@ export function CommunityChat({
           type: sidebarEntry.type,
           member_count: sidebarEntry.member_count,
           image_url: sidebarEntry.image_url,
-          lottie_url: sidebarEntry.lottie_url,
-          lottie_format: sidebarEntry.lottie_format,
-          lottie_data: sidebarEntry.lottie_data,
           is_private: sidebarEntry.is_private,
           enabled_tabs: sidebarEntry.enabled_tabs,
           owner_id: sidebarEntry.owner_id,

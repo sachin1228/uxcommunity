@@ -30,9 +30,6 @@ export interface Community {
   name: string;
   type: string;
   image_url: string | null;
-  lottie_url?: string | null;
-  lottie_format?: "json" | "dotlottie" | null;
-  lottie_data?: unknown;
   description: string | null;
   reference_id: string;
   reference_name: string | null;

@@ -6,7 +6,6 @@ import { deleteFromR2, deleteOwnedR2AssetIfUnique, deleteR2AssetIfUnreferenced, 
 import { resolveCommunityDp } from "@/lib/communities/dp";
 
 const MAX_IMAGE_BYTES  = 5 * 1024 * 1024; // 5 MB — same as master-data uploads
-const MAX_LOTTIE_BYTES = 5 * 1024 * 1024; // 5 MB — .lottie containers can hold assets
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
 
 const MASTER_TABLE: Record<string, { table: string; idCol: string }> = {
@@ -33,10 +32,11 @@ const DP_REFERENCE_LOOKUPS = [
 ];
 
 // ── POST /api/admin/communities/[id]/dp ──────────────────────────────────────
-// Replaces the display picture of an APP-CREATED community (owner_id IS NULL)
-// with an uploaded image or a Lottie animation (.lottie / .json). The change
-// is mirrored onto the linked master-data row, so it propagates everywhere the
-// app resolves master images, and the master-image caches are flushed.
+// Replaces the static display picture of an APP-CREATED community
+// (owner_id IS NULL) with an uploaded image. Animated (Lottie) display
+// pictures were removed; uploading an image also clears any legacy animation
+// reference. The change is mirrored onto the linked master-data row, so it
+// propagates everywhere the app resolves master images.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -70,19 +70,17 @@ export async function POST(
 
   const kind = formData.get("kind");
   const file = formData.get("file");
-  if (kind !== "image" && kind !== "lottie") {
-    return NextResponse.json({ error: "kind must be \"image\" or \"lottie\"." }, { status: 422 });
+  if (kind !== "image") {
+    return NextResponse.json({ error: "kind must be \"image\"." }, { status: 422 });
   }
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided." }, { status: 400 });
   }
 
-  let communityUpdate: Record<string, string | null>;
-  let masterUpdate: Record<string, string | null>;
   let uploadKey: string;
   let contentType: string;
 
-  if (kind === "image") {
+  {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
       return NextResponse.json(
         { error: "Only JPEG, PNG, WebP and SVG images are allowed." },
@@ -95,40 +93,10 @@ export async function POST(
     const ext = file.name.split(".").pop() ?? "jpg";
     uploadKey = `communities/${id}/dp-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     contentType = file.type;
-    communityUpdate = { image_url: null, lottie_url: null, lottie_format: null }; // set below
-    masterUpdate = { image_url: null, lottie_url: null, lottie_format: null };
-  } else {
-    const name = file.name.toLowerCase();
-    const isDotLottie = name.endsWith(".lottie");
-    const isJson = name.endsWith(".json") || file.type === "application/json";
-    if (!isDotLottie && !isJson) {
-      return NextResponse.json(
-        { error: "Only .lottie or .json Lottie animation files are allowed." },
-        { status: 422 }
-      );
-    }
-    if (file.size > MAX_LOTTIE_BYTES) {
-      return NextResponse.json({ error: "Lottie file must be under 5 MB." }, { status: 422 });
-    }
-    if (isJson) {
-      try { JSON.parse(await file.text()); } catch {
-        return NextResponse.json({ error: "File is not valid Lottie JSON." }, { status: 422 });
-      }
-    } else {
-      // .lottie files are ZIP containers — check the magic bytes.
-      const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      const magic = String.fromCharCode(...head);
-      if (magic !== "PK\u0003\u0004" && magic !== "PK\u0005\u0006") {
-        return NextResponse.json({ error: "File is not a valid .lottie animation." }, { status: 422 });
-      }
-    }
-    const format = isDotLottie ? "dotlottie" : "json";
-    const ext = isDotLottie ? "lottie" : "json";
-    uploadKey = `communities/${id}/dp-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    contentType = isDotLottie ? "application/octet-stream" : "application/json";
-    communityUpdate = { lottie_url: null, lottie_format: format };
-    masterUpdate = { lottie_url: null, lottie_format: format };
   }
+
+  let communityUpdate: Record<string, string | null> = {};
+  let masterUpdate: Record<string, string | null> = {};
 
   let url: string;
   try {
@@ -141,9 +109,12 @@ export async function POST(
   if (kind === "image") {
     communityUpdate.image_url = url;
     masterUpdate.image_url = url;
-  } else {
-    communityUpdate.lottie_url = url;
-    masterUpdate.lottie_url = url;
+    // Animated DPs are retired: an image upload also clears any legacy
+    // animation reference on the community (and its master row).
+    communityUpdate.lottie_url = null;
+    communityUpdate.lottie_format = null;
+    masterUpdate.lottie_url = null;
+    masterUpdate.lottie_format = null;
   }
 
   const { error: communityError } = await db
@@ -174,7 +145,7 @@ export async function POST(
     if (masterError) console.error("[community-dp] master row sync failed:", masterError);
   }
 
-  const previousUrl = kind === "image" ? community.image_url : community.lottie_url;
+  const previousUrl = community.image_url;
   if ((!lookup || master_synced) && shouldDeletePreviousR2Asset(previousUrl, url) && previousUrl) {
     await deleteOwnedR2AssetIfUnique(db, previousUrl, DP_REFERENCE_LOOKUPS);
   }
@@ -185,9 +156,6 @@ export async function POST(
     type: community.type,
     reference_id: community.reference_id,
     image_url: communityUpdate.image_url ?? community.image_url ?? null,
-    lottie_url: communityUpdate.lottie_url ?? community.lottie_url ?? null,
-    lottie_format: communityUpdate.lottie_format ?? community.lottie_format ?? null,
-    embedLottie: true,
   });
 
   return NextResponse.json({
@@ -195,9 +163,9 @@ export async function POST(
       id: community.id,
       name: community.name,
       image_url: dp.image_url,
-      lottie_url: dp.lottie_url,
-      lottie_format: dp.lottie_format,
-      lottie_data: dp.lottie_data,
+      lottie_url: null,
+      lottie_format: null,
+      lottie_data: null,
     },
     master_synced,
   });
@@ -264,8 +232,7 @@ export async function DELETE(
   return NextResponse.json({
     community: {
       id: community.id,
-      name: community.name,
-      image_url: community.image_url ?? null,
+      name: community.name,      image_url: community.image_url ?? null,
       lottie_url: null,
       lottie_format: null,
       lottie_data: null,

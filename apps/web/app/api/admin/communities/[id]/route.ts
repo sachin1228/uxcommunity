@@ -16,7 +16,7 @@ export async function GET(
 
   const { data: community, error } = await db
     .from("communities")
-    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at, lottie_url, lottie_format")
+    .select("id, name, type, image_url, description, reference_id, owner_id, is_active, created_at, updated_at")
     .eq("id", id)
     .maybeSingle();
 
@@ -24,16 +24,13 @@ export async function GET(
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
 
-  // Resolve the display picture (image + lottie, embedded for the preview)
-  // and the master reference name — cached, matching the app-wide convention.
+  // Resolve the display picture and the master reference name — cached,
+  // matching the app-wide convention.
   const [dp, masterNameMap] = await Promise.all([
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
       image_url: community.image_url ?? null,
-      lottie_url: community.lottie_url ?? null,
-      lottie_format: community.lottie_format ?? null,
-      embedLottie: true,
     }),
     TABLE_LOOKUP[community.type]
       ? getMasterNameMap(community.type)
@@ -100,9 +97,9 @@ export async function GET(
     community: {
       ...community,
       image_url: dp.image_url,
-      lottie_url: dp.lottie_url,
-      lottie_format: dp.lottie_format,
-      lottie_data: dp.lottie_data,
+      lottie_url: null,
+      lottie_format: null,
+      lottie_data: null,
       reference_name,
       member_count:  member_count  ?? 0,
       message_count: message_count ?? 0,

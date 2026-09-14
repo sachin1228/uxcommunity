@@ -11,6 +11,7 @@ import { compareByRecentActivity } from "@/components/communities/panel/sidebar-
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useNotifications } from "@/lib/use-notifications";
+import { useGuardedRouter } from "@/lib/navigation-guard";
 import { BrandLogo } from "@/components/ui/BrandLogo";
 import { WhatsAppIcon } from "@/components/ui/WhatsAppIcon";
 import {
@@ -73,12 +74,16 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
 
   const sorted = [...communities].sort(compareByRecentActivity);
 
-  // Prefetch bootstrap data on hover so clicking is instant (cache hit).
+  // Prefetch on hover so clicking is instant: the RSC route payload is fetched
+  // by Next (same request a click would fire), and the community's API sections
+  // are hydrated into the client request cache — both are cache hits on click.
+  const { prefetch } = useGuardedRouter();
   const prefetchCommunity = useCallback(
     (communityId: string) => {
+      prefetch(`/dashboard/communities/${communityId}`);
       fetchAndHydrateCommunityBootstrap(communityId, userId).catch(() => {});
     },
-    [userId],
+    [userId, prefetch],
   );
 
   const homeActive =

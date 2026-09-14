@@ -5,7 +5,6 @@ import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare,
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { LottieLoader } from "@/components/ui/LottieLoader";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
@@ -16,9 +15,6 @@ interface Community {
   type: string;
   member_count: number;
   image_url: string | null;
-  lottie_url?: string | null;
-  lottie_format?: "json" | "dotlottie" | null;
-  lottie_data?: unknown;
   is_private?: boolean;
   enabled_tabs?: string[];
   owner_id?: string | null;
@@ -206,9 +202,6 @@ export const ChatHeader = memo(function ChatHeader({
               <div className="flex items-center gap-3">
                 <CommunityDp
                   imageUrl={community.image_url}
-                  lottieUrl={community.lottie_url}
-                  lottieFormat={community.lottie_format}
-                  lottieData={community.lottie_data}
                   name={community.name}
                   size={44}
                   className="bg-surface-raised"
@@ -328,17 +321,11 @@ export const ChatHeader = memo(function ChatHeader({
             </nav>
           </>
         ) : (
-          /* Chat chrome is still loading — show the community Lottie instead
-             of a skeleton bar. The Lottie is the only loader in the chat
-             window, so no spinner fallback is shown. */
+          /* Chat chrome is still loading — show a small spinner instead of a
+             skeleton bar. */
           communityId ? (
             <div className="flex items-center justify-center py-2">
-              <LottieLoader
-                communityId={communityId}
-                communityType=""
-                size={44}
-                showFallback={false}
-              />
+              <Spinner className="h-5 w-5" />
             </div>
           ) : null
         )}

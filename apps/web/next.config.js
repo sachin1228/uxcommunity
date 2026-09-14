@@ -14,6 +14,15 @@ const nextConfig = {
   // `middlewareClientMaxBodySize` is rejected by the config validator).
   experimental: {
     proxyClientMaxBodySize: "55mb",
+
+    // Keep the client-side Router Cache for dynamic (authed) routes alive for
+    // 30s instead of the 0s default, so switching community A → B → A within
+    // half a minute reuses the cached RSC payload and renders instantly.
+    // Freshness of the DATA inside is unaffected: the chat still catch-up
+    // fetches over realtime/cache on mount.
+    staleTimes: {
+      dynamic: 30,
+    },
   },
 
   // Supabase-js has no generated types file in this project, which causes

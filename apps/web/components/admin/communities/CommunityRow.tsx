@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Users, MessageSquare, Sparkles } from "lucide-react";
+import { ChevronRight, Users, MessageSquare } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
 import { TYPE_LABELS, TYPE_COLORS } from "./communityTypes";
 
@@ -9,9 +9,6 @@ export interface CommunityListItem {
   name: string;
   type: string;
   image_url: string | null;
-  lottie_url?: string | null;
-  lottie_format?: "json" | "dotlottie" | null;
-  lottie_data?: unknown;
   /** Set when a member created the community — null for app-created ones. */
   owner_id: string | null;
   /** True for the communities the platform auto-creates (type !== "user"). */
@@ -48,21 +45,10 @@ export function CommunityRow({ community: c, isLast, onClick }: Props) {
           <div className="relative shrink-0">
             <CommunityDp
               imageUrl={c.image_url}
-              lottieUrl={c.lottie_url}
-              lottieFormat={c.lottie_format}
-              lottieData={c.lottie_data}
               name={c.name}
               size={32}
               className="bg-surface-raised"
             />
-            {c.lottie_url && (
-              <span
-                title="Animated display picture (Lottie)"
-                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-background"
-              >
-                <Sparkles strokeWidth={2.5} size={9} />
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <span className="font-body text-sm text-foreground">{c.name}</span>
