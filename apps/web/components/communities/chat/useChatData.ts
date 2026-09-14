@@ -63,6 +63,10 @@ interface UseChatDataOptions {
   onSeedLastReadAt?: (val: string | null) => void;
   /** Called once hasMounted should be set to true (first layout effect). */
   onMounted?: () => void;
+  /** Called when the initial hydration fails so completely that nothing could be rendered. */
+  onLoadError?: (message: string) => void;
+  /** Bump to re-run the mount hydration after a failure (retry). */
+  retryToken?: number;
 }
 
 export function useChatData({
@@ -72,6 +76,8 @@ export function useChatData({
   initialMessages,
   onSeedLastReadAt,
   onMounted,
+  onLoadError,
+  retryToken = 0,
 }: UseChatDataOptions) {
   const [community,           setCommunity]          = useState<Community | null>(null);
   const [members,             setMembers]            = useState<Member[]>([]);
@@ -155,7 +161,7 @@ export function useChatData({
 
   // ── Fetch messages (full or incremental via ?after=ISO) ───────────────────
   const fetchMessages = useCallback(
-    async (after?: string): Promise<void> => {
+    async (after?: string, force = false): Promise<void> => {
       const targetId = communityId;
       if (!after) {
         await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
@@ -164,9 +170,12 @@ export function useChatData({
         ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}`
         : `/api/communities/${targetId}/messages`;
 
+      // Incremental (?after=) reads must NEVER be served from cache: the cache
+      // can hold an older empty catch-up answer, which would drop the very
+      // messages this fetch exists to find. `force` bypasses the stale window.
       return fetchJsonCached<{ messages?: Message[] }>(
         url,
-        { staleMs: after ? 30_000 : 3 * 60_000 },
+        { staleMs: after ? 0 : 3 * 60_000, force: after ? force || true : force },
         currentUserId,
       )
         .then((d) => {
@@ -334,6 +343,33 @@ export function useChatData({
         setLoading(false);
         setInitialMessagesReady(true);
       }
+
+      // A network failure used to be swallowed and rendered as the "Be the
+      // first to say something" empty state — indistinguishable from a
+      // healthy but message-less community. When NOTHING was hydrated (no
+      // meta, no message page), surface an explicit error the user can retry.
+      // A genuinely empty community still caches its empty message page, so
+      // msgCache.has(...) is true and this stays silent for it.
+      if (
+        !cancelled &&
+        communityIdRef.current === communityId &&
+        !metaCache.has(communityId) &&
+        !msgCache.has(communityId)
+      ) {
+        onLoadError?.(
+          "Couldn't load this community's chat. Check your connection and try again."
+        );
+      }
+
+      // Incremental catch-up for messages that landed while the user was in
+      // another community. The sidebar keeps this community's chat socket
+      // alive, so no reconnect fires when they switch back — without this the
+      // window would show stale history until the next focus event.
+      if (!cancelled && communityIdRef.current === communityId) {
+        const cachedNow = msgCache.get(communityId) ?? [];
+        const lastRealNow = cachedNow.filter((m) => !m.id.startsWith("temp-")).at(-1);
+        void fetchMessages(lastRealNow?.created_at, true).catch(() => undefined);
+      }
     })();
 
     if (!initial.cachedMeta) setLoading(true);
@@ -341,7 +377,7 @@ export function useChatData({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId]);
+  }, [communityId, retryToken]);
 
   return {
     community,

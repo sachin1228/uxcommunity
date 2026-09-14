@@ -5,9 +5,17 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
+import { compareByRecentActivity } from "./sidebar-order";
 
 const TYPING_EXPIRY_MS = 3500;
-const TYPING_CHANNEL_LIMIT = 8;
+
+/**
+ * Typing subscriptions follow the same canonical-order cap as the live
+ * message sockets (SIDEBAR_REALTIME_LIMIT in useSidebarRealtime). They used to
+ * cover the first 8 communities in ARRAY order — a different set entirely —
+ * so typing dots silently vanished for some active communities.
+ */
+const TYPING_CHANNEL_LIMIT = 15;
 
 export function useSidebarTyping({
   communities,
@@ -29,7 +37,9 @@ export function useSidebarTyping({
     lastTypingMapRef.current = new Map();
 
     realtimeClient.init({ id: userId, name: null, avatar: null });
-    const subscribed = communities.slice(0, TYPING_CHANNEL_LIMIT);
+    const subscribed = [...communities]
+      .sort(compareByRecentActivity)
+      .slice(0, TYPING_CHANNEL_LIMIT);
     const unsubscribes: Array<() => void> = [];
 
     const flush = () => {
@@ -73,7 +83,10 @@ export function useSidebarTyping({
           if (!senderId || senderId === userId) return;
           let userMap = stateRef.current.get(comm.id);
           if (!userMap) { userMap = new Map(); stateRef.current.set(comm.id, userMap); }
-          if (typing) { userMap.set(senderId, { name, lastSeen: ts }); }
+          // Ignore the sender's device timestamp: a skewed clock made typing
+          // dots stick forever (or never appear). Arrival time is the truth
+          // we have.
+          if (typing) { userMap.set(senderId, { name, lastSeen: Date.now() }); }
           else { userMap.delete(senderId); if (userMap.size === 0) stateRef.current.delete(comm.id); }
           flush();
         }),

@@ -90,6 +90,27 @@ test("enforces a 30s cooldown between PATCHes for the same community", async () 
   await waitFor(() => calls.length === 2);
 });
 
+test("a user-open bypasses the cooldown so the badge stays cleared", async () => {
+  readManagerConfig.debounceMs = 10;
+  readManagerConfig.cooldownMs = 30_000;
+  const calls = installPatchCounter();
+
+  scheduleMarkRead("abc123", { unreadCount: 3 });
+  await waitFor(() => calls.length === 1);
+
+  // Re-open the same community within the cooldown window — the flow that used
+  // to resurrect the badge: the PATCH was suppressed, the local state stayed
+  // zeroed, and the next sidebar refetch brought the unread count back. A
+  // user-open must always send the PATCH.
+  scheduleMarkRead("abc123", { unreadCount: 2, bypassCooldown: true });
+  await waitFor(() => calls.length === 2);
+
+  // A realtime (non-bypass) trigger inside the window is still cooldown-gated.
+  scheduleMarkRead("abc123", { unreadCount: 1 });
+  await delay(60);
+  assert.equal(calls.length, 2);
+});
+
 test("deduplicates while a PATCH is already in flight", async () => {
   readManagerConfig.debounceMs = 10;
   let resolveFetch: () => void = () => {};

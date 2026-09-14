@@ -11,7 +11,7 @@ import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 type Community = CachedSidebarCommunity;
 
 function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000).toFixed(1)}M`;
+  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
   return String(n);
 }
@@ -153,8 +153,11 @@ export const CommunityRow = memo(function CommunityRow({
                 {typingText}
               </p>
 
-            ) : lastReaction ? (
-              /* Reaction preview: "You reacted 👍 to: "message"" */
+            ) : lastReaction && (!c.last_message || lastReaction.messageId === c.last_message.id) ? (
+              /* Reaction preview — only when it belongs to the LATEST message.
+                 Showing reactions to older messages replaced the actual last
+                 message preview, so busy communities hid their newest message
+                 behind any recent reaction. */
               <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
                 {lastReaction.isOwn ? " reacted " : " reacted "}

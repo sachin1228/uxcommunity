@@ -180,7 +180,9 @@ export function useScrollAndUnread({
     }
   }, [messages]);
 
-  // ── Scroll-to-bottom button visibility ───────────────────────────────────
+  // ── Scroll-to-bottom button visibility + divider dismissal ───────────────
+  // Reaching the bottom means the user has SEEN the messages at the unread
+  // boundary — dismiss the divider then, not only after the user sends.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -188,15 +190,29 @@ export function useScrollAndUnread({
       const dist =
         container.scrollHeight - container.scrollTop - container.clientHeight;
       setShowScrollToBottom(dist > 80);
+      if (dist <= 80 && !hideUnreadDivider && firstUnreadMsgIdRef.current) {
+        setHideUnreadDivider(true);
+      }
     };
     container.addEventListener("scroll", onScroll, { passive: true });
     return () => container.removeEventListener("scroll", onScroll);
+    // hideUnreadDivider is intentionally excluded: the listener must not be
+    // re-created on dismissal (which would also re-run on every toggle).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Reset showScrollToBottom on community change ──────────────────────────
   useEffect(() => {
     setShowScrollToBottom(false);
   }, [communityId]);
+
+  // Latest first-unread id for the scroll listener above — the ref mirrors the
+  // derived value without re-subscribing the scroll listener.
+  const firstUnreadMsgIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    firstUnreadMsgIdRef.current =
+      snapshotReady ? (unreadAtOpenRef.current?.firstMsgId ?? null) : null;
+  }, [snapshotReady]);
 
   // ── Derived unread values ─────────────────────────────────────────────────
   const realMessages = useMemo(

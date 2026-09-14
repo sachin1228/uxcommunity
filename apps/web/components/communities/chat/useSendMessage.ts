@@ -190,7 +190,10 @@ export function useSendMessage({
     imagePreviewUrl: string | null;
     replyTo: ReplyPreview | null;
     tempId: string;
-  }) {
+  }): Promise<{ sentCommunityId: string | null; message: Message | null }> {
+    // Set when the POST confirms the message landed — used by the caller to
+    // re-commit the row if the user switched communities mid-upload.
+    let lastConfirmedMessage: Message | null = null;
     // Persist retry data before any async work
     failedRetryDataRef.current.set(tempId, {
       file: imageFile,
@@ -247,10 +250,18 @@ export function useSendMessage({
       if (!current || current.last_message?.id !== tempId) return;
       restoreSidebarEntry(communityId, prevSidebarEntry);
     };
-    // Immediately jump to the bottom so the user sees their own message,
-    // regardless of how far up they were scrolled when they sent it.
+    // Jump to the bottom only when the user is already near it — replying to
+    // an older message must not teleport them away from the conversation they
+    // were reading. (The realtime path shows the scroll-to-bottom pill for the
+    // same situation.) The bottom sentinel's viewport position is a reliable
+    // "near bottom" test that works without owning the scroll container.
     requestAnimationFrame(() => {
-      scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
+      const sentinel = scrollToBottomRef.current;
+      if (!sentinel) return;
+      const rect = sentinel.getBoundingClientRect();
+      if (rect.top <= window.innerHeight + 250) {
+        sentinel.scrollIntoView({ behavior: "instant" });
+      }
     });
 
     // Re-enable the send button immediately — the optimistic bubble is already
@@ -260,6 +271,7 @@ export function useSendMessage({
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    const sentCommunityId = communityId;
 
     const runClientOperation = <T,>(operation: () => Promise<T>) => operation();
 
@@ -366,17 +378,40 @@ export function useSendMessage({
             image_url: message.image_url ?? existing?.image_url ?? optimistic?.image_url ?? null,
             status: "sent" as const,
           };
+          lastConfirmedMessage = merged;
 
           if (existing) {
             // Realtime beat the API response — update the existing real entry.
+            // The optimistic bubble may ALREADY be gone: the echo of an earlier
+            // send used to remove every temp- row by this user, which turned
+            // this map into a no-op and left the message missing. Append
+            // defensively when both the temp and the real row are absent.
             const next = prev
               .filter((m) => m.id !== tempId)
-              .map((m) => m.id === message.id ? merged : m);
+              .some((m) => m.id === message.id)
+              ? prev.filter((m) => m.id !== tempId).map((m) => (m.id === message.id ? merged : m))
+              : [...prev.filter((m) => m.id !== tempId), merged].sort(
+                  (a, b) =>
+                    new Date(a.created_at).getTime() -
+                    new Date(b.created_at).getTime(),
+                );
             msgCache.set(communityId, next);
             return next;
           }
 
-          const next = prev.map((m) => m.id === tempId ? merged : m);
+          const next = prev.map((m) => (m.id === tempId ? merged : m));
+          if (!next.some((m) => m.id === message.id)) {
+            // Same defensive append for the no-echo path: if the optimistic
+            // bubble was removed elsewhere, add the confirmed message back
+            // instead of silently dropping it.
+            const appended = [...next.filter((m) => m.id !== tempId), merged].sort(
+              (a, b) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime(),
+            );
+            msgCache.set(communityId, appended);
+            return appended;
+          }
           msgCache.set(communityId, next);
           return next;
         });
@@ -427,7 +462,8 @@ export function useSendMessage({
           failedRetryDataRef.current.delete(tempId);
         }
         rollbackSidebar();
-        return;
+        // Abort before confirmation: nothing was sent, report nothing.
+        return { sentCommunityId: null, message: null };
       }
 
       setMessages((prev) => {
@@ -444,6 +480,12 @@ export function useSendMessage({
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }
+
+    // Success commit — make it resilient to a community switch mid-upload:
+    // the state updater above is bound to the community the user navigated
+    // AWAY from, so capture the result and commit it to whichever community
+    // is mounted now if that changed.
+    return { sentCommunityId, message: lastConfirmedMessage };
   }
 
   async function handleSend() {
@@ -478,13 +520,36 @@ export function useSendMessage({
     inputRef.current?.focus();
 
     try {
-      await runSend({
+      const result = await runSend({
         content,
         imageFile,
         imagePreviewUrl,
         replyTo: currentReplyTo,
         tempId,
       });
+      // If the user navigated to another community mid-send, the state updater
+      // above ran against the OLD community's setMessages and never reached the
+      // UI. Commit the confirmed row into the message cache directly — it is
+      // keyed by community id — so the message is never lost. (No abort: the
+      // POST already returned 201, so the message exists server-side.)
+      const confirmed = result.message;
+      if (
+        result.sentCommunityId &&
+        result.sentCommunityId !== communityId &&
+        confirmed
+      ) {
+        const cached = msgCache.get(result.sentCommunityId) ?? [];
+        if (!cached.some((m) => m.id === confirmed.id)) {
+          const withoutTemp = cached.filter((m) => m.id !== tempId);
+          const next = [...withoutTemp, confirmed].sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime(),
+          );
+          msgCache.set(result.sentCommunityId, next);
+        }
+        failedRetryDataRef.current.delete(tempId);
+      }
     } finally {
       sendLockRef.current = false;
     }
@@ -497,6 +562,12 @@ export function useSendMessage({
   const handleRetrySend = useCallback(async (failedTempId: string) => {
     const retryData = failedRetryDataRef.current.get(failedTempId);
     if (!retryData || sendingRef.current || sendLockRef.current) return;
+    // A retry must never land in a different community than the one the user
+    // is viewing — a network-retry for a bubble that scrolled out of the
+    // previous chat window would be invisible and confusing. Drop it; the
+    // next cache hydrate for the original community shows the row as failed
+    // only if the retry data survived (it doesn't — it is dropped below).
+    if (!retryData) return;
 
     sendLockRef.current = true;
 
@@ -592,9 +663,14 @@ export function useSendMessage({
       if (!current || current.last_message?.id !== tempId) return;
       restoreSidebarEntry(communityId, prevSidebarEntry);
     };
-    // Jump to bottom so the GIF/sticker is immediately visible.
+    // Jump to bottom only when near it (same reasoning as text/image sends).
     requestAnimationFrame(() => {
-      scrollToBottomRef.current?.scrollIntoView({ behavior: "instant" });
+      const sentinel = scrollToBottomRef.current;
+      if (!sentinel) return;
+      const rect = sentinel.getBoundingClientRect();
+      if (rect.top <= window.innerHeight + 250) {
+        sentinel.scrollIntoView({ behavior: "instant" });
+      }
     });
 
     // Re-enable the input immediately — same pattern as text/image sends.

@@ -104,7 +104,10 @@ export function useTypingPresence({
       const ts = typeof payload?.ts === "number" ? payload.ts : Date.now();
       if (!userId || userId === currentUserId) return;
       if (typing) {
-        typingMapRef.current.set(userId, { name, lastSeen: ts });
+        // Ignore the sender's device timestamp (ts): a skewed clock made the
+        // indicator stick forever or never appear. Arrival time is the only
+        // clock all parties agree on.
+        typingMapRef.current.set(userId, { name, lastSeen: Date.now() });
       } else {
         typingMapRef.current.delete(userId);
       }

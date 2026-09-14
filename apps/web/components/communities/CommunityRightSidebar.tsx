@@ -76,9 +76,11 @@ function fallbackDescription(type?: string, referenceName?: string | null): stri
 
 function fmtCreatedAt(iso?: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-IN", {
-    day: "numeric",
+  // Same locale as the sidebar/chat timestamps (en-US) — en-IN read
+  // day-month-year while every other date in the product read month-day-year.
+  return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
+    day: "numeric",
     year: "numeric",
   });
 }

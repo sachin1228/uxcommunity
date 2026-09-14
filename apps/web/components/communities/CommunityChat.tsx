@@ -39,6 +39,7 @@ import { ShowcaseView } from "./showcase/ShowcaseView";
 import { CommunitySettingsView } from "./CommunitySettingsView";
 import { Modal } from "@/components/ui/Modal";
 import { useChatData } from "./chat/useChatData";
+import { useChatLoadError } from "./chat/useChatLoadError";
 import { useScrollAndUnread } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
@@ -158,11 +159,33 @@ export function CommunityChat({
     if (tab !== "chat") params.set("tab", tab);
     const qs = params.toString();
 
-    // Tabs are local views of the same mounted community page. Updating the
-    // URL with the History API keeps links shareable without requesting a new
-    // RSC payload, rerunning the page, or resetting chat state.
-    window.history.replaceState(null, "", qs ? `${pathname}?${qs}` : pathname);
+    // Tabs are local views of the same mounted community page. pushState keeps
+    // links shareable without requesting a new RSC payload AND makes Back
+    // return to the previous tab instead of leaving the community entirely.
+    // The popstate listener below mirrors history traversal back into state.
+    const url = qs ? `${pathname}?${qs}` : pathname;
+    if (url !== window.location.pathname + window.location.search) {
+      window.history.pushState({ communityTab: tab }, "", url);
+    }
   }, [pathname]);
+
+  // Back/forward through tab history updates the visible tab without a
+  // navigation. The communityId guard keeps the listener scoped to this page.
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      const match = /[?&]tab=([a-z]+)/.exec(window.location.search);
+      const tab = (match?.[1] ?? "chat") as ChatTab;
+      const valid: ChatTab[] = ["chat", "threads", "showcase", "resources", "events", "members"];
+      if (!valid.includes(tab)) return;
+      setActiveTab(tab);
+      // Keep the history entry object in sync so repeated Back works.
+      if (event.state?.communityTab !== tab) {
+        window.history.replaceState({ communityTab: tab }, "");
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const handleThreadCreated = useCallback((thread: CommunityThread) => {
     setThreadEvents((prev) => {
@@ -282,6 +305,9 @@ export function CommunityChat({
   );
 
   // ── Reply state ───────────────────────────────────────────────────────────
+  // Composer drafts (text + pending reply) are keyed per community so switching
+  // communities never silently discards what the user was typing.
+  const [drafts, setDrafts] = useState<Map<string, { input: string; replyTo: ReplyPreview | null }>>(new Map());
   const [replyTo, setReplyTo] = useState<ReplyPreview | null>(null);
   const [editingMessage, setEditingMessage] = useState<CachedMessage | null>(null);
   const [editingSaving, setEditingSaving] = useState(false);
@@ -304,6 +330,7 @@ export function CommunityChat({
   }, []);
 
   // ── Data fetching + message state ─────────────────────────────────────────
+  const chatLoadError = useChatLoadError(communityId);
   const {
     community,
     setCommunity,
@@ -319,7 +346,14 @@ export function CommunityChat({
     communityIdRef,
     membersRef,
     pendingProfileFetchRef,
-  } = useChatData({ communityId, currentUserId, initialMeta, initialMessages });
+  } = useChatData({
+    communityId,
+    currentUserId,
+    initialMeta,
+    initialMessages,
+    onLoadError: chatLoadError.reportError,
+    retryToken: chatLoadError.retryToken,
+  });
 
   const handleReactionToggled = useCallback(
     (msgId: string, reactions: MessageReaction[]) => {
@@ -579,7 +613,9 @@ export function CommunityChat({
 
   const handleDelete = useCallback(async (msgId: string) => {
     // Optimistic update: mark as deleted locally immediately
+    let previousMessage: CachedMessage | null = null;
     setMessages((prev) => {
+      previousMessage = prev.find((m) => m.id === msgId) ?? null;
       const next = prev.map((m) =>
         m.id === msgId
           ? { ...m, deleted_at: new Date().toISOString(), content: "", image_url: null, reply_to: null, reactions: [] }
@@ -594,13 +630,21 @@ export function CommunityChat({
         method: "DELETE",
       });
       if (!res.ok) {
-        // Rollback on failure — refetch to restore correct state
-        fetchMessages();
+        // Rollback: restore the pre-delete message directly instead of
+        // refetching the whole page — the refetch could return a stale cached
+        // snapshot that silently dropped newer messages from the timeline.
+        setMessages((prev) => {
+          if (!previousMessage) return prev;
+          return prev.map((m) => (m.id === msgId ? previousMessage! : m));
+        });
       }
     } catch {
-      fetchMessages();
+      setMessages((prev) => {
+        if (!previousMessage) return prev;
+        return prev.map((m) => (m.id === msgId ? previousMessage! : m));
+      });
     }
-  }, [communityId, fetchMessages, setMessages]);
+  }, [communityId, setMessages]);
 
   const currentUserMember = members.find((member) => member.user_id === currentUserId);
   const resolvedUserName = currentUserMember?.users?.name ?? currentUserName ?? "Someone";
@@ -842,7 +886,7 @@ export function CommunityChat({
 
   const {
     input,
-    setInput,
+    setInput: setInputRaw,
     sending,
     error,
     setError,
@@ -867,6 +911,56 @@ export function CommunityChat({
     scrollToBottomRef: bottomRef,
     resolveMentions: resolveMentionsForSend,
   });
+
+  // ── Per-community composer drafts ────────────────────────────────────────
+  // Save the outgoing draft whenever its value changes; restore it when the
+  // community remounts. Switching communities (or tabs) therefore never
+  // silently discards what the user was typing. The draft clears naturally
+  // after a send because the send path writes "" through this same wrapper.
+  const draftKeyRef = useRef<string>(communityId);
+  const latestInputRef = useRef<string>("");
+  useEffect(() => {
+    latestInputRef.current = input;
+  }, [input]);
+
+  const setInput = useCallback(
+    (value: React.SetStateAction<string>) => {
+      setInputRaw(value);
+      const key = draftKeyRef.current;
+      if (!key) return;
+      const nextInput =
+        typeof value === "function" ? (value as (prev: string) => string)(latestInputRef.current) : value;
+      setDrafts((prev) => {
+        const next = new Map(prev);
+        next.set(key, { input: nextInput, replyTo });
+        return next;
+      });
+    },
+    [setInputRaw, replyTo],
+  );
+
+  useEffect(() => {
+    const key = communityId;
+    draftKeyRef.current = key;
+    const saved = drafts.get(key);
+    if (saved) {
+      setInputRaw(saved.input);
+      setReplyTo(saved.replyTo);
+    } else {
+      // No draft for the incoming community: clear the outgoing community's
+      // composer state, otherwise its text and reply preview bleed into the
+      // new community until the first keystroke overwrites them.
+      setInputRaw("");
+      setReplyTo(null);
+    }
+    // An in-progress edit belongs to the outgoing community; keeping it would
+    // make "Save" PATCH the old community's message id against the new
+    // community's URL. Cancel the edit instead of risking a cross-community
+    // update. Reset the textarea height to match handleCancelEdit.
+    setEditingMessage(null);
+    if (inputRef.current) inputRef.current.style.height = "24px";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [communityId]);
 
   // ── Member @mentions (autocomplete + registry) ────────────────────────────
   const commitMentionText = useCallback(
@@ -1285,6 +1379,20 @@ export function CommunityChat({
               overflowAnchor: "none",
             }}
           >
+            {chatLoadError.error ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
+                <p className="max-w-xs text-sm text-foreground-muted">
+                  {chatLoadError.error}
+                </p>
+                <button
+                  type="button"
+                  onClick={chatLoadError.retry}
+                  className="rounded-lg border border-border px-4 py-1.5 text-sm font-medium transition-colors hover:bg-surface-raised"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : (
             <MessageList
               grouped={grouped}
               threadEvents={threadEvents}
@@ -1313,6 +1421,7 @@ export function CommunityChat({
               onDelete={handleDelete}
               onImageClick={handleImageClick}
             />
+            )}
           </div>
 
           {/* Static footer — separate from the scroll body, never overlapped */}

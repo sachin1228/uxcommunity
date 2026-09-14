@@ -57,7 +57,7 @@ export async function POST(
   // a full network round trip to every message send. The rate limit is still
   // enforced before any write happens; only the (cheap, PK-indexed) membership
   // read is issued alongside it.
-  const [rateResult, membershipResult] = await Promise.all([
+  const [rateResult, membershipResult, senderProfileResult] = await Promise.all([
     timer.measure("rate_limits", () =>
       Promise.all([
         rateLimit(`moderation:chat:${userId}:10s`, 5, 10),
@@ -72,7 +72,23 @@ export async function POST(
         .eq("user_id", userId)
         .maybeSingle(),
     ),
+    // Sender display info for the realtime payload (see Phase 4 below).
+    timer.measure("sender_profile", async () =>
+      await Promise.all([
+        db.from("users").select("name").eq("id", userId).maybeSingle(),
+        db
+          .from("designer_profiles")
+          .select("avatar_url")
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]),
+    ),
   ]);
+
+  const senderName =
+    (senderProfileResult?.[0]?.data as { name?: string } | null)?.name ?? null;
+  const senderAvatarUrl =
+    (senderProfileResult?.[1]?.data as { avatar_url?: string | null } | null)?.avatar_url ?? null;
 
   const [burst, minute] = rateResult;
   if (!burst.success) {
@@ -308,8 +324,29 @@ export async function POST(
   // Publish ONE event to the community chat room. Connected clients receive it
   // directly. Sidebar state is derived client-side from chat events.
   // Fire-and-forget: missed events are corrected by the client's next poll/catch-up.
+  // sender_name rides along on the event: without it every receiving client
+  // rendered "Someone: …" in the sidebar preview (and an anonymous sender row
+  // in the chat) until its per-user profile fetch round-tripped — the
+  // "Someone said hi → John: hi" flicker.
   after(async () => {
     try {
+      let replySenderName: string | null = null;
+      if (reply_to_id) {
+        const { data: parentRow } = await db
+          .from("community_messages")
+          .select("user_id")
+          .eq("id", reply_to_id)
+          .maybeSingle();
+        const parentId = (parentRow as { user_id?: string } | null)?.user_id ?? null;
+        if (parentId) {
+          const { data: parentUser } = await db
+            .from("users")
+            .select("name")
+            .eq("id", parentId)
+            .maybeSingle();
+          replySenderName = (parentUser as { name?: string } | null)?.name ?? null;
+        }
+      }
       await publishChatEvent({
         communityId,
         topic: "message",
@@ -317,9 +354,12 @@ export async function POST(
           id: inserted.id,
           community_id: communityId,
           user_id: inserted.user_id,
+          sender_name: senderName,
+          sender_avatar_url: senderAvatarUrl,
           content: inserted.content ?? "",
           created_at: inserted.created_at,
           reply_to_id: inserted.reply_to_id ?? null,
+          reply_sender_name: replySenderName,
           image_url: inserted.image_url ?? null,
           mentions: inserted.mentions ?? [],
         },

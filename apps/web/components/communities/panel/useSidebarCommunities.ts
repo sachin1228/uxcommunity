@@ -24,6 +24,7 @@ import { initReadManager, scheduleMarkRead } from "@/lib/communities/read-manage
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { useSidebarRealtime, SIDEBAR_REALTIME_LIMIT } from "./useSidebarRealtime";
 import { useSidebarTyping } from "./useSidebarTyping";
+import { mergeStaleServerList } from "./sidebar-merge";
 
 type Community = CachedSidebarCommunity;
 
@@ -59,7 +60,13 @@ export function useSidebarCommunities(userId: string) {
     }
     const cached = getCachedRequest<{ communities?: Community[] }>("/api/communities", userId);
     if (cached) {
-      sidebarStore.data = { communities: cached.communities ?? [], fetchedAt: Date.now() };
+      // The cache snapshot can predate realtime-applied previews in the store
+      // (see sidebar-merge.ts). Never let it demote newer activity on mount.
+      const merged = mergeStaleServerList(
+        sidebarStore.data?.communities ?? [],
+        cached.communities ?? [],
+      );
+      sidebarStore.data = { communities: merged, fetchedAt: Date.now() };
     }
     return sidebarStore.data?.communities ?? [];
   });
@@ -78,8 +85,13 @@ export function useSidebarCommunities(userId: string) {
         userId,
       );
       const fresh = data.communities ?? [];
-      sidebarStore.data = { communities: fresh, fetchedAt: Date.now() };
-      setCommunities(fresh);
+      // Merge, don't replace: a cache-hit response can be older per-community
+      // than what realtime already applied to the store (its entry is
+      // re-stamped by every mark-read patch). Replacing here is the bug that
+      // sank a just-messaged community back down the list on the next open.
+      const merged = mergeStaleServerList(sidebarStore.data?.communities ?? [], fresh);
+      sidebarStore.data = { communities: merged, fetchedAt: Date.now() };
+      setCommunities(merged);
     } catch (error) {
       console.error("[communities] fetch failed", error);
     } finally {
@@ -180,6 +192,9 @@ export function useSidebarCommunities(userId: string) {
       unreadCount: snapshot?.message_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "community opened",
+      // User-initiated open: must clear the badge even when a realtime
+      // mark-read for this community fired within the last 30s.
+      bypassCooldown: true,
     });
 
     setCommunities((prev) => {
@@ -236,6 +251,9 @@ export function useSidebarCommunities(userId: string) {
       unreadCount: snapshot?.message_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "sidebar navigation",
+      // User-initiated open: must clear the badge even when a realtime
+      // mark-read for this community fired within the last 30s.
+      bypassCooldown: true,
     });
 
     setCommunities((prev) => {
