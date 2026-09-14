@@ -360,7 +360,7 @@ function MessageHoverActions({
 
   return (
     <div
-      className={`flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity duration-150 ${
+      className={`flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto transition-opacity duration-150 ${
         animate ? "chat-hover-actions-in" : ""
       }`}
       style={animate ? ({ "--i": waveIndex } as React.CSSProperties) : undefined}
@@ -909,6 +909,41 @@ export const MessageBubble = memo(function MessageBubble({
   // ── Unified layout: own messages right-aligned, others left-aligned ──
   const showHeader = !isSameAuthor || isFirstUnread;
 
+  // Long-press (touch) opens the same menu as the hover "more" button —
+  // touch users had no way to reach reply/copy/delete/reactions at all.
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const clearLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    touchStartRef.current = null;
+  }, []);
+  useEffect(() => clearLongPress, [clearLongPress]);
+
+  const onTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+      longPressTimerRef.current = setTimeout(() => {
+        longPressTimerRef.current = null;
+        touchStartRef.current = null;
+        setMenuOpen(true);
+      }, 500);
+    },
+    [],
+  );
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    const touch = e.touches[0];
+    if (start && touch && (Math.abs(touch.clientX - start.x) > 10 || Math.abs(touch.clientY - start.y) > 10)) {
+      // Scrolling — cancel the long-press so it never fires mid-swipe.
+      clearLongPress();
+    }
+  }, [clearLongPress]);
+  const onTouchEnd = useCallback(() => clearLongPress(), [clearLongPress]);
+
   return (
     <Fragment>
       {unreadDivider}
@@ -922,6 +957,10 @@ export const MessageBubble = memo(function MessageBubble({
       <div
         data-message-id={msg.id}
         style={rowHighlightStyle}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
         className={`group flex w-full items-start gap-2 px-5 transition-colors duration-300 ${
           isMe ? "justify-end" : "justify-start"
         } ${isSameAuthor && !isFirstUnread ? "mt-0.5" : "mt-3"}`}

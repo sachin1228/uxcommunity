@@ -170,6 +170,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const [pickerOpen, setPickerOpen]   = useState(false);
     const [pickerPos, setPickerPos]     = useState<PickerPos | null>(null);
     const [dismissedUrl, setDismissedUrl] = useState<string | null>(null);
+    // True while an IME composition (Chinese/Japanese/Korean input) is in
+    // progress — the overlay can't render in-flight composition text, so the
+    // textarea's own glyphs are shown instead.
+    const [composing, setComposing] = useState(false);
     // Over the limit → hide the send button so the message can't be sent.
     const overLimit = input.length > MAX_MESSAGE_CHARS;
     const canSend = (!!input.trim() || !!pendingImagePreview) && !overLimit;
@@ -434,6 +438,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ref={ref}
                   data-chat-input
                   value={input}
+                  onCompositionStart={() => setComposing(true)}
+                  onCompositionEnd={(e) => {
+                    setComposing(false);
+                    // Keep the overlay in sync with the committed text.
+                    onComposerActivity?.(
+                      e.currentTarget.value,
+                      e.currentTarget.selectionStart,
+                    );
+                  }}
                   onChange={(e) => {
                     // No maxLength: let the user keep typing past the limit so
                     // the inline error below can show, then block sending.
@@ -464,8 +477,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                     height: "24px",
                     maxHeight: "120px",
                     // Text is drawn by the overlay; placeholder color is set
-                    // separately via ::placeholder so it stays visible.
-                    color: "transparent",
+                    // separately via ::placeholder so it stays visible. During
+                    // IME composition the in-progress text is NOT in the overlay
+                    // (the overlay only mirrors committed `value`), so the raw
+                    // glyph color is restored — otherwise Chinese/Japanese/
+                    // Korean composition text was invisible.
+                    color: composing ? "var(--color-foreground)" : "transparent",
                     caretColor: "var(--color-foreground)",
                   }}
                 />

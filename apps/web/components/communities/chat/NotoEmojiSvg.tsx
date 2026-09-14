@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { emojiToCodepoint } from "@/lib/noto-emoji";
 
 interface NotoEmojiSvgProps {
@@ -24,7 +24,13 @@ export const NotoEmojiSvg = memo(function NotoEmojiSvg({
   className = "",
 }: NotoEmojiSvgProps) {
   const codepoint = emojiToCodepoint(emoji);
-  if (!codepoint) return <span style={{ fontSize: size * 0.8 }}>{emoji}</span>;
+  // Falls back to the system emoji glyph when the CDN SVG fails (blocked
+  // network, GitHub rate limits) — previously the <img> just stayed broken
+  // and left an empty gap where the emoji should be.
+  const [failed, setFailed] = useState(false);
+  if (!codepoint || failed) {
+    return <span style={{ fontSize: size * 0.8 }}>{emoji}</span>;
+  }
 
   return (
     <span
@@ -37,6 +43,7 @@ export const NotoEmojiSvg = memo(function NotoEmojiSvg({
         alt={emoji}
         style={{ width: size, height: size }}
         loading="lazy"
+        onError={() => setFailed(true)}
       />
     </span>
   );

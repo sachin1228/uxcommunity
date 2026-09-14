@@ -180,6 +180,9 @@ export function useSidebarCommunities(userId: string) {
       unreadCount: snapshot?.message_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "community opened",
+      // User-initiated open: must clear the badge even when a realtime
+      // mark-read for this community fired within the last 30s.
+      bypassCooldown: true,
     });
 
     setCommunities((prev) => {
@@ -236,6 +239,9 @@ export function useSidebarCommunities(userId: string) {
       unreadCount: snapshot?.message_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "sidebar navigation",
+      // User-initiated open: must clear the badge even when a realtime
+      // mark-read for this community fired within the last 30s.
+      bypassCooldown: true,
     });
 
     setCommunities((prev) => {

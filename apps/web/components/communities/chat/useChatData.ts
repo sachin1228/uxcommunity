@@ -155,7 +155,7 @@ export function useChatData({
 
   // ── Fetch messages (full or incremental via ?after=ISO) ───────────────────
   const fetchMessages = useCallback(
-    async (after?: string): Promise<void> => {
+    async (after?: string, force = false): Promise<void> => {
       const targetId = communityId;
       if (!after) {
         await fetchAndHydrateCommunityBootstrap(targetId, currentUserId).catch(() => undefined);
@@ -164,9 +164,12 @@ export function useChatData({
         ? `/api/communities/${targetId}/messages?after=${encodeURIComponent(utcCursor(after))}`
         : `/api/communities/${targetId}/messages`;
 
+      // Incremental (?after=) reads must NEVER be served from cache: the cache
+      // can hold an older empty catch-up answer, which would drop the very
+      // messages this fetch exists to find. `force` bypasses the stale window.
       return fetchJsonCached<{ messages?: Message[] }>(
         url,
-        { staleMs: after ? 30_000 : 3 * 60_000 },
+        { staleMs: after ? 0 : 3 * 60_000, force: after ? force || true : force },
         currentUserId,
       )
         .then((d) => {
@@ -333,6 +336,16 @@ export function useChatData({
       if (!cancelled) {
         setLoading(false);
         setInitialMessagesReady(true);
+      }
+
+      // Incremental catch-up for messages that landed while the user was in
+      // another community. The sidebar keeps this community's chat socket
+      // alive, so no reconnect fires when they switch back — without this the
+      // window would show stale history until the next focus event.
+      if (!cancelled && communityIdRef.current === communityId) {
+        const cachedNow = msgCache.get(communityId) ?? [];
+        const lastRealNow = cachedNow.filter((m) => !m.id.startsWith("temp-")).at(-1);
+        void fetchMessages(lastRealNow?.created_at, true).catch(() => undefined);
       }
     })();
 

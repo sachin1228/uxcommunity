@@ -143,12 +143,14 @@ export async function notifyIncomingCommunityMessage(
 ) {
   if (message.senderId === userId || !markMessageNotificationSeen(message.id)) return;
   const preferences = readMessageNotificationPreferences(userId);
-  if (preferences.sound) void playMessageSound();
+  const attentionAway = document.visibilityState === "hidden" || !document.hasFocus();
+  // The sound used to play unconditionally — including for the community the
+  // user is actively reading. Only cue when the page is not being attended.
+  if (preferences.sound && attentionAway) void playMessageSound();
 
   const permission = typeof Notification === "undefined"
     ? "unsupported"
     : Notification.permission;
-  const attentionAway = document.visibilityState === "hidden" || !document.hasFocus();
   if (!shouldShowBrowserNotification(preferences, permission, attentionAway)) return;
 
   try {

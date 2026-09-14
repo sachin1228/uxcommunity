@@ -28,19 +28,27 @@ function GifGrid({ type, onSelect }: { type: "gif" | "sticker"; onSelect: (url: 
   const [notConfigured, setNotConfigured] = useState(false);
   const timerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
+  // Guards against out-of-order responses: a slow earlier fetch could
+  // overwrite the results of a newer query.
+  const requestSeqRef = useRef(0);
 
   const fetchGifs = useCallback(async (q: string) => {
+    const seq = ++requestSeqRef.current;
     setLoading(true);
     try {
       const p = new URLSearchParams({ type, limit: "24" });
       if (q) p.set("q", q);
       const res = await fetch(`/api/giphy?${p}`);
+      if (seq !== requestSeqRef.current) return; // a newer search superseded this one
       if (res.status === 503) { setNotConfigured(true); return; }
       if (!res.ok) throw new Error("err");
       const data = await res.json() as { results: GifItem[] };
+      if (seq !== requestSeqRef.current) return;
       setResults(data.results ?? []);
     } catch { /* keep existing */ }
-    finally   { setLoading(false); }
+    finally {
+      if (seq === requestSeqRef.current) setLoading(false);
+    }
   }, [type]);
 
   useEffect(() => {

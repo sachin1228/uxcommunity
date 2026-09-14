@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   ChevronRight,
   HelpCircle,
@@ -80,8 +81,11 @@ export function ThreadNotificationBubble({
 
         {/* Card row */}
         <div className="flex items-center gap-3">
-          {/* Thread card */}
-          <a
+          {/* Thread card — a Next <Link>, not a raw <a>: the raw anchor caused
+              a full page reload, which threw away every module-level cache
+              (messages, sidebar, request cache) and forced the whole app to
+              refetch after merely viewing a thread. */}
+          <Link
             href={href}
             className="flex items-center gap-3 flex-1 min-w-0 rounded-xl bg-surface-raised border border-white/[0.06] px-3 py-2.5 hover:bg-white/[0.06] transition-colors group"
           >
@@ -109,7 +113,7 @@ export function ThreadNotificationBubble({
                 <ChevronRight size={12} strokeWidth={2.5} />
               </p>
             </div>
-          </a>
+          </Link>
 
           {/* Category badge */}
           <span className="shrink-0 font-body text-xs text-foreground-muted border border-white/[0.12] rounded-full px-3 py-1 bg-surface-raised whitespace-nowrap">

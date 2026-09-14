@@ -39,13 +39,16 @@ export function useRealtimeChat({
   realtimeWasNearBottomRef,
 }: UseRealtimeChatOptions) {
   // ── Debounced catch-up fetch ───────────────────────────────────────────────
+  // Catch-up fetches bypass the request cache (force) — they exist precisely
+  // because the cache/socket may have missed messages, so replaying a cached
+  // "no new messages" answer would drop the very messages we're catching up on.
   const catchUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedCatchUp = useCallback(
     (after?: string) => {
       if (catchUpTimerRef.current) clearTimeout(catchUpTimerRef.current);
       catchUpTimerRef.current = setTimeout(() => {
         catchUpTimerRef.current = null;
-        fetchMessages(after);
+        fetchMessages(after, true);
       }, 300);
     },
     [fetchMessages],
@@ -71,6 +74,16 @@ export function useRealtimeChat({
 
     const unsubscribes: Array<() => void> = [];
 
+    // Catch-up on (re)subscription. The sidebar keeps chat sockets for its top
+    // communities alive, so switching into an already-connected community fires
+    // NO status event — without this, messages sent while the user was in
+    // another community would not load until the next focus/visibility change.
+    const cachedForCatchUp = msgCache.get(communityId) ?? [];
+    const lastRealForCatchUp = cachedForCatchUp
+      .filter((m) => !m.id.startsWith("temp-"))
+      .at(-1);
+    debouncedCatchUp(lastRealForCatchUp?.created_at ?? undefined);
+
     // ── New messages ───────────────────────────────────────────────────────
     unsubscribes.push(
       realtimeClient.on(chatRoom, "message", (data) => {
@@ -83,6 +96,10 @@ export function useRealtimeChat({
           reply_to_id: string | null;
           image_url: string | null;
           mentions?: MessageMention[];
+          /** Sender display info published by the server (see messages POST route). */
+          sender_name?: string | null;
+          sender_avatar_url?: string | null;
+          reply_sender_name?: string | null;
         };
 
         if (initialScrollDoneRef.current) {
@@ -102,17 +119,31 @@ export function useRealtimeChat({
         setMessages((prev) => {
           if (prev.some((m) => m.id === newRow.id)) return prev;
 
-          const matchedTemp = prev.find(
-            (m) => m.id.startsWith("temp-") && m.user_id === newRow.user_id
-          );
-          const withoutTemp = prev.filter(
-            (m) =>
-              !(m.id.startsWith("temp-") && m.user_id === newRow.user_id)
-          );
+          // Match ONE specific optimistic bubble (the sender's oldest in-flight
+          // send) instead of every temp- row by the same user. Removing them all
+          // made a second message sent in quick succession blink out of the UI,
+          // and its POST merge then became a no-op — the message could stay
+          // missing until its own echo arrived.
+          const matchedTemp =
+            prev.find(
+              (m) =>
+                m.id.startsWith("temp-") &&
+                m.user_id === newRow.user_id &&
+                m.status === "sending",
+            ) ?? null;
+          const withoutTemp = matchedTemp
+            ? prev.filter((m) => m.id !== matchedTemp.id)
+            : prev;
           const senderMember = membersRef.current.find(
             (m) => m.user_id === newRow.user_id
           );
-          const users: CachedMessage["users"] = senderMember?.users ?? null;
+          // Prefer the server-published name/avatar (no round trip); fall back
+          // to the local member roster; null only when neither is available —
+          // the lazy profile fetch then fills it in.
+          const users: CachedMessage["users"] = senderMember?.users ??
+            (newRow.sender_name
+              ? { name: newRow.sender_name, avatar_url: newRow.sender_avatar_url ?? null }
+              : null);
 
           let replyTo: ReplyPreview | null = null;
           if (newRow.reply_to_id) {
@@ -126,6 +157,15 @@ export function useRealtimeChat({
                   content:   parentInState.content ?? "",
                   user_name: parentInState.users?.name ?? "Unknown",
                   user_id:   parentInState.user_id,
+                };
+              } else if (newRow.reply_sender_name) {
+                // Server-published parent author name — shows the real
+                // "replied to John" immediately instead of a two-step fetch.
+                replyTo = {
+                  id: newRow.reply_to_id,
+                  content: "",
+                  user_name: newRow.reply_sender_name,
+                  user_id: null,
                 };
               }
             }
@@ -185,6 +225,7 @@ export function useRealtimeChat({
 
           if (
             !senderMember &&
+            !newRow.sender_name &&
             !pendingProfileFetchRef.current.has(newRow.user_id)
           ) {
             const targetCommunityId = communityId;

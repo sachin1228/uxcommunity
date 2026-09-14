@@ -27,7 +27,7 @@ export async function PATCH(
   const db = createServiceClient();
 
   // Fetch the current last_read_at BEFORE overwriting it so that
-  // CommunitiesPanel can store it in lastReadAtOnOpen and CommunityChat
+  // The sidebar can store it in lastReadAtOnOpen and CommunityChat
   // can use it to position the unread divider by timestamp comparison.
   const { data: prev } = await db
     .from("community_members")

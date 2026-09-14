@@ -6,10 +6,16 @@
  * funnel through `scheduleMarkRead`, which collapses them into a single PATCH
  * and skips it entirely when nothing actually changed:
  *
- *   - 30s cooldown per community (no PATCH if marked read recently)
+ *   - 30s cooldown per community for REALTIME-triggered mark-reads (a message
+ *     arriving in the active community must not PATCH on every event). Opened
+ *     by the user → bypass the cooldown: re-opening a community within 30s
+ *     must still clear its badge, or the next sidebar refetch resurrects it.
  *   - skip when the sidebar already reports 0 unread messages
  *   - debounce so bursts of events combine into one request
- *   - deduplicate while a PATCH is already in flight
+ *   - deduplicate while a PATCH is already in flight — but new unread activity
+ *     that arrives during the request schedules one follow-up PATCH
+ *   - one retry with backoff when the PATCH fails (the badge is already
+ *     zeroed locally, so a silent failure would resurrect the unread count)
  *
  * The in-memory cache is bounded: at most MAX_READ_STATE_ENTRIES communities
  * are tracked, so it cannot grow without limit during long-running sessions.
@@ -30,6 +36,12 @@ export interface MarkReadOptions {
   lastMessageTimestamp?: string | null;
   /** Human-readable trigger for dev logs. */
   reason?: string;
+  /**
+   * True for USER-initiated opens (sidebar click, route change) — bypasses the
+   * cooldown so re-opening a community always marks it read. Realtime-triggered
+   * mark-reads leave this unset and stay cooldown-gated.
+   */
+  bypassCooldown?: boolean;
 }
 
 interface CommunityReadState {
@@ -41,6 +53,12 @@ interface CommunityReadState {
   lastMessageTimestamp: string | null;
   /** True while a PATCH is in flight for this community. */
   inFlight: boolean;
+  /** Set when unread activity arrived while a PATCH was in flight. */
+  followUpPending: boolean;
+  /** Number of consecutive failed PATCHes (retry with backoff, capped). */
+  failures: number;
+  /** Timer for the failure retry backoff. */
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 /**
@@ -57,6 +75,10 @@ export const readManagerConfig = {
   debounceMs: 1_000,
   /** Max communities kept in memory; oldest unused entries are evicted past this. */
   maxEntries: MAX_READ_STATE_ENTRIES,
+  /** Delay before retrying a failed mark-read PATCH. */
+  retryMs: 3_000,
+  /** Max consecutive retries per community before giving up until the next event. */
+  maxRetries: 2,
 };
 
 const readStates = new Map<string, CommunityReadState>();
@@ -71,6 +93,9 @@ function ensureState(communityId: string): CommunityReadState {
       unreadCount: null,
       lastMessageTimestamp: null,
       inFlight: false,
+      followUpPending: false,
+      failures: 0,
+      retryTimer: null,
     };
     readStates.set(communityId, state);
     evictReadStatesIfNeeded();
@@ -87,20 +112,26 @@ function ensureState(communityId: string): CommunityReadState {
 /**
  * Enforce the cache size cap. Iterates oldest → newest (Map insertion order is
  * refreshed by `ensureState` on every touch) and drops fully unused entries.
- * Communities with a pending debounce timer or an in-flight PATCH are
- * protected — evicting them would break the debounce/dedup guarantees.
+ * Communities with a pending debounce timer, an in-flight PATCH, or a scheduled
+ * retry are protected — evicting them would break the debounce/retry guarantees.
  */
 function evictReadStatesIfNeeded(): void {
   while (readStates.size > readManagerConfig.maxEntries) {
     let evicted = false;
     for (const [communityId, state] of readStates) {
-      if (debounceTimers.has(communityId) || state.inFlight) continue;
+      if (
+        debounceTimers.has(communityId) ||
+        state.inFlight ||
+        state.retryTimer !== null
+      ) {
+        continue;
+      }
       readStates.delete(communityId);
       evicted = true;
       break;
     }
-    // Every remaining entry is protected (pending timer or in-flight request);
-    // stop rather than evicting entries the debounce/dedup logic depends on.
+    // Every remaining entry is protected; stop rather than evict entries the
+    // debounce/retry logic depends on.
     if (!evicted) break;
   }
 }
@@ -121,6 +152,9 @@ export function initReadManager(userId: string): void {
 export function resetReadManager(): void {
   for (const timer of debounceTimers.values()) clearTimeout(timer);
   debounceTimers.clear();
+  for (const state of readStates.values()) {
+    if (state.retryTimer) clearTimeout(state.retryTimer);
+  }
   readStates.clear();
   activeUserId = null;
 }
@@ -161,8 +195,8 @@ export function noteCommunityActivity(
 /**
  * Request that a community be marked read. Multiple calls for the same
  * community within the debounce window collapse into one PATCH; the request is
- * skipped entirely when the cooldown is active, the badge already shows 0
- * unread, or a PATCH is already in flight.
+ * skipped when the unread count is already 0, the realtime cooldown is active,
+ * or a PATCH is in flight (that one schedules a follow-up instead).
  */
 export function scheduleMarkRead(
   communityId: string,
@@ -170,15 +204,23 @@ export function scheduleMarkRead(
 ): void {
   mergeActivity(communityId, opts);
 
+  // A user-open supersedes any pending realtime cooldown/retry backoff.
+  const state = ensureState(communityId);
+  if (opts.bypassCooldown && state.retryTimer !== null) {
+    clearTimeout(state.retryTimer);
+    state.retryTimer = null;
+  }
+
   const existing = debounceTimers.get(communityId);
   if (existing) {
     clearTimeout(existing);
   }
+  const bypass = opts.bypassCooldown === true;
   debounceTimers.set(
     communityId,
     setTimeout(() => {
       debounceTimers.delete(communityId);
-      fireMarkRead(communityId);
+      fireMarkRead(communityId, { bypassCooldown: bypass });
     }, readManagerConfig.debounceMs),
   );
 }
@@ -189,21 +231,26 @@ export function flushMarkRead(communityId: string): void {
   if (timer) {
     clearTimeout(timer);
     debounceTimers.delete(communityId);
-    fireMarkRead(communityId);
+    fireMarkRead(communityId, { bypassCooldown: true });
   }
 }
 
-function fireMarkRead(communityId: string): void {
+function fireMarkRead(
+  communityId: string,
+  { bypassCooldown = false }: { bypassCooldown?: boolean } = {},
+): void {
   const state = readStates.get(communityId);
   if (!state) return;
 
   // Deduplicate simultaneous requests: never stack a second PATCH while one
-  // is in flight. The next event after the cooldown will re-request if needed.
+  // is in flight. If new unread activity arrived during the request, schedule
+  // exactly one follow-up so it is never lost.
   if (state.inFlight) {
+    if ((state.unreadCount ?? 0) > 0) state.followUpPending = true;
     return;
   }
 
-  if (state.lastUpdatedAt !== null) {
+  if (!bypassCooldown && state.lastUpdatedAt !== null) {
     const elapsedMs = Date.now() - state.lastUpdatedAt;
     if (elapsedMs < readManagerConfig.cooldownMs) {
       return;
@@ -226,12 +273,43 @@ function fireMarkRead(communityId: string): void {
   state.inFlight = true;
   state.lastUpdatedAt = Date.now();
   markReadOnServer(communityId)
-    .catch(() => {})
+    .then((ok) => {
+      const current = readStates.get(communityId);
+      if (!current) return;
+      current.inFlight = false;
+      if (ok) {
+        current.failures = 0;
+        // The PATCH succeeded — the server now agrees the community is read.
+        current.unreadCount = 0;
+        if (current.followUpPending) {
+          current.followUpPending = false;
+          if ((current.unreadCount ?? 0) > 0) {
+            debounceTimers.set(
+              communityId,
+              setTimeout(() => {
+                debounceTimers.delete(communityId);
+                fireMarkRead(communityId);
+              }, readManagerConfig.debounceMs),
+            );
+          }
+        }
+      } else if (current.failures < readManagerConfig.maxRetries) {
+        // Failure — the badge is already zeroed locally, so a silent give-up
+        // would resurrect the unread count on the next sidebar refetch.
+        // Retry with backoff (bounded).
+        current.failures += 1;
+        current.retryTimer = setTimeout(() => {
+          current.retryTimer = null;
+          fireMarkRead(communityId, { bypassCooldown: true });
+        }, readManagerConfig.retryMs * current.failures);
+      }
+    })
+    .catch(() => {
+      const current = readStates.get(communityId);
+      if (current) current.inFlight = false;
+    })
     .finally(() => {
       const current = readStates.get(communityId);
       if (current) current.inFlight = false;
     });
-
-  // Optimistic: the badge is cleared locally before the server responds.
-  state.unreadCount = 0;
 }

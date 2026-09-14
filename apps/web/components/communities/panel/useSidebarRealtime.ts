@@ -10,6 +10,7 @@ import {
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { noteCommunityActivity, scheduleMarkRead } from "@/lib/communities/read-manager";
 import { notifyIncomingCommunityMessage } from "@/lib/communities/message-notifications";
+import { compareByRecentActivity } from "./sidebar-order";
 
 interface Options {
   communities: CachedSidebarCommunity[];
@@ -28,14 +29,8 @@ interface Options {
  */
 export const SIDEBAR_REALTIME_LIMIT = 15;
 
-/** Mirrors GlobalSidebar's display order: most recent activity first. */
-function sortByRecentActivity(a: CachedSidebarCommunity, b: CachedSidebarCommunity): number {
-  const ta = [a.last_message?.created_at, a.joined_at].filter(Boolean).sort().at(-1) ?? "";
-  const tb = [b.last_message?.created_at, b.joined_at].filter(Boolean).sort().at(-1) ?? "";
-  if (tb > ta) return 1;
-  if (ta > tb) return -1;
-  return a.name.localeCompare(b.name);
-}
+/** Canonical sidebar ordering — shared with both sidebar UIs (see sidebar-order.ts). */
+const sortByRecentActivity = compareByRecentActivity;
 
 function applyUpdate(
   prev: CachedSidebarCommunity[],
@@ -66,7 +61,9 @@ export function useSidebarRealtime({
   // so the sidebar doesn't hold one WebSocket per community. The dep is the
   // sorted id list of THIS set, so resubscription only happens when a
   // community enters or leaves the top-N — preview/message updates within the
-  // set never tear the sockets down.
+  // set never tear the sockets down. Ordering is the canonical sidebar order
+  // (compareByRecentActivity) so the live set matches what both sidebar UIs
+  // show on top.
   const subscribed = [...communities]
     .sort(sortByRecentActivity)
     .slice(0, SIDEBAR_REALTIME_LIMIT);
