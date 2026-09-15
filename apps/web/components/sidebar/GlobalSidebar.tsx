@@ -3,7 +3,8 @@
 import { useState, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, Briefcase, Compass, Home, Library, MessageSquare, Plus, X } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus, X } from "lucide-react";
+import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
@@ -125,9 +126,9 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               href="/dashboard/notifications"
               aria-label={notificationCount > 0 ? `${notificationCount} unread notifications` : "Notifications"}
               title="Notifications"
-              className="relative flex h-6 w-6 items-center justify-center rounded-full border border-border text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground hover:border-foreground-muted"
+              className="relative flex h-6 w-6 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
             >
-              <Bell strokeWidth={2.5} size={12} />
+              <NotificationBellIcon size={18} />
               {notificationCount > 0 && (
                 <span
                   className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-semibold leading-[14px] text-white"
