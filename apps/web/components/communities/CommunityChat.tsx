@@ -86,7 +86,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { useChatData } from "./chat/useChatData";
 import { useChatLoadError } from "./chat/useChatLoadError";
-import { useScrollAndUnread } from "./chat/useScrollAndUnread";
+import { useScrollAndUnread, type ScrollControl } from "./chat/useScrollAndUnread";
 import { useRealtimeChat } from "./chat/useRealtimeChat";
 import { useSendMessage } from "./chat/useSendMessage";
 import { useTypingPresence } from "./chat/useTypingPresence";
@@ -576,87 +576,6 @@ export function CommunityChat({
     scrollAnchorRef.current = null;
   }, [communityId]);
 
-  // No dependency array on purpose: any commit can change what sits above the
-  // anchor (messages, hasMoreAbove, threadEvents, unread divider…), and a
-  // single querySelector + two getBoundingClientRect calls per commit is cheap.
-  useIsomorphicLayoutEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // While the initial position is still being resolved the list is hidden
-    // and useScrollAndUnread owns scrollTop — don't compete with it.
-    if (initialPositionResolved) {
-      const prev = scrollAnchorRef.current;
-      if (prev) {
-        const newOffset = measureAnchorOffset(container, prev.id);
-        if (newOffset !== null) {
-          const delta = newOffset - prev.offset;
-          if (delta !== 0) container.scrollTop += delta;
-        }
-      }
-    }
-
-    // Re-anchor on the (possibly new) oldest real message.
-    if (oldestRealMsgId) {
-      const offset = measureAnchorOffset(container, oldestRealMsgId);
-      scrollAnchorRef.current = offset === null ? null : { id: oldestRealMsgId, offset };
-    } else {
-      scrollAnchorRef.current = null;
-    }
-  });
-
-  // The anchor's stored offset must also track height changes that happen
-  // *without* a React commit (e.g. an avatar or image above it finishing its
-  // load). A ResizeObserver on the list content refreshes the snapshot so a
-  // later prepend never applies a stale delta.
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    const content = container?.firstElementChild;
-    if (!container || !content || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      const anchor = scrollAnchorRef.current;
-      if (!anchor) return;
-      const offset = measureAnchorOffset(container, anchor.id);
-      if (offset !== null) anchor.offset = offset;
-    });
-    ro.observe(content);
-    return () => ro.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, loading]);
-
-  // IntersectionObserver-based trigger: starts loading older messages before
-  // the user reaches the top by using a 300 px rootMargin.  Including
-  // `loading` and `loadingOlder` in the deps ensures the observer is
-  // (re-)created once the initial load finishes and the sentinel first
-  // appears in the DOM, and again after each older-page fetch completes.
-  // Stops observing automatically once hasMoreAbove becomes false.
-  useEffect(() => {
-    if (!hasMoreAbove) return;
-
-    const sentinel = topSentinelRef.current;
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          loadOlderCallbackRef.current?.();
-        }
-      },
-      {
-        root: scrollContainerRef.current,
-        // Fire 300 px before the sentinel reaches the viewport top so
-        // older messages start loading well before the user gets there.
-        rootMargin: "300px 0px 0px 0px",
-        threshold: 0,
-      }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-    // scrollContainerRef is a stable ref — safe to omit from deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasMoreAbove, loadingOlder, loading]);
-
   const handleDelete = useCallback(async (msgId: string) => {
     // Optimistic update: mark as deleted locally immediately
     let previousMessage: CachedMessage | null = null;
@@ -711,8 +630,12 @@ export function CommunityChat({
     initialScrollDoneRef,
     realtimeInsertPendingRef,
     realtimeWasNearBottomRef,
+    atBottomRef,
+    scrollControlRef,
     showScrollToBottom,
     initialPositionResolved,
+    containerEpoch,
+    attachScrollContainerRef,
     firstUnreadMsgId,
     unreadDisplayCount,
     setHideUnreadDivider,
@@ -724,6 +647,119 @@ export function CommunityChat({
     initialMessagesReady,
     initialLastReadAtFromSSR: initialLastReadAt,
   });
+
+  // ── Scroll container resize: re-pin when at bottom ────────────────────────
+  // The TypingIndicator and composer (reply bar, image preview) sit BELOW the
+  // scroll container, so when they appear/disappear the container shrinks or
+  // grows. The browser keeps scrollTop unchanged, which slides the last
+  // messages out of view. If the user was at the bottom before the resize, we
+  // re-pin — using the at-bottom flag captured on the last scroll event,
+  // i.e. before the resize, so a mid-history reader is never yanked down.
+  //
+  // This observer also owns the anchor-compensation for changes ABOVE the
+  // viewport (older pages being prepended, load-older slot disappearing),
+  // including the non-commit cases (an image above the anchor finishing its
+  // load). Keeping both jobs in one RO means there is exactly one resize
+  // handler competing with nobody.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      // 1) Stay glued to the bottom while the user is at it. Composer bars
+      //    and the TypingIndicator resize the container; image/avatar loads
+      //    resize the content — both change height with no React commit and
+      //    no scroll event, so atBottomRef still holds the user's position
+      //    from BEFORE the resize. That is exactly the pre-resize signal the
+      //    old prevDist-scroll-listener dance tried to reconstruct; RO
+      //    callbacks always run after layout, so a fresh distance check here
+      //    would already see the shrunken viewport and never re-pin.
+      if (initialScrollDoneRef.current && atBottomRef.current) {
+        container.scrollTop = container.scrollHeight - container.clientHeight;
+      }
+
+      // 2) Anchor refresh so a later prepend never applies a stale delta.
+      const anchor = scrollAnchorRef.current;
+      if (anchor) {
+        const offset = measureAnchorOffset(container, anchor.id);
+        if (offset !== null) anchor.offset = offset;
+      }
+    });
+
+    observer.observe(container);
+    // Observe the list content too: image/avatar loads change content height
+    // without a React commit, which would otherwise shift the viewport or
+    // leave the anchor stale for the next prepend.
+    const content = container.firstElementChild;
+    if (content) observer.observe(content);
+
+    return () => observer.disconnect();
+    // Re-attach whenever the container node is (re)mounted — tab switches
+    // replace the node, and the containerEpoch bump signals that remount.
+  }, [communityId, loading, containerEpoch]);
+
+  // ── Anchor compensation: keep the viewport pinned to the same messages ───
+  // Runs on every React commit; the ResizeObserver above covers non-commit
+  // height changes. Exactly one mechanism, so edits to other scroll paths can
+  // no longer break this one.
+  useIsomorphicLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // While the initial position is still being resolved the list is hidden
+    // and useScrollAndUnread owns scrollTop — don't compete with it.
+    if (initialPositionResolved) {
+      const prev = scrollAnchorRef.current;
+      if (prev) {
+        const newOffset = measureAnchorOffset(container, prev.id);
+        if (newOffset !== null) {
+          const delta = newOffset - prev.offset;
+          if (delta !== 0) container.scrollTop += delta;
+        }
+      }
+    }
+
+    // Re-anchor on the (possibly new) oldest real message.
+    if (oldestRealMsgId) {
+      const offset = measureAnchorOffset(container, oldestRealMsgId);
+      scrollAnchorRef.current = offset === null ? null : { id: oldestRealMsgId, offset };
+    } else {
+      scrollAnchorRef.current = null;
+    }
+  });
+
+  // IntersectionObserver-based trigger: starts loading older messages before
+  // the user reaches the top by using a 300 px rootMargin.  Including
+  // `loading` and `loadingOlder` in the deps ensures the observer is
+  // (re-)created once the initial load finishes and the sentinel first
+  // appears in the DOM, and again after each older-page fetch completes.
+  // Stops observing automatically once hasMoreAbove becomes false.
+  useEffect(() => {
+    if (!hasMoreAbove) return;
+
+    const sentinel = topSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadOlderCallbackRef.current?.();
+        }
+      },
+      {
+        root: scrollContainerRef.current,
+        // Fire 300 px before the sentinel reaches the viewport top so
+        // older messages start loading well before the user gets there.
+        rootMargin: "300px 0px 0px 0px",
+        threshold: 0,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // scrollContainerRef is a stable ref — safe to omit from deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMoreAbove, loadingOlder, loading]);
 
   // ── Row focus flash — shared by reply clicks and @ pill jumps ────────────
   const flashMessage = useCallback(
@@ -913,10 +949,10 @@ export function CommunityChat({
     setThreadEvents,
     membersRef,
     pendingProfileFetchRef,
-    scrollContainerRef,
     initialScrollDoneRef,
     realtimeInsertPendingRef,
     realtimeWasNearBottomRef,
+    scrollControlRef,
   });
 
   // ── Input + send ──────────────────────────────────────────────────────────
@@ -954,7 +990,7 @@ export function CommunityChat({
     setHideUnreadDivider,
     replyTo,
     onClearReply: handleClearReply,
-    scrollToBottomRef: bottomRef,
+    scrollControlRef,
     resolveMentions: resolveMentionsForSend,
   });
 
@@ -1208,48 +1244,6 @@ export function CommunityChat({
     [handleKeyDown, memberMentions],
   );
 
-  // ── Re-anchor to bottom when reply/image bar appears or disappears ───────
-  // When the input area grows (reply bar, image preview), the scroll container
-  // shrinks. The browser keeps scrollTop unchanged, so the last messages slide
-  // out of view, leaving a black gap.
-  //
-  // Strategy: track prevDist via a scroll listener so we always know the user's
-  // scroll position BEFORE the resize fires. Only snap back to bottom if the
-  // user was genuinely at the bottom (≤ 10 px) before the resize — this avoids
-  // the wrong behaviour of snapping users who intentionally scrolled up to read
-  // an older message before hitting Reply.
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    // Initialise with the current distance from the bottom
-    let prevDist =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-
-    // Keep prevDist fresh whenever the user scrolls manually
-    const onScroll = () => {
-      prevDist =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-    };
-
-    const observer = new ResizeObserver(() => {
-      // prevDist was captured before this resize → safe to use as "was at bottom"
-      if (prevDist <= 10) {
-        container.scrollTop = container.scrollHeight - container.clientHeight;
-      }
-      // Update prevDist to reflect the post-snap position
-      prevDist =
-        container.scrollHeight - container.scrollTop - container.clientHeight;
-    });
-
-    container.addEventListener("scroll", onScroll, { passive: true });
-    observer.observe(container);
-    return () => {
-      container.removeEventListener("scroll", onScroll);
-      observer.disconnect();
-    };
-  }, [scrollContainerRef]);
-
   // ── Group messages by date ────────────────────────────────────────────────
   const grouped = useMemo<DateGroup[]>(() =>
     messages.reduce<DateGroup[]>((acc, msg) => {
@@ -1411,7 +1405,7 @@ export function CommunityChat({
               pattern). It owns the scroll; the footer below is static, so
               messages can never flow underneath the input.                     */}
           <div
-            ref={scrollContainerRef}
+            ref={attachScrollContainerRef}
             data-chat-scroll-container
             className="relative flex-1 min-h-0 overflow-y-auto bg-background"
             style={{

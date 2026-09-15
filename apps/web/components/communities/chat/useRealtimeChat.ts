@@ -7,6 +7,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
 import type { CachedMessage, CachedThreadEvent, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
+import type { ScrollControl } from "./useScrollAndUnread";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 
 type Message = CachedMessage;
@@ -19,10 +20,11 @@ interface UseRealtimeChatOptions {
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
   membersRef: MutableRefObject<Member[]>;
   pendingProfileFetchRef: MutableRefObject<Map<string, Promise<void>>>;
-  scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
   initialScrollDoneRef: MutableRefObject<boolean>;
   realtimeInsertPendingRef: MutableRefObject<boolean>;
   realtimeWasNearBottomRef: MutableRefObject<boolean>;
+  /** Bottom-tracking policy from useScrollAndUnread (event-time captures). */
+  scrollControlRef: { current: ScrollControl };
 }
 
 export function useRealtimeChat({
@@ -33,10 +35,10 @@ export function useRealtimeChat({
   setThreadEvents,
   membersRef,
   pendingProfileFetchRef,
-  scrollContainerRef,
   initialScrollDoneRef,
   realtimeInsertPendingRef,
   realtimeWasNearBottomRef,
+  scrollControlRef,
 }: UseRealtimeChatOptions) {
   // ── Debounced catch-up fetch ───────────────────────────────────────────────
   // Catch-up fetches bypass the request cache (force) — they exist precisely
@@ -103,16 +105,10 @@ export function useRealtimeChat({
         };
 
         if (initialScrollDoneRef.current) {
-          const container = scrollContainerRef.current;
-          if (container) {
-            const dist =
-              container.scrollHeight -
-              container.scrollTop -
-              container.clientHeight;
-            realtimeWasNearBottomRef.current = dist < 100;
-          } else {
-            realtimeWasNearBottomRef.current = false;
-          }
+          // Capture the decision at event time — the only moment the user's
+          // viewport position is meaningful. The old inline distance check
+          // here was the second of the four competing scroll writers.
+          realtimeWasNearBottomRef.current = scrollControlRef.current.isAtBottom();
           realtimeInsertPendingRef.current = true;
         }
 
