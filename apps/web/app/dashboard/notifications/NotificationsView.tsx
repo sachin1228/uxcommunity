@@ -7,7 +7,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  AtSign,
   Bell,
   CalendarDays,
   CheckCheck,
@@ -29,7 +28,6 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
-  if (type === "chat_mention") return AtSign;
   if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
   if (type.includes("resource")) return FileText;
@@ -169,20 +167,22 @@ export function NotificationsView({ userId }: { userId: string }) {
           <EmptyNotifications
             icon={Bell}
             title="No notifications yet"
-            hint="Likes, comments, new threads, resources, events, and @mentions will appear here."
+            hint="Likes, comments and RSVPs on your posts will appear here."
           />
         ) : visible.length === 0 ? (
           tab === "activity" ? (
             <EmptyNotifications
               icon={MessageCircle}
               title="No likes or comments yet"
-              hint="Likes and comments on your threads, resources, and events will appear here."
+              hint="Likes, comments and RSVPs on your threads, resources and events will appear here."
             />
           ) : (
+            /* The Other tab renders nothing yet on purpose — see
+               lib/notifications-tabs.ts for where its types get declared. */
             <EmptyNotifications
               icon={Bell}
-              title="Nothing else yet"
-              hint="New threads, resources, events, RSVPs, and @mentions will appear here."
+              title="Nothing here yet"
+              hint="Other kinds of notifications will show up here."
             />
           )
         ) : (

@@ -21,52 +21,51 @@ function item(
   };
 }
 
-test("likes, comments and replies land in the activity tab", () => {
-  const engagement: NotificationType[] = [
-    "thread_like",
-    "thread_comment",
-    "thread_reply",
-    "resource_comment",
-    "resource_reply",
-    "event_comment",
-    "event_reply",
-  ];
+/** Every type the app still generates. */
+const ALL_TYPES: NotificationType[] = [
+  "thread_like",
+  "thread_comment",
+  "thread_reply",
+  "resource_comment",
+  "resource_reply",
+  "event_comment",
+  "event_reply",
+  "event_rsvp",
+];
 
-  for (const type of engagement) {
+test("every generated notification type lands in the activity tab", () => {
+  for (const type of ALL_TYPES) {
     assert.equal(notificationTabFor(type), "activity", type);
   }
 });
 
-// The request behind the split: created / shared / mentioned notifications must
-// not show up in the likes-and-comments list.
-test("created, shared and mentioned notifications go to Other", () => {
-  for (const type of [
-    "community_thread",
-    "community_resource",
-    "community_event",
-    "event_rsvp",
-    "event_save",
-    "chat_mention",
-  ] as NotificationType[]) {
-    assert.equal(notificationTabFor(type), "other", type);
-  }
-});
-
-test("an unrecognised future type defaults to Other", () => {
-  assert.equal(notificationTabFor("community_poll" as NotificationType), "other");
-});
-
-test("splitting preserves newest-first order and counts unread per tab", () => {
-  const { activity, other, unreadByTab } = splitNotificationsByTab([
-    item("n1", "community_thread", "2026-09-15T10:00:00Z"),
-    item("n2", "thread_like", "2026-09-15T09:00:00Z", "2026-09-15T09:30:00Z"),
-    item("n3", "chat_mention", "2026-09-15T08:00:00Z"),
-    item("n4", "thread_comment", "2026-09-15T07:00:00Z"),
+// The Other tab is a static placeholder: it claims no types yet, so a type it
+// is not given stays invisible instead of leaking into the first tab.
+test("the Other tab renders nothing until it claims a type", () => {
+  const page = splitNotificationsByTab([
+    item("n1", "thread_like", "2026-09-15T10:00:00Z"),
+    item("n2", "event_rsvp", "2026-09-15T09:00:00Z"),
   ]);
 
-  assert.deepEqual(activity.map((n) => n.id), ["n2", "n4"]);
-  assert.deepEqual(other.map((n) => n.id), ["n1", "n3"]);
-  assert.deepEqual(unreadByTab, { activity: 1, other: 2 });
+  assert.equal(page.other.length, 0);
+  assert.equal(page.unreadByTab.other, 0);
+});
+
+test("a type no tab declares stays invisible", () => {
+  assert.equal(notificationTabFor("chat_mention" as NotificationType), null);
+  assert.equal(notificationTabFor("community_thread" as NotificationType), null);
+});
+
+test("splitting keeps order and counts only the unread items it shows", () => {
+  const { activity, other, unreadByTab } = splitNotificationsByTab([
+    item("n1", "thread_like", "2026-09-15T09:00:00Z", "2026-09-15T09:30:00Z"),
+    item("n2", "thread_comment", "2026-09-15T08:00:00Z"),
+    item("n3", "event_rsvp", "2026-09-15T07:00:00Z"),
+  ]);
+
+  assert.deepEqual(activity.map((n) => n.id), ["n1", "n2", "n3"]);
+  assert.deepEqual(other, []);
+  assert.deepEqual(unreadByTab, { activity: 2, other: 0 });
 });
 
 test("an empty page yields two empty tabs", () => {

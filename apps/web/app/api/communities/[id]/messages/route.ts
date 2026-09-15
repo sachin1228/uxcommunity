@@ -10,7 +10,6 @@ import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { publishChatEvent } from "@/lib/realtime/server";
 import { createServerTimer } from "@/lib/server-timing";
-import { createNotification } from "@/lib/notifications";
 import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
 
 export async function GET(
@@ -267,55 +266,6 @@ export async function POST(
         }
       } catch (err) {
         console.error("[POST message] after() AI moderation error:", err);
-      }
-    });
-  }
-
-  // ── Phase 3: mention notifications after the response is sent ─────────────
-  // One bell row per mentioned member (self is already excluded during body
-  // parsing). Reuses createNotification so per-entity dedupe + realtime bell
-  // updates behave exactly like the other notification types.
-  if (mentions.length) {
-    const captured = {
-      communityId,
-      messageId: inserted.id,
-      content: content || "",
-      mentions,
-    };
-    after(async () => {
-      try {
-        const notificationDb = createServiceClient();
-        const [{ data: actor }, { data: community }] = (await Promise.all([
-          notificationDb.from("users").select("name").eq("id", userId).maybeSingle(),
-          notificationDb.from("communities").select("name").eq("id", communityId).maybeSingle(),
-        ])) as unknown as [
-          { data: { name: string } | null; error: unknown },
-          { data: { name: string } | null; error: unknown },
-        ];
-        const actorName = actor?.name ?? "Someone";
-        const communityName = community?.name ?? "community";
-        const bodyPreview = captured.content
-          ? captured.content.replace(/\s+/g, " ").trim().slice(0, 160)
-          : null;
-        for (const mention of captured.mentions) {
-          try {
-            await createNotification(notificationDb, {
-              userId: mention.user_id,
-              actorId: userId,
-              communityId: captured.communityId,
-              type: "chat_mention",
-              entityType: "message",
-              entityId: captured.messageId,
-              title: `${actorName} mentioned you in ${communityName}`,
-              body: bodyPreview,
-              href: `/dashboard/communities/${captured.communityId}#msg-${captured.messageId}`,
-            });
-          } catch (err) {
-            console.error("[POST message] mention notification failed:", err);
-          }
-        }
-      } catch (err) {
-        console.error("[POST message] mention notification delivery failed:", err);
       }
     });
   }

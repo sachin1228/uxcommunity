@@ -3,10 +3,16 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
+/**
+ * The notification types the app still generates: engagement on the user's own
+ * content (comments, replies, likes) plus event RSVPs.
+ *
+ * The community broadcasts ("started a new thread", "shared a new resource",
+ * "created a new event") and the chat @mention rows are gone — no route
+ * creates them any more, and the existing rows were cleared by
+ * migration 20260915120000_remove_broadcast_and_mention_notifications.sql.
+ */
 export type NotificationType =
-  | "community_thread"
-  | "community_resource"
-  | "community_event"
   | "thread_comment"
   | "thread_reply"
   | "thread_like"
@@ -14,16 +20,9 @@ export type NotificationType =
   | "resource_reply"
   | "event_comment"
   | "event_reply"
-  | "event_rsvp"
-  | "event_save"
-  | "chat_mention";
+  | "event_rsvp";
 
-export type NotificationEntityType =
-  | "community"
-  | "thread"
-  | "resource"
-  | "event"
-  | "message";
+export type NotificationEntityType = "thread" | "resource" | "event";
 
 interface NotificationInput {
   userId: string;
@@ -38,23 +37,7 @@ interface NotificationInput {
   metadata?: Record<string, unknown>;
 }
 
-interface CommunityNotificationInput {
-  communityId: string;
-  actorId: string;
-  type: Extract<NotificationType, "community_thread" | "community_resource" | "community_event">;
-  entityType: Extract<NotificationEntityType, "thread" | "resource" | "event">;
-  entityId: string;
-  title: string;
-  body?: string | null;
-  href: string;
-  metadata?: Record<string, unknown>;
-}
-
 type DeferredNotificationInput = Omit<NotificationInput, "title"> & {
-  title: (actorName: string) => string;
-};
-
-type DeferredCommunityNotificationInput = Omit<CommunityNotificationInput, "title"> & {
   title: (actorName: string) => string;
 };
 
@@ -191,68 +174,6 @@ export async function createNotification(
   return { ok: true };
 }
 
-export async function notifyCommunityMembers(
-  db: ReturnType<typeof createServiceClient>,
-  input: CommunityNotificationInput,
-) {
-  const { data, error } = await db
-    .from("community_members")
-    .select("user_id")
-    .eq("community_id", input.communityId)
-    .neq("user_id", input.actorId);
-
-  if (error) {
-    console.error("[notifications] community member lookup failed", error);
-    return;
-  }
-
-  const rows = (data ?? []).map((member) => ({
-    user_id: member.user_id,
-    actor_id: input.actorId,
-    community_id: input.communityId,
-    type: input.type,
-    entity_type: input.entityType,
-    entity_id: input.entityId,
-    title: input.title.slice(0, 160),
-    body: input.body?.slice(0, 500) ?? null,
-    href: input.href,
-    metadata: input.metadata ?? {},
-  }));
-
-  if (!rows.length) return;
-
-  const { data: insertedRows, error: insertError } = (await db
-    .from("notifications")
-    .insert(rows)
-    .select("id, user_id, type, title, body, href, read_at, created_at")) as unknown as {
-    data: Array<{
-      id: string;
-      user_id: string;
-      type: string;
-      title: string;
-      body: string | null;
-      href: string;
-      read_at: string | null;
-      created_at: string;
-    }> | null;
-    error: unknown;
-  };
-  if (insertError) {
-    console.error("[notifications] bulk insert failed", insertError);
-  }
-
-  // Best-effort realtime fan-out to each recipient's bell dropdown.
-  if (insertedRows?.length) {
-    void publishRealtimeBatch(
-      insertedRows.map((row) => ({
-        room: realtimeRooms.notifications(row.user_id),
-        topic: "insert",
-        data: row,
-      })),
-    );
-  }
-}
-
 export async function getActorName(
   db: ReturnType<typeof createServiceClient>,
   userId: string,
@@ -271,18 +192,6 @@ export function deferNotification(input: DeferredNotificationInput) {
       await createNotification(db, { ...input, title: input.title(actorName) });
     } catch (error) {
       console.error("[notifications] deferred delivery failed", error);
-    }
-  });
-}
-
-export function deferCommunityNotification(input: DeferredCommunityNotificationInput) {
-  after(async () => {
-    try {
-      const db = createServiceClient();
-      const actorName = await getActorName(db, input.actorId);
-      await notifyCommunityMembers(db, { ...input, title: input.title(actorName) });
-    } catch (error) {
-      console.error("[notifications] deferred community delivery failed", error);
     }
   });
 }

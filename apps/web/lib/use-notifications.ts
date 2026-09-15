@@ -18,10 +18,9 @@ import {
   subscribeToRequest,
 } from "@/lib/request-cache";
 
+// Mirrors NotificationType in lib/notifications.ts — the types still generated
+// (community broadcasts and chat @mentions were removed).
 export type NotificationType =
-  | "community_thread"
-  | "community_resource"
-  | "community_event"
   | "thread_comment"
   | "thread_reply"
   | "thread_like"
@@ -29,9 +28,7 @@ export type NotificationType =
   | "resource_reply"
   | "event_comment"
   | "event_reply"
-  | "event_rsvp"
-  | "event_save"
-  | "chat_mention";
+  | "event_rsvp";
 
 export interface NotificationItem {
   id: string;

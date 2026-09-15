@@ -7,7 +7,6 @@ import { moderateText } from "@/lib/moderation/text";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
-import { deferCommunityNotification, threadHref } from "@/lib/notifications";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityThreads } from "@/lib/communities/read-models";
@@ -304,18 +303,6 @@ export async function POST(
     contentRefId: inserted.id,
     contentHash: contentHash(text),
     decision,
-  });
-
-  deferCommunityNotification({
-    communityId,
-    actorId: userId,
-    type: "community_thread",
-    entityType: "thread",
-    entityId: inserted.id,
-    title: (actorName) => `${actorName} started a new thread`,
-    body: title,
-    href: threadHref(communityId, inserted.id),
-    metadata: { category },
   });
 
   const enriched = (await withAuthorAndLikes(db, [inserted as Record<string, unknown>], userId))[0];

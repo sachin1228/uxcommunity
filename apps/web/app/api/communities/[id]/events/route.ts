@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
-import { deferCommunityNotification, eventHref } from "@/lib/notifications";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
@@ -252,18 +251,6 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  deferCommunityNotification({
-    communityId,
-    actorId: userId,
-    type: "community_event",
-    entityType: "event",
-    entityId: data.id,
-    title: (actorName) => `${actorName} created a new event`,
-    body: title,
-    href: eventHref(communityId, data.id),
-    metadata: { event_date: eventDate },
-  });
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },

@@ -16,33 +16,45 @@ export const NOTIFICATION_TABS: ReadonlyArray<{
 ];
 
 /**
- * Engagement on the user's own content: a like, or a comment/reply anywhere in
- * the thread under what they posted.
+ * Which types each tab renders.
  *
- * Everything else — the broadcast the app fans out when someone starts a new
- * thread, shares a resource or creates an event, plus RSVPs, saves and
- * @mentions — belongs in "Other", so the first tab stays the conversations the
- * user is actually part of. Unknown types default to "Other" too: a new type
- * added later must never start crowding the primary list.
+ * - `activity` — engagement on the user's own content: a like, an RSVP, or a
+ *   comment/reply anywhere in the thread under what they posted.
+ * - `other` — intentionally EMPTY. The tab is a visible placeholder; add the
+ *   types that belong in it here (and update the tab's empty-state copy in
+ *   NotificationsView) to populate it.
+ *
+ * Nothing renders until a tab claims its type, so an unlisted type stays
+ * invisible rather than leaking into a tab that did not ask for it.
  */
-const ACTIVITY_TYPES: ReadonlySet<NotificationType> = new Set([
-  "thread_like",
-  "thread_comment",
-  "thread_reply",
-  "resource_comment",
-  "resource_reply",
-  "event_comment",
-  "event_reply",
-]);
+const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
+  activity: new Set([
+    "thread_like",
+    "thread_comment",
+    "thread_reply",
+    "resource_comment",
+    "resource_reply",
+    "event_comment",
+    "event_reply",
+    "event_rsvp",
+  ]),
+  other: new Set(),
+};
 
-export function notificationTabFor(type: NotificationType): NotificationTab {
-  return ACTIVITY_TYPES.has(type) ? "activity" : "other";
+/** The tab a type renders under, or null while no tab claims it yet. */
+export function notificationTabFor(type: NotificationType): NotificationTab | null {
+  if (TAB_TYPES.activity.has(type)) return "activity";
+  if (TAB_TYPES.other.has(type)) return "other";
+  return null;
 }
 
 /**
  * Splits a newest-first notification page into its two tabs, counting unread
  * items per tab along the way. Order inside each tab is preserved, so the
  * realtime path's prepends keep both lists sorted.
+ *
+ * Types no tab claims are dropped from both lists (and from the counts) — they
+ * stay invisible until a tab declares them.
  */
 export function splitNotificationsByTab<
   T extends { type: NotificationType; read_at: string | null },
@@ -57,6 +69,7 @@ export function splitNotificationsByTab<
 
   for (const item of items) {
     const tab = notificationTabFor(item.type);
+    if (!tab) continue;
     (tab === "activity" ? activity : other).push(item);
     if (!item.read_at) unreadByTab[tab] += 1;
   }
