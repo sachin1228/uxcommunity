@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DEFAULT_ENABLED_TABS } from "./areas";
+import { withShowcaseColumn } from "./showcase-flag";
 import type { CachedMeta } from "./cache";
 
 /**
@@ -24,7 +25,18 @@ export async function fetchCommunityMetaSSR(
 
   const [{ data: membership }, { data: community }, { data: currentUser }] = await Promise.all([
     db.from("community_members").select("joined_at, last_read_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id").eq("id", communityId).maybeSingle(),
+    // showcase_enabled is appended only once the showcase-toggle migration has
+    // added the column, so the first paint works before it is applied.
+    db
+      .from("communities")
+      .select(
+        await withShowcaseColumn(
+          db,
+          "id, name, type, image_url, reference_id, created_at, description, is_private, enabled_tabs, owner_id",
+        ),
+      )
+      .eq("id", communityId)
+      .maybeSingle(),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
   ]);
 
@@ -42,6 +54,8 @@ export async function fetchCommunityMetaSSR(
       owner_id: (community as any).owner_id ?? null,
       is_private: (community as any).is_private ?? false,
       enabled_tabs: (community as any).enabled_tabs ?? [...DEFAULT_ENABLED_TABS],
+      // Absent pre-migration; the tab bar reads that as "Showcase is on".
+      showcase_enabled: (community as any).showcase_enabled ?? null,
       // Role/permissions are not fetched server-side any more; bootstrap
       // overwrites them client-side moments later.
       current_user_role: null,

@@ -72,6 +72,8 @@ export interface CachedMeta {
     image_url: string | null;
     is_private?: boolean;
     enabled_tabs?: string[];
+    /** Showcase flag — absent on rows that predate it, which read as on. */
+    showcase_enabled?: boolean | null;
     owner_id?: string | null;
     invite_token?: string | null;
     description?: string | null;
@@ -112,6 +114,8 @@ export interface CachedSidebarCommunity {
   reference_name?: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
+  /** Showcase flag — absent on rows that predate it, which read as on. */
+  showcase_enabled?: boolean | null;
   owner_id?: string | null;
   created_at?: string | null;
   joined_at?: string | null;
@@ -280,7 +284,7 @@ export function invalidateOnCommunityDeleted(communityId: string): void {
  */
 export function patchSidebarCommunity(
   communityId: string,
-  patch: Partial<Pick<CachedSidebarCommunity, "name" | "image_url" | "is_private" | "enabled_tabs">>,
+  patch: Partial<Pick<CachedSidebarCommunity, "name" | "image_url" | "is_private" | "enabled_tabs" | "showcase_enabled">>,
 ): void {
   if (sidebarStore.data) {
     sidebarStore.data = {

@@ -10,6 +10,7 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { loadCommunityReadModel } from "@/lib/communities/read-models";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { canStoreShowcaseFlag, withShowcaseColumn } from "@/lib/communities/showcase-flag";
 import {
   getExperienceLevelNameMap,
   getMasterImageMap,
@@ -20,7 +21,7 @@ import {
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
-const VALID_TABS = new Set(["chat", "threads", "showcase", "events", "resources"]);
+const VALID_TABS = new Set(["chat", "threads", "events", "resources"]);
 
 export async function GET(
   _req: NextRequest,
@@ -64,12 +65,18 @@ export async function PATCH(
 
   // Snapshot the current values so the activity trail records what changed.
   // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
+  // showcase_enabled is read only once the showcase-toggle migration has added
+  // the column, so the request does not fail without it.
+  const beforeColumns = await withShowcaseColumn(
+    db,
+    "name, description, image_url, is_private, enabled_tabs",
+  );
   const { data: before } = (await db
     .from("communities")
-    .select("name, description, image_url, is_private, enabled_tabs")
+    .select(beforeColumns)
     .eq("id", id)
     .maybeSingle()) as unknown as {
-    data: { name: string | null; description: string | null; image_url: string | null; is_private: boolean; enabled_tabs: string[] } | null;
+    data: { name: string | null; description: string | null; image_url: string | null; is_private: boolean; enabled_tabs: string[]; showcase_enabled?: boolean | null } | null;
   };
 
   // Accept FormData (multipart, used when image may be included)
@@ -117,6 +124,16 @@ export async function PATCH(
         if (!sameTabs) changed.push("tabs");
       }
     } catch { /* ignore */ }
+  }
+
+  const showcaseStr = getString("showcase");
+  if (showcaseStr !== null) {
+    const nextShowcase = showcaseStr === "true";
+    // Absent on rows that predate the flag, which read as on.
+    if ((before?.showcase_enabled ?? true) !== nextShowcase && (await canStoreShowcaseFlag(db))) {
+      updates.showcase_enabled = nextShowcase;
+      changed.push("showcase");
+    }
   }
 
   // Handle image upload / removal

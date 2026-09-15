@@ -1,5 +1,4 @@
 import "server-only";
-
 import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
@@ -14,6 +13,7 @@ import {
   TABLE_LOOKUP,
 } from "@/lib/master-data-cache";
 import { resolveCommunityDp } from "./dp";
+import { withShowcaseColumn } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 
 const MESSAGE_PAGE_SIZE = 50;
@@ -56,7 +56,20 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   const db = createServiceClient();
   const [{ data: membership }, { data: community, error: communityError }] = await Promise.all([
     db.from("community_members").select("joined_at, role").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format").eq("id", communityId).eq("is_active", true).maybeSingle(),
+    // showcase_enabled is appended only once the showcase-toggle migration has
+    // added the column; the row is spread into the response, so an explicit
+    // list matters here.
+    db
+      .from("communities")
+      .select(
+        await withShowcaseColumn(
+          db,
+          "id, name, type, image_url, description, reference_id, created_at, is_private, enabled_tabs, owner_id, invite_token, lottie_url, lottie_format",
+        ),
+      )
+      .eq("id", communityId)
+      .eq("is_active", true)
+      .maybeSingle(),
   ]);
 
   if (!membership) return { ok: false, status: 403, error: "Not a member of this community." };

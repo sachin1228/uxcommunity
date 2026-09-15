@@ -38,6 +38,8 @@ interface Community {
   created_at?: string;
   is_private?: boolean;
   enabled_tabs?: string[];
+  /** Absent on rows that predate the flag; reads as on. */
+  showcase_enabled?: boolean | null;
 }
 
 interface Member {

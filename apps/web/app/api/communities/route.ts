@@ -9,10 +9,11 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { getSidebarCommunities } from "@/lib/communities/sidebar-server";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { canStoreShowcaseFlag } from "@/lib/communities/showcase-flag";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const VALID_TABS = new Set(["chat", "threads", "showcase", "events", "resources"]);
+const VALID_TABS = new Set(["chat", "threads", "events", "resources"]);
 
 function parseString(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
@@ -60,6 +61,9 @@ export async function POST(request: Request) {
   const isPrivate = parseString(formData.get("privacy")) === "private";
   const tabs = Array.from(new Set(["chat", ...parseJsonArray(formData.get("tabs"))]))
     .filter((tab) => VALID_TABS.has(tab));
+  // Showcase is stored in its own column, so it is not part of enabled_tabs.
+  const showcaseStr = parseString(formData.get("showcase"));
+  const showcaseChoice = showcaseStr === "true" ? true : showcaseStr === "false" ? false : null;
   const rules = parseJsonArray(formData.get("rules"))
     .map((rule) => rule.trim())
     .filter(Boolean)
@@ -103,6 +107,12 @@ export async function POST(request: Request) {
   }
 
   const inviteToken = randomUUID().replace(/-/g, "");
+  // Only write the flag where the column exists, so creation keeps working in an
+  // environment that has not applied the showcase-toggle migration yet.
+  const showcaseInsert =
+    showcaseChoice !== null && (await canStoreShowcaseFlag(db))
+      ? { showcase_enabled: showcaseChoice }
+      : {};
   const { data: community, error: communityError } = await db
     .from("communities")
     .insert({
@@ -116,6 +126,7 @@ export async function POST(request: Request) {
       invite_token: inviteToken,
       enabled_tabs: tabs,
       is_active: true,
+      ...showcaseInsert,
     })
     .select("id, name, type, image_url, is_private, invite_token, enabled_tabs")
     .single();
