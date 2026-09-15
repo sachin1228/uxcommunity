@@ -16,6 +16,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -42,7 +43,10 @@ interface CommunitySettingsViewProps {
   onDeleted: () => void;
 }
 
-type Tab = "chat" | "threads" | "events" | "resources";
+type Tab = "chat" | "threads" | "showcase" | "events" | "resources";
+
+/** Areas a new community starts with — mirrors the API + DB defaults. */
+const DEFAULT_TABS: Tab[] = ["chat", "threads", "showcase", "events", "resources"];
 
 const FEATURE_OPTIONS: Array<{
   id: Tab;
@@ -53,6 +57,7 @@ const FEATURE_OPTIONS: Array<{
 }> = [
   { id: "chat",      label: "Chat",      description: "Real-time member conversations", icon: MessageSquare, required: true },
   { id: "threads",   label: "Threads",   description: "Topic-led discussions",          icon: Hash },
+  { id: "showcase",  label: "Showcase",  description: "Share work and collect feedback", icon: Sparkles },
   { id: "events",    label: "Events",    description: "Meetups and online sessions",    icon: Calendar },
   { id: "resources", label: "Resources", description: "Links, files, and references",  icon: BookOpen },
 ];
@@ -74,7 +79,7 @@ export function CommunitySettingsView({
   const [description, setDescription] = useState(community.description ?? "");
   const [isPrivate,   setIsPrivate]   = useState(community.is_private ?? false);
   const [tabs,        setTabs]        = useState<Tab[]>(
-    (community.enabled_tabs ?? ["chat", "threads", "events", "resources"]) as Tab[]
+    (community.enabled_tabs ?? DEFAULT_TABS) as Tab[]
   );
 
   // Image state

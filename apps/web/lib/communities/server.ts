@@ -40,7 +40,7 @@ export async function fetchCommunityMetaSSR(
       created_at: (community as any).created_at ?? undefined,
       owner_id: (community as any).owner_id ?? null,
       is_private: (community as any).is_private ?? false,
-      enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "events", "resources"],
+      enabled_tabs: (community as any).enabled_tabs ?? ["chat", "threads", "showcase", "events", "resources"],
       // Role/permissions are not fetched server-side any more; bootstrap
       // overwrites them client-side moments later.
       current_user_role: null,

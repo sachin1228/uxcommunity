@@ -180,8 +180,11 @@ export const ChatHeader = memo(function ChatHeader({
     setConfirmAction(action);
   }
 
+  // Members is not an owner-toggleable area, so it stays visible regardless of
+  // enabled_tabs; every other tab (showcase included) follows the community's
+  // chosen areas.
   const visibleTabs = community
-    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    ? DEFAULT_TABS.filter((tab) => tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
     : DEFAULT_TABS;
 
   return (

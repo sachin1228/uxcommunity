@@ -1122,8 +1122,10 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
+  // "members" is always available; every other tab has to be one of the
+  // community's chosen areas, so a disabled Showcase falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members"]).has(activeTab)
+    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "members"]).has(activeTab)
       ? "chat"
       : activeTab;
 

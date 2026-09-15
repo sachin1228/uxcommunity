@@ -11,6 +11,7 @@ import {
   Lock,
   MessageSquare,
   Plus,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -19,7 +20,7 @@ import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
 
 type Privacy = "public" | "private";
-type CommunityTab = "chat" | "threads" | "events" | "resources";
+type CommunityTab = "chat" | "threads" | "showcase" | "events" | "resources";
 
 interface CreatedCommunity {
   id: string;
@@ -48,9 +49,13 @@ const FEATURE_OPTIONS: Array<{
 }> = [
   { id: "chat", label: "Chat", description: "Real-time member conversations", icon: MessageSquare, required: true },
   { id: "threads", label: "Threads", description: "Topic-led discussions", icon: Hash },
+  { id: "showcase", label: "Showcase", description: "Share work and collect feedback", icon: Sparkles },
   { id: "events", label: "Events", description: "Meetups and online sessions", icon: Calendar },
   { id: "resources", label: "Resources", description: "Links, files, and references", icon: BookOpen },
 ];
+
+/** Default areas for a new community — mirrors the API + DB defaults. */
+const DEFAULT_TABS: CommunityTab[] = ["chat", "threads", "showcase", "events", "resources"];
 
 function StepDots({ step }: { step: number }) {
   return (
@@ -100,7 +105,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
   const [name, setName] = useState("");
   const [privacy, setPrivacy] = useState<Privacy>("public");
   const [description, setDescription] = useState("");
-  const [tabs, setTabs] = useState<CommunityTab[]>(["chat", "threads", "events", "resources"]);
+  const [tabs, setTabs] = useState<CommunityTab[]>(DEFAULT_TABS);
   const [rules, setRules] = useState<string[]>([
     "Be respectful and kind to all members.",
     "Keep discussions relevant to this community.",

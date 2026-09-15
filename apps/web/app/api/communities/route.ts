@@ -12,7 +12,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const VALID_TABS = new Set(["chat", "threads", "events", "resources"]);
+const VALID_TABS = new Set(["chat", "threads", "showcase", "events", "resources"]);
 
 function parseString(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
