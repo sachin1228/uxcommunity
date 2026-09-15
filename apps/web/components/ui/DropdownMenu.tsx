@@ -26,6 +26,12 @@ interface DropdownMenuProps {
   align?: "left" | "right";
   /** Gap between trigger bottom and menu top in px (default: 4). */
   gap?: number;
+  /**
+   * `surface` (default) follows the app theme. `overlay` renders the
+   * always-dark panel — black, hairline border — regardless of the light/dark
+   * preference, for menus that are meant to read as an overlay.
+   */
+  tone?: "surface" | "overlay";
   className?: string;
 }
 
@@ -36,6 +42,7 @@ export function DropdownMenu({
   children,
   align = "right",
   gap = 4,
+  tone = "surface",
   className = "",
 }: DropdownMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -123,7 +130,8 @@ export function DropdownMenu({
       ref={menuRef}
       role="menu"
       style={{ position: "fixed", zIndex: 9999 }}
-      className={`min-w-[8rem] rounded-xl bg-surface-raised border border-white/[0.1] shadow-2xl overflow-hidden
+      className={`min-w-[8rem] rounded-xl border shadow-2xl overflow-hidden
+        ${tone === "overlay" ? "bg-overlay border-overlay-elevated" : "bg-surface-raised border-white/[0.1]"}
         animate-in fade-in zoom-in-95 duration-100 origin-top-right
         ${className}`}
     >

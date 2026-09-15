@@ -16,6 +16,18 @@ interface Props {
   variant?: "icon" | "row";
 }
 
+/** Rows are uniform: label on the left, icon on the right. */
+const ROW_CLASS =
+  "flex w-full items-center justify-between gap-3 rounded-md px-3 py-2.5 " +
+  "font-body text-sm text-overlay-foreground transition-colors hover:bg-overlay-elevated";
+const ROW_ICON_CLASS = "shrink-0 text-overlay-muted";
+
+const MENU_LINKS = [
+  { href: "/dashboard/profile", label: "View profile", icon: UserCircle },
+  { href: "/dashboard/communities", label: "Explore communities", icon: Compass },
+  { href: "/dashboard/library", label: "Library", icon: Library },
+];
+
 export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Props) {
   const isRow = variant === "row";
   const [open, setOpen] = useState(false);
@@ -62,48 +74,32 @@ export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Pr
         open={open}
         onClose={() => setOpen(false)}
         align={isRow ? "left" : "right"}
-        className="w-48"
+        tone="overlay"
+        className="w-60"
       >
-        <div className="border-b border-border px-3.5 py-3">
-          <p className="truncate font-body text-sm font-medium leading-tight text-foreground">{name}</p>
-          <p className="mt-1 truncate font-body text-xs leading-tight text-foreground-muted">{email}</p>
+        {/* Identity */}
+        <div className="border-b border-overlay-elevated px-4 py-3.5">
+          <p className="truncate font-body text-sm font-medium leading-tight text-overlay-foreground">{name}</p>
+          <p className="mt-1 truncate font-body text-xs leading-tight text-overlay-muted">{email}</p>
         </div>
 
-        <div className="border-b border-border py-1">
-          <Link
-            href="/dashboard/profile"
-            onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <UserCircle strokeWidth={2} size={16} />
-            <span>View profile</span>
-          </Link>
-          <Link
-            href="/dashboard/communities"
-            onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <Compass strokeWidth={2} size={16} />
-            <span>Explore communities</span>
-          </Link>
-          <Link
-            href="/dashboard/library"
-            onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground"
-          >
-            <Library strokeWidth={2} size={16} />
-            <span>Library</span>
-          </Link>
+        <div className="border-b border-overlay-elevated p-1">
+          {MENU_LINKS.map(({ href, label, icon: Icon }) => (
+            <Link key={href} href={href} onClick={() => setOpen(false)} className={ROW_CLASS}>
+              <span>{label}</span>
+              <Icon strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
+            </Link>
+          ))}
         </div>
 
-        <div className="py-1">
+        <div className="p-1">
           <button
             onClick={handleLogout}
             disabled={loggingOut}
-            className="flex w-full items-center gap-2.5 px-3.5 py-2 font-body text-sm text-foreground-muted transition-colors hover:bg-surface hover:text-foreground disabled:opacity-50"
+            className={`${ROW_CLASS} disabled:opacity-50`}
           >
-            <LogOut strokeWidth={2} size={16} />
             <span>{loggingOut ? "Signing out..." : "Sign out"}</span>
+            <LogOut strokeWidth={2} size={16} className={ROW_ICON_CLASS} />
           </button>
         </div>
       </DropdownMenu>
