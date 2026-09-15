@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { dedupeFetch, TOGGLE_FETCH_OPTIONS } from "@/lib/dedupe-fetch";
 
 type Options = {
   communityId: string;
@@ -26,6 +26,12 @@ export function useShowcaseInteractions(options: Options) {
   const saveRef = useRef<BooleanIntentCoalescer | null>(null);
   const [likePending, setLikePending] = useState(false);
   const [savePending, setSavePending] = useState(false);
+  /**
+   * The save state the card renders. It follows the coalescer's local intent,
+   * so a refetch that lands while the write is still in flight can't flip the
+   * bookmark back to its pre-click state.
+   */
+  const [savedState, setSavedState] = useState(options.saved);
 
   useEffect(() => {
     latestRef.current = options;
@@ -39,7 +45,7 @@ export function useShowcaseInteractions(options: Options) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, active }),
-      }, { cooldownMode: "url" });
+      }, TOGGLE_FETCH_OPTIONS);
       const result = (await response.json().catch(() => null)) as InteractionResponse | null;
       if (!response.ok || typeof result?.active !== "boolean") {
         throw new Error(result?.error ?? `Failed to update showcase ${action}.`);
@@ -64,7 +70,10 @@ export function useShowcaseInteractions(options: Options) {
 
     const save = new BooleanIntentCoalescer({
       initialValue: options.saved,
-      onOptimisticChange: (saved) => latestRef.current.onSaveChanged(saved),
+      onOptimisticChange: (saved) => {
+        setSavedState(saved);
+        latestRef.current.onSaveChanged(saved);
+      },
       onPendingChange: setSavePending,
       persist: async (saved) => (await persist("save", saved)).active!,
     });
@@ -80,9 +89,19 @@ export function useShowcaseInteractions(options: Options) {
   }, [options.communityId, options.postId]);
 
   useEffect(() => likeRef.current?.syncConfirmed(options.liked), [options.liked]);
-  useEffect(() => saveRef.current?.syncConfirmed(options.saved), [options.saved]);
+
+  useEffect(() => {
+    const coordinator = saveRef.current;
+    if (!coordinator) return;
+    // Read `pending` before syncing: while a write is outstanding the local
+    // intent stays on screen; once the coalescer was idle the server-backed
+    // prop is authoritative again (realtime, another tab).
+    const pending = coordinator.isPending();
+    coordinator.syncConfirmed(options.saved);
+    if (!pending) setSavedState(options.saved);
+  }, [options.saved]);
 
   const toggleLike = useCallback(() => likeRef.current?.toggle(), []);
   const toggleSave = useCallback(() => saveRef.current?.toggle(), []);
-  return { toggleLike, toggleSave, likePending, savePending };
+  return { toggleLike, toggleSave, likePending, savePending, saved: savedState };
 }

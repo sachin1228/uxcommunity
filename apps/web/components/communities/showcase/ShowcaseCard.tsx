@@ -51,7 +51,7 @@ export function ShowcaseCard({
   onEdit,
   onDelete,
 }: ShowcaseCardProps) {
-  const { toggleLike, toggleSave, likePending, savePending } = useShowcaseInteractions({
+  const { toggleLike, toggleSave, likePending, savePending, saved } = useShowcaseInteractions({
     communityId,
     postId: post.id,
     liked: post.user_liked,
@@ -169,7 +169,7 @@ export function ShowcaseCard({
             secondaryLabel={`Showcase · ${categoryLabel}`}
           />
           <ShowcaseOptionsMenu
-            saved={post.user_saved}
+            saved={saved}
             canManage={post.user_id === currentUserId}
             busy={savePending}
             onToggleSave={toggleSave}

@@ -11,6 +11,11 @@ interface EventOptionsMenuProps {
   isOwner: boolean;
   past?: boolean;
   deleting?: boolean;
+  /**
+   * True while the save write is in flight. It only drives a small syncing
+   * hint — the label always reflects the optimistic state the user picked, so
+   * a slow round trip can't make the menu look like it ignored the click.
+   */
   saving?: boolean;
   className?: string;
   onSave: () => void;
@@ -76,9 +81,15 @@ export function EventOptionsMenu({
       </button>
       {open && (
         <div className="absolute right-0 top-9 z-30 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
-          <button type="button" onClick={() => run(onSave)} disabled={saving} aria-pressed={saved} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+          <button
+            type="button"
+            onClick={() => run(onSave)}
+            aria-pressed={saved}
+            aria-busy={saving}
+            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+          >
             <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
-            {saving ? "Saving…" : saved ? "Unsave" : "Save"}
+            {saved ? "Unsave" : "Save"}
           </button>
           <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
             <Share2 strokeWidth={2.5} size={12} /> {shared ? "Copied!" : "Share"}
