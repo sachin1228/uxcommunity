@@ -18,9 +18,14 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
+import {
+  chosenAreas,
+  DEFAULT_ENABLED_TABS,
+  isAreaConfigurable,
+  type CommunityArea,
+} from "@/lib/communities/areas";
 
 type Privacy = "public" | "private";
-type CommunityTab = "chat" | "threads" | "showcase" | "events" | "resources";
 
 interface CreatedCommunity {
   id: string;
@@ -41,7 +46,7 @@ interface CreateCommunityModalProps {
 }
 
 const FEATURE_OPTIONS: Array<{
-  id: CommunityTab;
+  id: CommunityArea;
   label: string;
   description: string;
   icon: typeof MessageSquare;
@@ -53,9 +58,6 @@ const FEATURE_OPTIONS: Array<{
   { id: "events", label: "Events", description: "Meetups and online sessions", icon: Calendar },
   { id: "resources", label: "Resources", description: "Links, files, and references", icon: BookOpen },
 ];
-
-/** Default areas for a new community — mirrors the API + DB defaults. */
-const DEFAULT_TABS: CommunityTab[] = ["chat", "threads", "showcase", "events", "resources"];
 
 function StepDots({ step }: { step: number }) {
   return (
@@ -105,7 +107,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
   const [name, setName] = useState("");
   const [privacy, setPrivacy] = useState<Privacy>("public");
   const [description, setDescription] = useState("");
-  const [tabs, setTabs] = useState<CommunityTab[]>(DEFAULT_TABS);
+  const [tabs, setTabs] = useState<CommunityArea[]>([...DEFAULT_ENABLED_TABS]);
   const [rules, setRules] = useState<string[]>([
     "Be respectful and kind to all members.",
     "Keep discussions relevant to this community.",
@@ -121,7 +123,12 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
 
   const canContinue = useMemo(() => name.trim().length > 0 && name.trim().length <= 80, [name]);
 
-  function toggleTab(tab: CommunityTab) {
+  const isPrivate = privacy === "private";
+  // Public communities always have Showcase, so it is only a choice for private
+  // ones.
+  const areaOptions = FEATURE_OPTIONS.filter(({ id }) => isAreaConfigurable(id, isPrivate));
+
+  function toggleTab(tab: CommunityArea) {
     if (tab === "chat") return;
     setTabs((prev) =>
       prev.includes(tab)
@@ -150,7 +157,9 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
     formData.set("name", name.trim());
     formData.set("privacy", privacy);
     formData.set("description", description.trim());
-    formData.set("tabs", JSON.stringify(tabs));
+    // Public communities always show Showcase, so it is never part of their
+    // stored choice.
+    formData.set("tabs", JSON.stringify(chosenAreas(tabs, isPrivate)));
     formData.set("rules", JSON.stringify(rules.map((rule) => rule.trim()).filter(Boolean)));
     if (image) {
       try {
@@ -278,7 +287,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                 Choose the areas members will see. Chat is always included.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {FEATURE_OPTIONS.map(({ id, label, description: copy, icon: Icon, required }) => {
+                {areaOptions.map(({ id, label, description: copy, icon: Icon, required }) => {
                   const active = tabs.includes(id);
                   return (
                     <button
@@ -309,6 +318,11 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
                   );
                 })}
               </div>
+              {!isPrivate && (
+                <p className="mt-3 font-body text-xs text-foreground-muted">
+                  Showcase is always included in public communities.
+                </p>
+              )}
             </div>
           )}
 

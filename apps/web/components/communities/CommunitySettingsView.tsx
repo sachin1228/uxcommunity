@@ -21,6 +21,11 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  chosenAreas,
+  isAreaConfigurable,
+  type CommunityArea,
+} from "@/lib/communities/areas";
 
 interface Community {
   id: string;
@@ -43,10 +48,7 @@ interface CommunitySettingsViewProps {
   onDeleted: () => void;
 }
 
-type Tab = "chat" | "threads" | "showcase" | "events" | "resources";
-
-/** Areas a new community starts with — mirrors the API + DB defaults. */
-const DEFAULT_TABS: Tab[] = ["chat", "threads", "showcase", "events", "resources"];
+type Tab = CommunityArea;
 
 const FEATURE_OPTIONS: Array<{
   id: Tab;
@@ -78,8 +80,10 @@ export function CommunitySettingsView({
   const [name,        setName]        = useState(community.name);
   const [description, setDescription] = useState(community.description ?? "");
   const [isPrivate,   setIsPrivate]   = useState(community.is_private ?? false);
-  const [tabs,        setTabs]        = useState<Tab[]>(
-    (community.enabled_tabs ?? DEFAULT_TABS) as Tab[]
+  // Areas public communities always show are never part of the stored choice,
+  // so they never appear here as a toggle either.
+  const [tabs,        setTabs]        = useState<Tab[]>(() =>
+    chosenAreas(community.enabled_tabs, community.is_private ?? false)
   );
 
   // Image state
@@ -130,6 +134,10 @@ export function CommunitySettingsView({
 
   const inviteUrl = buildInviteUrl(inviteToken);
 
+  // Public communities always have Showcase, so it is only a toggle for private
+  // ones.
+  const areaOptions = FEATURE_OPTIONS.filter(({ id }) => isAreaConfigurable(id, isPrivate));
+
   function handleImageChange(file: File | null) {
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     if (file) {
@@ -149,6 +157,20 @@ export function CommunitySettingsView({
     if (tab === "chat") return;
     setTabs((prev) =>
       prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab]
+    );
+  }
+
+  /**
+   * A privacy change hands Showcase over to (or back from) the always-on list
+   * instead of dropping it: public makes it unconditional, private starts from
+   * it on. The tab is never silently lost by flipping privacy.
+   */
+  function handlePrivacyChange(next: boolean) {
+    setIsPrivate(next);
+    setTabs((prev) =>
+      next
+        ? (prev.includes("showcase") ? prev : [...prev, "showcase"])
+        : prev.filter((tab) => tab !== "showcase")
     );
   }
 
@@ -184,7 +206,7 @@ export function CommunitySettingsView({
       formData.set("name",        name.trim());
       formData.set("description", description.trim());
       formData.set("is_private",  String(isPrivate));
-      formData.set("tabs",        JSON.stringify(tabs));
+      formData.set("tabs",        JSON.stringify(chosenAreas(tabs, isPrivate)));
       formData.set("rules",       JSON.stringify(rules));
       if (image) {
         try {
@@ -391,7 +413,7 @@ export function CommunitySettingsView({
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setIsPrivate(value === "private")}
+                    onClick={() => handlePrivacyChange(value === "private")}
                     className={`relative flex items-center gap-3 rounded-lg border p-3 text-left transition-colors ${
                       active ? "border-accent bg-accent/10" : "border-border bg-surface-raised hover:border-accent/60"
                     }`}
@@ -419,7 +441,7 @@ export function CommunitySettingsView({
               Tabs
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              {FEATURE_OPTIONS.map(({ id, label, description: copy, icon: Icon, required }) => {
+              {areaOptions.map(({ id, label, description: copy, icon: Icon, required }) => {
                 const active = tabs.includes(id);
                 return (
                   <button
@@ -450,6 +472,11 @@ export function CommunitySettingsView({
                 );
               })}
             </div>
+            {!isPrivate && (
+              <p className="mt-3 font-body text-xs text-foreground-muted">
+                Showcase is always included in public communities.
+              </p>
+            )}
           </section>
 
           {/* Rules */}

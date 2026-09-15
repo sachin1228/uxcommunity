@@ -24,6 +24,7 @@ import {
 } from "@/lib/reaction-intent-coordinator";
 import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
+import { isAreaVisible, type CommunityArea } from "@/lib/communities/areas";
 
 import { ChatInput } from "./chat/ChatInput";
 import type { MentionCandidate } from "@/lib/communities/mentions";
@@ -1122,10 +1123,12 @@ export function CommunityChat({
     [community, sidebarEntry, communityId],
   );
 
-  // "members" is always available; every other tab has to be one of the
-  // community's chosen areas, so a disabled Showcase falls back to Chat.
+  // "members" is always available; every other tab has to be a chosen area
+  // (public communities always include Showcase), so a disabled area falls
+  // back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "members"]).has(activeTab)
+    activeTab !== "members" &&
+    !isAreaVisible(activeTab as CommunityArea, displayCommunity.enabled_tabs, displayCommunity.is_private)
       ? "chat"
       : activeTab;
 
