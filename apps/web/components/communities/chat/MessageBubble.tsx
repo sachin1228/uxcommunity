@@ -834,7 +834,9 @@ function DeletedBubble({
       )}
       <div className="flex items-center gap-1.5">
         <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
-        <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
+        {/* leading-6 matches the live message text row, so a deleted placeholder
+            occupies the same line box and the bubble keeps its rhythm. */}
+        <span className={`font-body text-xs leading-6 ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
           {isMe ? "You deleted this message" : "This message was deleted"}
         </span>
       </div>
