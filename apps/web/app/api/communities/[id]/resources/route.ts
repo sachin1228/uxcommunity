@@ -3,7 +3,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
-import { deferCommunityNotification, resourceHref } from "@/lib/notifications";
 import type { ResourceType } from "@/components/communities/resources/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityResources } from "@/lib/communities/read-models";
@@ -158,18 +157,6 @@ export async function POST(
     console.error("[POST resource]", error);
     return NextResponse.json({ error: "Failed to create resource." }, { status: 500 });
   }
-
-  deferCommunityNotification({
-    communityId,
-    actorId: userId,
-    type: "community_resource",
-    entityType: "resource",
-    entityId: inserted.id,
-    title: (actorName) => `${actorName} shared a new resource`,
-    body: title,
-    href: resourceHref(communityId, inserted.id),
-    metadata: { resource_type: resourceType },
-  });
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: inserted },

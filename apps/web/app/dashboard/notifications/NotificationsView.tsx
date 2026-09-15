@@ -5,17 +5,22 @@
 // unread badge, and mark-read behaviour live in useNotifications.
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
-  AtSign,
   Bell,
   CalendarDays,
   CheckCheck,
   FileText,
+  Heart,
   MessageCircle,
   Users,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  NOTIFICATION_TABS,
+  splitNotificationsByTab,
+  type NotificationTab,
+} from "@/lib/notifications-tabs";
 import {
   useNotifications,
   type NotificationItem,
@@ -23,12 +28,18 @@ import {
 } from "@/lib/use-notifications";
 
 function iconFor(type: NotificationType) {
-  if (type === "chat_mention") return AtSign;
+  if (type === "thread_like") return Heart;
   if (type.includes("event")) return CalendarDays;
   if (type.includes("resource")) return FileText;
   if (type.includes("comment") || type.includes("reply")) return MessageCircle;
   return Users;
 }
+
+/** Icons are a view concern; the tab keys/labels come from the shared module. */
+const TAB_ICONS: Record<NotificationTab, typeof Bell> = {
+  activity: MessageCircle,
+  other: Bell,
+};
 
 function formatRelativeTime(value: string) {
   const diff = Date.now() - new Date(value).getTime();
@@ -42,24 +53,40 @@ function formatRelativeTime(value: string) {
   return `${Math.floor(diff / day)}d`;
 }
 
+function EmptyNotifications({
+  icon: Icon,
+  title,
+  hint,
+}: {
+  icon: typeof Bell;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <div className="px-5 py-16 text-center">
+      <Icon strokeWidth={2.5} size={26} className="mx-auto mb-3 text-foreground-muted opacity-50" />
+      <p className="font-body text-sm font-medium text-foreground">{title}</p>
+      <p className="mt-1 font-body text-xs text-foreground-muted">{hint}</p>
+    </div>
+  );
+}
+
 export function NotificationsView({ userId }: { userId: string }) {
   const { notifications, unreadCount, loading, markOneRead, markAllRead } =
     useNotifications(userId);
 
+  const [tab, setTab] = useState<NotificationTab>("activity");
+
   const hasUnread = unreadCount > 0;
 
-  const emptyState = useMemo(
-    () => (
-      <div className="px-5 py-16 text-center">
-        <Bell strokeWidth={2.5} size={26} className="mx-auto mb-3 text-foreground-muted opacity-50" />
-        <p className="font-body text-sm font-medium text-foreground">No notifications yet</p>
-        <p className="mt-1 font-body text-xs text-foreground-muted">
-          Threads, resources, events, replies, and @mentions will appear here.
-        </p>
-      </div>
-    ),
-    [],
+  // Unread counts are derived from the loaded page — the server total
+  // (`unreadCount`) is not split by type.
+  const { activity, other, unreadByTab } = useMemo(
+    () => splitNotificationsByTab(notifications),
+    [notifications],
   );
+
+  const visible = tab === "activity" ? activity : other;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
@@ -81,16 +108,86 @@ export function NotificationsView({ userId }: { userId: string }) {
         </button>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
+      {/* Hidden while the very first page loads and when the account has no
+          notifications at all — a tab bar over nothing is just noise. */}
+      {!loading && notifications.length > 0 && (
+        <div
+          role="tablist"
+          aria-label="Notification types"
+          className="mt-4 flex items-center gap-1 overflow-x-auto border-b border-border md:gap-3"
+        >
+          {NOTIFICATION_TABS.map(({ key, label }) => {
+            const Icon = TAB_ICONS[key];
+            const active = tab === key;
+            const unread = unreadByTab[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                id={`notifications-tab-${key}`}
+                aria-selected={active}
+                aria-controls="notifications-panel"
+                onClick={() => setTab(key)}
+                className={`border-b-2 px-3 py-2.5 font-body text-xs transition-colors ${
+                  active
+                    ? "border-accent text-foreground"
+                    : "border-transparent text-foreground-muted hover:text-foreground"
+                }`}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <Icon size={14} strokeWidth={2.5} aria-hidden="true" />
+                  {label}
+                  {unread > 0 && (
+                    <span
+                      className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-soft px-1 font-body text-[10px] font-semibold leading-none text-accent"
+                      title={`${unread} unread`}
+                    >
+                      {unread > 9 ? "9+" : unread}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div
+        role="tabpanel"
+        id="notifications-panel"
+        aria-labelledby={`notifications-tab-${tab}`}
+        className="mt-4 overflow-hidden rounded-xl border border-border bg-surface"
+      >
         {loading ? (
           <div className="flex justify-center py-14">
             <Spinner className="h-4 w-4" />
           </div>
         ) : notifications.length === 0 ? (
-          emptyState
+          <EmptyNotifications
+            icon={Bell}
+            title="No notifications yet"
+            hint="Likes, comments and RSVPs on your posts will appear here."
+          />
+        ) : visible.length === 0 ? (
+          tab === "activity" ? (
+            <EmptyNotifications
+              icon={MessageCircle}
+              title="No likes or comments yet"
+              hint="Likes, comments and RSVPs on your threads, resources and events will appear here."
+            />
+          ) : (
+            /* The Other tab renders nothing yet on purpose — see
+               lib/notifications-tabs.ts for where its types get declared. */
+            <EmptyNotifications
+              icon={Bell}
+              title="Nothing here yet"
+              hint="Other kinds of notifications will show up here."
+            />
+          )
         ) : (
           <ul className="divide-y divide-border">
-            {notifications.map((item: NotificationItem) => {
+            {visible.map((item: NotificationItem) => {
               const Icon = iconFor(item.type);
               const unread = !item.read_at;
               return (

@@ -3,7 +3,7 @@
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { AtSign, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   applyReactionDelete,
   applyReactionInsert,
@@ -96,8 +96,6 @@ import { TypingIndicator } from "./chat/TypingIndicator";
 import { extractFirstUrl } from "@/lib/communities/linkPreview";
 import {
   fetchAndHydrateCommunityBootstrap,
-  fetchJsonCached,
-  getCachedRequest,
   initRequestCache,
   setCachedRequest,
   type CommunityBootstrap,
@@ -105,24 +103,6 @@ import {
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import type { SSRCommunitySections } from "@/lib/communities/server";
-
-/** Server notification rows relevant to seeding the pending-mention pill. */
-interface MentionNotificationRow {
-  id: string;
-  type: string;
-  href: string;
-  read_at: string | null;
-  created_at: string;
-}
-
-/** Pull { communityId, messageId } out of a chat_mention notification href. */
-function mentionTargetFromHref(
-  href: string,
-): { communityId: string; messageId: string } | null {
-  const match =
-    /^\/dashboard\/communities\/([\w-]+)#msg-([\w-]+)$/.exec(href);
-  return match ? { communityId: match[1], messageId: match[2] } : null;
-}
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -315,41 +295,6 @@ export function CommunityChat({
   // ── Highlighted message state (scroll-to-reply) — handler defined after scrollContainerRef ──
   const [highlightedMsgId, setHighlightedMsgId] = useState<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Messages that mentioned the user and are awaiting a jump — newest first.
-   * Entries are tagged with their community so the queue survives community
-   * switches within the session (each chat shows only its own entries). */
-  const [pendingMentions, setPendingMentions] = useState<
-    Array<{ communityId: string; messageId: string; createdAt: string }>
-  >([]);
-
-  const addPendingMention = useCallback(
-    (targetCommunityId: string, messageId: string, createdAt?: string) => {
-      setPendingMentions((prev) => {
-        if (
-          prev.some(
-            (m) =>
-              m.communityId === targetCommunityId && m.messageId === messageId,
-          )
-        ) {
-          return prev;
-        }
-        const next = [
-          ...prev,
-          {
-            communityId: targetCommunityId,
-            messageId,
-            createdAt: createdAt ?? new Date().toISOString(),
-          },
-        ];
-        next.sort((a, b) =>
-          a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
-        );
-        return next;
-      });
-    },
-    [],
-  );
-
   // ── Reply state ───────────────────────────────────────────────────────────
   // Composer drafts (text + pending reply) are keyed per community so switching
   // communities never silently discards what the user was typing.
@@ -751,114 +696,6 @@ export function CommunityChat({
     },
     [flashMessage],
   );
-
-  // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
-  // The pill lists messages that mentioned the user and are still awaiting a
-  // jump. It is fed by three channels:
-  //   1. the #msg-<id> hash the bell navigates with (land WITHOUT auto-scroll;
-  //      the user taps the @ pill when ready),
-  //   2. unread chat_mention notifications for the current user,
-  //   3. live chat_mention notifications while the chat is open.
-  //
-  // The URL hash is the only channel between the NotificationBell (dashboard
-  // shell) and this page, so it is tracked through every route to it: Next
-  // <Link> updates the hash with history.pushState — which does NOT fire a
-  // hashchange event — so a light interval is the reliable catch-all (manual
-  // edits and back/forward fire hashchange/popstate and update instantly).
-  useEffect(() => {
-    const consumeHash = () => {
-      const match = /^#msg-([\w-]+)$/.exec(window.location.hash);
-      if (!match) return;
-      addPendingMention(communityId, match[1]);
-      const url = new URL(window.location.href);
-      url.hash = "";
-      window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-    };
-    window.addEventListener("hashchange", consumeHash);
-    window.addEventListener("popstate", consumeHash);
-    const timer = window.setInterval(consumeHash, 400);
-    return () => {
-      window.removeEventListener("hashchange", consumeHash);
-      window.removeEventListener("popstate", consumeHash);
-      window.clearInterval(timer);
-    };
-  }, [addPendingMention, communityId]);
-
-  // Seed: unread chat_mention notifications (cached list first — paints
-  // instantly — then a fresh read catches stragglers in the background).
-  useEffect(() => {
-    let cancelled = false;
-    const apply = (items?: MentionNotificationRow[]) => {
-      if (!items || cancelled) return;
-      for (const item of items) {
-        if (item.type !== "chat_mention" || item.read_at) continue;
-        const target = mentionTargetFromHref(item.href);
-        if (target) addPendingMention(target.communityId, target.messageId, item.created_at);
-      }
-    };
-    // A macrotask keeps the cached seed out of the effect body proper.
-    const seedTimer = window.setTimeout(() => {
-      apply(
-        getCachedRequest<{ notifications?: MentionNotificationRow[] }>(
-          "/api/notifications",
-          currentUserId,
-        )?.notifications,
-      );
-    }, 0);
-    void fetchJsonCached<{ notifications?: MentionNotificationRow[] }>(
-      "/api/notifications",
-      { staleMs: 30_000 },
-      currentUserId,
-    )
-      .then((data) => apply(data?.notifications))
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-      window.clearTimeout(seedTimer);
-    };
-  }, [addPendingMention, currentUserId]);
-
-  // Live mentions: the server publishes a chat_mention notification row the
-  // moment someone mentions the user, so the pill grows without a refetch.
-  useEffect(() => {
-    const room = realtimeRooms.notifications(currentUserId);
-    const unsubRoom = realtimeClient.subscribe(room);
-    const unsub = realtimeClient.on(room, "insert", (data) => {
-      const next = data as MentionNotificationRow;
-      if (!next || next.type !== "chat_mention") return;
-      const target = mentionTargetFromHref(next.href);
-      if (target) addPendingMention(target.communityId, target.messageId, next.created_at);
-    });
-    return () => {
-      unsub();
-      unsubRoom();
-    };
-  }, [addPendingMention, currentUserId]);
-
-  /** Mentions awaiting a jump inside THIS community — newest first. */
-  const visiblePendingMentions = useMemo(
-    () => pendingMentions.filter((m) => m.communityId === communityId),
-    [communityId, pendingMentions],
-  );
-
-  /** Jump to the newest pending mention (newest → oldest on repeated taps). */
-  const jumpToPendingMention = useCallback(() => {
-    const target = visiblePendingMentions[0];
-    if (!target) return;
-    // Only consume when the row is actually in the loaded window — otherwise
-    // the pill stays so the user can tap again after the message loads.
-    if (flashMessage(target.messageId, 2000)) {
-      setPendingMentions((prev) =>
-        prev.filter(
-          (m) =>
-            !(
-              m.communityId === target.communityId &&
-              m.messageId === target.messageId
-            ),
-        ),
-      );
-    }
-  }, [flashMessage, visiblePendingMentions]);
 
   // ── Image viewer (lightbox) ───────────────────────────────────────────────
   // Every non-deleted image in the loaded chat window, in timeline order, so
@@ -1470,23 +1307,6 @@ export function CommunityChat({
 
           {/* Static footer — separate from the scroll body, never overlapped */}
           <footer className="relative shrink-0 z-10 bg-background">
-            {/* @ pill — jump to messages where the user was mentioned */}
-            {visiblePendingMentions.length > 0 && (
-              <button
-                type="button"
-                onClick={jumpToPendingMention}
-                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white shadow-lg hover:bg-[var(--ds-blue-900)] transition-colors"
-                aria-label={`${visiblePendingMentions.length} pending mention${visiblePendingMentions.length === 1 ? "" : "s"} — jump to message`}
-                title="Jump to the message where you were mentioned"
-              >
-                <AtSign strokeWidth={2.5} size={15} />
-                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--ds-blue-900)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
-                  {visiblePendingMentions.length > 9
-                    ? "9+"
-                    : visiblePendingMentions.length}
-                </span>
-              </button>
-            )}
             {/* Scroll-to-bottom button — floats just above the footer edge */}
             {showScrollToBottom && (
               <button
