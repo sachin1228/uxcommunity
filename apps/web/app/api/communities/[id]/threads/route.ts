@@ -290,11 +290,6 @@ export async function POST(
       topic: "thread-insert",
       data: inserted,
     },
-    {
-      room: realtimeRooms.profile(userId),
-      topic: "thread",
-      data: inserted,
-    },
   ]);
 
   await logModerationDecision(db, {
