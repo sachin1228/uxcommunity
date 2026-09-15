@@ -66,10 +66,6 @@ export interface CommunityThread {
   } | null;
 }
 
-export interface ProfileThread extends CommunityThread {
-  community: { name: string } | null;
-}
-
 export interface ThreadComment {
   id: string;
   thread_id: string;

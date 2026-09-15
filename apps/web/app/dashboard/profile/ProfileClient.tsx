@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
 import { ProfileCard } from "./components/ProfileCard";
-import { ProfileThreads } from "./components/ProfileThreads";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
-import type { ProfileThread } from "@/components/communities/threads/types";
 
 interface Props {
   initialName: string;
@@ -23,8 +21,6 @@ interface Props {
   initialBio: string;
   initialInterestIds: string[];
   allInterests: { id: string; name: string; image_url?: string | null }[];
-  initialThreads: ProfileThread[];
-  currentUserId: string;
 }
 
 export function ProfileClient({
@@ -38,8 +34,6 @@ export function ProfileClient({
   jobTitle,
   initialLinkedIn,
   initialPortfolio,
-  initialThreads,
-  currentUserId,
 }: Props) {
   const router = useRouter();
   const [name] = useState(initialName);
@@ -137,13 +131,6 @@ export function ProfileClient({
         portfolio={portfolio}
         onLinkedinChange={setLinkedin}
         onPortfolioChange={setPortfolio}
-      />
-
-      <ProfileThreads
-        initialThreads={initialThreads}
-        currentUserId={currentUserId}
-        currentUserName={name}
-        currentUserAvatar={avatarUrl}
       />
 
       {showPicturePicker && (

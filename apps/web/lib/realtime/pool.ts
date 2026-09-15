@@ -10,7 +10,7 @@
  * Community-scoped rooms (chat:*, threads:*, events:*, resources:*, showcase:*, rules:*)
  * each get their own WebSocket to the CommunityDO.
  *
- * User-scoped rooms (notifications:*, profile:*) share a connection to UserDO.
+ * User-scoped rooms (notifications:*) share a connection to UserDO.
  */
 
 import { realtimeClient, type RealtimeUser } from "./client";
