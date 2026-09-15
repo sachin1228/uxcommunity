@@ -24,6 +24,7 @@ import {
 } from "@/lib/reaction-intent-coordinator";
 import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
+import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 
 import { ChatInput } from "./chat/ChatInput";
 import type { MentionCandidate } from "@/lib/communities/mentions";
@@ -1116,14 +1117,18 @@ export function CommunityChat({
           image_url: sidebarEntry.image_url,
           is_private: sidebarEntry.is_private,
           enabled_tabs: sidebarEntry.enabled_tabs,
+          showcase_enabled: sidebarEntry.showcase_enabled,
           owner_id: sidebarEntry.owner_id,
         }
       : null),
     [community, sidebarEntry, communityId],
   );
 
+  // "members" is always available; every other tab has to be enabled for this
+  // community, so a switched-off area falls back to Chat.
   const renderedTab: ChatTab = displayCommunity &&
-    !new Set([...(displayCommunity.enabled_tabs ?? ["chat", "threads", "showcase", "resources", "events"]), "showcase", "members"]).has(activeTab)
+    activeTab !== "members" &&
+    !isFeatureVisible(activeTab as CommunityFeature, displayCommunity)
       ? "chat"
       : activeTab;
 
@@ -1191,6 +1196,7 @@ export function CommunityChat({
                     ...(updated.image_url    !== undefined && { image_url:    updated.image_url }),
                     ...(updated.is_private   !== undefined && { is_private:   updated.is_private }),
                     ...(updated.enabled_tabs !== undefined && { enabled_tabs: updated.enabled_tabs }),
+                    ...(updated.showcase_enabled !== undefined && { showcase_enabled: updated.showcase_enabled }),
                   });
                 });
                 setShowSettings(false);

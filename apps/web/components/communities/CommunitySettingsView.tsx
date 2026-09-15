@@ -16,10 +16,18 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import {
+  DEFAULT_ENABLED_TABS,
+  isShowcaseEnabled,
+  toEnabledTabs,
+  type CommunityArea,
+  type CommunityFeature,
+} from "@/lib/communities/areas";
 
 interface Community {
   id: string;
@@ -27,6 +35,8 @@ interface Community {
   description?: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
+  /** Absent on rows that predate the flag; reads as on. */
+  showcase_enabled?: boolean | null;
   invite_token?: string | null;
   owner_id?: string | null;
   image_url?: string | null;
@@ -42,7 +52,7 @@ interface CommunitySettingsViewProps {
   onDeleted: () => void;
 }
 
-type Tab = "chat" | "threads" | "events" | "resources";
+type Tab = CommunityFeature;
 
 const FEATURE_OPTIONS: Array<{
   id: Tab;
@@ -53,6 +63,7 @@ const FEATURE_OPTIONS: Array<{
 }> = [
   { id: "chat",      label: "Chat",      description: "Real-time member conversations", icon: MessageSquare, required: true },
   { id: "threads",   label: "Threads",   description: "Topic-led discussions",          icon: Hash },
+  { id: "showcase",  label: "Showcase",  description: "Share work and collect feedback", icon: Sparkles },
   { id: "events",    label: "Events",    description: "Meetups and online sessions",    icon: Calendar },
   { id: "resources", label: "Resources", description: "Links, files, and references",  icon: BookOpen },
 ];
@@ -73,9 +84,11 @@ export function CommunitySettingsView({
   const [name,        setName]        = useState(community.name);
   const [description, setDescription] = useState(community.description ?? "");
   const [isPrivate,   setIsPrivate]   = useState(community.is_private ?? false);
-  const [tabs,        setTabs]        = useState<Tab[]>(
-    (community.enabled_tabs ?? ["chat", "threads", "events", "resources"]) as Tab[]
+  const [tabs,        setTabs]        = useState<CommunityArea[]>(() =>
+    toEnabledTabs(community.enabled_tabs ?? DEFAULT_ENABLED_TABS)
   );
+  // Showcase has its own flag; absent means on (rows created before the flag).
+  const [showcase,    setShowcase]    = useState(() => isShowcaseEnabled(community.showcase_enabled));
 
   // Image state
   const [image,         setImage]         = useState<File | null>(null);
@@ -142,6 +155,10 @@ export function CommunitySettingsView({
 
   function toggleTab(tab: Tab) {
     if (tab === "chat") return;
+    if (tab === "showcase") {
+      setShowcase((prev) => !prev);
+      return;
+    }
     setTabs((prev) =>
       prev.includes(tab) ? prev.filter((t) => t !== tab) : [...prev, tab]
     );
@@ -179,7 +196,8 @@ export function CommunitySettingsView({
       formData.set("name",        name.trim());
       formData.set("description", description.trim());
       formData.set("is_private",  String(isPrivate));
-      formData.set("tabs",        JSON.stringify(tabs));
+      formData.set("tabs",        JSON.stringify(toEnabledTabs(tabs)));
+      formData.set("showcase",    String(showcase));
       formData.set("rules",       JSON.stringify(rules));
       if (image) {
         try {
@@ -200,7 +218,14 @@ export function CommunitySettingsView({
           rules: rules.map((rule_text, index) => ({ id: `local-${index}`, rule_text })),
         });
         const newImageUrl = data?.image_url !== undefined ? data.image_url : (removeImage ? null : (community.image_url ?? null));
-        onSaved({ name: name.trim(), description: description.trim() || null, is_private: isPrivate, enabled_tabs: tabs, image_url: newImageUrl });
+        onSaved({
+          name: name.trim(),
+          description: description.trim() || null,
+          is_private: isPrivate,
+          enabled_tabs: toEnabledTabs(tabs),
+          showcase_enabled: showcase,
+          image_url: newImageUrl,
+        });
         setSaveMsg("Settings saved.");
         setTimeout(() => { setSaveMsg(null); onClose(); }, 1200);
       } else {
@@ -415,7 +440,7 @@ export function CommunitySettingsView({
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {FEATURE_OPTIONS.map(({ id, label, description: copy, icon: Icon, required }) => {
-                const active = tabs.includes(id);
+                const active = id === "showcase" ? showcase : tabs.includes(id);
                 return (
                   <button
                     key={id}

@@ -11,15 +11,20 @@ import {
   Lock,
   MessageSquare,
   Plus,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { compressAvatarClient, compressedFile } from "@/lib/image-client";
+import {
+  COMMUNITY_FEATURES,
+  toEnabledTabs,
+  type CommunityFeature,
+} from "@/lib/communities/areas";
 
 type Privacy = "public" | "private";
-type CommunityTab = "chat" | "threads" | "events" | "resources";
 
 interface CreatedCommunity {
   id: string;
@@ -40,7 +45,7 @@ interface CreateCommunityModalProps {
 }
 
 const FEATURE_OPTIONS: Array<{
-  id: CommunityTab;
+  id: CommunityFeature;
   label: string;
   description: string;
   icon: typeof MessageSquare;
@@ -48,6 +53,7 @@ const FEATURE_OPTIONS: Array<{
 }> = [
   { id: "chat", label: "Chat", description: "Real-time member conversations", icon: MessageSquare, required: true },
   { id: "threads", label: "Threads", description: "Topic-led discussions", icon: Hash },
+  { id: "showcase", label: "Showcase", description: "Share work and collect feedback", icon: Sparkles },
   { id: "events", label: "Events", description: "Meetups and online sessions", icon: Calendar },
   { id: "resources", label: "Resources", description: "Links, files, and references", icon: BookOpen },
 ];
@@ -100,7 +106,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
   const [name, setName] = useState("");
   const [privacy, setPrivacy] = useState<Privacy>("public");
   const [description, setDescription] = useState("");
-  const [tabs, setTabs] = useState<CommunityTab[]>(["chat", "threads", "events", "resources"]);
+  const [tabs, setTabs] = useState<CommunityFeature[]>([...COMMUNITY_FEATURES]);
   const [rules, setRules] = useState<string[]>([
     "Be respectful and kind to all members.",
     "Keep discussions relevant to this community.",
@@ -116,7 +122,7 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
 
   const canContinue = useMemo(() => name.trim().length > 0 && name.trim().length <= 80, [name]);
 
-  function toggleTab(tab: CommunityTab) {
+  function toggleTab(tab: CommunityFeature) {
     if (tab === "chat") return;
     setTabs((prev) =>
       prev.includes(tab)
@@ -145,7 +151,9 @@ export function CreateCommunityModal({ open, onClose, onCreated }: CreateCommuni
     formData.set("name", name.trim());
     formData.set("privacy", privacy);
     formData.set("description", description.trim());
-    formData.set("tabs", JSON.stringify(tabs));
+    // Showcase has its own flag; enabled_tabs only carries the tabbed areas.
+    formData.set("tabs", JSON.stringify(toEnabledTabs(tabs)));
+    formData.set("showcase", tabs.includes("showcase") ? "true" : "false");
     formData.set("rules", JSON.stringify(rules.map((rule) => rule.trim()).filter(Boolean)));
     if (image) {
       try {

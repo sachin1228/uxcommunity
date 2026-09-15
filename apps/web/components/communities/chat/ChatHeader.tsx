@@ -8,6 +8,7 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
+import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 
 interface Community {
   id: string;
@@ -17,6 +18,8 @@ interface Community {
   image_url: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
+  /** Absent on rows that predate the flag; reads as on. */
+  showcase_enabled?: boolean | null;
   owner_id?: string | null;
 }
 
@@ -180,8 +183,12 @@ export const ChatHeader = memo(function ChatHeader({
     setConfirmAction(action);
   }
 
+  // Members is not an owner-toggleable area, so it stays visible regardless of
+  // enabled_tabs; every other tab follows the community's own flags.
   const visibleTabs = community
-    ? DEFAULT_TABS.filter((tab) => tab === "showcase" || tab === "members" || (community.enabled_tabs ?? DEFAULT_TABS).includes(tab))
+    ? DEFAULT_TABS.filter(
+        (tab) => tab === "members" || isFeatureVisible(tab as CommunityFeature, community),
+      )
     : DEFAULT_TABS;
 
   return (
