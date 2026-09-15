@@ -73,10 +73,6 @@ export interface ProfileCommunity {
   image_url: string | null;
 }
 
-export interface ProfileThread extends CommunityThread {
-  community: ProfileCommunity | null;
-}
-
 export interface ThreadComment {
   id: string;
   thread_id: string;

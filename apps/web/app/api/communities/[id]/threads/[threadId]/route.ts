@@ -241,11 +241,6 @@ export async function PATCH(
       topic: "thread-update",
       data: updated,
     },
-    {
-      room: realtimeRooms.profile(userId),
-      topic: "thread",
-      data: updated,
-    },
   ]);
 
   return NextResponse.json({ thread: await enrichThread(db, updated as Record<string, unknown>, userId) });
@@ -306,11 +301,6 @@ export async function DELETE(
     {
       room: realtimeRooms.chat(communityId),
       topic: "thread-delete",
-      data: { id: threadId },
-    },
-    {
-      room: realtimeRooms.profile(existing.user_id),
-      topic: "thread",
       data: { id: threadId },
     },
   ]);

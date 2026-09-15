@@ -5,7 +5,6 @@
  *   GET   /api/profile
  *   PATCH /api/profile
  *   POST  /api/profile/interests
- *   GET   /api/profile/threads
  *   GET   /api/lottie-settings
  *   GET   /api/link-preview?url=...
  *
@@ -64,16 +63,6 @@ export function profileTests() {
     check(res, {
       'profile/interests: status 2xx': (r) =>
         r.status >= 200 && r.status < 300,
-    });
-    sleep(0.1);
-  });
-
-  group('profile — threads list', () => {
-    const res = http.get(`${BASE_URL}/api/profile/threads`, {
-      tags: { name: 'profile/threads' },
-    });
-    check(res, {
-      'profile/threads: status 200': (r) => r.status === 200,
     });
     sleep(0.1);
   });

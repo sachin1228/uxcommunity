@@ -291,9 +291,8 @@ Total: 1 HTTP, 0 DB queries
 | 11 | `showcase:${postId}` | `ShowcaseDetailClient.tsx` | Showcase detail open | Navigate away | ✅ client.close() |
 | 12 | `rules:${cid}` | `CommunityInfoPanel.tsx` | Info panel open | Panel close | ✅ client.close() |
 | 13 | `notifications:${userId}` | `NotificationBell.tsx` | Dashboard mount | Logout | ✅ client.close() |
-| 14 | `profile:${userId}` | `ProfileThreads.tsx` | Profile page mount | Navigate away | ✅ client.close() |
 
-**Maximum concurrent connections per user**: ~14 (if all rooms open simultaneously)
+**Maximum concurrent connections per user**: ~13 (if all rooms open simultaneously)
 **Typical concurrent connections**: 3-5 (panel + typing for sidebar + 1 active community rooms)
 
 ### Server-Side Presence Tracking
@@ -1220,10 +1219,9 @@ Performance-focused PostgreSQL functions that do complex joins/aggregations in t
 | 5 | `get_home_feed_page` | Cross-community feed query | 🟡 Complex |
 | 6 | `get_thread_list_page` | Thread list with aggregates | 🟡 Complex |
 | 7 | `get_event_list_page` | Event list with RSVP data | 🟡 Complex |
-| 8 | Profile saved items (`/api/profile/saved`) | 6-8 sequential SELECT queries | 🟡 Many queries |
-| 9 | `loadCommunityReadModel` | 5+ parallel SELECTs | 🟡 Multiple queries |
-| 10 | `enrichAuthoredRows` | 3 parallel SELECTs + RPC | 🟡 Multiple queries |
-| 11-20 | Various CRUD routes | 1-3 SELECTs per route | 🟢 Simple queries |
+| 8 | `loadCommunityReadModel` | 5+ parallel SELECTs | 🟡 Multiple queries |
+| 9 | `enrichAuthoredRows` | 3 parallel SELECTs + RPC | 🟡 Multiple queries |
+| 10-19 | Various CRUD routes | 1-3 SELECTs per route | 🟢 Simple queries |
 
 ---
 

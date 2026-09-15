@@ -6,7 +6,7 @@
  * Architecture:
  *   Component → realtimeClient (singleton) → N WebSockets → CommunityDOs
  *   Each community-scoped room (chat:*, threads:*, etc.) gets its own
- *   WebSocket directly to the CommunityDO. User-scoped rooms (notifications:*, profile:*)
+ *   WebSocket directly to the CommunityDO. User-scoped rooms (notifications:*)
  *   still connect to UserDO.
  *
  * Reference-counted subscriptions:
@@ -100,7 +100,7 @@ interface ConnectionState {
  *
  * Manages multiple WebSockets:
  *   - One per active community (for community-scoped rooms)
- *   - One for user-scoped rooms (notifications, profile, designers-studio)
+ *   - One for user-scoped rooms (notifications, designers-studio)
  *
  * Reference-counted lifecycle:
  *   on(room, topic, handler)  → increments topic refcount, subscribes if first

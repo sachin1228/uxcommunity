@@ -74,11 +74,6 @@ export async function POST(
         topic: "like",
         data: { event: "INSERT", thread_id: threadId, user_id: userId },
       },
-      {
-        room: realtimeRooms.profile(thread.user_id),
-        topic: "like",
-        data: { event: "INSERT", thread_id: threadId, user_id: userId },
-      },
     ]);
 
     if (!existing) {
@@ -122,11 +117,6 @@ export async function POST(
   void publishRealtimeBatch([
     {
       room: realtimeRooms.threads(communityId),
-      topic: "like",
-      data: { event: "DELETE", thread_id: threadId, user_id: userId },
-    },
-    {
-      room: realtimeRooms.profile(thread.user_id),
       topic: "like",
       data: { event: "DELETE", thread_id: threadId, user_id: userId },
     },

@@ -6,7 +6,6 @@
 export const realtimeRooms = {
   chat: (communityId: string) => `chat:${communityId}`,
   presence: (communityId: string) => `presence:${communityId}`,
-  profile: (userId: string) => `profile:${userId}`,
   notifications: (userId: string) => `notifications:${userId}`,
   threads: (communityId: string) => `threads:${communityId}`,
   threadComments: (threadId: string) => `thread-comments:${threadId}`,

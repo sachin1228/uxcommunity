@@ -148,18 +148,6 @@ export async function POST(
         undo_used: undoUsed,
       },
     },
-    {
-      room: realtimeRooms.profile(thread.user_id),
-      topic: "poll",
-      data: {
-        event: isUndo ? "UNDO" : "INSERT",
-        thread_id: threadId,
-        user_id: userId,
-        counts,
-        user_vote: userVote,
-        undo_used: undoUsed,
-      },
-    },
   ]);
 
   return NextResponse.json({ counts, user_vote: userVote, undo_used: undoUsed });
