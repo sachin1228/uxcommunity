@@ -150,14 +150,14 @@ export const CommunityRow = memo(function CommunityRow({
                 {typingText}
               </p>
 
-            ) : lastReaction && (!c.last_message || lastReaction.messageId === c.last_message.id) ? (
-              /* Reaction preview — only when it belongs to the LATEST message.
-                 Showing reactions to older messages replaced the actual last
-                 message preview, so busy communities hid their newest message
-                 behind any recent reaction. */
+            ) : lastReaction ? (
+              /* Reaction preview — shown for ANY reaction, not just ones on
+                 the latest message. Reacting to an older message must still
+                 confirm in the sidebar ("john reacted ❤️ to: 'ok'"); dropping
+                 it made the reaction look like it never registered. */
               <p className="font-body text-[13px] text-foreground-muted truncate flex-1">
                 <span className="font-medium">{lastReaction.firstName}</span>
-                {lastReaction.isOwn ? " reacted " : " reacted "}
+                {" reacted "}
                 <NotoEmojiSvg emoji={lastReaction.emoji} size={14} className="align-middle mx-0.5" />
                 {" to: "}
                 <span>{lastReaction.messagePreview}</span>
