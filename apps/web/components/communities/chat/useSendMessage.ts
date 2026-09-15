@@ -10,7 +10,7 @@ import {
 import type { CachedMessage, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { compressImage, compressedFile, preloadImage } from "@/lib/image-client";
-import { MAX_MESSAGE_CHARS } from "./chatUtils";
+import { MAX_MESSAGE_CHARS, scrollChatToBottom } from "./chatUtils";
 
 type Message = CachedMessage;
 
@@ -23,8 +23,8 @@ interface UseSendMessageOptions {
   setHideUnreadDivider: (val: boolean) => void;
   replyTo: ReplyPreview | null;
   onClearReply: () => void;
-  /** Ref to the bottom sentinel — scrolled into view instantly on every send. */
-  scrollToBottomRef: React.RefObject<HTMLDivElement>;
+  /** The chat's scrollable message body — pinned to the newest message on every send. */
+  scrollContainerRef: React.RefObject<HTMLDivElement>;
   /** Resolves the members @mentioned in the final text (composer registry). */
   resolveMentions?: (content: string) => MessageMention[];
 }
@@ -44,7 +44,7 @@ export function useSendMessage({
   setHideUnreadDivider,
   replyTo,
   onClearReply,
-  scrollToBottomRef,
+  scrollContainerRef,
   resolveMentions,
 }: UseSendMessageOptions) {
   // Stable-ish helper: mentions only exist while there is text to mention in.
@@ -250,19 +250,14 @@ export function useSendMessage({
       if (!current || current.last_message?.id !== tempId) return;
       restoreSidebarEntry(communityId, prevSidebarEntry);
     };
-    // Jump to the bottom only when the user is already near it — replying to
-    // an older message must not teleport them away from the conversation they
-    // were reading. (The realtime path shows the scroll-to-bottom pill for the
-    // same situation.) The bottom sentinel's viewport position is a reliable
-    // "near bottom" test that works without owning the scroll container.
-    requestAnimationFrame(() => {
-      const sentinel = scrollToBottomRef.current;
-      if (!sentinel) return;
-      const rect = sentinel.getBoundingClientRect();
-      if (rect.top <= window.innerHeight + 250) {
-        sentinel.scrollIntoView({ behavior: "instant" });
-      }
-    });
+    // Always jump to the bottom: the message just sent is the newest row, so
+    // it is what the user expects to see — even when they sent it while
+    // scrolled up reading older history. Running in a rAF puts the jump after
+    // the optimistic bubble has been committed and laid out, so `scrollHeight`
+    // already includes it.
+    requestAnimationFrame(() =>
+      scrollChatToBottom(scrollContainerRef.current),
+    );
 
     // Re-enable the send button immediately — the optimistic bubble is already
     // visible, so there's no reason to block the input while waiting for the
@@ -663,15 +658,10 @@ export function useSendMessage({
       if (!current || current.last_message?.id !== tempId) return;
       restoreSidebarEntry(communityId, prevSidebarEntry);
     };
-    // Jump to bottom only when near it (same reasoning as text/image sends).
-    requestAnimationFrame(() => {
-      const sentinel = scrollToBottomRef.current;
-      if (!sentinel) return;
-      const rect = sentinel.getBoundingClientRect();
-      if (rect.top <= window.innerHeight + 250) {
-        sentinel.scrollIntoView({ behavior: "instant" });
-      }
-    });
+    // Always jump to the bottom (same reasoning as text/image sends).
+    requestAnimationFrame(() =>
+      scrollChatToBottom(scrollContainerRef.current),
+    );
 
     // Re-enable the input immediately — same pattern as text/image sends.
     setSending(false);
