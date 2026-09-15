@@ -28,6 +28,7 @@
     "test:r2-lifecycle": "tsx --test apps/web/lib/r2-lifecycle.test.ts",
     "test:read-manager": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/read-manager.test.ts",
     "test:sidebar-merge": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/panel/sidebar-merge.test.ts",
+    "test:chat-scroll": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/chatUtils.test.ts",
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"
   },
   "engines": {

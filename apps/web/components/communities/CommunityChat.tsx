@@ -954,7 +954,8 @@ export function CommunityChat({
     setHideUnreadDivider,
     replyTo,
     onClearReply: handleClearReply,
-    scrollToBottomRef: bottomRef,
+    // The hook pins this container to the newest message on every send.
+    scrollContainerRef,
     resolveMentions: resolveMentionsForSend,
   });
 
