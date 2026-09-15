@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { scrollChatToBottom, type ScrollableLike } from "./chatUtils";
+import {
+  pickOptimisticMatch,
+  scrollChatToBottom,
+  type OptimisticLike,
+  type ScrollableLike,
+} from "./chatUtils";
 
 function scrollContainer(
   scrollTop: number,
@@ -41,4 +46,87 @@ test("a chat shorter than its viewport lands at offset zero", () => {
 test("no-ops while the scroll container is not mounted", () => {
   assert.doesNotThrow(() => scrollChatToBottom(null));
   assert.doesNotThrow(() => scrollChatToBottom(undefined));
+});
+
+// ─── Optimistic echo matching ─────────────────────────────────────────────
+
+const ME = "user-me";
+const THEM = "user-them";
+
+function bubble(
+  id: string,
+  content: string | null,
+  overrides: Partial<OptimisticLike> = {},
+): OptimisticLike {
+  return { id, user_id: ME, content, status: "sending", ...overrides };
+}
+
+// The repro from the bug report: two messages typed and sent back-to-back, so
+// both bubbles are in flight at once. Each echo has to confirm its own bubble.
+test("two in-flight sends each match their own echo", () => {
+  const inFlight = [bubble("temp-1", "first"), bubble("temp-2", "second")];
+
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: ME, content: "first" })?.id,
+    "temp-1",
+  );
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: ME, content: "second" })?.id,
+    "temp-2",
+  );
+});
+
+// Echoes are published fire-and-forget (after() on the server), so the second
+// message can be confirmed before the first. Content — not arrival order —
+// decides which bubble is replaced, so no message is lost or duplicated.
+test("an out-of-order echo still lands on the bubble it confirms", () => {
+  const inFlight = [bubble("temp-1", "first"), bubble("temp-2", "second")];
+
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: ME, content: "second" })?.id,
+    "temp-2",
+  );
+});
+
+// "ok" sent twice in a row is indistinguishable by content — the oldest bubble
+// is the one this echo belongs to, so the pairing stays first-in-first-out.
+test("identical texts pair oldest-first", () => {
+  const inFlight = [bubble("temp-1", "ok"), bubble("temp-2", "ok")];
+
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: ME, content: "ok" })?.id,
+    "temp-1",
+  );
+});
+
+// Image/GIF sends carry no text: the echo can only be matched by position.
+test("a textless echo matches the oldest in-flight bubble", () => {
+  const inFlight = [bubble("temp-1", ""), bubble("temp-2", "")];
+
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: ME, content: "" })?.id,
+    "temp-1",
+  );
+});
+
+test("another member's echo never steals my optimistic bubble", () => {
+  const inFlight = [bubble("temp-1", "mine")];
+
+  assert.equal(
+    pickOptimisticMatch(inFlight, { user_id: THEM, content: "mine" }),
+    null,
+  );
+});
+
+test("confirmed and failed rows are not replaced by a new echo", () => {
+  const rows = [
+    bubble("temp-1", "failed one", { status: "failed" }),
+    bubble("temp-2", "already sent", { status: "sent" }),
+    bubble("real-1", "already sent"),
+  ];
+
+  assert.equal(
+    pickOptimisticMatch(rows, { user_id: ME, content: "already sent" }),
+    null,
+  );
 });
