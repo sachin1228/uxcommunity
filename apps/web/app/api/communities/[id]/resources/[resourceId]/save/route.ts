@@ -59,6 +59,9 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "save", data: { event: body.saved ? "INSERT" : "DELETE", resource_id: resourceId, user_id: userId } },
+    ...(resource.user_id
+      ? [{ room: realtimeRooms.profile(resource.user_id), topic: "save", data: { event: body.saved ? "INSERT" : "DELETE", resource_id: resourceId, user_id: userId } }]
+      : []),
   ]);
   return NextResponse.json({ saved: body.saved, save_count: count ?? 0 });
 }

@@ -47,7 +47,8 @@ export async function POST(
     { room: realtimeRooms.events(communityId), topic: "like", data: { event_id: eventId, user_id: userId } },
   ]);
 
-  const [{ data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
+  const [{ data: eventAuthor }, { data: persisted, error: stateError }, { count, error: countError }] = await Promise.all([
+    db.from("community_events").select("user_id").eq("id", eventId).maybeSingle(),
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_likes").select("event_id", { count: "exact", head: true }).eq("event_id", eventId),
   ]);
@@ -58,6 +59,12 @@ export async function POST(
   // Drop the cached home feed so its user_liked snapshot doesn't predate this
   // mutation (otherwise the heart reverts to its pre-click state on refresh).
   revalidateTag(HOME_FEED_TAG, { expire: 0 });
+
+  if (eventAuthor?.user_id) {
+    void publishRealtimeBatch([
+      { room: realtimeRooms.profile(eventAuthor.user_id), topic: "like", data: { event_id: eventId, user_id: userId } },
+    ]);
+  }
 
   return NextResponse.json({ liked: body.liked, like_count: count ?? 0 });
 }

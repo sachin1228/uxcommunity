@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+import { attachAuthors, communityOf } from "@/lib/profile-content";
 
 export async function GET() {
   let session;
@@ -17,7 +18,7 @@ export async function GET() {
   const { data, error } = await db
     .from("community_threads")
     .select(
-      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(name)",
+      "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(id, name, image_url)",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -28,12 +29,11 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch your threads." }, { status: 500 });
   }
 
-  const threads = (data ?? []).map((thread) => {
-    const raw = (thread as { communities?: unknown }).communities;
-    const community: { name: string } | null =
-      !raw ? null : Array.isArray(raw) ? ((raw[0] as { name: string }) ?? null) : (raw as { name: string });
-    return { ...thread, users: null, community, communities: undefined };
-  });
+  const threads = (data ?? []).map((thread) => ({
+    ...(thread as Record<string, unknown>),
+    community: communityOf((thread as { communities?: unknown }).communities),
+    communities: undefined,
+  }));
 
   const threadsWithVotes = await attachPollVotes(
     db,
@@ -42,13 +42,14 @@ export async function GET() {
   );
   if (!threadsWithVotes.length) return NextResponse.json({ threads: [] });
 
-  const threadIds = threads.map((t) => t.id);
-  const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] = await Promise.all([
-    db.from("thread_likes").select("thread_id").in("thread_id", threadIds),
-    db.from("thread_likes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
-    db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
-    db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
-  ]);
+  const [authoredThreads, { data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] =
+    await Promise.all([
+      attachAuthors(db, threadsWithVotes),
+      db.from("thread_likes").select("thread_id").in("thread_id", threadsWithVotes.map((t) => t.id as string)),
+      db.from("thread_likes").select("thread_id").in("thread_id", threadsWithVotes.map((t) => t.id as string)).eq("user_id", userId),
+      db.from("thread_saves").select("thread_id").in("thread_id", threadsWithVotes.map((t) => t.id as string)).eq("user_id", userId),
+      db.from("thread_comments").select("thread_id").in("thread_id", threadsWithVotes.map((t) => t.id as string)),
+    ]);
 
   const likeCountMap: Record<string, number> = {};
   for (const l of allLikes ?? []) likeCountMap[l.thread_id] = (likeCountMap[l.thread_id] ?? 0) + 1;
@@ -60,12 +61,12 @@ export async function GET() {
   const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
 
   return NextResponse.json({
-    threads: threadsWithVotes.map((thread) => ({
+    threads: authoredThreads.map((thread) => ({
       ...thread,
-      like_count: likeCountMap[thread.id] ?? 0,
-      user_liked: myLikeSet.has(thread.id),
-      user_saved: mySaveSet.has(thread.id),
-      comment_count: commentCountMap[thread.id] ?? 0,
+      like_count: likeCountMap[thread.id as string] ?? 0,
+      user_liked: myLikeSet.has(thread.id as string),
+      user_saved: mySaveSet.has(thread.id as string),
+      comment_count: commentCountMap[thread.id as string] ?? 0,
     })),
   });
 }

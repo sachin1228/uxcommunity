@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MessageSquareText,
   CalendarDays,
@@ -13,6 +13,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ProfileThread } from "@/components/communities/threads/types";
 import type { CommunityEvent } from "@/components/communities/events/types";
 import type { CommunityResource } from "@/components/communities/resources/types";
+import type { EventRsvp } from "@/components/communities/events/types";
 import { ThreadCard } from "@/components/communities/threads/ThreadCard";
 import { EventCard } from "@/components/communities/events/EventCard";
 import { ResourceCard } from "@/components/communities/resources/ResourceCard";
@@ -20,13 +21,10 @@ import { useGuardedRouter } from "@/lib/navigation-guard";
 
 type Tab = "threads" | "events" | "resources" | "saved";
 
-type ProfileEvent    = CommunityEvent    & { community: { name: string } | null };
-type ProfileResource = CommunityResource & { community: { name: string } | null };
-
 type SavedItem =
   | { type: "thread";   data: ProfileThread }
-  | { type: "event";    data: ProfileEvent }
-  | { type: "resource"; data: ProfileResource };
+  | { type: "event";    data: CommunityEvent }
+  | { type: "resource"; data: CommunityResource };
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "threads",   label: "Threads",   icon: <MessageSquareText strokeWidth={2.5} size={13} /> },
@@ -70,12 +68,12 @@ export function ProfileThreads({
   const router = useGuardedRouter();
 
   // ── Events tab ────────────────────────────────────────────────────────────
-  const [events, setEvents]           = useState<ProfileEvent[]>([]);
+  const [events, setEvents]           = useState<CommunityEvent[]>([]);
   const [eventsLoaded, setEventsLoaded]     = useState(false);
   const [eventsLoading, setEventsLoading]   = useState(false);
 
   // ── Resources tab ─────────────────────────────────────────────────────────
-  const [resources, setResources]               = useState<ProfileResource[]>([]);
+  const [resources, setResources]               = useState<CommunityResource[]>([]);
   const [resourcesLoaded, setResourcesLoaded]   = useState(false);
   const [resourcesLoading, setResourcesLoading] = useState(false);
 
@@ -83,6 +81,10 @@ export function ProfileThreads({
   const [savedItems, setSavedItems]         = useState<SavedItem[]>([]);
   const [savedLoaded, setSavedLoaded]       = useState(false);
   const [savedLoading, setSavedLoading]     = useState(false);
+
+  function mapSavedItems(updater: (current: SavedItem[]) => SavedItem[]) {
+    setSavedItems((current) => updater(current));
+  }
 
   // Lazy-load events on first visit to that tab
   useEffect(() => {
@@ -114,9 +116,9 @@ export function ProfileThreads({
       .then((r) => (r.ok ? r.json() : { threads: [], events: [], resources: [] }))
       .then((d) => {
         const items: SavedItem[] = [
-          ...(d.threads   ?? []).map((t: ProfileThread)    => ({ type: "thread"   as const, data: t })),
-          ...(d.events    ?? []).map((e: ProfileEvent)     => ({ type: "event"    as const, data: e })),
-          ...(d.resources ?? []).map((r: ProfileResource)  => ({ type: "resource" as const, data: r })),
+          ...(d.threads   ?? []).map((t: CommunityThread)    => ({ type: "thread"   as const, data: t })),
+          ...(d.events    ?? []).map((e: CommunityEvent)     => ({ type: "event"    as const, data: e })),
+          ...(d.resources ?? []).map((r: CommunityResource)  => ({ type: "resource" as const, data: r })),
         ];
         setSavedItems(items);
         setSavedLoaded(true);
@@ -125,19 +127,64 @@ export function ProfileThreads({
       .finally(() => setSavedLoading(false));
   }, [activeTab, savedLoaded]);
 
-  // ── Realtime subscriptions for threads ───────────────────────────────────
+  // ── Realtime subscriptions ────────────────────────────────────────────────
+  // The profile room receives "thread" / "like" / "poll" events for the
+  // owner's threads plus (since the cards must stay in sync everywhere)
+  // "event", "rsvp", "save" events for the owner's events and the viewer's
+  // saves, and "resource" events for the owner's resources. Interaction
+  // counters apply optimistically; content changes refetch that list.
   useEffect(() => {
     if (!isVisible) return;
     const room = realtimeRooms.profile(currentUserId);
     const unsubRoom = realtimeClient.subscribe(room);
 
-    const unsubThread = realtimeClient.on(room, "thread", async () => {
+    const refetchThreads = async () => {
       try {
         const response = await fetch("/api/profile/threads", { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
         setThreads(data.threads as ProfileThread[]);
       } catch { /* reconciled on next refresh */ }
+    };
+
+    const refetchEvents = async () => {
+      if (!eventsLoaded) return;
+      try {
+        const response = await fetch("/api/profile/events", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        setEvents(data.events ?? []);
+      } catch { /* reconciled on next refresh */ }
+    };
+
+    const refetchResources = async () => {
+      if (!resourcesLoaded) return;
+      try {
+        const response = await fetch("/api/profile/resources", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        setResources(data.resources ?? []);
+      } catch { /* reconciled on next refresh */ }
+    };
+
+    const refetchSaved = async () => {
+      if (!savedLoaded) return;
+      try {
+        const response = await fetch("/api/profile/saved", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const items: SavedItem[] = [
+          ...(data.threads   ?? []).map((t: CommunityThread)   => ({ type: "thread"   as const, data: t })),
+          ...(data.events    ?? []).map((e: CommunityEvent)    => ({ type: "event"    as const, data: e })),
+          ...(data.resources ?? []).map((r: CommunityResource) => ({ type: "resource" as const, data: r })),
+        ];
+        setSavedItems(items);
+      } catch { /* reconciled on next refresh */ }
+    };
+
+    const unsubThread = realtimeClient.on(room, "thread", () => {
+      void refetchThreads();
+      void refetchSaved();
     });
 
     const unsubPoll = realtimeClient.on(room, "poll", (data) => {
@@ -149,21 +196,113 @@ export function ProfileThreads({
           thread.id !== record.thread_id ? thread : { ...thread, poll_vote_counts: record.counts },
         ),
       );
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "thread" && item.data.id === record.thread_id
+            ? { ...item, data: { ...item.data, poll_vote_counts: record.counts } }
+            : item,
+        ),
+      );
     });
 
     const unsubLike = realtimeClient.on(room, "like", (data) => {
-      const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; user_id?: string } | null;
-      if (!record?.thread_id) return;
-      const threadId = record.thread_id;
-      if (record.user_id === currentUserId && pendingLikes.current.has(threadId)) return;
-      setThreads((current) =>
-        current.map((thread) => {
-          if (thread.id !== threadId) return thread;
-          if (record.event === "INSERT") return { ...thread, like_count: thread.like_count + 1 };
-          if (record.event === "DELETE") return { ...thread, like_count: Math.max(0, thread.like_count - 1) };
-          return thread;
-        }),
+      const record = data as { event?: "INSERT" | "UPDATE" | "DELETE"; thread_id?: string; event_id?: string; user_id?: string } | null;
+      const threadId = record?.thread_id;
+      const eventId = record?.event_id;
+      if (!threadId && !eventId) return;
+      if (threadId && record!.user_id === currentUserId && pendingLikes.current.has(threadId)) return;
+      const delta = record!.event === "DELETE" ? -1 : 1;
+      if (threadId) {
+        setThreads((current) =>
+          current.map((thread) =>
+            thread.id !== threadId ? thread : { ...thread, like_count: Math.max(0, thread.like_count + delta) },
+          ),
+        );
+        mapSavedItems((current) =>
+          current.map((item) =>
+            item.type === "thread" && item.data.id === threadId
+              ? { ...item, data: { ...item.data, like_count: Math.max(0, item.data.like_count + delta) } }
+              : item,
+          ),
+        );
+      }
+      if (eventId) {
+        setEvents((current) =>
+          current.map((event) =>
+            event.id !== eventId ? event : { ...event, like_count: Math.max(0, event.like_count + delta) },
+          ),
+        );
+        mapSavedItems((current) =>
+          current.map((item) =>
+            item.type === "event" && item.data.id === eventId
+              ? { ...item, data: { ...item.data, like_count: Math.max(0, item.data.like_count + delta) } }
+              : item,
+          ),
+        );
+      }
+    });
+
+    // Event content changed (create/edit/delete) — refetch both lists.
+    const unsubEvent = realtimeClient.on(room, "event", () => {
+      void refetchEvents();
+      void refetchSaved();
+    });
+
+    const unsubRsvp = realtimeClient.on(room, "rsvp", (data) => {
+      const record = data as { event?: "INSERT" | "DELETE"; event_id?: string; user_id?: string } | null;
+      if (!record?.event_id) return;
+      const delta = record.event === "DELETE" ? -1 : 1;
+      const apply = (event: CommunityEvent) =>
+        event.id === record.event_id
+          ? { ...event, rsvp_count: Math.max(0, event.rsvp_count + delta) }
+          : event;
+      setEvents((current) => current.map(apply));
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "event" ? { ...item, data: apply(item.data) } : item,
+        ),
       );
+    });
+
+    const unsubSave = realtimeClient.on(room, "save", (data) => {
+      const record = data as { event?: "INSERT" | "DELETE"; event_id?: string; resource_id?: string; user_id?: string } | null;
+      if (!record) return;
+      // Our own saves were applied optimistically with the exact server count;
+      // refetch the saved list so a save made from another surface lands here.
+      if (record.user_id === currentUserId) {
+        void refetchSaved();
+        return;
+      }
+      const delta = record.event === "DELETE" ? -1 : 1;
+      if (record.event_id) {
+        const apply = (event: CommunityEvent) =>
+          event.id === record.event_id
+            ? { ...event, save_count: Math.max(0, event.save_count + delta) }
+            : event;
+        setEvents((current) => current.map(apply));
+        mapSavedItems((current) =>
+          current.map((item) =>
+            item.type === "event" ? { ...item, data: apply(item.data) } : item,
+          ),
+        );
+      }
+      if (record.resource_id) {
+        const apply = (resource: CommunityResource) =>
+          resource.id === record.resource_id
+            ? { ...resource, save_count: Math.max(0, resource.save_count + delta) }
+            : resource;
+        setResources((current) => current.map(apply));
+        mapSavedItems((current) =>
+          current.map((item) =>
+            item.type === "resource" ? { ...item, data: apply(item.data) } : item,
+          ),
+        );
+      }
+    });
+
+    const unsubResource = realtimeClient.on(room, "resource", () => {
+      void refetchResources();
+      void refetchSaved();
     });
 
     realtimeClient.connect();
@@ -171,9 +310,13 @@ export function ProfileThreads({
       unsubThread();
       unsubPoll();
       unsubLike();
+      unsubEvent();
+      unsubRsvp();
+      unsubSave();
+      unsubResource();
       unsubRoom();
     };
-  }, [currentUserId, isVisible]);
+  }, [currentUserId, isVisible, eventsLoaded, resourcesLoaded, savedLoaded]);
 
   // ── Thread handlers ───────────────────────────────────────────────────────
   function handleUpdated(
@@ -186,6 +329,13 @@ export function ProfileThreads({
           t.id === threadId ? ({ ...t, ...updated, community } as ProfileThread) : t,
         ),
       );
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "thread" && item.data.id === threadId
+            ? { ...item, data: { ...item.data, ...updated } }
+            : item,
+        ),
+      );
     };
   }
 
@@ -195,6 +345,13 @@ export function ProfileThreads({
     setThreads((current) =>
       current.map((t) =>
         t.id === threadId ? { ...t, user_liked: liked, like_count: newCount } : t,
+      ),
+    );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "thread" && item.data.id === threadId
+          ? { ...item, data: { ...item.data, user_liked: liked, like_count: newCount } }
+          : item,
       ),
     );
   }
@@ -211,7 +368,7 @@ export function ProfileThreads({
         t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } : t,
       ),
     );
-    setSavedItems((current) =>
+    mapSavedItems((current) =>
       current.map((item) =>
         item.type === "thread" && item.data.id === threadId
           ? { ...item, data: { ...item.data, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } }
@@ -222,24 +379,56 @@ export function ProfileThreads({
 
   function handleDeleted(threadId: string) {
     setThreads((current) => current.filter((t) => t.id !== threadId));
+    mapSavedItems((current) => current.filter((i) => !(i.type === "thread" && i.data.id === threadId)));
+  }
+
+  // Save/unsave from the Threads tab mirrors into the Saved list: unsaving
+  // drops the card, saving appends it (when that list is already loaded).
+  function handleThreadSaveFromThreadsTab(thread: ProfileThread, saved: boolean) {
+    handleSaveChanged(thread.id, saved);
+    if (!saved) {
+      mapSavedItems((current) => current.filter((i) => !(i.type === "thread" && i.data.id === thread.id)));
+    } else {
+      mapSavedItems((current) =>
+        savedLoaded && !current.some((i) => i.type === "thread" && i.data.id === thread.id)
+          ? [...current, { type: "thread" as const, data: { ...thread, user_saved: true } }]
+          : current,
+      );
+    }
   }
 
   // ── Event handlers ────────────────────────────────────────────────────────
   function handleEventUpdated(eventId: string) {
-    return (updated: CommunityEvent) =>
+    return (updated: CommunityEvent) => {
       setEvents((current) =>
         current.map((e) => (e.id === eventId ? { ...e, ...updated } : e)),
       );
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "event" && item.data.id === eventId
+            ? { ...item, data: { ...item.data, ...updated } }
+            : item,
+        ),
+      );
+    };
   }
 
   function handleEventDeleted(eventId: string) {
     setEvents((current) => current.filter((e) => e.id !== eventId));
+    mapSavedItems((current) => current.filter((i) => !(i.type === "event" && i.data.id === eventId)));
   }
 
-  function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {
+  function applyEventRsvp(itemId: string, rsvped: boolean, count: number) {
     setEvents((current) =>
       current.map((e) =>
-        e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e,
+        e.id === itemId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e,
+      ),
+    );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "event" && item.data.id === itemId
+          ? { ...item, data: { ...item.data, user_rsvped: rsvped, rsvp_count: count } }
+          : item,
       ),
     );
   }
@@ -250,6 +439,13 @@ export function ProfileThreads({
         e.id === eventId ? { ...e, user_liked: liked, like_count: count } : e,
       ),
     );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "event" && item.data.id === eventId
+          ? { ...item, data: { ...item.data, user_liked: liked, like_count: count } }
+          : item,
+      ),
+    );
   }
 
   function handleEventSaveChanged(eventId: string, saved: boolean, count: number) {
@@ -258,20 +454,83 @@ export function ProfileThreads({
         e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e,
       ),
     );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "event" && item.data.id === eventId
+          ? { ...item, data: { ...item.data, user_saved: saved, save_count: count } }
+          : item,
+      ),
+    );
   }
+
+  // Save/unsave from the Events tab mirrors into the Saved list.
+  function handleEventSaveFromEventsTab(event: CommunityEvent, saved: boolean, count: number) {
+    handleEventSaveChanged(event.id, saved, count);
+    if (!saved) {
+      mapSavedItems((current) => current.filter((i) => !(i.type === "event" && i.data.id === event.id)));
+    } else {
+      mapSavedItems((current) =>
+        savedLoaded && !current.some((i) => i.type === "event" && i.data.id === event.id)
+          ? [...current, { type: "event" as const, data: { ...event, user_saved: true, save_count: count } }]
+          : current,
+      );
+    }
+  }
+
+  // The events tab has no per-event realtime preview channel, so the attendee
+  // avatar stacks must be refetched once an RSVP settles — otherwise the
+  // current user's avatar never appears until the next full load.
+  const handleEventRsvpSettled = useCallback(async (event: CommunityEvent) => {
+    if (!event.community_id) return;
+    try {
+      const response = await fetch(
+        `/api/communities/${event.community_id}/events/${event.id}/rsvp/list`,
+      );
+      if (!response.ok) return;
+      const data = await response.json() as { rsvps?: EventRsvp[] };
+      const rsvps = data.rsvps ?? [];
+      setEvents((current) =>
+        current.map((e) => (e.id === event.id ? { ...e, rsvps } : e)),
+      );
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "event" && item.data.id === event.id
+            ? { ...item, data: { ...item.data, rsvps } }
+            : item,
+        ),
+      );
+    } catch {
+      // Non-fatal — previews catch up on the next list fetch.
+    }
+  }, []);
 
   // ── Resource handlers ─────────────────────────────────────────────────────
   function handleResourceUpdated(resourceId: string) {
-    return (updated: CommunityResource) =>
+    return (updated: CommunityResource) => {
       setResources((current) =>
         current.map((r) => (r.id === resourceId ? { ...r, ...updated } : r)),
       );
+      mapSavedItems((current) =>
+        current.map((item) =>
+          item.type === "resource" && item.data.id === resourceId
+            ? { ...item, data: { ...item.data, ...updated } }
+            : item,
+        ),
+      );
+    };
   }
 
   function handleResourceSaveChanged(resourceId: string, saved: boolean, count: number) {
     setResources((current) =>
       current.map((r) =>
         r.id === resourceId ? { ...r, user_saved: saved, save_count: count } : r,
+      ),
+    );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "resource" && item.data.id === resourceId
+          ? { ...item, data: { ...item.data, user_saved: saved, save_count: count } }
+          : item,
       ),
     );
   }
@@ -282,13 +541,38 @@ export function ProfileThreads({
         r.id === resourceId ? { ...r, user_bookmarked: bookmarked, bookmark_count: count } : r,
       ),
     );
+    mapSavedItems((current) =>
+      current.map((item) =>
+        item.type === "resource" && item.data.id === resourceId
+          ? { ...item, data: { ...item.data, user_bookmarked: bookmarked, bookmark_count: count } }
+          : item,
+      ),
+    );
   }
 
   function handleResourceDeleted(resourceId: string) {
     setResources((current) => current.filter((r) => r.id !== resourceId));
+    mapSavedItems((current) => current.filter((i) => !(i.type === "resource" && i.data.id === resourceId)));
   }
 
-  // ── Patch helper — fills in current user info when author is the viewer ───
+  // Bookmark/unbookmark from the Resources tab mirrors into the Saved list
+  // (bookmarks are what the Saved list is built from).
+  function handleResourceBookmarkFromResourcesTab(resource: CommunityResource, bookmarked: boolean, count: number) {
+    handleResourceBookmarkChanged(resource.id, bookmarked, count);
+    if (!bookmarked) {
+      mapSavedItems((current) => current.filter((i) => !(i.type === "resource" && i.data.id === resource.id)));
+    } else {
+      mapSavedItems((current) =>
+        savedLoaded && !current.some((i) => i.type === "resource" && i.data.id === resource.id)
+          ? [...current, { type: "resource" as const, data: { ...resource, user_bookmarked: true, bookmark_count: count } }]
+          : current,
+      );
+    }
+  }
+
+  // ── Patch helper — fills in the viewer's info only when the author row is
+  // genuinely missing (deleted accounts); real authors are served by the API
+  // so saved items show whoever actually wrote the post. ──
   function patchUser<T extends { users: { name: string; avatar_url: string | null } | null }>(item: T): T {
     return {
       ...item,
@@ -334,9 +618,11 @@ export function ProfileThreads({
                   currentUserId={currentUserId}
                   communityId={thread.community_id}
                   communityName={thread.community?.name}
+                  communityImage={thread.community?.image_url}
+                  communityNamePlacement="below"
                   onUpdated={handleUpdated(thread.id, thread.community)}
                   onLikeChanged={handleLikeChanged}
-                  onSaveChanged={handleSaveChanged}
+                  onSaveChanged={(threadId, saved) => handleThreadSaveFromThreadsTab(thread, saved)}
                   onPollVoteChanged={handlePollVoteChanged}
                   onDeleted={handleDeleted}
                   onOpen={() => router.push(`/dashboard/communities/${thread.community_id}/threads/${thread.id}`)}
@@ -361,15 +647,18 @@ export function ProfileThreads({
                   <EventCard
                     key={event.id}
                     event={patchUser(event)}
+                    rsvps={event.rsvps}
                     currentUserId={currentUserId}
                     communityId={event.community_id}
                     communityName={event.community?.name}
+                    communityImage={event.community?.image_url}
                     onOpen={() => router.push(`/dashboard/communities/${event.community_id}/events/${event.id}`)}
                     onUpdated={handleEventUpdated(event.id)}
                     onDeleted={handleEventDeleted}
-                    onRsvpChanged={handleRsvpChanged}
+                    onRsvpChanged={applyEventRsvp}
+                    onRsvpSettled={() => handleEventRsvpSettled(event)}
                     onLikeChanged={handleEventLikeChanged}
-                    onSaveChanged={handleEventSaveChanged}
+                    onSaveChanged={(eventId, saved, count) => handleEventSaveFromEventsTab(event, saved, count)}
                   />
               ))}
             </div>
@@ -386,16 +675,18 @@ export function ProfileThreads({
               message="Resources you share in communities will appear here."
             />
           ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-3">
               {resources.map((resource) => (
                 <ResourceCard
                   key={resource.id}
                   resource={resource}
                   currentUserId={currentUserId}
                   communityId={resource.community_id}
+                  communityName={resource.community?.name}
+                  communityImage={resource.community?.image_url}
                   onUpdated={handleResourceUpdated(resource.id)}
                   onSaveChanged={handleResourceSaveChanged}
-                  onBookmarkChanged={handleResourceBookmarkChanged}
+                  onBookmarkChanged={(resourceId, bookmarked, count) => handleResourceBookmarkFromResourcesTab(resource, bookmarked, count)}
                   onDeleted={handleResourceDeleted}
                   onOpen={() => router.push(`/dashboard/communities/${resource.community_id}/resources/${resource.id}`)}
                 />
@@ -425,23 +716,20 @@ export function ProfileThreads({
                       currentUserId={currentUserId}
                       communityId={thread.community_id}
                       communityName={thread.community?.name}
+                      communityImage={thread.community?.image_url}
+                      communityNamePlacement="below"
                       onUpdated={handleUpdated(thread.id, thread.community)}
                       onLikeChanged={handleLikeChanged}
                       onSaveChanged={(threadId, saved) => {
                         if (!saved) {
-                          setSavedItems((current) =>
+                          mapSavedItems((current) =>
                             current.filter((i) => !(i.type === "thread" && i.data.id === threadId)),
                           );
                         }
                         handleSaveChanged(threadId, saved);
                       }}
                       onPollVoteChanged={handlePollVoteChanged}
-                      onDeleted={(threadId) => {
-                        setSavedItems((current) =>
-                          current.filter((i) => !(i.type === "thread" && i.data.id === threadId)),
-                        );
-                        handleDeleted(threadId);
-                      }}
+                      onDeleted={handleDeleted}
                       onOpen={() => router.push(`/dashboard/communities/${thread.community_id}/threads/${thread.id}`)}
                     />
                   );
@@ -453,51 +741,25 @@ export function ProfileThreads({
                     <EventCard
                       key={`event-${event.id}`}
                       event={patchUser(event)}
+                      rsvps={event.rsvps}
                       currentUserId={currentUserId}
                       communityId={event.community_id}
                       communityName={event.community?.name}
+                      communityImage={event.community?.image_url}
                       onOpen={() => router.push(`/dashboard/communities/${event.community_id}/events/${event.id}`)}
-                      onUpdated={(updated) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "event" && i.data.id === event.id
-                              ? { ...i, data: { ...i.data, ...updated } }
-                              : i,
-                          ),
-                        )
-                      }
-                      onDeleted={(eventId) =>
-                        setSavedItems((current) =>
-                          current.filter((i) => !(i.type === "event" && i.data.id === eventId)),
-                        )
-                      }
-                      onRsvpChanged={(eventId, rsvped, count) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "event" && i.data.id === event.id
-                              ? { ...i, data: { ...i.data, user_rsvped: rsvped, rsvp_count: count } }
-                              : i,
-                          ),
-                        )
-                      }
-                      onLikeChanged={(eventId, liked, count) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "event" && i.data.id === eventId
-                              ? { ...i, data: { ...i.data, user_liked: liked, like_count: count } }
-                              : i,
-                          ),
-                        )
-                      }
-                      onSaveChanged={(eventId, saved, count) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "event" && i.data.id === event.id
-                              ? { ...i, data: { ...i.data, user_saved: saved, save_count: count } }
-                              : i,
-                          ),
-                        )
-                      }
+                      onUpdated={handleEventUpdated(event.id)}
+                      onDeleted={handleEventDeleted}
+                      onRsvpChanged={applyEventRsvp}
+                      onRsvpSettled={() => handleEventRsvpSettled(event)}
+                      onLikeChanged={handleEventLikeChanged}
+                      onSaveChanged={(eventId, saved, count) => {
+                        if (!saved) {
+                          mapSavedItems((current) =>
+                            current.filter((i) => !(i.type === "event" && i.data.id === eventId)),
+                          );
+                        }
+                        handleEventSaveChanged(eventId, saved, count);
+                      }}
                     />
                   );
                 }
@@ -510,45 +772,27 @@ export function ProfileThreads({
                       resource={resource}
                       currentUserId={currentUserId}
                       communityId={resource.community_id}
-                      onUpdated={(updated) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "resource" && i.data.id === resource.id
-                              ? { ...i, data: { ...i.data, ...updated } }
-                              : i,
-                          ),
-                        )
-                      }
-                      onSaveChanged={(resourceId, saved, count) =>
-                        setSavedItems((current) =>
-                          current.map((i) =>
-                            i.type === "resource" && i.data.id === resourceId
-                              ? { ...i, data: { ...i.data, user_saved: saved, save_count: count } }
-                              : i,
-                          ),
-                        )
-                      }
-                      onBookmarkChanged={(resourceId, bookmarked, count) =>
-                        // Unbookmarking removes the card from the saved list
-                        bookmarked
-                          ? setSavedItems((current) =>
-                              current.map((i) =>
-                                i.type === "resource" && i.data.id === resourceId
-                                  ? { ...i, data: { ...i.data, user_bookmarked: true, bookmark_count: count } }
-                                  : i,
-                              ),
-                            )
-                          : setSavedItems((current) =>
-                              current.filter(
-                                (i) => !(i.type === "resource" && i.data.id === resourceId),
-                              ),
-                            )
-                      }
-                      onDeleted={(resourceId) =>
-                        setSavedItems((current) =>
-                          current.filter((i) => !(i.type === "resource" && i.data.id === resourceId)),
-                        )
-                      }
+                      communityName={resource.community?.name}
+                      communityImage={resource.community?.image_url}
+                      onUpdated={handleResourceUpdated(resource.id)}
+                      onSaveChanged={(resourceId, saved, count) => {
+                        if (!saved) {
+                          mapSavedItems((current) =>
+                            current.filter((i) => !(i.type === "resource" && i.data.id === resourceId)),
+                          );
+                        }
+                        handleResourceSaveChanged(resourceId, saved, count);
+                      }}
+                      onBookmarkChanged={(resourceId, bookmarked, count) => {
+                        // Unbookmarking removes the card from the saved list.
+                        if (!bookmarked) {
+                          mapSavedItems((current) =>
+                            current.filter((i) => !(i.type === "resource" && i.data.id === resourceId)),
+                          );
+                        }
+                        handleResourceBookmarkChanged(resourceId, bookmarked, count);
+                      }}
+                      onDeleted={handleResourceDeleted}
                       onOpen={() => router.push(`/dashboard/communities/${resource.community_id}/resources/${resource.id}`)}
                     />
                   );

@@ -16,7 +16,7 @@ export async function GET() {
   const { data, error } = await db
     .from("community_resources")
     .select(
-      "id, community_id, user_id, title, description, resource_type, url, allow_replies, created_at, updated_at, communities(name)",
+      "id, community_id, user_id, title, description, resource_type, url, allow_replies, created_at, updated_at, communities(id, name, image_url)",
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
@@ -29,22 +29,26 @@ export async function GET() {
 
   const resources = (data ?? []).map((r) => {
     const raw = (r as { communities?: unknown }).communities;
-    const community: { name: string } | null =
-      !raw ? null : Array.isArray(raw) ? ((raw[0] as { name: string }) ?? null) : (raw as { name: string });
+    const row = (Array.isArray(raw) ? raw[0] : raw) as
+      | { id?: string; name?: string; image_url?: string | null }
+      | null
+      | undefined;
+    const community = row?.name
+      ? { id: row.id ?? "", name: row.name, image_url: row.image_url ?? null }
+      : null;
     return { ...r, communities: undefined, community };
   });
 
   if (!resources.length) return NextResponse.json({ resources: [] });
 
   const resourceIds = resources.map((r) => r.id);
-  const [{ data: allSaves }, { data: mySaves }, { data: allBookmarks }, { data: myBookmarks }, { data: allComments }, { data: profile }] =
+  const [{ data: allSaves }, { data: mySaves }, { data: allBookmarks }, { data: myBookmarks }, { data: allComments }] =
     await Promise.all([
       db.from("resource_saves").select("resource_id").in("resource_id", resourceIds),
       db.from("resource_saves").select("resource_id").in("resource_id", resourceIds).eq("user_id", userId),
       db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds),
       db.from("resource_bookmarks").select("resource_id").in("resource_id", resourceIds).eq("user_id", userId),
       db.from("resource_comments").select("resource_id").in("resource_id", resourceIds),
-      db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
     ]);
 
   const saveCountMap: Record<string, number> = {};
@@ -58,7 +62,6 @@ export async function GET() {
 
   const mySaveSet = new Set((mySaves ?? []).map((s) => s.resource_id));
   const myBookmarkSet = new Set((myBookmarks ?? []).map((b) => b.resource_id));
-  const avatarUrl = (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null;
 
   return NextResponse.json({
     resources: resources.map((r) => ({
@@ -70,6 +73,5 @@ export async function GET() {
       user_bookmarked: myBookmarkSet.has(r.id),
       users: null, // patched client-side
     })),
-    avatarUrl,
   });
 }

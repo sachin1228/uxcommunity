@@ -175,6 +175,7 @@ export async function PATCH(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
+    { room: realtimeRooms.profile((data as unknown as { user_id: string }).user_id), topic: "event", data },
   ]);
 
   const enriched = await enrichOne(db, data as unknown as Record<string, unknown>, userId);
@@ -220,6 +221,7 @@ export async function DELETE(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },
+    { room: realtimeRooms.profile(existing.user_id), topic: "event", data: { id: eventId } },
   ]);
 
   return NextResponse.json({ ok: true });

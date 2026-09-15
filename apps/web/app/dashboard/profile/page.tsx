@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+import { attachAuthors, communityOf } from "@/lib/profile-content";
 import { ProfileClient } from "./ProfileClient";
 import type { ProfileThread } from "@/components/communities/threads/types";
 
@@ -37,7 +39,7 @@ export default async function ProfilePage() {
     db
       .from("community_threads")
       .select(
-        "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(name)",
+        "id, community_id, user_id, title, category, tags, attachments, links, allow_replies, poll, created_at, updated_at, communities(id, name, image_url)",
       )
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
@@ -45,21 +47,28 @@ export default async function ProfilePage() {
   ]);
 
   // Compute real like + comment counts so the profile page doesn't open with all zeros.
+  const baseThreads = (rawThreads ?? []).map((thread) => ({
+    ...(thread as unknown as Record<string, unknown>),
+    community: communityOf((thread as { communities?: unknown }).communities),
+    communities: undefined,
+  }));
   const threadList = await attachPollVotes(
     db,
-    (rawThreads ?? []) as unknown as Array<Record<string, unknown>>,
+    baseThreads as unknown as Array<Record<string, unknown>>,
     userId,
   );
-  const threadIds = threadList.map((t) => t.id);
+  const threadIds = threadList.map((t) => t.id as string);
 
-  const [{ data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] = threadIds.length
-    ? await Promise.all([
-        db.from("thread_likes").select("thread_id").in("thread_id", threadIds),
-        db.from("thread_likes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
-        db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
-        db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
-      ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+  const [authoredThreads, { data: allLikes }, { data: myLikes }, { data: mySaves }, { data: allComments }] =
+    threadIds.length
+      ? await Promise.all([
+          attachAuthors(db, threadList),
+          db.from("thread_likes").select("thread_id").in("thread_id", threadIds),
+          db.from("thread_likes").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
+          db.from("thread_saves").select("thread_id").in("thread_id", threadIds).eq("user_id", userId),
+          db.from("thread_comments").select("thread_id").in("thread_id", threadIds),
+        ])
+      : [[], { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const likeCountMap: Record<string, number> = {};
   for (const l of allLikes ?? []) likeCountMap[l.thread_id] = (likeCountMap[l.thread_id] ?? 0) + 1;
@@ -69,15 +78,6 @@ export default async function ProfilePage() {
 
   const myLikeSet = new Set((myLikes ?? []).map((l) => l.thread_id));
   const mySaveSet = new Set((mySaves ?? []).map((s) => s.thread_id));
-
-  // Supabase returns the joined communities row as an object (many-to-one),
-  // not as an array. Normalise to { name } | null regardless of shape.
-  function communityOf(thread: { communities?: unknown }): { name: string } | null {
-    const raw = thread.communities;
-    if (!raw) return null;
-    if (Array.isArray(raw)) return (raw[0] as { name: string }) ?? null;
-    return raw as { name: string };
-  }
 
   // Resolve the job title slug to its admin-managed display name (the profile
   // column stores a slug, which has no PostgREST embed).
@@ -112,14 +112,12 @@ export default async function ProfilePage() {
       initialBio={(profile as any)?.bio ?? ""}
       initialInterestIds={myInterestIds}
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
-      initialThreads={threadList.map((thread) => ({
+      initialThreads={authoredThreads.map((thread) => ({
         ...thread,
-        users: null,
-        community: communityOf(thread),
-        like_count: likeCountMap[thread.id] ?? 0,
-        user_liked: myLikeSet.has(thread.id),
-        user_saved: mySaveSet.has(thread.id),
-        comment_count: commentCountMap[thread.id] ?? 0,
+        like_count: likeCountMap[thread.id as string] ?? 0,
+        user_liked: myLikeSet.has(thread.id as string),
+        user_saved: mySaveSet.has(thread.id as string),
+        comment_count: commentCountMap[thread.id as string] ?? 0,
       })) as ProfileThread[]}
       currentUserId={userId}
     />

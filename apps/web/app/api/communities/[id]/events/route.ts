@@ -254,6 +254,7 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
+    { room: realtimeRooms.profile(userId), topic: "event", data },
   ]);
 
   const [enriched] = await enrichEvents(db, [data as unknown as Record<string, unknown>], userId);

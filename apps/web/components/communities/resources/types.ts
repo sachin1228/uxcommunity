@@ -1,3 +1,5 @@
+import type { ProfileCommunity } from "../threads/types";
+
 export const RESOURCE_TYPES = [
   { value: "figma",       label: "Figma",        description: "Design files, prototypes, FigJam boards" },
   { value: "article",     label: "Article",       description: "Blog posts, tutorials, case studies" },
@@ -36,6 +38,8 @@ export interface CommunityResource {
     name: string;
     avatar_url: string | null;
   } | null;
+  /** Present on profile surfaces — the community the resource was shared in. */
+  community?: ProfileCommunity | null;
 }
 
 export interface ResourceComment {

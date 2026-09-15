@@ -52,6 +52,7 @@ export async function POST(
 
     void publishRealtimeBatch([
       { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
+      { room: realtimeRooms.profile(event.user_id), topic: "rsvp", data: { event: "DELETE", event_id: eventId, user_id: userId } },
     ]);
     const { data: remaining } = await db.from("event_rsvps").select("event_id").eq("event_id", eventId);
     return NextResponse.json({ rsvped: false, rsvp_count: (remaining ?? []).length });
@@ -80,6 +81,7 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
+    { room: realtimeRooms.profile(event.user_id), topic: "rsvp", data: { event: "INSERT", event_id: eventId, user_id: userId } },
   ]);
   deferNotification({
     userId: event.user_id,

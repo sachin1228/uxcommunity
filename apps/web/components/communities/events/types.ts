@@ -1,3 +1,5 @@
+import type { ProfileCommunity } from "../threads/types";
+
 export interface CommunityEvent {
   id: string;
   community_id: string;
@@ -25,6 +27,8 @@ export interface CommunityEvent {
   user_saved: boolean;
   rsvps?: EventRsvp[];
   users: { name: string; avatar_url: string | null } | null;
+  /** Present on profile surfaces — the community the event was posted in. */
+  community?: ProfileCommunity | null;
 }
 
 export interface EventRsvp {

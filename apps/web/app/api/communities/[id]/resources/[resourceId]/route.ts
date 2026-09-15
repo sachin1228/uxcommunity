@@ -128,6 +128,7 @@ export async function PATCH(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: updated },
+    { room: realtimeRooms.profile((updated as unknown as { user_id: string }).user_id), topic: "resource", data: updated },
   ]);
 
   return NextResponse.json({ resource: await enrichResource(db, updated as Record<string, unknown>, userId) });
@@ -158,6 +159,7 @@ export async function DELETE(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: { id: resourceId } },
+    { room: realtimeRooms.profile(existing.user_id), topic: "resource", data: { id: resourceId } },
   ]);
 
   return new NextResponse(null, { status: 204 });

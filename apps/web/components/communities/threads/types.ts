@@ -66,8 +66,15 @@ export interface CommunityThread {
   } | null;
 }
 
+/** Community info attached to profile-surface items (name + avatar image). */
+export interface ProfileCommunity {
+  id: string;
+  name: string;
+  image_url: string | null;
+}
+
 export interface ProfileThread extends CommunityThread {
-  community: { name: string } | null;
+  community: ProfileCommunity | null;
 }
 
 export interface ThreadComment {

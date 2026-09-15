@@ -160,6 +160,7 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: inserted },
+    { room: realtimeRooms.profile(userId), topic: "resource", data: inserted },
   ]);
 
   const enriched = (await withAuthorAndMeta(db, [inserted as Record<string, unknown>], userId))[0];
