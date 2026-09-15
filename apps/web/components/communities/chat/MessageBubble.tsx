@@ -800,18 +800,24 @@ function DeletedBubble({
   isMe,
   createdAt,
   isFirstInGroup,
+  showHeader,
   senderName,
   senderId,
 }: {
   isMe: boolean;
   createdAt: string;
   isFirstInGroup: boolean;
+  /** Same rule as a live bubble — the name row only opens a run of messages. */
+  showHeader: boolean;
   senderName?: string | null;
   senderId?: string | null;
 }) {
   return (
+    // Stacked exactly like a live bubble — name row, message row, time row — so
+    // a deleted message keeps the shape of the conversation around it instead of
+    // cramming the sender, the placeholder and the timestamp onto one line.
     <div
-      className={`relative inline-flex select-none items-center gap-1.5 rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
+      className={`relative w-fit select-none rounded-[10px] ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""} px-3 pt-2 pb-1.5 shadow-sm
         ${isMe
           ? "bg-[var(--ds-blue-800)] [--color-accent-foreground:white]"
           : "bg-surface-raised"
@@ -823,16 +829,20 @@ function DeletedBubble({
           className={isMe ? "text-[var(--ds-blue-800)]" : "text-surface-raised"}
         />
       )}
-      {!isMe && senderName && (
-        <SenderName name={senderName} userId={senderId ?? null} className="mr-1" />
+      {!isMe && showHeader && senderName && (
+        <SenderName name={senderName} userId={senderId ?? null} />
       )}
-      <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
-      <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
-        {isMe ? "You deleted this message" : "This message was deleted"}
-      </span>
-      <span className={`ml-1 shrink-0 font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
-        {fmtTime(createdAt)}
-      </span>
+      <div className="flex items-center gap-1.5">
+        <Ban strokeWidth={2.5} size={13} className={isMe ? "shrink-0 text-accent-foreground" : "shrink-0 text-foreground-muted"} />
+        <span className={`font-body text-xs ${isMe ? "text-accent-foreground" : "text-foreground-muted"}`}>
+          {isMe ? "You deleted this message" : "This message was deleted"}
+        </span>
+      </div>
+      <div className="mt-0 flex items-center justify-end gap-1">
+        <span className={`font-mono text-[10px] ${isMe ? "text-accent-foreground opacity-60" : "text-foreground-muted"}`}>
+          {fmtTime(createdAt)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -981,6 +991,7 @@ export const MessageBubble = memo(function MessageBubble({
               isMe={isMe}
               createdAt={msg.created_at}
               isFirstInGroup={isFirstInGroup}
+              showHeader={showHeader}
               senderName={sender?.name}
               senderId={msg.user_id}
             />
