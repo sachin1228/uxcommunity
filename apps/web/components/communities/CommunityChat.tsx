@@ -770,7 +770,6 @@ export function CommunityChat({
   const {
     input,
     setInput: setInputRaw,
-    sending,
     error,
     setError,
     handleSend,
@@ -1322,7 +1321,10 @@ export function CommunityChat({
               <ChatInput
                 ref={inputRef}
                 input={input}
-                sending={sending || editingSaving}
+                // Only an in-flight message *edit* locks the composer. Sending a
+                // chat message never disables it: sends are dispatched
+                // concurrently and the composer clears synchronously.
+                sending={editingSaving}
                 error={error}
                 placeholder="Type a message…"
                 replyTo={replyTo}

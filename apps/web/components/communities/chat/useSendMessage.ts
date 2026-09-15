@@ -35,6 +35,17 @@ type RetryData = {
   replyTo: ReplyPreview | null;
 };
 
+/** Everything one send needs — shared by the composer, retry and GIF paths. */
+type SendArgs = {
+  content: string;
+  imageFile: File | null;
+  imagePreviewUrl: string | null;
+  replyTo: ReplyPreview | null;
+  tempId: string;
+};
+
+type SendResult = { sentCommunityId: string | null; message: Message | null };
+
 export function useSendMessage({
   communityId,
   currentUserId,
@@ -59,28 +70,37 @@ export function useSendMessage({
       : [];
   };
   const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
   const [pendingImagePreview, setPendingImagePreview] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Guards against double-sends: `sending` resets synchronously once the
-  // optimistic bubble is shown, so a second Enter while the network request is
-  // still in flight would otherwise fire a duplicate POST. This ref stays
-  // locked until the request fully settles (success or failure).
-  const sendLockRef = useRef(false);
+  // ── Concurrent sends ──────────────────────────────────────────────────────
+  // Sends never wait for each other: the optimistic bubble is on screen
+  // immediately, so the next message must be dispatchable while the previous
+  // POST (or image upload) is still in flight. Each send owns its own
+  // AbortController, keyed by temp id, so cancelling one bubble can never abort
+  // another message's request.
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
-  // Mirror of `sending` kept in a ref so handleRetrySend's guard can read it
-  // without depending on the state value (which would recreate the callback on
-  // every send and defeat MessageBubble's memoization).
-  const sendingRef = useRef(sending);
-  useEffect(() => {
-    sendingRef.current = sending;
-  }, [sending]);
+  // Re-entry guard that only spans the *synchronous* part of a dispatch. React
+  // batches the optimistic updates, so a duplicated dispatch inside one event
+  // tick (held Enter, double-clicked Send) would still read the old `input` and
+  // POST the same text twice. The guard is released as soon as the request has
+  // been created — the network part then runs in the background.
+  const dispatchingRef = useRef(false);
+
+  // Temp ids are the identity of an optimistic bubble, so they must be unique
+  // even when two sends start within the same millisecond — a bare
+  // `temp-${Date.now()}` collides, and the colliding bubble overwrote the first
+  // one in the very same render.
+  const tempIdSeqRef = useRef(0);
+  const nextTempId = useCallback(() => {
+    tempIdSeqRef.current += 1;
+    return `temp-${Date.now()}-${tempIdSeqRef.current}`;
+  }, []);
 
   // Stores retry data (file + content + replyTo) keyed by tempId so failed
   // messages can be retried without losing the original payload.
@@ -157,8 +177,10 @@ export function useSendMessage({
   }, []);
 
   const handleCancelSend = useCallback((tempId: string) => {
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = null;
+    // Only this message's request is aborted — other sends still uploading keep
+    // theirs, which is why the controller is looked up by temp id.
+    abortControllersRef.current.get(tempId)?.abort();
+    abortControllersRef.current.delete(tempId);
 
     // For image sends: the AbortError catch in runSend will mark the message
     // as "failed" so the user can retry — don't remove the message here.
@@ -184,13 +206,7 @@ export function useSendMessage({
     imagePreviewUrl,
     replyTo: msgReplyTo,
     tempId,
-  }: {
-    content: string;
-    imageFile: File | null;
-    imagePreviewUrl: string | null;
-    replyTo: ReplyPreview | null;
-    tempId: string;
-  }): Promise<{ sentCommunityId: string | null; message: Message | null }> {
+  }: SendArgs): Promise<SendResult> {
     // Set when the POST confirms the message landed — used by the caller to
     // re-commit the row if the user switched communities mid-upload.
     let lastConfirmedMessage: Message | null = null;
@@ -259,13 +275,8 @@ export function useSendMessage({
       scrollChatToBottom(scrollContainerRef.current),
     );
 
-    // Re-enable the send button immediately — the optimistic bubble is already
-    // visible, so there's no reason to block the input while waiting for the
-    // network. Errors are shown inline on the failed bubble.
-    setSending(false);
-
     const abortController = new AbortController();
-    abortControllerRef.current = abortController;
+    abortControllersRef.current.set(tempId, abortController);
     const sentCommunityId = communityId;
 
     const runClientOperation = <T,>(operation: () => Promise<T>) => operation();
@@ -334,6 +345,12 @@ export function useSendMessage({
             reply_to_id: msgReplyTo?.id ?? null,
             image_url: uploadedImageUrl,
             mentions: mentions.map((m) => ({ user_id: m.user_id })),
+            // Each send carries its own nonce, so two identical messages ("ok",
+            // "ok") never share a request key. dedupeFetch joins identical
+            // in-flight requests and replays recently settled ones by
+            // method + URL + body — without the nonce the second bubble would
+            // merge with the first response and never reach the server.
+            client_nonce: tempId,
           }),
           signal: abortController.signal,
         }),
@@ -471,7 +488,7 @@ export function useSendMessage({
       rollbackSidebar();
       setError(err instanceof Error ? err.message : "Network error.");
     } finally {
-      abortControllerRef.current = null;
+      abortControllersRef.current.delete(tempId);
       // Revoke the blob URL now that upload is done (success, fail, or cancel)
       if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
     }
@@ -483,25 +500,44 @@ export function useSendMessage({
     return { sentCommunityId, message: lastConfirmedMessage };
   }
 
+  /**
+   * Dispatches a send under the same-tick re-entry guard.
+   *
+   * `runSend`'s synchronous prologue (optimistic bubble, sidebar bump, scroll
+   * pin, input clear) all runs before its first await, so the guard can be
+   * released the moment the request has been created: a message typed while an
+   * earlier one is still uploading goes out straight away, and only a duplicate
+   * dispatch inside the very same event tick is dropped.
+   */
+  function beginSend(args: SendArgs): Promise<SendResult> {
+    dispatchingRef.current = true;
+    try {
+      return runSend(args);
+    } finally {
+      dispatchingRef.current = false;
+    }
+  }
+
   async function handleSend() {
     const content = input.trim();
     const imageFile = pendingImageFile;
     // Capture blob URL BEFORE clearing so we can keep it alive during upload
     const imagePreviewUrl = pendingImagePreview;
 
-    if ((!content && !imageFile) || sending || sendLockRef.current) return;
+    // No `sending` check: a message typed while an earlier send is still in
+    // flight is dispatched immediately. `dispatchingRef` only closes the gap
+    // inside a single event tick.
+    if ((!content && !imageFile) || dispatchingRef.current) return;
     // Final guard — the composer caps input, but never send over the limit.
     if (content.length > MAX_MESSAGE_CHARS) {
       setError(`Message is too long (max ${MAX_MESSAGE_CHARS} characters).`);
       return;
     }
 
-    sendLockRef.current = true;
-    setSending(true);
     setError(null);
 
     const currentReplyTo = replyToRef.current;
-    const tempId = `temp-${Date.now()}`;
+    const tempId = nextTempId();
 
     // Clear input state WITHOUT revoking the blob URL (runSend will revoke in finally)
     setPendingImagePreview(null);
@@ -514,39 +550,36 @@ export function useSendMessage({
     }
     inputRef.current?.focus();
 
-    try {
-      const result = await runSend({
-        content,
-        imageFile,
-        imagePreviewUrl,
-        replyTo: currentReplyTo,
-        tempId,
-      });
-      // If the user navigated to another community mid-send, the state updater
-      // above ran against the OLD community's setMessages and never reached the
-      // UI. Commit the confirmed row into the message cache directly — it is
-      // keyed by community id — so the message is never lost. (No abort: the
-      // POST already returned 201, so the message exists server-side.)
-      const confirmed = result.message;
-      if (
-        result.sentCommunityId &&
-        result.sentCommunityId !== communityId &&
-        confirmed
-      ) {
-        const cached = msgCache.get(result.sentCommunityId) ?? [];
-        if (!cached.some((m) => m.id === confirmed.id)) {
-          const withoutTemp = cached.filter((m) => m.id !== tempId);
-          const next = [...withoutTemp, confirmed].sort(
-            (a, b) =>
-              new Date(a.created_at).getTime() -
-              new Date(b.created_at).getTime(),
-          );
-          msgCache.set(result.sentCommunityId, next);
-        }
-        failedRetryDataRef.current.delete(tempId);
+    const result = await beginSend({
+      content,
+      imageFile,
+      imagePreviewUrl,
+      replyTo: currentReplyTo,
+      tempId,
+    });
+
+    // If the user navigated to another community mid-send, the state updater
+    // above ran against the OLD community's setMessages and never reached the
+    // UI. Commit the confirmed row into the message cache directly — it is
+    // keyed by community id — so the message is never lost. (No abort: the
+    // POST already returned 201, so the message exists server-side.)
+    const confirmed = result.message;
+    if (
+      result.sentCommunityId &&
+      result.sentCommunityId !== communityId &&
+      confirmed
+    ) {
+      const cached = msgCache.get(result.sentCommunityId) ?? [];
+      if (!cached.some((m) => m.id === confirmed.id)) {
+        const withoutTemp = cached.filter((m) => m.id !== tempId);
+        const next = [...withoutTemp, confirmed].sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() -
+            new Date(b.created_at).getTime(),
+        );
+        msgCache.set(result.sentCommunityId, next);
       }
-    } finally {
-      sendLockRef.current = false;
+      failedRetryDataRef.current.delete(tempId);
     }
   }
 
@@ -555,16 +588,12 @@ export function useSendMessage({
    * optimistic one, and re-runs the upload + message flow.
    */
   const handleRetrySend = useCallback(async (failedTempId: string) => {
+    // The retry payload is consumed synchronously below, so a double-click on
+    // Retry can never queue two sends for the same bubble — and a retry for a
+    // bubble that scrolled out of the previous chat window is dropped instead
+    // of firing invisibly into another community.
     const retryData = failedRetryDataRef.current.get(failedTempId);
-    if (!retryData || sendingRef.current || sendLockRef.current) return;
-    // A retry must never land in a different community than the one the user
-    // is viewing — a network-retry for a bubble that scrolled out of the
-    // previous chat window would be invisible and confusing. Drop it; the
-    // next cache hydrate for the original community shows the row as failed
-    // only if the retry data survived (it doesn't — it is dropped below).
     if (!retryData) return;
-
-    sendLockRef.current = true;
 
     // Remove the failed message before re-queueing
     setMessages((prev) => {
@@ -574,28 +603,23 @@ export function useSendMessage({
     });
     failedRetryDataRef.current.delete(failedTempId);
 
-    setSending(true);
     setError(null);
 
-    const tempId = `temp-${Date.now()}`;
+    const tempId = nextTempId();
     // Create a fresh blob URL from the stored File for the new optimistic preview
     const imagePreviewUrl = retryData.file
       ? URL.createObjectURL(retryData.file)
       : null;
 
-    try {
-      await runSend({
-        content: retryData.content,
-        imageFile: retryData.file,
-        imagePreviewUrl,
-        replyTo: retryData.replyTo,
-        tempId,
-      });
-    } finally {
-      sendLockRef.current = false;
-    }
+    await beginSend({
+      content: retryData.content,
+      imageFile: retryData.file,
+      imagePreviewUrl,
+      replyTo: retryData.replyTo,
+      tempId,
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, setMessages]);
+  }, [communityId, setMessages, nextTempId]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.nativeEvent.isComposing || e.keyCode === 229) return;
@@ -610,12 +634,12 @@ export function useSendMessage({
    * No file upload needed — the URL is stored as image_url directly.
    */
   const handleGifSend = useCallback(async (gifUrl: string) => {
-    if (sending || sendLockRef.current) return;
-    sendLockRef.current = true;
-    setSending(true);
+    // No in-flight guard: a GIF is picked explicitly from the picker (which
+    // closes on select), so there is no stale-composer duplicate to protect
+    // against — and concurrent sends are exactly what this hook now allows.
     setError(null);
 
-    const tempId = `temp-${Date.now()}`;
+    const tempId = nextTempId();
 
     const optimistic: Message = {
       id: tempId,
@@ -663,14 +687,24 @@ export function useSendMessage({
       scrollChatToBottom(scrollContainerRef.current),
     );
 
-    // Re-enable the input immediately — same pattern as text/image sends.
-    setSending(false);
+    // Tracked like every other send, so cancelling this bubble aborts this
+    // request — not whichever send happened to start last.
+    const abortController = new AbortController();
+    abortControllersRef.current.set(tempId, abortController);
 
     try {
       const res = await dedupeFetch(`/api/communities/${communityId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: "", image_url: gifUrl, mentions: [] }),
+        // Same per-send nonce as text/image sends: posting the same GIF twice
+        // in a row must produce two messages, not one deduped request.
+        body: JSON.stringify({
+          content: "",
+          image_url: gifUrl,
+          mentions: [],
+          client_nonce: tempId,
+        }),
+        signal: abortController.signal,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -713,26 +747,29 @@ export function useSendMessage({
         rollbackSidebar();
         setError((data as { error?: string }).error ?? "Failed to send.");
       }
-    } catch {
-      setMessages((prev) => {
-        const next = prev.map((m) =>
-          m.id === tempId ? { ...m, status: "failed" as const } : m,
-        );
-        msgCache.set(communityId, next);
-        return next;
-      });
+    } catch (err) {
+      // A cancelled GIF send already removed its bubble (and has no retry
+      // payload), so only a real failure marks the row failed.
+      if ((err as Error).name !== "AbortError") {
+        setMessages((prev) => {
+          const next = prev.map((m) =>
+            m.id === tempId ? { ...m, status: "failed" as const } : m,
+          );
+          msgCache.set(communityId, next);
+          return next;
+        });
+        setError("Network error.");
+      }
       rollbackSidebar();
-      setError("Network error.");
     } finally {
-      sendLockRef.current = false;
+      abortControllersRef.current.delete(tempId);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [communityId, currentUserId, sending, setMessages]);
+  }, [communityId, currentUserId, setMessages, nextTempId]);
 
   return {
     input,
     setInput,
-    sending,
     error,
     setError,
     handleSend,

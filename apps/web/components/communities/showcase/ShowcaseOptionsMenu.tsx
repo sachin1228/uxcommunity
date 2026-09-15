@@ -13,7 +13,11 @@ export function ShowcaseOptionsMenu({
 }: {
   saved: boolean;
   canManage: boolean;
-  /** Disables the save item while a save mutation is in flight (spam guard). */
+  /**
+   * True while the save write is in flight. It only drives a small syncing
+   * hint — the label always reflects the optimistic state the user picked, so
+   * a slow round trip can't make the menu look like it ignored the click.
+   */
   busy?: boolean;
   onToggleSave: () => void;
   onEdit: () => void;
@@ -59,9 +63,8 @@ export function ShowcaseOptionsMenu({
               onToggleSave();
             }}
             aria-pressed={saved}
-      aria-busy={busy}
-      className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
-
+            aria-busy={busy}
+            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised"
           >
             <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}

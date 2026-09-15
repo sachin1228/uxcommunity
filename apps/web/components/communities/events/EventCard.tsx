@@ -214,7 +214,7 @@ export function EventCard({
   const descriptionId = useId();
   const descriptionRef = useRef<HTMLParagraphElement | null>(null);
   const description = event.description?.trim();
-  const { toggleLike, toggleSave, savePending } = useEventInteractions({
+  const { toggleLike, toggleSave, savePending, saved } = useEventInteractions({
     eventId: event.id,
     communityId,
     liked: event.user_liked,
@@ -529,7 +529,7 @@ export function EventCard({
           />
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
             <EventOptionsMenu
-              saved={event.user_saved}
+              saved={saved}
               shared={shared}
               reported={reported}
               isOwner={isOwner}

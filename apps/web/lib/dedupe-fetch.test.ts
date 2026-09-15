@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import test, { afterEach } from "node:test"
 
-import { clearDedupeCache, dedupeFetch } from "./dedupe-fetch"
+import { clearDedupeCache, dedupeFetch, TOGGLE_FETCH_OPTIONS } from "./dedupe-fetch"
 
 const originalFetch = globalThis.fetch
 
@@ -204,6 +204,47 @@ test("url-mode does not collapse when the cooldown window has passed", async () 
   await dedupeFetch("/api/communities/c1/events/e1/save", { method: "POST", body: JSON.stringify({ saved: false }) }, { cooldownMode: "url", mutationCooldownMs: 100 })
 
   assert.equal(calls, 2)
+})
+
+test("toggle options never answer an alternating click from a settled response", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    return jsonResponse({ saved: calls === 1 })
+  }) as typeof fetch
+
+  // Save then unsave: the second click must reach the server. Replaying the
+  // settled `saved: true` body would silently drop the unsave and snap the
+  // optimistic UI back to "saved".
+  const saved = await dedupeFetch("/api/communities/c1/threads/t1/save", {
+    method: "POST",
+    body: JSON.stringify({ saved: true }),
+  }, TOGGLE_FETCH_OPTIONS)
+  const unsaved = await dedupeFetch("/api/communities/c1/threads/t1/save", {
+    method: "POST",
+    body: JSON.stringify({ saved: false }),
+  }, TOGGLE_FETCH_OPTIONS)
+
+  assert.equal(calls, 2)
+  assert.equal((await saved.json()).saved, true)
+  assert.equal((await unsaved.json()).saved, false)
+})
+
+test("toggle options still share one in-flight request per identical body", async () => {
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls += 1
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    return jsonResponse({ saved: true })
+  }) as typeof fetch
+
+  const init = { method: "POST", body: JSON.stringify({ saved: true }) }
+  await Promise.all([
+    dedupeFetch("/api/communities/c1/threads/t1/save", init, TOGGLE_FETCH_OPTIONS),
+    dedupeFetch("/api/communities/c1/threads/t1/save", init, TOGGLE_FETCH_OPTIONS),
+  ])
+
+  assert.equal(calls, 1)
 })
 
 test("exact-mode keeps alternating toggle bodies as separate requests", async () => {

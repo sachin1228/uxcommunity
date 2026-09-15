@@ -131,6 +131,27 @@ export type DedupeFetchOptions = {
 }
 
 /**
+ * Options for a boolean toggle mutation (like / save / bookmark) whose next
+ * click almost always wants the OPPOSITE state.
+ *
+ * `url` mode collapses a click burst onto one request by replaying a settled
+ * response for ANY body. For a toggle that is wrong twice over: the replayed
+ * body answers the opposite intent, so a click that lands right after a save
+ * silently does nothing and the UI snaps back to "saved"; and bursts are
+ * already collapsed at the source — `BooleanIntentCoalescer` keeps a single
+ * request in flight and flushes the latest intent once, so a 20-click burst is
+ * at most two requests even with replay disabled.
+ *
+ * Both replay windows are therefore switched off here. Concurrent identical
+ * requests still join (in-flight dedupe), so nothing is sent twice.
+ */
+export const TOGGLE_FETCH_OPTIONS: DedupeFetchOptions = {
+  cooldownMode: "url",
+  settleWindowMs: 0,
+  mutationCooldownMs: 0,
+}
+
+/**
  * fetch() wrapper that shares in-flight requests and replays recently
  * settled results, so rapid repeated clicks produce a single request.
  */

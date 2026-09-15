@@ -65,6 +65,46 @@ export function scrollChatToBottom(
   );
 }
 
+// ─── Optimistic sends ─────────────────────────────────────────────────────
+
+/**
+ * The minimal shape of a chat row needed to pair an incoming realtime echo
+ * with the optimistic bubble it confirms.
+ */
+export interface OptimisticLike {
+  id: string;
+  user_id: string;
+  content: string | null;
+  status?: "sending" | "sent" | "failed";
+}
+
+/**
+ * Picks which optimistic bubble an incoming echo replaces.
+ *
+ * Several sends can be in flight at once, so their echoes can interleave — an
+ * echo must land on the bubble it belongs to, otherwise the confirmed row
+ * inherits another bubble's local-only fields (the blob: preview URL, the reply
+ * preview) and one message looks like it duplicated. Text is the strongest
+ * signal available, so an exact content match wins, and the sender's oldest
+ * in-flight bubble is the fallback (image/GIF sends carry no text).
+ */
+export function pickOptimisticMatch<
+  T extends OptimisticLike,
+>(messages: readonly T[], incoming: { user_id: string; content: string | null }): T | null {
+  const inFlight = messages.filter(
+    (m) =>
+      m.id.startsWith("temp-") &&
+      m.user_id === incoming.user_id &&
+      m.status === "sending",
+  );
+
+  return (
+    inFlight.find((m) => (m.content ?? "") === (incoming.content ?? "")) ??
+    inFlight[0] ??
+    null
+  );
+}
+
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   const today = new Date();

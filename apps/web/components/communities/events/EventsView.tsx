@@ -83,7 +83,16 @@ export function EventsView({
     unsubscribes.push(realtimeClient.on(room, "event", () => void fetchEvents(true, true)));
     unsubscribes.push(realtimeClient.on(room, "rsvp", () => void fetchEvents(true, true)));
     unsubscribes.push(realtimeClient.on(room, "like", () => void fetchEvents(true, true)));
-    unsubscribes.push(realtimeClient.on(room, "save", () => void fetchEvents(true, true)));
+    unsubscribes.push(
+      realtimeClient.on(room, "save", (data) => {
+        const record = data as { user_id?: string } | null;
+        // Our own save was already applied optimistically with the exact count
+        // the route returned. Refetching both event pages for it would stall
+        // the tab behind two fresh requests for no new information.
+        if (record?.user_id === currentUserId) return;
+        void fetchEvents(true, true);
+      }),
+    );
 
     realtimeClient.connect();
 

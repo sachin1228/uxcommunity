@@ -22,7 +22,7 @@ import {
   getCachedLinkPreview,
   hasFreshLinkPreview,
 } from "@/lib/communities/linkPreviewCache";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { dedupeFetch, TOGGLE_FETCH_OPTIONS } from "@/lib/dedupe-fetch";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { usePendingMutation } from "@/lib/use-mutation";
 
@@ -86,6 +86,10 @@ export function ResourceCard({
   const initialSavedRef = useRef(resource.user_saved);
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
+  // Local intent wins while the save write is outstanding, so the heart never
+  // flips back to its pre-click state if a list refetch lands mid-flight.
+  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
+  const displayedSaved = optimisticSaved ?? resource.user_saved;
 
   useEffect(() => {
     latestSaveRef.current = { resource, onSaveChanged };
@@ -130,6 +134,7 @@ export function ResourceCard({
     const coordinator = new BooleanIntentCoalescer({
       initialValue: initialSavedRef.current,
       onOptimisticChange: (saved) => {
+        setOptimisticSaved(saved);
         const current = latestSaveRef.current;
         const count = Math.max(
           0,
@@ -145,7 +150,7 @@ export function ResourceCard({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ saved }),
           },
-          { cooldownMode: "url" },
+          TOGGLE_FETCH_OPTIONS,
         );
         const result = (await response.json().catch(() => null)) as {
           saved?: boolean;
@@ -170,7 +175,13 @@ export function ResourceCard({
   }, [communityId, resource.id]);
 
   useEffect(() => {
-    saveCoalescerRef.current?.syncConfirmed(resource.user_saved);
+    const coordinator = saveCoalescerRef.current;
+    // Read `pending` before syncing: while a write is outstanding the local
+    // intent stays on screen; once the coalescer was idle the server-backed
+    // prop is authoritative again (realtime, another device).
+    const pending = coordinator?.isPending() ?? false;
+    coordinator?.syncConfirmed(resource.user_saved);
+    if (!pending) setOptimisticSaved(null);
   }, [resource.user_saved]);
 
   function handleSave(event: React.MouseEvent) {
@@ -189,7 +200,7 @@ export function ResourceCard({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ bookmarked: desiredBookmarkRef.current }),
-        }, { cooldownMode: "url" });
+        }, TOGGLE_FETCH_OPTIONS);
         if (!response.ok) throw new Error("Failed to update resource bookmark");
         const result = (await response.json()) as { bookmarked: boolean; bookmark_count: number };
         confirmedBookmarkRef.current = result.bookmarked;
@@ -211,7 +222,9 @@ export function ResourceCard({
   function handleBookmark(event: React.MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
-    if (bookmarkBusy) return;
+    // No busy guard: a click during an in-flight write just moves the desired
+    // state and the running flush loop picks it up, so an immediate undo works
+    // instead of being swallowed for the length of the round trip.
     const newBookmarked = !desiredBookmarkRef.current;
     const newCount = Math.max(0, optimisticBookmarkCountRef.current + (newBookmarked ? 1 : -1));
     desiredBookmarkRef.current = newBookmarked;
@@ -235,7 +248,7 @@ export function ResourceCard({
         <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           <button type="button" onClick={(event) => { handleBookmark(event); setMenuOpen(false); }} aria-busy={bookmarkBusy} aria-pressed={displayedBookmarked} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
             <Bookmark strokeWidth={2.5} size={11} fill={displayedBookmarked ? "currentColor" : "none"} />
-            {bookmarkBusy ? "Saving…" : displayedBookmarked ? "Unsave" : "Save"}
+            {displayedBookmarked ? "Unsave" : "Save"}
           </button>
           {isOwner ? (
             <>
@@ -330,9 +343,9 @@ export function ResourceCard({
             ) : null}
             <div className="mt-3 flex items-center justify-between gap-4">
               <div className="flex shrink-0 items-center gap-4">
-                <button type="button" onClick={handleSave} aria-label={resource.user_saved ? "Unlike" : "Like"} aria-pressed={resource.user_saved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
-                  <HeartIcon size={16} active={resource.user_saved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-                  <span className={`font-body text-sm font-semibold tabular-nums ${resource.user_saved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
+                <button type="button" onClick={handleSave} aria-label={displayedSaved ? "Unlike" : "Like"} aria-pressed={displayedSaved} aria-busy={saveBusy} className="group/like flex shrink-0 cursor-pointer items-center gap-2 disabled:cursor-not-allowed disabled:opacity-60">
+                  <HeartIcon size={16} active={displayedSaved} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${displayedSaved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+                  <span className={`font-body text-sm font-semibold tabular-nums ${displayedSaved ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{resource.save_count}</span>
                 </button>
                 {resource.allow_replies !== false && (
                   <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">

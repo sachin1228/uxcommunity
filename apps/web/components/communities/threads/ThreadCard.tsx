@@ -21,7 +21,7 @@ import { ThreadImageCarousel } from "./ThreadImageCarousel";
 import { ThreadImageLightbox } from "./ThreadImageLightbox";
 import { formatRelativeDate, isThreadEdited } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
-import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { dedupeFetch, TOGGLE_FETCH_OPTIONS } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 
@@ -64,6 +64,9 @@ export function ThreadCard({
   const desiredLikeRef = useRef(thread.user_liked);
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
   const displayedSaved = optimisticSaved ?? thread.user_saved;
+  // Only used for a small "syncing" hint next to the label — the label itself
+  // always shows `displayedSaved`, so a slow save never looks ignored.
+  const [saveSyncing, setSaveSyncing] = useState(false);
   const likeCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
   const saveCoalescerRef = useRef<BooleanIntentCoalescer | null>(null);
 
@@ -173,6 +176,7 @@ export function ThreadCard({
           setOptimisticSaved(saved);
           onSaveChanged(thread.id, saved);
         },
+        onPendingChange: setSaveSyncing,
         persist: async (saved) => {
           const response = await dedupeFetch(
             `/api/communities/${communityId}/threads/${thread.id}/save`,
@@ -181,7 +185,7 @@ export function ThreadCard({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ saved }),
             },
-            { cooldownMode: "url" },
+            TOGGLE_FETCH_OPTIONS,
           );
           const result = (await response.json().catch(() => null)) as {
             saved?: boolean;
@@ -403,6 +407,7 @@ export function ThreadCard({
                     setMenuOpen(false);
                   }}
                   aria-pressed={displayedSaved}
+                  aria-busy={saveSyncing}
                   className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                 >
                   <Bookmark strokeWidth={2.5} size={11} fill={displayedSaved ? "currentColor" : "none"} />

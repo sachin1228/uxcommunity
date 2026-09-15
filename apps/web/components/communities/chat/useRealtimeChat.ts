@@ -8,6 +8,7 @@ import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/commun
 import type { CachedMessage, CachedThreadEvent, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
+import { pickOptimisticMatch } from "./chatUtils";
 
 type Message = CachedMessage;
 
@@ -119,18 +120,16 @@ export function useRealtimeChat({
         setMessages((prev) => {
           if (prev.some((m) => m.id === newRow.id)) return prev;
 
-          // Match ONE specific optimistic bubble (the sender's oldest in-flight
-          // send) instead of every temp- row by the same user. Removing them all
-          // made a second message sent in quick succession blink out of the UI,
-          // and its POST merge then became a no-op — the message could stay
-          // missing until its own echo arrived.
-          const matchedTemp =
-            prev.find(
-              (m) =>
-                m.id.startsWith("temp-") &&
-                m.user_id === newRow.user_id &&
-                m.status === "sending",
-            ) ?? null;
+          // Match ONE specific optimistic bubble instead of every temp- row by
+          // the same user. Removing them all made a second message sent in
+          // quick succession blink out of the UI, and its POST merge then
+          // became a no-op — the message could stay missing until its own echo
+          // arrived. With several sends in flight the echoes can interleave, so
+          // the row whose text matches wins (see pickOptimisticMatch).
+          const matchedTemp = pickOptimisticMatch(prev, {
+            user_id: newRow.user_id,
+            content: newRow.content,
+          });
           const withoutTemp = matchedTemp
             ? prev.filter((m) => m.id !== matchedTemp.id)
             : prev;
