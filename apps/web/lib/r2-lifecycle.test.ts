@@ -97,6 +97,7 @@ test("every column that can hold an R2 URL is tracked by the orphan audit", () =
 
   for (const required of [
     "designer_profiles.avatar_url",
+    "designer_profiles.banner_url",
     "communities.image_url",
     "communities.lottie_url",
     "community_messages.image_url",

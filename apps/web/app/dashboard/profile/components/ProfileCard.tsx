@@ -1,141 +1,159 @@
 "use client";
 
-import {
-  Camera, Mail, Calendar,
-  MapPin, Layers, Star, Lock, BadgeCheck,
-  Linkedin, Globe,
-} from "lucide-react";
+import Link from "next/link";
+import { Camera, MapPin, PenLine, Star, Layers, BadgeCheck } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
-const fieldCls =
-  "bg-transparent border-b border-border focus:border-accent outline-none text-foreground font-body text-xs transition-colors w-full pb-0.5 placeholder:text-foreground-subtle";
+const chipCls =
+  "flex items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs text-foreground";
 
 interface ProfileCardProps {
   name: string;
-  email: string;
   avatarUrl: string | null;
-  memberSince: string | null;
+  /** Cover image for the hero. Falls back to the gradient when null. */
+  bannerUrl: string | null;
   onOpenAvatarPicker: () => void;
+  onOpenBannerPicker: () => void;
   city: string | null;
   sector: string | null;
   experienceLevel: string | null;
   jobTitle: string | null;
-  linkedin: string;
-  portfolio: string;
-  onLinkedinChange: (v: string) => void;
-  onPortfolioChange: (v: string) => void;
+  bio: string;
+  /** Read-only topic chips; topics are picked during onboarding. */
+  interestNames: string[];
 }
 
+/**
+ * The profile hero: banner, overlapping avatar, name, role/city line, bio,
+ * interest chips and a compact stats block. Contact details and links live on
+ * the Settings page (`app/dashboard/settings`).
+ */
 export function ProfileCard({
-  name, email, avatarUrl, memberSince,
+  name,
+  avatarUrl,
+  bannerUrl,
   onOpenAvatarPicker,
-  city, sector, experienceLevel, jobTitle,
-  linkedin, portfolio, onLinkedinChange, onPortfolioChange,
+  onOpenBannerPicker,
+  city,
+  sector,
+  experienceLevel,
+  jobTitle,
+  bio,
+  interestNames,
 }: ProfileCardProps) {
+  // Role line: "Product Designer · Bengaluru" — mirrors the reference layout.
+  const roleLine = [jobTitle, city].filter(Boolean).join(" · ");
+
   return (
-    <div className="rounded-2xl border border-border bg-surface mb-6 overflow-hidden">
+    <section
+      aria-label="Profile details"
+      className="overflow-hidden rounded-2xl border border-border bg-surface"
+    >
+      {/* ── Banner — the member's cover image, or the gradient placeholder ── */}
+      <div className="relative h-32 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400 sm:h-36">
+        {bannerUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={bannerUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        )}
+        <button
+          type="button"
+          onClick={onOpenBannerPicker}
+          className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 font-body text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
+        >
+          <Camera strokeWidth={2.5} size={11} />
+          {bannerUrl ? "Edit banner" : "Add banner"}
+        </button>
+      </div>
 
-      {/* ── Top row: avatar · identity info · links ── */}
-      <div className="flex items-stretch divide-x divide-border">
-
-        {/* Avatar */}
-        <div className="flex flex-col items-center justify-center gap-2 px-5 py-4 shrink-0">
-          <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-border bg-accent/20">
-            <AvatarImg url={avatarUrl} name={name} size={56} className="w-14 h-14 object-cover" />
-          </div>
-          <button
-            onClick={onOpenAvatarPicker}
-            className="flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 font-body text-[10px] text-foreground-muted hover:text-accent hover:border-accent/40 transition-all whitespace-nowrap"
-          >
-            <Camera strokeWidth={2.5} size={9} />
-            Change photo
-          </button>
-        </div>
-
-        {/* Name / email / since — all read-only */}
-        <div className="flex flex-col justify-center gap-2.5 px-5 py-4 flex-1 min-w-0">
-          <div>
-            <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-0.5">
-              Name
-            </p>
-            <p className="font-body text-sm font-medium text-foreground truncate">{name}</p>
-          </div>
-          <div className="flex gap-5">
-            <div className="min-w-0">
-              <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                <Mail strokeWidth={2.5} size={9} /> Email
-              </p>
-              <p className="font-body text-xs text-foreground-subtle truncate">{email}</p>
+      {/* ── Avatar + name ── */}
+      <div className="relative px-5 pb-5">
+        <div className="-mt-10 flex items-end gap-4">
+          <div className="group relative shrink-0">
+            <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-surface bg-accent/20">
+              <AvatarImg url={avatarUrl} name={name} size={72} className="h-full w-full object-cover" />
             </div>
-            {memberSince && (
-              <div className="shrink-0">
-                <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
-                  <Calendar strokeWidth={2.5} size={9} /> Since
-                </p>
-                <p className="font-body text-xs text-foreground-subtle">{memberSince}</p>
-              </div>
+            {/* The avatar keeps its own upload — the banner is a separate image. */}
+            <button
+              type="button"
+              onClick={onOpenAvatarPicker}
+              aria-label="Change profile picture"
+              title="Change profile picture"
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+            >
+              <Camera strokeWidth={2.5} size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Name */}
+        <div className="mt-3 flex items-center gap-3">
+          <h2 className="truncate font-display text-xl font-semibold text-foreground">{name}</h2>
+          <Link
+            href="/dashboard/settings"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
+          >
+            <PenLine strokeWidth={2.5} size={11} />
+            Edit Profile
+          </Link>
+        </div>
+
+        {/* Role · city */}
+        {(roleLine || sector || experienceLevel) && (
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-body text-sm text-foreground-muted">
+            {jobTitle && (
+              <span className="flex items-center gap-1">
+                <BadgeCheck strokeWidth={2.5} size={12} className="text-accent" />
+                {jobTitle}
+              </span>
             )}
-          </div>
-        </div>
+            {roleLine && jobTitle && <span aria-hidden="true">·</span>}
+            {city && (
+              <span className="flex items-center gap-1">
+                <MapPin strokeWidth={2.5} size={12} className="text-accent" />
+                {city}
+              </span>
+            )}
+            {sector && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="flex items-center gap-1">
+                  <Layers strokeWidth={2.5} size={12} className="text-accent" />
+                  {sector}
+                </span>
+              </>
+            )}
+            {experienceLevel && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="flex items-center gap-1 capitalize">
+                  <Star strokeWidth={2.5} size={12} className="text-accent" />
+                  {experienceLevel.replace(/_/g, " ")}
+                </span>
+              </>
+            )}
+          </p>
+        )}
 
-        {/* LinkedIn + Portfolio */}
-        <div className="flex flex-col justify-center gap-3 px-5 py-4 w-64 shrink-0">
-          <div>
-            <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
-            </label>
-            <input
-              type="url"
-              value={linkedin}
-              onChange={(e) => onLinkedinChange(e.target.value)}
-              placeholder="https://linkedin.com/in/yourname"
-              className={fieldCls}
-            />
-          </div>
-          <div>
-            <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Globe strokeWidth={2.5} size={9} /> Portfolio
-            </label>
-            <input
-              type="url"
-              value={portfolio}
-              onChange={(e) => onPortfolioChange(e.target.value)}
-              placeholder="https://yourportfolio.com"
-              className={fieldCls}
-            />
-          </div>
-        </div>
-      </div>
+        {/* Bio */}
+        {bio && (
+          <p className="mt-3 max-w-prose font-body text-sm leading-relaxed text-foreground-muted">{bio}</p>
+        )}
 
-      {/* ── Bottom row: professional identity chips ── */}
-      <div className="flex items-center gap-2 px-5 py-3 border-t border-border flex-wrap">
-        <span className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider shrink-0 mr-1">
-          Identity
-        </span>
-        {city && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <MapPin strokeWidth={2.5} size={10} className="text-accent shrink-0" />{city}
-          </span>
+        {/* Interest chips */}
+        {interestNames.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {interestNames.map((n) => (
+              <span key={n} className={chipCls}>
+                {n}
+              </span>
+            ))}
+          </div>
         )}
-        {sector && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <Layers strokeWidth={2.5} size={10} className="text-accent shrink-0" />{sector}
-          </span>
-        )}
-        {jobTitle && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <BadgeCheck strokeWidth={2.5} size={10} className="text-accent shrink-0" />{jobTitle}
-          </span>
-        )}
-        {experienceLevel && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground capitalize">
-            <Star strokeWidth={2.5} size={10} className="text-accent shrink-0" />{experienceLevel.replace(/_/g, " ")}
-          </span>
-        )}
-        <span className="flex items-center gap-1 font-body text-[10px] text-foreground-subtle ml-auto shrink-0">
-          <Lock strokeWidth={2.5} size={9} /> Not editable here
-        </span>
       </div>
-    </div>
+    </section>
   );
 }

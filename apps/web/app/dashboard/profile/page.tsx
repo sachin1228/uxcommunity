@@ -25,6 +25,7 @@ export default async function ProfilePage({ searchParams }: Props) {
     { data: profile },
     { data: userInterests },
     { data: allInterests },
+    { data: bannerRow },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -39,6 +40,14 @@ export default async function ProfilePage({ searchParams }: Props) {
       .select("interest_id, design_interests(id, name, image_url)")
       .eq("user_id", userId),
     db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
+    // Banner read on its own: the hero can live without this optional column,
+    // so if it is missing the gradient renders and every other field on this
+    // page still loads.
+    db
+      .from("designer_profiles")
+      .select("banner_url")
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
 
   // Resolve the job title slug to its admin-managed display name (the profile
@@ -67,6 +76,7 @@ export default async function ProfilePage({ searchParams }: Props) {
       createdAt={user?.created_at ?? ""}
       avatarUrl={(profile as any)?.avatar_url ?? null}
       avatarSource={(profile as any)?.avatar_source ?? null}
+      bannerUrl={(bannerRow as { banner_url?: string | null } | null)?.banner_url ?? null}
       city={(profile as any)?.cities?.name ?? null}
       sector={(profile as any)?.design_sectors?.name ?? null}
       experienceLevel={(profile as any)?.experience_level ?? null}
