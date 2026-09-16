@@ -19,9 +19,7 @@ const chipCls =
 
 interface ProfileCardProps {
   name: string;
-  email: string;
   avatarUrl: string | null;
-  memberSince: string | null;
   onOpenAvatarPicker: () => void;
   city: string | null;
   sector: string | null;
@@ -35,7 +33,7 @@ interface ProfileCardProps {
  * `ProfileLinksCard` beside it.
  */
 export function ProfileCard({
-  name, email, avatarUrl, memberSince,
+  name, avatarUrl,
   onOpenAvatarPicker,
   city, sector, experienceLevel, jobTitle,
 }: ProfileCardProps) {
@@ -64,22 +62,6 @@ export function ProfileCard({
           <div className="min-w-0">
             <p className={labelCls}>Name</p>
             <p className="truncate font-display text-base font-semibold text-foreground">{name}</p>
-          </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3">
-            <div className="min-w-0">
-              <p className={labelCls}>
-                <Mail strokeWidth={2.5} size={9} /> Email
-              </p>
-              <p className="truncate font-body text-xs text-foreground-subtle">{email}</p>
-            </div>
-            {memberSince && (
-              <div className="shrink-0">
-                <p className={labelCls}>
-                  <Calendar strokeWidth={2.5} size={9} /> Since
-                </p>
-                <p className="font-body text-xs text-foreground-subtle">{memberSince}</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -122,15 +104,20 @@ export function ProfileCard({
 }
 
 interface ProfileLinksCardProps {
+  email: string;
+  memberSince: string | null;
   linkedin: string;
   portfolio: string;
   onLinkedinChange: (v: string) => void;
   onPortfolioChange: (v: string) => void;
 }
 
-/** The right half of the profile header: the editable links. */
+/**
+ * The right half of the profile header: the contact details and the editable
+ * links. Email and member-since are read-only, same treatment as the URLs.
+ */
 export function ProfileLinksCard({
-  linkedin, portfolio, onLinkedinChange, onPortfolioChange,
+  email, memberSince, linkedin, portfolio, onLinkedinChange, onPortfolioChange,
 }: ProfileLinksCardProps) {
   return (
     <section
@@ -141,11 +128,30 @@ export function ProfileLinksCard({
         id="profile-links-heading"
         className="font-display text-[15px] font-semibold text-foreground"
       >
-        Links
+        Contact & links
       </h2>
 
       <div className="mt-4 flex flex-col gap-5">
-        <div>
+        <div className="min-w-0">
+          <p className={labelCls}>
+            <Mail strokeWidth={2.5} size={9} /> Email
+          </p>
+          <p className="truncate border-b border-border pb-1 font-body text-xs text-foreground-subtle" title={email}>
+            {email}
+          </p>
+        </div>
+        {memberSince && (
+          <div className="shrink-0">
+            <p className={labelCls}>
+              <Calendar strokeWidth={2.5} size={9} /> Since
+            </p>
+            <p className="border-b border-border pb-1 font-body text-xs text-foreground-subtle">
+              {memberSince}
+            </p>
+          </div>
+        )}
+
+        <div className="border-t border-border pt-4">
           <label htmlFor="profile-linkedin" className={labelCls}>
             <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
           </label>

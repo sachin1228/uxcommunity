@@ -126,9 +126,7 @@ export function ProfileClient({
       <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
         <ProfileCard
           name={name}
-          email={email}
           avatarUrl={avatarUrl}
-          memberSince={memberSince}
           onOpenAvatarPicker={() => setShowPicturePicker(true)}
           city={city}
           sector={sector}
@@ -137,6 +135,8 @@ export function ProfileClient({
         />
 
         <ProfileLinksCard
+          email={email}
+          memberSince={memberSince}
           linkedin={linkedin}
           portfolio={portfolio}
           onLinkedinChange={setLinkedin}
