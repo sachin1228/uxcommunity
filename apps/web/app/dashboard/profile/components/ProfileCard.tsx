@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Camera, MapPin, PenLine, Plus, Star, Layers, BadgeCheck } from "lucide-react";
+import { Camera, MapPin, PenLine, Star, Layers, BadgeCheck } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 const chipCls =
@@ -20,9 +19,8 @@ interface ProfileCardProps {
   experienceLevel: string | null;
   jobTitle: string | null;
   bio: string;
+  /** Read-only topic chips; topics are picked during onboarding. */
   interestNames: string[];
-  allInterests: { id: string; name: string }[];
-  onSaveInterests: (ids: string[]) => Promise<void>;
   postCount: number;
 }
 
@@ -43,29 +41,8 @@ export function ProfileCard({
   jobTitle,
   bio,
   interestNames,
-  allInterests,
-  onSaveInterests,
   postCount,
 }: ProfileCardProps) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [savingInterests, setSavingInterests] = useState(false);
-
-  const selectedIds = allInterests
-    .filter((i) => interestNames.includes(i.name))
-    .map((i) => i.id);
-
-  async function toggleInterest(id: string) {
-    const next = selectedIds.includes(id)
-      ? selectedIds.filter((x) => x !== id)
-      : [...selectedIds, id];
-    setSavingInterests(true);
-    try {
-      await onSaveInterests(next);
-    } finally {
-      setSavingInterests(false);
-    }
-  }
-
   // Role line: "Product Designer · Bengaluru" — mirrors the reference layout.
   const roleLine = [jobTitle, city].filter(Boolean).join(" · ");
 
@@ -176,47 +153,13 @@ export function ProfileCard({
         )}
 
         {/* Interest chips */}
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {interestNames.map((n) => (
-            <span key={n} className={chipCls}>
-              {n}
-            </span>
-          ))}
-          {!pickerOpen && (
-            <button
-              type="button"
-              onClick={() => setPickerOpen(true)}
-              disabled={savingInterests}
-              aria-label="Add interests"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-surface-raised text-foreground-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
-            >
-              <Plus strokeWidth={2.5} size={13} />
-            </button>
-          )}
-        </div>
-
-        {pickerOpen && (
-          <div className="mt-3 rounded-xl border border-border bg-surface-raised p-3">
-            <div className="flex flex-wrap gap-2">
-              {allInterests.map((i) => {
-                const active = selectedIds.includes(i.id);
-                return (
-                  <button
-                    key={i.id}
-                    type="button"
-                    onClick={() => void toggleInterest(i.id)}
-                    aria-pressed={active}
-                    className={`rounded-full border px-3 py-1.5 font-body text-xs transition-colors ${
-                      active
-                        ? "border-accent bg-accent-soft text-accent"
-                        : "border-border bg-surface text-foreground-muted hover:text-foreground"
-                    }`}
-                  >
-                    {i.name}
-                  </button>
-                );
-              })}
-            </div>
+        {interestNames.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {interestNames.map((n) => (
+              <span key={n} className={chipCls}>
+                {n}
+              </span>
+            ))}
           </div>
         )}
       </div>

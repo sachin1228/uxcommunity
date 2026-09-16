@@ -48,7 +48,6 @@ export function ProfileClient({
   const [name] = useState(initialName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [bannerUrl, setBannerUrl] = useState(initialBannerUrl);
-  const [interestIds, setInterestIds] = useState<string[]>(initialInterestIds);
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -62,24 +61,8 @@ export function ProfileClient({
   const [bannerError, setBannerError] = useState<string | null>(null);
 
   const interestNames = allInterests
-    .filter((i) => interestIds.includes(i.id))
+    .filter((i) => initialInterestIds.includes(i.id))
     .map((i) => i.name);
-
-  async function handleSaveInterests(nextIds: string[]) {
-    // Optimistic: flip the chips right away, roll back if the save fails.
-    const previous = interestIds;
-    setInterestIds(nextIds);
-    try {
-      const res = await fetch("/api/profile/interests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interest_ids: nextIds }),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-    } catch {
-      setInterestIds(previous);
-    }
-  }
 
   useEffect(() => {
     return () => {
@@ -239,8 +222,6 @@ export function ProfileClient({
           jobTitle={jobTitle}
           bio={initialBio}
           interestNames={interestNames}
-          allInterests={allInterests}
-          onSaveInterests={handleSaveInterests}
           postCount={postCount}
         />
       </div>
