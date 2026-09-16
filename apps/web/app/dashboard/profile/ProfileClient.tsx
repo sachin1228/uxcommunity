@@ -26,7 +26,6 @@ interface Props {
   initialBio: string;
   initialInterestIds: string[];
   allInterests: { id: string; name: string; image_url?: string | null }[];
-  postCount: number;
 }
 
 export function ProfileClient({
@@ -42,7 +41,6 @@ export function ProfileClient({
   initialBio,
   initialInterestIds,
   allInterests,
-  postCount,
 }: Props) {
   const router = useRouter();
   const [name] = useState(initialName);
@@ -222,7 +220,6 @@ export function ProfileClient({
           jobTitle={jobTitle}
           bio={initialBio}
           interestNames={interestNames}
-          postCount={postCount}
         />
       </div>
 

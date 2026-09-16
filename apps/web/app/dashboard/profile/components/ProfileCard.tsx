@@ -21,7 +21,6 @@ interface ProfileCardProps {
   bio: string;
   /** Read-only topic chips; topics are picked during onboarding. */
   interestNames: string[];
-  postCount: number;
 }
 
 /**
@@ -41,7 +40,6 @@ export function ProfileCard({
   jobTitle,
   bio,
   interestNames,
-  postCount,
 }: ProfileCardProps) {
   // Role line: "Product Designer · Bengaluru" — mirrors the reference layout.
   const roleLine = [jobTitle, city].filter(Boolean).join(" · ");
@@ -71,9 +69,9 @@ export function ProfileCard({
         </button>
       </div>
 
-      {/* ── Avatar + name + stats ── */}
+      {/* ── Avatar + name ── */}
       <div className="relative px-5 pb-5">
-        <div className="-mt-10 flex items-end justify-between gap-4">
+        <div className="-mt-10 flex items-end gap-4">
           <div className="group relative shrink-0">
             <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-surface bg-accent/20">
               <AvatarImg url={avatarUrl} name={name} size={72} className="h-full w-full object-cover" />
@@ -88,13 +86,6 @@ export function ProfileCard({
             >
               <Camera strokeWidth={2.5} size={18} />
             </button>
-          </div>
-
-          <div className="flex items-start gap-5 pt-3 sm:gap-7">
-            <div className="text-right">
-              <p className="font-display text-lg font-semibold leading-tight text-foreground">{postCount}</p>
-              <p className="font-body text-[11px] text-foreground-muted">Posts</p>
-            </div>
           </div>
         </div>
 
