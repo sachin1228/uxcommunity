@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, MapPin, PenLine, Plus, Star, Layers, BadgeCheck, Lock } from "lucide-react";
+import Link from "next/link";
+import { Camera, MapPin, PenLine, Plus, Star, Layers, BadgeCheck } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 const chipCls =
@@ -10,7 +11,10 @@ const chipCls =
 interface ProfileCardProps {
   name: string;
   avatarUrl: string | null;
+  /** Cover image for the hero. Falls back to the gradient when null. */
+  bannerUrl: string | null;
   onOpenAvatarPicker: () => void;
+  onOpenBannerPicker: () => void;
   city: string | null;
   sector: string | null;
   experienceLevel: string | null;
@@ -30,7 +34,9 @@ interface ProfileCardProps {
 export function ProfileCard({
   name,
   avatarUrl,
+  bannerUrl,
   onOpenAvatarPicker,
+  onOpenBannerPicker,
   city,
   sector,
   experienceLevel,
@@ -68,25 +74,43 @@ export function ProfileCard({
       aria-label="Profile details"
       className="overflow-hidden rounded-2xl border border-border bg-surface"
     >
-      {/* ── Banner ── */}
+      {/* ── Banner — the member's cover image, or the gradient placeholder ── */}
       <div className="relative h-32 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-orange-400 sm:h-36">
+        {bannerUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={bannerUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        )}
         <button
           type="button"
-          onClick={onOpenAvatarPicker}
+          onClick={onOpenBannerPicker}
           className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/35 px-3 py-1.5 font-body text-[11px] font-medium text-white backdrop-blur transition-colors hover:bg-black/50"
         >
           <Camera strokeWidth={2.5} size={11} />
-          Edit photo
+          {bannerUrl ? "Edit banner" : "Add banner"}
         </button>
       </div>
 
       {/* ── Avatar + name + stats ── */}
       <div className="relative px-5 pb-5">
         <div className="-mt-10 flex items-end justify-between gap-4">
-          <div className="shrink-0">
+          <div className="group relative shrink-0">
             <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-surface bg-accent/20">
               <AvatarImg url={avatarUrl} name={name} size={72} className="h-full w-full object-cover" />
             </div>
+            {/* The avatar keeps its own upload — the banner is a separate image. */}
+            <button
+              type="button"
+              onClick={onOpenAvatarPicker}
+              aria-label="Change profile picture"
+              title="Change profile picture"
+              className="absolute inset-0 flex items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
+            >
+              <Camera strokeWidth={2.5} size={18} />
+            </button>
           </div>
 
           <div className="flex items-start gap-5 pt-3 sm:gap-7">
@@ -100,14 +124,13 @@ export function ProfileCard({
         {/* Name */}
         <div className="mt-3 flex items-center gap-3">
           <h2 className="truncate font-display text-xl font-semibold text-foreground">{name}</h2>
-          <button
-            type="button"
-            onClick={onOpenAvatarPicker}
+          <Link
+            href="/dashboard/settings"
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3 py-1.5 font-body text-xs font-medium text-foreground transition-colors hover:border-accent/40 hover:text-accent"
           >
             <PenLine strokeWidth={2.5} size={11} />
             Edit Profile
-          </button>
+          </Link>
         </div>
 
         {/* Role · city */}

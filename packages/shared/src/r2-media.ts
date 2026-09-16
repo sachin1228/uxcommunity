@@ -96,6 +96,9 @@ export const MASTER_LOTTIE_LOOKUPS: MediaReferenceLookup[] = [
 /** Every column across the app that can hold an R2 media URL. */
 export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   { table: "designer_profiles", column: "avatar_url" },
+  // Profile hero cover. Tracked alongside the avatar so the orphan audit does
+  // not treat an uploaded banner as an orphan and delete it.
+  { table: "designer_profiles", column: "banner_url" },
   { table: "communities", column: "image_url" },
   { table: "communities", column: "lottie_url" },
   { table: "cities", column: "image_url" },
@@ -124,6 +127,7 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
 /** Human-readable entity type per lookup, for reports. */
 export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "designer_profiles.avatar_url": "profile",
+  "designer_profiles.banner_url": "profile_banner",
   "communities.image_url": "community",
   "communities.lottie_url": "community",
   "cities.image_url": "city",

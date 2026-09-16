@@ -45,6 +45,13 @@ export interface CompressOptions {
  */
 const AVATAR_MAX_DIMENSION = 400;
 
+/**
+ * Banners render as a wide strip (a few hundred CSS pixels tall on desktop,
+ * doubled for retina), so they need more pixels than an avatar but far fewer
+ * than a full-size post image.
+ */
+const BANNER_MAX_DIMENSION = 1600;
+
 // ── Web Worker plumbing ──────────────────────────────────────────────────────
 // A single lazily-created Worker is shared across calls (the jSquash encoder
 // module stays warm inside it, so repeated compressions skip WASM re-init).
@@ -260,6 +267,15 @@ export async function compressImage(file: File, options?: CompressOptions): Prom
  */
 export function compressAvatarClient(file: File): Promise<ClientCompressedImage> {
   return compressImage(file, { maxDimension: AVATAR_MAX_DIMENSION });
+}
+
+/**
+ * Compress a profile banner to WebP quality 0.90, fit inside 1600×1600.
+ * Same guarantees as the avatar path: aspect preserved, never upscaled,
+ * never cropped — the hero crops to its own aspect with object-cover.
+ */
+export function compressBannerClient(file: File): Promise<ClientCompressedImage> {
+  return compressImage(file, { maxDimension: BANNER_MAX_DIMENSION });
 }
 
 /** Wrap a compressed blob as a `.webp` File so it can be appended to FormData. */
