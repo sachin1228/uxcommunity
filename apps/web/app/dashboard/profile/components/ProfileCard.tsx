@@ -1,15 +1,10 @@
 "use client";
 
 import {
-  Camera, Mail, Calendar,
+  Camera, Calendar,
   MapPin, Layers, Star, Lock, BadgeCheck,
-  Linkedin, Globe,
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-
-/** Shared style for the editable URL fields on the links card. */
-const fieldCls =
-  "w-full border-b border-border bg-transparent pb-1 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent";
 
 const labelCls =
   "mb-0.5 flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted";
@@ -28,9 +23,9 @@ interface ProfileCardProps {
 }
 
 /**
- * The left half of the profile header: who you are and the identity chips.
- * Everything describing the member lives here; the editable links sit in
- * `ProfileLinksCard` beside it.
+ * The profile header: who you are and the identity chips. Read-only — contact
+ * details and the editable links live on the Settings page
+ * (`app/dashboard/settings`).
  */
 export function ProfileCard({
   name, avatarUrl,
@@ -42,7 +37,7 @@ export function ProfileCard({
       aria-label="Profile details"
       className="overflow-hidden rounded-2xl border border-border bg-surface"
     >
-      {/* ── Avatar · name · email · since ── */}
+      {/* ── Avatar · name ── */}
       <div className="flex items-start gap-5 px-5 py-5">
         <div className="flex shrink-0 flex-col items-center gap-2">
           <div className="h-16 w-16 overflow-hidden rounded-full bg-accent/20 ring-2 ring-border">
@@ -57,12 +52,9 @@ export function ProfileCard({
           </button>
         </div>
 
-        {/* Name / email / since — all read-only */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
-          <div className="min-w-0">
-            <p className={labelCls}>Name</p>
-            <p className="truncate font-display text-base font-semibold text-foreground">{name}</p>
-          </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center">
+          <p className={labelCls}>Name</p>
+          <p className="truncate font-display text-base font-semibold text-foreground">{name}</p>
         </div>
       </div>
 
@@ -97,85 +89,6 @@ export function ProfileCard({
               <Star strokeWidth={2.5} size={10} className="shrink-0 text-accent" />{experienceLevel.replace(/_/g, " ")}
             </span>
           )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-interface ProfileLinksCardProps {
-  email: string;
-  memberSince: string | null;
-  linkedin: string;
-  portfolio: string;
-  onLinkedinChange: (v: string) => void;
-  onPortfolioChange: (v: string) => void;
-}
-
-/**
- * The right half of the profile header: the contact details and the editable
- * links. Email and member-since are read-only, same treatment as the URLs.
- */
-export function ProfileLinksCard({
-  email, memberSince, linkedin, portfolio, onLinkedinChange, onPortfolioChange,
-}: ProfileLinksCardProps) {
-  return (
-    <section
-      aria-labelledby="profile-links-heading"
-      className="rounded-2xl border border-border bg-surface px-5 py-5"
-    >
-      <h2
-        id="profile-links-heading"
-        className="font-display text-[15px] font-semibold text-foreground"
-      >
-        Contact & links
-      </h2>
-
-      <div className="mt-4 flex flex-col gap-5">
-        <div className="min-w-0">
-          <p className={labelCls}>
-            <Mail strokeWidth={2.5} size={9} /> Email
-          </p>
-          <p className="truncate border-b border-border pb-1 font-body text-xs text-foreground-subtle" title={email}>
-            {email}
-          </p>
-        </div>
-        {memberSince && (
-          <div className="shrink-0">
-            <p className={labelCls}>
-              <Calendar strokeWidth={2.5} size={9} /> Since
-            </p>
-            <p className="border-b border-border pb-1 font-body text-xs text-foreground-subtle">
-              {memberSince}
-            </p>
-          </div>
-        )}
-
-        <div className="border-t border-border pt-4">
-          <label htmlFor="profile-linkedin" className={labelCls}>
-            <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
-          </label>
-          <input
-            id="profile-linkedin"
-            type="url"
-            value={linkedin}
-            onChange={(e) => onLinkedinChange(e.target.value)}
-            placeholder="https://linkedin.com/in/yourname"
-            className={fieldCls}
-          />
-        </div>
-        <div>
-          <label htmlFor="profile-portfolio" className={labelCls}>
-            <Globe strokeWidth={2.5} size={9} /> Portfolio
-          </label>
-          <input
-            id="profile-portfolio"
-            type="url"
-            value={portfolio}
-            onChange={(e) => onPortfolioChange(e.target.value)}
-            placeholder="https://yourportfolio.com"
-            className={fieldCls}
-          />
         </div>
       </div>
     </section>

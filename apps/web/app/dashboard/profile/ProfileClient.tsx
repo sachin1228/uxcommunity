@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
-import { ProfileCard, ProfileLinksCard } from "./components/ProfileCard";
+import { ProfileCard } from "./components/ProfileCard";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
@@ -31,30 +31,20 @@ export function ProfileClient({
   userId,
   initialTab,
   initialName,
-  email,
-  createdAt,
   avatarUrl: initialAvatarUrl,
   city,
   sector,
   experienceLevel,
   jobTitle,
-  initialLinkedIn,
-  initialPortfolio,
 }: Props) {
   const router = useRouter();
   const [name] = useState(initialName);
-  const [linkedin, setLinkedin] = useState(initialLinkedIn);
-  const [portfolio, setPortfolio] = useState(initialPortfolio);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [pictureSaving, setPictureSaving] = useState(false);
   const [pictureError, setPictureError] = useState<string | null>(null);
-
-  const memberSince = createdAt
-    ? new Date(createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : null;
 
   useEffect(() => {
     return () => {
@@ -123,7 +113,7 @@ export function ProfileClient({
         </p>
       </div>
 
-      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
+      <div className="mb-6">
         <ProfileCard
           name={name}
           avatarUrl={avatarUrl}
@@ -132,15 +122,6 @@ export function ProfileClient({
           sector={sector}
           experienceLevel={experienceLevel}
           jobTitle={jobTitle}
-        />
-
-        <ProfileLinksCard
-          email={email}
-          memberSince={memberSince}
-          linkedin={linkedin}
-          portfolio={portfolio}
-          onLinkedinChange={setLinkedin}
-          onPortfolioChange={setPortfolio}
         />
       </div>
 

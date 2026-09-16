@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Compass, Library, LogOut, UserCircle } from "lucide-react";
+import { LogOut, Settings, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { DropdownMenu } from "@/components/ui/DropdownMenu";
@@ -24,8 +24,7 @@ const ROW_ICON_CLASS = "shrink-0 text-overlay-muted";
 
 const MENU_LINKS = [
   { href: "/dashboard/profile", label: "View profile", icon: UserCircle },
-  { href: "/dashboard/communities", label: "Explore communities", icon: Compass },
-  { href: "/dashboard/library", label: "Library", icon: Library },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export function ProfileDropdown({ name, email, avatarUrl, variant = "icon" }: Props) {
