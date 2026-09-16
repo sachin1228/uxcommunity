@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extensionForMime } from "@/lib/image-utils";
-import { deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -94,13 +94,24 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (dbError || !updatedProfile) {
+    // The row still points at the previous banner, so this upload would be
+    // orphaned the moment we abandon it — drop it instead of leaking it.
+    try {
+      await deleteFromR2(key);
+    } catch (cleanupError) {
+      console.error("[profile/banner] new upload cleanup error:", cleanupError);
+    }
     console.error("[profile/banner] profile update error:", dbError);
     return NextResponse.json({ error: "Failed to save banner." }, { status: 500 });
   }
 
+  // Reclaim the replaced banner. This runs AFTER the row was repointed, so the
+  // reference scan must be "delete when nothing points at it" — the
+  // delete-if-unique helper expects the row to still hold exactly one
+  // reference and silently skips once the update has landed.
   const previousUrl = (currentProfile as { banner_url?: string | null } | null)?.banner_url ?? null;
-  if (shouldDeletePreviousR2Asset(previousUrl, publicUrl) && previousUrl) {
-    await deleteOwnedR2AssetIfUnique(db, previousUrl, [
+  if (previousUrl) {
+    await deleteR2AssetIfUnreferenced(db, previousUrl, [
       { table: "designer_profiles", column: "banner_url" },
     ]);
   }
@@ -143,9 +154,11 @@ export async function DELETE() {
     return NextResponse.json({ error: "Failed to remove banner." }, { status: 500 });
   }
 
+  // Same reclaim rule as the replace path: the row no longer points at the
+  // banner we just cleared, so delete it if nothing else does.
   const previousUrl = (currentProfile as { banner_url?: string | null } | null)?.banner_url ?? null;
   if (previousUrl) {
-    await deleteOwnedR2AssetIfUnique(db, previousUrl, [
+    await deleteR2AssetIfUnreferenced(db, previousUrl, [
       { table: "designer_profiles", column: "banner_url" },
     ]);
   }

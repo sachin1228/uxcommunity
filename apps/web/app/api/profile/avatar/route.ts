@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extensionForMime } from "@/lib/image-utils";
-import { deleteFromR2, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset, uploadToR2 } from "@/lib/r2";
+import { deleteFromR2, deleteR2AssetIfUnreferenced, uploadToR2 } from "@/lib/r2";
 import { validateAndModerateImage } from "@/lib/moderation/image";
 import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
@@ -92,8 +92,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to save profile picture." }, { status: 500 });
   }
 
-  if (shouldDeletePreviousR2Asset(currentProfile.avatar_url, publicUrl) && currentProfile.avatar_url) {
-    await deleteOwnedR2AssetIfUnique(db, currentProfile.avatar_url, [
+  // Reclaim the replaced picture. The row was already repointed above, so the
+  // reference scan must be "delete when nothing points at it" — the
+  // delete-if-unique helper expects the row to still hold exactly one
+  // reference and silently skips once the update has landed, which left every
+  // replaced avatar in R2 forever.
+  if (currentProfile.avatar_url) {
+    await deleteR2AssetIfUnreferenced(db, currentProfile.avatar_url, [
       { table: "designer_profiles", column: "avatar_url" },
     ]);
   }
