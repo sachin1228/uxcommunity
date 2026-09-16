@@ -1,13 +1,21 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
+import { isProfileFeedScope, type ProfileFeedScope } from "@/lib/supabase/performance-rpcs";
 import { ProfileClient } from "./ProfileClient";
 
 export const metadata = { title: "Your Profile" };
 
-export default async function ProfilePage() {
+interface Props {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function ProfilePage({ searchParams }: Props) {
   const session = await getSession();
   if (!session || session.role !== "user") redirect("/login");
+
+  const { tab } = await searchParams;
+  const initialTab: ProfileFeedScope = tab && isProfileFeedScope(tab) ? tab : "all";
 
   const db = createServiceClient();
   const userId = session.userId!;
@@ -52,6 +60,8 @@ export default async function ProfilePage() {
 
   return (
     <ProfileClient
+      userId={userId}
+      initialTab={initialTab}
       initialName={user?.name ?? ""}
       email={user?.email ?? session.email ?? ""}
       createdAt={user?.created_at ?? ""}

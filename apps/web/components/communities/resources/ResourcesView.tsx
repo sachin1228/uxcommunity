@@ -31,6 +31,8 @@ import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
+import { useContentChanges } from "@/lib/communities/use-content-changes";
 
 const RESOURCES_STALE_MS = 60_000;
 /** Must match PAGE_SIZE in the resources list read model. */
@@ -122,6 +124,11 @@ export function ResourcesView({
   // events aren't replayed); brief alt-tabs no longer fire a request each.
   useHiddenCatchUp(() => void fetchResources(true));
 
+  // Saves, bookmarks, edits and deletes made anywhere else are merged in place.
+  useContentChanges("resource", (changes) => {
+    writeCache((current) => applyContentChanges(current, changes, "resource"));
+  });
+
   function writeCache(updater: (prev: CommunityResource[]) => CommunityResource[]) {
     setResources((prev) => {
       const next = updater(prev);
@@ -136,22 +143,35 @@ export function ResourcesView({
 
   function handleCreated(resource: CommunityResource) {
     writeCache((prev) => [resource, ...prev.filter((r) => r.id !== resource.id)]);
+    publishContentChange({ kind: "resource", id: resource.id, created: true });
   }
 
   function handleUpdated(updated: CommunityResource) {
     writeCache((prev) => prev.map((r) => (r.id === updated.id ? { ...r, ...updated } : r)));
+    publishContentChange({
+      kind: "resource",
+      id: updated.id,
+      patch: updated as unknown as Record<string, unknown>,
+    });
   }
 
   function handleSaveChanged(resourceId: string, saved: boolean, newCount: number) {
     writeCache((prev) => prev.map((r) => r.id === resourceId ? { ...r, user_saved: saved, save_count: newCount } : r));
+    publishContentChange({ kind: "resource", id: resourceId, patch: { user_saved: saved, save_count: newCount } });
   }
 
   function handleBookmarkChanged(resourceId: string, bookmarked: boolean, newCount: number) {
     writeCache((prev) => prev.map((r) => r.id === resourceId ? { ...r, user_bookmarked: bookmarked, bookmark_count: newCount } : r));
+    publishContentChange({
+      kind: "resource",
+      id: resourceId,
+      patch: { user_bookmarked: bookmarked, bookmark_count: newCount },
+    });
   }
 
   function handleDeleted(resourceId: string) {
     writeCache((prev) => prev.filter((r) => r.id !== resourceId));
+    publishContentChange({ kind: "resource", id: resourceId, removed: true });
   }
 
   // ── Load older resources (keyset pagination via ?cursor=createdAt|id) ────

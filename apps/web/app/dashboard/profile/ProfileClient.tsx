@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
 import { ProfileCard } from "./components/ProfileCard";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
+import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
+import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
 
 interface Props {
+  userId: string;
+  initialTab: ProfileActivityTab;
   initialName: string;
   email: string;
   createdAt: string;
@@ -24,6 +28,8 @@ interface Props {
 }
 
 export function ProfileClient({
+  userId,
+  initialTab,
   initialName,
   email,
   createdAt,
@@ -132,6 +138,8 @@ export function ProfileClient({
         onLinkedinChange={setLinkedin}
         onPortfolioChange={setPortfolio}
       />
+
+      <ProfileActivityFeed currentUserId={userId} initialTab={initialTab} basePath="/dashboard/profile" />
 
       {showPicturePicker && (
         <AvatarPickerModal

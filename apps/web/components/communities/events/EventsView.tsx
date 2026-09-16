@@ -15,6 +15,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
+import { useContentChanges } from "@/lib/communities/use-content-changes";
 
 const EVENTS_STALE_MS = 60_000;
 
@@ -106,6 +108,11 @@ export function EventsView({
   // events aren't replayed); brief alt-tabs no longer fire a request each.
   useHiddenCatchUp(() => void fetchEvents(true));
 
+  // RSVPs, likes, saves and edits made anywhere else are merged in place.
+  useContentChanges("event", (changes) => {
+    writeCache((current) => applyContentChanges(current, changes, "event"));
+  });
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -142,6 +149,7 @@ export function EventsView({
     writeCache((prev) => [event, ...prev].sort(
       (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     ));
+    publishContentChange({ kind: "event", id: event.id, created: true });
   }
 
   function handleUpdated(updated: CommunityEvent) {
@@ -149,22 +157,31 @@ export function EventsView({
       prev.map((e) => (e.id === updated.id ? { ...e, ...updated } : e))
           .sort((a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime())
     );
+    publishContentChange({
+      kind: "event",
+      id: updated.id,
+      patch: updated as unknown as Record<string, unknown>,
+    });
   }
 
   function handleDeleted(eventId: string) {
     writeCache((prev) => prev.filter((e) => e.id !== eventId));
+    publishContentChange({ kind: "event", id: eventId, removed: true });
   }
 
   function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {
     writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_rsvped: rsvped, rsvp_count: count } : e));
+    publishContentChange({ kind: "event", id: eventId, patch: { user_rsvped: rsvped, rsvp_count: count } });
   }
 
   function handleLikeChanged(eventId: string, liked: boolean, count: number) {
     writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_liked: liked, like_count: count } : e));
+    publishContentChange({ kind: "event", id: eventId, patch: { user_liked: liked, like_count: count } });
   }
 
   function handleSaveChanged(eventId: string, saved: boolean, count: number) {
     writeCache((prev) => prev.map((e) => e.id === eventId ? { ...e, user_saved: saved, save_count: count } : e));
+    publishContentChange({ kind: "event", id: eventId, patch: { user_saved: saved, save_count: count } });
   }
 
   // Split into upcoming and past

@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(17);
+select plan(19);
 
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
@@ -10,6 +10,7 @@ select has_function('public', 'get_event_list_aggregates', array['uuid','uuid[]'
 select has_function('public', 'get_resource_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_showcase_list_page', array['uuid','uuid','timestamptz','uuid','integer']);
 select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer']);
+select has_function('public', 'get_profile_feed_page', array['uuid','text','timestamptz','integer']);
 
 create temporary table rpc_test_context as
 select community_id, user_id, joined_at
@@ -124,6 +125,23 @@ select is(
    limit 1),
   true,
   'home feed thread items include author metadata'
+);
+
+-- The profile activity tabs read the same card payloads as the homepage. A
+-- member with no posts and no saves must get an empty page for every scope
+-- rather than an error, so an empty profile still renders its tabs.
+select is(
+  (select count(*)::integer
+   from public.get_profile_feed_page('00000000-0000-0000-0000-000000000000'::uuid, 'all', null, 30)),
+  0,
+  'profile feed returns nothing for a member with no posts'
+);
+
+select is(
+  (select count(*)::integer
+   from public.get_profile_feed_page('00000000-0000-0000-0000-000000000000'::uuid, 'saved', null, 30)),
+  0,
+  'profile saved scope returns nothing for a member with no saves'
 );
 
 select * from finish();
