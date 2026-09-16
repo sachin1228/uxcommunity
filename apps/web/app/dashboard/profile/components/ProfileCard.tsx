@@ -7,8 +7,15 @@ import {
 } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
+/** Shared style for the editable URL fields on the links card. */
 const fieldCls =
-  "bg-transparent border-b border-border focus:border-accent outline-none text-foreground font-body text-xs transition-colors w-full pb-0.5 placeholder:text-foreground-subtle";
+  "w-full border-b border-border bg-transparent pb-1 font-body text-xs text-foreground outline-none transition-colors placeholder:text-foreground-subtle focus:border-accent";
+
+const labelCls =
+  "mb-0.5 flex items-center gap-1 font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted";
+
+const chipCls =
+  "flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground";
 
 interface ProfileCardProps {
   name: string;
@@ -20,32 +27,32 @@ interface ProfileCardProps {
   sector: string | null;
   experienceLevel: string | null;
   jobTitle: string | null;
-  linkedin: string;
-  portfolio: string;
-  onLinkedinChange: (v: string) => void;
-  onPortfolioChange: (v: string) => void;
 }
 
+/**
+ * The left half of the profile header: who you are and the identity chips.
+ * Everything describing the member lives here; the editable links sit in
+ * `ProfileLinksCard` beside it.
+ */
 export function ProfileCard({
   name, email, avatarUrl, memberSince,
   onOpenAvatarPicker,
   city, sector, experienceLevel, jobTitle,
-  linkedin, portfolio, onLinkedinChange, onPortfolioChange,
 }: ProfileCardProps) {
   return (
-    <div className="rounded-2xl border border-border bg-surface mb-6 overflow-hidden">
-
-      {/* ── Top row: avatar · identity info · links ── */}
-      <div className="flex items-stretch divide-x divide-border">
-
-        {/* Avatar */}
-        <div className="flex flex-col items-center justify-center gap-2 px-5 py-4 shrink-0">
-          <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-border bg-accent/20">
-            <AvatarImg url={avatarUrl} name={name} size={56} className="w-14 h-14 object-cover" />
+    <section
+      aria-label="Profile details"
+      className="overflow-hidden rounded-2xl border border-border bg-surface"
+    >
+      {/* ── Avatar · name · email · since ── */}
+      <div className="flex items-start gap-5 px-5 py-5">
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          <div className="h-16 w-16 overflow-hidden rounded-full bg-accent/20 ring-2 ring-border">
+            <AvatarImg url={avatarUrl} name={name} size={64} className="h-16 w-16 object-cover" />
           </div>
           <button
             onClick={onOpenAvatarPicker}
-            className="flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2.5 py-1 font-body text-[10px] text-foreground-muted hover:text-accent hover:border-accent/40 transition-all whitespace-nowrap"
+            className="flex items-center gap-1 whitespace-nowrap rounded-full border border-border bg-surface-raised px-2.5 py-1 font-body text-[10px] text-foreground-muted transition-all hover:border-accent/40 hover:text-accent"
           >
             <Camera strokeWidth={2.5} size={9} />
             Change photo
@@ -53,23 +60,21 @@ export function ProfileCard({
         </div>
 
         {/* Name / email / since — all read-only */}
-        <div className="flex flex-col justify-center gap-2.5 px-5 py-4 flex-1 min-w-0">
-          <div>
-            <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider mb-0.5">
-              Name
-            </p>
-            <p className="font-body text-sm font-medium text-foreground truncate">{name}</p>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
+          <div className="min-w-0">
+            <p className={labelCls}>Name</p>
+            <p className="truncate font-display text-base font-semibold text-foreground">{name}</p>
           </div>
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
             <div className="min-w-0">
-              <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
+              <p className={labelCls}>
                 <Mail strokeWidth={2.5} size={9} /> Email
               </p>
-              <p className="font-body text-xs text-foreground-subtle truncate">{email}</p>
+              <p className="truncate font-body text-xs text-foreground-subtle">{email}</p>
             </div>
             {memberSince && (
               <div className="shrink-0">
-                <p className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-0.5">
+                <p className={labelCls}>
                   <Calendar strokeWidth={2.5} size={9} /> Since
                 </p>
                 <p className="font-body text-xs text-foreground-subtle">{memberSince}</p>
@@ -77,65 +82,96 @@ export function ProfileCard({
             )}
           </div>
         </div>
+      </div>
 
-        {/* LinkedIn + Portfolio */}
-        <div className="flex flex-col justify-center gap-3 px-5 py-4 w-64 shrink-0">
-          <div>
-            <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
-            </label>
-            <input
-              type="url"
-              value={linkedin}
-              onChange={(e) => onLinkedinChange(e.target.value)}
-              placeholder="https://linkedin.com/in/yourname"
-              className={fieldCls}
-            />
-          </div>
-          <div>
-            <label className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-              <Globe strokeWidth={2.5} size={9} /> Portfolio
-            </label>
-            <input
-              type="url"
-              value={portfolio}
-              onChange={(e) => onPortfolioChange(e.target.value)}
-              placeholder="https://yourportfolio.com"
-              className={fieldCls}
-            />
-          </div>
+      {/* ── Identity chips ── */}
+      <div className="border-t border-border px-5 py-3">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <span className="font-body text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">
+            Identity
+          </span>
+          <span className="flex shrink-0 items-center gap-1 font-body text-[10px] text-foreground-subtle">
+            <Lock strokeWidth={2.5} size={9} /> Not editable here
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {city && (
+            <span className={chipCls}>
+              <MapPin strokeWidth={2.5} size={10} className="shrink-0 text-accent" />{city}
+            </span>
+          )}
+          {sector && (
+            <span className={chipCls}>
+              <Layers strokeWidth={2.5} size={10} className="shrink-0 text-accent" />{sector}
+            </span>
+          )}
+          {jobTitle && (
+            <span className={chipCls}>
+              <BadgeCheck strokeWidth={2.5} size={10} className="shrink-0 text-accent" />{jobTitle}
+            </span>
+          )}
+          {experienceLevel && (
+            <span className={`${chipCls} capitalize`}>
+              <Star strokeWidth={2.5} size={10} className="shrink-0 text-accent" />{experienceLevel.replace(/_/g, " ")}
+            </span>
+          )}
         </div>
       </div>
+    </section>
+  );
+}
 
-      {/* ── Bottom row: professional identity chips ── */}
-      <div className="flex items-center gap-2 px-5 py-3 border-t border-border flex-wrap">
-        <span className="font-body text-[10px] font-semibold text-foreground-muted uppercase tracking-wider shrink-0 mr-1">
-          Identity
-        </span>
-        {city && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <MapPin strokeWidth={2.5} size={10} className="text-accent shrink-0" />{city}
-          </span>
-        )}
-        {sector && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <Layers strokeWidth={2.5} size={10} className="text-accent shrink-0" />{sector}
-          </span>
-        )}
-        {jobTitle && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground">
-            <BadgeCheck strokeWidth={2.5} size={10} className="text-accent shrink-0" />{jobTitle}
-          </span>
-        )}
-        {experienceLevel && (
-          <span className="flex items-center gap-1 rounded-lg border border-border bg-surface-raised px-2.5 py-1 font-body text-xs text-foreground capitalize">
-            <Star strokeWidth={2.5} size={10} className="text-accent shrink-0" />{experienceLevel.replace(/_/g, " ")}
-          </span>
-        )}
-        <span className="flex items-center gap-1 font-body text-[10px] text-foreground-subtle ml-auto shrink-0">
-          <Lock strokeWidth={2.5} size={9} /> Not editable here
-        </span>
+interface ProfileLinksCardProps {
+  linkedin: string;
+  portfolio: string;
+  onLinkedinChange: (v: string) => void;
+  onPortfolioChange: (v: string) => void;
+}
+
+/** The right half of the profile header: the editable links. */
+export function ProfileLinksCard({
+  linkedin, portfolio, onLinkedinChange, onPortfolioChange,
+}: ProfileLinksCardProps) {
+  return (
+    <section
+      aria-labelledby="profile-links-heading"
+      className="rounded-2xl border border-border bg-surface px-5 py-5"
+    >
+      <h2
+        id="profile-links-heading"
+        className="font-display text-[15px] font-semibold text-foreground"
+      >
+        Links
+      </h2>
+
+      <div className="mt-4 flex flex-col gap-5">
+        <div>
+          <label htmlFor="profile-linkedin" className={labelCls}>
+            <Linkedin strokeWidth={2.5} size={9} /> LinkedIn
+          </label>
+          <input
+            id="profile-linkedin"
+            type="url"
+            value={linkedin}
+            onChange={(e) => onLinkedinChange(e.target.value)}
+            placeholder="https://linkedin.com/in/yourname"
+            className={fieldCls}
+          />
+        </div>
+        <div>
+          <label htmlFor="profile-portfolio" className={labelCls}>
+            <Globe strokeWidth={2.5} size={9} /> Portfolio
+          </label>
+          <input
+            id="profile-portfolio"
+            type="url"
+            value={portfolio}
+            onChange={(e) => onPortfolioChange(e.target.value)}
+            placeholder="https://yourportfolio.com"
+            className={fieldCls}
+          />
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compressAvatarClient } from "@/lib/image-client";
-import { ProfileCard } from "./components/ProfileCard";
+import { ProfileCard, ProfileLinksCard } from "./components/ProfileCard";
 import { AvatarPickerModal } from "./components/AvatarPickerModal";
 import { ProfileActivityFeed } from "@/components/feeds/ProfileActivityFeed";
 import type { ProfileActivityTab } from "@/components/feeds/ProfileActivityFeed";
@@ -123,21 +123,26 @@ export function ProfileClient({
         </p>
       </div>
 
-      <ProfileCard
-        name={name}
-        email={email}
-        avatarUrl={avatarUrl}
-        memberSince={memberSince}
-        onOpenAvatarPicker={() => setShowPicturePicker(true)}
-        city={city}
-        sector={sector}
-        experienceLevel={experienceLevel}
-        jobTitle={jobTitle}
-        linkedin={linkedin}
-        portfolio={portfolio}
-        onLinkedinChange={setLinkedin}
-        onPortfolioChange={setPortfolio}
-      />
+      <div className="mb-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
+        <ProfileCard
+          name={name}
+          email={email}
+          avatarUrl={avatarUrl}
+          memberSince={memberSince}
+          onOpenAvatarPicker={() => setShowPicturePicker(true)}
+          city={city}
+          sector={sector}
+          experienceLevel={experienceLevel}
+          jobTitle={jobTitle}
+        />
+
+        <ProfileLinksCard
+          linkedin={linkedin}
+          portfolio={portfolio}
+          onLinkedinChange={setLinkedin}
+          onPortfolioChange={setPortfolio}
+        />
+      </div>
 
       <ProfileActivityFeed currentUserId={userId} initialTab={initialTab} basePath="/dashboard/profile" />
 
