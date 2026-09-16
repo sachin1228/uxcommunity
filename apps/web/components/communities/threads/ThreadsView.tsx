@@ -23,6 +23,8 @@ import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
+import { useContentChanges } from "@/lib/communities/use-content-changes";
 
 const THREADS_STALE_MS = 60_000;
 /** Must match PAGE_SIZE in the threads list read model. */
@@ -149,6 +151,15 @@ export function ThreadsView({
   // events aren't replayed); brief alt-tabs no longer fire a request each.
   useHiddenCatchUp(() => void fetchThreads(true));
 
+  // A like, save, poll vote, edit or delete performed anywhere else (the
+  // homepage feed, the profile activity tabs, a thread detail page) is merged
+  // into this list instead of waiting for a refetch.
+  // Deliberately not memoized: the hook always calls the latest handler, so a
+  // community switch can never patch the previous community's cache entry.
+  useContentChanges("thread", (changes) => {
+    writeCache((current) => applyContentChanges(current, changes, "thread"));
+  });
+
   function writeCache(updater: (prev: CommunityThread[]) => CommunityThread[]) {
     setThreads((prev) => {
       const next = updater(prev);
@@ -164,26 +175,45 @@ export function ThreadsView({
   function handleCreated(thread: CommunityThread) {
     writeCache((cur) => [thread, ...cur.filter((item) => item.id !== thread.id)]);
     onThreadCreated?.(thread);
+    // Tells the profile activity tabs (and the homepage feed) that a card they
+    // may not hold yet now exists.
+    publishContentChange({ kind: "thread", id: thread.id, created: true });
   }
 
   function handleUpdated(updated: CommunityThread) {
     writeCache((cur) => cur.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
+    publishContentChange({
+      kind: "thread",
+      id: updated.id,
+      patch: updated as unknown as Record<string, unknown>,
+    });
   }
 
   function handleLikeChanged(threadId: string, liked: boolean, newCount: number) {
     writeCache((cur) =>
       cur.map((t) => t.id === threadId ? { ...t, user_liked: liked, like_count: newCount } : t),
     );
+    publishContentChange({
+      kind: "thread",
+      id: threadId,
+      patch: { user_liked: liked, like_count: newCount },
+    });
   }
 
   function handlePollVoteChanged(threadId: string, counts: number[], userVote: number | null, undoUsed: boolean) {
     writeCache((cur) =>
       cur.map((t) => t.id === threadId ? { ...t, poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed } : t),
     );
+    publishContentChange({
+      kind: "thread",
+      id: threadId,
+      patch: { poll_vote_counts: counts, poll_user_vote: userVote, poll_undo_used: undoUsed },
+    });
   }
 
   function handleSaveChanged(threadId: string, saved: boolean) {
     writeCache((cur) => cur.map((t) => t.id === threadId ? { ...t, user_saved: saved } : t));
+    publishContentChange({ kind: "thread", id: threadId, patch: { user_saved: saved } });
   }
 
   function handleDeleted(threadId: string) {
@@ -192,6 +222,7 @@ export function ThreadsView({
     // the same frame instead of waiting for the realtime round trip (which
     // never arrives in environments without a realtime worker).
     onThreadDeleted?.(threadId);
+    publishContentChange({ kind: "thread", id: threadId, removed: true });
   }
 
   // ── Load older threads (keyset pagination via ?cursor=createdAt|id) ──────

@@ -47,7 +47,7 @@ export function BrowserNotificationInitializer() {
       {!dismissed && (
         <aside
           aria-label="Notification status"
-          className="mx-3 mb-2 flex shrink-0 items-center gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2.5 text-foreground"
+          className="mx-[13px] mb-[7px] flex shrink-0 items-center gap-2 rounded-xl border border-accent/20 bg-accent-soft px-3 py-2.5 text-foreground"
         >
           <BellOff strokeWidth={2.5} className="size-5 shrink-0 text-accent" aria-hidden="true" />
           <p className="min-w-0 flex-1 font-body text-xs leading-relaxed">

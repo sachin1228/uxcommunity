@@ -22,6 +22,8 @@ import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
 import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
+import { useContentChanges } from "@/lib/communities/use-content-changes";
 
 const STALE = 30_000;
 
@@ -91,6 +93,19 @@ export function ShowcaseView({
     );
   }
 
+  // Likes, saves, edits and deletes made anywhere else are merged in place.
+  useContentChanges("showcase", (changes) => {
+    setPosts((current) => {
+      const next = applyContentChanges(current, changes, "showcase");
+      patchCachedRequest<{ posts?: ShowcasePost[] }>(
+        requestUrl,
+        (cachedPage) => ({ ...cachedPage, posts: next }),
+        currentUserId,
+      );
+      return next;
+    });
+  });
+
   async function loadMore() {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -114,6 +129,11 @@ export function ShowcaseView({
     replacePosts(
       posts.map((post) => (post.id === id ? { ...post, ...change } : post)),
     );
+    publishContentChange({
+      kind: "showcase",
+      id,
+      patch: change as Record<string, unknown>,
+    });
   }
 
   async function remove(post: ShowcasePost) {
@@ -131,6 +151,7 @@ export function ShowcaseView({
         { method: "DELETE" },
       );
       if (!response.ok) throw new Error("Failed to delete showcase post");
+      publishContentChange({ kind: "showcase", id: post.id, removed: true });
     } catch {
       deletedPostIdsRef.current.delete(post.id);
       replacePosts(previousPosts);
@@ -265,7 +286,10 @@ export function ShowcaseView({
         <CreateShowcaseModal
           communityId={communityId}
           onClose={() => setCreating(false)}
-          onCreated={(post) => replacePosts([post, ...posts])}
+          onCreated={(post) => {
+            replacePosts([post, ...posts]);
+            publishContentChange({ kind: "showcase", id: post.id, created: true });
+          }}
         />
       )}
       {editing && (
@@ -274,11 +298,16 @@ export function ShowcaseView({
           initialIsPublic={editing.is_public}
           post={editing}
           onClose={() => setEditing(null)}
-          onUpdated={(post) =>
+          onUpdated={(post) => {
             replacePosts(
               posts.map((item) => (item.id === post.id ? post : item)),
-            )
-          }
+            );
+            publishContentChange({
+              kind: "showcase",
+              id: post.id,
+              patch: post as unknown as Record<string, unknown>,
+            });
+          }}
         />
       )}
       <ConfirmDialog

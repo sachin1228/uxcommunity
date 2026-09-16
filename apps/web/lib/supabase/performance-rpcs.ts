@@ -37,7 +37,16 @@ type PerformanceRpcMap = {
   get_resource_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_event_list_page: { args: { p_community_id: string; p_user_id: string; p_phase: "upcoming" | "past"; p_cursor_event_date: string | null; p_cursor_id: string | null; p_now: string; p_limit: number }; returns: Array<{ item: Json }> };
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
+  get_profile_feed_page: { args: { p_user_id: string; p_scope: ProfileFeedScope; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
 };
+
+/** Card scopes the profile activity tabs can request. */
+export const PROFILE_FEED_SCOPES = ["all", "thread", "showcase", "resource", "event", "saved"] as const;
+export type ProfileFeedScope = (typeof PROFILE_FEED_SCOPES)[number];
+
+export function isProfileFeedScope(value: string): value is ProfileFeedScope {
+  return (PROFILE_FEED_SCOPES as readonly string[]).includes(value);
+}
 
 type RpcResult<T> = Promise<{ data: T | null; error: PostgrestError | null }>;
 

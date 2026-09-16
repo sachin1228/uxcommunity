@@ -6,30 +6,14 @@ import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
-
-const PAGE_SIZE = 30;
+import {
+  FEED_PAGE_SIZE as PAGE_SIZE,
+  isFeedCard,
+  normalizeFeedCard,
+  type FeedCardObject,
+} from "@/lib/feeds/feed-items";
 
 export const dynamic = "force-dynamic";
-
-type HomeFeedObject = { [key: string]: Json | undefined };
-
-function isHomeFeedItem(item: Json): item is HomeFeedObject {
-  if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
-  const kind = item._type;
-  return (kind === "thread" || kind === "event" || kind === "resource" || kind === "showcase")
-    && item.community_id !== null && item.community_id !== undefined;
-}
-
-function normalizeHomeFeedItem(item: HomeFeedObject): Json {
-  return {
-    ...item,
-    ...(item._type === "thread" ? {
-      attachments: Array.isArray(item.attachments) ? item.attachments : [],
-      links: Array.isArray(item.links) ? item.links : [],
-      tags: Array.isArray(item.tags) ? item.tags : [],
-    } : {}),
-  };
-}
 
 // The home feed is read by every user on every dashboard visit. Recomputing it
 // per request runs ~30 × ~6 correlated count subqueries in get_home_feed_page,
@@ -53,12 +37,12 @@ const loadFeedPage = unstable_cache(
     // showcase records are intentionally left out.
     let items = (data ?? [])
       .map(({ item }) => item)
-      .filter(isHomeFeedItem)
-      .map(normalizeHomeFeedItem);
+      .filter(isFeedCard)
+      .map(normalizeFeedCard);
 
     // Attach poll vote totals so feed thread cards show live counts.
-    const threadObjects = items.filter((item): item is HomeFeedObject =>
-      isHomeFeedItem(item) && item._type === "thread",
+    const threadObjects = items.filter((item): item is FeedCardObject =>
+      isFeedCard(item) && item._type === "thread",
     );
     if (threadObjects.length) {
       const attached = await attachPollVotes(
@@ -66,12 +50,12 @@ const loadFeedPage = unstable_cache(
         threadObjects as unknown as Array<Record<string, unknown>>,
         userId,
       );
-      const byId = new Map<string, HomeFeedObject>();
+      const byId = new Map<string, FeedCardObject>();
       for (const row of attached) {
-        if (typeof row.id === "string") byId.set(row.id, row as unknown as HomeFeedObject);
+        if (typeof row.id === "string") byId.set(row.id, row as unknown as FeedCardObject);
       }
       items = items.map((item) =>
-        isHomeFeedItem(item) && item._type === "thread" && typeof item.id === "string" && byId.has(item.id)
+        isFeedCard(item) && item._type === "thread" && typeof item.id === "string" && byId.has(item.id)
           ? byId.get(item.id)!
           : item,
       );
