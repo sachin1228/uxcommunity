@@ -25,6 +25,7 @@ interface Props {
   initialBio: string;
   initialInterestIds: string[];
   allInterests: { id: string; name: string; image_url?: string | null }[];
+  postCount: number;
 }
 
 export function ProfileClient({
@@ -36,15 +37,40 @@ export function ProfileClient({
   sector,
   experienceLevel,
   jobTitle,
+  initialBio,
+  initialInterestIds,
+  allInterests,
+  postCount,
 }: Props) {
   const router = useRouter();
   const [name] = useState(initialName);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatarUrl);
+  const [interestIds, setInterestIds] = useState<string[]>(initialInterestIds);
   const [showPicturePicker, setShowPicturePicker] = useState(false);
   const [uploadBlob, setUploadBlob] = useState<Blob | null>(null);
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [pictureSaving, setPictureSaving] = useState(false);
   const [pictureError, setPictureError] = useState<string | null>(null);
+
+  const interestNames = allInterests
+    .filter((i) => interestIds.includes(i.id))
+    .map((i) => i.name);
+
+  async function handleSaveInterests(nextIds: string[]) {
+    // Optimistic: flip the chips right away, roll back if the save fails.
+    const previous = interestIds;
+    setInterestIds(nextIds);
+    try {
+      const res = await fetch("/api/profile/interests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interest_ids: nextIds }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+    } catch {
+      setInterestIds(previous);
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -122,6 +148,11 @@ export function ProfileClient({
           sector={sector}
           experienceLevel={experienceLevel}
           jobTitle={jobTitle}
+          bio={initialBio}
+          interestNames={interestNames}
+          allInterests={allInterests}
+          onSaveInterests={handleSaveInterests}
+          postCount={postCount}
         />
       </div>
 

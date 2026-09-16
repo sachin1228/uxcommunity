@@ -25,6 +25,10 @@ export default async function ProfilePage({ searchParams }: Props) {
     { data: profile },
     { data: userInterests },
     { data: allInterests },
+    { count: threadCount },
+    { count: eventCount },
+    { count: resourceCount },
+    { count: showcaseCount },
   ] = await Promise.all([
     db.from("users").select("name, email, created_at").eq("id", userId).maybeSingle(),
     db
@@ -39,7 +43,14 @@ export default async function ProfilePage({ searchParams }: Props) {
       .select("interest_id, design_interests(id, name, image_url)")
       .eq("user_id", userId),
     db.from("design_interests").select("id, name, image_url").eq("is_active", true).order("name"),
+    db.from("community_threads").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    db.from("community_events").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    db.from("community_resources").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    db.from("community_showcase_posts").select("id", { count: "exact", head: true }).eq("user_id", userId),
   ]);
+
+  const postCount =
+    (threadCount ?? 0) + (eventCount ?? 0) + (resourceCount ?? 0) + (showcaseCount ?? 0);
 
   // Resolve the job title slug to its admin-managed display name (the profile
   // column stores a slug, which has no PostgREST embed).
@@ -76,6 +87,7 @@ export default async function ProfilePage({ searchParams }: Props) {
       initialBio={(profile as any)?.bio ?? ""}
       initialInterestIds={myInterestIds}
       allInterests={(allInterests ?? []) as { id: string; name: string; image_url?: string | null }[]}
+      postCount={postCount}
     />
   );
 }
