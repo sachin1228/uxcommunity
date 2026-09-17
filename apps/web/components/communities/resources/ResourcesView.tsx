@@ -31,6 +31,7 @@ import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
 
@@ -144,6 +145,18 @@ export function ResourcesView({
   function handleCreated(resource: CommunityResource) {
     writeCache((prev) => [resource, ...prev.filter((r) => r.id !== resource.id)]);
     publishContentChange({ kind: "resource", id: resource.id, created: true });
+    // Mirror into the chat timeline as a permanent "You created a resource" card.
+    notifyContentEvent({
+      kind: "insert",
+      event: {
+        id: resource.id,
+        community_id: resource.community_id,
+        user_id: resource.user_id,
+        kind: "resource",
+        title: resource.title,
+        created_at: resource.created_at,
+      },
+    });
   }
 
   function handleUpdated(updated: CommunityResource) {
@@ -172,6 +185,8 @@ export function ResourcesView({
   function handleDeleted(resourceId: string) {
     writeCache((prev) => prev.filter((r) => r.id !== resourceId));
     publishContentChange({ kind: "resource", id: resourceId, removed: true });
+    // Drop the chat timeline's permanent "created a resource" card too.
+    notifyContentEvent({ kind: "delete", event: { id: resourceId, community_id: communityId, kind: "resource" } });
   }
 
   // ── Load older resources (keyset pagination via ?cursor=createdAt|id) ────

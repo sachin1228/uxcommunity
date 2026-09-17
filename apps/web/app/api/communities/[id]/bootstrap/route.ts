@@ -7,8 +7,9 @@ import {
   loadCommunityReadModel,
   type ReadResult,
 } from "@/lib/communities/read-models";
+import { loadCommunityContentEvents } from "@/lib/communities/content-events";
 type Params = { params: Promise<{ id: string }> };
-type Section = "community" | "messages" | "rules";
+type Section = "community" | "messages" | "content-events" | "rules";
 
 /**
  * Sections that gate the whole response. Rules are a cheap extra bundled so
@@ -17,6 +18,22 @@ type Section = "community" | "messages" | "rules";
  * the client falls back to the individual endpoint.
  */
 const CRITICAL = new Set<Section>(["community", "messages"]);
+
+/**
+ * Which content areas the chat timeline should show "created a …" cards for:
+ * exactly the areas the community's nav shows (showcase reads as on unless the
+ * flag says otherwise).
+ */
+function contentAreaLimits(community: Record<string, unknown> | undefined) {
+  const tabs = (community?.enabled_tabs as string[] | null | undefined) ?? null;
+  const enabled = (area: string) => tabs === null || tabs.includes(area);
+  return {
+    threads: enabled("threads"),
+    showcase: community?.showcase_enabled !== false,
+    events: enabled("events"),
+    resources: enabled("resources"),
+  };
+}
 
 async function readSection(
   name: Section,
@@ -48,6 +65,18 @@ export async function GET(_request: NextRequest, context: Params) {
   const operations: Array<[Section, () => Promise<unknown>]> = [
     ["community", async () => unwrapReadResult(await loadCommunityReadModel(communityId, userId))],
     ["messages", async () => unwrapReadResult(await loadCommunityMessagePage(communityId, userId))],
+    [
+      "content-events",
+      async () => {
+        const readModel = await loadCommunityReadModel(communityId, userId);
+        if (!readModel.ok) return { events: [] };
+        const events = await loadCommunityContentEvents(
+          communityId,
+          contentAreaLimits(readModel.data.community as Record<string, unknown>),
+        );
+        return { events };
+      },
+    ],
     // Cheap rules are bundled into the same request so the info panel never
     // needs its own network round trip. The shape matches the standalone
     // /rules endpoint, so the hydrated request-cache entries are interchangeable.

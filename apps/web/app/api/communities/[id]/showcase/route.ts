@@ -4,7 +4,9 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { loadCommunityShowcasePage } from "@/lib/communities/read-models";
+import { contentEventPayload } from "@/lib/communities/content-events";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 async function member(db: ReturnType<typeof createServiceClient>, communityId: string, userId: string) {
   const { data } = await db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle();
@@ -71,5 +73,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // attachments are persisted exactly as the validated client sent them.
   const { data, error } = await db.from("community_showcase_posts").insert({ community_id: id, user_id: userId, title, image_url: imageUrl, attachments, category, is_public: isPublic, allow_replies: allowReplies }).select("*").single();
   if (error || !data) return NextResponse.json({ error: "Failed to share your work." }, { status: 500 });
+  void publishRealtimeBatch([
+    {
+      // The chat timeline's permanent "<name> created a showcase" card.
+      room: realtimeRooms.chat(id),
+      topic: "content-insert",
+      data: contentEventPayload(data as Record<string, unknown>, "showcase"),
+    },
+  ]);
   return NextResponse.json({ post: (await enrich(db, [data], userId))[0] }, { status: 201 });
 }

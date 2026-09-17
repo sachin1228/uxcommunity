@@ -7,9 +7,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import { MessageBubble } from "./MessageBubble";
 import { UnreadDivider } from "./UnreadDivider";
 import { ThreadNotificationBubble } from "./ThreadNotificationBubble";
+import { ContentNotificationBubble } from "./ContentNotificationBubble";
 import { fmtDate } from "./chatUtils";
 import { CommunityDp } from "../CommunityDp";
-import type { CachedMessage, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
+import type { CachedMessage, CachedContentEvent, CachedThreadEvent, MessageReaction } from "@/lib/communities/cache";
 
 type Message = CachedMessage;
 
@@ -27,7 +28,8 @@ interface DateGroup {
 
 type TimelineItem =
   | { kind: "message"; msg: CachedMessage; created_at: string }
-  | { kind: "thread"; event: CachedThreadEvent; created_at: string };
+  | { kind: "thread"; event: CachedThreadEvent; created_at: string }
+  | { kind: "content"; event: CachedContentEvent; created_at: string };
 
 interface MergedGroup {
   date: string;
@@ -37,6 +39,10 @@ interface MergedGroup {
 interface MessageListProps {
   grouped: DateGroup[];
   threadEvents: CachedThreadEvent[];
+  /** Permanent "<name> created a …" cards for threads/showcase/resources/events. */
+  contentEvents: CachedContentEvent[];
+  /** True once the content-event history fetch has settled. */
+  contentEventsReady: boolean;
   currentUserId: string;
   firstUnreadMsgId: string | null;
   unreadDisplayCount: number;
@@ -79,6 +85,8 @@ interface MessageListProps {
 export const MessageList = memo(function MessageList({
   grouped,
   threadEvents,
+  contentEvents,
+  contentEventsReady,
   currentUserId,
   firstUnreadMsgId,
   unreadDisplayCount,
@@ -104,7 +112,9 @@ export const MessageList = memo(function MessageList({
   onDelete,
   onImageClick,
 }: MessageListProps) {
-  // Merge messages + thread events into date-grouped timeline items.
+  // Merge messages + content events into date-grouped timeline items. Threads
+  // still carry the richer legacy bubble (thumbnail, category badge); the other
+  // three areas use the shared compact card.
   const mergedGroups = useMemo<MergedGroup[]>(() => {
     // Build a map of date → items so we can add thread events even on dates
     // that have no regular messages yet.
@@ -119,10 +129,19 @@ export const MessageList = memo(function MessageList({
       map.set(group.date, items);
     }
 
+    const contentOnly = new Set(contentEvents.map((event) => event.id));
+
     for (const event of threadEvents) {
+      if (contentOnly.has(event.id)) continue;
       const date = fmtDate(event.created_at);
       if (!map.has(date)) map.set(date, []);
       map.get(date)!.push({ kind: "thread", event, created_at: event.created_at });
+    }
+
+    for (const event of contentEvents) {
+      const date = fmtDate(event.created_at);
+      if (!map.has(date)) map.set(date, []);
+      map.get(date)!.push({ kind: "content", event, created_at: event.created_at });
     }
 
     // Sort each group's items by created_at, then sort groups by date.
@@ -139,7 +158,7 @@ export const MessageList = memo(function MessageList({
         new Date(b.items[0]?.created_at ?? 0).getTime()
     );
     return result;
-  }, [grouped, threadEvents]);
+  }, [grouped, threadEvents, contentEvents]);
 
   // ── Entrance-animation eligibility ────────────────────────────────────
   // Only messages that arrive *live* (sent by me or pushed via realtime after
@@ -234,10 +253,11 @@ export const MessageList = memo(function MessageList({
         </div>
       )}
 
-      {/* Empty state — only shown once threads have loaded too, so we don't
-          flash "Be the first to say something" in communities that have threads
-          but no chat messages while the thread fetch is still in flight.     */}
-      {mergedGroups.length === 0 && threadsReady && (
+      {/* Empty state — only shown once threads and content events have loaded
+          too, so we don't flash "Be the first to say something" in communities
+          whose only activity is a thread or a showcase post while those fetches
+          are still in flight. */}
+      {mergedGroups.length === 0 && threadsReady && contentEventsReady && (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 py-16 px-5">
           <CommunityDp
             imageUrl={displayCommunity?.image_url ?? null}
@@ -288,6 +308,18 @@ export const MessageList = memo(function MessageList({
                 return (
                   <ThreadNotificationBubble
                     key={`thread-${item.event.id}`}
+                    event={item.event}
+                    communityId={communityId}
+                    currentUserId={currentUserId}
+                  />
+                );
+              }
+
+              if (item.kind === "content") {
+                prevItem = null;
+                return (
+                  <ContentNotificationBubble
+                    key={`content-${item.event.kind}-${item.event.id}`}
                     event={item.event}
                     communityId={communityId}
                     currentUserId={currentUserId}

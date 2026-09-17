@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
+import { notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
 
@@ -150,6 +151,18 @@ export function EventsView({
       (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     ));
     publishContentChange({ kind: "event", id: event.id, created: true });
+    // Mirror into the chat timeline as a permanent "You created an event" card.
+    notifyContentEvent({
+      kind: "insert",
+      event: {
+        id: event.id,
+        community_id: event.community_id,
+        user_id: event.user_id,
+        kind: "event",
+        title: event.title,
+        created_at: event.created_at,
+      },
+    });
   }
 
   function handleUpdated(updated: CommunityEvent) {
@@ -167,6 +180,8 @@ export function EventsView({
   function handleDeleted(eventId: string) {
     writeCache((prev) => prev.filter((e) => e.id !== eventId));
     publishContentChange({ kind: "event", id: eventId, removed: true });
+    // Drop the chat timeline's permanent "created an event" card too.
+    notifyContentEvent({ kind: "delete", event: { id: eventId, community_id: communityId, kind: "event" } });
   }
 
   function handleRsvpChanged(eventId: string, rsvped: boolean, count: number) {

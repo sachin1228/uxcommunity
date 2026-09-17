@@ -199,7 +199,9 @@ export function useSidebarCommunities(userId: string) {
 
     setCommunities((prev) => {
       const updated = prev.map((c) =>
-        c.id === activeCommunityId ? { ...c, message_count: 0, mention_count: 0 } : c
+        c.id === activeCommunityId
+          ? { ...c, message_count: 0, mention_count: 0, unread_content_count: 0 }
+          : c
       );
       if (sidebarStore.data) {
         const storeById = new Map(
@@ -258,7 +260,9 @@ export function useSidebarCommunities(userId: string) {
 
     setCommunities((prev) => {
       const updated = prev.map((c) =>
-        c.id === id ? { ...c, message_count: 0, mention_count: 0 } : c
+        c.id === id
+          ? { ...c, message_count: 0, mention_count: 0, unread_content_count: 0 }
+          : c
       );
       if (sidebarStore.data) {
         const storeById = new Map(

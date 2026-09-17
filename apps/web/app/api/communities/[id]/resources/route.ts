@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import type { ResourceType } from "@/components/communities/resources/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityResources } from "@/lib/communities/read-models";
+import { contentEventPayload } from "@/lib/communities/content-events";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 100;
@@ -160,6 +161,12 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: inserted },
+    {
+      // The chat timeline's permanent "<name> created a resource" card.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-insert",
+      data: contentEventPayload(inserted as Record<string, unknown>, "resource"),
+    },
   ]);
 
   const enriched = (await withAuthorAndMeta(db, [inserted as Record<string, unknown>], userId))[0];

@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
+import { contentEventPayload } from "@/lib/communities/content-events";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -254,6 +255,12 @@ export async function POST(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data },
+    {
+      // The chat timeline's permanent "<name> created an event" card.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-insert",
+      data: contentEventPayload(data as Record<string, unknown>, "event"),
+    },
   ]);
 
   const [enriched] = await enrichEvents(db, [data as unknown as Record<string, unknown>], userId);

@@ -5,7 +5,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { msgCache, applyReactionInsert, applyReactionDelete } from "@/lib/communities/cache";
-import type { CachedMessage, CachedThreadEvent, MessageMention, ReplyPreview } from "@/lib/communities/cache";
+import type { CachedContentEvent, CachedMessage, CachedThreadEvent, ContentEventKind, MessageMention, ReplyPreview } from "@/lib/communities/cache";
 import type { Member } from "./useChatData";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
 import { pickOptimisticMatch } from "./chatUtils";
@@ -18,6 +18,8 @@ interface UseRealtimeChatOptions {
   fetchMessages: (after?: string, force?: boolean) => Promise<void>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setThreadEvents: React.Dispatch<React.SetStateAction<CachedThreadEvent[]>>;
+  /** Permanent "<name> created a …" cards (threads/showcase/resources/events). */
+  setContentEvents: React.Dispatch<React.SetStateAction<CachedContentEvent[]>>;
   membersRef: MutableRefObject<Member[]>;
   pendingProfileFetchRef: MutableRefObject<Map<string, Promise<void>>>;
   scrollContainerRef: MutableRefObject<HTMLDivElement | null>;
@@ -32,6 +34,7 @@ export function useRealtimeChat({
   fetchMessages,
   setMessages,
   setThreadEvents,
+  setContentEvents,
   membersRef,
   pendingProfileFetchRef,
   scrollContainerRef,
@@ -406,6 +409,50 @@ export function useRealtimeChat({
         const row = data as { id?: string };
         if (!row.id) return;
         setThreadEvents((prev) => prev.filter((e) => e.id !== row.id));
+        // The unified content card for this thread goes too.
+        setContentEvents((prev) => prev.filter((e) => e.id !== row.id));
+      }),
+    );
+
+    // ── Unified content events (threads + showcase + resources + events) ────
+    // The server broadcasts one topic per create/delete on the chat room so
+    // the timeline's permanent "<name> created a …" card stays current without
+    // refetching. (The creator's own optimistic insert dedupes by id.)
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-insert", (data) => {
+        const row = data as {
+          id?: string;
+          community_id?: string;
+          user_id?: string;
+          kind?: ContentEventKind;
+          title?: string;
+          created_at?: string;
+        };
+        if (!row.id || !row.user_id || !row.created_at || !row.kind) return;
+        const senderMember = membersRef.current.find((m) => m.user_id === row.user_id);
+        const event: CachedContentEvent = {
+          id: row.id,
+          community_id: row.community_id ?? communityId,
+          user_id: row.user_id,
+          kind: row.kind,
+          title: row.title ?? "",
+          created_at: row.created_at,
+          users: senderMember?.users ?? null,
+        };
+        setContentEvents((prev) => {
+          if (prev.some((e) => e.id === event.id)) return prev;
+          return [...prev, event].sort(
+            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+          );
+        });
+      }),
+    );
+
+    unsubscribes.push(
+      realtimeClient.on(chatRoom, "content-delete", (data) => {
+        const row = data as { id?: string };
+        if (!row.id) return;
+        setContentEvents((prev) => prev.filter((e) => e.id !== row.id));
       }),
     );
 

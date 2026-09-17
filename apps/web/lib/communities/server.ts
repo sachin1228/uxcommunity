@@ -86,4 +86,6 @@ export interface SSRCommunitySections {
   showcase?: unknown;
   members?: unknown;
   rules?: unknown;
+  /** Permanent "<name> created a …" timeline cards seeded with the page. */
+  contentEvents?: import("./cache").CachedContentEvent[];
 }

@@ -31,7 +31,7 @@ export async function markReadOnServer(communityId: string): Promise<boolean> {
         ...sidebarStore.data,
         communities: sidebarStore.data.communities.map((c) =>
           c.id === communityId
-            ? { ...c, last_read_at: newLastReadAt, message_count: 0 }
+            ? { ...c, last_read_at: newLastReadAt, message_count: 0, unread_content_count: 0 }
             : c
         ),
       };
@@ -52,13 +52,13 @@ async function patchCachedSidebarEntry(
 ): Promise<void> {
   try {
     const { patchCachedRequest } = await import("@/lib/request-cache");
-    patchCachedRequest<{ communities: Array<{ id: string; message_count: number; last_read_at?: string | null }> }>(
+    patchCachedRequest<{ communities: Array<{ id: string; message_count: number; unread_content_count?: number; last_read_at?: string | null }> }>(
       "/api/communities",
       (current) => ({
         ...current,
         communities: (current.communities ?? []).map((c) =>
           c.id === communityId
-            ? { ...c, message_count: 0, last_read_at: lastReadAt }
+            ? { ...c, message_count: 0, unread_content_count: 0, last_read_at: lastReadAt }
             : c
         ),
       }),

@@ -15,7 +15,16 @@ import {
   msgFetchedAt,
   patchSidebarMessageContent,
 } from "@/lib/communities/cache";
-import type { CachedMessage, CachedMeta, CachedThreadEvent, MessageMention, MessageReaction, ReplyPreview } from "@/lib/communities/cache";
+import {
+  CONTENT_EVENT_CHANGED_EVENT,
+  type CachedMessage,
+  type CachedMeta,
+  type CachedContentEvent,
+  type CachedThreadEvent,
+  type MessageMention,
+  type MessageReaction,
+  type ReplyPreview,
+} from "@/lib/communities/cache";
 import {
   clearReactionIntentsForCommunity,
   ReactionIntentCoordinator,
@@ -105,6 +114,7 @@ import {
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import type { SSRCommunitySections } from "@/lib/communities/server";
+import type { CachedContentEvent as SSRContentEvent } from "@/lib/communities/cache";
 
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -122,6 +132,7 @@ export function CommunityChat({
   initialMessages,
   initialLastReadAt,
   initialSections,
+  initialContentEvents,
   initialTab = "chat",
 }: {
   communityId: string;
@@ -131,6 +142,7 @@ export function CommunityChat({
   initialMessages?: CachedMessage[];
   initialLastReadAt?: string | null;
   initialSections?: SSRCommunitySections;
+  initialContentEvents?: SSRContentEvent[];
   initialTab?: ChatTab;
 }) {
   const pathname = usePathname();
@@ -139,8 +151,15 @@ export function CommunityChat({
   const [activeTab, setActiveTab] = useState<ChatTab>(initialTab);
   const [showSettings, setShowSettings] = useState(false);
   const [threadEvents, setThreadEvents] = useState<CachedThreadEvent[]>([]);
+  // Permanent "John created a …" cards for threads AND the other three areas.
+  // Seeded from /bootstrap (history) and kept current by the chat room's
+  // content-insert / content-delete realtime topics — so the card is as
+  // permanent as a message, not a session-only bubble.
+  const [contentEvents, setContentEvents] = useState<CachedContentEvent[]>([]);
   /** True once the initial threads fetch for the current community has settled. */
   const [threadsReady, setThreadsReady] = useState(false);
+  /** True once the content-events history (bootstrap section) has settled. */
+  const [contentEventsReady, setContentEventsReady] = useState(false);
   useIsomorphicLayoutEffect(() => { setHasMounted(true); }, []);
 
   // Seed every first-page endpoint before child passive effects run. This keeps
@@ -156,11 +175,11 @@ export function CommunityChat({
       [`${base}/showcase`, initialSections.showcase],
       [`${base}/members?page=0`, initialSections.members],
       [`${base}/rules`, initialSections.rules],
-    ];
+      [`${base}/content-events`, { events: initialContentEvents }],
+    ];;
     for (const [url, value] of urls) {
       if (value !== undefined) setCachedRequest(url, value, currentUserId);
     }
-
     // When the SSR snapshot already carries the community read model and first
     // message page, mirror it into the bootstrap cache entry as well. Otherwise
     // every downstream bootstrap-backed read (chat data, info panel, tab views)
@@ -240,6 +259,24 @@ export function CommunityChat({
   // thread-delete echo.
   const handleThreadDeleted = useCallback((threadId: string) => {
     setThreadEvents((prev) => prev.filter((event) => event.id !== threadId));
+    // The unified content-event card is the one the timeline renders now.
+    setContentEvents((prev) => prev.filter((event) => event.id !== threadId));
+  }, []);
+
+  // Local creates for the other three areas (showcase/resource/event) — the
+  // server broadcast (content-insert) also lands here, so the dedupe by id
+  // keeps this idempotent for the creator's own clients.
+  const handleContentCreated = useCallback((event: CachedContentEvent) => {
+    setContentEvents((prev) => {
+      if (prev.some((item) => item.id === event.id)) return prev;
+      return [...prev, event].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+    });
+  }, []);
+
+  const handleContentDeleted = useCallback((id: string) => {
+    setContentEvents((prev) => prev.filter((event) => event.id !== id));
   }, []);
 
   // Prime only first-render data. Secondary tabs fetch from their own cached
@@ -250,6 +287,8 @@ export function CommunityChat({
       if (!cancelled) {
         setThreadEvents([]);
         setThreadsReady(false);
+        setContentEvents([]);
+        setContentEventsReady(false);
       }
     });
     initRequestCache(currentUserId);
@@ -263,7 +302,10 @@ export function CommunityChat({
       msgCache.set(communityId, initialMessages);
       msgFetchedAt.set(communityId, fetchedAt);
       queueMicrotask(() => {
-        if (!cancelled) setThreadsReady(true);
+        if (!cancelled) {
+          setThreadsReady(true);
+          setContentEventsReady(true);
+        }
       });
       return () => { cancelled = true; };
     }
@@ -276,6 +318,7 @@ export function CommunityChat({
           members: CachedMeta["members"];
         };
         const messageData = data.messages as { messages: CachedMessage[] };
+        const contentData = data["content-events"] as { events?: CachedContentEvent[] } | undefined;
         const fetchedAt = Date.now();
 
         metaCache.set(communityId, {
@@ -285,10 +328,14 @@ export function CommunityChat({
         });
         msgCache.set(communityId, messageData.messages ?? []);
         msgFetchedAt.set(communityId, fetchedAt);
+        if (contentData) setContentEvents(contentData.events ?? []);
       })
       .catch(() => {})
       .finally(() => {
-        if (!cancelled) setThreadsReady(true);
+        if (!cancelled) {
+          setThreadsReady(true);
+          setContentEventsReady(true);
+        }
       });
 
     return () => { cancelled = true; };
@@ -347,6 +394,42 @@ export function CommunityChat({
     onLoadError: chatLoadError.reportError,
     retryToken: chatLoadError.retryToken,
   });
+
+  // Local creates/deletes from the mounted tabs (Threads/Showcase/Resources/
+  // Events) mirror into the timeline instantly — the server broadcast arrives
+  // later via realtime and dedupes by id.
+  useEffect(() => {
+    const onContentEvent = (change: Event) => {
+      const detail = (change as CustomEvent<{
+        kind: "insert" | "delete";
+        event: { id: string; community_id: string; user_id?: string; kind: CachedContentEvent["kind"]; title?: string; created_at?: string };
+      }>).detail;
+      if (!detail || detail.event.community_id !== communityId) return;
+      if (detail.kind === "delete") {
+        setContentEvents((prev) => prev.filter((event) => event.id !== detail.event.id));
+        return;
+      }
+      const row = detail.event;
+      setContentEvents((prev) => {
+        if (prev.some((event) => event.id === row.id)) return prev;
+        const member = members.find((m) => m.user_id === row.user_id);
+        const next: CachedContentEvent = {
+          id: row.id,
+          community_id: row.community_id,
+          user_id: row.user_id ?? currentUserId,
+          kind: row.kind,
+          title: row.title ?? "",
+          created_at: row.created_at ?? new Date().toISOString(),
+          users: member?.users ?? null,
+        };
+        return [...prev, next].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        );
+      });
+    };
+    window.addEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
+    return () => window.removeEventListener(CONTENT_EVENT_CHANGED_EVENT, onContentEvent);
+  }, [communityId, currentUserId, members]);
 
   // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
   // Read straight off the loaded messages: any message that mentions the
@@ -773,13 +856,14 @@ export function CommunityChat({
     [communityId],
   );
 
-  // ── Realtime subscription ──────────────────────────────────────────────────
+  // ── Realtime subscription ──────────────────────────────────────────────
   useRealtimeChat({
     communityId,
     currentUserId,
     fetchMessages,
     setMessages,
     setThreadEvents,
+    setContentEvents,
     membersRef,
     pendingProfileFetchRef,
     scrollContainerRef,
@@ -1313,6 +1397,8 @@ export function CommunityChat({
             <MessageList
               grouped={grouped}
               threadEvents={threadEvents}
+              contentEvents={contentEvents}
+              contentEventsReady={contentEventsReady}
               currentUserId={currentUserId}
               firstUnreadMsgId={firstUnreadMsgId}
               unreadDisplayCount={unreadDisplayCount}
