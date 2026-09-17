@@ -120,14 +120,14 @@ as $$
     where flags.events_enabled and e.created_at > membership.joined_at
   ),
   content_stats as (
-    select community_id,
+    select item.community_id,
       count(*) filter (
-        where user_id <> p_user_id
-          and (membership.last_read_at is null or created_at > membership.last_read_at)
+        where item.user_id <> p_user_id
+          and (membership.last_read_at is null or item.created_at > membership.last_read_at)
       )::integer as unread_content_count
     from content_items item
     join memberships membership on membership.community_id = item.community_id
-    group by community_id
+    group by item.community_id
   ),
   latest_content as (
     select distinct on (community_id)
