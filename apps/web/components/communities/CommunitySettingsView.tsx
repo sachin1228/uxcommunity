@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { CommunityNameBadges } from "./CommunityBadges";
 import {
   DEFAULT_ENABLED_TABS,
   isShowcaseEnabled,
@@ -32,6 +33,8 @@ import {
 interface Community {
   id: string;
   name: string;
+  /** Drives the verified seal beside the name (platform vs member community). */
+  type?: string | null;
   description?: string | null;
   is_private?: boolean;
   enabled_tabs?: string[];
@@ -272,7 +275,10 @@ export function CommunitySettingsView({
             <h2 className="font-display text-base font-semibold text-foreground leading-none">
               Community Settings
             </h2>
-            <p className="font-body text-[11px] text-foreground-muted mt-0.5">{community.name}</p>
+            <p className="mt-0.5 flex items-center gap-1 font-body text-[11px] text-foreground-muted">
+              {community.name}
+              <CommunityNameBadges type={community.type} isPrivate={isPrivate} size={11} />
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button

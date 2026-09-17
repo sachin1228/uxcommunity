@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
-import { Lock } from "lucide-react";
+import { CommunityNameBadges } from "../CommunityBadges";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
@@ -139,9 +139,7 @@ export const CommunityRow = memo(function CommunityRow({
             <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
               {c.name}
             </span>
-            {c.is_private && (
-              <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
-            )}
+            <CommunityNameBadges type={c.type} isPrivate={c.is_private} />
             {(c.last_message || lastContent) && !typingText && (
               <SidebarTimestamp
                 iso={

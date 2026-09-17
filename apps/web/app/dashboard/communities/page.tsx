@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Check, Lock } from "lucide-react";
 import { CommunityDp } from "@/components/communities/CommunityDp";
+import { CommunityNameBadges } from "@/components/communities/CommunityBadges";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
@@ -80,8 +81,9 @@ function CommunityCard({
 
           {/* Name + member count */}
           <div className="min-w-0 flex-1">
-            <p className="font-display text-sm font-semibold text-foreground truncate leading-tight">
-              {c.name}
+            <p className="flex items-center gap-1 font-display text-sm font-semibold text-foreground leading-tight">
+              <span className="min-w-0 truncate">{c.name}</span>
+              <CommunityNameBadges type={c.type} isPrivate={c.is_private} />
             </p>
             <p className="font-body text-[11px] text-foreground-muted leading-tight mt-0.5">
               {c.member_count.toLocaleString()} member{c.member_count !== 1 ? "s" : ""}

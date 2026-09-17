@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { invalidateOnJoin } from "@/lib/communities/cache";
 import { Lock, Globe2, Users, Check, MessageSquare } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
+import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
+import { isSignupCommunity } from "@/lib/communities/community-badges";
 
 interface Community {
   id: string;
@@ -92,8 +94,12 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         </div>
 
         {/* Name + description */}
-        <h1 className="text-center font-display text-xl font-semibold text-foreground">
+        <h1 className="flex items-center justify-center gap-1.5 font-display text-xl font-semibold text-foreground">
           {community.name}
+          {/* Platform-created communities (city, sector, interest, …) carry the
+              verified seal here too, so an invite link reads the same as the
+              sidebar the member lands in. */}
+          {isSignupCommunity(community.type) && <SignupCommunityBadge size={16} />}
         </h1>
         {community.description && (
           <p className="mt-2 text-center font-body text-sm leading-relaxed text-foreground-muted">
