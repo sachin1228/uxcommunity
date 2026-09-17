@@ -99,7 +99,33 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
   }
 
   const hasMasterData = Boolean(TABLE_LOOKUP[community.type]);
-  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }] = await Promise.all([
+  // Three cheap head counts rather than every membership row: the info panel
+  // needs totals per role, and a community can hold tens of thousands of
+  // members. They ride along in the same parallel wave, so they cost no
+  // additional round trip.
+  const countByRole = (role: string) =>
+    db
+      .from("community_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("community_id", communityId)
+      .eq("role", role);
+
+  // "Top Contributor" is not a stored role — it is the number of members who
+  // have actually posted here. Threads (polls included) and showcase posts both
+  // carry the author, so the two id-only scans union into one distinct count.
+  // The showcase table may predate its migration in an old environment, which
+  // reads as "no showcase authors" instead of failing the whole read model.
+  const authorScans = Promise.all([
+    db.from("community_threads").select("user_id").eq("community_id", communityId),
+    db.from("community_showcase_posts").select("user_id").eq("community_id", communityId),
+  ]).then(([threads, showcase]) =>
+    new Set([
+      ...((threads.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
+      ...((showcase.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
+    ]).size,
+  );
+
+  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }, roleCounts, owner, contributorCount] = await Promise.all([
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
@@ -108,6 +134,16 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     hasMasterData ? getMasterNameMap(community.type) : Promise.resolve({} as Record<string, string>),
     getExperienceLevelNameMap(),
     db.from("community_members").select("user_id, joined_at, role", { count: "exact" }).eq("community_id", communityId).order("joined_at", { ascending: false }).limit(10),
+    Promise.all([countByRole("owner"), countByRole("admin"), countByRole("member")]).then(
+      ([ownerRole, adminRole, memberRole]) => ({
+        owner: ownerRole.count ?? 0,
+        admin: adminRole.count ?? 0,
+        member: memberRole.count ?? 0,
+      }),
+    ),
+    // Platform-run communities have no owner_id — the panel omits the row.
+    resolveCommunityOwner(db, community.owner_id),
+    authorScans,
   ]);
 
   const memberUserIds = (memberRows ?? []).map((member) => member.user_id);
@@ -145,6 +181,9 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         image_url: dp.image_url,
         reference_name: (community.reference_id ? masterNameMap[community.reference_id] : undefined) ?? null,
         member_count: memberCount ?? 0,
+        owner,
+        role_counts: roleCounts,
+        contributor_count: contributorCount,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,
         current_user_role: currentUserRole,
         current_user_permissions: currentUserPermissions,
@@ -155,6 +194,24 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     },
   };
 });
+
+/** Owner name + avatar for the community info panel; null when unowned. */
+async function resolveCommunityOwner(
+  db: ReturnType<typeof createServiceClient>,
+  ownerId: string | null,
+): Promise<{ id: string; name: string; avatar_url: string | null } | null> {
+  if (!ownerId) return null;
+  const [{ data: user }, { data: profile }] = await Promise.all([
+    db.from("users").select("name").eq("id", ownerId).maybeSingle(),
+    db.from("designer_profiles").select("avatar_url").eq("user_id", ownerId).maybeSingle(),
+  ]);
+  if (!user?.name) return null;
+  return {
+    id: ownerId,
+    name: user.name as string,
+    avatar_url: (profile as { avatar_url?: string | null } | null)?.avatar_url ?? null,
+  };
+}
 
 export async function isCommunityMember(
   communityId: string,

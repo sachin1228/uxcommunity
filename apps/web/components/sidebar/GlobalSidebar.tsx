@@ -3,10 +3,9 @@
 import { useState, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus, X } from "lucide-react";
+import { Briefcase, Compass, Home, Library, X } from "lucide-react";
 import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
-import { Spinner } from "@/components/ui/Spinner";
-import { CommunityRow } from "@/components/communities/panel/CommunityRow";
+import { CommunitySidebarSection } from "@/components/communities/panel/CommunitySidebarSection";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { compareByRecentActivity } from "@/components/communities/panel/sidebar-order";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
@@ -236,55 +235,22 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
         )}
       </div>
 
-      {/* ALL — community list */}
-      <div>
-        <div className="flex items-center justify-between px-[17px] pb-[7px] pt-[9px]">
-          <span className="font-body text-[9px] font-semibold uppercase tracking-widest text-foreground-muted">
-            Your Community
-          </span>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-raised text-foreground-muted transition-colors hover:text-foreground"
-            aria-label="Create community"
-            title="Create community"
-          >
-            <Plus size={11} strokeWidth={2.5} />
-          </button>
-        </div>
-
-        {/* Notification status — anchored just under the community header so the
-            prompt stays next to the list it concerns instead of the workspace
-            nav, and scrolls away with it. */}
-        {!mobile && <BrowserNotificationInitializer />}
-
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Spinner className="h-4 w-4" />
-          </div>
-        ) : communities.length === 0 ? (
-          <div className="px-4 py-6 text-center">
-            <MessageSquare
-              size={24}
-              className="mx-auto text-foreground-muted mb-2 opacity-40"
-            />
-            <p className="font-body text-xs text-foreground-muted">No communities yet</p>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-[3px] px-[13px]">
-            {sorted.map((c) => (
-              <CommunityRow
-                key={c.id}
-                c={c}
-                active={c.id === activeCommunityId}
-                typingText={typingMap.get(c.id)}
-                onClick={handleNavigate}
-                onHover={prefetchCommunity}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* COMMUNITY — search, Following, Suggested, See All */}
+      {/* Notification status — anchored just above the community list so the
+          prompt stays next to the list it concerns instead of the workspace
+          nav, and scrolls away with it. */}
+      {!mobile && <BrowserNotificationInitializer />}
+      <CommunitySidebarSection
+        userId={userId}
+        communities={sorted}
+        loading={loading}
+        activeCommunityId={activeCommunityId}
+        typingMap={typingMap}
+        onNavigate={handleNavigate}
+        onHover={prefetchCommunity}
+        onCreate={() => setCreateOpen(true)}
+        mobile={mobile}
+      />
       </div>
 
       {/* Profile — pinned to the bottom of the sidebar */}
