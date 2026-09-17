@@ -4,11 +4,10 @@
  * CommunityRightSidebar
  *
  * Floating info card on the right of every community page: the community's
- * identity (DP, name, member count, membership check) with the live member
- * avatars, a Community Overview (creator / created / category / tags), the
- * description, the numbered Community Rules and a Member Role breakdown. Lives
- * in the communities layout so it persists across chat, threads, events,
- * resources and detail routes.
+ * members strip (count, who is online, avatar faces), a Community Overview
+ * (creator / created / category / tags), the description, the numbered
+ * Community Rules and a Member Role breakdown. Lives in the communities layout
+ * so it persists across chat, threads, events, resources and detail routes.
  *
  * Data strategy mirrors CommunityPageShell: pre-seed from the shared
  * metaCache, fall back to the sidebarStore for a fast first paint, then fetch
@@ -19,8 +18,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
-import { Check, ChevronRight, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import {
   metaCache,
   inFlightMetaFetch,
@@ -33,7 +31,6 @@ import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { AvatarImg } from "@/components/ui/AvatarImg";
-import { CommunityDp } from "./CommunityDp";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 
 type Community = CachedMeta["community"] & {
@@ -336,46 +333,27 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
       className="hidden xl:flex w-80 shrink-0 flex-col overflow-y-auto p-3 pl-0"
     >
       <div className="rounded-2xl border border-border bg-background">
-        {/* ── Identity ────────────────────────────────────────────────── */}
-        <section aria-labelledby="sidebar-community-heading" className="px-5 py-5">
-          <div className="flex items-start gap-3">
-            <CommunityDp
-              imageUrl={community?.image_url ?? null}
-              name={community?.name ?? "Community"}
-              size={48}
-              className="bg-surface-raised"
-            />
-
-            <div className="min-w-0 flex-1">
-              <h2
-                id="sidebar-community-heading"
-                className="truncate font-display text-[17px] font-semibold leading-tight text-foreground"
-              >
-                {community?.name ?? "Community"}
-              </h2>
-              <Link
-                href={`/dashboard/communities/${communityId}?tab=members`}
-                className="mt-1 inline-flex items-center gap-0.5 font-body text-[13px] text-foreground-muted transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              >
-                {memberLabel(memberCount)}
-                <ChevronRight size={14} strokeWidth={2.5} aria-hidden="true" />
-              </Link>
-            </div>
-
-            {/* Membership check — every viewer of this panel is a member. */}
-            <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent text-accent-foreground"
-              aria-label="You are a member of this community"
-              title="You're a member"
+        {/* ── Members ─────────────────────────────────────────────────── */}
+        <section aria-labelledby="sidebar-members-heading" className="px-5 py-5">
+          <div className="flex items-center justify-between">
+            <h2
+              id="sidebar-members-heading"
+              className="font-display text-[15px] font-semibold text-foreground"
             >
-              <Check size={14} strokeWidth={3} aria-hidden="true" />
+              Members{community ? ` (${memberCount})` : ""}
+            </h2>
+            <span
+              className="inline-flex items-center gap-1.5 font-body text-xs text-foreground-muted"
+              aria-label={`${onlineCount} online`}
+            >
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
+              {onlineCount} online
             </span>
           </div>
 
-          {/* Live members: avatar stack + who's online right now. */}
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex items-center">
             {visibleMembers.length > 0 ? (
-              <ul className="flex min-w-0 items-center" aria-label="Recent members">
+              <ul className="flex items-center" aria-label="Recent members">
                 {visibleMembers.map((member, index) => (
                   <li
                     key={member.user_id}
@@ -402,7 +380,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
               </ul>
             ) : (
               <div className="flex items-center" aria-hidden="true">
-                {Array.from({ length: 4 }).map((_, index) => (
+                {Array.from({ length: 5 }).map((_, index) => (
                   <span
                     key={index}
                     className={`h-9 w-9 rounded-full bg-surface-raised ring-2 ring-background animate-pulse ${index > 0 ? "-ml-2.5" : ""}`}
@@ -410,14 +388,6 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
                 ))}
               </div>
             )}
-
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5 font-body text-xs text-foreground-muted"
-              aria-label={`${onlineCount} online`}
-            >
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-500" aria-hidden="true" />
-              {onlineCount} online
-            </span>
           </div>
         </section>
 
