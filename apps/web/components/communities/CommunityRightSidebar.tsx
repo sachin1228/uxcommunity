@@ -5,10 +5,10 @@
  *
  * Floating info card on the right of every community page: the community's
  * identity (DP, name, member count, membership check) with the live member
- * avatars, a Community Overview (creator / created / category / tags), a
- * Create Post action, the description, the numbered Community Rules and a
- * Member Role breakdown. Lives in the communities layout so it persists across
- * chat, threads, events, resources and detail routes.
+ * avatars, a Community Overview (creator / created / category / tags), the
+ * description, the numbered Community Rules and a Member Role breakdown. Lives
+ * in the communities layout so it persists across chat, threads, events,
+ * resources and detail routes.
  *
  * Data strategy mirrors CommunityPageShell: pre-seed from the shared
  * metaCache, fall back to the sidebarStore for a fast first paint, then fetch
@@ -20,7 +20,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronRight, Info, Plus } from "lucide-react";
+import { Check, ChevronRight, Info } from "lucide-react";
 import {
   metaCache,
   inFlightMetaFetch,
@@ -32,12 +32,8 @@ import { fetchJsonCached, patchCachedRequest } from "@/lib/request-cache";
 import { realtimeClient } from "@/lib/realtime/client";
 import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
-import { useGuardedRouter } from "@/lib/navigation-guard";
-import { publishContentChange } from "@/lib/communities/content-sync";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { CommunityDp } from "./CommunityDp";
-import { CreateThreadModal } from "./threads/CreateThreadModal";
-import type { CommunityThread } from "./threads/types";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
 
 type Community = CachedMeta["community"] & {
@@ -282,7 +278,6 @@ interface Props {
 export function CommunityRightSidebar({ currentUserId }: Props) {
   const params = useParams<{ id?: string }>();
   const communityId = typeof params?.id === "string" ? params.id : null;
-  const router = useGuardedRouter();
 
   const { community, members } = useCommunityMeta(communityId);
   const rules = useCommunityRules(communityId, currentUserId);
@@ -291,7 +286,6 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
     currentUserId,
   });
 
-  const [composing, setComposing] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   // Explore page and other non-community routes: no sidebar.
@@ -335,14 +329,6 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
       count: roleCounts?.owner ?? 0,
     },
   ].filter((row) => row.count > 0);
-
-  function handleThreadCreated(thread: CommunityThread) {
-    // Same announcement the Threads tab makes, so the homepage and profile
-    // feeds pick the new post up instead of waiting for their next refetch.
-    publishContentChange({ kind: "thread", id: thread.id, created: true });
-    setComposing(false);
-    router.push(`/dashboard/communities/${communityId}/threads/${thread.id}`);
-  }
 
   return (
     <aside
@@ -487,18 +473,6 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
           )}
         </section>
 
-        {/* ── Create Post ─────────────────────────────────────────────── */}
-        <section className="border-t border-border px-5 py-4">
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 font-body text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Create Post
-            <Plus size={16} strokeWidth={2.5} aria-hidden="true" />
-          </button>
-        </section>
-
         {/* ── Description ─────────────────────────────────────────────── */}
         <section
           aria-labelledby="sidebar-description-heading"
@@ -597,16 +571,6 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
           </section>
         )}
       </div>
-
-      {composing && (
-        <CreateThreadModal
-          communityId={communityId}
-          name={community?.name}
-          avatarUrl={community?.image_url ?? null}
-          onClose={() => setComposing(false)}
-          onCreated={handleThreadCreated}
-        />
-      )}
     </aside>
   );
 }
