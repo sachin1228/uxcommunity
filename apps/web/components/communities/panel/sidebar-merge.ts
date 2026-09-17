@@ -14,8 +14,8 @@ import { compareByRecentActivity } from "./sidebar-order";
  * The merge keeps the union of both lists. Per community the entry with the
  * NEWER activity key (same comparator the sidebar renders with) wins its
  * descriptive fields (preview, reaction, timestamps); the counters that only
- * the server computes authoritatively (unread count, last_read_at, member
- * count, archived flag) always come from the server list.
+ * the server computes authoritatively (unread count, unread mention count,
+ * last_read_at, member count, archived flag) always come from the server list.
  *
  * Returns entries sorted in the canonical sidebar order.
  */
@@ -39,6 +39,7 @@ export function mergeStaleServerList(
       ...winner,
       // Server-authoritative counters regardless of which preview won.
       message_count: incoming.message_count,
+      mention_count: incoming.mention_count,
       last_read_at: incoming.last_read_at,
       member_count: incoming.member_count,
       is_archived: incoming.is_archived,

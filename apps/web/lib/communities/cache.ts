@@ -121,6 +121,8 @@ export interface CachedSidebarCommunity {
   joined_at?: string | null;
   member_count: number;
   message_count: number;
+  /** Unread messages that @mentioned this user — raises the row's "@" mark. */
+  mention_count?: number;
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
   last_read_at?: string | null;

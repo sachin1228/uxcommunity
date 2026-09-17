@@ -153,10 +153,13 @@ export function useSidebarRealtime({
 
       unsubscribes.push(
         realtimeClient.on(chatRoom, "message", (data) => {
-          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; image_url?: string | null };
+          const row = data as { id: string; community_id: string; content: string; created_at: string; user_id: string; reply_to_id?: string | null; image_url?: string | null; mentions?: Array<{ user_id?: string }> };
           if (!joinedCommunityIds.has(row.community_id)) return;
           const isOwn = row.user_id === userId;
           const isActive = row.community_id === activeCommunityIdRef.current;
+          // Published with the message (see the messages POST route), so the
+          // sidebar's "@" mark grows in the same frame as the unread badge.
+          const mentionsMe = Array.isArray(row.mentions) && row.mentions.some((mention) => mention?.user_id === userId);
           const knownName = resolvedNames.get(row.user_id) ?? null;
           if (!isOwn) {
             if (isActive) {
@@ -171,6 +174,7 @@ export function useSidebarRealtime({
               ...c, is_archived: false, lastReaction: null,
               last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!row.reply_to_id, is_deleted: false, reactions: [] },
               message_count: !isOwn && !isActive ? c.message_count + 1 : c.message_count,
+              mention_count: mentionsMe && !isOwn && !isActive ? (c.mention_count ?? 0) + 1 : c.mention_count,
             })),
           );
           if (!isOwn) {

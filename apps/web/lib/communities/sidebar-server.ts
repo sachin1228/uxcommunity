@@ -11,6 +11,8 @@ type ActivityRow = {
   archived_at: string | null;
   member_count: number;
   unread_count: number;
+  /** Absent until the sidebar-unread-mentions migration is applied. */
+  unread_mention_count?: number;
   last_message: null | {
     id: string;
     content: string | null;
@@ -98,6 +100,7 @@ export async function getSidebarCommunities(userId: string) {
       reference_name: names[community.id] ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,
+      mention_count: row.unread_mention_count ?? 0,
       last_read_at: row.last_read_at,
       joined_at: row.joined_at,
       is_archived: Boolean(row.archived_at && (!message || message.created_at <= row.archived_at)),

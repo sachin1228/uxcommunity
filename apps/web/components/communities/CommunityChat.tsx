@@ -3,7 +3,7 @@
 import { useState, useInsertionEffect, useLayoutEffect, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { ChevronDown } from "lucide-react";
+import { AtSign, ChevronDown } from "lucide-react";
 import {
   applyReactionDelete,
   applyReactionInsert,
@@ -23,6 +23,7 @@ import {
   type ReactionIntent,
 } from "@/lib/reaction-intent-coordinator";
 import { fmtDate, MAX_MESSAGE_CHARS } from "./chat/chatUtils";
+import { collectPendingMentions } from "./chat/mention-jumps";
 import { ChatHeader, type ChatTab } from "./chat/ChatHeader";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 
@@ -346,6 +347,25 @@ export function CommunityChat({
     onLoadError: chatLoadError.reportError,
     retryToken: chatLoadError.retryToken,
   });
+
+  // ── Pending @mention jumps (the "@" pill) ─────────────────────────────────
+  // Read straight off the loaded messages: any message that mentions the
+  // current user and is newer than the read marker this page loaded with. The
+  // mentions live on the message row itself and ride along with the realtime
+  // event, so a live mention surfaces here the moment it arrives — the pill no
+  // longer depends on chat_mention notification rows.
+  const [jumpedMentionIds, setJumpedMentionIds] = useState<string[]>([]);
+
+  const pendingMentions = useMemo(
+    () =>
+      collectPendingMentions(
+        messages,
+        currentUserId,
+        initialLastReadAt,
+        jumpedMentionIds,
+      ),
+    [messages, currentUserId, initialLastReadAt, jumpedMentionIds],
+  );
 
   const handleReactionToggled = useCallback(
     (msgId: string, reactions: MessageReaction[]) => {
@@ -697,6 +717,17 @@ export function CommunityChat({
     },
     [flashMessage],
   );
+
+  /** Jump to the newest pending mention (newest → oldest on repeated taps). */
+  const jumpToPendingMention = useCallback(() => {
+    const target = pendingMentions[0];
+    if (!target) return;
+    // Only consume when the row is actually in the loaded window — otherwise
+    // the pill stays so the user can tap again after the message loads.
+    if (flashMessage(target.id, 2000)) {
+      setJumpedMentionIds((prev) => [...prev, target.id]);
+    }
+  }, [flashMessage, pendingMentions]);
 
   // ── Image viewer (lightbox) ───────────────────────────────────────────────
   // Every non-deleted image in the loaded chat window, in timeline order, so
@@ -1312,6 +1343,21 @@ export function CommunityChat({
 
           {/* Static footer — separate from the scroll body, never overlapped */}
           <footer className="relative shrink-0 z-10 bg-background">
+            {/* @ pill — jump to messages where the user was mentioned */}
+            {pendingMentions.length > 0 && (
+              <button
+                type="button"
+                onClick={jumpToPendingMention}
+                className="absolute -top-[88px] right-4 z-20 h-8 w-8 flex items-center justify-center rounded-full bg-[var(--ds-blue-800)] text-white shadow-lg hover:bg-[var(--ds-blue-900)] transition-colors"
+                aria-label={`${pendingMentions.length} pending mention${pendingMentions.length === 1 ? "" : "s"} — jump to message`}
+                title="Jump to the message where you were mentioned"
+              >
+                <AtSign strokeWidth={2.5} size={15} />
+                <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--ds-blue-900)] px-1 text-[10px] font-bold leading-none text-white ring-2 ring-background">
+                  {pendingMentions.length > 9 ? "9+" : pendingMentions.length}
+                </span>
+              </button>
+            )}
             {/* Scroll-to-bottom button — floats just above the footer edge */}
             {showScrollToBottom && (
               <button
