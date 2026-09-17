@@ -303,6 +303,12 @@ export async function DELETE(
       topic: "thread-delete",
       data: { id: threadId },
     },
+    {
+      // Remove the timeline's permanent "created a thread" card too.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-delete",
+      data: { id: threadId, community_id: communityId, kind: "thread" },
+    },
   ]);
 
   return new NextResponse(null, { status: 204 });

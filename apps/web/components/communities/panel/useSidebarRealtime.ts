@@ -6,6 +6,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import {
   sidebarStore,
   type CachedSidebarCommunity,
+  type SidebarLastContent,
 } from "@/lib/communities/cache";
 import { patchCachedRequest } from "@/lib/request-cache";
 import { shouldSuppressReactionEcho } from "@/lib/reaction-intent-coordinator";
@@ -175,6 +176,8 @@ export function useSidebarRealtime({
               last_message: { id: row.id, content: row.content, created_at: row.created_at, user: knownName ? { name: knownName } : isOwn ? c.last_message?.user ?? null : null, is_own: isOwn, has_image: !row.content && !!row.image_url, is_reply: !!row.reply_to_id, is_deleted: false, reactions: [] },
               message_count: !isOwn && !isActive ? c.message_count + 1 : c.message_count,
               mention_count: mentionsMe && !isOwn && !isActive ? (c.mention_count ?? 0) + 1 : c.mention_count,
+              // A new message is newer activity than any content preview.
+              last_content: null,
             })),
           );
           if (!isOwn) {
@@ -198,6 +201,89 @@ export function useSidebarRealtime({
                 setCommunities((prev) => applyUpdate(prev, commId, (c) => { if (c.last_message?.created_at !== msgAt) return c; return { ...c, last_message: { ...c.last_message!, reply_to_user: firstName } }; }));
               }).catch(() => {});
           }
+        }),
+      );
+
+      // ── Content events (threads / showcase / resources / events) ──────────
+      // One topic per create/delete lands on the chat room for every kind.
+      // A creation raises the community's unread badge (server calls this
+      // unread_content_count) and takes over the preview line — "john created
+      // a thread" — exactly like the chat timeline renders the same event.
+      unsubscribes.push(
+        realtimeClient.on(chatRoom, "content-insert", (data) => {
+          const row = data as { id?: string; community_id?: string; user_id?: string; kind?: SidebarLastContent["kind"]; title?: string; created_at?: string };
+          const insertId = row.id;
+          const insertCommunityId = row.community_id;
+          const insertUserId = row.user_id;
+          const insertKind = row.kind;
+          const insertCreatedAt = row.created_at;
+          if (!insertId || !insertCommunityId || !insertUserId || !insertKind || !insertCreatedAt) return;
+          if (!joinedCommunityIds.has(insertCommunityId)) return;
+          const isOwn = row.user_id === userId;
+          const isActive = row.community_id === activeCommunityIdRef.current;
+          if (!isOwn) {
+            if (isActive) {
+              // While the member is looking at the community, treat it as read:
+              // the timeline card is already visible to them.
+              scheduleMarkRead(insertCommunityId, { unreadCount: 1, contentUnreadCount: 1, lastMessageTimestamp: insertCreatedAt, reason: "realtime content" });
+            } else {
+              const currentEntry = communitiesRef.current.find((c) => c.id === insertCommunityId);
+              noteCommunityActivity(insertCommunityId, {
+                unreadCount: currentEntry?.message_count ?? 0,
+                contentUnreadCount: (currentEntry?.unread_content_count ?? 0) + 1,
+                lastMessageTimestamp: insertCreatedAt,
+              });
+            }
+          }
+          const knownName = resolvedNames.get(insertUserId) ?? null;
+          setCommunities((prev) =>
+            applyUpdate(prev, insertCommunityId, (c) => ({
+              ...c,
+              is_archived: false,
+              unread_content_count: !isOwn && !isActive ? (c.unread_content_count ?? 0) + 1 : c.unread_content_count ?? 0,
+              last_content: {
+                id: insertId,
+                kind: insertKind,
+                title: row.title ?? "",
+                created_at: insertCreatedAt,
+                isOwn,
+                firstName: isOwn ? "You" : knownName,
+              },
+            })),
+          );
+          if (!isOwn && !knownName && !resolvedNames.has(insertUserId)) {
+            const commId = insertCommunityId;
+            const createdAt = insertCreatedAt;
+            const uid = insertUserId;
+            resolveName(commId, uid).then((name) => {
+              if (!name) return;
+              setCommunities((prev) =>
+                applyUpdate(prev, commId, (c) => {
+                  if (c.last_content?.created_at !== createdAt) return c;
+                  return { ...c, last_content: { ...c.last_content!, firstName: name } };
+                }),
+              );
+            });
+          }
+        }),
+      );
+
+      unsubscribes.push(
+        realtimeClient.on(chatRoom, "content-delete", (data) => {
+          const row = data as { id?: string; community_id?: string };
+          const deleteId = row.id;
+          const deleteCommunityId = row.community_id;
+          if (!deleteId || !deleteCommunityId || !joinedCommunityIds.has(deleteCommunityId)) return;
+          setCommunities((prev) =>
+            applyUpdate(prev, deleteCommunityId, (c) => {
+              if (c.last_content?.id !== deleteId) return c;
+              return {
+                ...c,
+                last_content: null,
+                unread_content_count: Math.max(0, (c.unread_content_count ?? 0) - 1),
+              };
+            }),
+          );
         }),
       );
 

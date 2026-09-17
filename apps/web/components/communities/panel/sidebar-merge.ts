@@ -40,6 +40,7 @@ export function mergeStaleServerList(
       // Server-authoritative counters regardless of which preview won.
       message_count: incoming.message_count,
       mention_count: incoming.mention_count,
+      unread_content_count: incoming.unread_content_count,
       last_read_at: incoming.last_read_at,
       member_count: incoming.member_count,
       is_archived: incoming.is_archived,
@@ -48,6 +49,20 @@ export function mergeStaleServerList(
       lastReaction: previous.lastReaction && (!incoming.lastReaction || (previous.lastReaction.createdAt ?? "") >= (incoming.lastReaction.createdAt ?? ""))
         ? previous.lastReaction
         : incoming.lastReaction,
+      // Same for content previews ("john created a thread"): realtime may
+      // have landed one on the local row that the server snapshot predates.
+      // A same-item row persisted before the author-name fix (no firstName)
+      // would render "Someone" forever — heal it from the server row.
+      last_content: (() => {
+        const prev = previous.last_content;
+        const incomingContent = incoming.last_content ?? null;
+        if (prev && (!incomingContent || prev.created_at >= incomingContent.created_at)) {
+          return prev.id === incomingContent?.id && !prev.firstName && incomingContent.firstName
+            ? incomingContent
+            : prev;
+        }
+        return incomingContent;
+      })(),
     };
   });
 

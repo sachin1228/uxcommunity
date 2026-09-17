@@ -56,6 +56,28 @@ export interface CachedThreadEvent {
   users: { name: string; avatar_url: string | null } | null;
 }
 
+/**
+ * Which community area a content notification belongs to. The chat timeline
+ * renders one shared "<name> created a …" card for all four kinds.
+ */
+export type ContentEventKind = "thread" | "showcase" | "resource" | "event";
+
+/**
+ * A "John created a …" event shown inline in the chat timeline. Unlike the
+ * legacy thread-only event this is persisted server-side, so it is permanent —
+ * it reappears from history on every visit, exactly like a normal message.
+ */
+export interface CachedContentEvent {
+  /** The id of the thread/showcase post/resource/event itself. */
+  id: string;
+  community_id: string;
+  user_id: string;
+  kind: ContentEventKind;
+  title: string;
+  created_at: string;
+  users: { name: string; avatar_url: string | null } | null;
+}
+
 /** Effective community-management grants for the current user. */
 export interface ClientCommunityPermissions {
   can_edit_settings?: boolean;
@@ -123,11 +145,15 @@ export interface CachedSidebarCommunity {
   message_count: number;
   /** Unread messages that @mentioned this user — raises the row's "@" mark. */
   mention_count?: number;
+  /** Unread threads/showcase posts/resources/events created by others. */
+  unread_content_count?: number;
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;
+  /** Newest thread/showcase/resource/event — previewed as "john created a thread" etc. */
+  last_content?: SidebarLastContent | null;
   last_message: {
     id: string;
     content: string;
@@ -146,6 +172,17 @@ export interface CachedSidebarCommunity {
     /** Unique emoji strings that have been reacted to this message. */
     reactions?: string[];
   } | null;
+}
+
+export interface SidebarLastContent {
+  id: string;
+  kind: ContentEventKind;
+  title: string;
+  created_at: string;
+  /** True when the current user created it (preview shows "You"). */
+  isOwn?: boolean;
+  /** Author's first name, resolved client-side after a realtime event. */
+  firstName?: string | null;
 }
 
 export const sidebarStore: {
@@ -497,6 +534,26 @@ export function patchSidebarMessageContent(
     }),
   );
   notifySidebarMessageChanged();
+}
+
+// ─── Content-event mirrors (timeline ↔ tabs) ───────────────────────────────
+
+export const CONTENT_EVENT_CHANGED_EVENT = "uxcommunity:content-event-changed";
+
+/**
+ * Fired when the current user creates or deletes a thread/showcase post/
+ * resource/event so the mounted chat timeline can add or remove its permanent
+ * "You created a …" card in the same frame. Payload mirrors the realtime
+ * `content-insert` / `content-delete` topics, so the timeline treats both
+ * paths identically (idempotent by item id).
+ */
+export function notifyContentEvent(
+  detail:
+    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string } }
+    | { kind: "delete"; event: { id: string; community_id: string; kind: ContentEventKind } },
+): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CONTENT_EVENT_CHANGED_EVENT, { detail }));
 }
 
 /**

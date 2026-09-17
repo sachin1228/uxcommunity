@@ -220,6 +220,12 @@ export async function DELETE(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.events(communityId), topic: "event", data: { id: eventId } },
+    {
+      // Remove the timeline's permanent "created an event" card too.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-delete",
+      data: { id: eventId, community_id: communityId, kind: "event" },
+    },
   ]);
 
   return NextResponse.json({ ok: true });

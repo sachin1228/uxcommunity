@@ -158,6 +158,12 @@ export async function DELETE(
 
   void publishRealtimeBatch([
     { room: realtimeRooms.resources(communityId), topic: "resource", data: { id: resourceId } },
+    {
+      // Remove the timeline's permanent "created a resource" card too.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-delete",
+      data: { id: resourceId, community_id: communityId, kind: "resource" },
+    },
   ]);
 
   return new NextResponse(null, { status: 204 });

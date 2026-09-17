@@ -6,6 +6,10 @@ import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
 import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
+import {
+  contentIsNewerThanLastMessage,
+  formatContentPreview,
+} from "./sidebar-content";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = CachedSidebarCommunity;
@@ -92,6 +96,15 @@ export const CommunityRow = memo(function CommunityRow({
 }: CommunityRowProps) {
   const { lastReaction } = c;
   const preview = c.last_message ? formatPreview(c.last_message) : null;
+  // A thread/showcase/resource/event created after the newest message takes
+  // over the preview line ("john created a thread") — mirroring the chat
+  // timeline, where the same event renders as its own notification card. The
+  // unread content items also raise the green badge below.
+  const lastContent =
+    c.last_content && contentIsNewerThanLastMessage(c.last_content, c)
+      ? c.last_content
+      : null;
+  const contentPreview = lastContent ? formatContentPreview(lastContent) : null;
 
   // Throttle prefetch to avoid hammering the network on rapid mouse moves.
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,8 +142,14 @@ export const CommunityRow = memo(function CommunityRow({
             {c.is_private && (
               <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
             )}
-            {c.last_message && !typingText && (
-              <SidebarTimestamp iso={c.last_message.created_at} />
+            {(c.last_message || lastContent) && !typingText && (
+              <SidebarTimestamp
+                iso={
+                  !lastContent || (c.last_message && c.last_message.created_at > lastContent.created_at)
+                    ? c.last_message!.created_at
+                    : lastContent.created_at
+                }
+              />
             )}
           </div>
 
@@ -148,6 +167,15 @@ export const CommunityRow = memo(function CommunityRow({
               /* Typing — highest priority */
               <p className="font-body text-[13px] text-accent truncate flex-1">
                 {typingText}
+              </p>
+
+            ) : contentPreview ? (
+              /* Content preview — "john created a thread" etc., shown when a
+                 thread/showcase post/resource/event is the newest activity in
+                 the community. */
+              <p className="font-body text-[13px] leading-5 truncate flex-1 text-foreground-muted">
+                <span className="font-medium">{contentPreview.prefix}: </span>
+                {contentPreview.text}
               </p>
 
             ) : lastReaction ? (
@@ -193,10 +221,13 @@ export const CommunityRow = memo(function CommunityRow({
               </span>
             ) : null}
 
-            {/* Unread badge */}
-            {c.message_count > 0 && !active && (
+            {/* Unread badge — messages plus unread threads/showcase posts/
+                resources/events created by others */}
+            {c.message_count + (c.unread_content_count ?? 0) > 0 && !active && (
               <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
-                {c.message_count > 99 ? "99+" : c.message_count}
+                {c.message_count + (c.unread_content_count ?? 0) > 99
+                  ? "99+"
+                  : c.message_count + (c.unread_content_count ?? 0)}
               </span>
             )}
           </div>

@@ -23,6 +23,7 @@ import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
 
@@ -175,6 +176,19 @@ export function ThreadsView({
   function handleCreated(thread: CommunityThread) {
     writeCache((cur) => [thread, ...cur.filter((item) => item.id !== thread.id)]);
     onThreadCreated?.(thread);
+    // Mirror into the chat timeline (and the sidebar) as a permanent
+    // "You created a thread" card.
+    notifyContentEvent({
+      kind: "insert",
+      event: {
+        id: thread.id,
+        community_id: thread.community_id,
+        user_id: thread.user_id,
+        kind: "thread",
+        title: thread.title,
+        created_at: thread.created_at,
+      },
+    });
     // Tells the profile activity tabs (and the homepage feed) that a card they
     // may not hold yet now exists.
     publishContentChange({ kind: "thread", id: thread.id, created: true });
@@ -222,6 +236,7 @@ export function ThreadsView({
     // the same frame instead of waiting for the realtime round trip (which
     // never arrives in environments without a realtime worker).
     onThreadDeleted?.(threadId);
+    notifyContentEvent({ kind: "delete", event: { id: threadId, community_id: communityId, kind: "thread" } });
     publishContentChange({ kind: "thread", id: threadId, removed: true });
   }
 

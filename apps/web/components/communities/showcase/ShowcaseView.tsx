@@ -22,6 +22,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
 import { ShowcaseCard } from "./ShowcaseCard";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
+import { notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
 
@@ -152,6 +153,8 @@ export function ShowcaseView({
       );
       if (!response.ok) throw new Error("Failed to delete showcase post");
       publishContentChange({ kind: "showcase", id: post.id, removed: true });
+      // Drop the chat timeline's permanent "created a showcase" card too.
+      notifyContentEvent({ kind: "delete", event: { id: post.id, community_id: communityId, kind: "showcase" } });
     } catch {
       deletedPostIdsRef.current.delete(post.id);
       replacePosts(previousPosts);
@@ -289,6 +292,19 @@ export function ShowcaseView({
           onCreated={(post) => {
             replacePosts([post, ...posts]);
             publishContentChange({ kind: "showcase", id: post.id, created: true });
+            // Mirror into the chat timeline as a permanent "You created a
+            // showcase" card.
+            notifyContentEvent({
+              kind: "insert",
+              event: {
+                id: post.id,
+                community_id: communityId,
+                user_id: post.user_id,
+                kind: "showcase",
+                title: post.title,
+                created_at: post.created_at,
+              },
+            });
           }}
         />
       )}

@@ -117,3 +117,61 @@ test("empty local list just returns the server list", () => {
   const merged = mergeStaleServerList([], STALE_SERVER_LIST);
   assert.equal(merged, STALE_SERVER_LIST);
 });
+
+test("a locally cached content preview without an author name is healed from the server", () => {
+  // Regression: a last_content cached before the server started sending
+  // author_name (no firstName) would win the merge forever and render
+  // "Someone created a thread" even after the fix shipped.
+  const staleLocal = [
+    community("a", "A", "2026-09-14T14:00:00Z", {
+      last_content: {
+        id: "t1",
+        kind: "thread",
+        title: "Design systems",
+        created_at: "2026-09-14T13:59:00Z",
+        firstName: null,
+      },
+    }),
+  ];
+  const server = [
+    community("a", "A", "2026-09-14T14:00:00Z", {
+      last_content: {
+        id: "t1",
+        kind: "thread",
+        title: "Design systems",
+        created_at: "2026-09-14T13:59:00Z",
+        firstName: "sachin",
+      },
+    }),
+  ];
+  const merged = mergeStaleServerList(staleLocal, server);
+  assert.equal(merged[0]?.last_content?.firstName, "sachin");
+});
+
+test("a realtime content preview with a name is not clobbered by an older server row", () => {
+  const server = [
+    community("a", "A", "2026-09-14T14:00:00Z", {
+      last_content: {
+        id: "t0",
+        kind: "showcase",
+        title: "Old post",
+        created_at: "2026-09-14T13:00:00Z",
+        firstName: "john",
+      },
+    }),
+  ];
+  const local = [
+    community("a", "A", "2026-09-14T14:00:00Z", {
+      last_content: {
+        id: "t1",
+        kind: "thread",
+        title: "Brand new thread",
+        created_at: "2026-09-14T13:59:00Z",
+        firstName: "sachin",
+      },
+    }),
+  ];
+  const merged = mergeStaleServerList(local, server);
+  assert.equal(merged[0]?.last_content?.id, "t1");
+  assert.equal(merged[0]?.last_content?.firstName, "sachin");
+});

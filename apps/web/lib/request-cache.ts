@@ -208,6 +208,8 @@ export type CommunityBootstrap = {
   messages: unknown
   permissions: unknown
   unreadCount: number
+  /** Permanent "John created a …" chat cards for threads/showcase/resources/events. */
+  "content-events"?: { events?: unknown[] }
   threads?: unknown
   events?: unknown
   resources?: unknown
@@ -232,6 +234,7 @@ export async function fetchAndHydrateCommunityBootstrap(
     [`${base}/messages`, data.messages],
     [`${base}/permissions`, data.permissions],
     [`${base}/unread`, { unreadCount: data.unreadCount }],
+    [`${base}/content-events`, data["content-events"]],
     [`${base}/threads`, data.threads],
     [`${base}/events`, data.events],
     [`${base}/resources`, data.resources],

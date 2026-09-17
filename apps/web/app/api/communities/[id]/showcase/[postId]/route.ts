@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { parseShowcaseBody } from "@/lib/communities/showcase-validation";
+import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 /** Extract attachment URLs from a stored attachments JSON array (for R2 lookups). */
 function attachmentUrls(value: unknown): string[] {
@@ -145,6 +146,15 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
   }
   await deleteR2AssetIfUnreferenced(db, existing.image_url, [
     { table: "community_showcase_posts", column: "image_url" },
+  ]);
+
+  void publishRealtimeBatch([
+    {
+      // Remove the timeline's permanent "created a showcase" card too.
+      room: realtimeRooms.chat(id),
+      topic: "content-delete",
+      data: { id: postId, community_id: id, kind: "showcase" },
+    },
   ]);
 
   return new NextResponse(null, { status: 204 });

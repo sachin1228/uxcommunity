@@ -10,6 +10,7 @@ import { contentHash } from "@/lib/moderation/normalize";
 import type { ThreadCategory, ThreadAttachment } from "@/components/communities/threads/types";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { loadCommunityThreads } from "@/lib/communities/read-models";
+import { contentEventPayload } from "@/lib/communities/content-events";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 
 const PAGE_SIZE = 50;
@@ -289,6 +290,12 @@ export async function POST(
       room: realtimeRooms.chat(communityId),
       topic: "thread-insert",
       data: inserted,
+    },
+    {
+      // The chat timeline's permanent "<name> created a thread" card.
+      room: realtimeRooms.chat(communityId),
+      topic: "content-insert",
+      data: contentEventPayload(inserted as Record<string, unknown>, "thread"),
     },
   ]);
 
