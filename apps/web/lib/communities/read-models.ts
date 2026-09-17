@@ -110,7 +110,22 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
       .eq("community_id", communityId)
       .eq("role", role);
 
-  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }, roleCounts, owner] = await Promise.all([
+  // "Top Contributor" is not a stored role — it is the number of members who
+  // have actually posted here. Threads (polls included) and showcase posts both
+  // carry the author, so the two id-only scans union into one distinct count.
+  // The showcase table may predate its migration in an old environment, which
+  // reads as "no showcase authors" instead of failing the whole read model.
+  const authorScans = Promise.all([
+    db.from("community_threads").select("user_id").eq("community_id", communityId),
+    db.from("community_showcase_posts").select("user_id").eq("community_id", communityId),
+  ]).then(([threads, showcase]) =>
+    new Set([
+      ...((threads.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
+      ...((showcase.data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
+    ]).size,
+  );
+
+  const [dp, masterNameMap, experienceLevelNameMap, { data: memberRows, count: memberCount }, roleCounts, owner, contributorCount] = await Promise.all([
     resolveCommunityDp({
       type: community.type,
       reference_id: community.reference_id,
@@ -128,6 +143,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
     ),
     // Platform-run communities have no owner_id — the panel omits the row.
     resolveCommunityOwner(db, community.owner_id),
+    authorScans,
   ]);
 
   const memberUserIds = (memberRows ?? []).map((member) => member.user_id);
@@ -167,6 +183,7 @@ export const loadCommunityReadModel = cache(async function loadCommunityReadMode
         member_count: memberCount ?? 0,
         owner,
         role_counts: roleCounts,
+        contributor_count: contributorCount,
         invite_token: community.owner_id === userId ? community.invite_token : undefined,
         current_user_role: currentUserRole,
         current_user_permissions: currentUserPermissions,

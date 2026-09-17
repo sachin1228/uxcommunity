@@ -84,6 +84,8 @@ export interface CachedMeta {
     owner?: { id: string; name: string; avatar_url: string | null } | null;
     /** Members per role, for the info panel's Member Role breakdown. */
     role_counts?: { owner: number; admin: number; member: number } | null;
+    /** Distinct members who have posted (discussion or showcase) here. */
+    contributor_count?: number | null;
     /** Effective permission grants (owners: everything; admins: configured toggles). */
     current_user_permissions?: ClientCommunityPermissions | null;
   };

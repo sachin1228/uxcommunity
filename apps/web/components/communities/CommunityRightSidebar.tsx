@@ -6,8 +6,9 @@
  * Floating info card on the right of every community page: the community's
  * members strip (count, who is online, avatar faces), a Community Overview
  * (creator / created / category / tags), the description, the numbered
- * Community Rules and a Member Role breakdown. Lives in the communities layout
- * so it persists across chat, threads, events, resources and detail routes.
+ * Community Rules and a Member Role breakdown (Member / Top Contributor /
+ * Admin / Owner). Lives in the communities layout so it persists across chat,
+ * threads, events, resources and detail routes.
  *
  * Data strategy mirrors CommunityPageShell: pre-seed from the shared
  * metaCache, fall back to the sidebarStore for a fast first paint, then fetch
@@ -294,6 +295,7 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
   const memberCount = community?.member_count ?? members.length;
   const owner = community?.owner ?? null;
   const roleCounts = community?.role_counts ?? null;
+  const contributorCount = community?.contributor_count ?? 0;
   const visibleMembers = members.slice(0, MAX_AVATARS);
   const overflow = Math.max(0, memberCount - visibleMembers.length);
   const category = type ? TYPE_LABELS[type] ?? "Community" : "Community";
@@ -312,6 +314,12 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
       label: "Member",
       hint: "Everyone who has joined this community.",
       count: roleCounts?.member ?? 0,
+    },
+    {
+      key: "contributor",
+      label: "Top Contributor",
+      hint: "Members who have posted a discussion or shared work here.",
+      count: contributorCount,
     },
     {
       key: "admin",
