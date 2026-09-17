@@ -178,6 +178,21 @@ export const CommunityRow = memo(function CommunityRow({
               </p>
             )}
 
+            {/* Unread @mention mark — the same signal the chat's "@" pill
+                gives once the community is open, surfaced here for the
+                communities the member is not looking at. It is a plain mark:
+                the number beside it is the community's normal unread count,
+                not a mention tally. */}
+            {c.mention_count ? (
+              <span
+                className="shrink-0 font-body text-[14px] font-bold leading-none text-accent"
+                aria-label="You were mentioned in this community"
+                title="You were mentioned in this community"
+              >
+                @
+              </span>
+            ) : null}
+
             {/* Unread badge */}
             {c.message_count > 0 && !active && (
               <span className="flex items-center justify-center p-1 min-w-[20px] h-[16px] rounded-full bg-green-500 text-white font-mono text-[11px] leading-[10px] font-semibold shrink-0">
