@@ -237,20 +237,19 @@ export function CommunitySidebarSection({
             </p>
           ) : (
             <>
-              {/* ── Following ── */}
-              <p className={SECTION_LABEL_CLASS}>Following</p>
+              {/* ── Following — the member's own communities, no heading ── */}
               {loading ? (
                 <div className="flex justify-center py-6">
                   <Spinner className="h-4 w-4" />
                 </div>
               ) : following.length === 0 ? (
-                <p className="mt-[7px] px-[5px] font-body text-[11px] leading-snug text-foreground-muted">
+                <p className="px-[5px] font-body text-[11px] leading-snug text-foreground-muted">
                   {searching
                     ? `No followed community matches “${search.trim()}”`
                     : "You haven't joined a community yet."}
                 </p>
               ) : (
-                <ul className="mt-[7px] flex flex-col gap-[3px]">
+                <ul className="flex flex-col gap-[3px]">
                   {following.map((c) => (
                     <CommunityRow
                       key={c.id}
