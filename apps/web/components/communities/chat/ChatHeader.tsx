@@ -1,13 +1,14 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { BookMarked, Calendar, ChevronDown, Lock, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
+import { BookMarked, Calendar, ChevronDown, MessageCircle, MessagesSquare, MoreHorizontal, Settings, Sparkles, Users } from "lucide-react";
 import { invalidateOnArchive, invalidateOnCommunityDeleted, invalidateOnLeave, msgCache, metaCache } from "@/lib/communities/cache";
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { Spinner } from "@/components/ui/Spinner";
 import { ModalPortal } from "@/components/ui/Modal";
 import { CommunityDp } from "../CommunityDp";
+import { CommunityNameBadges } from "../CommunityBadges";
 import { isFeatureVisible, type CommunityFeature } from "@/lib/communities/areas";
 
 interface Community {
@@ -217,9 +218,11 @@ export const ChatHeader = memo(function ChatHeader({
                   <h3 className="font-display text-base font-semibold text-foreground leading-none">
                     <span className="inline-flex items-center gap-1.5">
                       {community.name}
-                      {community.is_private && (
-                        <Lock strokeWidth={2.5} size={13} className="text-foreground-muted" aria-label="Private community" />
-                      )}
+                      <CommunityNameBadges
+                        type={community.type}
+                        isPrivate={community.is_private}
+                        size={13}
+                      />
                     </span>
                   </h3>
                   <div className="mt-0.5 flex items-center gap-2 font-body text-[11px] text-foreground-muted">
