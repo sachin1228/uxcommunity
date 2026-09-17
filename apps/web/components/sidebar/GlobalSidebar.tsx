@@ -221,8 +221,8 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
               </button>
             </div>
             <p className="mt-[5px] font-body text-[10px] leading-snug text-foreground-muted">
-              This is my project. Join our WhatsApp group if you want to provide
-              feedback on this app.
+              Join our WhatsApp group if you want to provide
+              feedback on this app and help shape its future. We&apos;d love to hear from you!
             </p>
             <a
               href={WHATSAPP_COMMUNITY_URL}
