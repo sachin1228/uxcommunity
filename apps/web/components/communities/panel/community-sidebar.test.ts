@@ -1,54 +1,26 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { CachedExploreCommunity } from "@/lib/communities/cache";
-import { communityMetaLine, communityTag, memberCountLabel } from "./community-label";
+import { communityTag, memberCountLabel } from "./community-label";
 import { matchesCommunitySearch, selectSuggestedCommunities } from "./suggested-communities";
 
-test("tag prefers the master-data reference name", () => {
-  assert.equal(
-    communityTag({ name: "Backpackers on Budget", type: "interest", reference_name: "Travel Style" }),
-    "Travel Style",
-  );
+test("tag reads as the community's kind", () => {
+  assert.equal(communityTag("interest"), "Interest");
+  assert.equal(communityTag("city"), "City");
+  assert.equal(communityTag("sector"), "Industry");
+  assert.equal(communityTag("experience_level"), "Experience");
+  assert.equal(communityTag("job_title"), "Job Title");
+  assert.equal(communityTag("general"), "General");
+  assert.equal(communityTag("user"), "Member-led");
+  assert.equal(communityTag("brand_new_type"), "Community");
 });
 
-test("tag falls back to the kind when the reference just repeats the name", () => {
-  assert.equal(
-    communityTag({ name: "Accessibility", type: "interest", reference_name: "Accessibility" }),
-    "Interest",
-  );
-  assert.equal(
-    communityTag({ name: " accessibility ", type: "interest", reference_name: "Accessibility" }),
-    "Interest",
-    "comparison ignores surrounding whitespace and case",
-  );
-});
-
-test("tag falls back to the kind for every community type", () => {
-  assert.equal(communityTag({ name: "Mumbai", type: "city", reference_name: null }), "City");
-  assert.equal(communityTag({ name: "Fintech", type: "sector" }), "Industry");
-  assert.equal(communityTag({ name: "Design Systems Guild", type: "user" }), "Member-led");
-  assert.equal(communityTag({ name: "General", type: "general" }), "General");
-  assert.equal(communityTag({ name: "Weird", type: "brand_new_type" }), "Community");
-});
-
-test("member counts read like the sidebar reference", () => {
+test("member counts match the Following rows' format", () => {
   assert.equal(memberCountLabel(1), "1 member");
   assert.equal(memberCountLabel(24), "24 members");
-  assert.equal(memberCountLabel(32_700), "32.7K members");
+  assert.equal(memberCountLabel(32_700), "32.7k members");
   assert.equal(memberCountLabel(1_200_000), "1.2M members");
-  assert.equal(memberCountLabel(2_000), "2K members", "trailing .0 is dropped");
-});
-
-test("meta line joins the tag and the member count", () => {
-  assert.equal(
-    communityMetaLine({
-      name: "Backpackers on Budget",
-      type: "interest",
-      reference_name: "Travel Style",
-      member_count: 32_700,
-    }),
-    "Travel Style · 32.7K members",
-  );
+  assert.equal(memberCountLabel(2_000), "2k members", "a trailing .0 is dropped");
 });
 
 test("search matching is case-insensitive and empty-safe", () => {

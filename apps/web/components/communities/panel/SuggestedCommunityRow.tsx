@@ -2,7 +2,7 @@
 
 import { Check, Lock, Plus } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
-import { communityMetaLine } from "./community-label";
+import { communityTag, memberCountLabel } from "./community-label";
 import type { CachedExploreCommunity } from "@/lib/communities/cache";
 
 interface Props {
@@ -40,7 +40,7 @@ export function SuggestedCommunityRow({
 
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="truncate font-body text-[11px] leading-none text-foreground-muted">
-              {communityMetaLine(c)}
+              {communityTag(c.type)} · {memberCountLabel(c.member_count)}
             </span>
             <span className="mt-[5px] flex min-w-0 items-center gap-1">
               <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
