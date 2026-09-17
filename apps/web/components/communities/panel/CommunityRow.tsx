@@ -5,16 +5,11 @@ import { Lock } from "lucide-react";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
 import { NotoEmojiSvg } from "../chat/NotoEmojiSvg";
-import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
+import { emojiToCodepoint } from "@/lib/noto-emoji";
+import { communityMetaLine } from "./community-label";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
 type Community = CachedSidebarCommunity;
-
-function fmtCount(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${+(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
 
 /** Render text with SVG emoji images for the sidebar preview. */
 function renderTextWithEmoji(text: string) {
@@ -121,24 +116,23 @@ export const CommunityRow = memo(function CommunityRow({
         />
 
         <div className="flex-1 min-w-0">
-          {/* Community name + timestamp */}
+          {/* Meta first — "Interest · 32.7K members" — then the name, as the
+              sidebar reference does. The timestamp stays pinned to the meta
+              line's right edge. */}
+          <div className="mb-0.5 flex items-center gap-1 min-w-0 font-body text-[11px] leading-none text-foreground-muted">
+            <span className="min-w-0 truncate">{communityMetaLine(c)}</span>
+            {c.last_message && !typingText && (
+              <SidebarTimestamp iso={c.last_message.created_at} />
+            )}
+          </div>
+
+          {/* Community name + private lock */}
           <div className="flex items-center gap-1 mb-0.5 min-w-0">
             <span className="min-w-0 truncate font-body text-[14px] font-medium text-foreground">
               {c.name}
             </span>
             {c.is_private && (
               <Lock strokeWidth={2.5} size={11} className="shrink-0 text-foreground-muted" aria-label="Private community" />
-            )}
-            {c.last_message && !typingText && (
-              <SidebarTimestamp iso={c.last_message.created_at} />
-            )}
-          </div>
-
-          {/* Meta: member count + city */}
-          <div className="mb-0.5 flex items-center gap-1 font-body text-[11px] leading-none text-foreground-muted">
-            <span> {fmtCount(c.member_count)} members</span>
-            {c.type === "city" && c.reference_name && (
-              <span>· {c.reference_name}</span>
             )}
           </div>
 
