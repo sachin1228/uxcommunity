@@ -80,6 +80,10 @@ export interface CachedMeta {
     created_at?: string;
     /** "owner" | "admin" | "member" — the current user's role in this community. */
     current_user_role?: string | null;
+    /** Who created the community; null on platform-run communities. */
+    owner?: { id: string; name: string; avatar_url: string | null } | null;
+    /** Members per role, for the info panel's Member Role breakdown. */
+    role_counts?: { owner: number; admin: number; member: number } | null;
     /** Effective permission grants (owners: everything; admins: configured toggles). */
     current_user_permissions?: ClientCommunityPermissions | null;
   };
