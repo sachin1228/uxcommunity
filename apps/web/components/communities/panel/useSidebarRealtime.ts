@@ -225,11 +225,12 @@ export function useSidebarRealtime({
             if (isActive) {
               // While the member is looking at the community, treat it as read:
               // the timeline card is already visible to them.
-              scheduleMarkRead(insertCommunityId, { unreadCount: 1, lastMessageTimestamp: insertCreatedAt, reason: "realtime content" });
+              scheduleMarkRead(insertCommunityId, { unreadCount: 1, contentUnreadCount: 1, lastMessageTimestamp: insertCreatedAt, reason: "realtime content" });
             } else {
               const currentEntry = communitiesRef.current.find((c) => c.id === insertCommunityId);
               noteCommunityActivity(insertCommunityId, {
-                unreadCount: (currentEntry?.message_count ?? 0) + (currentEntry?.unread_content_count ?? 0) + 1,
+                unreadCount: currentEntry?.message_count ?? 0,
+                contentUnreadCount: (currentEntry?.unread_content_count ?? 0) + 1,
                 lastMessageTimestamp: insertCreatedAt,
               });
             }

@@ -190,6 +190,7 @@ export function useSidebarCommunities(userId: string) {
 
     scheduleMarkRead(activeCommunityId, {
       unreadCount: snapshot?.message_count ?? null,
+      contentUnreadCount: snapshot?.unread_content_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "community opened",
       // User-initiated open: must clear the badge even when a realtime
@@ -251,6 +252,7 @@ export function useSidebarCommunities(userId: string) {
 
     scheduleMarkRead(id, {
       unreadCount: snapshot?.message_count ?? null,
+      contentUnreadCount: snapshot?.unread_content_count ?? null,
       lastMessageTimestamp: snapshot?.last_message?.created_at ?? null,
       reason: "sidebar navigation",
       // User-initiated open: must clear the badge even when a realtime

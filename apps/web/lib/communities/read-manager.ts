@@ -30,8 +30,10 @@ import { sidebarStore } from "./cache";
 import { markReadOnServer } from "@/components/communities/panel/markReadOnServer";
 
 export interface MarkReadOptions {
-  /** Last known unread count from the sidebar projection. */
+  /** Last known unread MESSAGE count from the sidebar projection. */
   unreadCount?: number | null;
+  /** Last known unread CONTENT count (threads/showcase/resources/events). */
+  contentUnreadCount?: number | null;
   /** Newest known message created_at (kept fresh by realtime). */
   lastMessageTimestamp?: string | null;
   /** Human-readable trigger for dev logs. */
@@ -47,8 +49,16 @@ export interface MarkReadOptions {
 interface CommunityReadState {
   /** ms timestamp of the last PATCH sent for this community. */
   lastUpdatedAt: number | null;
-  /** Highest unread count seen since the last mark-read. */
+  /** Highest unread MESSAGE count seen since the last mark-read. */
   unreadCount: number | null;
+  /**
+   * Highest unread CONTENT count (threads/showcase/resources/events) seen
+   * since the last mark-read. Tracked separately from unreadCount so a
+   * community whose only new activity is a content item still PATCHes on
+   * open — unreadCount alone is 0 and used to suppress the request, leaving
+   * the server's last_read_at behind and resurrecting the badge on refetch.
+   */
+  contentUnreadCount: number | null;
   /** Newest known message created_at. */
   lastMessageTimestamp: string | null;
   /** True while a PATCH is in flight for this community. */
@@ -91,6 +101,7 @@ function ensureState(communityId: string): CommunityReadState {
     state = {
       lastUpdatedAt: null,
       unreadCount: null,
+      contentUnreadCount: null,
       lastMessageTimestamp: null,
       inFlight: false,
       followUpPending: false,
@@ -161,7 +172,7 @@ export function resetReadManager(): void {
 
 function mergeActivity(
   communityId: string,
-  opts: { unreadCount?: number | null; lastMessageTimestamp?: string | null },
+  opts: { unreadCount?: number | null; contentUnreadCount?: number | null; lastMessageTimestamp?: string | null },
 ): CommunityReadState {
   const state = ensureState(communityId);
   if (opts.unreadCount !== undefined && opts.unreadCount !== null) {
@@ -169,6 +180,9 @@ function mergeActivity(
     // that still has unread messages pending a mark-read, so keep the highest
     // count seen since the last PATCH.
     state.unreadCount = Math.max(state.unreadCount ?? 0, opts.unreadCount);
+  }
+  if (opts.contentUnreadCount !== undefined && opts.contentUnreadCount !== null) {
+    state.contentUnreadCount = Math.max(state.contentUnreadCount ?? 0, opts.contentUnreadCount);
   }
   if (
     opts.lastMessageTimestamp &&
@@ -187,7 +201,7 @@ function mergeActivity(
  */
 export function noteCommunityActivity(
   communityId: string,
-  activity: { unreadCount?: number | null; lastMessageTimestamp?: string | null },
+  activity: { unreadCount?: number | null; contentUnreadCount?: number | null; lastMessageTimestamp?: string | null },
 ): void {
   mergeActivity(communityId, activity);
 }
@@ -246,7 +260,9 @@ function fireMarkRead(
   // is in flight. If new unread activity arrived during the request, schedule
   // exactly one follow-up so it is never lost.
   if (state.inFlight) {
-    if ((state.unreadCount ?? 0) > 0) state.followUpPending = true;
+    if ((state.unreadCount ?? 0) > 0 || (state.contentUnreadCount ?? 0) > 0) {
+      state.followUpPending = true;
+    }
     return;
   }
 
@@ -257,16 +273,24 @@ function fireMarkRead(
     }
   }
 
-  // When the unread count was never reported (e.g. the sidebar fetch is still
-  // in flight on a fresh page load), consult the live sidebar projection,
-  // which realtime keeps current.
+  // When the unread counts were never reported (e.g. the sidebar fetch is
+  // still in flight on a fresh page load), consult the live sidebar
+  // projection, which realtime keeps current. BOTH counters matter: a
+  // community whose only unread activity is a thread/showcase post/resource
+  // or event has message_count 0, and skipping the PATCH here left the
+  // server's last_read_at behind — the next sidebar refetch resurrected the
+  // content badge on a community the user had just opened.
   let unreadCount = state.unreadCount;
-  if (unreadCount === null || unreadCount === undefined) {
+  let contentUnreadCount = state.contentUnreadCount;
+  if (unreadCount === null || unreadCount === undefined || contentUnreadCount === null || contentUnreadCount === undefined) {
     const live = sidebarStore.data?.communities.find((c) => c.id === communityId);
-    if (live) unreadCount = live.message_count;
+    if (live) {
+      if (unreadCount === null || unreadCount === undefined) unreadCount = live.message_count;
+      if (contentUnreadCount === null || contentUnreadCount === undefined) contentUnreadCount = live.unread_content_count ?? 0;
+    }
   }
 
-  if (unreadCount === 0) {
+  if ((unreadCount ?? 0) === 0 && (contentUnreadCount ?? 0) === 0) {
     return;
   }
 
@@ -279,11 +303,13 @@ function fireMarkRead(
       current.inFlight = false;
       if (ok) {
         current.failures = 0;
-        // The PATCH succeeded — the server now agrees the community is read.
+        // The PATCH succeeded — the server now agrees the community is read,
+        // for messages AND content alike.
         current.unreadCount = 0;
+        current.contentUnreadCount = 0;
         if (current.followUpPending) {
           current.followUpPending = false;
-          if ((current.unreadCount ?? 0) > 0) {
+          if ((current.unreadCount ?? 0) > 0 || (current.contentUnreadCount ?? 0) > 0) {
             debounceTimers.set(
               communityId,
               setTimeout(() => {

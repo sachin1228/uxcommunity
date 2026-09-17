@@ -70,6 +70,34 @@ test("skips a PATCH when the unread count is already 0", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("a community whose only unread activity is content still PATCHes on open", async () => {
+  // Regression: the open decision read only the MESSAGE count. A community
+  // whose badge came purely from a thread/showcase post/resource or event
+  // reported unreadCount 0, the PATCH was suppressed, the server's
+  // last_read_at never advanced, and the next sidebar refetch resurrected
+  // the content badge on a community the user had just opened.
+  readManagerConfig.debounceMs = 20;
+  const calls = installPatchCounter();
+
+  scheduleMarkRead("abc123", { unreadCount: 0, contentUnreadCount: 1, reason: "community opened" });
+
+  await waitFor(() => calls.length === 1);
+  assert.equal(calls.length, 1);
+});
+
+test("content-only unread is suppressed once both counters are read", async () => {
+  readManagerConfig.debounceMs = 20;
+  const calls = installPatchCounter();
+
+  // Open, PATCH (clears both counters), then the route-change effect fires
+  // again while everything is read — no second PATCH may be sent.
+  scheduleMarkRead("abc123", { unreadCount: 0, contentUnreadCount: 1, reason: "sidebar navigation" });
+  await waitFor(() => calls.length === 1);
+  scheduleMarkRead("abc123", { unreadCount: 0, contentUnreadCount: 0, reason: "community opened", bypassCooldown: true });
+  await delay(60);
+  assert.equal(calls.length, 1);
+});
+
 test("enforces a 30s cooldown between PATCHes for the same community", async () => {
   readManagerConfig.debounceMs = 10;
   readManagerConfig.cooldownMs = 30_000;

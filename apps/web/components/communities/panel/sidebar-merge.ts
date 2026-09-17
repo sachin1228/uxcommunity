@@ -51,9 +51,18 @@ export function mergeStaleServerList(
         : incoming.lastReaction,
       // Same for content previews ("john created a thread"): realtime may
       // have landed one on the local row that the server snapshot predates.
-      last_content: previous.last_content && (!incoming.last_content || previous.last_content.created_at >= incoming.last_content.created_at)
-        ? previous.last_content
-        : incoming.last_content ?? null,
+      // A same-item row persisted before the author-name fix (no firstName)
+      // would render "Someone" forever — heal it from the server row.
+      last_content: (() => {
+        const prev = previous.last_content;
+        const incomingContent = incoming.last_content ?? null;
+        if (prev && (!incomingContent || prev.created_at >= incomingContent.created_at)) {
+          return prev.id === incomingContent?.id && !prev.firstName && incomingContent.firstName
+            ? incomingContent
+            : prev;
+        }
+        return incomingContent;
+      })(),
     };
   });
 
