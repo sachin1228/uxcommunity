@@ -234,6 +234,7 @@ function ProfileActivityScope({
         currentUserId={currentUserId}
         onChange={updateItems}
         emptyState={emptyStateFor(scope)}
+        showPastEvents
       />
 
       {items.length > 0 && hasMore && (

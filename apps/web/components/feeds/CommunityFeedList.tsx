@@ -32,6 +32,11 @@ interface CommunityFeedListProps {
   onChange: (update: (current: FeedItem[]) => FeedItem[]) => void;
   /** Shown when there is nothing to render (copy differs per surface). */
   emptyState?: ReactNode;
+  /**
+   * Ended events are hidden from the home feed but shown on the profile
+   * activity tabs, where the Events tab is the member's event history.
+   */
+  showPastEvents?: boolean;
 }
 
 /**
@@ -52,6 +57,7 @@ export function CommunityFeedList({
   currentUserId,
   onChange,
   emptyState,
+  showPastEvents = false,
 }: CommunityFeedListProps) {
   const router = useGuardedRouter();
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);  const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
@@ -234,9 +240,11 @@ export function CommunityFeedList({
   // ── Render ────────────────────────────────────────────────────────────────
 
   const now = new Date();
-  const visibleItems = items.filter((item) =>
-    item._type !== "event" || new Date(item.end_date ?? item.event_date) >= now,
-  );
+  const visibleItems = showPastEvents
+    ? items
+    : items.filter((item) =>
+        item._type !== "event" || new Date(item.end_date ?? item.event_date) >= now,
+      );
 
   if (!visibleItems.length) {
     return <>{emptyState ?? null}</>;
