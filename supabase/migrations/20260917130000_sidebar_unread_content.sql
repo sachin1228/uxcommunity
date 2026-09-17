@@ -130,10 +130,12 @@ as $$
     group by item.community_id
   ),
   latest_content as (
-    select distinct on (community_id)
-      community_id, id, user_id, created_at, kind, title
-    from content_items
-    order by community_id, created_at desc, id desc
+    select distinct on (item.community_id)
+      item.community_id, item.id, item.user_id, item.created_at, item.kind, item.title,
+      author.name as author_name
+    from content_items item
+    left join public.users author on author.id = item.user_id
+    order by item.community_id, item.created_at desc, item.id desc
   )
   select coalesce(jsonb_agg(jsonb_build_object(
     'community_id', membership.community_id,
@@ -160,7 +162,8 @@ as $$
       ) end,
     'last_content', case when content_item.id is null then null else jsonb_build_object(
       'id', content_item.id, 'kind', content_item.kind, 'title', content_item.title,
-      'created_at', content_item.created_at, 'user_id', content_item.user_id
+      'created_at', content_item.created_at, 'user_id', content_item.user_id,
+      'author_name', content_item.author_name
     ) end
   )), '[]'::jsonb)
   from memberships membership

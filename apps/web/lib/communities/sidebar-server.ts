@@ -22,6 +22,8 @@ type ActivityRow = {
     title: string | null;
     created_at: string;
     user_id: string;
+    /** Absent until the migration that joins the author's name is applied. */
+    author_name?: string | null;
   };
   last_message: null | {
     id: string;
@@ -119,6 +121,9 @@ export async function getSidebarCommunities(userId: string) {
             title: row.last_content.title ?? "",
             created_at: row.last_content.created_at,
             isOwn: row.last_content.user_id === userId,
+            firstName: row.last_content.user_id === userId
+              ? "You"
+              : row.last_content.author_name?.split(" ")[0] ?? null,
           }
         : null,
       last_read_at: row.last_read_at,
