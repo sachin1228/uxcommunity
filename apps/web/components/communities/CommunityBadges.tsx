@@ -1,26 +1,32 @@
 import { Globe2, Lock } from "lucide-react";
-import { communityVisibility, isSignupCommunity } from "@/lib/communities/community-badges";
+import {
+  communityNameBadges,
+  type CommunityVisibilityIcon,
+} from "@/lib/communities/community-badges";
 
 /**
- * The badge pair shown after every community name:
+ * The badges shown after a community name, so a member can tell at a glance
+ * what kind of group they are looking at:
  *
- *   ✓ verified seal — the community was created for the member by the signup
- *                     flow (General, city, sector, interest, experience level,
- *                     job title) rather than by another member.
- *   globe / lock    — public communities advertise themselves with the earth
- *                     icon; a member-created private community shows a lock.
+ *   ✓  verified seal — a default group the signup flow created for them
+ *                      (General, city, sector, experience level, job title)
+ *   🌐 earth         — an interest community, or a public member-created group
+ *   🔒 lock          — a private group
  *
- * Both are decorative-next-to-text: they carry an aria-label so they are still
- * announced, and a title so the meaning is available on hover.
+ * Which pair a community gets is decided by `communityNameBadges` in
+ * `lib/communities/community-badges.ts`; this file only draws it.
+ *
+ * Both badges are labels rather than decoration: each carries an aria-label so
+ * it is announced, and a title so the meaning is available on hover.
  */
 
 /** Verified color — the universal blue of a verified seal. */
 const VERIFIED_COLOR = "text-[#1D9BF0]";
 
 /**
- * Verified seal for platform-created communities. The glyph is the standard
+ * Verified seal for platform-created default groups. The glyph is the standard
  * 22×22 verified badge (a passport-stamp silhouette with a check cut out), so
- * it scales cleanly from an 11px sidebar row to a 16px settings header.
+ * it scales cleanly from an 11px sidebar row to a 16px invite page.
  */
 export function SignupCommunityBadge({
   size = 13,
@@ -46,19 +52,18 @@ export function SignupCommunityBadge({
   );
 }
 
-/** Earth for a public community, lock for one only its members can see. */
-export function CommunityVisibilityBadge({
-  isPrivate,
+/** Earth for a public/discoverable community, lock for a private one. */
+export function CommunityVisibilityIcon({
+  kind,
   size = 12,
   className = "",
 }: {
-  isPrivate?: boolean | null;
+  kind: CommunityVisibilityIcon;
   size?: number;
   className?: string;
 }) {
-  const visibility = communityVisibility(isPrivate);
-  const label = visibility === "private" ? "Private community" : "Public community";
-  const Icon = visibility === "private" ? Lock : Globe2;
+  const label = kind === "lock" ? "Private community" : "Public community";
+  const Icon = kind === "lock" ? Lock : Globe2;
 
   return (
     // The label lives on the wrapper so the answer to "public or private?" is
@@ -75,9 +80,10 @@ export function CommunityVisibilityBadge({
 }
 
 /**
- * Both badges in the order they read: "Name ✓ 🌐". One component so a new
- * surface can't show a lock without the matching verified seal (or vice
- * versa) — pass the community's `type` and `is_private` straight through.
+ * The full badge pair for a community name: "Name ✓", "Name 🌐", "Name 🔒" or
+ * "Name ✓ 🔒". Pass the community's `type` and `is_private` straight through —
+ * one component so every surface draws the same pair from the same rules, and
+ * renders nothing when the rules say a name carries no badge at all.
  */
 export function CommunityNameBadges({
   type,
@@ -87,14 +93,17 @@ export function CommunityNameBadges({
 }: {
   type?: string | null;
   isPrivate?: boolean | null;
-  /** Icon size in px for the visibility glyph; the seal is drawn one px larger. */
+  /** Icon size in px; the seal is drawn one px larger than the visibility icon. */
   size?: number;
   className?: string;
 }) {
+  const { verified, visibility } = communityNameBadges(type, isPrivate);
+  if (!verified && !visibility) return null;
+
   return (
     <span className={`inline-flex shrink-0 items-center gap-1 ${className}`}>
-      {isSignupCommunity(type) ? <SignupCommunityBadge size={size + 1} /> : null}
-      <CommunityVisibilityBadge isPrivate={isPrivate} size={size} />
+      {verified ? <SignupCommunityBadge size={size + 1} /> : null}
+      {visibility ? <CommunityVisibilityIcon kind={visibility} size={size} /> : null}
     </span>
   );
 }

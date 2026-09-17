@@ -6,7 +6,7 @@ import { invalidateOnJoin } from "@/lib/communities/cache";
 import { Lock, Globe2, Users, Check, MessageSquare } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { SignupCommunityBadge } from "@/components/communities/CommunityBadges";
-import { isSignupCommunity } from "@/lib/communities/community-badges";
+import { communityNameBadges } from "@/lib/communities/community-badges";
 
 interface Community {
   id: string;
@@ -68,6 +68,12 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
   }
 
   const avatarLetter = community.name.charAt(0).toUpperCase();
+  // Only the seal is drawn here: the privacy pill above the name already
+  // carries the earth/lock, so repeating it beside the name would double up.
+  const { verified: isVerifiedCommunity } = communityNameBadges(
+    community.type,
+    community.is_private,
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
@@ -96,10 +102,10 @@ export function JoinCommunityClient({ community, token }: JoinCommunityClientPro
         {/* Name + description */}
         <h1 className="flex items-center justify-center gap-1.5 font-display text-xl font-semibold text-foreground">
           {community.name}
-          {/* Platform-created communities (city, sector, interest, …) carry the
-              verified seal here too, so an invite link reads the same as the
-              sidebar the member lands in. */}
-          {isSignupCommunity(community.type) && <SignupCommunityBadge size={16} />}
+          {/* Default groups (city, sector, experience level, job title, General)
+              carry the verified seal here too, so an invite link reads the same
+              as the sidebar the member lands in. */}
+          {isVerifiedCommunity && <SignupCommunityBadge size={16} />}
         </h1>
         {community.description && (
           <p className="mt-2 text-center font-body text-sm leading-relaxed text-foreground-muted">
