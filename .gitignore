@@ -150,3 +150,8 @@ apps/web/next-env.d.ts
 __pycache__/
 *.pyc
 
+# Firebase server credentials — never commit service-account keys
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*service-account*.json
+

@@ -32,8 +32,19 @@ export default function CommunitiesScreen() {
         ? `&image=${encodeURIComponent(community.image_url)}`
         : '';
       const tabsParam = `&tabs=${encodeURIComponent(community.enabled_tabs.join(','))}`;
+      // Ownership only gates the "delete anyone's message" affordance in chat;
+      // the server still authorizes every delete.
+      const ownerParam = community.owner_id
+        ? `&owner=${encodeURIComponent(community.owner_id)}`
+        : '';
+      // Snapshot the unread state *before* markCommunityRead zeroes the badge so
+      // the chat can draw its "N unread messages" divider in the right place.
+      const unreadParam = `&unread=${community.unread_count ?? 0}`;
+      const readParam = community.last_read_at
+        ? `&read=${encodeURIComponent(community.last_read_at)}`
+        : '';
       router.push(
-        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}`
+        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${ownerParam}${unreadParam}${readParam}`
       );
     },
     [router, markCommunityRead]

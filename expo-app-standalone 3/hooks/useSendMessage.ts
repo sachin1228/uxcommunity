@@ -7,16 +7,19 @@
  *   3. On cancel / network error → status becomes "failed"; the bubble stays
  *      so the user can tap Retry.
  *   4. On success → tempId is replaced with the real server message.
+ *   5. Editing an owned message PATCHes it and stamps `edited_at` locally.
  */
 
-import { useCallback, useRef } from 'react';
-import { Message, uploadChatImage, sendMessage } from '@/lib/communities';
+import { useCallback, useRef, useState } from 'react';
+import { Message, editMessage, uploadChatImage, sendMessage } from '@/lib/communities';
 import { PendingImage } from '@/components/chat/ChatInput';
+import type { MessageMention } from '@/lib/chat';
 
 type RetryPayload = {
   text: string;
   pendingImage: PendingImage | null;
   replyTo: Message | null;
+  mentions: MessageMention[];
 };
 
 interface Options {
@@ -43,6 +46,9 @@ export function useSendMessage({
   // Retry payloads keyed by tempId (kept even after failure for retry)
   const retryData = useRef<Map<string, RetryPayload>>(new Map());
 
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
   // ── private helpers ────────────────────────────────────────────────────────
 
   const upsertMsg = useCallback(
@@ -68,10 +74,11 @@ export function useSendMessage({
       tempId: string,
       text: string,
       pendingImage: PendingImage | null,
-      replyTo: Message | null
+      replyTo: Message | null,
+      mentions: MessageMention[]
     ) => {
       // Persist so retry can reconstruct the payload
-      retryData.current.set(tempId, { text, pendingImage, replyTo });
+      retryData.current.set(tempId, { text, pendingImage, replyTo, mentions });
 
       // Insert optimistic bubble immediately
       const optimistic: Message = {
@@ -91,10 +98,12 @@ export function useSendMessage({
               id: replyTo.id,
               content: replyTo.content,
               user_name: replyTo.users?.name ?? 'Unknown',
+              user_id: replyTo.user_id,
             }
           : null,
         image_url: pendingImage?.uri ?? null,
         deleted_at: null,
+        mentions,
         status: 'sending',
       };
 
@@ -127,6 +136,7 @@ export function useSendMessage({
             content: text || undefined,
             reply_to_id: replyTo?.id,
             image_url: imageUrl,
+            mentions: mentions.length ? mentions : undefined,
           },
           ctrl.signal
         );
@@ -140,10 +150,12 @@ export function useSendMessage({
             users: msg.users ?? opt?.users ?? null,
             reply_to: msg.reply_to ?? opt?.reply_to ?? null,
             image_url: msg.image_url ?? opt?.image_url ?? null,
+            mentions: msg.mentions ?? opt?.mentions ?? null,
             status: 'sent',
           };
 
-          // Realtime may have already inserted the real row
+          // Realtime may have already inserted the real row (fan-out echoes the
+          // message back before the POST response lands).
           if (prev.some((m) => m.id === msg.id)) {
             return prev
               .filter((m) => m.id !== tempId)
@@ -181,11 +193,16 @@ export function useSendMessage({
   // ── public API ─────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(
-    (text: string, pendingImage: PendingImage | undefined, replyTo: Message | null) => {
+    (
+      text: string,
+      pendingImage: PendingImage | undefined,
+      replyTo: Message | null,
+      mentions: MessageMention[] = [],
+    ) => {
       if (!text.trim() && !pendingImage) return;
       stopTyping();
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      runSend(tempId, text, pendingImage ?? null, replyTo);
+      runSend(tempId, text, pendingImage ?? null, replyTo, mentions);
     },
     [stopTyping, runSend]
   );
@@ -206,10 +223,53 @@ export function useSendMessage({
       retryData.current.delete(tempId);
 
       const newTempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      runSend(newTempId, payload.text, payload.pendingImage, payload.replyTo);
+      runSend(newTempId, payload.text, payload.pendingImage, payload.replyTo, payload.mentions);
     },
     [setMessages, runSend]
   );
 
-  return { handleSend, handleCancel, handleRetry };
+  /**
+   * PATCH an owned message's text. Resolves true when the edit was accepted so
+   * the caller can close its editor; the realtime `message-edit` event then
+   * reconciles every other client.
+   */
+  const handleEdit = useCallback(
+    async (messageId: string, content: string): Promise<boolean> => {
+      const trimmed = content.trim();
+      if (!trimmed) {
+        setEditError('Message cannot be empty.');
+        return false;
+      }
+
+      setEditSaving(true);
+      setEditError(null);
+      try {
+        const { edited_at } = await editMessage(communityId, messageId, trimmed);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId ? { ...m, content: trimmed, edited_at } : m,
+          ),
+        );
+        return true;
+      } catch (err) {
+        setEditError(err instanceof Error ? err.message : 'Failed to edit message.');
+        return false;
+      } finally {
+        setEditSaving(false);
+      }
+    },
+    [communityId, setMessages],
+  );
+
+  const clearEditError = useCallback(() => setEditError(null), []);
+
+  return {
+    handleSend,
+    handleCancel,
+    handleRetry,
+    handleEdit,
+    editSaving,
+    editError,
+    clearEditError,
+  };
 }

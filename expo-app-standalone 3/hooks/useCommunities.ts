@@ -25,6 +25,8 @@ import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { getCommunities, markRead, Community, LastMessage, LastReaction } from '@/lib/communities';
 import { communityStore } from '@/lib/communityStore';
 import { apiFetch } from '@/lib/api';
+import { setAppBadgeCountAsync } from '@/lib/push';
+import { syncBadgeFromServer } from '@/lib/notificationSettings';
 import { useAuth } from '@/context/AuthContext';
 
 // ---------------------------------------------------------------------------
@@ -85,6 +87,8 @@ export function useCommunities() {
   /** Cached sender names keyed by user_id — mirrors web's resolvedNames Map. */
   const resolvedNames  = useRef(new Map<string, string>());
   const reconcileRef   = useRef(false);
+  /** Latest visible list, so markCommunityRead can sum unread without a re-render. */
+  const communitiesRef = useRef<Community[]>([]);
   const typingMapRef   = useRef<Map<string, Map<string, { name: string; lastSeen: number }>>>(new Map());
 
   // ── Name resolution ────────────────────────────────────────────────────────
@@ -451,6 +455,10 @@ export function useCommunities() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    communitiesRef.current = communities.filter((c) => !c.is_archived);
+  }, [communities]);
+
   // Re-subscribe whenever the set of community IDs changes or user loads
   useEffect(() => {
     if (communities.length === 0) return;
@@ -479,13 +487,28 @@ export function useCommunities() {
   /**
    * Call on entering a community chat.
    * Zeros badge locally, persists to server, guards realtime increment.
+   *
+   * The app icon badge is re-summed here too: opening a chat is the moment
+   * the unread total changes, and leaving the old number on the icon until
+   * the next push would be visibly wrong. The local sum is applied first so
+   * the icon moves immediately, then the server total replaces it once the
+   * read has actually been persisted.
    */
   const markCommunityRead = useCallback((communityId: string) => {
     communityStore.activeCommunityId = communityId;
     setCommunities((prev) =>
       prev.map((c) => (c.id === communityId ? { ...c, unread_count: 0 } : c))
     );
-    markRead(communityId).catch(() => {});
+
+    const remaining = communitiesRef.current.reduce(
+      (sum, c) => sum + (c.id === communityId ? 0 : c.unread_count ?? 0),
+      0
+    );
+    void setAppBadgeCountAsync(remaining);
+
+    markRead(communityId)
+      .then(() => syncBadgeFromServer())
+      .catch(() => {});
   }, []);
 
   /** Call on leaving a community chat (unmount). */

@@ -24,6 +24,7 @@
       "backgroundColor": "#09090B",
       "package": "in.uxcommunity.app",
       "softwareKeyboardLayoutMode": "resize",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon-circle.png",
         "backgroundColor": "#1D1F26"
@@ -35,8 +36,26 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#0062D1",
+          "defaultChannel": "messages"
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow uxcommunity to access your photos.",
+          "savePhotosPermission": "Allow uxcommunity to save chat images to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ],
+    "notification": {
+      "color": "#0062D1"
+    },
     "experiments": {
       "typedRoutes": true
     },

@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
 import { useColorScheme } from 'react-native';
 import { AuthProvider } from '@/context/AuthContext';
+import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
 import colors from '@/constants/colors';
 
 SplashScreen.preventAutoHideAsync();
@@ -55,6 +56,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1, backgroundColor: bg }}>
             <KeyboardProvider>
               <AuthProvider>
+                <PushNotificationsBridge />
                 <Stack
                   screenOptions={{
                     headerShown: false,
@@ -67,6 +69,10 @@ export default function RootLayout() {
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen
                     name="community/[id]"
+                    options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
+                  />
+                  <Stack.Screen
+                    name="settings/notifications"
                     options={{ animation: 'slide_from_right', contentStyle: { backgroundColor: bg } }}
                   />
                   <Stack.Screen name="+not-found" />

@@ -35,6 +35,7 @@
     "test:community-areas": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/areas.test.ts",
     "test:community-badges": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/community-badges.test.ts",
     "test:content-sync": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/content-sync.test.ts",
+    "test:push-budget": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/push/chat.test.ts",
     "test:rpc-integration": "npx supabase test db --file supabase/tests/performance_rpcs.test.sql"
   },
   "engines": {

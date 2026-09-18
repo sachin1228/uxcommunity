@@ -1,4 +1,5 @@
 import { apiFetch, apiFormUpload } from './api';
+import type { MentionCandidate, MessageMention } from './chat';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -63,6 +64,8 @@ export interface ReplyPreview {
   id: string;
   content: string | null;
   user_name: string;
+  /** Present on live payloads; older history-built previews omit it. */
+  user_id?: string | null;
 }
 
 export interface Message {
@@ -73,6 +76,10 @@ export interface Message {
   reply_to_id: string | null;
   image_url: string | null;
   deleted_at: string | null;
+  /** Set when the author edited the text (15-minute window, web parity). */
+  edited_at?: string | null;
+  /** Members actually mentioned at send time — authoritative for rendering. */
+  mentions?: MessageMention[] | null;
   users: MessageUser | null;
   reactions: Reaction[];
   reply_to: ReplyPreview | null;
@@ -109,7 +116,13 @@ export async function getMessages(
 
 export async function sendMessage(
   communityId: string,
-  payload: { content?: string; reply_to_id?: string; image_url?: string },
+  payload: {
+    content?: string;
+    reply_to_id?: string;
+    image_url?: string;
+    /** Members picked from the composer's @-autocomplete. */
+    mentions?: MessageMention[];
+  },
   signal?: AbortSignal
 ): Promise<Message> {
   const { data } = await apiFetch<{ message: Message }>(
@@ -143,6 +156,48 @@ export async function deleteMessage(
     `/api/communities/${communityId}/messages/${messageId}`,
     { method: 'DELETE' }
   );
+}
+
+/**
+ * Edit the text of an owned message. Images and reply metadata are kept as-is;
+ * the client only offers this within MESSAGE_EDIT_WINDOW_MS of sending.
+ *
+ * Returns the server's `edited_at` so the bubble can label itself immediately
+ * (the realtime `message-edit` event reconciles everyone else).
+ */
+export async function editMessage(
+  communityId: string,
+  messageId: string,
+  content: string
+): Promise<{ edited_at: string | null }> {
+  const { data } = await apiFetch<{ message?: { edited_at?: string | null }; edited_at?: string | null }>(
+    `/api/communities/${communityId}/messages/${messageId}`,
+    { method: 'PATCH', body: { content } }
+  );
+  return { edited_at: data.message?.edited_at ?? data.edited_at ?? new Date().toISOString() };
+}
+
+/**
+ * Community member roster for the composer's @-autocomplete.
+ *
+ * The endpoint pages at 30 rows, so page through until it runs out (bounded)
+ * to keep every member mentionable — the web popover filters the roster
+ * locally for the same reason.
+ */
+export async function getCommunityMembers(
+  communityId: string,
+  maxMembers = 200,
+): Promise<MentionCandidate[]> {
+  const all: MentionCandidate[] = [];
+  for (let page = 0; all.length < maxMembers; page += 1) {
+    const { data } = await apiFetch<{ members?: MentionCandidate[]; has_more?: boolean }>(
+      `/api/communities/${communityId}/members?page=${page}`,
+    );
+    const batch = data.members ?? [];
+    all.push(...batch);
+    if (!data.has_more || batch.length === 0) break;
+  }
+  return all.slice(0, maxMembers);
 }
 
 /**

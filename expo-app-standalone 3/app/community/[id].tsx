@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,15 +20,19 @@ import { useChatMessages } from '@/hooks/useChatMessages';
 import { useTypingPresence } from '@/hooks/useTypingPresence';
 import { useAuth } from '@/context/AuthContext';
 import { MessageBubble } from '@/components/chat/MessageBubble';
-import { ImageViewer } from '@/components/chat/ImageViewer';
+import { ImageViewer, LightboxImage } from '@/components/chat/ImageViewer';
 import { ChatInput, PendingImage } from '@/components/chat/ChatInput';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
-import { EmojiPicker } from '@/components/chat/EmojiPicker';
+import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
+import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import {
   toggleReaction,
   deleteMessage,
-  Message,
+  getCommunities,
+  type Community,
+  type Message,
 } from '@/lib/communities';
+import { fmtDate, type MessageMention } from '@/lib/chat';
 import { useSendMessage } from '@/hooks/useSendMessage';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -39,8 +43,30 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
 import type { CommunityTab, ContentKind } from '@/lib/communityContent';
 
+/** FlatList row: a day divider, the unread marker, or a message. */
+type ChatRow =
+  | { kind: 'date'; key: string; label: string }
+  | { kind: 'unread'; key: string }
+  | { kind: 'message'; key: string; msg: Message; isSameAuthor: boolean };
+
 export default function CommunityChat() {
-  const { id, name, image, tabs: enabledTabsParam } = useLocalSearchParams<{ id: string; name: string; image?: string; tabs?: string }>();
+  const {
+    id,
+    name,
+    image,
+    tabs: enabledTabsParam,
+    owner: ownerParam,
+    unread: unreadParam,
+    read: readParam,
+  } = useLocalSearchParams<{
+    id: string;
+    name: string;
+    image?: string;
+    tabs?: string;
+    owner?: string;
+    unread?: string;
+    read?: string;
+  }>();
   const colors = useColors();
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -48,9 +74,34 @@ export default function CommunityChat() {
   const { user } = useAuth();
   const [headerHeight, setHeaderHeight] = useState(0);
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
+  /**
+   * A push notification can only carry the community id, so when the route
+   * arrives without its display params the community is resolved from the
+   * signed-in member's list.
+   */
+  const [resolved, setResolved] = useState<Community | null>(null);
+  const needsResolution = !name;
+
+  useEffect(() => {
+    if (!needsResolution) return;
+    let cancelled = false;
+    getCommunities()
+      .then((list) => {
+        if (!cancelled) setResolved(list.find((c) => c.id === id) ?? null);
+      })
+      .catch(() => {
+        /* the header falls back to a generic title */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, needsResolution]);
+
   const enabledTabs = new Set(
-    (enabledTabsParam ? decodeURIComponent(enabledTabsParam).split(',') : ['chat', 'threads', 'events', 'resources'])
-      .map((tab) => tab.trim().toLowerCase())
+    (enabledTabsParam
+      ? decodeURIComponent(enabledTabsParam).split(',')
+      : resolved?.enabled_tabs ?? ['chat', 'threads', 'events', 'resources']
+    ).map((tab) => tab.trim().toLowerCase()),
   );
   const allTabs: Array<{ key: CommunityTab; label: string }> = [
     { key: 'chat', label: 'Chat' },
@@ -59,6 +110,15 @@ export default function CommunityChat() {
     { key: 'resources', label: 'Resources' },
   ];
   const tabs = allTabs.filter((tab) => tab.key === 'chat' || enabledTabs.has(tab.key));
+
+  // Unread marker inputs, snapshotted before the list zeroes its badge.
+  const initialUnreadCount = Number(unreadParam ?? resolved?.unread_count ?? 0) || 0;
+  const lastReadAt = readParam
+    ? decodeURIComponent(readParam)
+    : resolved?.last_read_at ?? null;
+  // Don't latch the unread position until we actually know it — on a push
+  // deep-link the community (and therefore last_read_at) arrives a beat later.
+  const readStateKnown = unreadParam !== undefined || resolved !== null;
 
   // Track this as the active community so useCommunities won't increment
   // unread_count for incoming messages while we're looking at this chat.
@@ -81,40 +141,98 @@ export default function CommunityChat() {
     softDeleteMessage,
   } = useChatMessages(id);
 
-  const { typingLabel, onInputChange, stopTyping } = useTypingPresence(id);
+  const { typingUsers, onInputChange, stopTyping } = useTypingPresence(id);
 
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
-  const [viewingImageUri, setViewingImageUri] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const [copiedNotice, setCopiedNotice] = useState(false);
+  const [imageIndex, setImageIndex] = useState<number | null>(null);
 
-  const handleImagePress = useCallback((uri: string) => {
-    setViewingImageUri(uri);
-  }, []);
+  const ownerId = ownerParam ?? resolved?.owner_id;
+  const isOwnCommunity = !!ownerId && !!user?.id && ownerId === user.id;
 
-  const listRef = useRef<FlatList>(null);
+  const listRef = useRef<FlatList<ChatRow>>(null);
 
   /**
-   * isAtBottom — true when the last message in the list is currently visible
-   * on screen. Updated by onViewableItemsChanged which is far more reliable
-   * than scroll-offset arithmetic (no timing race, no threshold guessing).
-   * Starts true because the chat always opens scrolled to the latest message.
+   * atBottom — whether the newest message is on screen. Updated by
+   * onViewableItemsChanged, which is far more reliable than scroll-offset
+   * arithmetic (no timing race, no threshold guessing). The ref feeds the
+   * keyboard handler; the state drives the "jump to latest" button.
    */
-  const isAtBottom = useRef(true);
+  const atBottomRef = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
   const lastMessageIdRef = useRef<string | null>(null);
 
-  // Keep lastMessageIdRef in sync so the viewability callback can reference it
-  // without being recreated (FlatList requires a stable onViewableItemsChanged).
+  // ── Unread marker: latched once, from the first loaded page ──────────────
+  const unreadLatchedRef = useRef(false);
   useEffect(() => {
-    lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+    if (unreadLatchedRef.current || messages.length === 0 || !readStateKnown) return;
+    unreadLatchedRef.current = true;
+    if (!lastReadAt || initialUnreadCount <= 0) return;
+    const firstUnread = messages.find(
+      (m) => m.created_at > lastReadAt && m.user_id !== user?.id,
+    );
+    if (firstUnread) setFirstUnreadId(firstUnread.id);
+  }, [messages, lastReadAt, initialUnreadCount, user?.id, readStateKnown]);
+
+  // ── Rows: day dividers + unread marker interleaved with messages ─────────
+  const rows = useMemo<ChatRow[]>(() => {
+    const out: ChatRow[] = [];
+    let currentDate: string | null = null;
+    let prevAuthorId: string | null = null;
+    let groupIndex = 0;
+    let unreadPlaced = false;
+
+    for (const msg of messages) {
+      const day = fmtDate(msg.created_at);
+      if (day !== currentDate) {
+        // While older history may still exist above, the first group's pill
+        // would "float" upward on every prepend — the web app hides it until
+        // the real start of history is known. Same rule here.
+        const isFirstGroup = groupIndex === 0;
+        if (!isFirstGroup || !hasMore) {
+          out.push({ kind: 'date', key: `date-${day}-${out.length}`, label: day });
+        }
+        currentDate = day;
+        prevAuthorId = null;
+        groupIndex += 1;
+      }
+
+      if (!unreadPlaced && firstUnreadId && msg.id === firstUnreadId) {
+        out.push({ kind: 'unread', key: `unread-${msg.id}` });
+        unreadPlaced = true;
+      }
+
+      out.push({
+        kind: 'message',
+        key: msg.id,
+        msg,
+        isSameAuthor: prevAuthorId === msg.user_id,
+      });
+      prevAuthorId = msg.user_id;
+    }
+    return out;
+  }, [messages, hasMore, firstUnreadId]);
+
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    lastMessageIdRef.current = lastMessage?.id ?? null;
   }, [messages]);
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 10 });
   const handleViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: Array<{ item: Message }> }) => {
+    ({ viewableItems }: { viewableItems: Array<{ item: ChatRow }> }) => {
       const lastId = lastMessageIdRef.current;
       if (!lastId) return;
-      isAtBottom.current = viewableItems.some((vi) => vi.item.id === lastId);
-    }
+      const next = viewableItems.some(
+        (vi) => vi.item.kind === 'message' && vi.item.msg.id === lastId,
+      );
+      atBottomRef.current = next;
+      // Only re-render when the answer actually flips.
+      setAtBottom((prev) => (prev === next ? prev : next));
+    },
   );
 
   const scrollToLatest = useCallback((animated = true) => {
@@ -127,13 +245,21 @@ export default function CommunityChat() {
     const subscription = KeyboardEvents.addListener('keyboardDidShow', () => {
       // Only jump to the bottom when the last message is already visible.
       // If the user has scrolled up to read old messages, leave them there.
-      if (isAtBottom.current) scrollToLatest(true);
+      if (atBottomRef.current) scrollToLatest(true);
     });
 
     return () => subscription.remove();
   }, [scrollToLatest]);
 
-  const { handleSend: _handleSend, handleCancel, handleRetry } = useSendMessage({
+  const {
+    handleSend: _handleSend,
+    handleCancel,
+    handleRetry,
+    handleEdit,
+    editSaving,
+    editError,
+    clearEditError,
+  } = useSendMessage({
     communityId: id,
     currentUser: {
       id: user?.id ?? '',
@@ -146,11 +272,11 @@ export default function CommunityChat() {
   });
 
   const handleSend = useCallback(
-    (text: string, pendingImage?: PendingImage) => {
-      _handleSend(text, pendingImage, replyTo);
+    (text: string, pendingImage?: PendingImage, mentions?: MessageMention[]) => {
+      _handleSend(text, pendingImage, replyTo, mentions);
       setReplyTo(null);
     },
-    [_handleSend, replyTo]
+    [_handleSend, replyTo],
   );
 
   const handleReaction = useCallback(
@@ -159,10 +285,10 @@ export default function CommunityChat() {
         const reactions = await toggleReaction(id, messageId, emoji);
         updateReactions(messageId, reactions);
       } catch {
-        // silent
+        // silent — the realtime reaction events reconcile
       }
     },
-    [id, updateReactions]
+    [id, updateReactions],
   );
 
   const handleDelete = useCallback(
@@ -175,54 +301,156 @@ export default function CommunityChat() {
         // Realtime UPDATE will reconcile if this fails
       }
     },
-    [id, softDeleteMessage]
+    [id, softDeleteMessage],
+  );
+
+  const handleCopy = useCallback(() => {
+    setCopiedNotice(true);
+    setTimeout(() => setCopiedNotice(false), 1400);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (messageId: string, content: string) => {
+      const ok = await handleEdit(messageId, content);
+      if (ok) setEditingMessage(null);
+    },
+    [handleEdit],
   );
 
   const handleLongPress = useCallback((msg: Message) => {
     setSelectedMessage(msg);
   }, []);
 
+  /** Jumps the list to the message a reply quotes (web parity). */
+  const handleReplyPress = useCallback(
+    (messageId: string) => {
+      const index = rows.findIndex((row) => row.kind === 'message' && row.msg.id === messageId);
+      if (index < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+      } catch {
+        listRef.current?.scrollToOffset({ offset: Math.max(0, index * 60), animated: true });
+      }
+    },
+    [rows],
+  );
+
+  // ── Lightbox: every image in the loaded timeline ─────────────────────────
+  const lightboxImages = useMemo<LightboxImage[]>(
+    () =>
+      messages
+        .filter((m) => !!m.image_url && !m.deleted_at)
+        .map((m) => ({
+          url: m.image_url as string,
+          content: m.content,
+          user_name: m.users?.name ?? null,
+          avatar_url: m.users?.avatar_url ?? null,
+          created_at: m.created_at,
+        })),
+    [messages],
+  );
+
+  const handleImagePress = useCallback(
+    (url: string) => {
+      const index = lightboxImages.findIndex((img) => img.url === url);
+      setImageIndex(index < 0 ? 0 : index);
+    },
+    [lightboxImages],
+  );
+
   const renderItem = useCallback(
-    ({ item, index }: { item: Message; index: number }) => {
-      const prevMessage = index > 0 ? messages[index - 1] : null;
-      // Group consecutive messages from the same sender (only for non-deleted)
-      const isSameAuthor =
-        !!prevMessage &&
-        prevMessage.user_id === item.user_id &&
-        !prevMessage.deleted_at &&
-        !item.deleted_at;
+    ({ item }: { item: ChatRow }) => {
+      if (item.kind === 'date') {
+        return (
+          <View style={styles.dateDivider}>
+            <Text
+              style={[
+                styles.datePill,
+                { color: colors.mutedForeground, backgroundColor: colors.surfaceRaised },
+              ]}
+            >
+              {item.label}
+            </Text>
+          </View>
+        );
+      }
+
+      if (item.kind === 'unread') {
+        const label =
+          initialUnreadCount > 0
+            ? `${initialUnreadCount} unread message${initialUnreadCount === 1 ? '' : 's'}`
+            : 'New messages';
+        return (
+          <View style={styles.unreadDivider}>
+            <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+            <Text
+              style={[
+                styles.unreadPill,
+                {
+                  color: colors.mutedForeground,
+                  backgroundColor: colors.surfaceRaised,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {label}
+            </Text>
+            <View style={[styles.unreadLine, { backgroundColor: colors.border }]} />
+          </View>
+        );
+      }
 
       return (
         <MessageBubble
-          message={item}
-          isOwn={item.user_id === user?.id}
-          isSameAuthor={isSameAuthor}
+          message={item.msg}
+          isOwn={item.msg.user_id === user?.id}
+          isSameAuthor={item.isSameAuthor}
+          currentUserId={user?.id ?? ''}
           onLongPress={handleLongPress}
           onReactionPress={handleReaction}
           onImagePress={handleImagePress}
-          currentUserId={user?.id ?? ''}
           onCancel={handleCancel}
           onRetry={handleRetry}
+          onReplyPress={handleReplyPress}
         />
       );
     },
-    [user?.id, handleLongPress, handleReaction, handleImagePress, handleCancel, handleRetry, messages]
+    [
+      user?.id,
+      handleLongPress,
+      handleReaction,
+      handleImagePress,
+      handleCancel,
+      handleRetry,
+      handleReplyPress,
+      colors,
+      initialUnreadCount,
+    ],
   );
 
-  const keyExtractor = useCallback((item: Message) => item.id, []);
+  const keyExtractor = useCallback((item: ChatRow) => item.key, []);
 
   const handleLoadMore = useCallback(() => {
     if (hasMore && !isLoadingMore) loadMore();
   }, [hasMore, isLoadingMore, loadMore]);
 
-  const communityName = name ? decodeURIComponent(name) : 'Chat';
-  const communityImage = image ? decodeURIComponent(image) : null;
+  const communityName = name ? decodeURIComponent(name) : resolved?.name ?? 'Community';
+  const communityImage = image
+    ? decodeURIComponent(image)
+    : resolved?.image_url ?? null;
 
   const chatContent = (
     <View style={styles.flex}>
+      {copiedNotice && (
+        <View style={[styles.toast, { backgroundColor: colors.foreground }]}>
+          <Feather name="check" size={13} color={colors.background} />
+          <Text style={[styles.toastText, { color: colors.background }]}>Copied</Text>
+        </View>
+      )}
+
       {isLoading && (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} />
+          <ActivityIndicator color={colors.chatOwnBubble} />
         </View>
       )}
 
@@ -235,7 +463,7 @@ export default function CommunityChat() {
       {!isLoading && (
         <FlatList
           ref={listRef}
-          data={messages}
+          data={rows}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
@@ -244,28 +472,79 @@ export default function CommunityChat() {
           viewabilityConfig={viewabilityConfig.current}
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.2}
+          onScrollToIndexFailed={(info) => {
+            // Variable-height bubbles make an exact index jump unreliable; land
+            // near the row, let layout settle, then retry once.
+            listRef.current?.scrollToOffset({
+              offset: Math.max(0, info.averageItemLength * info.index),
+              animated: true,
+            });
+            setTimeout(() => {
+              try {
+                listRef.current?.scrollToIndex({
+                  index: info.index,
+                  animated: true,
+                  viewPosition: 0.5,
+                });
+              } catch {
+                /* give up quietly — the user can scroll */
+              }
+            }, 120);
+          }}
           ListHeaderComponent={
             isLoadingMore ? (
               <View style={styles.loadMoreSpinner}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <ActivityIndicator size="small" color={colors.chatOwnBubble} />
               </View>
             ) : null
           }
           ListEmptyComponent={
-            <View style={styles.center}>
-              <Feather name="message-circle" size={36} color={colors.mutedForeground} />
+            <View style={styles.emptyWrap}>
+              {communityImage ? (
+                <Image source={{ uri: communityImage }} style={styles.emptyAvatar} />
+              ) : (
+                <View style={[styles.emptyAvatar, { backgroundColor: colors.surfaceRaised }]} />
+              )}
               <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                No messages yet. Say hello!
+                Welcome to{' '}
+                <Text style={{ color: colors.foreground, fontFamily: 'Geist_500Medium' }}>
+                  {communityName}
+                </Text>
+                !
+                {'\n'}
+                <Text style={styles.emptySubtext}>Be the first to say something.</Text>
               </Text>
             </View>
           }
         />
       )}
 
-      <View onLayout={() => { if (isAtBottom.current) scrollToLatest(false); }}>
-        <TypingIndicator label={typingLabel} />
+      <View
+        style={styles.footer}
+        onLayout={() => {
+          if (atBottomRef.current) scrollToLatest(false);
+        }}
+      >
+        {/* Scroll-to-bottom button — floats just above the footer edge */}
+        {!atBottom && !isLoading && (
+          <Pressable
+            onPress={() => scrollToLatest(true)}
+            accessibilityLabel="Scroll to latest message"
+            hitSlop={6}
+            style={[
+              styles.jumpBtn,
+              { backgroundColor: colors.surfaceRaised, borderColor: colors.border },
+            ]}
+          >
+            <Feather name="chevron-down" size={16} color={colors.mutedForeground} />
+          </Pressable>
+        )}
+
+        <TypingIndicator users={typingUsers} />
 
         <ChatInput
+          communityId={id}
+          currentUserId={user?.id ?? ''}
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
           onSend={handleSend}
@@ -305,24 +584,23 @@ export default function CommunityChat() {
               style={[
                 styles.headerAvatar,
                 styles.headerAvatarFallback,
-                { backgroundColor: colors.primarySoft },
+                { backgroundColor: colors.surfaceRaised },
               ]}
             >
-              <Text style={[styles.headerAvatarText, { color: colors.primary }]}>
+              <Text style={[styles.headerAvatarText, { color: colors.mutedForeground }]}>
                 {communityName.slice(0, 1).toUpperCase()}
               </Text>
             </View>
           )}
-          <Text
-            style={[styles.headerTitle, { color: colors.foreground }]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.headerTitle, { color: colors.foreground }]} numberOfLines={1}>
             {communityName}
           </Text>
         </View>
       </View>
 
-      <View style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}>
+      <View
+        style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}
+      >
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
@@ -330,11 +608,18 @@ export default function CommunityChat() {
               <Pressable
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key)}
-                style={[styles.tab, active && { borderBottomColor: colors.primary }]}
+                style={[styles.tab, active && { borderBottomColor: colors.chatOwnBubble }]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
-                <Text style={[styles.tabText, { color: active ? colors.primary : colors.mutedForeground }]}>{tab.label}</Text>
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: active ? colors.foreground : colors.mutedForeground },
+                  ]}
+                >
+                  {tab.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -366,23 +651,42 @@ export default function CommunityChat() {
         />
       )}
 
-      {/* Full-screen image viewer */}
-      <ImageViewer
-        uri={viewingImageUri}
-        onClose={() => setViewingImageUri(null)}
-      />
+      {/* Full-screen image lightbox — mounted only while open */}
+      {imageIndex !== null && lightboxImages.length > 0 && (
+        <ImageViewer
+          images={lightboxImages}
+          index={Math.min(imageIndex, lightboxImages.length - 1)}
+          onClose={() => setImageIndex(null)}
+          onNavigate={setImageIndex}
+        />
+      )}
 
-      {/* Long-press action sheet */}
-      <EmojiPicker
+      {/* Long-press action sheet — reactions, reply, copy, edit, delete */}
+      <MessageActionsSheet
         message={selectedMessage}
-        isOwn={Boolean(selectedMessage && selectedMessage.user_id === user?.id)}
+        currentUserId={user?.id ?? ''}
+        canModerate={isOwnCommunity}
         onClose={() => setSelectedMessage(null)}
         onReact={handleReaction}
-        onReply={(msg) => {
-          setReplyTo(msg);
-          setSelectedMessage(null);
+        onReply={(msg) => setReplyTo(msg)}
+        onCopy={handleCopy}
+        onEdit={(msg) => {
+          clearEditError();
+          setEditingMessage(msg);
         }}
         onDelete={handleDelete}
+      />
+
+      {/* Edit composer */}
+      <EditMessageModal
+        message={editingMessage}
+        isSaving={editSaving}
+        error={editError}
+        onClose={() => {
+          clearEditError();
+          setEditingMessage(null);
+        }}
+        onSave={handleSaveEdit}
       />
     </View>
   );
@@ -471,12 +775,93 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     flexGrow: 1,
-    paddingTop: 8,
+    paddingTop: 4,
+  },
+  dateDivider: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  datePill: {
+    fontSize: 11,
+    fontFamily: 'Geist_500Medium',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  unreadDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginVertical: 12,
+  },
+  unreadLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  unreadPill: {
+    fontSize: 11,
+    fontFamily: 'Geist_500Medium',
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    overflow: 'hidden',
+  },
+  emptyWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    padding: 32,
+  },
+  emptyAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   emptyText: {
     fontSize: 14,
     fontFamily: 'Geist_400Regular',
     textAlign: 'center',
-    marginTop: 8,
+    lineHeight: 20,
   },
+  emptySubtext: { fontSize: 12 },
+  footer: { position: 'relative' },
+  jumpBtn: {
+    position: 'absolute',
+    right: 16,
+    top: -40,
+    zIndex: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
+  toast: {
+    position: 'absolute',
+    alignSelf: 'center',
+    top: 12,
+    zIndex: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  toastText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
 });

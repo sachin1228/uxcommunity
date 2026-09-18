@@ -1,133 +1,98 @@
 import React from 'react';
-import {
-  Alert,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { Message } from '@/lib/communities';
 
-const COMMON_EMOJIS = ['❤️', '👍', '👎', '😮', '🔥', '😂', '🎉', '👏', '💯', '✅'];
+/**
+ * Composer emoji picker — the React Native counterpart of the web
+ * `EmojiGifPicker` tab, reduced to emoji. Tapping an emoji inserts it at the
+ * end of the draft and keeps the sheet open so several can be picked in a row
+ * (same behaviour as the web composer).
+ */
+
+const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
+  {
+    title: 'Smileys',
+    emoji: [
+      '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+      '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+      '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🥳',
+      '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '😣', '😖', '😫',
+      '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳',
+      '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭',
+      '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😴', '🤤',
+    ],
+  },
+  {
+    title: 'Gestures',
+    emoji: [
+      '👍', '👎', '👌', '🤌', '✌️', '🤞', '🤟', '🤘', '🤙', '👈',
+      '👉', '👆', '👇', '☝️', '✋', '🤚', '🖐️', '🖖', '👋', '🤝',
+      '🙏', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '💪',
+    ],
+  },
+  {
+    title: 'Hearts & symbols',
+    emoji: [
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+      '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '✨', '🔥',
+      '⭐', '🌟', '💯', '✅', '❌', '⚠️', '🎉', '🎊', '🎈', '🏆',
+      '🥇', '👑', '💡', '🚀', '⚡', '💎', '📌', '📎', '🔗', '🕐',
+    ],
+  },
+  {
+    title: 'Work & design',
+    emoji: [
+      '💻', '🖥️', '⌨️', '🖱️', '🎨', '🖌️', '🖍️', '📐', '📏', '✏️',
+      '📝', '📄', '📁', '📊', '📈', '📉', '🗂️', '🧠', '🧩', '🔍',
+      '🛠️', '⚙️', '🧑‍💻', '👩‍💻', '👨‍💻', '🧑‍🎨', '👩‍🎨', '👨‍🎨', '📱', '🕹️',
+    ],
+  },
+];
 
 interface Props {
-  message: Message | null;
-  isOwn: boolean;
+  visible: boolean;
   onClose: () => void;
-  onReact: (messageId: string, emoji: string) => void;
-  onReply: (message: Message) => void;
-  onDelete: (messageId: string) => void;
+  onSelect: (emoji: string) => void;
 }
 
-export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelete }: Props) {
+export function EmojiPicker({ visible, onClose, onSelect }: Props) {
   const colors = useColors();
 
-  if (!message) return null;
-
-  const isDeleted = !!message.deleted_at;
-  const canReact = !isDeleted;
-  const canReply = !isDeleted;
-  const canDelete = isOwn && !isDeleted;
-
-  function handleDelete() {
-    if (!message) return;
-    onClose();
-    // Small delay so the modal closes first, then show the native alert
-    setTimeout(() => {
-      Alert.alert(
-        'Delete message?',
-        'This will delete the message for everyone in this chat.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete for everyone',
-            style: 'destructive',
-            onPress: () => onDelete(message.id),
-          },
-        ]
-      );
-    }, 200);
-  }
-
   return (
-    <Modal
-      transparent
-      animationType="fade"
-      visible={!!message}
-      onRequestClose={onClose}
-    >
-      <Pressable
-        style={[styles.backdrop, { backgroundColor: colors.foreground + '80' }]}
-        onPress={onClose}
-      >
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: colors.card, borderColor: colors.border },
-          ]}
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable
+          style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={(e) => e.stopPropagation()}
         >
-          {/* Emoji row — only for non-deleted messages */}
-          {canReact && (
-            <>
-              <View style={styles.emojiRow}>
-                {COMMON_EMOJIS.map((emoji) => (
-                  <Pressable
-                    key={emoji}
-                    style={({ pressed }) => [
-                      styles.emojiBtn,
-                      { backgroundColor: pressed ? colors.subtle : 'transparent' },
-                    ]}
-                    onPress={() => {
-                      onReact(message.id, emoji);
-                      onClose();
-                    }}
-                  >
-                    <Text style={styles.emoji}>{emoji}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            </>
-          )}
-
-          {/* Reply */}
-          {canReply && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.action,
-                { backgroundColor: pressed ? colors.subtle : 'transparent' },
-              ]}
-              onPress={() => {
-                onReply(message);
-                onClose();
-              }}
-            >
-              <Text style={[styles.actionText, { color: colors.foreground }]}>↩ Reply</Text>
-            </Pressable>
-          )}
-
-          {/* Delete — own messages only */}
-          {canDelete && (
-            <>
-              {canReply && (
-                <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              )}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.action,
-                  { backgroundColor: pressed ? colors.destructive + '14' : 'transparent' },
-                ]}
-                onPress={handleDelete}
-              >
-                <Text style={[styles.actionText, { color: colors.destructive }]}>
-                  🗑 Delete
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {EMOJI_SECTIONS.map((section) => (
+              <View key={section.title}>
+                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+                  {section.title}
                 </Text>
-              </Pressable>
-            </>
-          )}
-        </View>
+                <View style={styles.grid}>
+                  {section.emoji.map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      onPress={() => onSelect(emoji)}
+                      style={({ pressed }) => [
+                        styles.emojiCell,
+                        { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                      ]}
+                    >
+                      <Text style={styles.emoji}>{emoji}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </Pressable>
       </Pressable>
     </Modal>
   );
@@ -136,47 +101,40 @@ export function EmojiPicker({ message, isOwn, onClose, onReact, onReply, onDelet
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 20,
+    height: 340,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 16,
   },
-  emojiRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 12,
-    gap: 4,
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
+  sectionTitle: {
+    fontSize: 11,
+    fontFamily: 'Geist_600SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 12,
+    marginBottom: 6,
+    marginLeft: 4,
   },
-  emojiBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  emojiCell: {
+    width: '12.5%',
+    aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 10,
   },
-  emoji: {
-    fontSize: 26,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: 0,
-  },
-  action: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  actionText: {
-    fontSize: 15,
-    fontFamily: 'Geist_500Medium',
-  },
+  emoji: { fontSize: 24 },
 });

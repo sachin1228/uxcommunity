@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/BrandLogo';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +11,7 @@ import { resolveProfilePictureUri } from '@/lib/profilePicture';
 export function AppHeader() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user } = useAuth();
   const [avatarError, setAvatarError] = useState(false);
   const avatarUrl = avatarError ? null : resolveProfilePictureUri(user?.avatar_url);
@@ -39,9 +41,10 @@ export function AppHeader() {
 
       <View style={styles.actions}>
         <Pressable
-          accessibilityLabel="Notifications"
+          accessibilityLabel="Notification settings"
           accessibilityRole="button"
           hitSlop={8}
+          onPress={() => router.push('/settings/notifications')}
           style={({ pressed }) => [
             styles.iconButton,
             { backgroundColor: pressed ? colors.background : 'transparent' },

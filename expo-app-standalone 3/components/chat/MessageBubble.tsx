@@ -1,17 +1,26 @@
-import React, { Fragment, useEffect, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Image,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import {
+  COLLAPSED_LINES,
+  fmtTime,
+  isEmojiOnly,
+  splitContentForRender,
+  userNameColor,
+} from '@/lib/chat';
+import { MessageBubbleTail } from './MessageBubbleTail';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,53 +30,34 @@ interface Props {
   message: Message;
   isOwn: boolean;
   isSameAuthor: boolean;
+  currentUserId: string;
   onLongPress: (message: Message) => void;
   onReactionPress: (messageId: string, emoji: string) => void;
   onImagePress?: (uri: string) => void;
-  currentUserId: string;
   onCancel?: (tempId: string) => void;
   onRetry?: (tempId: string) => void;
+  /** Jumps the list to the message this one replies to. */
+  onReplyPress?: (messageId: string) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+type Palette = ReturnType<typeof useColors>;
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-/**
- * Returns true when the entire string is 1–3 emoji with no other content.
- */
-function isEmojiOnly(text: string): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  const emojiRegex = /\p{Emoji_Presentation}/gu;
-  const matches = trimmed.match(emojiRegex);
-  if (!matches || matches.length > 3) return false;
-  const remainder = trimmed.replace(emojiRegex, '').replace(/\s/g, '');
-  return remainder.length === 0;
-}
+const EMOJI_MESSAGE_SIZE = 48;
 
 // ---------------------------------------------------------------------------
-// Sub-components
+// Avatar
 // ---------------------------------------------------------------------------
 
-/**
- * Profile picture with automatic initials fallback.
- *
- * Uploaded image URLs render directly. Missing, legacy generated, or failed
- * image URLs fall back to the member's initials.
- */
 function Avatar({
   name,
   avatarUrl,
   colors,
+  size = 28,
 }: {
   name: string;
   avatarUrl: string | null;
-  colors: ReturnType<typeof useColors>;
+  colors: Palette;
+  size?: number;
 }) {
   const resolvedUri = resolveProfilePictureUri(avatarUrl);
   const [imageError, setImageError] = useState(false);
@@ -82,23 +72,27 @@ function Avatar({
     <View
       style={[
         styles.avatar,
-        { backgroundColor: colors.primarySoft, overflow: 'hidden' },
+        { width: size, height: size, borderRadius: size / 2, backgroundColor: colors.surfaceRaised },
       ]}
     >
       {resolvedUri && !imageError ? (
         <Image
           source={{ uri: resolvedUri }}
-          style={styles.avatarImage}
+          style={{ width: size, height: size }}
           onError={() => setImageError(true)}
         />
       ) : (
-        <Text style={[styles.avatarText, { color: colors.primary }]}>{letters}</Text>
+        <Text style={[styles.avatarText, { color: colors.mutedForeground }]}>{letters}</Text>
       )}
     </View>
   );
 }
 
-function ReactionChips({
+// ---------------------------------------------------------------------------
+// Reaction pills — sit half-outside the bubble, WhatsApp-style
+// ---------------------------------------------------------------------------
+
+function ReactionPills({
   reactions,
   currentUserId,
   messageId,
@@ -109,34 +103,34 @@ function ReactionChips({
   currentUserId: string;
   messageId: string;
   onReactionPress: (messageId: string, emoji: string) => void;
-  colors: ReturnType<typeof useColors>;
+  colors: Palette;
 }) {
   if (!reactions || reactions.length === 0) return null;
+
   return (
-    <View style={styles.reactions}>
-      {reactions.map((r) => {
-        const isActive = r.user_ids.includes(currentUserId);
+    <View style={styles.reactionPills}>
+      {reactions.map(({ emoji, user_ids }) => {
+        const iMine = user_ids.includes(currentUserId);
         return (
           <Pressable
-            key={r.emoji}
-            onPress={() => onReactionPress(messageId, r.emoji)}
-            style={[
-              styles.reactionChip,
+            key={emoji}
+            onPress={() => onReactionPress(messageId, emoji)}
+            hitSlop={4}
+            accessibilityLabel={iMine ? `Remove ${emoji} reaction` : `Add ${emoji} reaction`}
+            style={({ pressed }) => [
+              styles.reactionPill,
               {
-                backgroundColor: isActive ? colors.primarySoft : colors.secondary,
-                borderColor: isActive ? colors.primary : colors.border,
+                backgroundColor: colors.chatReactionPill,
+                // Web hard-codes a black ring on both themes.
+                borderColor: '#000',
+                opacity: pressed ? 0.75 : 1,
               },
             ]}
           >
-            <Text style={styles.reactionEmoji}>{r.emoji}</Text>
-            {r.user_ids.length > 1 && (
-              <Text
-                style={[
-                  styles.reactionCount,
-                  { color: isActive ? colors.primary : colors.mutedForeground },
-                ]}
-              >
-                {r.user_ids.length}
+            <Text style={styles.reactionPillEmoji}>{emoji}</Text>
+            {user_ids.length > 1 && (
+              <Text style={[styles.reactionPillCount, { color: colors.foreground }]}>
+                {user_ids.length}
               </Text>
             )}
           </Pressable>
@@ -146,26 +140,279 @@ function ReactionChips({
   );
 }
 
-function ReplyPreview({
-  replyTo,
+// ---------------------------------------------------------------------------
+// Reply quote inside a bubble
+// ---------------------------------------------------------------------------
+
+function ReplyBubble({
+  reply,
+  isOwn,
   colors,
+  onPress,
 }: {
-  replyTo: NonNullable<Message['reply_to']>;
-  colors: ReturnType<typeof useColors>;
+  reply: NonNullable<Message['reply_to']>;
+  isOwn: boolean;
+  colors: Palette;
+  onPress?: () => void;
 }) {
+  // Reply names get the same per-user color as sender names when the author's
+  // id is known; history-built previews omit it and fall back to neutral.
+  const ownText = colors.chatOwnBubbleForeground;
+  const nameColor = reply.user_id
+    ? userNameColor(reply.user_id, colors)
+    : isOwn
+      ? ownText
+      : colors.mutedForeground;
+
   return (
-    <View
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
       style={[
-        styles.replyPreview,
-        { borderLeftColor: colors.primary, backgroundColor: colors.subtle },
+        styles.replyBubble,
+        {
+          backgroundColor: isOwn ? colors.chatReplyBgOwn : colors.chatReplyBgOther,
+          borderLeftColor: isOwn ? colors.chatReplyBorderOwn : colors.chatReplyBorderOther,
+        },
       ]}
     >
-      <Text style={[styles.replyName, { color: colors.cardForeground }]}>
-        {replyTo.user_name}
+      <Text
+        numberOfLines={1}
+        style={[styles.replyName, { color: nameColor, opacity: isOwn ? 0.85 : 1 }]}
+      >
+        {reply.user_name}
       </Text>
-      <Text style={[styles.replyContent, { color: colors.mutedForeground }]} numberOfLines={1}>
-        {replyTo.content ?? '📷 Image'}
+      <Text
+        numberOfLines={2}
+        style={[
+          styles.replyContent,
+          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.8 : 1 },
+        ]}
+      >
+        {reply.content || '📷 Image'}
       </Text>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rich message text: mentions + links + emoji enlargement + "Read more"
+// ---------------------------------------------------------------------------
+
+function RichContent({
+  content,
+  mentions,
+  isOwn,
+  colors,
+}: {
+  content: string;
+  mentions: Message['mentions'];
+  isOwn: boolean;
+  colors: Palette;
+}) {
+  const [collapsed, setCollapsed] = useState(true);
+  const [truncated, setTruncated] = useState(false);
+  const runs = useMemo(() => splitContentForRender(content, mentions), [content, mentions]);
+
+  const textColor = isOwn ? colors.chatOwnBubbleForeground : colors.foreground;
+  const mentionColor = isOwn ? colors.chatMentionOwn : colors.chatMention;
+  const linkColor = isOwn ? colors.chatOwnBubbleForeground : colors.chatMention;
+
+  const openUrl = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {
+      /* ignore un-openable links */
+    });
+  }, []);
+
+  return (
+    <Text
+      style={[styles.content, { color: textColor }]}
+      numberOfLines={collapsed ? COLLAPSED_LINES : undefined}
+      onTextLayout={(e) => {
+        const lineCount = e.nativeEvent.lines.length;
+        setTruncated(collapsed && lineCount >= COLLAPSED_LINES);
+      }}
+    >
+      {runs.map((run, i) => {
+        if (run.kind === 'mention') {
+          return (
+            <Text key={i} style={[styles.mentionText, { color: mentionColor }]}>
+              {run.text}
+            </Text>
+          );
+        }
+        if (run.kind === 'url') {
+          return (
+            <Text
+              key={i}
+              style={{ color: linkColor, textDecorationLine: 'underline' }}
+              onPress={() => openUrl(run.url)}
+            >
+              {run.text}
+            </Text>
+          );
+        }
+        return <Fragment key={i}>{run.text}</Fragment>;
+      })}
+      {truncated && collapsed && (
+        <Text>
+          {'\u2060… '}
+          <Text
+            style={[
+              styles.readMore,
+              { color: isOwn ? colors.chatOwnBubbleForeground : colors.mutedForeground },
+            ]}
+            onPress={() => setCollapsed(false)}
+            suppressHighlighting
+          >
+            Read more
+          </Text>
+        </Text>
+      )}
+    </Text>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Media inside a bubble
+// ---------------------------------------------------------------------------
+
+const MEDIA_MAX_WIDTH = 240;
+const MEDIA_MAX_HEIGHT = 300;
+const MEDIA_MIN_HEIGHT = 90;
+
+function BubbleImage({
+  uri,
+  isOwn,
+  standalone,
+  dimmed,
+  createdAt,
+  showStatus,
+  onPress,
+  onLongPress,
+}: {
+  uri: string;
+  isOwn: boolean;
+  standalone: boolean;
+  dimmed: boolean;
+  createdAt: string;
+  showStatus: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const [ratio, setRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Image.getSize(
+      uri,
+      (w, h) => {
+        if (!cancelled && w > 0 && h > 0) setRatio(w / h);
+      },
+      () => {
+        /* keep the 4:3 fallback */
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [uri]);
+
+  const aspect = ratio ?? 4 / 3;
+  let width = MEDIA_MAX_WIDTH;
+  let height = MEDIA_MAX_WIDTH / aspect;
+  if (height > MEDIA_MAX_HEIGHT) {
+    height = MEDIA_MAX_HEIGHT;
+    width = MEDIA_MAX_HEIGHT * aspect;
+  }
+  if (height < MEDIA_MIN_HEIGHT) {
+    height = MEDIA_MIN_HEIGHT;
+    width = Math.min(MEDIA_MIN_HEIGHT * aspect, MEDIA_MAX_WIDTH);
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={350}
+      accessibilityLabel="View full image"
+      accessibilityRole="button"
+      style={[standalone ? styles.mediaStandalone : styles.mediaInBubble, { width, height }]}
+    >
+      <Image
+        source={{ uri }}
+        style={{ width: '100%', height: '100%', opacity: dimmed ? 0.5 : 1 }}
+        resizeMode="cover"
+      />
+      {standalone && showStatus && (
+        <View style={[styles.mediaTimeOverlay, { backgroundColor: 'rgba(0,0,0,0.55)' }]}>
+          <Text style={styles.mediaTimeText}>{fmtTime(createdAt)}</Text>
+          {isOwn && (
+            <Ionicons name="checkmark-done-sharp" size={11} color="rgba(255,255,255,0.9)" />
+          )}
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Send-status chrome
+// ---------------------------------------------------------------------------
+
+function RetryIndicator({ onRetry, colors }: { onRetry: () => void; colors: Palette }) {
+  return (
+    <View style={styles.retryCol}>
+      <Pressable
+        onPress={onRetry}
+        hitSlop={8}
+        accessibilityLabel="Retry sending"
+        style={styles.retryBtn}
+      >
+        <Ionicons name="refresh" size={13} color="#FFFFFF" />
+      </Pressable>
+      <Text style={[styles.retryText, { color: colors.destructive }]}>Retry</Text>
+    </View>
+  );
+}
+
+function TimeRow({
+  message,
+  isOwn,
+  colors,
+}: {
+  message: Message;
+  isOwn: boolean;
+  colors: Palette;
+}) {
+  const status = message.status;
+  const timeColor = isOwn ? colors.chatOwnBubbleForeground : colors.mutedForeground;
+  const opacity = isOwn ? 0.6 : 1;
+
+  return (
+    <View style={styles.timeRow}>
+      {!!message.edited_at && (
+        <Text
+          style={[
+            styles.timeText,
+            { color: timeColor, opacity: isOwn ? 0.5 : 1, marginRight: 2 },
+          ]}
+        >
+          edited
+        </Text>
+      )}
+      <Text style={[styles.timeText, { color: timeColor, opacity }]}>
+        {fmtTime(message.created_at)}
+      </Text>
+      {isOwn && status === 'sending' && (
+        <ActivityIndicator size="small" color={timeColor} style={styles.tinySpinner} />
+      )}
+      {isOwn && (status === 'sent' || !status) && (
+        <Ionicons name="checkmark-done-sharp" size={11} color={timeColor} style={{ opacity: 0.7 }} />
+      )}
+      {isOwn && status === 'failed' && (
+        <Text style={[styles.timeText, { color: colors.destructive }]}>!</Text>
+      )}
     </View>
   );
 }
@@ -178,333 +425,227 @@ export function MessageBubble({
   message,
   isOwn,
   isSameAuthor,
+  currentUserId,
   onLongPress,
   onReactionPress,
   onImagePress,
-  currentUserId,
   onCancel,
   onRetry,
+  onReplyPress,
 }: Props) {
   const colors = useColors();
-
-  // Pulse animation for the sending spinner ring
-  const spinAnim = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (message.status === 'sending') {
-      Animated.loop(
-        Animated.timing(spinAnim, { toValue: 1, duration: 900, useNativeDriver: true })
-      ).start();
-    } else {
-      spinAnim.stopAnimation();
-      spinAnim.setValue(0);
-    }
-  }, [message.status, spinAnim]);
+  const { width: screenWidth } = useWindowDimensions();
 
   const sender = message.users;
   const senderName = sender?.name ?? (isOwn ? 'You' : 'Unknown');
-  const showHeader = !isSameAuthor;
+  const reactions = message.reactions ?? [];
+  const replyTo = message.reply_to ?? null;
+  const imageUrl = message.image_url ?? null;
+  const failed = message.status === 'failed';
+  const uploading = message.status === 'sending' && !!imageUrl;
   const isDeleted = !!message.deleted_at;
-  const isEmojiMsg =
-    !isDeleted &&
-    !message.image_url &&
-    !message.reply_to &&
-    !!message.content &&
-    isEmojiOnly(message.content);
+  const imageOnly = !!imageUrl && !message.content && !replyTo;
+  const isFirstInGroup = !isSameAuthor;
+  const showHeader = !isSameAuthor;
 
-  // Fix #1/#2: time color
-  const timeColor = isOwn ? colors.primaryForeground : colors.mutedForeground;
+  const bubbleMaxWidth = Math.min(screenWidth * 0.78, 420);
+
+  // Big bubble-free emoji when the whole message is 1–3 emoji glyphs.
+  const isEmojiMsg =
+    !isDeleted && !imageUrl && !replyTo && !!message.content && isEmojiOnly(message.content);
+
+  const ownBubbleColor = failed ? colors.chatFailedBubble : colors.chatOwnBubble;
+  const bubbleBg = isOwn ? ownBubbleColor : colors.surfaceRaised;
+  const tailColor = isOwn ? ownBubbleColor : colors.surfaceRaised;
+
+  const senderColor = userNameColor(message.user_id, colors);
+  const ownText = colors.chatOwnBubbleForeground;
+  const textColor = isOwn ? ownText : colors.foreground;
+
+  const handlePress = useCallback(() => {
+    if (isOwn && failed) onRetry?.(message.id);
+  }, [isOwn, failed, onRetry, message.id]);
+
+  const handleLongPress = useCallback(() => {
+    if (isDeleted) return;
+    onLongPress(message);
+  }, [isDeleted, onLongPress, message]);
 
   return (
     <View
       style={[
         styles.row,
-        isSameAuthor ? styles.rowCompact : styles.rowFirst,
+        { justifyContent: isOwn ? 'flex-end' : 'flex-start' },
+        isFirstInGroup ? styles.rowFirst : styles.rowCompact,
       ]}
     >
-      {/* ── Left avatar column (always present, Slack-style) ── */}
-      <View style={styles.avatarCol}>
-        {showHeader && (
-          <Avatar
-            name={senderName}
-            avatarUrl={sender?.avatar_url ?? null}
-            colors={colors}
-          />
-        )}
-      </View>
+      {/* Avatar column — hidden for own messages (web parity) */}
+      {!isOwn && (
+        <View style={styles.avatarCol}>
+          {showHeader && (
+            <Avatar name={senderName} avatarUrl={sender?.avatar_url ?? null} colors={colors} />
+          )}
+        </View>
+      )}
 
-      {/* ── Content column ── */}
-      <View style={styles.contentCol}>
-        {/* Sender name only — no designation badge */}
-        {showHeader && !isDeleted && (
-          <Text style={[styles.senderName, { color: colors.mutedForeground }]}>
-            {senderName}
-          </Text>
-        )}
-
-        {/* ── Deleted message ── */}
-        {isDeleted ? (
+      {/* Content column */}
+      <View style={[styles.contentCol, { maxWidth: bubbleMaxWidth }]}>
+        {!isDeleted && isEmojiMsg ? (
           <View
             style={[
-              styles.deletedBubble,
-              {
-                backgroundColor: isOwn ? colors.primarySoft : colors.card,
-                borderColor: isOwn ? colors.primary : colors.border,
-              },
+              styles.bubbleRow,
+              isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther,
             ]}
           >
-            <Text style={[styles.deletedIcon, { color: isOwn ? colors.primaryForeground : colors.mutedForeground }]}>
-              ⊘
-            </Text>
-            <Text style={[styles.deletedText, { color: isOwn ? colors.primaryForeground : colors.mutedForeground }]}>
-              {isOwn ? 'You deleted this message' : 'This message was deleted'}
-            </Text>
-            <Text style={[styles.deletedTime, { color: timeColor }]}>
-              {formatTime(message.created_at)}
-            </Text>
-          </View>
-        ) : isEmojiMsg ? (
-          /* ── Big emoji — no bubble ── */
-          <View style={styles.emojiContainer}>
-            <Text style={styles.bigEmoji}>{message.content}</Text>
-            {/* Fix #1: time on its own line, right-aligned */}
-            <View style={styles.timeRow}>
-              <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-                {formatTime(message.created_at)}
-              </Text>
-              {isOwn && (
-                <Ionicons name="checkmark-done-sharp" size={15} color={colors.mutedForeground} />
-              )}
+            <View style={styles.bubbleWrap}>
+              <View style={styles.emojiWrap}>
+                <Text style={styles.bigEmoji}>{message.content}</Text>
+                <TimeRow message={message} isOwn={isOwn} colors={colors} />
+              </View>
+              <ReactionPills
+                reactions={reactions}
+                currentUserId={currentUserId}
+                messageId={message.id}
+                onReactionPress={onReactionPress}
+                colors={colors}
+              />
             </View>
-            <ReactionChips
-              reactions={message.reactions}
-              currentUserId={currentUserId}
-              messageId={message.id}
-              onReactionPress={onReactionPress}
-              colors={colors}
-            />
           </View>
-        ) : message.image_url && !message.content ? (
-          /* ── Image-only: no bubble wrapper, just a bordered image card ── */
-          <Fragment>
-            <View style={{ alignSelf: 'flex-start' }}>
-              <Pressable
-                onPress={() => message.status !== 'sending' && message.status !== 'failed' && onImagePress?.(message.image_url!)}
-                onLongPress={() => onLongPress(message)}
-                delayLongPress={350}
-                accessibilityLabel="View full image"
-                accessibilityRole="button"
-                style={[styles.imageCard, { borderColor: colors.primary }]}
-              >
-                <Image
-                  source={{ uri: message.image_url }}
-                  style={[
-                    styles.messageImage,
-                    (message.status === 'sending' || message.status === 'failed') && { opacity: 0.45 },
-                  ]}
-                  resizeMode="cover"
-                />
-                {(!message.status || message.status === 'sent') && (
-                  <View style={[styles.imageTimeOverlay, { backgroundColor: colors.foreground + '73' }]}>
-                    <Text style={[styles.imageTimeText, { color: colors.primaryForeground }]}>
-                      {formatTime(message.created_at)}
-                    </Text>
-                    {isOwn && (
-                      <Ionicons
-                        name="checkmark-done-sharp"
-                        size={13}
-                        color={colors.primaryForeground}
-                      />
-                    )}
-                  </View>
-                )}
-              </Pressable>
+        ) : (
+          <View
+            style={[
+              styles.bubbleRow,
+              isOwn ? styles.bubbleRowOwn : styles.bubbleRowOther,
+            ]}
+          >
+            {failed && <RetryIndicator onRetry={() => onRetry?.(message.id)} colors={colors} />}
 
-              {/* Sending overlay — spinner ring + cancel */}
-              {isOwn && message.status === 'sending' && (
-                <View style={styles.statusOverlay} pointerEvents="box-none">
-                  <View style={[styles.spinnerRing, { backgroundColor: colors.foreground + '59' }]} pointerEvents="none">
-                    <ActivityIndicator size="large" color={colors.primaryForeground} />
-                  </View>
-                  <Pressable
-                    onPress={() => onCancel?.(message.id)}
-                    style={styles.cancelCircle}
-                    hitSlop={10}
-                  >
-                    <Ionicons name="close" size={18} color={colors.primaryForeground} />
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Failed overlay — tap to retry */}
-              {isOwn && message.status === 'failed' && (
-                <Pressable
-                  style={styles.statusOverlay}
-                  onPress={() => onRetry?.(message.id)}
-                >
-                  <Ionicons name="reload-outline" size={28} color={colors.primaryForeground} />
-                  <Text style={styles.retryLabel}>Tap to retry</Text>
-                </Pressable>
-              )}
-            </View>
-            <ReactionChips
-              reactions={message.reactions}
-              currentUserId={currentUserId}
-              messageId={message.id}
-              onReactionPress={onReactionPress}
-              colors={colors}
-            />
-          </Fragment>
-        ) : message.image_url && message.content ? (
-          /* ── Image + caption: blue bubble, image flush at top, text below ── */
-          <Fragment>
-            <View style={{ alignSelf: 'flex-start' }}>
+            <View style={styles.bubbleWrap}>
               <Pressable
-                onLongPress={() => onLongPress(message)}
+                onPress={handlePress}
+                onLongPress={handleLongPress}
                 delayLongPress={350}
                 style={[
                   styles.bubble,
-                  styles.bubbleImageCaption,
+                  imageUrl ? styles.bubbleMedia : styles.bubbleText,
                   {
-                    backgroundColor: isOwn ? colors.primary : colors.card,
-                    borderColor: isOwn ? 'transparent' : colors.border,
-                    opacity: (message.status === 'sending' || message.status === 'failed') ? 0.55 : 1,
+                    backgroundColor: bubbleBg,
+                    shadowColor: '#000',
                   },
+                  isFirstInGroup &&
+                    (isOwn ? styles.bubbleFirstOwn : styles.bubbleFirstOther),
                 ]}
               >
-                <Pressable
-                  onPress={() => message.status !== 'sending' && message.status !== 'failed' && onImagePress?.(message.image_url!)}
-                  onLongPress={() => onLongPress(message)}
-                  delayLongPress={350}
-                  accessibilityLabel="View full image"
-                  accessibilityRole="button"
-                >
-                  <Image
-                    source={{ uri: message.image_url }}
-                    style={styles.captionImage}
-                    resizeMode="cover"
-                  />
-                </Pressable>
-                <View style={styles.captionPadding}>
+                {isFirstInGroup && <MessageBubbleTail side={isOwn ? 'right' : 'left'} color={tailColor} />}
+
+                {/* Sender name inside the bubble, WhatsApp-style. Own messages
+                    skip it, matching WhatsApp and the web app. */}
+                {!isOwn && showHeader && !isDeleted && (
                   <Text
-                    style={[
-                      styles.content,
-                      { color: isOwn ? colors.primaryForeground : colors.foreground },
-                    ]}
+                    style={[styles.senderName, { color: senderColor }, imageUrl ? styles.nameOnMedia : null]}
                   >
-                    {message.content}
+                    {senderName}
                   </Text>
-                </View>
-                <View style={styles.captionTimeRow}>
-                  {(!message.status || message.status === 'sent') && (
-                    <Text style={[styles.timeText, { color: timeColor }]}>
-                      {formatTime(message.created_at)}
-                    </Text>
-                  )}
-                  {isOwn && (!message.status || message.status === 'sent') && (
-                    <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                  )}
-                  {message.status === 'sending' && (
-                    <ActivityIndicator size="small" color={timeColor} />
-                  )}
-                  {isOwn && message.status === 'failed' && (
-                    <Ionicons name="warning-outline" size={15} color={colors.destructive} />
-                  )}
-                </View>
+                )}
+
+                {isDeleted ? (
+                  <Fragment>
+                    <View style={styles.deletedRow}>
+                      <Ionicons name="ban" size={13} color={isOwn ? ownText : colors.mutedForeground} />
+                      <Text
+                        style={[
+                          styles.deletedText,
+                          { color: isOwn ? ownText : colors.mutedForeground },
+                        ]}
+                      >
+                        {isOwn ? 'You deleted this message' : 'This message was deleted'}
+                      </Text>
+                    </View>
+                    <View style={styles.timeRow}>
+                      <Text
+                        style={[
+                          styles.timeText,
+                          { color: isOwn ? ownText : colors.mutedForeground, opacity: isOwn ? 0.6 : 1 },
+                        ]}
+                      >
+                        {fmtTime(message.created_at)}
+                      </Text>
+                    </View>
+                  </Fragment>
+                ) : (
+                  <Fragment>
+                    {replyTo && (
+                      <ReplyBubble
+                        reply={replyTo}
+                        isOwn={isOwn}
+                        colors={colors}
+                        onPress={onReplyPress ? () => onReplyPress(replyTo.id) : undefined}
+                      />
+                    )}
+
+                    {imageUrl && (
+                      <BubbleImage
+                        uri={imageUrl}
+                        isOwn={isOwn}
+                        standalone={imageOnly}
+                        dimmed={uploading || failed}
+                        createdAt={message.created_at}
+                        showStatus={!uploading && !failed}
+                        onPress={() => onImagePress?.(imageUrl)}
+                        onLongPress={handleLongPress}
+                      />
+                    )}
+
+                    {!!message.content && (
+                      <View style={imageUrl ? styles.contentOnMedia : null}>
+                        <RichContent
+                          content={message.content}
+                          mentions={message.mentions}
+                          isOwn={isOwn}
+                          colors={colors}
+                        />
+                      </View>
+                    )}
+
+                    {!imageOnly && (
+                      <View style={imageUrl ? styles.timeRowOnMedia : null}>
+                        <TimeRow message={message} isOwn={isOwn} colors={colors} />
+                      </View>
+                    )}
+
+                    {/* Uploading overlay — spinner ring + cancel (web parity) */}
+                    {isOwn && uploading && (
+                      <View style={styles.statusOverlay} pointerEvents="box-none">
+                        <View style={styles.spinnerRing} pointerEvents="none">
+                          <ActivityIndicator size="large" color="#FFFFFF" />
+                          <Pressable
+                            onPress={() => onCancel?.(message.id)}
+                            hitSlop={12}
+                            style={styles.cancelCircle}
+                            accessibilityLabel="Cancel upload"
+                          >
+                            <Ionicons name="close" size={14} color="#FFFFFF" />
+                          </Pressable>
+                        </View>
+                      </View>
+                    )}
+                  </Fragment>
+                )}
               </Pressable>
 
-              {/* Sending overlay */}
-              {isOwn && message.status === 'sending' && (
-                <View style={[styles.statusOverlay, { borderRadius: 16 }]} pointerEvents="box-none">
-                  <View style={[styles.spinnerRing, { backgroundColor: colors.foreground + '59' }]} pointerEvents="none">
-                    <ActivityIndicator size="large" color={colors.primaryForeground} />
-                  </View>
-                  <Pressable
-                    onPress={() => onCancel?.(message.id)}
-                    style={styles.cancelCircle}
-                    hitSlop={10}
-                  >
-                    <Ionicons name="close" size={18} color={colors.primaryForeground} />
-                  </Pressable>
-                </View>
-              )}
-
-              {/* Failed overlay */}
-              {isOwn && message.status === 'failed' && (
-                <Pressable
-                  style={[styles.statusOverlay, { borderRadius: 16 }]}
-                  onPress={() => onRetry?.(message.id)}
-                >
-                  <Ionicons name="reload-outline" size={28} color={colors.primaryForeground} />
-                  <Text style={[styles.retryLabel, { color: colors.primaryForeground }]}>Tap to retry</Text>
-                </Pressable>
-              )}
+              <ReactionPills
+                reactions={reactions}
+                currentUserId={currentUserId}
+                messageId={message.id}
+                onReactionPress={onReactionPress}
+                colors={colors}
+              />
             </View>
-            <ReactionChips
-              reactions={message.reactions}
-              currentUserId={currentUserId}
-              messageId={message.id}
-              onReactionPress={onReactionPress}
-              colors={colors}
-            />
-          </Fragment>
-        ) : (
-          /* ── Text-only bubble ── */
-          <Fragment>
-            <Pressable
-              onLongPress={() => onLongPress(message)}
-              onPress={isOwn && message.status === 'failed' ? () => onRetry?.(message.id) : undefined}
-              delayLongPress={350}
-              style={[
-                styles.bubble,
-                {
-                  backgroundColor: isOwn ? colors.primary : colors.card,
-                  borderColor: isOwn ? 'transparent' : colors.border,
-                  opacity: message.status === 'sending' ? 0.65 : 1,
-                },
-              ]}
-            >
-              {message.reply_to && !message.reply_to.id.startsWith('deleted') && (
-                <ReplyPreview replyTo={message.reply_to} colors={colors} />
-              )}
-              <Text
-                style={[
-                  styles.content,
-                  { color: isOwn ? colors.primaryForeground : colors.foreground },
-                ]}
-              >
-                {message.content}
-              </Text>
-              <View style={styles.timeRow}>
-                {(!message.status || message.status === 'sent') && (
-                  <Text style={[styles.timeText, { color: timeColor }]}>
-                    {formatTime(message.created_at)}
-                  </Text>
-                )}
-                {isOwn && (!message.status || message.status === 'sent') && (
-                  <Ionicons name="checkmark-done-sharp" size={15} color={timeColor} />
-                )}
-                {message.status === 'sending' && (
-                  <ActivityIndicator size="small" color={timeColor} />
-                )}
-                {isOwn && message.status === 'failed' && (
-                  <>
-                    <Ionicons name="warning-outline" size={14} color={colors.destructive} />
-                    <Text style={[styles.timeText, { color: colors.destructive }]}>
-                      Tap to retry
-                    </Text>
-                  </>
-                )}
-              </View>
-            </Pressable>
-            <ReactionChips
-              reactions={message.reactions}
-              currentUserId={currentUserId}
-              messageId={message.id}
-              onReactionPress={onReactionPress}
-              colors={colors}
-            />
-          </Fragment>
+          </View>
         )}
+
+        {/* Reserve room for the pills that hang below the bubble */}
+        {reactions.length > 0 && !isDeleted && <View style={styles.reactionSpacer} />}
       </View>
     </View>
   );
@@ -518,248 +659,154 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     gap: 8,
   },
-  rowFirst: {
-    marginTop: 12,
-  },
-  rowCompact: {
-    marginTop: 2,
-  },
+  rowFirst: { marginTop: 12 },
+  rowCompact: { marginTop: 2 },
 
-  avatarCol: {
-    width: 28,
-    flexShrink: 0,
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarImage: {
-    width: 28,
-    height: 28,
-  },
-  avatarText: {
-    fontSize: 11,
-    fontFamily: 'Geist_600SemiBold',
-  },
+  avatarCol: { width: 28, flexShrink: 0 },
+  avatar: { alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarText: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
 
-  contentCol: {
-    flex: 1,
-    minWidth: 0,
-    maxWidth: '85%',
-    gap: 2,
-  },
+  contentCol: { flexShrink: 1, minWidth: 0 },
 
-  // Fix #3: sender name only, no badge
-  senderName: {
-    fontSize: 12,
-    fontFamily: 'Geist_600SemiBold',
-    marginBottom: 2,
-    marginLeft: 2,
-  },
+  bubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bubbleRowOwn: { flexDirection: 'row-reverse' },
+  bubbleRowOther: { flexDirection: 'row' },
 
-  deletedBubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-  },
-  deletedIcon: {
-    fontSize: 13,
-  },
-  deletedText: {
-    fontSize: 12,
-    fontFamily: 'Geist_400Regular',
-    fontStyle: 'italic',
-  },
-  deletedTime: {
-    fontSize: 10,
-    fontFamily: 'Geist_400Regular',
-    marginLeft: 4,
-  },
-
-  emojiContainer: {
-    alignSelf: 'flex-start',
-    gap: 4,
-  },
-  bigEmoji: {
-    fontSize: 40,
-    lineHeight: 48,
-  },
+  bubbleWrap: { position: 'relative', minWidth: 0 },
 
   bubble: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 6,
-    alignSelf: 'flex-start',
-    maxWidth: '100%',
+    borderRadius: 10,
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
+  bubbleFirstOwn: { borderTopRightRadius: 0 },
+  bubbleFirstOther: { borderTopLeftRadius: 0 },
+  bubbleText: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 6 },
+  // Media bubbles keep a thin frame around the image (WhatsApp-style).
+  bubbleMedia: { padding: 4 },
 
-  replyPreview: {
-    borderLeftWidth: 2,
-    paddingLeft: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 6,
-    gap: 2,
-  },
-  replyName: {
-    fontSize: 11,
-    fontFamily: 'Geist_600SemiBold',
-  },
-  replyContent: {
+  senderName: {
     fontSize: 12,
+    lineHeight: 16,
+    fontFamily: 'Geist_600SemiBold',
+    marginBottom: 2,
+  },
+  nameOnMedia: { marginBottom: 4, paddingLeft: 4 },
+
+  content: {
+    fontSize: 15,
+    lineHeight: 22,
     fontFamily: 'Geist_400Regular',
   },
+  mentionText: { fontFamily: 'Geist_600SemiBold' },
+  readMore: { fontSize: 15, fontFamily: 'Geist_500Medium' },
+  contentOnMedia: { paddingLeft: 4, paddingRight: 4 },
 
-  // Image-only: standalone pressable card — 2px border, no outer bubble
-  imageCard: {
-    borderRadius: 14,
-    borderWidth: 2,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
+  // ── reply quote ─────────────────────────────────────────────────────────
+  replyBubble: {
+    borderLeftWidth: 2,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 4,
+    maxWidth: '100%',
   },
-  messageImage: {
-    width: 220,
-    height: 160,
-  },
+  replyName: { fontSize: 10, fontFamily: 'Geist_600SemiBold', lineHeight: 14 },
+  replyContent: { fontSize: 11, lineHeight: 15 },
 
-  // Image+caption bubble modifier — zero padding so image sits flush at top
-  bubbleImageCaption: {
-    padding: 0,
-    overflow: 'hidden',
-  },
-  // Image inside an image+caption bubble — full width, no border (bubble provides the shape)
-  captionImage: {
-    width: 220,
-    height: 160,
-  },
-  imageTimeOverlay: {
+  // ── media ───────────────────────────────────────────────────────────────
+  mediaStandalone: { borderRadius: 8, overflow: 'hidden', position: 'relative' },
+  mediaInBubble: { borderRadius: 8, overflow: 'hidden', position: 'relative' },
+  mediaTimeOverlay: {
     position: 'absolute',
-    bottom: 6,
-    right: 7,
+    bottom: 8,
+    right: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    borderRadius: 8,
+    gap: 4,
+    borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  imageTimeText: {
-    fontSize: 10,
-    fontFamily: 'Geist_400Regular',
-  },
+  mediaTimeText: { fontSize: 10, fontFamily: 'Geist_400Regular', color: 'rgba(255,255,255,0.9)' },
 
-  // Padding wrapper for caption text that follows an image
-  // (bubble padding is zeroed for images, so we re-add it here)
-  captionPadding: {
-    paddingHorizontal: 12,
-    paddingTop: 6,
-  },
-  // Time row shown below caption on image+text messages
-  captionTimeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 3,
-    paddingHorizontal: 12,
-    paddingBottom: 6,
-    marginTop: 2,
-  },
-
-  content: {
-    fontSize: 16,
-    fontFamily: 'Geist_400Regular',
-    lineHeight: 24,
-  },
-
-  // Fix #1/#2: time always on its own line, right-aligned — matches web layout
+  // ── time row ────────────────────────────────────────────────────────────
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 3,
-    marginTop: 3,
-    marginLeft: 8, // small left offset to match web spacing
+    gap: 4,
+    marginTop: 1,
   },
-  timeText: {
-    fontSize: 10,
-    fontFamily: 'Geist_400Regular',
-  },
+  timeRowOnMedia: { paddingRight: 4, paddingBottom: 2 },
+  timeText: { fontSize: 10, fontFamily: 'Geist_400Regular' },
+  tinySpinner: { transform: [{ scale: 0.6 }], marginLeft: -2 },
 
-  // ── send-status overlays ──────────────────────────────────────────────────
-
-  /** Fills the image card; hosts the spinner+cancel or retry UI. */
+  // ── own-message overlays ────────────────────────────────────────────────
   statusOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
   },
-
-  /** Transparent ring that sits behind the ActivityIndicator. */
   spinnerRing: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
-
-  /** The × button centred inside the spinner ring. */
   cancelCircle: {
     position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // ── retry ───────────────────────────────────────────────────────────────
+  retryCol: { alignItems: 'center', gap: 4, flexShrink: 0, alignSelf: 'center' },
+  retryBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  retryText: { fontSize: 9, fontFamily: 'Geist_500Medium', lineHeight: 11 },
 
-  retryLabel: {
-    fontSize: 11,
-    fontFamily: 'Geist_500Medium',
-  },
+  // ── deleted ─────────────────────────────────────────────────────────────
+  deletedRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  deletedText: { fontSize: 12, lineHeight: 22, fontFamily: 'Geist_400Regular', fontStyle: 'italic' },
 
-  reactions: {
+  // ── big emoji ───────────────────────────────────────────────────────────
+  emojiWrap: { alignItems: 'flex-start', paddingHorizontal: 2, paddingBottom: 2 },
+  bigEmoji: { fontSize: EMOJI_MESSAGE_SIZE, lineHeight: EMOJI_MESSAGE_SIZE + 8 },
+
+  // ── reactions ───────────────────────────────────────────────────────────
+  reactionPills: {
+    position: 'absolute',
+    bottom: -14,
+    left: 12,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
-    marginTop: 4,
-    marginLeft: 2,
   },
-  reactionChip: {
+  reactionPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 12,
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
     borderWidth: 1,
-    gap: 3,
   },
-  reactionEmoji: {
-    fontSize: 14,
-  },
-  reactionCount: {
-    fontSize: 12,
-    fontFamily: 'Geist_500Medium',
-  },
+  reactionPillEmoji: { fontSize: 14 },
+  reactionPillCount: { fontSize: 10, fontFamily: 'Geist_500Medium', opacity: 0.7 },
+  reactionSpacer: { height: 20 },
 });

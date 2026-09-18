@@ -34,6 +34,15 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase server credentials — NEVER commit these. The FCM v1 service-account
+# key belongs in Expo credentials (Android → Push Notifications), not in git.
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*service-account*.json
+
+# Note: google-services.json is deliberately NOT ignored — it is client config
+# (not a secret) and cloud builds need it in the repository.
+
 # typescript
 *.tsbuildinfo
 .vercel

@@ -49,6 +49,9 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     const config = ROOM_TOPICS[kind];
     const room = config.getRoom(communityId);
     realtimeClient.connect(room);
+    // Refcounted room subscription: releasing it must not tear the socket down
+    // while another screen still listens to the same room.
+    const unsubRoom = realtimeClient.subscribe(room);
 
     const unsubscribes = config.topics.map((topic) =>
       realtimeClient.on(room, topic, invalidate)
@@ -56,7 +59,7 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
     };
   }, [communityId, enabled, invalidate, kind]);
 

@@ -9,6 +9,7 @@ import { moderationFailureResponse } from "@/lib/moderation/http";
 import { logModerationDecision } from "@/lib/moderation/log";
 import { contentHash } from "@/lib/moderation/normalize";
 import { publishChatEvent } from "@/lib/realtime/server";
+import { sendChatMessagePush } from "@/lib/push/chat";
 import { createServerTimer } from "@/lib/server-timing";
 import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
 
@@ -313,6 +314,24 @@ export async function POST(
           image_url: inserted.image_url ?? null,
           mentions: inserted.mentions ?? [],
         },
+      });
+
+      // Wake every other member's device. Realtime only reaches an app that is
+      // running — once the OS suspends it the socket dies — so background
+      // delivery has to go through Expo's push service.
+      //
+      // The local text rules already ran synchronously before the insert, so a
+      // push can only reach a message that passed moderation; the slower AI
+      // pass is the one that runs later, and it is rare enough that a stale
+      // notification beats delaying every message behind an AI call.
+      await sendChatMessagePush({
+        communityId,
+        messageId: inserted.id,
+        senderId: inserted.user_id,
+        senderName,
+        content: inserted.content ?? null,
+        hasImage: !!inserted.image_url,
+        isReply: !!inserted.reply_to_id,
       });
     } catch (err) {
       console.error("[POST message] realtime publish error:", err);

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "583849344870",
+    "project_id": "uxcommunity",
+    "storage_bucket": "uxcommunity.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583849344870:android:48ee3de198a0c9ae7cd2a7",
+        "android_client_info": {
+          "package_name": "in.uxcommunity.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxCECNnA_WRSFLksq8TfR_96gvHvyz56Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

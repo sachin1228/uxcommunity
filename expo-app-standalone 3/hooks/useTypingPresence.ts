@@ -1,29 +1,71 @@
 /**
- * Sends and receives typing presence for a single chat room.
+ * Sends and receives typing presence for a single chat room — a React Native
+ * port of the web `useTypingPresence` so the indicator behaves identically:
+ *
+ *   • the local user broadcasts "typing" at most once per TYPING_THROTTLE_MS
+ *   • typing stops after TYPING_IDLE_MS without a keystroke
+ *   • a remote typist expires TYPING_EXPIRY_MS after their last heartbeat
+ *
  * Uses Cloudflare Realtime (chat room) instead of Supabase Broadcast.
  * Event: typing  Payload: { user_id, name, typing: boolean, ts }
+ *
+ * The sender's device timestamp is intentionally ignored — a skewed clock made
+ * the indicator stick forever or never appear. Arrival time is the only clock
+ * all parties agree on.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { realtimeClient, realtimeRooms } from '@/lib/realtime';
 import { useAuth } from '@/context/AuthContext';
 
-interface TypingEntry {
-  user_id: string;
+const TYPING_IDLE_MS = 1600;
+const TYPING_EXPIRY_MS = 3500;
+const TYPING_THROTTLE_MS = 1000;
+
+export interface TypingUser {
+  id: string;
   name: string;
-  ts: number;
 }
 
-const TYPING_EXPIRY_MS = 3500;
-const TYPING_DEBOUNCE_MS = 1000;
+/** "Ada is typing…" / "Ada and Max are typing…" / "Ada and 3 others are typing…" */
+export function typingLabelFor(users: TypingUser[]): string | null {
+  if (users.length === 0) return null;
+  if (users.length === 1) return `${users[0].name} is typing…`;
+  if (users.length === 2) return `${users[0].name} and ${users[1].name} are typing…`;
+  return `${users[0].name} and ${users.length - 1} others are typing…`;
+}
 
 export function useTypingPresence(communityId: string) {
   const { user } = useAuth();
-  const [typists, setTypists] = useState<TypingEntry[]>([]);
-  const unsubRef = useRef<(() => void) | null>(null);
-  const stopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
+
+  const typingMapRef = useRef<Map<string, { name: string; lastSeen: number }>>(new Map());
+  /** Last value handed to setTypingUsers, so unchanged flushes skip the setState. */
+  const lastFlushedRef = useRef<TypingUser[]>([]);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSentAtRef = useRef(0);
   const isTypingRef = useRef(false);
-  const expireTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const identityRef = useRef({ user_id: user?.id ?? '', name: user?.name ?? 'Someone' });
+  identityRef.current = { user_id: user?.id ?? '', name: user?.name ?? 'Someone' };
+
+  const flushTypingUsers = useCallback(() => {
+    const now = Date.now();
+    for (const [id, entry] of typingMapRef.current.entries()) {
+      if (now - entry.lastSeen > TYPING_EXPIRY_MS) typingMapRef.current.delete(id);
+    }
+    const users = [...typingMapRef.current.entries()]
+      .map(([id, { name }]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const prev = lastFlushedRef.current;
+    const unchanged =
+      users.length === prev.length &&
+      users.every((u, i) => prev[i] && prev[i].id === u.id && prev[i].name === u.name);
+    if (unchanged) return;
+
+    lastFlushedRef.current = users;
+    setTypingUsers(users);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -32,94 +74,82 @@ export function useTypingPresence(communityId: string) {
 
     realtimeClient.init({ id: user.id, name: user.name ?? null, avatar: null });
     realtimeClient.connect(room);
+    // Refcounted room subscription — see useChatMessages.
+    const unsubRoom = realtimeClient.subscribe(room);
+    lastSentAtRef.current = 0;
 
     const unsub = realtimeClient.on(room, 'typing', (data) => {
       const payload = (data ?? {}) as Record<string, unknown>;
       const senderId = typeof payload?.user_id === 'string' ? payload.user_id : '';
       const name = typeof payload?.name === 'string' ? payload.name : 'Someone';
       const isTyping = payload?.typing === true;
-      const ts = typeof payload?.ts === 'number' ? payload.ts : Date.now();
 
       if (!senderId || senderId === user.id) return;
 
-      setTypists((prev) => {
-        if (isTyping) {
-          return [...prev.filter((e) => e.user_id !== senderId), { user_id: senderId, name, ts }];
-        }
-        return prev.filter((e) => e.user_id !== senderId);
-      });
-
-      clearTimeout(expireTimers.current[senderId]);
       if (isTyping) {
-        expireTimers.current[senderId] = setTimeout(() => {
-          setTypists((prev) => prev.filter((e) => e.user_id !== senderId));
-        }, TYPING_EXPIRY_MS);
+        typingMapRef.current.set(senderId, { name, lastSeen: Date.now() });
+      } else {
+        typingMapRef.current.delete(senderId);
       }
+      flushTypingUsers();
     });
 
-    unsubRef.current = unsub;
+    const expiryTimer = setInterval(flushTypingUsers, 1000);
 
     return () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      isTypingRef.current = false;
+      lastSentAtRef.current = 0;
+      clearInterval(expiryTimer);
+      typingMapRef.current.clear();
+      lastFlushedRef.current = [];
       unsub();
-      unsubRef.current = null;
-      Object.values(expireTimers.current).forEach(clearTimeout);
-      realtimeClient.unsubscribe(room);
+      unsubRoom();
+      setTypingUsers([]);
     };
-  }, [communityId, user?.id, user?.name]);
+  }, [communityId, user?.id, user?.name, flushTypingUsers]);
 
-  const sendTyping = useCallback(
-    (isTyping: boolean) => {
-      if (!user) return;
+  const broadcast = useCallback(
+    (typing: boolean) => {
       const room = realtimeRooms.chat(communityId);
+      const now = Date.now();
+      if (typing && now - lastSentAtRef.current < TYPING_THROTTLE_MS) return;
+      lastSentAtRef.current = typing ? now : 0;
       realtimeClient.publish(room, 'typing', {
-        user_id: user.id,
-        name: user.name,
-        typing: isTyping,
-        ts: Date.now(),
+        ...identityRef.current,
+        typing,
+        ts: now,
       });
     },
-    [user, communityId]
+    [communityId],
   );
 
-  /** Call on every keystroke. Debounces stop-typing automatically. */
-  const onInputChange = useCallback(
-    (text: string) => {
-      const hasText = text.length > 0;
-
-      if (hasText && !isTypingRef.current) {
-        isTypingRef.current = true;
-        sendTyping(true);
-      }
-
-      // Reset the stop timer on every keystroke
-      if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
-      stopTimerRef.current = setTimeout(() => {
-        isTypingRef.current = false;
-        sendTyping(false);
-      }, TYPING_DEBOUNCE_MS);
-
-      if (!hasText) {
-        isTypingRef.current = false;
-        sendTyping(false);
+  const setTyping = useCallback(
+    (typing: boolean) => {
+      isTypingRef.current = typing;
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      broadcast(typing);
+      if (typing) {
+        idleTimerRef.current = setTimeout(() => {
+          isTypingRef.current = false;
+          broadcast(false);
+        }, TYPING_IDLE_MS);
       }
     },
-    [sendTyping]
+    [broadcast],
+  );
+
+  /** Call on every keystroke. Stops typing automatically when the box empties. */
+  const onInputChange = useCallback(
+    (text: string) => {
+      setTyping(text.length > 0);
+    },
+    [setTyping],
   );
 
   const stopTyping = useCallback(() => {
-    if (isTypingRef.current) {
-      isTypingRef.current = false;
-      sendTyping(false);
-    }
-  }, [sendTyping]);
+    if (isTypingRef.current) setTyping(false);
+  }, [setTyping]);
 
-  const typingLabel = (() => {
-    const active = typists.filter((e) => Date.now() - e.ts < TYPING_EXPIRY_MS);
-    if (active.length === 0) return null;
-    if (active.length === 1) return `${active[0].name} is typing…`;
-    if (active.length === 2) return `${active[0].name} & ${active[1].name} are typing…`;
-    return 'Several people are typing…';
-  })();
-
-  return { typingLabel, onInputChange, stopTyping };
+  return { typingUsers, typingLabel: typingLabelFor(typingUsers), onInputChange, stopTyping };
 }

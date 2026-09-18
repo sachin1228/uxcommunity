@@ -6,6 +6,7 @@ import React, {
   useState,
 } from 'react';
 import { getMe, login as apiLogin, logout as apiLogout, User } from '@/lib/auth';
+import { unregisterStoredPushTokenAsync } from '@/lib/push';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Detach this device before the session cookie is cleared, otherwise the
+    // next person to sign in here keeps receiving the previous account's pushes.
+    await unregisterStoredPushTokenAsync();
     await apiLogout();
     setUser(null);
   }, []);
