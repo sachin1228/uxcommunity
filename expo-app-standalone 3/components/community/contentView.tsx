@@ -21,8 +21,11 @@ import {
   CommunityThread,
   ContentAction,
   ContentKind,
+  collapsedBodyLines,
   contentAuthor,
   contentLabel,
+  contentSecondaryLabel,
+  formatRelativeDate,
   getLinkPreviewImage,
   setContentAction,
 } from '@/lib/communityContent';
@@ -56,33 +59,41 @@ export interface ActionDefinition {
 }
 
 /**
- * Interactions each kind exposes, in card order — the same set the web cards
- * render. This table is the only place the four API shapes are reconciled.
+ * Every interaction a card can render, keyed by action. This table is the only
+ * place the four API shapes are reconciled.
  */
-export const ACTIONS_BY_KIND: Record<ContentKind, ActionDefinition[]> = {
-  threads: [
-    { action: 'like', icon: 'heart', label: 'Like', field: 'user_liked', countField: 'like_count', activeColor: 'like' },
-    { action: 'save', icon: 'bookmark', label: 'Save', field: 'user_saved', activeColor: 'accent' },
-  ],
-  showcase: [
-    { action: 'like', icon: 'heart', label: 'Like', field: 'user_liked', countField: 'like_count', activeColor: 'like' },
-    { action: 'save', icon: 'bookmark', label: 'Save', field: 'user_saved', activeColor: 'accent' },
-  ],
-  events: [
-    { action: 'like', icon: 'heart', label: 'Like', field: 'user_liked', countField: 'like_count', activeColor: 'like' },
-    { action: 'rsvp', icon: 'check-circle', label: 'Going', field: 'user_rsvped', countField: 'rsvp_count', countSuffix: 'going', activeColor: 'accent' },
-    { action: 'save', icon: 'bookmark', label: 'Save', field: 'user_saved', countField: 'save_count', activeColor: 'accent' },
-  ],
-  resources: [
-    // The heart maps to `save` on the API, exactly as on the web — and picks up
-    // the `--like` tint, matching the web resource card.
-    { action: 'save', icon: 'heart', label: 'Like', field: 'user_saved', countField: 'save_count', activeColor: 'like' },
-    { action: 'bookmark', icon: 'bookmark', label: 'Bookmark', field: 'user_bookmarked', countField: 'bookmark_count', activeColor: 'accent' },
-  ],
+const LIKE: ActionDefinition = { action: 'like', icon: 'heart', label: 'Like', field: 'user_liked', countField: 'like_count', activeColor: 'like' };
+const SAVE: ActionDefinition = { action: 'save', icon: 'bookmark', label: 'Save', field: 'user_saved', activeColor: 'accent' };
+const RSVP: ActionDefinition = { action: 'rsvp', icon: 'check-circle', label: 'Going', field: 'user_rsvped', countField: 'rsvp_count', countSuffix: 'going', activeColor: 'accent' };
+/** The resource heart is the API's `save`, exactly as on the web. */
+const RESOURCE_LIKE: ActionDefinition = { action: 'save', icon: 'heart', label: 'Like', field: 'user_saved', countField: 'save_count', activeColor: 'like' };
+/** The resource menu's "Save"/"Unsave" rows are the API's bookmark. */
+const BOOKMARK: ActionDefinition = { action: 'bookmark', icon: 'bookmark', label: 'Save', field: 'user_bookmarked', activeColor: 'accent' };
+
+/**
+ * What the card footer shows, per kind — the web cards keep the footer to the
+ * heart and the comment count and move everything else into the ··· menu.
+ * (Events additionally keep their RSVP there: the web shows it as its own wide
+ * call-to-action, which the mobile footer stands in for.)
+ */
+export const FOOTER_ACTIONS_BY_KIND: Record<ContentKind, ActionDefinition[]> = {
+  threads: [LIKE],
+  showcase: [LIKE],
+  events: [LIKE, RSVP],
+  resources: [RESOURCE_LIKE],
+};
+
+/** The save-shaped row the ··· menu offers, per kind (null when there is none). */
+const MENU_ACTION_BY_KIND: Record<ContentKind, ActionDefinition | null> = {
+  threads: SAVE,
+  showcase: SAVE,
+  events: SAVE,
+  resources: BOOKMARK,
 };
 
 export function actionDefinition(kind: ContentKind, action: ContentAction): ActionDefinition | undefined {
-  return ACTIONS_BY_KIND[kind].find((entry) => entry.action === action);
+  const all = [...FOOTER_ACTIONS_BY_KIND[kind], MENU_ACTION_BY_KIND[kind]].filter(Boolean) as ActionDefinition[];
+  return all.find((entry) => entry.action === action);
 }
 
 function fieldOf(item: CommunityContent, field: string): unknown {
@@ -292,12 +303,23 @@ export function ContentCard({
   const resource = kind === 'resources' ? item as CommunityResource : null;
   const showcase = kind === 'showcase' ? item as CommunityShowcase : null;
   const author = contentAuthor(item);
-  const date = event ? new Date(event.event_date) : new Date(item.created_at);
   const images = (thread?.attachments ?? showcase?.attachments ?? [])
     .filter((attachment) => attachment.type.startsWith('image/'));
   const previewImage = useResourcePreview(resource?.url);
   const coverImage = event?.cover_image_url ?? showcase?.image_url ?? (resource ? previewImage : null);
   const isOwner = item.user_id === currentUserId;
+
+  // The body text each kind puts on its card, mirroring the web cards: a thread
+  // shows its title (which carries the whole post) collapsed behind "Read more",
+  // an event shows a 2-line title plus a collapsible description, a resource
+  // clamps its description to 3 lines, and a showcase title is never clamped.
+  const primaryBody = resource ? resource.description || resource.title : item.title;
+  const secondaryBody = kind === 'events' ? item.description : null;
+  const primaryLines =
+    kind === 'threads' ? collapsedBodyLines(kind, item)
+      : kind === 'events' ? 2
+        : kind === 'resources' ? 3
+          : undefined;
 
   return (
     <Pressable
@@ -323,6 +345,8 @@ export function ContentCard({
           </View>
         ) : null}
 
+        {/* Author meta — name and relative date on one line, the category as
+            the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
           {resolveProfilePictureUri(author?.avatar_url) ? (
             <Image source={{ uri: resolveProfilePictureUri(author?.avatar_url)! }} style={styles.avatar} />
@@ -334,36 +358,38 @@ export function ContentCard({
             </View>
           )}
           <View style={styles.authorCopy}>
-            <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
-              {author?.name ?? 'Community member'}
-            </Text>
-            <Text style={[styles.meta, { color: colors.foregroundMuted }]}>
-              {event
-                ? date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                : date.toLocaleDateString([], { month: 'short', day: 'numeric' })}
+            <View style={styles.authorLine}>
+              <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
+                {author?.name ?? 'Community member'}
+              </Text>
+              <Text style={[styles.meta, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+                {formatRelativeDate(item.created_at)}
+              </Text>
+            </View>
+            <Text style={[styles.secondaryLabel, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+              {contentSecondaryLabel(kind, item)}
             </Text>
           </View>
-          {isOwner && onEdit && onDelete ? (
-            <OptionsMenu onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
-          ) : null}
+          <ContentOptionsMenu
+            item={item}
+            kind={kind}
+            actions={actions}
+            isOwner={isOwner}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         </View>
 
-        <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
-        {!thread ? (
-          <Text style={[styles.description, { color: colors.foregroundMuted }]} numberOfLines={3}>
-            {item.description}
-          </Text>
+        <CollapsibleBody
+          text={primaryBody}
+          textStyle={styles.cardTitle}
+          collapsedLines={primaryLines}
+          expandable={kind === 'threads'}
+        />
+        {secondaryBody ? (
+          <CollapsibleBody text={secondaryBody} textStyle={styles.description} collapsedLines={2} />
         ) : null}
         {images.length ? <MediaGrid images={images} /> : null}
-
-        <View style={styles.tags}>
-          {thread ? <Tag text={thread.category} /> : null}
-          {showcase ? <Tag text={showcase.category.replace(/_/g, ' ')} /> : null}
-          {resource ? <Tag text={resource.resource_type.replace('_', ' ')} /> : null}
-          {(thread?.tags ?? resource?.tags ?? []).slice(0, 3).map((tag) => (
-            <Tag key={tag} text={`#${tag}`} />
-          ))}
-        </View>
 
         {event ? (
           <View style={styles.eventMeta}>
@@ -402,7 +428,7 @@ export function ContentActionRow({
   const colors = useColors();
   return (
     <View style={[styles.actions, { borderTopColor: colors.borderSubtle }]}>
-      {ACTIONS_BY_KIND[kind].map((definition) => {
+      {FOOTER_ACTIONS_BY_KIND[kind].map((definition) => {
         const active = actions.isActive(item, kind, definition.action);
         const count = actions.countFor(item, kind, definition.action);
         // Count-less actions toggle their verb instead of showing a number,
@@ -490,9 +516,14 @@ export function ContentDetail({
           <Text style={[styles.detailHeaderTitle, { color: colors.foreground }]} numberOfLines={1}>
             {communityName ?? contentLabel(kind)}
           </Text>
-          {isOwner && onEdit && onDelete ? (
-            <OptionsMenu onEdit={() => onEdit(item)} onDelete={() => onDelete(item)} />
-          ) : null}
+          <ContentOptionsMenu
+            item={item}
+            kind={kind}
+            actions={actions}
+            isOwner={isOwner}
+            onEdit={onEdit}
+            onDelete={onDelete}
+          />
         </View>
 
         <ScrollView contentContainerStyle={[styles.detailContent, { paddingBottom: insets.bottom + 32 }]}>
@@ -509,11 +540,16 @@ export function ContentDetail({
               </View>
             )}
             <View style={styles.authorCopy}>
-              <Text style={[styles.author, { color: colors.foreground }]}>
-                {author?.name ?? 'Community member'}
-              </Text>
-              <Text style={[styles.meta, { color: colors.foregroundMuted }]}>
-                {new Date(event?.event_date ?? item.created_at).toLocaleString()}
+              <View style={styles.authorLine}>
+                <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
+                  {author?.name ?? 'Community member'}
+                </Text>
+                <Text style={[styles.meta, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+                  {formatRelativeDate(item.created_at)}
+                </Text>
+              </View>
+              <Text style={[styles.secondaryLabel, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+                {contentSecondaryLabel(kind, item)}
               </Text>
             </View>
           </View>
@@ -534,13 +570,6 @@ export function ContentDetail({
               <Text style={[styles.linkText, { color: colors.accent }]} numberOfLines={1}>{file.name}</Text>
             </Pressable>
           ))}
-
-          <View style={styles.tags}>
-            {thread ? <Tag text={thread.category} /> : null}
-            {showcase ? <Tag text={showcase.category.replace(/_/g, ' ')} /> : null}
-            {resource ? <Tag text={resource.resource_type.replace('_', ' ')} /> : null}
-            {(thread?.tags ?? resource?.tags ?? []).map((tag) => <Tag key={tag} text={`#${tag}`} />)}
-          </View>
 
           {event ? (
             <View style={[styles.detailPanel, { backgroundColor: colors.surfaceRaised }]}>
@@ -588,9 +617,31 @@ export function ContentDetail({
 // Pieces
 // ---------------------------------------------------------------------------
 
-export function OptionsMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+/**
+ * The ··· menu.
+ *
+ * Mirrors the web dropdown: Save/Unsave first (available to everyone — this is
+ * where saving lives, it is deliberately not in the footer), then Edit and
+ * Delete for the author.
+ */
+export function ContentOptionsMenu({
+  item,
+  kind,
+  actions,
+  isOwner,
+  onEdit,
+  onDelete,
+}: {
+  item: CommunityContent;
+  kind: ContentKind;
+  actions: ContentActionsApi;
+  isOwner: boolean;
+  onEdit?: (item: CommunityContent) => void;
+  onDelete?: (item: CommunityContent) => void;
+}) {
   const colors = useColors();
   const [visible, setVisible] = useState(false);
+  const saveAction = MENU_ACTION_BY_KIND[kind];
 
   return (
     <>
@@ -601,33 +652,110 @@ export function OptionsMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete
         accessibilityRole="button"
         accessibilityLabel="Post options"
       >
-        <Feather name="more-vertical" size={21} color={colors.foregroundMuted} />
+        <Feather name="more-vertical" size={21} color={colors.foregroundSubtle} />
       </Pressable>
 
       <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setVisible(false)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setVisible(false)} accessibilityLabel="Close post options">
           <View style={[styles.optionsSheet, { backgroundColor: colors.overlayElevated, shadowColor: '#000' }]}>
-            <Pressable
-              onPress={() => { setVisible(false); onEdit(); }}
-              style={styles.optionRow}
-              accessibilityRole="button"
-            >
-              <Feather name="edit-2" size={16} color={colors.foreground} />
-              <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
-            </Pressable>
-            <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
-            <Pressable
-              onPress={() => { setVisible(false); onDelete(); }}
-              style={styles.optionRow}
-              accessibilityRole="button"
-            >
-              <Feather name="trash-2" size={16} color={colors.destructive} />
-              <Text style={[styles.optionText, { color: colors.destructive }]}>Delete</Text>
-            </Pressable>
+            {saveAction ? (
+              <Pressable
+                onPress={() => { setVisible(false); actions.action(item, kind, saveAction.action); }}
+                style={styles.optionRow}
+                accessibilityRole="button"
+                accessibilityState={{ selected: actions.isActive(item, kind, saveAction.action) }}
+              >
+                <Feather
+                  name={saveAction.icon}
+                  size={16}
+                  color={actions.isActive(item, kind, saveAction.action) ? colors.accent : colors.foregroundMuted}
+                />
+                <Text
+                  style={[
+                    styles.optionText,
+                    { color: actions.isActive(item, kind, saveAction.action) ? colors.accent : colors.foreground },
+                  ]}
+                >
+                  {actions.isActive(item, kind, saveAction.action) ? 'Unsave' : 'Save'}
+                </Text>
+              </Pressable>
+            ) : null}
+
+            {isOwner && onEdit && onDelete ? (
+              <>
+                <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
+                <Pressable
+                  onPress={() => { setVisible(false); onEdit(item); }}
+                  style={styles.optionRow}
+                  accessibilityRole="button"
+                >
+                  <Feather name="edit-2" size={16} color={colors.foreground} />
+                  <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => { setVisible(false); onDelete(item); }}
+                  style={styles.optionRow}
+                  accessibilityRole="button"
+                >
+                  <Feather name="trash-2" size={16} color={colors.destructive} />
+                  <Text style={[styles.optionText, { color: colors.destructive }]}>Delete</Text>
+                </Pressable>
+              </>
+            ) : null}
           </View>
         </Pressable>
       </Modal>
     </>
+  );
+}
+
+/**
+ * Card body text, collapsed to `collapsedLines` behind a "Read more" — the
+ * mobile equivalent of the web `TruncateMarkup` + inline Read more button.
+ */
+export function CollapsibleBody({
+  text,
+  textStyle,
+  collapsedLines,
+  expandable = true,
+}: {
+  text: string | null | undefined;
+  textStyle: React.ComponentProps<typeof Text>['style'];
+  /** Omit to render the text in full — no clamp and no "Read more". */
+  collapsedLines?: number;
+  /** False renders a plain clamp with no affordance (web resource cards). */
+  expandable?: boolean;
+}) {
+  const colors = useColors();
+  const [expanded, setExpanded] = useState(false);
+  const [truncated, setTruncated] = useState(false);
+
+  if (!text) return null;
+
+  return (
+    <View>
+      <Text
+        style={[textStyle, { color: colors.foreground }]}
+        numberOfLines={expanded || !collapsedLines ? undefined : collapsedLines}
+        onTextLayout={(event) => {
+          if (expanded || !collapsedLines) return;
+          const lines = event.nativeEvent.lines.length;
+          setTruncated(lines >= collapsedLines);
+        }}
+      >
+        {text}
+      </Text>
+      {truncated && !expanded && expandable ? (
+        <Pressable
+          onPress={(event) => { event.stopPropagation(); setExpanded(true); }}
+          accessibilityRole="button"
+          accessibilityLabel="Read more"
+          hitSlop={6}
+        >
+          <Text style={[styles.readMore, { color: colors.foregroundSubtle }]}>Read more</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -693,15 +821,6 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
   );
 }
 
-function Tag({ text }: { text: string }) {
-  const colors = useColors();
-  return (
-    <View style={[styles.tag, { backgroundColor: colors.surfaceRaised }]}>
-      <Text style={[styles.tagText, { color: colors.foregroundMuted }]}>{text}</Text>
-    </View>
-  );
-}
-
 function threadDescription(title: string, description: string | null) {
   const body = description?.trim();
   if (!body || body === title.trim()) return null;
@@ -730,8 +849,11 @@ const styles = StyleSheet.create({
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: 'Geist_600SemiBold', fontSize: 13 },
   authorCopy: { flex: 1 },
-  author: { fontFamily: 'Geist_600SemiBold', fontSize: 14 },
-  meta: { fontFamily: 'Geist_400Regular', fontSize: 12, marginTop: 1 },
+  authorLine: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  author: { flexShrink: 1, fontFamily: 'Geist_600SemiBold', fontSize: 14 },
+  meta: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
+  secondaryLabel: { fontSize: 11, fontFamily: 'Geist_600SemiBold', marginTop: 1 },
+  readMore: { marginTop: 2, fontSize: 13, fontFamily: 'Geist_500Medium' },
 
   menuButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   menuBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
@@ -751,9 +873,6 @@ const styles = StyleSheet.create({
 
   cardTitle: { fontFamily: 'Geist_600SemiBold', fontSize: 15, lineHeight: 21 },
   description: { fontFamily: 'Geist_400Regular', fontSize: 13, lineHeight: 19 },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  tagText: { fontFamily: 'Geist_500Medium', fontSize: 11, textTransform: 'capitalize' },
   eventMeta: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eventMetaText: { flex: 1, fontFamily: 'Geist_400Regular', fontSize: 13 },
   linkButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },

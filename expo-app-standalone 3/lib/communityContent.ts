@@ -155,6 +155,88 @@ export function contentAuthor(item: CommunityContent): Author | null {
   return (item as CommunityShowcase).author ?? item.users ?? null;
 }
 
+/**
+ * Thread categories with their display labels — the web `THREAD_CATEGORIES`
+ * plus the two categories the mobile composer also offers.
+ */
+export const THREAD_CATEGORY_LABELS: Record<string, string> = {
+  question: 'Question',
+  discussion: 'Discussion',
+  idea: 'Idea',
+  feedback: 'Feedback',
+  referral: 'Referral',
+  collaboration: 'Collaboration',
+};
+
+/** Resource types with their display labels (web `RESOURCE_TYPES`). */
+export const RESOURCE_TYPE_LABELS: Record<string, string> = {
+  figma: 'Figma',
+  article: 'Article',
+  tool: 'Tool',
+  video: 'Video',
+  book: 'Book',
+  font: 'Font',
+  icon_pack: 'Icon Pack',
+  color: 'Color',
+  template: 'Template',
+  inspiration: 'Inspiration',
+  other: 'Other',
+};
+
+function showcaseCategoryLabel(value: string): string {
+  return SHOWCASE_CATEGORY_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+/**
+ * The muted second line under the author in every card — "Threads · Discussion",
+ * "Resources · Figma", "Event · Online", "Showcase · UI Design". Same strings as
+ * the web cards, which is where the category lives on the web (there is no
+ * category pill).
+ */
+export function contentSecondaryLabel(kind: ContentKind, item: CommunityContent): string {
+  if (kind === 'threads') {
+    const thread = item as CommunityThread;
+    return `Threads · ${THREAD_CATEGORY_LABELS[thread.category] ?? 'Post'}`;
+  }
+  if (kind === 'resources') {
+    const resource = item as CommunityResource;
+    return `Resources · ${RESOURCE_TYPE_LABELS[resource.resource_type] ?? 'Post'}`;
+  }
+  if (kind === 'showcase') {
+    const showcase = item as CommunityShowcase;
+    return `Showcase · ${showcaseCategoryLabel(showcase.category)}`;
+  }
+  const event = item as CommunityEvent;
+  if (event.is_online) return 'Event · Online';
+  return event.location ? `Event · ${event.location}` : 'Event';
+}
+
+/** "3h ago" — the web `formatRelativeDate` from threads/threadShared. */
+export function formatRelativeDate(value: string): string {
+  const elapsed = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(1, Math.floor(elapsed / 60_000));
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * How many lines a card body is collapsed to before "Read more".
+ *
+ * Threads follow the web rule exactly: 5 lines for a text-only thread, 2 as
+ * soon as there is an attachment (the body is then competing with media), and
+ * the same 2 serves events and resources.
+ */
+export function collapsedBodyLines(kind: ContentKind, item: CommunityContent): number {
+  if (kind === 'threads') {
+    const thread = item as CommunityThread;
+    return (thread.attachments?.length ?? 0) === 0 ? 5 : 2;
+  }
+  return 2;
+}
+
 export async function getCommunityContent<K extends ContentKind>(
   communityId: string,
   kind: K,
