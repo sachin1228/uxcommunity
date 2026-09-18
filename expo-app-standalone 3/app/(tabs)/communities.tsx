@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -20,7 +19,6 @@ import { Community } from '@/lib/communities';
 
 export default function CommunitiesScreen() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
   const router = useRouter();
   const { communities, isLoading, error, reload, markCommunityRead, getTypingLabel } =
     useCommunities();
@@ -32,6 +30,8 @@ export default function CommunitiesScreen() {
         ? `&image=${encodeURIComponent(community.image_url)}`
         : '';
       const tabsParam = `&tabs=${encodeURIComponent(community.enabled_tabs.join(','))}`;
+      // Showcase keeps its own flag (defaults to on) — see lib/communities/areas.ts on the web.
+      const showcaseParam = `&showcase=${community.showcase_enabled === false ? '0' : '1'}`;
       // Ownership only gates the "delete anyone's message" affordance in chat;
       // the server still authorizes every delete.
       const ownerParam = community.owner_id
@@ -44,7 +44,7 @@ export default function CommunitiesScreen() {
         ? `&read=${encodeURIComponent(community.last_read_at)}`
         : '';
       router.push(
-        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${ownerParam}${unreadParam}${readParam}`
+        `/community/${community.id}?name=${encodeURIComponent(community.name)}${imageParam}${tabsParam}${showcaseParam}${ownerParam}${unreadParam}${readParam}`
       );
     },
     [router, markCommunityRead]
@@ -62,8 +62,8 @@ export default function CommunitiesScreen() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
       <AppHeader />
 
       {isLoading && (

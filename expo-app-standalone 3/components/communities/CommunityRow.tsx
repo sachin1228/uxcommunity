@@ -177,9 +177,12 @@ export function CommunityRow({ community, typingLabel, onPress }: Props) {
 
   return (
     <Pressable
+      // Transparent by default so the page background shows through the list,
+      // exactly like the web sidebar rows; pressing lifts the row onto the
+      // raised surface (the web's hover/active treatment).
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: pressed ? colors.surface : colors.subtle },
+        { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
       ]}
       onPress={onPress}
     >

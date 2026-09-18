@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Message } from '@/lib/communities';
 import { canEditMessage } from '@/lib/chat';
+import { hapticSelection } from '@/lib/haptics';
 
 /**
  * The five quick reactions, in the same order and with the same active-state
@@ -96,6 +97,7 @@ export function MessageActionsSheet({
               </View>
               <Pressable
                 onPress={() => {
+                  hapticSelection();
                   const id = message.id;
                   setConfirmingDelete(false);
                   onClose();
@@ -230,7 +232,13 @@ function ActionRow({
   const colors = useColors();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        // Every row in the sheet ticks: Reply, Copy, Edit, Delete, and the
+        // delete confirmation. The reaction tiles are left to the reaction
+        // handler, which already ticks by direction.
+        hapticSelection();
+        onPress();
+      }}
       accessibilityRole="menuitem"
       style={({ pressed }) => [
         styles.actionRow,

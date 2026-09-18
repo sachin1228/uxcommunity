@@ -146,12 +146,12 @@ export default function NotificationSettingsScreen() {
   }, [preferences]);
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.subtle }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.subtle,
+            backgroundColor: colors.background,
             borderBottomColor: colors.border,
             paddingTop: insets.top + 8,
           },

@@ -26,18 +26,25 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { MessageActionsSheet } from '@/components/chat/MessageActionsSheet';
 import { EditMessageModal } from '@/components/chat/EditMessageModal';
 import {
-  toggleReaction,
+  setMessageReaction,
   deleteMessage,
   getCommunities,
   type Community,
   type Message,
 } from '@/lib/communities';
-import { fmtDate, type MessageMention } from '@/lib/chat';
+import {
+  fmtDate,
+  myReactionEmoji,
+  nextReactionIntent,
+  projectOwnReaction,
+  type MessageMention,
+  type ReactionIntent,
+} from '@/lib/chat';
 import { useSendMessage } from '@/hooks/useSendMessage';
+import { hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommunityContentView } from '@/components/community/CommunityContentView';
@@ -55,6 +62,7 @@ export default function CommunityChat() {
     name,
     image,
     tabs: enabledTabsParam,
+    showcase: showcaseParam,
     owner: ownerParam,
     unread: unreadParam,
     read: readParam,
@@ -63,12 +71,12 @@ export default function CommunityChat() {
     name: string;
     image?: string;
     tabs?: string;
+    showcase?: string;
     owner?: string;
     unread?: string;
     read?: string;
   }>();
   const colors = useColors();
-  const colorScheme = useColorScheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -100,16 +108,27 @@ export default function CommunityChat() {
   const enabledTabs = new Set(
     (enabledTabsParam
       ? decodeURIComponent(enabledTabsParam).split(',')
-      : resolved?.enabled_tabs ?? ['chat', 'threads', 'events', 'resources']
+      : resolved?.enabled_tabs ?? ['chat', 'threads', 'showcase', 'resources', 'events']
     ).map((tab) => tab.trim().toLowerCase()),
   );
+  // Same order and labels as the web community header.
   const allTabs: Array<{ key: CommunityTab; label: string }> = [
     { key: 'chat', label: 'Chat' },
     { key: 'threads', label: 'Threads' },
-    { key: 'events', label: 'Events' },
+    { key: 'showcase', label: 'Showcase' },
     { key: 'resources', label: 'Resources' },
+    { key: 'events', label: 'Events' },
   ];
-  const tabs = allTabs.filter((tab) => tab.key === 'chat' || enabledTabs.has(tab.key));
+  /**
+   * Showcase keeps its own flag and defaults to on (web `isShowcaseEnabled`),
+   * so a community whose row predates the flag still shows the tab.
+   */
+  const showcaseEnabled = showcaseParam !== '0' && resolved?.showcase_enabled !== false;
+  const tabs = allTabs.filter((tab) => {
+    if (tab.key === 'chat') return true;
+    if (tab.key === 'showcase') return showcaseEnabled;
+    return enabledTabs.has(tab.key);
+  });
 
   // Unread marker inputs, snapshotted before the list zeroes its badge.
   const initialUnreadCount = Number(unreadParam ?? resolved?.unread_count ?? 0) || 0;
@@ -279,16 +298,50 @@ export default function CommunityChat() {
     [_handleSend, replyTo],
   );
 
+  /**
+   * Message reactions.
+   *
+   * The API stores an explicit desired emoji (`null` clears it), so tapping
+   * your own reaction removes it, any other tap replaces it — the same rule as
+   * the web client. Painting the intent locally first keeps the tap instant,
+   * and the server's grouped reactions are the final word once they land.
+   *
+   * The desired state is tracked in a ref as well as on screen: two taps in the
+   * same tick both read a stale message otherwise, and the second would repeat
+   * the first intent instead of undoing it.
+   */
+  const reactionIntentRef = useRef(new Map<string, ReactionIntent>());
+
   const handleReaction = useCallback(
     async (messageId: string, emoji: string) => {
+      const currentUser = user?.id ?? '';
+      const message = messages.find((m) => m.id === messageId);
+      if (!message || !currentUser) return;
+
+      const previousReactions = message.reactions ?? [];
+      const previous =
+        reactionIntentRef.current.get(messageId) ??
+        myReactionEmoji(previousReactions, currentUser);
+      const desired = nextReactionIntent(previous, emoji);
+      // Reacting and un-reacting are different gestures to the hand: the tick
+      // fires here so the pill on the bubble and the tile in the action sheet
+      // feel identical.
+      hapticToggle(desired !== null);
+
+      reactionIntentRef.current.set(messageId, desired);
+      updateReactions(messageId, projectOwnReaction(previousReactions, desired, currentUser));
+
       try {
-        const reactions = await toggleReaction(id, messageId, emoji);
+        const { reactions } = await setMessageReaction(id, messageId, desired);
         updateReactions(messageId, reactions);
+        reactionIntentRef.current.set(messageId, myReactionEmoji(reactions, currentUser));
       } catch {
-        // silent — the realtime reaction events reconcile
+        // Roll the pill back rather than leave an intent the server rejected.
+        reactionIntentRef.current.delete(messageId);
+        updateReactions(messageId, previousReactions);
       }
     },
-    [id, updateReactions],
+    [id, updateReactions, messages, user?.id],
   );
 
   const handleDelete = useCallback(
@@ -555,8 +608,8 @@ export default function CommunityChat() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       {/* Header measured for iOS keyboard offset. Android uses keyboard-controller height resize. */}
       <View
@@ -564,7 +617,7 @@ export default function CommunityChat() {
         style={[
           styles.header,
           {
-            backgroundColor: colors.subtle,
+            backgroundColor: colors.background,
             paddingTop: insets.top + 8,
           },
         ]}
@@ -599,7 +652,10 @@ export default function CommunityChat() {
       </View>
 
       <View
-        style={[styles.tabsShell, { backgroundColor: colors.subtle, borderBottomColor: colors.border }]}
+        style={[
+          styles.tabsShell,
+          { backgroundColor: colors.background, borderBottomColor: colors.border },
+        ]}
       >
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
           {tabs.map((tab) => {
@@ -641,7 +697,7 @@ export default function CommunityChat() {
               {chatContent}
             </RNKeyboardAvoidingView>
           )}
-          <View style={{ height: insets.bottom, backgroundColor: colors.subtle }} />
+          <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
         </>
       ) : (
         <CommunityContentView

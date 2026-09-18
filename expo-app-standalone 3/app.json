@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon-square.png",
     "scheme": "uxcommunity",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/uxcommunity-splash.png",

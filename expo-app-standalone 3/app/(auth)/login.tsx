@@ -14,12 +14,10 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { BrandLogo } from '@/components/BrandLogo';
 
 export default function LoginScreen() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
   const { login } = useAuth();
   const router = useRouter();
 
@@ -53,8 +51,8 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.subtle }]}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      <StatusBar style={colors.isDark ? 'light' : 'dark'} />
 
       <KeyboardAvoidingView
         style={styles.flex}

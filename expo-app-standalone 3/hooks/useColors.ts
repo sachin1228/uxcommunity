@@ -1,18 +1,36 @@
 import { useColorScheme } from 'react-native';
-import colors from '@/constants/colors';
+import colors, { DEFAULT_COLOR_SCHEME, type ColorScheme } from '@/constants/colors';
 
 /**
- * Returns design tokens for the current color scheme.
+ * Returns design tokens for the active colour scheme.
  *
- * Falls back to light palette when no `dark` key exists in constants/colors.ts.
- * Add a `dark` key there to enable automatic dark-mode switching.
+ * The web app renders dark-only, so — unlike the platform default — this hook
+ * resolves to the dark palette unless the caller explicitly asks otherwise
+ * (`useColors('light')`) or opts the device back in with
+ * `EXPO_PUBLIC_COLOR_SCHEME=light`.
+ *
+ * The resolved scheme is returned alongside the palette so screens can style
+ * native chrome (status bar, refresh control, blur tint) to match the tokens
+ * they just rendered with.
  */
-export function useColors() {
-  const scheme = useColorScheme();
-  const palettes = colors as { light: typeof colors.light; dark?: typeof colors.light };
-  const palette =
-    scheme === 'dark' && palettes.dark
-      ? palettes.dark
-      : colors.light;
-  return { ...palette, radius: colors.radius };
+export function useColors(override?: ColorScheme) {
+  const deviceScheme = useColorScheme();
+  const envScheme =
+    process.env.EXPO_PUBLIC_COLOR_SCHEME === 'light' ||
+    process.env.EXPO_PUBLIC_COLOR_SCHEME === 'dark'
+      ? (process.env.EXPO_PUBLIC_COLOR_SCHEME as ColorScheme)
+      : undefined;
+
+  const scheme: ColorScheme = override ?? envScheme ?? DEFAULT_COLOR_SCHEME;
+  const palette = scheme === 'dark' ? colors.dark : colors.light;
+  const isDark = scheme === 'dark';
+
+  return {
+    ...palette,
+    scheme,
+    isDark,
+    /** Kept for callers that still branch on the raw device scheme. */
+    deviceScheme,
+    radius: colors.radius,
+  };
 }

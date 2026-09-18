@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Message, Reaction } from '@/lib/communities';
+import { hapticImpact, hapticSelection } from '@/lib/haptics';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 import {
   COLLAPSED_LINES,
@@ -463,11 +464,16 @@ export function MessageBubble({
   const textColor = isOwn ? ownText : colors.foreground;
 
   const handlePress = useCallback(() => {
-    if (isOwn && failed) onRetry?.(message.id);
+    if (!isOwn || !failed) return;
+    hapticSelection();
+    onRetry?.(message.id);
   }, [isOwn, failed, onRetry, message.id]);
 
   const handleLongPress = useCallback(() => {
     if (isDeleted) return;
+    // The press must register in the hand at the moment the action sheet
+    // slides up, which is exactly when the long-press timer fires.
+    hapticImpact();
     onLongPress(message);
   }, [isDeleted, onLongPress, message]);
 

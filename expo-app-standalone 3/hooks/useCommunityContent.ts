@@ -11,8 +11,12 @@ export function communityContentKey(communityId: string, kind: ContentKind) {
 /**
  * Map content kind → Cloudflare Realtime room and the topics to subscribe.
  * Each kind subscribes to the appropriate room and listens for relevant events.
+ *
+ * Showcase is absent on purpose: its realtime room is keyed by *post* id on the
+ * web, not by community, so there is nothing community-scoped to subscribe to.
+ * The tab stays fresh through the foreground refetch below and pull-to-refresh.
  */
-const ROOM_TOPICS: Record<ContentKind, { getRoom: (cid: string) => string; topics: string[] }> = {
+const ROOM_TOPICS: Partial<Record<ContentKind, { getRoom: (cid: string) => string; topics: string[] }>> = {
   threads: {
     getRoom: (cid) => realtimeRooms.threads(cid),
     topics: ['thread', 'like', 'save'],
@@ -47,6 +51,7 @@ export function useCommunityContent<K extends ContentKind>(communityId: string, 
     if (!communityId || !enabled) return;
 
     const config = ROOM_TOPICS[kind];
+    if (!config) return;
     const room = config.getRoom(communityId);
     realtimeClient.connect(room);
     // Refcounted room subscription: releasing it must not tear the socket down
