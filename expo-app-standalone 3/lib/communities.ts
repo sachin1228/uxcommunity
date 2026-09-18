@@ -1,5 +1,7 @@
 import { apiFetch, apiFormUpload } from './api';
-import type { MentionCandidate, MessageMention } from './chat';
+import type { MentionCandidate, MessageMention, Reaction } from './chat';
+
+export type { Reaction };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +40,11 @@ export interface Community {
   reference_name: string | null;
   is_private: boolean;
   enabled_tabs: string[];
+  /**
+   * Showcase has its own flag rather than living in `enabled_tabs`, and it
+   * defaults to on — a community that predates the flag still shows the tab.
+   */
+  showcase_enabled?: boolean | null;
   owner_id: string;
   member_count: number;
   message_count: number;
@@ -53,11 +60,6 @@ export interface MessageUser {
   name: string;
   avatar_url: string | null;
   designation: string | null;
-}
-
-export interface Reaction {
-  emoji: string;
-  user_ids: string[];
 }
 
 export interface ReplyPreview {
@@ -132,16 +134,29 @@ export async function sendMessage(
   return data.message;
 }
 
-export async function toggleReaction(
+/**
+ * Set (or clear, with `null`) the signed-in member's reaction on a message.
+ *
+ * The endpoint takes an explicit desired state — `{ desiredEmoji }` — rather
+ * than a toggle, so retries and rapid taps can never invert the final value,
+ * and it answers with the authoritative grouped reactions for the message.
+ *
+ * NOTE: sending `{ emoji }` used to make this a silent no-op (HTTP 422), which
+ * is why reactions could not be given from the mobile app at all.
+ */
+export async function setMessageReaction(
   communityId: string,
   messageId: string,
-  emoji: string
-): Promise<Reaction[]> {
-  const { data } = await apiFetch<{ reactions: Reaction[] }>(
-    `/api/communities/${communityId}/messages/${messageId}/reactions`,
-    { method: 'POST', body: { emoji } }
-  );
-  return data.reactions;
+  desiredEmoji: string | null
+): Promise<{ reactions: Reaction[]; currentUserEmoji: string | null }> {
+  const { data } = await apiFetch<{
+    reactions: Reaction[];
+    currentUserEmoji?: string | null;
+  }>(`/api/communities/${communityId}/messages/${messageId}/reactions`, {
+    method: 'POST',
+    body: { desiredEmoji },
+  });
+  return { reactions: data.reactions ?? [], currentUserEmoji: data.currentUserEmoji ?? desiredEmoji };
 }
 
 export async function markRead(communityId: string): Promise<void> {

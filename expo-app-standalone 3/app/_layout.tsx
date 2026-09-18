@@ -14,19 +14,18 @@ import {
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as SystemUI from 'expo-system-ui';
-import { useColorScheme } from 'react-native';
 import { AuthProvider } from '@/context/AuthContext';
 import { PushNotificationsBridge } from '@/components/PushNotificationsBridge';
-import colors from '@/constants/colors';
+import { useColors } from '@/hooks/useColors';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const bg = isDark ? colors.dark.subtle : colors.light.subtle;
+  // The native window background is driven by the design-system page colour
+  // (web `--color-background`), so there is no white flash between screens.
+  const { background: bg } = useColors();
 
   const [fontsLoaded, fontError] = useFonts({
     Geist_400Regular,

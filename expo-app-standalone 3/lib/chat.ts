@@ -352,6 +352,91 @@ export function splitContentForRender(
   return out;
 }
 
+// ─── Message reactions ────────────────────────────────────────────────────
+//
+// Port of apps/web/lib/communities/cache.ts `applyReactionInsert` /
+// `applyReactionDelete`. The reaction API takes an explicit *desired* emoji
+// (`null` clears it) rather than a toggle, so the client has to project the
+// intent locally — that projection is what makes a tap feel instant on mobile.
+
+export type ReactionIntent = string | null;
+
+/** One emoji on a message/comment plus everyone who picked it. */
+export interface Reaction {
+  emoji: string;
+  user_ids: string[];
+}
+
+/** The emoji the current user has on a message, or null. */
+export function myReactionEmoji(
+  reactions: readonly Reaction[],
+  userId: string,
+): ReactionIntent {
+  if (!userId) return null;
+  return reactions.find((reaction) => reaction.user_ids.includes(userId))?.emoji ?? null;
+}
+
+/** Adds `userId` to `emoji`, removing them from whatever they had before. */
+export function applyReactionInsert(
+  reactions: readonly Reaction[],
+  emoji: string,
+  userId: string,
+): Reaction[] {
+  const without = reactions
+    .map((reaction) => ({
+      ...reaction,
+      user_ids: reaction.user_ids.filter((id) => id !== userId),
+    }))
+    .filter((reaction) => reaction.user_ids.length > 0);
+
+  const existing = without.find((reaction) => reaction.emoji === emoji);
+  if (existing) {
+    return without.map((reaction) =>
+      reaction.emoji === emoji
+        ? { ...reaction, user_ids: [...reaction.user_ids, userId] }
+        : reaction,
+    );
+  }
+  return [...without, { emoji, user_ids: [userId] }];
+}
+
+/** Removes `userId` from `emoji`, dropping the pill when it empties. */
+export function applyReactionDelete(
+  reactions: readonly Reaction[],
+  emoji: string,
+  userId: string,
+): Reaction[] {
+  return reactions
+    .map((reaction) =>
+      reaction.emoji === emoji
+        ? { ...reaction, user_ids: reaction.user_ids.filter((id) => id !== userId) }
+        : reaction,
+    )
+    .filter((reaction) => reaction.user_ids.length > 0);
+}
+
+/**
+ * Applies `desired` as the viewer's reaction, leaving everyone else's in place.
+ * This is the state the bubble should show the instant the user taps.
+ */
+export function projectOwnReaction(
+  reactions: readonly Reaction[],
+  desired: ReactionIntent,
+  userId: string,
+): Reaction[] {
+  const current = myReactionEmoji(reactions, userId);
+  const withoutCurrent = current ? applyReactionDelete(reactions, current, userId) : [...reactions];
+  return desired ? applyReactionInsert(withoutCurrent, desired, userId) : withoutCurrent;
+}
+
+/**
+ * Resolves the emoji a tap should produce: tapping your own reaction removes it,
+ * any other tap replaces it (WhatsApp/iMessage behaviour, same as the web app).
+ */
+export function nextReactionIntent(current: ReactionIntent, tapped: string): ReactionIntent {
+  return current === tapped ? null : tapped;
+}
+
 // ─── Optimistic sends ─────────────────────────────────────────────────────
 
 export interface OptimisticLike {

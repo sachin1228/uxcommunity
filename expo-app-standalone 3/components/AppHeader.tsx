@@ -28,7 +28,7 @@ export function AppHeader() {
       style={[
         styles.header,
         {
-          backgroundColor: colors.subtle,
+          backgroundColor: colors.background,
           borderBottomColor: colors.border,
           paddingTop: insets.top + 8,
         },
