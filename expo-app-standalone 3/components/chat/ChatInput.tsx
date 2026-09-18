@@ -225,20 +225,6 @@ export function ChatInput({
               <Feather name="smile" size={19} color={colors.mutedForeground} />
             </Pressable>
 
-            <Pressable
-              onPress={handlePickImage}
-              disabled={disabled}
-              hitSlop={6}
-              accessibilityLabel="Attach image"
-              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
-            >
-              <Feather
-                name="image"
-                size={19}
-                color={pendingImage ? colors.accent : colors.mutedForeground}
-              />
-            </Pressable>
-
             <TextInput
               ref={inputRef}
               style={[styles.textInput, { color: colors.foreground }]}
@@ -263,6 +249,21 @@ export function ChatInput({
                 {text.length}/{MAX_MESSAGE_CHARS}
               </Text>
             )}
+
+            {/* Gallery button — at the very end of the row, WhatsApp-style */}
+            <Pressable
+              onPress={handlePickImage}
+              disabled={disabled}
+              hitSlop={6}
+              accessibilityLabel="Attach image"
+              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+            >
+              <Feather
+                name="image"
+                size={19}
+                color={pendingImage ? colors.accent : colors.mutedForeground}
+              />
+            </Pressable>
           </View>
 
               {overLimit && (
