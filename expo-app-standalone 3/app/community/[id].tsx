@@ -82,6 +82,9 @@ export default function CommunityChat() {
   const { user } = useAuth();
   const [headerHeight, setHeaderHeight] = useState(0);
   const [activeTab, setActiveTab] = useState<CommunityTab>('chat');
+  /** Inline emoji panel below the composer (WhatsApp-style) — closed when
+   *  the chat scrolls, a tab changes, or the screen loses the composer. */
+  const [emojiPanelOpen, setEmojiPanelOpen] = useState(false);
   /**
    * A push notification can only carry the community id, so when the route
    * arrives without its display params the community is resolved from the
@@ -520,6 +523,9 @@ export default function CommunityChat() {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={[styles.messagesList, { paddingBottom: 8 }]}
+          // Reading old messages means the user is done picking emoji —
+          // close the inline panel so it doesn't eat half the screen.
+          onScrollBeginDrag={() => setEmojiPanelOpen(false)}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           onViewableItemsChanged={handleViewableItemsChanged.current}
           viewabilityConfig={viewabilityConfig.current}
@@ -602,6 +608,8 @@ export default function CommunityChat() {
           onCancelReply={() => setReplyTo(null)}
           onSend={handleSend}
           onTypingChange={onInputChange}
+          emojiPanelOpen={emojiPanelOpen}
+          onEmojiPanelOpenChange={setEmojiPanelOpen}
         />
       </View>
     </View>
@@ -663,7 +671,10 @@ export default function CommunityChat() {
             return (
               <Pressable
                 key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
+                onPress={() => {
+                  setEmojiPanelOpen(false);
+                  setActiveTab(tab.key);
+                }}
                 style={[styles.tab, active && { borderBottomColor: colors.chatOwnBubble }]}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
