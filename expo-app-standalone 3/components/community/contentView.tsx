@@ -332,20 +332,6 @@ export function ContentCard({
       {coverImage ? <Image source={{ uri: coverImage }} style={styles.cover} /> : null}
 
       <View style={styles.cardBody}>
-        {communityName ? (
-          <View style={styles.communityRow}>
-            {resolveProfilePictureUri(communityImage) ? (
-              <Image
-                source={{ uri: resolveProfilePictureUri(communityImage)! }}
-                style={styles.communityAvatar}
-              />
-            ) : null}
-            <Text style={[styles.communityName, { color: colors.foregroundMuted }]} numberOfLines={1}>
-              {communityName}
-            </Text>
-          </View>
-        ) : null}
-
         {/* Author meta — name and relative date on one line, the category as
             the muted second line, exactly like the web `PostAuthorMeta`. */}
         <View style={styles.authorRow}>
@@ -407,6 +393,8 @@ export function ContentCard({
           actions={actions}
           commentCount={actions.commentCountFor(item)}
           onComments={onComments}
+          communityName={communityName}
+          communityImage={communityImage}
         />
       </View>
     </Pressable>
@@ -419,16 +407,22 @@ export function ContentActionRow({
   actions,
   commentCount,
   onComments,
+  communityName,
+  communityImage,
 }: {
   item: CommunityContent;
   kind: ContentKind;
   actions: ContentActionsApi;
   commentCount: number;
   onComments: (item: CommunityContent) => void;
+  /** Feed rows name the community the post came from, right-aligned like the web. */
+  communityName?: string | null;
+  communityImage?: string | null;
 }) {
   const colors = useColors();
+  const communityAvatar = resolveProfilePictureUri(communityImage);
   return (
-    <View style={[styles.actions, { borderTopColor: colors.borderSubtle }]}>
+    <View style={styles.actions}>
       {FOOTER_ACTIONS_BY_KIND[kind].map((definition) => {
         const active = actions.isActive(item, kind, definition.action);
         const count = actions.countFor(item, kind, definition.action);
@@ -459,6 +453,27 @@ export function ContentActionRow({
         accessibilityLabel="Comments"
         onPress={() => onComments(item)}
       />
+
+      {/* Community attribution — the web keeps the engagement cluster on the
+          left and puts "posted in <community>" at the bottom-right. */}
+      {communityName ? (
+        <View style={styles.communityLabel}>
+          <Text style={[styles.communityLabelText, { color: colors.foregroundSubtle }]} numberOfLines={1}>
+            posted in
+          </Text>
+          {communityAvatar ? (
+            <Image source={{ uri: communityAvatar }} style={styles.communityLabelAvatar} />
+          ) : (
+            <View style={[styles.communityLabelAvatar, { backgroundColor: colors.surfaceRaised }]} />
+          )}
+          <Text
+            style={[styles.communityLabelName, { color: colors.foregroundMuted }]}
+            numberOfLines={1}
+          >
+            {communityName}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -847,9 +862,17 @@ const styles = StyleSheet.create({
   cover: { width: '100%', height: 170 },
   cardBody: { padding: 14, gap: 11 },
 
-  communityRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  communityAvatar: { width: 18, height: 18, borderRadius: 9 },
-  communityName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 12 },
+  communityLabel: {
+    flexShrink: 1,
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  communityLabelText: { fontFamily: 'Geist_500Medium', fontSize: 11 },
+  communityLabelAvatar: { width: 16, height: 16, borderRadius: 8 },
+  communityLabelName: { flexShrink: 1, fontFamily: 'Geist_500Medium', fontSize: 11 },
 
   authorRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   avatar: { width: 34, height: 34, borderRadius: 17 },
@@ -885,13 +908,15 @@ const styles = StyleSheet.create({
   linkButton: { minHeight: 44, borderRadius: 12, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 8 },
   linkText: { flex: 1, fontFamily: 'Geist_500Medium', fontSize: 13 },
 
+  // No divider above the footer: the web card runs the engagement row straight
+  // off the body, separated by spacing alone.
   actions: {
     minHeight: 36,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 20,
+    // The web footer spaces the engagement cluster with gap-4 before the
+    // right-aligned community attribution.
+    gap: 16,
   },
   action: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionText: { fontFamily: 'Geist_500Medium', fontSize: 12 },
