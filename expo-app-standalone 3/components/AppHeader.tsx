@@ -47,7 +47,9 @@ export function AppHeader() {
           onPress={() => router.push('/settings/notifications')}
           style={({ pressed }) => [
             styles.iconButton,
-            { backgroundColor: pressed ? colors.background : 'transparent' },
+            // The header sits on the page background, so the pressed state has
+            // to lift onto the raised surface to be visible at all.
+            { backgroundColor: pressed ? colors.surfaceRaised : 'transparent' },
           ]}
         >
           <Feather name="bell" size={22} color={colors.mutedForeground} />
