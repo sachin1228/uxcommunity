@@ -1,12 +1,18 @@
 import React from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 
 /**
  * Composer emoji picker — the React Native counterpart of the web
- * `EmojiGifPicker` tab, reduced to emoji. Tapping an emoji inserts it at the
- * end of the draft and keeps the sheet open so several can be picked in a row
- * (same behaviour as the web composer).
+ * `EmojiGifPicker` tab, reduced to emoji.
+ *
+ * Unlike a modal, the panel renders inline directly below the composer
+ * (WhatsApp-style): the input stays visible and usable above it, the panel
+ * runs edge-to-edge to the bottom of the screen, and the parent decides when
+ * it closes (tapping the input again, sending, or scrolling the chat).
+ * Tapping an emoji inserts it at the end of the draft and keeps the panel
+ * open so several can be picked in a row (same behaviour as the web composer).
  */
 
 const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
@@ -50,72 +56,72 @@ const EMOJI_SECTIONS: Array<{ title: string; emoji: string[] }> = [
 ];
 
 interface Props {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (emoji: string) => void;
+  /** Called with the tapped emoji. The chat screen mounts the panel without
+   *  a handler (ChatInput wires the insertion), so it is optional. */
+  onSelect?: (emoji: string) => void;
 }
 
-export function EmojiPicker({ visible, onClose, onSelect }: Props) {
+export function EmojiPicker({ onSelect }: Props) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
 
   return (
-    <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {EMOJI_SECTIONS.map((section) => (
-              <View key={section.title}>
-                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
-                  {section.title}
-                </Text>
-                <View style={styles.grid}>
-                  {section.emoji.map((emoji) => (
-                    <Pressable
-                      key={emoji}
-                      onPress={() => onSelect(emoji)}
-                      style={({ pressed }) => [
-                        styles.emojiCell,
-                        { backgroundColor: pressed ? colors.subtle : 'transparent' },
-                      ]}
-                    >
-                      <Text style={styles.emoji}>{emoji}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
+    <View
+      style={[
+        styles.panel,
+        {
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
+          paddingBottom: insets.bottom,
+        },
+      ]}
+    >
+      {/* Drag handle — decorative, like the WhatsApp sticker drawer */}
+      <View style={[styles.handle, { backgroundColor: colors.border }]} />
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {EMOJI_SECTIONS.map((section) => (
+          <View key={section.title}>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>
+              {section.title}
+            </Text>
+            <View style={styles.grid}>
+              {section.emoji.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  onPress={() => onSelect?.(emoji)}
+                  style={({ pressed }) => [
+                    styles.emojiCell,
+                    { backgroundColor: pressed ? colors.subtle : 'transparent' },
+                  ]}
+                >
+                  <Text style={styles.emoji}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  panel: {
+    height: 320,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  sheet: {
-    height: 340,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 16,
+  handle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 8,
+    marginBottom: 4,
   },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 24 },

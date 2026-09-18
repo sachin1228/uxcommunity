@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
@@ -46,6 +47,12 @@ interface Props {
   disabled?: boolean;
   /** Populated by the parent so a send failure shows inside the composer, as on web. */
   error?: string | null;
+  /** Whether the inline emoji panel below the composer is open. Controlled by
+   *  the parent screen so it can also close the panel (tab switch, scroll). */
+  emojiPanelOpen?: boolean;
+  /** Reports panel open/close so the parent can render the panel below the
+   *  footer and close it from outside (scrolling, tab change). */
+  onEmojiPanelOpenChange?: (open: boolean) => void;
 }
 
 export function ChatInput({
@@ -57,12 +64,18 @@ export function ChatInput({
   onTypingChange,
   disabled,
   error,
+  emojiPanelOpen = false,
+  onEmojiPanelOpenChange,
 }: Props) {
   const colors = useColors();
   const [text, setText] = useState('');
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const inputRef = useRef<TextInput>(null);
+
+  // The emoji panel is owned by the parent screen (it renders the panel below
+  // the footer and closes it on scroll/tab change); this is just a shorthand.
+  const pickerOpen = emojiPanelOpen;
+  const setPickerOpen = (open: boolean) => onEmojiPanelOpenChange?.(open);
 
   const {
     mentionOpen,
@@ -93,8 +106,22 @@ export function ChatInput({
     onSend(trimmed, pendingImage ?? undefined, resolveMentions(trimmed));
     setText('');
     setPendingImage(null);
+    setPickerOpen(false);
     onTypingChange('');
     resetMentions();
+  }
+
+  /** Emoji button — opens the inline panel below the composer (dismissing
+   *  the keyboard so the input stays visible above it, WhatsApp-style); a
+   *  second tap closes the panel and puts the caret back in the input. */
+  function togglePicker() {
+    if (pickerOpen) {
+      setPickerOpen(false);
+      inputRef.current?.focus();
+    } else {
+      setPickerOpen(true);
+      Keyboard.dismiss();
+    }
   }
 
   function handlePickMention(candidate: Parameters<typeof pickMention>[0]) {
@@ -110,7 +137,11 @@ export function ChatInput({
   }
 
   function insertEmoji(emoji: string) {
-    handleChangeText(text + emoji);
+    // Deliberately not handleChangeText — picking an emoji must not close
+    // the panel, so several emoji can be added in a row.
+    setText(text + emoji);
+    onTypingChange(text + emoji);
+    onComposerActivity(text + emoji, (text + emoji).length);
   }
 
   async function handlePickImage() {
@@ -138,7 +169,14 @@ export function ChatInput({
   }
 
   return (
-    <View style={styles.root}>
+    <View
+      style={[
+        styles.root,
+        // While the emoji panel is open it runs edge-to-edge to the screen
+        // bottom, so the composer must not add its own bottom padding.
+        { paddingBottom: pickerOpen ? 0 : 8 },
+      ]}
+    >
       {!!error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
 
       {/* ── @-mention picker — floats above the composer while typing ── */}
@@ -216,13 +254,20 @@ export function ChatInput({
           {/* Input row */}
           <View style={styles.boxInner}>
             <Pressable
-              onPress={() => setPickerOpen(true)}
+              onPress={togglePicker}
               disabled={disabled}
               hitSlop={6}
               accessibilityLabel="Open emoji picker"
-              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+              style={({ pressed }) => [
+                styles.pillBtn,
+                { opacity: pressed ? 0.5 : 1 },
+              ]}
             >
-              <Feather name="smile" size={19} color={colors.mutedForeground} />
+              <Feather
+                name="smile"
+                size={19}
+                color={pickerOpen ? colors.accent : colors.mutedForeground}
+              />
             </Pressable>
 
             <TextInput
@@ -231,7 +276,17 @@ export function ChatInput({
               placeholder="Type a message…"
               placeholderTextColor={colors.mutedForeground}
               value={text}
-              onChangeText={handleChangeText}
+              onChangeText={(v) => {
+                // Typing means the user wants the keyboard back — close the
+                // emoji panel so keyboard and panel never fight for space.
+                if (pickerOpen) setPickerOpen(false);
+                handleChangeText(v);
+              }}
+              onFocus={() => {
+                // Tapping the field directly also swaps the panel for the
+                // keyboard, like WhatsApp.
+                if (pickerOpen) setPickerOpen(false);
+              }}
               onSelectionChange={(e) => onComposerActivity(text, e.nativeEvent.selection.end)}
               multiline
               returnKeyType="default"
@@ -295,11 +350,7 @@ export function ChatInput({
         </Pressable>
       </View>
 
-      <EmojiPicker
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onSelect={insertEmoji}
-      />
+      {pickerOpen && <EmojiPicker onSelect={insertEmoji} />}
     </View>
   );
 }
@@ -308,7 +359,6 @@ const styles = StyleSheet.create({
   root: {
     paddingHorizontal: 12,
     paddingTop: 2,
-    paddingBottom: 8,
     gap: 6,
   },
 
