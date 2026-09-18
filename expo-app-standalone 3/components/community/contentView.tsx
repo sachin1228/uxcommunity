@@ -30,6 +30,7 @@ import {
   setContentAction,
 } from '@/lib/communityContent';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
+import { HeartIcon } from './HeartIcon';
 
 /**
  * The community card, the card detail, and the optimistic interaction state
@@ -801,11 +802,13 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
   accessibilityLabel: string;
 }) {
   const colors = useColors();
+  // Inactive actions sit on the web's foreground-subtle, and the heart is the
+  // only one that turns pink when it lights up.
   const tint = active
     ? activeColor === 'like'
       ? colors.like
       : colors.accent
-    : colors.foregroundMuted;
+    : colors.foregroundSubtle;
   return (
     <Pressable
       onPress={(event) => { event.stopPropagation(); onPress(); }}
@@ -815,7 +818,11 @@ function Action({ icon, label, active, activeColor = 'accent', onPress, accessib
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ selected: Boolean(active) }}
     >
-      <Feather name={icon} size={16} color={tint} />
+      {icon === 'heart' ? (
+        <HeartIcon size={16} active={Boolean(active)} color={colors.foregroundSubtle} />
+      ) : (
+        <Feather name={icon} size={16} color={tint} />
+      )}
       <Text style={[styles.actionText, { color: tint }]}>{label}</Text>
     </Pressable>
   );
