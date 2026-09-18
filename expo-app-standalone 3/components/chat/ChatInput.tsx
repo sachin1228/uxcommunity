@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useColors } from '@/hooks/useColors';
 import { Message } from '@/lib/communities';
 import { MAX_MESSAGE_CHARS, extractFirstUrl, type MessageMention } from '@/lib/chat';
@@ -21,6 +22,18 @@ import { MentionSuggestions } from './MentionSuggestions';
 export interface PendingImage {
   uri: string;
   mimeType: string;
+}
+
+/**
+ * Filled paper-plane send icon — the same path the web composers use, so the
+ * send button silhouette is identical on both clients (WhatsApp-style).
+ */
+function SendPlaneIcon({ color, size = 18 }: { color: string; size?: number }) {
+  return (
+    <Svg viewBox="0 0 24 24" width={size} height={size}>
+      <Path fill={color} d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+    </Svg>
+  );
 }
 
 interface Props {
@@ -137,150 +150,148 @@ export function ChatInput({
         />
       )}
 
-      {/* ── Composer box — web parity: surface-raised rounded panel ── */}
-      <View style={[styles.box, { backgroundColor: colors.surfaceRaised }]}>
-        {/* Reply quote inside the box */}
-        {replyTo && (
-          <View
-            style={[
-              styles.replyBanner,
-              { backgroundColor: colors.background, borderLeftColor: colors.accent },
-            ]}
-          >
-            <View style={styles.replyInfo}>
-              <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
-                {replyTo.users?.name ?? 'message'}
-              </Text>
-              <Text numberOfLines={2} style={[styles.replyText, { color: colors.mutedForeground }]}>
-                {replyTo.content || '📷 Image'}
-              </Text>
-            </View>
-            <Pressable onPress={onCancelReply} hitSlop={8} accessibilityLabel="Cancel reply">
-              <Feather name="x" size={18} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-        )}
-
-        {/* Pending image preview strip */}
-        {pendingImage && (
-          <View style={styles.imagePreviewRow}>
-            <Image
-              source={{ uri: pendingImage.uri }}
-              style={[styles.imageThumb, { borderColor: colors.border }]}
-              resizeMode="cover"
-            />
-            <Text numberOfLines={1} style={[styles.imageReady, { color: colors.mutedForeground }]}>
-              Image ready to send
-            </Text>
-            <Pressable
-              onPress={() => setPendingImage(null)}
-              hitSlop={8}
-              accessibilityLabel="Remove image"
-            >
-              <Feather name="x" size={14} color={colors.mutedForeground} />
-            </Pressable>
-          </View>
-        )}
-
-        {/* Link hint — shown while composing when a URL is detected */}
-        {!!linkPreviewUrl && (
-          <View style={styles.linkRow}>
-            <Feather name="link" size={11} color={colors.mutedForeground} />
-            <Text numberOfLines={1} style={[styles.linkText, { color: colors.mutedForeground }]}>
-              {(() => {
-                try {
-                  return new URL(linkPreviewUrl).hostname.replace(/^www\./, '');
-                } catch {
-                  return linkPreviewUrl;
-                }
-              })()}
-            </Text>
-          </View>
-        )}
-
-        {/* Input row */}
-        <View style={styles.inputRow}>
-          <Pressable
-            onPress={() => setPickerOpen(true)}
-            disabled={disabled}
-            hitSlop={6}
-            accessibilityLabel="Open emoji picker"
-            style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
-          >
-            <Feather name="smile" size={19} color={colors.mutedForeground} />
-          </Pressable>
-
-          <Pressable
-            onPress={handlePickImage}
-            disabled={disabled}
-            hitSlop={6}
-            accessibilityLabel="Attach image"
-            style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
-          >
-            <Feather
-              name="image"
-              size={19}
-              color={pendingImage ? colors.accent : colors.mutedForeground}
-            />
-          </Pressable>
-
-          <TextInput
-            ref={inputRef}
-            style={[styles.textInput, { color: colors.foreground }]}
-            placeholder="Type a message…"
-            placeholderTextColor={colors.mutedForeground}
-            value={text}
-            onChangeText={handleChangeText}
-            onSelectionChange={(e) => onComposerActivity(text, e.nativeEvent.selection.end)}
-            multiline
-            returnKeyType="default"
-            editable={!disabled}
-            textAlignVertical="center"
-          />
-
-          {nearLimit && (
-            <Text
+      {/* ── Composer row: the input pill with the send button as a sibling
+          circle outside it, WhatsApp-style ── */}
+      <View style={styles.composerRow}>
+        <View style={[styles.box, { backgroundColor: colors.surfaceRaised }]}>
+          {/* Reply quote inside the box */}
+          {replyTo && (
+            <View
               style={[
-                styles.counter,
-                { color: overLimit ? colors.destructive : colors.mutedForeground },
+                styles.replyBanner,
+                { backgroundColor: colors.background, borderLeftColor: colors.accent },
               ]}
             >
-              {text.length}/{MAX_MESSAGE_CHARS}
-            </Text>
+              <View style={styles.replyInfo}>
+                <Text numberOfLines={1} style={[styles.replyName, { color: colors.accent }]}>
+                  {replyTo.users?.name ?? 'message'}
+                </Text>
+                <Text numberOfLines={2} style={[styles.replyText, { color: colors.mutedForeground }]}>
+                  {replyTo.content || '📷 Image'}
+                </Text>
+              </View>
+              <Pressable onPress={onCancelReply} hitSlop={8} accessibilityLabel="Cancel reply">
+                <Feather name="x" size={18} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
           )}
 
-          <Pressable
-            onPress={handleSend}
-            disabled={!canSend}
-            hitSlop={4}
-            accessibilityLabel="Send"
-            style={({ pressed }) => [
-              styles.sendBtn,
-              {
-                backgroundColor: canSend ? colors.chatOwnBubble : colors.subtle,
-                opacity: pressed && canSend ? 0.85 : 1,
-              },
-            ]}
-          >
-            {disabled ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Feather
-                name="send"
-                size={15}
-                color={canSend ? '#FFFFFF' : colors.mutedForeground}
-                style={{ marginLeft: 1 }}
+          {/* Pending image preview strip */}
+          {pendingImage && (
+            <View style={styles.imagePreviewRow}>
+              <Image
+                source={{ uri: pendingImage.uri }}
+                style={[styles.imageThumb, { borderColor: colors.border }]}
+                resizeMode="cover"
               />
-            )}
-          </Pressable>
-        </View>
+              <Text numberOfLines={1} style={[styles.imageReady, { color: colors.mutedForeground }]}>
+                Image ready to send
+              </Text>
+              <Pressable
+                onPress={() => setPendingImage(null)}
+                hitSlop={8}
+                accessibilityLabel="Remove image"
+              >
+                <Feather name="x" size={14} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+          )}
 
-        {overLimit && (
-          <Text style={[styles.limitError, { color: colors.destructive }]}>
-            Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove{' '}
-            {text.length - MAX_MESSAGE_CHARS} to send.
-          </Text>
-        )}
+          {/* Link hint — shown while composing when a URL is detected */}
+          {!!linkPreviewUrl && (
+            <View style={styles.linkRow}>
+              <Feather name="link" size={11} color={colors.mutedForeground} />
+              <Text numberOfLines={1} style={[styles.linkText, { color: colors.mutedForeground }]}>
+                {(() => {
+                  try {
+                    return new URL(linkPreviewUrl).hostname.replace(/^www\./, '');
+                  } catch {
+                    return linkPreviewUrl;
+                  }
+                })()}
+              </Text>
+            </View>
+          )}
+
+          {/* Input row */}
+          <View style={styles.boxInner}>
+            <Pressable
+              onPress={() => setPickerOpen(true)}
+              disabled={disabled}
+              hitSlop={6}
+              accessibilityLabel="Open emoji picker"
+              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+            >
+              <Feather name="smile" size={19} color={colors.mutedForeground} />
+            </Pressable>
+
+            <Pressable
+              onPress={handlePickImage}
+              disabled={disabled}
+              hitSlop={6}
+              accessibilityLabel="Attach image"
+              style={({ pressed }) => [styles.pillBtn, { opacity: pressed ? 0.5 : 1 }]}
+            >
+              <Feather
+                name="image"
+                size={19}
+                color={pendingImage ? colors.accent : colors.mutedForeground}
+              />
+            </Pressable>
+
+            <TextInput
+              ref={inputRef}
+              style={[styles.textInput, { color: colors.foreground }]}
+              placeholder="Type a message…"
+              placeholderTextColor={colors.mutedForeground}
+              value={text}
+              onChangeText={handleChangeText}
+              onSelectionChange={(e) => onComposerActivity(text, e.nativeEvent.selection.end)}
+              multiline
+              returnKeyType="default"
+              editable={!disabled}
+              textAlignVertical="center"
+            />
+
+            {nearLimit && (
+              <Text
+                style={[
+                  styles.counter,
+                  { color: overLimit ? colors.destructive : colors.mutedForeground },
+                ]}
+              >
+                {text.length}/{MAX_MESSAGE_CHARS}
+              </Text>
+            )}
+          </View>
+
+              {overLimit && (
+              <Text style={[styles.limitError, { color: colors.destructive }]}>
+                Message is too long (max {MAX_MESSAGE_CHARS} characters) — remove{' '}
+                {text.length - MAX_MESSAGE_CHARS} to send.
+              </Text>
+            )}
+          </View>
+
+        <Pressable
+          onPress={handleSend}
+          disabled={!canSend}
+          hitSlop={4}
+          accessibilityLabel="Send"
+          style={({ pressed }) => [
+            styles.sendBtn,
+            {
+              backgroundColor: canSend ? colors.chatOwnBubble : colors.surfaceRaised,
+              opacity: pressed && canSend ? 0.85 : 1,
+            },
+          ]}
+        >
+          {disabled ? (
+            <ActivityIndicator size="small" color={colors.mutedForeground} />
+          ) : (
+            <SendPlaneIcon color={canSend ? '#FFFFFF' : colors.mutedForeground} size={20} />
+          )}
+        </Pressable>
       </View>
 
       <EmojiPicker
@@ -301,14 +312,30 @@ const styles = StyleSheet.create({
   },
 
   box: {
+    flex: 1,
     borderRadius: 18,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
+  },
+
+  /** Inner padding of the composer pill (kept off `box` so the pill's
+   * chrome and its content layout can be styled independently). */
+  boxInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+
+  /** Pill + send-button row — the button is a sibling of the pill, not
+   * inside it, so the pill never has to grow around the button. */
+  composerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
   },
 
   replyBanner: {
@@ -347,14 +374,6 @@ const styles = StyleSheet.create({
   },
   linkText: { flex: 1, fontSize: 10, fontFamily: 'Geist_400Regular' },
 
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-    gap: 2,
-  },
-
   pillBtn: {
     width: 36,
     height: 36,
@@ -380,12 +399,13 @@ const styles = StyleSheet.create({
   counter: { fontSize: 10, fontFamily: 'Geist_400Regular', marginBottom: 10, flexShrink: 0 },
 
   sendBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    // Matches the pill's single-line height (padding 4+4 + input 36) so the
+    // circle is flush with the pill's bottom edge, exactly like WhatsApp.
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
     flexShrink: 0,
   },
 
