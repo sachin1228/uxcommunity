@@ -12,6 +12,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { hapticSelection, hapticToggle } from '@/lib/haptics';
 import { BooleanIntentCoalescer } from '@/lib/booleanIntentCoalescer';
 import {
   CommunityContent,
@@ -443,7 +444,12 @@ export function ContentActionRow({
             active={active}
             activeColor={definition.activeColor}
             accessibilityLabel={`${active ? 'Remove' : 'Add'} ${definition.label}`}
-            onPress={() => actions.action(item, kind, definition.action)}
+            onPress={() => {
+              // Every footer action is a desired-state flip: the tick follows the
+              // direction the tap is about to take.
+              hapticToggle(!active);
+              actions.action(item, kind, definition.action);
+            }}
           />
         );
       })}
@@ -451,7 +457,10 @@ export function ContentActionRow({
         icon="message-circle"
         label={String(commentCount)}
         accessibilityLabel="Comments"
-        onPress={() => onComments(item)}
+        onPress={() => {
+          hapticSelection();
+          onComments(item);
+        }}
       />
 
       {/* Community attribution — the web keeps the engagement cluster on the
@@ -658,11 +667,16 @@ export function ContentOptionsMenu({
   const colors = useColors();
   const [visible, setVisible] = useState(false);
   const saveAction = MENU_ACTION_BY_KIND[kind];
+  const saved = saveAction ? actions.isActive(item, kind, saveAction.action) : false;
 
   return (
     <>
       <Pressable
-        onPress={(event) => { event.stopPropagation(); setVisible(true); }}
+        onPress={(event) => {
+          event.stopPropagation();
+          hapticSelection();
+          setVisible(true);
+        }}
         style={styles.menuButton}
         hitSlop={8}
         accessibilityRole="button"
@@ -676,23 +690,22 @@ export function ContentOptionsMenu({
           <View style={[styles.optionsSheet, { backgroundColor: colors.overlayElevated, shadowColor: '#000' }]}>
             {saveAction ? (
               <Pressable
-                onPress={() => { setVisible(false); actions.action(item, kind, saveAction.action); }}
+                onPress={() => {
+                  hapticToggle(!saved);
+                  setVisible(false);
+                  actions.action(item, kind, saveAction.action);
+                }}
                 style={styles.optionRow}
                 accessibilityRole="button"
-                accessibilityState={{ selected: actions.isActive(item, kind, saveAction.action) }}
+                accessibilityState={{ selected: saved }}
               >
                 <Feather
                   name={saveAction.icon}
                   size={16}
-                  color={actions.isActive(item, kind, saveAction.action) ? colors.accent : colors.foregroundMuted}
+                  color={saved ? colors.accent : colors.foregroundMuted}
                 />
-                <Text
-                  style={[
-                    styles.optionText,
-                    { color: actions.isActive(item, kind, saveAction.action) ? colors.accent : colors.foreground },
-                  ]}
-                >
-                  {actions.isActive(item, kind, saveAction.action) ? 'Unsave' : 'Save'}
+                <Text style={[styles.optionText, { color: saved ? colors.accent : colors.foreground }]}>
+                  {saved ? 'Unsave' : 'Save'}
                 </Text>
               </Pressable>
             ) : null}
@@ -701,7 +714,11 @@ export function ContentOptionsMenu({
               <>
                 <View style={[styles.optionDivider, { backgroundColor: colors.borderSubtle }]} />
                 <Pressable
-                  onPress={() => { setVisible(false); onEdit(item); }}
+                  onPress={() => {
+                    hapticSelection();
+                    setVisible(false);
+                    onEdit(item);
+                  }}
                   style={styles.optionRow}
                   accessibilityRole="button"
                 >
@@ -709,7 +726,11 @@ export function ContentOptionsMenu({
                   <Text style={[styles.optionText, { color: colors.foreground }]}>Edit</Text>
                 </Pressable>
                 <Pressable
-                  onPress={() => { setVisible(false); onDelete(item); }}
+                  onPress={() => {
+                    hapticSelection();
+                    setVisible(false);
+                    onDelete(item);
+                  }}
                   style={styles.optionRow}
                   accessibilityRole="button"
                 >
@@ -763,7 +784,11 @@ export function CollapsibleBody({
       </Text>
       {truncated && !expanded && expandable ? (
         <Pressable
-          onPress={(event) => { event.stopPropagation(); setExpanded(true); }}
+          onPress={(event) => {
+            event.stopPropagation();
+            hapticSelection();
+            setExpanded(true);
+          }}
           accessibilityRole="button"
           accessibilityLabel="Read more"
           hitSlop={6}

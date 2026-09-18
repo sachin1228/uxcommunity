@@ -41,6 +41,7 @@ import {
   type ReactionIntent,
 } from '@/lib/chat';
 import { useSendMessage } from '@/hooks/useSendMessage';
+import { hapticToggle } from '@/lib/haptics';
 import { communityStore } from '@/lib/communityStore';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -322,6 +323,10 @@ export default function CommunityChat() {
         reactionIntentRef.current.get(messageId) ??
         myReactionEmoji(previousReactions, currentUser);
       const desired = nextReactionIntent(previous, emoji);
+      // Reacting and un-reacting are different gestures to the hand: the tick
+      // fires here so the pill on the bubble and the tile in the action sheet
+      // feel identical.
+      hapticToggle(desired !== null);
 
       reactionIntentRef.current.set(messageId, desired);
       updateReactions(messageId, projectOwnReaction(previousReactions, desired, currentUser));

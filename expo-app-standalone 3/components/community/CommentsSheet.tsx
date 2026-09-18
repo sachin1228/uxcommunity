@@ -16,6 +16,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { hapticError, hapticSelection, hapticSuccess, hapticToggle } from '@/lib/haptics';
 import {
   ALLOWED_COMMENT_REACTIONS,
   COMMENT_MAX_LENGTH,
@@ -231,7 +232,10 @@ export function CommentsSheet({
               return (
                 <Pressable
                   key={option}
-                  onPress={() => setSort(option)}
+                  onPress={() => {
+                    hapticSelection();
+                    setSort(option);
+                  }}
                   style={[
                     styles.sortChip,
                     {
@@ -386,8 +390,10 @@ function CommentComposer({
         parent_id: parentId ?? null,
       });
       setBody('');
+      hapticSuccess();
       onPosted(comment);
     } catch (e) {
+      hapticError();
       Alert.alert('Could not post', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setSending(false);
@@ -443,7 +449,14 @@ function CommentComposer({
         </Pressable>
       </View>
       {compact && onCancel ? (
-        <Pressable onPress={onCancel} hitSlop={6} style={styles.composerCancel}>
+        <Pressable
+          onPress={() => {
+            hapticSelection();
+            onCancel();
+          }}
+          hitSlop={6}
+          style={styles.composerCancel}
+        >
           <Text style={[styles.composerCancelText, { color: colors.foregroundMuted }]}>Cancel</Text>
         </Pressable>
       ) : null}
@@ -513,8 +526,10 @@ function CommentRow({
         onPress: async () => {
           try {
             await deleteComment(communityId, kind, targetId, comment.id);
+            hapticSuccess();
             onDeleted(comment.id, comment.parent_id);
           } catch (e) {
+            hapticError();
             Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
           }
         },
@@ -525,6 +540,8 @@ function CommentRow({
   const toggleReaction = async (emoji: CommentReactionEmoji) => {
     if (reactPending.current) return;
     const current = comment.reactions ?? [];
+    // Tapping your own emoji removes it, anything else adds — tick by direction.
+    hapticToggle(!(current.find((reaction) => reaction.emoji === emoji)?.reacted ?? false));
     reactPending.current = true;
     setReacting(true);
     // Paint the flip immediately, then reconcile with the authoritative list.
@@ -578,7 +595,10 @@ function CommentRow({
           </Text>
           {isOwner ? (
             <Pressable
-              onPress={confirmDelete}
+              onPress={() => {
+                hapticSelection();
+                confirmDelete();
+              }}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Delete comment"
@@ -599,7 +619,10 @@ function CommentRow({
           {canReact ? (
             <>
               <Pressable
-                onPress={() => setPickerOpen((open) => !open)}
+                onPress={() => {
+                  hapticSelection();
+                  setPickerOpen((open) => !open);
+                }}
                 style={[styles.addReaction, { backgroundColor: colors.surfaceRaised }]}
                 accessibilityRole="button"
                 accessibilityLabel="Add reaction"
@@ -641,6 +664,7 @@ function CommentRow({
           {allowReplies ? (
             <Pressable
               onPress={() => {
+                hapticSelection();
                 onReplyTargetChange(replyTarget?.id === comment.id ? null : comment);
                 setRepliesOpen(true);
               }}
@@ -699,7 +723,13 @@ function CommentRow({
               : null}
 
             {hasReplies ? (
-              <Pressable onPress={() => setRepliesOpen((open) => !open)} hitSlop={6}>
+              <Pressable
+                onPress={() => {
+                  hapticSelection();
+                  setRepliesOpen((open) => !open);
+                }}
+                hitSlop={6}
+              >
                 <Text style={[styles.collapseText, { color: colors.foreground }]}>
                   {repliesOpen
                     ? 'Collapse replies'
