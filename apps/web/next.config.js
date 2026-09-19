@@ -43,6 +43,39 @@ const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@uxcommunity/shared", "@uxcommunity/design-system"],
   allowedDevOrigins: ["*.replit.dev", "*.pike.replit.dev", "*.sisko.replit.dev", "127.0.0.1"],
+  // Emoji assets are vendored static files (see apps/web/public/emoji and
+  // scripts/update-emoji.mjs) that only change when someone deliberately
+  // re-vendors them, so let browsers and CDNs keep them for a year. The files
+  // are not committed to git — they ship as emoji-assets.tar.gz and are
+  // extracted by scripts/extract-emoji.mjs on install/build. NOTE: these
+  // paths are NOT content-hashed — after refreshing the vendored files,
+  // bust caches by changing the path (e.g. /emoji/v2/...) or a deploy-wide
+  // cache purge, not by editing files in place.
+  async headers() {
+    return [
+      {
+        source: "/emoji/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // The catalog drives the picker UI, so keep it fresh enough that
+        // re-vendored emoji show up without a manual purge; it is a single
+        // ~190KB fetch per session, so this stays cheap.
+        source: "/emoji/catalog.json",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=3600, must-revalidate",
+          },
+        ],
+      },
+    ];
+  },
   // Allow Next.js <Image> to optimise uploaded images from Supabase storage.
   images: {
     remotePatterns: [

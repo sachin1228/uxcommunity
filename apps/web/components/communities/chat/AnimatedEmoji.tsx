@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, memo } from "react";
 import Lottie, { type LottieRefCurrentProps } from "lottie-react";
-import { emojiToCodepoint } from "@/lib/noto-emoji";
+import { emojiToCodepoint, lottieUrlForCodepoint } from "@/lib/noto-emoji";
 import { NotoEmojiSvg } from "./NotoEmojiSvg";
 
 interface AnimatedEmojiProps {
@@ -82,7 +82,7 @@ export const AnimatedEmoji = memo(function AnimatedEmoji({
 
     const loadAnimation = async () => {
       try {
-        const url = `https://fonts.gstatic.com/s/e/notoemoji/latest/${codepoint}/lottie.json`;
+        const url = lottieUrlForCodepoint(codepoint);
         const response = await fetch(url);
 
         if (!response.ok) {

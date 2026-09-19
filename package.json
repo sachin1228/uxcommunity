@@ -6,6 +6,9 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/extract-emoji.mjs",
+    "prebuild": "node scripts/extract-emoji.mjs",
+    "emoji:update": "node scripts/update-emoji.mjs",
     "dev": "npm run dev --workspace=apps/web",
     "dev:realtime": "npm run dev --workspace=apps/realtime",
     "build": "npm run build --workspace=apps/web",
