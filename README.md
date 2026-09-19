@@ -10,6 +10,7 @@ A platform for UI/UX, product, and social media designers. Designers apply to jo
 | **Auth** | Custom JWT sessions via `jose` + `bcryptjs`. No Supabase Auth — sessions live in an httpOnly cookie. Includes login, logout, password-reset request/confirm. |
 | **Admin panel** | Review and approve/reject applications; manage users (block/unblock); CRUD for master data: cities, sectors, experience levels, interests, communities, Lottie animations. |
 | **Communities / chat** | Real-time community chat (Cloudflare Durable Objects — see `apps/realtime`). Members are auto-joined to communities on sign-up. Admins can delete messages. |
+| **Weekly competitions** | A recurring design challenge: Sunday a new brief drops, designers submit and vote all week, Saturday becomes results day and the week moves into the archive. Status is derived from each cycle's timestamps (see `apps/web/lib/competitions/cycle.ts`), votes are server-authoritative with one-per-entry and no self-voting enforced in the database, and cycle notifications (started / 24h left / results) reach members once each through the existing notifications system. Admins manage briefs, rules and voting rules, moderate entries, and push notifications from Admin → Competitions. |
 | **Image uploads** | Avatar and community images uploaded via signed Supabase Storage URLs, compressed server-side with `sharp`. |
 | **Rate limiting** | Redis-backed sliding-window rate limiter (Upstash) on login (IP + email), application submission, and password-reset requests. |
 

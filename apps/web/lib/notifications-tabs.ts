@@ -12,7 +12,7 @@ export const NOTIFICATION_TABS: ReadonlyArray<{
   label: string;
 }> = [
   { key: "activity", label: "Likes and comments" },
-  { key: "other", label: "Other" },
+  { key: "other", label: "Competitions" },
 ];
 
 /**
@@ -20,9 +20,8 @@ export const NOTIFICATION_TABS: ReadonlyArray<{
  *
  * - `activity` — engagement on the user's own content: a like, an RSVP, or a
  *   comment/reply anywhere in the thread under what they posted.
- * - `other` — intentionally EMPTY. The tab is a visible placeholder; add the
- *   types that belong in it here (and update the tab's empty-state copy in
- *   NotificationsView) to populate it.
+ * - `other` — the weekly competition cycle: votes and comments on the member's
+ *   entry, plus the once-per-cycle start / deadline / results broadcasts.
  *
  * Nothing renders until a tab claims its type, so an unlisted type stays
  * invisible rather than leaking into a tab that did not ask for it.
@@ -38,7 +37,13 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "event_reply",
     "event_rsvp",
   ]),
-  other: new Set(),
+  other: new Set([
+    "competition_vote",
+    "competition_comment",
+    "competition_started",
+    "competition_deadline",
+    "competition_results",
+  ]),
 };
 
 /** The tab a type renders under, or null while no tab claims it yet. */

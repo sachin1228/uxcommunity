@@ -13,6 +13,8 @@ export const realtimeRooms = {
   resources: (communityId: string) => `resources:${communityId}`,
   resourceComments: (resourceId: string) => `resource-comments:${resourceId}`,
   showcase: (postId: string) => `showcase:${postId}`,
+  /** Discussion under one competition entry. */
+  competitionEntry: (entryId: string) => `competition-entry:${entryId}`,
   rules: (communityId: string) => `rules:${communityId}`,
   /** 3D designer studio — one shared room for everyone. */
   designers: () => "designers-studio",

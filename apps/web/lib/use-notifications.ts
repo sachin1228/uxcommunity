@@ -28,7 +28,12 @@ export type NotificationType =
   | "resource_reply"
   | "event_comment"
   | "event_reply"
-  | "event_rsvp";
+  | "event_rsvp"
+  | "competition_vote"
+  | "competition_comment"
+  | "competition_started"
+  | "competition_deadline"
+  | "competition_results";
 
 export interface NotificationItem {
   id: string;

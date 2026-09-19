@@ -3,7 +3,7 @@
 import { useState, useCallback, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Compass, Home, Library, MessageSquare, Plus, X } from "lucide-react";
+import { Briefcase, Compass, Home, Library, MessageSquare, Plus, Trophy, X } from "lucide-react";
 import { NotificationBellIcon } from "@/components/ui/NotificationBellIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { CommunityRow } from "@/components/communities/panel/CommunityRow";
@@ -91,10 +91,12 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
     isMatch("/dashboard", pathname) &&
     !isMatch("/dashboard/communities", pathname) &&
     !isMatch("/dashboard/library", pathname) &&
+    !isMatch("/dashboard/competitions", pathname) &&
     !isMatch("/dashboard/jobs", pathname) &&
     !isMatch("/dashboard/notifications", pathname);
   const exploreActive = pathname === "/dashboard/communities";
   const libraryActive = isMatch("/dashboard/library", pathname);
+  const competitionsActive = isMatch("/dashboard/competitions", pathname);
   const jobsActive = isMatch("/dashboard/jobs", pathname);
   const notificationsActive = isMatch("/dashboard/notifications", pathname);
 
@@ -183,6 +185,19 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
             >
               <Library strokeWidth={2.5} size={15} className="shrink-0" />
               <span className="flex-1 truncate">Library</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/dashboard/competitions"
+              className={`flex items-center gap-[11px] rounded-lg px-[11px] py-[7px] font-body text-sm font-normal transition-colors ${
+                competitionsActive
+                  ? "bg-surface-raised text-foreground"
+                  : "text-foreground-muted hover:text-foreground hover:bg-surface-raised"
+              }`}
+            >
+              <Trophy strokeWidth={2.5} size={15} className="shrink-0" />
+              <span className="flex-1 truncate">Competitions</span>
             </Link>
           </li>
           <li>

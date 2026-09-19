@@ -20,9 +20,21 @@ export type NotificationType =
   | "resource_reply"
   | "event_comment"
   | "event_reply"
-  | "event_rsvp";
+  | "event_rsvp"
+  // Weekly competitions: engagement on a member's entry, plus the once-per-cycle
+  // broadcasts to every member (see lib/competitions/notifications.ts).
+  | "competition_vote"
+  | "competition_comment"
+  | "competition_started"
+  | "competition_deadline"
+  | "competition_results";
 
-export type NotificationEntityType = "thread" | "resource" | "event";
+export type NotificationEntityType =
+  | "thread"
+  | "resource"
+  | "event"
+  | "competition"
+  | "competition_entry";
 
 interface NotificationInput {
   userId: string;

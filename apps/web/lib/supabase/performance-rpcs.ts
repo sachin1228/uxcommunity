@@ -36,6 +36,78 @@ type PerformanceRpcMap = {
   get_thread_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_resource_list_page: { args: { p_community_id: string; p_user_id: string; p_before: string | null; p_cursor_id: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_event_list_page: { args: { p_community_id: string; p_user_id: string; p_phase: "upcoming" | "past"; p_cursor_event_date: string | null; p_cursor_id: string | null; p_now: string; p_limit: number }; returns: Array<{ item: Json }> };
+  get_competition_entries: {
+    args: {
+      p_competition_id: string;
+      p_user_id: string;
+      p_sort: string;
+      p_limit: number;
+      p_offset: number;
+    };
+    returns: Array<{
+      id: string;
+      competition_id: string;
+      user_id: string;
+      title: string;
+      description: string;
+      cover_image_url: string;
+      design_image_url: string;
+      image_urls: Json;
+      figma_url: string | null;
+      prototype_url: string | null;
+      tools: Json;
+      tags: Json;
+      is_featured: boolean;
+      created_at: string;
+      updated_at: string;
+      author_name: string;
+      author_avatar_url: string | null;
+      author_role: string | null;
+      vote_count: number;
+      comment_count: number;
+      user_voted: boolean;
+      user_bookmarked: boolean;
+    }>;
+  };
+  get_competition_entry: {
+    args: { p_competition_id: string; p_entry_id: string; p_user_id: string };
+    returns: PerformanceRpcMap["get_competition_entries"]["returns"];
+  };
+  get_competition_stats: {
+    args: { p_competition_id: string };
+    returns: Array<{
+      entries: number;
+      designers: number;
+      votes: number;
+      comments: number;
+      participants: number;
+    }>;
+  };
+  get_competition_stats_bulk: {
+    args: { p_competition_ids: string[] };
+    returns: Array<{
+      competition_id: string;
+      entries: number;
+      designers: number;
+      votes: number;
+      comments: number;
+      participants: number;
+    }>;
+  };
+  get_competition_winners: {
+    args: { p_competition_ids: string[] };
+    returns: Array<{
+      competition_id: string;
+      entry_id: string;
+      user_id: string;
+      title: string;
+      cover_image_url: string;
+      design_image_url: string;
+      author_name: string;
+      author_avatar_url: string | null;
+      vote_count: number;
+    }>;
+  };
   get_home_feed_page: { args: { p_user_id: string; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
   get_profile_feed_page: { args: { p_user_id: string; p_scope: ProfileFeedScope; p_before: string | null; p_limit: number }; returns: Array<{ item: Json }> };
 };

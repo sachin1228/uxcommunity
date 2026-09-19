@@ -10,9 +10,12 @@ import {
   Bell,
   CalendarDays,
   CheckCheck,
+  Clock,
   FileText,
   Heart,
   MessageCircle,
+  Palette,
+  Trophy,
   Users,
 } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
@@ -32,6 +35,12 @@ function iconFor(type: NotificationType) {
   if (type.includes("event")) return CalendarDays;
   if (type.includes("resource")) return FileText;
   if (type.includes("comment") || type.includes("reply")) return MessageCircle;
+  // Weekly competitions: a vote is a heart, the cycle broadcasts get their own
+  // glyph so the bell reads at a glance.
+  if (type === "competition_vote") return Heart;
+  if (type === "competition_started") return Palette;
+  if (type === "competition_deadline") return Clock;
+  if (type === "competition_results") return Trophy;
   return Users;
 }
 
@@ -177,12 +186,10 @@ export function NotificationsView({ userId }: { userId: string }) {
               hint="Likes, comments and RSVPs on your threads, resources and events will appear here."
             />
           ) : (
-            /* The Other tab renders nothing yet on purpose — see
-               lib/notifications-tabs.ts for where its types get declared. */
-            <EmptyNotifications
-              icon={Bell}
-              title="Nothing here yet"
-              hint="Other kinds of notifications will show up here."
+              <EmptyNotifications
+              icon={Trophy}
+              title="No competition updates yet"
+              hint="Votes and comments on your entries, plus the weekly challenge announcements, land here."
             />
           )
         ) : (

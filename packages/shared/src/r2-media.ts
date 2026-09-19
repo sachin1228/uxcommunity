@@ -73,6 +73,13 @@ export const THREAD_ATTACHMENT_LOOKUP: MediaReferenceLookup = {
   getUrls: attachmentUrls,
 };
 
+/** Extra competition shots — stored as an array of { name, url, type, size }. */
+export const COMPETITION_ENTRY_IMAGES_LOOKUP: MediaReferenceLookup = {
+  table: "competition_entries",
+  column: "image_urls",
+  getUrls: attachmentUrls,
+};
+
 /** Master-data + community display pictures can be mirrored across rows, so a
  *  deletion must check every column that can hold the same object. */
 export const MASTER_IMAGE_LOOKUPS: MediaReferenceLookup[] = [
@@ -121,6 +128,11 @@ export const ALL_MEDIA_LOOKUPS: MediaReferenceLookup[] = [
   SHOWCASE_ATTACHMENT_LOOKUP,
   SHOWCASE_POSTER_LOOKUP,
   THREAD_ATTACHMENT_LOOKUP,
+  // Weekly competitions: the challenge cover plus each entry's three image slots.
+  { table: "competitions", column: "cover_image_url" },
+  { table: "competition_entries", column: "cover_image_url" },
+  { table: "competition_entries", column: "design_image_url" },
+  COMPETITION_ENTRY_IMAGES_LOOKUP,
   { table: "lottie_settings", column: "lottie_url" },
 ];
 
@@ -146,5 +158,9 @@ export const LOOKUP_ENTITY_TYPES: Record<string, string> = {
   "community_showcase_posts.image_url": "showcase",
   "community_showcase_posts.attachments": "showcase",
   "community_threads.attachments": "thread",
+  "competitions.cover_image_url": "competition",
+  "competition_entries.cover_image_url": "competition_entry",
+  "competition_entries.design_image_url": "competition_entry",
+  "competition_entries.image_urls": "competition_entry",
   "lottie_settings.lottie_url": "lottie_setting",
 };
