@@ -6,7 +6,15 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionDetail, resolveEntrySort } from "@/lib/competitions/queries";
 import { deferDueCompetitionBroadcasts } from "@/lib/competitions/notifications";
 import { canRankByVotes, canVote, countdownLabel, countdownTarget, formatCycleDate } from "@/lib/competitions/cycle";
-import { MetaLine, SectionHeading, StatsRow, StatusChip, WeekBadge } from "@/components/competitions/CompetitionChrome";
+import {
+  CompetitionSetupNotice,
+  MetaLine,
+  SectionHeading,
+  StatsRow,
+  StatusChip,
+  WeekBadge,
+} from "@/components/competitions/CompetitionChrome";
+import { withCompetitionSchema } from "@/lib/competitions/setup";
 import { ChallengeBrief } from "@/components/competitions/ChallengeBrief";
 import { Countdown } from "@/components/competitions/Countdown";
 import { EntryGrid } from "@/components/competitions/EntryGrid";
@@ -35,7 +43,12 @@ export default async function CompetitionPage({ params, searchParams }: Props) {
   const { sort } = await searchParams;
 
   const db = createServiceClient();
-  const payload = await loadCompetitionDetail(db, slug, userId, { sort: sort ?? null });
+  const loaded = await withCompetitionSchema(() =>
+    loadCompetitionDetail(db, slug, userId, { sort: sort ?? null }),
+  );
+  if (!loaded.ok) return <CompetitionSetupNotice />;
+
+  const payload = loaded.data;
   if (!payload) notFound();
 
   const { competition, stats, entries, myEntry, winner, upcoming } = payload;

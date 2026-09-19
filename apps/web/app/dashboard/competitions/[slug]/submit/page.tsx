@@ -5,7 +5,8 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionDetail } from "@/lib/competitions/queries";
 import { canSubmitEntry, formatCycleDate } from "@/lib/competitions/cycle";
-import { MetaLine, StatusChip, WeekBadge } from "@/components/competitions/CompetitionChrome";
+import { CompetitionSetupNotice, MetaLine, StatusChip, WeekBadge } from "@/components/competitions/CompetitionChrome";
+import { withCompetitionSchema } from "@/lib/competitions/setup";
 import { PageShell } from "@/components/competitions/CompetitionSections";
 import { SubmitEntryForm } from "@/components/competitions/SubmitEntryForm";
 
@@ -25,7 +26,10 @@ export default async function SubmitEntryPage({ params }: { params: Promise<{ sl
 
   const { slug } = await params;
   const db = createServiceClient();
-  const payload = await loadCompetitionDetail(db, slug, userId);
+  const loaded = await withCompetitionSchema(() => loadCompetitionDetail(db, slug, userId));
+  if (!loaded.ok) return <CompetitionSetupNotice />;
+
+  const payload = loaded.data;
   if (!payload) notFound();
 
   const { competition, myEntry } = payload;

@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionHome } from "@/lib/competitions/queries";
 import { deferDueCompetitionBroadcasts } from "@/lib/competitions/notifications";
+import { isCompetitionSchemaMissing } from "@/lib/competitions/setup";
 
 /**
  * GET /api/competitions
@@ -37,6 +38,12 @@ export async function GET() {
 
     return NextResponse.json(payload);
   } catch (error) {
+    if (isCompetitionSchemaMissing(error)) {
+      return NextResponse.json(
+        { error: "Competitions are not set up on this environment yet.", setupRequired: true },
+        { status: 503 },
+      );
+    }
     console.error("[competitions] home load failed", error);
     return NextResponse.json({ error: "Failed to load competitions." }, { status: 500 });
   }

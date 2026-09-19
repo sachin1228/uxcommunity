@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { listCompetitions } from "@/lib/competitions/queries";
 import { cycleAnchorFor, nextCycleWindows, weeklyCycleFrom } from "@/lib/competitions/cycle";
+import { isCompetitionSchemaMissing } from "@/lib/competitions/setup";
 import { parseCompetitionUpsertBody } from "@/lib/competitions/validation";
 
 /**
@@ -23,6 +24,12 @@ export async function GET() {
   try {
     return NextResponse.json({ competitions: await listCompetitions(db) });
   } catch (error) {
+    if (isCompetitionSchemaMissing(error)) {
+      return NextResponse.json(
+        { error: "Competitions are not set up on this environment yet.", setupRequired: true },
+        { status: 503 },
+      );
+    }
     console.error("[admin competitions] list failed", error);
     return NextResponse.json({ error: "Failed to load competitions." }, { status: 500 });
   }

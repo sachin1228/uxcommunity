@@ -4,7 +4,8 @@ import { ArrowLeft, Archive } from "lucide-react";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionArchive } from "@/lib/competitions/queries";
-import { EmptyState } from "@/components/competitions/CompetitionChrome";
+import { withCompetitionSchema } from "@/lib/competitions/setup";
+import { CompetitionSetupNotice, EmptyState } from "@/components/competitions/CompetitionChrome";
 import { ArchivePreview, PageShell } from "@/components/competitions/CompetitionSections";
 
 export const metadata = { title: "Past competitions — uxcommunity" };
@@ -21,7 +22,9 @@ export default async function CompetitionArchivePage() {
   if (!session || session.role !== "user") redirect("/login");
 
   const db = createServiceClient();
-  const archive = await loadCompetitionArchive(db);
+  const loaded = await withCompetitionSchema(() => loadCompetitionArchive(db));
+  if (!loaded.ok) return <CompetitionSetupNotice />;
+  const archive = loaded.data;
 
   return (
     <PageShell>

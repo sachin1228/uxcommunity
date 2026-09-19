@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionDetail } from "@/lib/competitions/queries";
 import { deferDueCompetitionBroadcasts } from "@/lib/competitions/notifications";
+import { isCompetitionSchemaMissing } from "@/lib/competitions/setup";
 
 /**
  * GET /api/competitions/[slug]?sort=recent|votes|featured&limit=60
@@ -36,6 +37,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     deferDueCompetitionBroadcasts([payload.competition]);
     return NextResponse.json(payload);
   } catch (error) {
+    if (isCompetitionSchemaMissing(error)) {
+      return NextResponse.json(
+        { error: "Competitions are not set up on this environment yet.", setupRequired: true },
+        { status: 503 },
+      );
+    }
     console.error("[competitions] detail load failed", error);
     return NextResponse.json({ error: "Failed to load this competition." }, { status: 500 });
   }

@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+import { Wrench } from "lucide-react";
 import type { CompetitionStatus } from "@/lib/competitions/cycle";
 import { statusLabel } from "@/lib/competitions/cycle";
+import { COMPETITION_SETUP_MIGRATION } from "@/lib/competitions/setup";
 
 /**
  * Presentational chrome shared by the competition pages.
@@ -100,6 +102,34 @@ export function SectionHeading({
         <h2 className="mt-1 font-display text-lg font-semibold text-foreground">{title}</h2>
       </div>
       {action}
+    </div>
+  );
+}
+
+/**
+ * Shown when the competition tables have not been created in this environment.
+ * A raw PostgREST schema error is unreadable and looks like a crash; this says
+ * exactly what is missing and what to run.
+ */
+export function CompetitionSetupNotice() {
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 py-16 sm:px-6">
+      <div className="rounded-2xl bg-surface-raised p-6 shadow-sm sm:p-8">
+        <p className="flex items-center gap-2 font-display text-lg font-semibold text-foreground">
+          <Wrench size={17} strokeWidth={2.5} className="text-foreground-subtle" />
+          Competitions aren&apos;t set up on this environment yet
+        </p>
+        <p className="mt-2 font-body text-sm leading-relaxed text-foreground-muted">
+          The database tables for weekly competitions have not been created here, so the feature has
+          nothing to read. Apply the migration below and reload.
+        </p>
+        <pre className="mt-4 overflow-x-auto rounded-lg bg-background-subtle px-3 py-2.5 font-mono text-[11px] text-foreground-muted">
+          {COMPETITION_SETUP_MIGRATION}
+        </pre>
+        <p className="mt-3 font-body text-xs text-foreground-subtle">
+          Nothing is broken for members in the meantime — this page is the only thing affected.
+        </p>
+      </div>
     </div>
   );
 }

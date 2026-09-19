@@ -3,6 +3,8 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getComments, getCompetitionBySlug, getEntry } from "@/lib/competitions/queries";
 import { canComment, canVote } from "@/lib/competitions/cycle";
+import { withCompetitionSchema } from "@/lib/competitions/setup";
+import { CompetitionSetupNotice } from "@/components/competitions/CompetitionChrome";
 import { EntryDetailView } from "@/components/competitions/EntryDetailView";
 
 export const metadata = { title: "Entry — uxcommunity" };
@@ -26,13 +28,17 @@ export default async function CompetitionEntryPage({
   const { slug, entryId } = await params;
   const db = createServiceClient();
 
-  const competition = await getCompetitionBySlug(db, slug);
-  if (!competition) notFound();
+  const loaded = await withCompetitionSchema(async () => {
+    const competition = await getCompetitionBySlug(db, slug);
+    if (!competition) return null;
+    const entry = await getEntry(db, competition.id, entryId, userId);
+    if (!entry) return null;
+    return { competition, entry, comments: await getComments(db, entryId) };
+  });
+  if (!loaded.ok) return <CompetitionSetupNotice />;
+  if (!loaded.data) notFound();
 
-  const entry = await getEntry(db, competition.id, entryId, userId);
-  if (!entry) notFound();
-
-  const comments = await getComments(db, entryId);
+  const { competition, entry, comments } = loaded.data;
 
   return (
     <EntryDetailView

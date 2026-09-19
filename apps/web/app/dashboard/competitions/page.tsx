@@ -4,7 +4,8 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadCompetitionHome } from "@/lib/competitions/queries";
 import { deferDueCompetitionBroadcasts } from "@/lib/competitions/notifications";
-import { EmptyState } from "@/components/competitions/CompetitionChrome";
+import { withCompetitionSchema } from "@/lib/competitions/setup";
+import { CompetitionSetupNotice, EmptyState } from "@/components/competitions/CompetitionChrome";
 import {
   ArchivePreview,
   CompetitionHero,
@@ -30,8 +31,13 @@ export default async function CompetitionsPage() {
   const userId = session.userId!;
 
   const db = createServiceClient();
-  const payload = await loadCompetitionHome(db, userId);
-  const { current, currentStats, currentEntries, currentWinner, upcoming, archive } = payload;
+
+  // An environment where the migration has not run yet must explain itself
+  // rather than render a raw PostgREST error.
+  const loaded = await withCompetitionSchema(() => loadCompetitionHome(db, userId));
+  if (!loaded.ok) return <CompetitionSetupNotice />;
+
+  const { current, currentStats, currentEntries, currentWinner, upcoming, archive } = loaded.data;
 
   // Keep the weekly rhythm without a cron: whichever cycle is due claims its
   // notification here, once (see lib/competitions/notifications.ts).
