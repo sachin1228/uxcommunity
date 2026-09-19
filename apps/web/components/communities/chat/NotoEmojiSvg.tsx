@@ -12,7 +12,8 @@ interface NotoEmojiSvgProps {
   className?: string;
 }
 
-const SVG_BASE = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/svg";
+// Self-hosted SVGs vendored into public/emoji/svg (see lib/noto-emoji.ts).
+const SVG_BASE = "/emoji/svg";
 
 /**
  * Lightweight SVG-only emoji renderer.

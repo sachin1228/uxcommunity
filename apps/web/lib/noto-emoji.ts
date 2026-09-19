@@ -1,7 +1,8 @@
 /**
- * Noto Emoji Animation catalog service.
- * Fetches the emoji catalog from Google's Noto Emoji Animation project
- * and maps codepoints to Lottie animation URLs.
+ * Noto Emoji catalog service (self-hosted).
+ * Serves the vendored emoji catalog and maps codepoints to local SVG and
+ * Lottie animation URLs. See the comment above CATALOG_URL for how the
+ * vendored assets get here.
  */
 
 export interface NotoEmoji {
@@ -19,9 +20,16 @@ export interface EmojiCatalog {
   categories: string[];
 }
 
-const CATALOG_URL = "https://googlefonts.github.io/noto-emoji-animation/data/api.json";
-const LOTTIE_BASE = "https://fonts.gstatic.com/s/e/notoemoji/latest";
-const SVG_BASE = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/svg";
+// Self-hosted assets (vendored into apps/web/public/emoji) so emoji rendering
+// never depends on a third-party CDN. The catalog is a snapshot of Google's
+// Noto Emoji Animation API (googlefonts.github.io/noto-emoji-animation), the
+// SVGs are from googlefonts/noto-emoji `2D/svg` and the Lottie animations from
+// fonts.gstatic.com (Apache-2.0; see public/emoji/svg/LICENSE). Upstream
+// restructures (e.g. the 2026 svg/ -> 2D/svg move) no longer break the app —
+// refresh the vendored files with scripts/update-emoji.mjs to pick up changes.
+const CATALOG_URL = "/emoji/catalog.json";
+const LOTTIE_BASE = "/emoji/lottie";
+const SVG_BASE = "/emoji/svg";
 
 // In-memory cache
 let catalogCache: EmojiCatalog | null = null;
@@ -194,4 +202,15 @@ export async function getEmojiLottieUrl(emoji: string): Promise<string | null> {
  */
 export function svgUrlForCodepoint(codepoint: string): string {
   return `${SVG_BASE}/emoji_u${stripVS16(codepoint)}.svg`;
+}
+
+/**
+ * Get Lottie animation URL for a codepoint (synchronous).
+ * Served from the vendored snapshot in public/emoji/lottie (one JSON per
+ * stripped codepoint, downloaded from fonts.gstatic.com — see
+ * scripts/update-emoji.mjs). Returns null when the character has no
+ * codepoint key; AnimatedEmoji falls back to the static SVG in that case.
+ */
+export function lottieUrlForCodepoint(codepoint: string): string {
+  return `${LOTTIE_BASE}/${stripVS16(codepoint)}.json`;
 }

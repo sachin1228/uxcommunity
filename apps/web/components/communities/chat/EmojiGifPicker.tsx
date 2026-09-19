@@ -258,13 +258,7 @@ export function NotoEmojiGrid({ onSelect }: { onSelect: (emoji: string) => void 
                   hover:bg-surface-raised active:scale-90 transition-all duration-100"
                 title={emoji.name}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={emoji.svgUrl}
-                  alt={emoji.name}
-                  className="w-6 h-6"
-                  loading="lazy"
-                />
+                <NotoEmojiSvg emoji={emoji.unicode} size={24} />
               </button>
             ))}
           </div>
