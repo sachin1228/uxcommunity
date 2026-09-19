@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" role="img" aria-label="Demo design submission">
+  <rect width="900" height="1600" fill="#1a1120"/>
+  
+  <g opacity="0.75">
+    <text x="64" y="76" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#f6effa">9:41</text>
+    <rect x="742" y="54" width="46" height="22" rx="6" fill="none" stroke="#b39bc8" stroke-width="4"/>
+    <rect x="752" y="63" width="20" height="5" rx="2.5" fill="#b39bc8"/>
+    <rect x="800" y="58" width="4" height="14" rx="2" fill="#b39bc8"/>
+    <rect x="812" y="52" width="4" height="20" rx="2" fill="#b39bc8"/>
+    <rect x="824" y="46" width="4" height="26" rx="2" fill="#b39bc8"/>
+  </g>
+  
+    <text x="64" y="215" font-family="Inter, Helvetica, Arial, sans-serif" font-size="28" letter-spacing="5" fill="#b39bc8">OVERVIEW</text>
+    <text x="64" y="320" font-family="Inter, Helvetica, Arial, sans-serif" font-size="120" font-weight="700" fill="#f6effa">₹42k</text>
+    <text x="64" y="390" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" fill="#b39bc8">Your month · on track</text>
+    <rect x="64" y="450" width="772" height="420" rx="36" fill="#261a31"/>
+    <rect x="116" y="730" width="34" height="60" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="176" y="663" width="34" height="127" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="236" y="596" width="34" height="194" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="296" y="529" width="34" height="261" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="356" y="682" width="34" height="108" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="416" y="615" width="34" height="175" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="476" y="548" width="34" height="242" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="536" y="701" width="34" height="89" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="596" y="634" width="34" height="156" rx="17" fill="#c084fc" opacity="1"/><rect x="656" y="567" width="34" height="223" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="716" y="720" width="34" height="70" rx="17" fill="#b39bc8" opacity="0.35"/><rect x="776" y="653" width="34" height="137" rx="17" fill="#b39bc8" opacity="0.35"/>
+    <rect x="64" y="920" width="772" height="220" rx="36" fill="#261a31"/>
+    <text x="108" y="1000" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#b39bc8">BIGGEST CHANGE</text>
+    <text x="108" y="1070" font-family="Inter, Helvetica, Arial, sans-serif" font-size="46" font-weight="600" fill="#f6effa">Nothing unexpected</text>
+    <text x="108" y="1116" font-family="Inter, Helvetica, Arial, sans-serif" font-size="28" fill="#b39bc8">Two subscriptions renew next week</text>
+</svg>

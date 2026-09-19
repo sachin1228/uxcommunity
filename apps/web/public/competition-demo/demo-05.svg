@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" role="img" aria-label="Demo design submission">
+  <rect width="900" height="1600" fill="#fdf6ec"/>
+  
+  <g opacity="0.75">
+    <text x="64" y="76" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#2a1f14">9:41</text>
+    <rect x="742" y="54" width="46" height="22" rx="6" fill="none" stroke="#a08c76" stroke-width="4"/>
+    <rect x="752" y="63" width="20" height="5" rx="2.5" fill="#a08c76"/>
+    <rect x="800" y="58" width="4" height="14" rx="2" fill="#a08c76"/>
+    <rect x="812" y="52" width="4" height="20" rx="2" fill="#a08c76"/>
+    <rect x="824" y="46" width="4" height="26" rx="2" fill="#a08c76"/>
+  </g>
+  
+    <rect x="64" y="140" width="772" height="640" rx="40" fill="#ffffff"/>
+    <text x="120" y="260" font-family="Inter, Helvetica, Arial, sans-serif" font-size="28" letter-spacing="5" fill="#a08c76">STEP 1 OF 3</text>
+    <text x="120" y="370" font-family="Inter, Helvetica, Arial, sans-serif" font-size="82" font-weight="700" fill="#2a1f14">Weekend</text>
+    <text x="120" y="450" font-family="Inter, Helvetica, Arial, sans-serif" font-size="82" font-weight="700" fill="#2a1f14">in Udaipur</text>
+    <text x="120" y="540" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#a08c76">No settings, no tour. One question</text>
+    <text x="120" y="586" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#a08c76">that changes what you see next.</text>
+    <rect x="120" y="650" width="200" height="70" rx="35" fill="#e07a2f"/>
+    <text x="220" y="696" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" font-weight="600" fill="#fdf6ec">3 days</text>
+    
+      <g transform="translate(64, 840)">
+        <circle cx="40" cy="46" r="26" fill="#e07a2f" opacity="0.28"/>
+        <text x="40" y="56" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#2a1f14">1</text>
+        <text x="100" y="40" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#2a1f14">Answer one question</text>
+        <text x="100" y="82" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#a08c76">About 10 seconds</text>
+      </g>
+      <g transform="translate(64, 1000)">
+        <circle cx="40" cy="46" r="26" fill="#e07a2f" opacity="0.48000000000000004"/>
+        <text x="40" y="56" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#2a1f14">2</text>
+        <text x="100" y="40" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#2a1f14">See a real result</text>
+        <text x="100" y="82" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#a08c76">Not a demo screen</text>
+      </g>
+      <g transform="translate(64, 1160)">
+        <circle cx="40" cy="46" r="26" fill="#e07a2f" opacity="0.68"/>
+        <text x="40" y="56" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#2a1f14">3</text>
+        <text x="100" y="40" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#2a1f14">Keep what you like</text>
+        <text x="100" y="82" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#a08c76">Everything is editable</text>
+      </g>
+</svg>

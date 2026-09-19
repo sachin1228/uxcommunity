@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" role="img" aria-label="Demo design submission">
+  <rect width="900" height="1600" fill="#0d1418"/>
+  
+  <g opacity="0.75">
+    <text x="64" y="76" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#eff6f9">9:41</text>
+    <rect x="742" y="54" width="46" height="22" rx="6" fill="none" stroke="#87a3b3" stroke-width="4"/>
+    <rect x="752" y="63" width="20" height="5" rx="2.5" fill="#87a3b3"/>
+    <rect x="800" y="58" width="4" height="14" rx="2" fill="#87a3b3"/>
+    <rect x="812" y="52" width="4" height="20" rx="2" fill="#87a3b3"/>
+    <rect x="824" y="46" width="4" height="26" rx="2" fill="#87a3b3"/>
+  </g>
+  
+    <text x="64" y="230" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" letter-spacing="6" fill="#87a3b3">FORECAST</text>
+    <text x="64" y="340" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92" font-weight="700" fill="#eff6f9">First</text>
+    <text x="64" y="440" font-family="Inter, Helvetica, Arial, sans-serif" font-size="92" font-weight="700" fill="#eff6f9">ninety</text>
+    <text x="64" y="600" font-family="Inter, Helvetica, Arial, sans-serif" font-size="220" font-weight="700" fill="#38bdf8">seconds</text>
+    <rect x="64" y="700" width="772" height="1" fill="#87a3b3" opacity="0.35"/>
+    
+      <g transform="translate(64, 790)">
+        <text x="0" y="0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#87a3b3">M</text>
+        <circle cx="34" cy="90" r="34" fill="#38bdf8" opacity="0.18"/>
+        <text x="6" y="200" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#eff6f9">12°</text>
+      </g>
+      <g transform="translate(222, 790)">
+        <text x="0" y="0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#87a3b3">T</text>
+        <circle cx="34" cy="90" r="39" fill="#38bdf8" opacity="0.32"/>
+        <text x="6" y="200" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#eff6f9">13°</text>
+      </g>
+      <g transform="translate(380, 790)">
+        <text x="0" y="0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#87a3b3">W</text>
+        <circle cx="34" cy="90" r="44" fill="#38bdf8" opacity="0.46"/>
+        <text x="6" y="200" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#eff6f9">14°</text>
+      </g>
+      <g transform="translate(538, 790)">
+        <text x="0" y="0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#87a3b3">T</text>
+        <circle cx="34" cy="90" r="49" fill="#38bdf8" opacity="0.6000000000000001"/>
+        <text x="6" y="200" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#eff6f9">15°</text>
+      </g>
+      <g transform="translate(696, 790)">
+        <text x="0" y="0" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#87a3b3">F</text>
+        <circle cx="34" cy="90" r="54" fill="#38bdf8" opacity="0.74"/>
+        <text x="6" y="200" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#eff6f9">16°</text>
+      </g>
+    <rect x="64" y="1090" width="772" height="300" rx="32" fill="#16212a"/>
+    <text x="108" y="1170" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#87a3b3">REMINDER</text>
+    <text x="108" y="1240" font-family="Inter, Helvetica, Arial, sans-serif" font-size="44" font-weight="600" fill="#eff6f9">ninety seconds</text>
+    <text x="108" y="1300" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#87a3b3">Umbrella stays home today.</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" role="img" aria-label="Demo design submission">
+  <rect width="900" height="1600" fill="#0e1b17"/>
+  
+  <g opacity="0.75">
+    <text x="64" y="76" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#eef6f1">9:41</text>
+    <rect x="742" y="54" width="46" height="22" rx="6" fill="none" stroke="#8fb3a5" stroke-width="4"/>
+    <rect x="752" y="63" width="20" height="5" rx="2.5" fill="#8fb3a5"/>
+    <rect x="800" y="58" width="4" height="14" rx="2" fill="#8fb3a5"/>
+    <rect x="812" y="52" width="4" height="20" rx="2" fill="#8fb3a5"/>
+    <rect x="824" y="46" width="4" height="26" rx="2" fill="#8fb3a5"/>
+  </g>
+  
+    <rect x="64" y="150" width="772" height="520" rx="40" fill="#16261f"/>
+    <rect x="104" y="190" width="692" height="440" rx="28" fill="#4ade80" opacity="0.22"/>
+    <text x="140" y="300" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" letter-spacing="5" fill="#8fb3a5">NOW</text>
+    <text x="140" y="400" font-family="Inter, Helvetica, Arial, sans-serif" font-size="76" font-weight="700" fill="#eef6f1">playing</text>
+    <text x="140" y="470" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" fill="#8fb3a5">03:42</text>
+    <rect x="140" y="530" width="620" height="8" rx="4" fill="#0e1b17" opacity="0.5"/>
+    <rect x="140" y="530" width="240" height="8" rx="4" fill="#4ade80"/>
+    
+      <g transform="translate(64, 740)">
+        <rect x="0" y="0" width="772" height="112" rx="26" fill="#16261f" opacity="1"/>
+        <rect x="36" y="26" width="60" height="60" rx="18" fill="#4ade80" opacity="0.7"/>
+        <text x="128" y="66" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#eef6f1">Track 1</text>
+        <text x="128" y="98" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#8fb3a5">Because you played something softer</text>
+      </g>
+      <g transform="translate(64, 880)">
+        <rect x="0" y="0" width="772" height="112" rx="26" fill="#16261f" opacity="0.87"/>
+        <rect x="36" y="26" width="60" height="60" rx="18" fill="#4ade80" opacity="0.6"/>
+        <text x="128" y="66" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#eef6f1">Track 2</text>
+        <text x="128" y="98" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#8fb3a5">Because you played something softer</text>
+      </g>
+      <g transform="translate(64, 1020)">
+        <rect x="0" y="0" width="772" height="112" rx="26" fill="#16261f" opacity="0.74"/>
+        <rect x="36" y="26" width="60" height="60" rx="18" fill="#4ade80" opacity="0.49999999999999994"/>
+        <text x="128" y="66" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#eef6f1">Track 3</text>
+        <text x="128" y="98" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#8fb3a5">Because you played something softer</text>
+      </g>
+      <g transform="translate(64, 1160)">
+        <rect x="0" y="0" width="772" height="112" rx="26" fill="#16261f" opacity="0.61"/>
+        <rect x="36" y="26" width="60" height="60" rx="18" fill="#4ade80" opacity="0.3999999999999999"/>
+        <text x="128" y="66" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#eef6f1">Track 4</text>
+        <text x="128" y="98" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#8fb3a5">Because you played something softer</text>
+      </g>
+      <g transform="translate(64, 1300)">
+        <rect x="0" y="0" width="772" height="112" rx="26" fill="#16261f" opacity="0.48"/>
+        <rect x="36" y="26" width="60" height="60" rx="18" fill="#4ade80" opacity="0.29999999999999993"/>
+        <text x="128" y="66" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#eef6f1">Track 5</text>
+        <text x="128" y="98" font-family="Inter, Helvetica, Arial, sans-serif" font-size="24" fill="#8fb3a5">Because you played something softer</text>
+      </g>
+</svg>

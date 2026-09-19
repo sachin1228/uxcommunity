@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1600" viewBox="0 0 900 1600" role="img" aria-label="Demo design submission">
+  <rect width="900" height="1600" fill="#f6f4ef"/>
+  
+  <g opacity="0.75">
+    <text x="64" y="76" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#191713">9:41</text>
+    <rect x="742" y="54" width="46" height="22" rx="6" fill="none" stroke="#8b857a" stroke-width="4"/>
+    <rect x="752" y="63" width="20" height="5" rx="2.5" fill="#8b857a"/>
+    <rect x="800" y="58" width="4" height="14" rx="2" fill="#8b857a"/>
+    <rect x="812" y="52" width="4" height="20" rx="2" fill="#8b857a"/>
+    <rect x="824" y="46" width="4" height="26" rx="2" fill="#8b857a"/>
+  </g>
+  
+    <text x="64" y="210" font-family="Inter, Helvetica, Arial, sans-serif" font-size="28" letter-spacing="5" fill="#8b857a">TODAY</text>
+    <text x="64" y="300" font-family="Inter, Helvetica, Arial, sans-serif" font-size="72" font-weight="700" fill="#191713">Clarity</text>
+    <rect x="64" y="360" width="772" height="440" rx="36" fill="#ffffff"/>
+    <circle cx="200" cy="530" r="86" fill="#1f6f5c" opacity="0.9"/>
+    <text x="200" y="556" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="64" font-weight="700" fill="#f6f4ef">24°</text>
+    <text x="330" y="490" font-family="Inter, Helvetica, Arial, sans-serif" font-size="34" fill="#191713">by default</text>
+    <text x="330" y="546" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#8b857a">Light jacket · 6 min walk</text>
+    <text x="330" y="600" font-family="Inter, Helvetica, Arial, sans-serif" font-size="30" fill="#8b857a">Leave by 8:20 to stay dry</text>
+    
+      <rect x="64" y="860" width="772" height="120" rx="28" fill="#ffffff" opacity="1"/>
+      <rect x="104" y="900" width="60" height="60" rx="18" fill="#1f6f5c" opacity="0.5"/>
+      <text x="196" y="930" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#191713">Feels like 16°</text>
+      <text x="196" y="968" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#8b857a">Dry through the evening</text>
+      <rect x="64" y="1010" width="772" height="120" rx="28" fill="#ffffff" opacity="0.8200000000000001"/>
+      <rect x="104" y="1050" width="60" height="60" rx="18" fill="#1f6f5c" opacity="0.5"/>
+      <text x="196" y="1080" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#191713">Wind 14 km/h</text>
+      <text x="196" y="1118" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#8b857a">Cooler than yesterday</text>
+      <rect x="64" y="1160" width="772" height="120" rx="28" fill="#ffffff" opacity="0.64"/>
+      <rect x="104" y="1200" width="60" height="60" rx="18" fill="#1f6f5c" opacity="0.5"/>
+      <text x="196" y="1230" font-family="Inter, Helvetica, Arial, sans-serif" font-size="32" fill="#191713">Sunset 18:52</text>
+      <text x="196" y="1268" font-family="Inter, Helvetica, Arial, sans-serif" font-size="26" fill="#8b857a">Good light for a walk</text>
+</svg>

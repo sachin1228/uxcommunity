@@ -36,6 +36,8 @@
     "test:mention-jumps": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/components/communities/chat/mention-jumps.test.ts",
     "test:notification-tabs": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/notifications-tabs.test.ts",
     "test:competitions": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/competitions/cycle.test.ts apps/web/lib/competitions/validation.test.ts apps/web/lib/competitions/setup.test.ts",
+    "art:competitions-demo": "node scripts/generate-competition-demo-art.mjs",
+    "seed:competitions-demo": "test -n \"$DATABASE_URL\" || { echo 'DATABASE_URL is not set - see apps/web/.env.example'; exit 1; }; PGOPTIONS=\"-c app.competition_demo_seed=on\" psql --single-transaction -v ON_ERROR_STOP=1 -f supabase/seeds/competitions-demo.sql \"$DATABASE_URL\"",
     "test:community-areas": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/areas.test.ts",
     "test:community-badges": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/community-badges.test.ts",
     "test:content-sync": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/communities/content-sync.test.ts",
