@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
+import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
 
 /**
  * POST /api/communities/[id]/join
@@ -108,6 +110,9 @@ export async function POST(
       return NextResponse.json({ error: "Failed to submit join request." }, { status: 500 });
     }
 
+    // The community can no longer be suggested to this member as a one-tap join.
+    revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
+
     return NextResponse.json({ status: "requested", communityId });
   }
 
@@ -122,6 +127,10 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: "Failed to join community." }, { status: 500 });
   }
+
+  // Drop the cached suggestion lists so the homepage rail (and any other
+  // surface reading them) stops offering a community this member just joined.
+  revalidateTag(SUGGESTED_COMMUNITIES_TAG, { expire: 0 });
 
   return NextResponse.json({ success: true });
 }

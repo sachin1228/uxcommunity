@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ShowcaseDetailClient } from "@/components/communities/showcase/ShowcaseDetailClient";
-import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
+import { HomeRail } from "@/app/dashboard/HomeRail";
 import type { ShowcaseComment, ShowcasePost } from "@/components/communities/showcase/types";
 
 export default async function ShowcaseDetailPage({ params }: { params: Promise<{ postId: string }> }) {
@@ -24,7 +24,7 @@ export default async function ShowcaseDetailPage({ params }: { params: Promise<{
       <div className="mx-auto w-full max-w-[40rem]">
         <ShowcaseDetailClient initialPost={post} initialComments={comments} currentUserId={userId} communityId={communityId} communityName={community?.name ?? "Community"} communityImage={community?.image_url ?? null} showCommunityAttribution backHref="/dashboard" backLabel="Home" />
       </div>
-        <HomeSidebar />
+        <HomeRail userId={userId} />
       </div>
     </div>
   );

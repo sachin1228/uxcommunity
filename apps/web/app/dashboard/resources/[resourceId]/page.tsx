@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
-import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
+import { HomeRail } from "@/app/dashboard/HomeRail";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
 
 interface Props {
@@ -135,7 +135,7 @@ export default async function ResourceDetailPage({ params }: Props) {
             backLabel="Home"
           />
         </div>
-        <HomeSidebar />
+        <HomeRail userId={userId} />
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadThreadDetail } from "@/lib/threads/load-thread-detail";
 import { ThreadDetailClient } from "@/components/communities/threads/ThreadDetailClient";
-import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
+import { HomeRail } from "@/app/dashboard/HomeRail";
 
 export default async function ThreadDetailPage({ params }: { params: Promise<{ threadId: string }> }) {
   const session = await getSession();
@@ -49,7 +49,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
             backLabel="Home"
           />
         </div>
-        <HomeSidebar />
+        <HomeRail userId={userId} />
       </div>
     </div>
   );
