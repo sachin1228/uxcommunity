@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
-import { HomeSidebar } from "@/app/dashboard/HomeSidebar";
+import { HomeRail } from "@/app/dashboard/HomeRail";
 import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 
 export default async function EventDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
@@ -95,7 +95,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             backLabel="Home"
           />
         </div>
-        <HomeSidebar />
+        <HomeRail userId={userId} />
       </div>
     </div>
   );

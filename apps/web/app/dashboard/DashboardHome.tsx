@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { DashboardSingleColumn } from "./ContentLoader";
-import { HomeSidebar } from "./HomeSidebar";
 import { HomeFeed } from "./HomeFeed";
 import { HomeFeedFilters } from "./HomeFeedFilters";
 
 interface DashboardHomeProps {
   userId: string;
+  /**
+   * The sidebar rail, rendered on the server (HomeRail) and slotted in here so
+   * this client shell can own the two-column layout without owning the data.
+   */
+  rail?: ReactNode;
 }
 
-export function DashboardHome({ userId }: DashboardHomeProps) {
+export function DashboardHome({ userId, rail }: DashboardHomeProps) {
   const [refreshToken, setRefreshToken] = useState(0);
 
   return (
@@ -19,7 +23,7 @@ export function DashboardHome({ userId }: DashboardHomeProps) {
         <HomeFeedFilters />
         <HomeFeed currentUserId={userId} refreshToken={refreshToken} />
       </DashboardSingleColumn>
-      <HomeSidebar />
+      {rail}
     </div>
   );
 }
