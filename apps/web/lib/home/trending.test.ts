@@ -1,85 +1,126 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { aggregateTrendingTopics, normalizeTopic } from "./trending";
+import {
+  engagementOf,
+  rankTrendingPosts,
+  trendingScore,
+  type TrendingPostCandidate,
+} from "./trending";
 
-test("ranks topics by how many threads used them", () => {
-  const topics = aggregateTrendingTopics([
-    { tags: ["Design Systems"] },
-    { tags: ["Design Systems", "AI"] },
-    { tags: ["AI"] },
-    { tags: ["Design Systems"] },
-  ]);
+const NOW = Date.parse("2026-09-22T12:00:00.000Z");
 
-  assert.deepEqual(topics, [
-    { topic: "Design Systems", post_count: 3, share: 75 },
-    { topic: "AI", post_count: 2, share: 50 },
-  ]);
-});
+function post(
+  overrides: Partial<TrendingPostCandidate> & { id: string },
+): TrendingPostCandidate {
+  return {
+    title: overrides.id,
+    community_id: "c1",
+    // Two hours old unless the test says otherwise.
+    created_at: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(),
+    like_count: 0,
+    comment_count: 0,
+    ...overrides,
+  };
+}
 
-test("counts one thread once per topic, however often the tag repeats", () => {
-  const topics = aggregateTrendingTopics([{ tags: ["Portfolio", "portfolio", "Portfolio"] }]);
-  assert.deepEqual(topics, [{ topic: "Portfolio", post_count: 1, share: 100 }]);
-});
+function ids(posts: TrendingPostCandidate[]) {
+  return posts.map((p) => p.id);
+}
 
-test("groups spellings case-insensitively under the newest one", () => {
-  // Rows arrive newest-first, so the label the reader sees is the latest
-  // spelling the community used.
-  const topics = aggregateTrendingTopics([
-    { tags: ["ux research"] },
-    { tags: ["UX Research"] },
-  ]);
-
-  assert.equal(topics.length, 1);
-  assert.equal(topics[0].topic, "ux research");
-  assert.equal(topics[0].post_count, 2);
-});
-
-test("share is the topic's slice of the tagged threads only", () => {
-  const topics = aggregateTrendingTopics([
-    { tags: ["Motion"] },
-    { tags: ["Motion"] },
-    { tags: ["Branding"] },
-    { tags: null }, // untagged thread — not part of any share
-    { tags: [] },
-  ]);
-
-  const motion = topics.find((topic) => topic.topic === "Motion");
-  const branding = topics.find((topic) => topic.topic === "Branding");
-  assert.equal(motion?.share, 66.7);
-  assert.equal(branding?.share, 33.3);
-});
-
-test("ignores blank, hashed-only and over-long tags", () => {
-  const topics = aggregateTrendingTopics([
-    { tags: ["   ", "#", "#  ", "a".repeat(31), "Accessibility"] },
-  ]);
-
-  assert.deepEqual(topics, [{ topic: "Accessibility", post_count: 1, share: 100 }]);
-});
-
-test("strips the leading hash and collapses inner whitespace", () => {
-  assert.equal(normalizeTopic("#Design   Systems"), "Design Systems");
-  assert.equal(normalizeTopic("  Accessibility  "), "Accessibility");
-  assert.equal(normalizeTopic(""), null);
-  assert.equal(normalizeTopic("x".repeat(31)), null);
-});
-
-test("breaks ties alphabetically so the list is stable", () => {
-  const topics = aggregateTrendingTopics([
-    { tags: ["Web3"] },
-    { tags: ["Vibe coding"] },
-  ]);
-
-  assert.deepEqual(
-    topics.map((topic) => topic.topic),
-    ["Vibe coding", "Web3"],
+test("ranks by engagement, likes and comments counting the same", () => {
+  const ranked = rankTrendingPosts(
+    [
+      post({ id: "quiet", like_count: 1 }),
+      post({ id: "debated", like_count: 4, comment_count: 9 }),
+      post({ id: "liked", like_count: 6, comment_count: 1 }),
+    ],
+    { now: NOW },
   );
+
+  assert.deepEqual(ids(ranked), ["debated", "liked", "quiet"]);
 });
 
-test("honours the limit and returns nothing without tagged threads", () => {
-  const rows = ["A", "B", "C", "D", "E", "F"].map((tag) => ({ tags: [tag] }));
+test("counts a like and a comment as one point each", () => {
+  assert.equal(engagementOf(post({ id: "a", like_count: 3, comment_count: 4 })), 7);
+});
 
-  assert.equal(aggregateTrendingTopics(rows, 3).length, 3);
-  assert.deepEqual(aggregateTrendingTopics([{ tags: [] }, {}]), []);
-  assert.deepEqual(aggregateTrendingTopics([], 5), []);
+test("skips posts nobody has engaged with", () => {
+  const ranked = rankTrendingPosts(
+    [
+      post({ id: "untouched" }),
+      post({ id: "liked", like_count: 1 }),
+    ],
+    { now: NOW },
+  );
+
+  assert.deepEqual(ids(ranked), ["liked"]);
+  assert.deepEqual(rankTrendingPosts([post({ id: "untouched" })], { now: NOW }), []);
+});
+
+test("fades engagement with age so the card keeps moving", () => {
+  const fresh = post({ id: "fresh", like_count: 6, comment_count: 0 });
+  const stale = post({
+    id: "stale",
+    like_count: 10,
+    comment_count: 0,
+    created_at: new Date(NOW - 6 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+
+  // Six days is two half-lives: 10 points become 2.5, so this week's 6 wins.
+  assert.deepEqual(ids(rankTrendingPosts([stale, fresh], { now: NOW })), ["fresh", "stale"]);
+});
+
+test("a much bigger stale post can still outrank a fresh small one", () => {
+  const fresh = post({ id: "fresh", like_count: 2 });
+  const stale = post({
+    id: "stale",
+    like_count: 40,
+    created_at: new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+
+  assert.deepEqual(ids(rankTrendingPosts([fresh, stale], { now: NOW })), ["stale", "fresh"]);
+});
+
+test("halves the score after one half-life", () => {
+  const hoursAgo = (hours: number) => new Date(NOW - hours * 60 * 60 * 1000).toISOString();
+  const start = trendingScore(post({ id: "a", like_count: 8, created_at: hoursAgo(0) }), NOW);
+  const faded = trendingScore(post({ id: "b", like_count: 8, created_at: hoursAgo(72) }), NOW);
+
+  assert.equal(start, 8);
+  assert.equal(Math.round(faded * 100) / 100, 4);
+});
+
+test("keeps the same order when scores tie", () => {
+  const shared = {
+    like_count: 4,
+    created_at: new Date(NOW - 3 * 60 * 60 * 1000).toISOString(),
+  };
+  const ranked = rankTrendingPosts(
+    [post({ id: "b", ...shared }), post({ id: "a", ...shared })],
+    { now: NOW },
+  );
+
+  assert.deepEqual(ids(ranked), ["a", "b"]);
+});
+
+test("treats an unparseable timestamp as brand new instead of dropping the post", () => {
+  const ranked = rankTrendingPosts(
+    [post({ id: "broken", created_at: "not-a-date", like_count: 3 })],
+    { now: NOW },
+  );
+
+  assert.deepEqual(ids(ranked), ["broken"]);
+});
+
+test("clamps negative counts and honours the limit", () => {
+  assert.equal(engagementOf(post({ id: "weird", like_count: -5, comment_count: 2 })), 2);
+
+  const ranked = rankTrendingPosts(
+    [1, 2, 3, 4, 5, 6].map((n, index) =>
+      post({ id: `p${n}`, like_count: 10 - index, created_at: new Date(NOW - index * 1000).toISOString() }),
+    ),
+    { now: NOW, limit: 3 },
+  );
+
+  assert.deepEqual(ids(ranked), ["p1", "p2", "p3"]);
 });

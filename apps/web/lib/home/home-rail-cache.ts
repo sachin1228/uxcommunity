@@ -7,8 +7,8 @@
  * revalidate has to be importable from somewhere else.
  */
 
-/** The weekly trending-topic build. Rebuilt by TTL; nothing revalidates it. */
-export const TRENDING_TOPICS_TAG = "home-trending-topics";
+/** The week's post-engagement build. Rebuilt by TTL; nothing revalidates it. */
+export const TRENDING_POSTS_TAG = "home-trending-posts";
 
 /**
  * The per-member suggestion list. `POST /api/communities/[id]/join` revalidates
