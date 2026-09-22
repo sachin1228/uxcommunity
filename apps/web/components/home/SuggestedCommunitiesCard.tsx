@@ -89,17 +89,17 @@ export function SuggestedCommunitiesCard({
       )}
 
       {visible.length === 0 ? (
-        <p className="border-t border-border-subtle px-4 py-3.5 font-body text-xs leading-relaxed text-foreground-muted">
+        <p className="px-4 pb-4 font-body text-xs leading-relaxed text-foreground-muted">
           {error
             ? "Nothing to show right now."
             : "You're in every community that matches your profile — check back as new ones open."}
         </p>
       ) : (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col px-4 pb-3">
           {visible.map((community) => (
             <li
               key={community.id}
-              className="flex items-center gap-3 border-t border-border-subtle px-4 py-2.5"
+              className="flex items-center gap-3 py-2.5"
             >
               <CommunityDp imageUrl={community.image_url} name={community.name} size={34} />
               <div className="min-w-0 flex-1">

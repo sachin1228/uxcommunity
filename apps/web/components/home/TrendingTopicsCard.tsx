@@ -31,15 +31,15 @@ export function TrendingTopicsCard({ topics }: { topics: TrendingTopic[] }) {
       </p>
 
       {topics.length === 0 ? (
-        <p className="border-t border-border-subtle px-4 py-3.5 font-body text-xs leading-relaxed text-foreground-muted">
+        <p className="px-4 pb-4 font-body text-xs leading-relaxed text-foreground-muted">
           No topics yet. Add a topic when you post a thread and it will show up here.
         </p>
       ) : (
-        <ol className="flex flex-col">
+        <ol className="flex flex-col px-4 pb-3">
           {topics.map((topic, index) => (
             <li
               key={topic.topic}
-              className="flex items-start gap-3 border-t border-border-subtle px-4 py-2.5"
+              className="flex items-start gap-3 py-2.5"
             >
               <span
                 className="w-4 shrink-0 pt-px font-mono text-xs text-foreground-subtle tabular-nums"
