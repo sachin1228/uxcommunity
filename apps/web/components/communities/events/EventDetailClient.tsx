@@ -147,7 +147,8 @@ export function EventDetailClient({
             className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
           />
         )}
-        {/* Event post */}
+        {/* Event post + its Discussion / Attendees panel: one card, with the
+            panel sitting under the engagement row. */}
         <section className={communityFeedLayout.detailCard}>
             <EventCard
               variant="detail"
@@ -174,10 +175,9 @@ export function EventDetailClient({
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
             />
-        </section>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
+        <div className="mt-4">
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
@@ -255,6 +255,7 @@ export function EventDetailClient({
             </div>
           )}
         </div>
+        </section>
       </div>
 
     </div>

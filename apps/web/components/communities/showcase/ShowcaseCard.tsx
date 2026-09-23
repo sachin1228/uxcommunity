@@ -30,6 +30,12 @@ interface ShowcaseCardProps {
   onSaveChanged: (saved: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  /**
+   * Rendered inside the card, under the engagement row (like · comments ·
+   * community). The detail page puts its comment thread here so the post and
+   * the discussion read as one card instead of two stacked ones.
+   */
+  commentSection?: React.ReactNode;
 }
 
 /** Media list for a post: attachments when present, else the legacy cover image. */
@@ -50,6 +56,7 @@ export function ShowcaseCard({
   onSaveChanged,
   onEdit,
   onDelete,
+  commentSection,
 }: ShowcaseCardProps) {
   const { toggleLike, toggleSave, likePending, savePending, saved } = useShowcaseInteractions({
     communityId,
@@ -218,6 +225,9 @@ export function ShowcaseCard({
           <div className="flex-1" />
           {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
         </div>
+
+        {/* ── Comment thread (detail page only) ── */}
+        {commentSection && <div className="mt-4">{commentSection}</div>}
       </article>
 
       {lightboxIndex !== null && (

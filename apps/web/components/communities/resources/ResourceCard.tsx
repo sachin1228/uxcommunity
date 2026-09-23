@@ -63,6 +63,12 @@ interface ResourceCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
+  /**
+   * Rendered inside the card, under the engagement row (like · comments ·
+   * community). The detail page puts its comment thread here so the resource
+   * and the discussion read as one card instead of two stacked ones.
+   */
+  commentSection?: React.ReactNode;
 }
 
 export function ResourceCard({
@@ -76,6 +82,7 @@ export function ResourceCard({
   onOpen,
   communityName,
   communityImage,
+  commentSection,
 }: ResourceCardProps) {
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
   const isOwner = resource.user_id === currentUserId;
@@ -356,6 +363,9 @@ export function ResourceCard({
               </div>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
+
+            {/* ── Comment thread (detail page only) ── */}
+            {commentSection && <div className="mt-4">{commentSection}</div>}
         </>
       </article>
       {showEditModal && (

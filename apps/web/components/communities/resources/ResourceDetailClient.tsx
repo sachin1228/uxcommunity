@@ -123,27 +123,31 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
             onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
             onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}
             onDeleted={() => router.push(`/dashboard/communities/${communityId}?tab=resources`)}
+            // The discussion lives inside the resource card, under the
+            // engagement row.
+            commentSection={
+              /* `aria-label` names the region — there is no visible "Comments"
+                 heading above it. */
+              <section aria-label="Comments">
+                <CommentSection
+                  communityId={communityId}
+                  kind="resources"
+                  targetId={resource.id}
+                  allowReplies={resource.allow_replies !== false}
+                  comments={comments}
+                  currentUserId={currentUserId}
+                  onPosted={handleCommentPosted}
+                  onDeleted={handleCommentDeleted}
+                  emptyState={
+                    <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                      <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                      <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
+                    </div>
+                  }
+                />
+              </section>
+            }
           />
-
-          {/* Comments section */}
-          <div className={`mt-6 ${communityFeedLayout.card}`}>
-            <CommentSection
-              communityId={communityId}
-              kind="resources"
-              targetId={resource.id}
-              allowReplies={resource.allow_replies !== false}
-              comments={comments}
-              currentUserId={currentUserId}
-              onPosted={handleCommentPosted}
-              onDeleted={handleCommentDeleted}
-              emptyState={
-                <div className={`${communityFeedLayout.emptyState} mt-6 min-h-40`}>
-                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-                </div>
-              }
-            />
-          </div>
         </div>
       </div>
 
