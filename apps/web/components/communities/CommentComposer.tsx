@@ -319,7 +319,7 @@ export function CommentComposer<C = unknown>({
             input grows — rather than a stadium (`rounded-full`), which turns
             into an ellipse-ended capsule on multiple lines. */}
         <div className="rounded-[1.6rem] border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
-          <form onSubmit={submit} className="flex min-h-[52px] w-full items-center gap-1 px-2 py-1.5">
+          <form onSubmit={submit} className="flex min-h-[48px] w-full items-center gap-1 px-2 py-1.5">
             <button
               ref={emojiBtnRef}
               type="button"
@@ -365,13 +365,18 @@ export function CommentComposer<C = unknown>({
                   Cancel
                 </button>
               )}
-              <button
-                type="submit"
-                disabled={saving || !body.trim()}
-                className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-              {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
-            </button>
+              {/* LinkedIn-style: the send pill appears once there is something
+                  to send, so an empty field is just the input. Kept while a
+                  post is in flight so the spinner has somewhere to live. */}
+              {(body.trim().length > 0 || saving) && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
+                </button>
+              )}
             </div>
           </form>
         </div>
