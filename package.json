@@ -26,6 +26,7 @@
     "test:global-fetch": "tsx --test apps/web/lib/global-fetch.test.ts",
     "test:link-preview-cache": "tsx --test apps/web/lib/communities/linkPreviewCache.test.ts",
     "test:mentions": "tsx --test apps/web/lib/communities/mentions.test.ts",
+    "test:comment-text": "tsx --test apps/web/lib/communities/comment-text.test.ts",
     "test:user-color": "tsx --test apps/web/lib/communities/user-color.test.ts",
     "test:moderation-image": "tsx --tsconfig apps/web/tsconfig.json --test apps/web/lib/moderation/image.test.ts apps/web/lib/moderation/http.test.ts",
     "test:r2-lifecycle": "tsx --test apps/web/lib/r2-lifecycle.test.ts",

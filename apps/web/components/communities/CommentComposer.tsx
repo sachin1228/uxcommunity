@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { splitCommentText } from "@/lib/communities/comment-text";
 
 /**
  * Matches a full emoji grapheme cluster (base + skin tone + keycap + ZWJ
@@ -18,27 +19,56 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 const EMOJI_CLUSTER =
   /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
 
-/** Renders comment text with emoji shown as Noto SVGs, like chat bubbles. */
-export function renderEmojiText(text: string): ReactNode {
+/** An `@mention` inside comment text: the same blue the chat bubbles use for
+ *  mentions, without their chip background. */
+const MENTION_CLASS =
+  "font-medium text-[var(--ds-blue-700)] dark:text-[var(--ds-blue-900)]";
+
+/**
+ * Renders comment text: `@mentions` in blue, emoji as Noto SVGs, like chat
+ * bubbles.
+ *
+ * `knownNames` are the display names to highlight across spaces (longest wins)
+ * — the authors participating in this comment section — so a multi-word reply
+ * mention like `@Vishal Gn` reads as one tag instead of a tag plus a stray word.
+ * Names we don't know fall back to the bare `@token`.
+ */
+export function renderEmojiText(text: string, knownNames: readonly string[] = []): ReactNode {
   if (!text) return null;
   const parts: ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  EMOJI_CLUSTER.lastIndex = 0;
-  while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(
-      <NotoEmojiSvg key={`e${m.index}`} emoji={m[0]} size={16} className="mx-0.5 align-middle" />,
-    );
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  // No emoji found — return the plain string to avoid an extra text node.
+
+  const pushPlain = (chunk: string, keyBase: string) => {
+    EMOJI_CLUSTER.lastIndex = 0;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = EMOJI_CLUSTER.exec(chunk)) !== null) {
+      if (m.index > last) parts.push(chunk.slice(last, m.index));
+      parts.push(
+        <NotoEmojiSvg key={`${keyBase}e${m.index}`} emoji={m[0]} size={16} className="mx-0.5 align-middle" />,
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < chunk.length) parts.push(chunk.slice(last));
+  };
+
+  splitCommentText(text, knownNames).forEach((segment, index) => {
+    if (segment.mention) {
+      parts.push(
+        <span key={`m${index}`} className={MENTION_CLASS}>
+          {segment.text}
+        </span>,
+      );
+    } else if (segment.text) {
+      pushPlain(segment.text, `s${index}-`);
+    }
+  });
+
+  // No mention and no emoji — return the plain string to avoid an extra text node.
   if (parts.length === 1 && typeof parts[0] === "string") return parts[0];
   return parts;
 }
 
-const AVATAR_PX = { xs: 20, sm: 24, md: 32, lg: 40 } as const;
+const AVATAR_PX = { xs: 20, sm: 24, md: 32, lg: 36 } as const;
 
 export function Avatar({
   name,

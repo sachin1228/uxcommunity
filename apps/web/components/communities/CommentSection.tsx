@@ -117,6 +117,26 @@ function replyMention(target: CommunityComment, currentUserId: string): string |
   return `@${name} `;
 }
 
+/**
+ * Every author name present in the section — the candidates `@mention`
+ * highlighting matches against, so a seeded multi-word name ("@Vishal Gn") is
+ * painted whole. Comments store no mention records, so this is the only roster
+ * available without another request; anything else falls back to the bare
+ * `@token`.
+ */
+function participantNames(comments: readonly CommunityComment[]): string[] {
+  const names = new Set<string>();
+  for (const comment of comments) {
+    const name = comment.users?.name?.trim();
+    if (name) names.add(name);
+    for (const reply of comment.replies ?? []) {
+      const replyName = reply.users?.name?.trim();
+      if (replyName) names.add(replyName);
+    }
+  }
+  return [...names];
+}
+
 // ── Single comment row ────────────────────────────────────────────────────────
 
 function CommentRow<C extends CommunityComment>({
@@ -127,6 +147,7 @@ function CommentRow<C extends CommunityComment>({
   currentUserId,
   allowReplies,
   isReply,
+  mentionNames,
   replyTarget,
   onReplyTargetChange,
   onDeleted,
@@ -140,6 +161,8 @@ function CommentRow<C extends CommunityComment>({
   currentUserId: string;
   allowReplies: boolean;
   isReply?: boolean;
+  /** Display names to highlight as `@mentions` in the body (longest wins). */
+  mentionNames: readonly string[];
   /** The comment the open reply composer is aimed at (lifted so only one composer exists per thread). */
   replyTarget?: C | null;
   onReplyTargetChange?: (target: C | null) => void;
@@ -251,7 +274,9 @@ function CommentRow<C extends CommunityComment>({
             the last reply — the nested-comment bracket shown in the design,
             replacing the old dashed timeline spine. */}
         <div className="flex shrink-0 flex-col items-center">
-          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "md" : "lg"} />
+          {/* One avatar size for the whole thread, replies included — a reply is
+              the same person as a top-level comment, so it is not scaled down. */}
+          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="lg" />
           {showConnector && (
             <span aria-hidden="true" className="relative mt-1 w-4 flex-1">
               {/* Border colour is expressed as alpha stops rather than the
@@ -311,19 +336,15 @@ function CommentRow<C extends CommunityComment>({
             )}
           </header>
 
-          {/* The author's experience level, as the same pill the members list
-              shows them with — so a commenter is the same person here as in the
-              roster. Absent for members whose profile has no experience level. */}
+          {/* The author's experience level, tracking the name on its own line.
+              Plain secondary text rather than a chip — it is a label about the
+              person, not a control. Absent when the profile has no level. */}
           {designation && (
-            <div className="mt-1">
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-body text-[10px] font-medium leading-none text-accent">
-                {designation}
-              </span>
-            </div>
+            <p className="font-body text-xs text-foreground-muted">{designation}</p>
           )}
 
           <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm leading-5 text-foreground">
-            {renderEmojiText(comment.body)}
+            {renderEmojiText(comment.body, mentionNames)}
           </p>
 
           {comment.image_url && (
@@ -345,7 +366,10 @@ function CommentRow<C extends CommunityComment>({
                   <button
                     type="button"
                     onClick={() => setPickerOpen((p) => !p)}
-                    className="inline-flex h-7 items-center rounded-md px-1.5 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                    // The negative margin cancels this button's own padding so
+                    // the emoji glyph — not its hit area — lines up with the
+                    // comment text above, in the same column.
+                    className="-ml-1.5 inline-flex h-7 items-center rounded-md px-1.5 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                     aria-label="Add reaction"
                     aria-expanded={pickerOpen}
                   >
@@ -398,7 +422,9 @@ function CommentRow<C extends CommunityComment>({
                 className={`ml-1 inline-flex h-7 items-center rounded-md px-2 font-body text-xs font-semibold transition-colors ${
                   replyTarget?.id === comment.id
                     ? "text-[var(--ds-blue-800)] dark:text-[var(--ds-blue-900)]"
-                    : "text-foreground hover:bg-surface-raised"
+                    // Muted like the emoji icon it sits beside — the action row
+                    // reads as one quiet strip, not one loud button.
+                    : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                 }`}
                 style={replyTarget?.id === comment.id ? SELECTED_ACTION_STYLE : undefined}
               >
@@ -424,6 +450,7 @@ function CommentRow<C extends CommunityComment>({
                       currentUserId={currentUserId}
                       allowReplies={allowReplies}
                       isReply
+                      mentionNames={mentionNames}
                       replyTarget={replyTarget}
                       onReplyTargetChange={onReplyTargetChange}
                       onDeleted={onDeleted}
@@ -532,6 +559,10 @@ export function CommentSection<C extends CommunityComment>({
 
   const total = comments.reduce((acc, comment) => acc + 1 + (comment.replies ?? []).length, 0);
 
+  // Author names in this thread, so reply mentions of them are highlighted as
+  // one tag — including multi-word names.
+  const mentionNames = useMemo(() => participantNames(comments), [comments]);
+
   return (
     <div>
       {allowReplies ? (
@@ -580,6 +611,7 @@ export function CommentSection<C extends CommunityComment>({
               targetId={targetId}
               currentUserId={currentUserId}
               allowReplies={allowReplies}
+              mentionNames={mentionNames}
               replyTarget={replyTarget}
               onReplyTargetChange={setReplyTarget}
               onDeleted={onDeleted}
