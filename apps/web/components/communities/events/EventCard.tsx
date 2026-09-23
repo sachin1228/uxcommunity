@@ -593,24 +593,27 @@ export function EventCard({
 
       <div className="mt-4">{eventBody}</div>
 
+      {/* Engagement row — the thread card's shape: actions left, community
+          attribution right. */}
       <div className="mt-3 flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
-          aria-label={event.user_liked ? "Unlike event" : "Like event"}
-          aria-pressed={event.user_liked}
-          className="group/like flex shrink-0 cursor-pointer items-center gap-2"
-        >
-          <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
-          <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-4">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
+            aria-label={event.user_liked ? "Unlike event" : "Like event"}
+            aria-pressed={event.user_liked}
+            className="group/like flex shrink-0 cursor-pointer items-center gap-2"
+          >
+            <HeartIcon size={16} active={event.user_liked} className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`} />
+            <span className={`font-body text-sm font-semibold tabular-nums ${event.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}>{event.like_count}</span>
+          </button>
 
-        <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
-          <CommentIcon />
-          {event.comment_count ?? 0}
-        </span>
+          <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+            <CommentIcon />
+            {event.comment_count ?? 0}
+          </span>
+        </div>
 
-        <div className="flex-1" />
         {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
 

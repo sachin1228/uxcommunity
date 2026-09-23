@@ -75,39 +75,41 @@ export function EventOptionsMenu({
         }}
         aria-label="Event options"
         aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
+        /* Same trigger, panel and rows as the thread, showcase and resource
+           cards — one post-options affordance for the whole feed. */
+        className="flex h-7 w-7 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-surface-raised hover:text-foreground"
       >
-        <MoreHorizontal strokeWidth={2.5} size={16} />
+        <MoreHorizontal strokeWidth={2.5} size={15} />
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-30 min-w-[150px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+        <div className="absolute right-0 top-8 z-20 min-w-[160px] rounded-lg border border-border bg-surface py-1 shadow-lg">
           <button
             type="button"
             onClick={() => run(onSave)}
             aria-pressed={saved}
             aria-busy={saving}
-            className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
+            className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground"
           >
-            <Bookmark strokeWidth={2.5} size={12} fill={saved ? "currentColor" : "none"} />
+            <Bookmark strokeWidth={2.5} size={11} fill={saved ? "currentColor" : "none"} />
             {saved ? "Unsave" : "Save"}
           </button>
-          <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-            <Share2 strokeWidth={2.5} size={12} /> {shared ? "Copied!" : "Share"}
+          <button type="button" onClick={() => run(onShare)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+            <Share2 strokeWidth={2.5} size={11} /> {shared ? "Copied!" : "Share"}
           </button>
           {isOwner && !past && onEdit && onDelete && (
             <>
-              <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
-                <Pencil strokeWidth={2.5} size={12} /> Edit
+              <button type="button" onClick={() => run(onEdit)} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground">
+                <Pencil strokeWidth={2.5} size={11} /> Edit
               </button>
-              <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
-                {deleting ? <Spinner size={12} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={12} />}
+              <button type="button" onClick={() => run(onDelete)} disabled={deleting} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50">
+                {deleting ? <Spinner size={11} className="text-red-400" /> : <Trash2 strokeWidth={2.5} size={11} />}
                 {deleting ? "Deleting…" : "Delete"}
               </button>
             </>
           )}
           {onReport && (
-            <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-2 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
-              <Flag strokeWidth={2.5} size={12} /> {reported ? "Reported" : "Report"}
+            <button type="button" onClick={() => run(onReport)} disabled={reported} className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50">
+              <Flag strokeWidth={2.5} size={11} /> {reported ? "Reported" : "Report"}
             </button>
           )}
         </div>
