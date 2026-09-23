@@ -79,7 +79,7 @@ export function ThreadNotificationBubble({
 
   return (
     <div
-      className={`group flex w-full items-start gap-2 px-5 mt-3 ${
+      className={`group flex w-full items-start gap-2 px-5 mt-2 ${
         isMe ? "justify-end" : "justify-start"
       }`}
     >
@@ -93,7 +93,7 @@ export function ThreadNotificationBubble({
       )}
 
       {/* Bubble column */}
-      <div className="min-w-0 max-w-[85%]">
+      <div className="min-w-0 max-w-[65%]">
         <div
           className={`relative select-none rounded-[10px] px-3 pt-2 pb-1.5 shadow-sm ${
             isMe
@@ -134,24 +134,25 @@ export function ThreadNotificationBubble({
                   : "bg-black/[0.03] border-black/[0.06] hover:bg-black/[0.06] dark:bg-white/[0.04] dark:border-white/[0.08] dark:hover:bg-white/[0.08]"
               }`}
             >
-              {/* Thumbnail — image, video poster, or tinted category tile */}
-              <div className="h-[64px] w-[64px] shrink-0 overflow-hidden">
+              {/* Thumbnail — image, video poster, or tinted category tile.
+                  Stretches to the card's full height (min 64px). */}
+              <div className="relative w-[64px] min-h-[64px] shrink-0 overflow-hidden">
                 {imgUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={imgUrl}
                     alt={event.title}
-                    className="h-full w-full object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                     loading="lazy"
                     draggable={false}
                   />
                 ) : posterUrl ? (
-                  <div className="relative h-full w-full">
+                  <>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={posterUrl}
                       alt=""
-                      className="h-full w-full object-cover"
+                      className="absolute inset-0 h-full w-full object-cover"
                       loading="lazy"
                       draggable={false}
                     />
@@ -160,7 +161,7 @@ export function ThreadNotificationBubble({
                         <Video size={12} strokeWidth={2.5} />
                       </span>
                     </div>
-                  </div>
+                  </>
                 ) : (
                   <div
                     className="flex h-full w-full items-center justify-center"

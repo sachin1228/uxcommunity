@@ -68,7 +68,7 @@ function ReplyBubble({
   return (
     <div
       onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
-      className={`mb-1 px-2.5 py-1.5 rounded-xl border-l-2 text-left max-w-full cursor-pointer
+      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
         ${isMe
           ? "bg-black/20 border-white/20 hover:bg-black/30"
           : "bg-black/10 border-white/15 hover:bg-black/20"
