@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronUp,
   Flag,
-  MessageSquare,
   MoreHorizontal,
   Smile,
   Trash2,
@@ -577,8 +576,6 @@ export function CommentSection<C extends CommunityComment>({
     return list;
   }, [comments, sort]);
 
-  const total = comments.reduce((acc, comment) => acc + 1 + (comment.replies ?? []).length, 0);
-
   // Author names in this thread, so reply mentions of them are highlighted as
   // one tag — including multi-word names.
   const mentionNames = useMemo(() => participantNames(comments), [comments]);
@@ -600,11 +597,9 @@ export function CommentSection<C extends CommunityComment>({
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 text-foreground-muted">
-          <MessageSquare strokeWidth={2} size={15} />
-          <span className="font-body text-xs tabular-nums">{total}</span>
-        </div>
+      {/* Just the sort control: the comment count was never the thing the
+          reader needs here, and the card already ends in the list itself. */}
+      <div className="mt-3 flex items-center justify-end gap-4">
         <label className="flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
           <ArrowUpDown strokeWidth={2} size={13} />
           <select
