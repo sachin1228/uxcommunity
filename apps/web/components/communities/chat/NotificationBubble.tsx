@@ -18,12 +18,17 @@ import type { ContentEventKind } from "@/lib/communities/cache";
 interface KindAccent {
   icon: LucideIcon;
   label: string;
-  /** Tile gradient — two vivid stops of the same hue from the design system. */
+  /**
+   * Tile gradient — the saturated pair of the hue. `-600` (the vivid mid stop)
+   * down to `-900` (the deep stop in light mode, the bright one in dark), which
+   * is what keeps the tile as saturated as the reference in *both* themes.
+   * The `-800` end read as mud in dark mode.
+   */
   from: string;
   to: string;
   /** Ink for the small kind glyph on the card's label row. */
   ink: string;
-  /** Ring tint for the bubble and its payload card, mixed down to a hairline. */
+  /** Ring tint for the bubble and its payload card, mixed down by the caller. */
   ring: string;
 }
 
@@ -39,33 +44,33 @@ const KIND_ACCENT: Record<ContentEventKind, KindAccent> = {
     icon: MessageCircle,
     label: "Thread",
     from: "var(--ds-blue-600)",
-    to: "var(--ds-blue-800)",
+    to: "var(--ds-blue-900)",
     ink: "var(--ds-blue-900)",
-    ring: "var(--ds-blue-700)",
+    ring: "var(--ds-blue-600)",
   },
   showcase: {
     icon: ImageIcon,
     label: "Showcase",
     from: "var(--ds-pink-600)",
-    to: "var(--ds-pink-800)",
+    to: "var(--ds-pink-900)",
     ink: "var(--ds-pink-900)",
-    ring: "var(--ds-pink-700)",
+    ring: "var(--ds-pink-600)",
   },
   resource: {
     icon: LayoutTemplate,
     label: "Resource",
     from: "var(--ds-purple-600)",
-    to: "var(--ds-purple-800)",
+    to: "var(--ds-purple-900)",
     ink: "var(--ds-purple-900)",
-    ring: "var(--ds-purple-700)",
+    ring: "var(--ds-purple-600)",
   },
   event: {
     icon: CalendarDays,
     label: "Event",
-    from: "var(--ds-amber-700)",
+    from: "var(--ds-amber-600)",
     to: "var(--ds-amber-900)",
     ink: "var(--ds-amber-900)",
-    ring: "var(--ds-amber-700)",
+    ring: "var(--ds-amber-600)",
   },
 };
 
@@ -135,7 +140,7 @@ export function NotificationBubble({
           // opacity modifier to a bare var() color (it would emit
           // rgb(var(--x) / 0.26), which never resolves for a hex token).
           style={{
-            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 26%, transparent), var(--shadow-sm)`,
+            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 40%, transparent), var(--shadow-sm)`,
           }}
         >
           <MessageBubbleTail side="left" className="text-surface-raised" />
@@ -154,7 +159,7 @@ export function NotificationBubble({
             aria-label={`View ${accent.label.toLowerCase()}: ${title}`}
             className="group/card mt-1.5 flex items-center gap-2.5 rounded-[12px] bg-black/[0.02] p-1.5 pr-2.5 transition-colors hover:bg-black/[0.05] dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
             style={{
-              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 45%, transparent)`,
+              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 60%, transparent)`,
             }}
           >
             {/* Kind tile — gradient of the kind's hue, glossy top edge */}
