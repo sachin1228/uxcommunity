@@ -319,7 +319,10 @@ export function CommentComposer<C = unknown>({
             input grows — rather than a stadium (`rounded-full`), which turns
             into an ellipse-ended capsule on multiple lines. */}
         <div className="rounded-[1.6rem] border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
-          <form onSubmit={submit} className="flex min-h-[48px] w-full items-center gap-1 px-2 py-1.5">
+          {/* 40px tall: the 32px controls inside plus `py-1`. At this height the
+              1.6rem radius is wider than half the box, so it renders as a full
+              pill, like LinkedIn's 40px comment box. */}
+          <form onSubmit={submit} className="flex min-h-10 w-full items-center gap-1 px-2 py-1">
             <button
               ref={emojiBtnRef}
               type="button"
