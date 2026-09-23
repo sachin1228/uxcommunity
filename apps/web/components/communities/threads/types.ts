@@ -74,7 +74,7 @@ export interface ThreadComment {
   body: string;
   created_at: string;
   updated_at: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies: ThreadComment[];
   /** Grouped emoji reactions on this comment (absent until the reactions migration is applied). */
   reactions?: CommentReactionSummary[];

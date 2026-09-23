@@ -15,6 +15,8 @@ import {
 import { resolveCommunityDp } from "./dp";
 import { withShowcaseColumn } from "./showcase-flag";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+// One shared experience-level label cleaner — see ./comment-authors.ts.
+import { cleanDesignation } from "./comment-authors";
 
 const MESSAGE_PAGE_SIZE = 50;
 
@@ -42,12 +44,6 @@ export type ReadResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; error: string };
 
-function cleanDesignation(name: string): string {
-  const clean = name.split("(")[0].trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
 
 export const loadCommunityReadModel = cache(async function loadCommunityReadModel(
   communityId: string,

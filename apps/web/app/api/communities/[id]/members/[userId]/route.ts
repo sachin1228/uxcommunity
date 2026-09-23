@@ -2,18 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus, logCommunityActivity } from "@/lib/communities/manager-role";
-
-/**
- * Strip year-range suffixes and singularize experience level names for display.
- * e.g. "Mid-Level Designers (3-5 years)" → "Mid-Level Designer"
- *      "Heads of Design"                 → "Head of Design"
- */
-function cleanDesignation(name: string): string {
-  const clean = name.split("(")[0].trim();
-  if (/^heads\s+of\b/i.test(clean)) return clean.replace(/^heads/i, "Head");
-  if (clean.endsWith("s") && clean.length > 1) return clean.slice(0, -1);
-  return clean;
-}
+import { cleanDesignation } from "@/lib/communities/comment-authors";
 
 /**
  * GET /api/communities/[id]/members/[userId]

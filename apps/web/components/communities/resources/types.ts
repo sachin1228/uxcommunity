@@ -46,6 +46,6 @@ export interface ResourceComment {
   body: string;
   created_at: string;
   updated_at: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies: ResourceComment[];
 }

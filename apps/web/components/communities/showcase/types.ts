@@ -56,6 +56,6 @@ export interface ShowcasePost {
 
 export interface ShowcaseComment {
   id: string; post_id: string; user_id: string; parent_id: string | null; body: string; created_at: string; updated_at: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies: ShowcaseComment[];
 }

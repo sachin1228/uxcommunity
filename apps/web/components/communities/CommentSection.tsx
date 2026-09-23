@@ -36,7 +36,7 @@ export interface CommunityComment {
   body: string;
   created_at: string;
   updated_at: string;
-  users: { name: string; avatar_url: string | null } | null;
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies?: CommunityComment[];
   reactions?: CommentReactionSummary[];
   image_url?: string | null;
@@ -158,6 +158,7 @@ function CommentRow<C extends CommunityComment>({
   const reactionPending = useRef(false);
   const isOwner = comment.user_id === currentUserId;
   const name = comment.users?.name ?? "Member";
+  const designation = comment.users?.designation ?? null;
   const canReact = typeof onReactionToggled === "function";
   const hasReplies = !isReply && (comment.replies ?? []).length > 0;
   // True on the top-level comment whose thread hosts the open reply composer
@@ -309,6 +310,17 @@ function CommentRow<C extends CommunityComment>({
               </div>
             )}
           </header>
+
+          {/* The author's experience level, as the same pill the members list
+              shows them with — so a commenter is the same person here as in the
+              roster. Absent for members whose profile has no experience level. */}
+          {designation && (
+            <div className="mt-1">
+              <span className="inline-flex items-center rounded-full bg-accent/10 px-1.5 py-0.5 font-body text-[10px] font-medium leading-none text-accent">
+                {designation}
+              </span>
+            </div>
+          )}
 
           <p className="mt-1 whitespace-pre-wrap break-words font-body text-sm leading-5 text-foreground">
             {renderEmojiText(comment.body)}

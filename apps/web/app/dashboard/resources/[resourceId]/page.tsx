@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import { HomeRail } from "@/app/dashboard/HomeRail";
+import { loadCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
 
 interface Props {
@@ -64,20 +65,13 @@ async function getComments(
 
   if (!data?.length) return [];
 
-  const userIds = [...new Set(data.map((comment) => comment.user_id))];
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-  ]);
-
-  const nameMap = Object.fromEntries((users ?? []).map((user) => [user.id, user.name]));
-  const avatarMap = Object.fromEntries((profiles ?? []).map((profile) => [profile.user_id, profile.avatar_url]));
+  // Name, avatar and the designation pill come from the shared author resolver,
+  // so the first paint matches the members list.
+  const authors = await loadCommentAuthors(db, data.map((comment) => comment.user_id));
 
   const withUsers = data.map((comment) => ({
     ...comment,
-    users: nameMap[comment.user_id]
-      ? { name: nameMap[comment.user_id], avatar_url: avatarMap[comment.user_id] ?? null }
-      : null,
+    users: authors[comment.user_id] ?? null,
     replies: [] as ResourceComment[],
   })) as ResourceComment[];
 

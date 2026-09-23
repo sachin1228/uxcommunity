@@ -3,6 +3,7 @@ import { requireSession } from "@/lib/auth/session";
 import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
   const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
@@ -18,11 +19,20 @@ async function access(db: ReturnType<typeof createServiceClient>, communityId: s
   return Boolean(membership) || post.is_public === true;
 }
 
-async function enrich(db: ReturnType<typeof createServiceClient>, rows: Array<Record<string, unknown>>) {
-  const ids = [...new Set(rows.map((row) => row.user_id as string))];
-  const [{ data: users }, { data: profiles }] = ids.length ? await Promise.all([db.from("users").select("id, name").in("id", ids), db.from("designer_profiles").select("user_id, avatar_url").in("user_id", ids)]) : [{ data: [] }, { data: [] }];
-  const names = Object.fromEntries((users ?? []).map((user) => [user.id, user.name])); const avatars = Object.fromEntries((profiles ?? []).map((profile) => [profile.user_id, profile.avatar_url]));
-  return rows.map((row) => ({ ...row, users: { name: names[row.user_id as string] ?? "Community member", avatar_url: avatars[row.user_id as string] ?? null }, replies: [] as Record<string, unknown>[] }));
+async function enrich(
+  db: ReturnType<typeof createServiceClient>,
+  rows: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown> & { replies: Record<string, unknown>[] }>> {
+  // One shared author resolver, so a comment author reads the same here as on
+  // the thread / resource / event surfaces and in the members list. The rows
+  // stay index-accessible for the reply nesting at the call site.
+  const authored = await attachCommentAuthors(db, rows);
+  return authored.map(
+    (row) =>
+      ({ ...row, replies: [] as Record<string, unknown>[] }) as Record<string, unknown> & {
+        replies: Record<string, unknown>[];
+      },
+  );
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string; postId: string }> }) {
