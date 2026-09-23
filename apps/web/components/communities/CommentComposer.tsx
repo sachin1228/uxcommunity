@@ -314,7 +314,11 @@ export function CommentComposer<C = unknown>({
   if (variant === "inline") {
     return (
       <div className="relative w-full">
-        <div className="rounded-xl border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
+        {/* `1.6rem` is the radius LinkedIn puts on its comment box: a pill at
+            this field's 52px height, and a soft rounded rectangle once the
+            input grows — rather than a stadium (`rounded-full`), which turns
+            into an ellipse-ended capsule on multiple lines. */}
+        <div className="rounded-[1.6rem] border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
           <form onSubmit={submit} className="flex min-h-[52px] w-full items-center gap-1 px-2 py-1.5">
             <button
               ref={emojiBtnRef}
@@ -404,7 +408,7 @@ export function CommentComposer<C = unknown>({
 
   // ── Default variant (resources / showcase / events) ───────────────────────
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
+    <div className="relative w-full rounded-[1.6rem] border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">
       {/* ── Single row: avatar · input · cancel · actions ── */}
       <div className="flex w-full items-end gap-2">
