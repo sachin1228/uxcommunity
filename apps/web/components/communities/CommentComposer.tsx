@@ -38,12 +38,27 @@ export function renderEmojiText(text: string): ReactNode {
   return parts;
 }
 
-const AVATAR_PX = { xs: 20, sm: 24, md: 32 } as const;
+const AVATAR_PX = { xs: 20, sm: 24, md: 32, lg: 40 } as const;
 
-export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "xs" | "sm" | "md" }) {
+export function Avatar({
+  name,
+  avatarUrl,
+  size = "md",
+}: {
+  name: string;
+  avatarUrl: string | null;
+  size?: "xs" | "sm" | "md" | "lg";
+}) {
   const px = AVATAR_PX[size];
   return (
-    <AvatarImg url={avatarUrl} name={name} size={px} className="shrink-0 object-cover" />
+    <AvatarImg
+      url={avatarUrl}
+      name={name}
+      size={px}
+      // Comment avatars are always circular — a stored picture would otherwise
+      // render as a square next to the name-initials fallback, which is round.
+      className="shrink-0 rounded-full object-cover"
+    />
   );
 }
 

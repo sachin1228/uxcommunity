@@ -19,7 +19,7 @@ const AVATAR_PX = { sm: 24, md: 32, lg: 40 } as const;
 function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" | "lg" }) {
   const px = AVATAR_PX[size];
   return (
-    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 object-cover" />
+    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 rounded-full object-cover" />
   );
 }
 

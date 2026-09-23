@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpDown,
   ChevronDown,
+  ChevronUp,
   MessageSquare,
   MoreVertical,
   Plus,
@@ -96,6 +97,18 @@ function totalReactionCount(comment: CommunityComment) {
 }
 
 /**
+ * Translucent blue wash for the "selected" states in a comment's action row
+ * (you reacted with this emoji / the reply composer is aimed here).
+ *
+ * Applied inline on purpose: Tailwind does not emit `color-mix()` for an
+ * arbitrary CSS-var utility with an opacity modifier — `bg-[var(--ds-blue-800)]/10`
+ * silently compiles to nothing (same workaround as MessageBubble's row flash).
+ */
+const SELECTED_ACTION_STYLE: React.CSSProperties = {
+  backgroundColor: "color-mix(in srgb, var(--ds-blue-800) 12%, transparent)",
+};
+
+/**
  * Seed text for the reply composer: mentioning the author we're replying to,
  * like LinkedIn — unless it's our own comment.
  */
@@ -115,7 +128,6 @@ function CommentRow<C extends CommunityComment>({
   currentUserId,
   allowReplies,
   isReply,
-  isLast,
   replyTarget,
   onReplyTargetChange,
   onDeleted,
@@ -129,8 +141,6 @@ function CommentRow<C extends CommunityComment>({
   currentUserId: string;
   allowReplies: boolean;
   isReply?: boolean;
-  /** Last item in the list — its timeline connector stops early. */
-  isLast?: boolean;
   /** The comment the open reply composer is aimed at (lifted so only one composer exists per thread). */
   replyTarget?: C | null;
   onReplyTargetChange?: (target: C | null) => void;
@@ -138,7 +148,7 @@ function CommentRow<C extends CommunityComment>({
   onReplied: (comment: C) => void;
   onReactionToggled?: (commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) => void;
 }) {
-  // Replies are expanded by default (LinkedIn-style); "Collapse replies" folds them.
+  // Replies are expanded by default (LinkedIn-style); "Hide replies" folds them.
   const [repliesOpen, setRepliesOpen] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -158,6 +168,9 @@ function CommentRow<C extends CommunityComment>({
     !isReply && replyTarget && (replyTarget.id === comment.id || replyTarget.parent_id === comment.id),
   );
   const activeReplyTarget = hostsReplyComposer ? replyTarget! : null;
+  // Top-level comments with a reply thread hang a connector track in the
+  // avatar gutter, spanning the replies (and the inline composer) below them.
+  const showConnector = !isReply && (hasReplies || hostsReplyComposer);
 
   /** Open the inline composer (anchored at the bottom of the thread) aimed at this comment. */
   function startReply() {
@@ -232,27 +245,22 @@ function CommentRow<C extends CommunityComment>({
 
   return (
     <>
-      <article className={`group/comment relative ${isReply ? "" : "pl-8"}`}>
-        {/* Timeline dot + dashed connector (top-level comments only). The
-            connector spans the whole thread — replies and composer included —
-            when the comment has any, like LinkedIn's continuous spine. */}
-        {!isReply && (
-          <>
-            <span aria-hidden="true" className="absolute left-[11px] top-2.5 h-1.5 w-1.5 rounded-full bg-foreground-muted" />
-            <span
-              aria-hidden="true"
-              className={`absolute left-[14px] top-4 border-l border-dashed border-foreground-subtle ${hasReplies ? "bottom-1" : isLast ? "bottom-2" : "-bottom-4"}`}
-              style={{
-                maskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
-                WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 80%)",
-              }}
-            />
-          </>
-        )}
+      <article className="group/comment relative flex gap-3">
+        {/* Avatar gutter. The avatar is a circle pinned to the left edge, and
+            the thread's connector drops from beneath it, curving right under
+            the last reply — the nested-comment bracket shown in the design,
+            replacing the old dashed timeline spine. */}
+        <div className="flex shrink-0 flex-col items-center">
+          <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "md" : "lg"} />
+          {showConnector && (
+            <span aria-hidden="true" className="relative mt-1 w-4 flex-1">
+              <span className="absolute bottom-1 left-2 top-0 w-4 rounded-bl-2xl border-b border-l border-border-strong" />
+            </span>
+          )}
+        </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <header className="flex min-w-0 items-center gap-2">
-            <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size="xs" />
             <span className="truncate font-body text-[13px] font-semibold text-foreground">{name}</span>
             <span aria-hidden="true" className="text-foreground-subtle">•</span>
             <time
@@ -304,20 +312,21 @@ function CommentRow<C extends CommunityComment>({
             </a>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-0.5">
             {canReact && (
               <>
-                {/* Add-reaction pill + emoji picker */}
+                {/* Add-reaction + emoji picker — a flat icon button, matching
+                    the borderless action row in the design. */}
                 <div className="relative" ref={pickerRef}>
                   <button
                     type="button"
                     onClick={() => setPickerOpen((p) => !p)}
-                    className="inline-flex h-7 items-center gap-1 rounded-full border border-border bg-surface px-2 text-foreground-muted shadow-xs transition-colors hover:text-foreground"
+                    className="inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                     aria-label="Add reaction"
                     aria-expanded={pickerOpen}
                   >
-                    <Smile strokeWidth={2} size={13} />
-                    <Plus strokeWidth={2} size={11} />
+                    <Smile strokeWidth={2} size={15} />
+                    <Plus strokeWidth={2.5} size={11} />
                   </button>
                   {pickerOpen && (
                     <div className="absolute bottom-9 left-0 z-20 flex items-center gap-0.5 rounded-xl border border-border bg-surface p-1 shadow-lg">
@@ -336,25 +345,25 @@ function CommentRow<C extends CommunityComment>({
                   )}
                 </div>
 
-                {/* Existing reactions */}
+                {/* Existing reactions — flat chips, tinted when you're one of
+                    the people who reacted. */}
                 {(comment.reactions ?? []).map((reaction) => (
                   <button
                     key={reaction.emoji}
                     type="button"
                     onClick={() => toggleReaction(reaction.emoji)}
                     aria-pressed={reaction.reacted}
-                    className={`inline-flex h-7 items-center gap-1 rounded-full border px-2 font-body text-xs font-medium tabular-nums shadow-xs transition-colors ${
+                    className={`inline-flex h-7 items-center gap-1 rounded-md px-2 font-body text-xs font-medium tabular-nums transition-colors ${
                       reaction.reacted
-                        ? "border-[var(--ds-blue-800)] bg-[var(--ds-blue-800)]/10 text-[var(--ds-blue-800)]"
-                        : "border-border bg-surface text-foreground-muted hover:text-foreground"
+                        ? "text-[var(--ds-blue-800)] dark:text-[var(--ds-blue-900)]"
+                        : "text-foreground-muted hover:bg-surface-raised hover:text-foreground"
                     }`}
+                    style={reaction.reacted ? SELECTED_ACTION_STYLE : undefined}
                   >
                     <NotoEmojiSvg emoji={reaction.emoji} size={14} />
                     {reaction.count}
                   </button>
                 ))}
-
-                <span aria-hidden="true" className="text-foreground-subtle">•</span>
               </>
             )}
 
@@ -363,24 +372,25 @@ function CommentRow<C extends CommunityComment>({
                 type="button"
                 onClick={startReply}
                 aria-pressed={replyTarget?.id === comment.id}
-                className={`inline-flex h-7 items-center rounded-full border px-3.5 font-body text-xs font-medium shadow-xs transition-colors ${
+                className={`ml-1 inline-flex h-7 items-center rounded-md px-2 font-body text-xs font-semibold transition-colors ${
                   replyTarget?.id === comment.id
-                    ? "border-[var(--ds-blue-800)] bg-[var(--ds-blue-800)]/10 text-[var(--ds-blue-800)]"
-                    : "border-border bg-surface text-foreground hover:bg-surface-raised"
+                    ? "text-[var(--ds-blue-800)] dark:text-[var(--ds-blue-900)]"
+                    : "text-foreground hover:bg-surface-raised"
                 }`}
+                style={replyTarget?.id === comment.id ? SELECTED_ACTION_STYLE : undefined}
               >
                 Reply
               </button>
             )}
           </div>
 
-          {/* ── Reply thread (top-level comments only): flat replies on the
-                spine → "Collapse replies" → inline composer anchored at the
+          {/* ── Reply thread (top-level comments only): flat replies under the
+                connector → hide/view toggle → inline composer anchored at the
                 bottom, like LinkedIn ── */}
           {!isReply && (hasReplies || hostsReplyComposer) && (
             <div className="mt-3">
               {hasReplies && repliesOpen && (
-                <div className="flex flex-col gap-3 pl-6">
+                <div className="flex flex-col gap-3">
                   {(comment.replies ?? []).map((reply) => (
                     <CommentRow
                       key={reply.id}
@@ -405,17 +415,22 @@ function CommentRow<C extends CommunityComment>({
                 <button
                   type="button"
                   onClick={() => setRepliesOpen((p) => !p)}
-                  className="mt-3 inline-flex items-center font-body text-xs font-semibold text-foreground transition-colors hover:text-foreground-muted"
+                  className="mt-3 inline-flex items-center gap-1 font-body text-xs font-semibold text-foreground transition-colors hover:text-foreground-muted"
                   aria-expanded={repliesOpen}
                 >
                   {repliesOpen
-                    ? "Collapse replies"
+                    ? "Hide replies"
                     : `View ${(comment.replies ?? []).length} ${(comment.replies ?? []).length === 1 ? "reply" : "replies"}`}
+                  <ChevronUp
+                    strokeWidth={2.5}
+                    size={14}
+                    className={`transition-transform duration-150 ${repliesOpen ? "" : "rotate-180"}`}
+                  />
                 </button>
               )}
 
               {activeReplyTarget && (
-                <div className={hasReplies && repliesOpen ? "mt-3" : hasReplies ? "mt-3 pl-6" : "pl-6"}>
+                <div className="mt-3">
                   <CommentBox
                     key={activeReplyTarget.id}
                     communityId={communityId}
@@ -533,7 +548,7 @@ export function CommentSection<C extends CommunityComment>({
 
       {sorted.length > 0 ? (
         <div className="mt-4 flex flex-col gap-4">
-          {sorted.map((comment, index) => (
+          {sorted.map((comment) => (
             <CommentRow
               key={comment.id}
               comment={comment}
@@ -542,7 +557,6 @@ export function CommentSection<C extends CommunityComment>({
               targetId={targetId}
               currentUserId={currentUserId}
               allowReplies={allowReplies}
-              isLast={index === sorted.length - 1}
               replyTarget={replyTarget}
               onReplyTargetChange={setReplyTarget}
               onDeleted={onDeleted}
