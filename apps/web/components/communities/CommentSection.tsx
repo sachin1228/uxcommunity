@@ -264,7 +264,13 @@ function CommentRow<C extends CommunityComment>({
         </div>
 
         <div className="min-w-0 flex-1">
-          <header className="flex min-w-0 items-center gap-2">
+          {/* The row must be exactly one line tall so the name lines up with the
+              top of the avatar. `leading-5` is inherited as a fixed 20px, so the
+              16px separator dot and the 11px timestamp share one 20px band
+              instead of each opening a taller line of their own, and the 28px
+              options button is kept out of the height by a negative block
+              margin while keeping its full hit area. */}
+          <header className="flex min-w-0 items-center gap-2 leading-5">
             <span className="truncate font-body text-[13px] font-semibold text-foreground">{name}</span>
             <span aria-hidden="true" className="text-foreground-subtle">•</span>
             <time
@@ -275,7 +281,7 @@ function CommentRow<C extends CommunityComment>({
               {formatRelativeDate(comment.created_at)}
             </time>
             {isOwner && (
-              <div className="relative -mr-1 ml-auto shrink-0" ref={menuRef}>
+              <div className="relative -mr-1 -my-1.5 ml-auto shrink-0" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((p) => !p)}
