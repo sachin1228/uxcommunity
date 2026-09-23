@@ -125,18 +125,18 @@ export function NotificationBubble({
   const name = isMe ? "You" : senderName ?? "Someone";
 
   return (
-    <div className="flex w-full items-start gap-2 px-5 mt-3">
+    <div className="flex w-full items-start gap-2 px-5 mt-4">
       {/* Avatar column */}
       <div className="w-7 shrink-0 mt-0.5">
         {senderName && <ChatAvatar name={senderName} url={avatarUrl} size={7} />}
       </div>
 
-      {/* Content column. It hugs its content, but never below 13rem: a
+      {/* Content column. It hugs its content, but never below 14rem: a
           three-word title used to produce a cramped stub of a card, and the
           four kinds should look like one family down the timeline. */}
-      <div className="min-w-[13rem] max-w-[26rem]">
+      <div className="min-w-[14rem] max-w-[28rem]">
         <div
-          className="relative select-none rounded-[14px] rounded-tl-none bg-surface-raised px-2.5 pt-2 pb-1.5"
+          className="relative select-none rounded-[16px] rounded-tl-none bg-surface-raised px-3 pt-2.5 pb-2"
           // Hairline ring in the kind's hue plus the bubble's usual lift. The
           // ring is an inline color-mix() because Tailwind cannot apply an
           // opacity modifier to a bare var() color (it would emit
@@ -149,7 +149,7 @@ export function NotificationBubble({
 
           {/* Sender name, colored per user — same row as a message bubble */}
           <p
-            className="font-body text-xs font-semibold leading-4 break-words"
+            className="font-body text-[13px] font-semibold leading-4 break-words"
             style={{ color: userColorVar(senderId) }}
           >
             {name}
@@ -159,14 +159,14 @@ export function NotificationBubble({
           <Link
             href={href}
             aria-label={`View ${accent.label.toLowerCase()}: ${title}`}
-            className="group/card mt-1.5 flex items-center gap-2.5 rounded-[12px] bg-black/[0.02] p-1.5 pr-2.5 transition-colors hover:bg-black/[0.05] dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+            className="group/card mt-2 flex items-center gap-3 rounded-[14px] bg-black/[0.02] p-2 pr-3 transition-colors hover:bg-black/[0.05] dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
             style={{
               boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 60%, transparent)`,
             }}
           >
             {/* Kind tile — gradient of the kind's hue, glossy top edge */}
             <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] text-white"
+              className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[14px] text-white"
               style={{
                 backgroundImage: `linear-gradient(145deg, ${accent.from}, ${accent.to})`,
                 boxShadow:
@@ -181,28 +181,28 @@ export function NotificationBubble({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <Icon size={20} strokeWidth={2.25} />
+                <Icon size={22} strokeWidth={2.25} />
               )}
             </span>
 
             {/* Kind label + title + optional subtitle */}
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex items-center gap-1 font-body text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-foreground-muted">
-                <Icon size={12} strokeWidth={2.75} style={{ color: accent.ink }} />
+              <span className="flex items-center gap-1.5 font-body text-xs font-semibold uppercase leading-none tracking-[0.12em] text-foreground-muted">
+                <Icon size={13} strokeWidth={2.75} style={{ color: accent.ink }} />
                 {accent.label}
               </span>
-              <span className="mt-1.5 font-body text-sm font-medium leading-snug text-foreground line-clamp-2">
+              <span className="mt-1.5 font-body text-[15px] font-semibold leading-snug text-foreground line-clamp-2">
                 {title}
               </span>
               {subtitle && (
-                <span className="mt-0.5 truncate font-body text-xs leading-snug text-foreground-muted">
+                <span className="mt-1 truncate font-body text-xs leading-snug text-foreground-muted">
                   {subtitle}
                 </span>
               )}
             </span>
 
             <ChevronRight
-              size={16}
+              size={18}
               strokeWidth={2.5}
               className="shrink-0 text-foreground-muted transition-transform group-hover/card:translate-x-0.5"
             />
@@ -210,9 +210,9 @@ export function NotificationBubble({
 
           {/* Timestamp, message-bubble style. The exact time is the label; the
               relative "6h ago" rides along as the tooltip. */}
-          <div className="mt-0.5 flex items-center justify-end">
+          <div className="mt-1 flex items-center justify-end">
             <span
-              className="font-body text-[11px] text-foreground-muted"
+              className="font-body text-xs text-foreground-muted"
               title={fmtTimeAgo(createdAt)}
             >
               {fmtTime(createdAt)}
