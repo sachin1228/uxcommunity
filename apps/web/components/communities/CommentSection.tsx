@@ -16,6 +16,7 @@ import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { ALLOWED_COMMENT_REACTIONS } from "@/lib/communities/comment-reactions";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { formatRelativeDate, formatFullDate } from "./threads/threadShared";
+import { sortCommentTree } from "@/lib/communities/comment-tree";
 
 /**
  * Shared comment section used by every community content type (threads,
@@ -90,10 +91,6 @@ export function CommentBox<C>({
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
-
-function totalReactionCount(comment: CommunityComment) {
-  return (comment.reactions ?? []).reduce((total, reaction) => total + reaction.count, 0);
-}
 
 /**
  * Translucent blue wash for the "selected" states in a comment's action row
@@ -570,13 +567,7 @@ export function CommentSection<C extends CommunityComment>({
   // Which comment the single inline reply composer is aimed at (null = closed).
   const [replyTarget, setReplyTarget] = useState<C | null>(null);
 
-  const sorted = useMemo(() => {
-    const list = [...comments];
-    list.sort((a, b) => sort === "popular"
-      ? totalReactionCount(b) - totalReactionCount(a) || Date.parse(b.created_at) - Date.parse(a.created_at)
-      : Date.parse(b.created_at) - Date.parse(a.created_at));
-    return list;
-  }, [comments, sort]);
+  const sorted = useMemo(() => sortCommentTree(comments, sort), [comments, sort]);
 
   // Author names in this thread, so reply mentions of them are highlighted as
   // one tag — including multi-word names.
@@ -600,8 +591,10 @@ export function CommentSection<C extends CommunityComment>({
       )}
 
       {/* Just the sort control: the comment count was never the thing the
-          reader needs here, and the card already ends in the list itself. */}
-      <div className="mt-3 flex items-center justify-end gap-4">
+          reader needs here, and the card already ends in the list itself.
+          Sits on the left, in the comment column, rather than floating off on
+          its own against the right edge. */}
+      <div className="mt-3 flex items-center gap-4">
         <label className="flex items-center gap-1.5 font-body text-xs font-semibold text-foreground">
           <ArrowUpDown strokeWidth={2} size={13} />
           <select
