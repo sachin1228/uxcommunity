@@ -1,16 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ChevronRight,
-  HelpCircle,
-  MessageCircle,
-  Lightbulb,
-  Flag,
-  type LucideIcon,
-} from "lucide-react";
-import { ChatAvatar } from "./ChatAvatar";
-import { fmtTimeAgo } from "./chatUtils";
+import { NotificationBubble } from "./NotificationBubble";
 import type { CachedThreadEvent } from "@/lib/communities/cache";
 import { THREAD_CATEGORIES } from "@/components/communities/threads/types";
 
@@ -26,14 +16,6 @@ function categoryLabel(value: string): string {
   );
 }
 
-/** Icon shown in the thumbnail when there is no image attachment. */
-const CATEGORY_ICON: Record<string, LucideIcon> = {
-  question:   HelpCircle,
-  discussion: MessageCircle,
-  idea:       Lightbulb,
-  feedback:   Flag,
-};
-
 /** Picks the first image attachment from a thread, if any. */
 function thumbnailUrl(event: CachedThreadEvent): string | null {
   const img = event.attachments.find((a) =>
@@ -42,85 +24,35 @@ function thumbnailUrl(event: CachedThreadEvent): string | null {
   return img?.url ?? null;
 }
 
+/**
+ * "John created a thread" for threads that only exist as the legacy
+ * thread-events row (threads created before content events were persisted
+ * server-side). Newer threads arrive as content events and render through
+ * ContentNotificationBubble; both share NotificationBubble, so they look
+ * identical. The thread's category becomes the card's second line, and its
+ * first image attachment becomes the tile once one exists.
+ */
 export function ThreadNotificationBubble({
   event,
   communityId,
   currentUserId,
 }: ThreadNotificationBubbleProps) {
-  const sender  = event.users;
-  const isMe    = event.user_id === currentUserId;
-  // The avatar must always key off the real display name — "You" is only the
-  // label. Otherwise the fallback renders "Y" (and its color) for the author's
-  // own threads instead of their initials.
-  const senderName = sender?.name ?? "Someone";
-  const name    = isMe ? "You" : senderName;
-  const timeAgo = fmtTimeAgo(event.created_at);
-  const imgUrl  = thumbnailUrl(event);
-  const label   = categoryLabel(event.category);
-  const href    = `/dashboard/communities/${communityId}/threads/${event.id}`;
-  const CatIcon = CATEGORY_ICON[event.category] ?? HelpCircle;
+  const sender = event.users;
 
   return (
-    <div className="flex items-start gap-2 w-full px-5 mt-3">
-      {/* Avatar column */}
-      <div className="w-7 shrink-0 mt-0.5">
-        {sender && (
-          <ChatAvatar name={senderName} url={sender.avatar_url} size={7} />
-        )}
-      </div>
-
-      {/* Content column */}
-      <div className="flex-1 min-w-0">
-        {/* Header line */}
-        <p className="font-body text-[11px] text-foreground-muted mb-1.5 ml-0.5">
-          <span className="font-semibold text-foreground">{name}</span>
-          {" created a new thread"}
-          <span className="mx-1.5 opacity-40">·</span>
-          {timeAgo}
-        </p>
-
-        {/* Card row */}
-        <div className="flex items-center gap-3">
-          {/* Thread card — a Next <Link>, not a raw <a>: the raw anchor caused
-              a full page reload, which threw away every module-level cache
-              (messages, sidebar, request cache) and forced the whole app to
-              refetch after merely viewing a thread. */}
-          <Link
-            href={href}
-            className="flex items-center gap-3 flex-1 min-w-0 rounded-xl bg-surface-raised border border-white/[0.06] px-3 py-2.5 hover:bg-white/[0.06] transition-colors group"
-          >
-            {/* Thumbnail */}
-            <div className="h-12 w-12 shrink-0 rounded-lg overflow-hidden flex items-center justify-center bg-white/[0.06]">
-              {imgUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={imgUrl}
-                  alt={event.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <CatIcon size={22} strokeWidth={2.5} className="text-foreground-muted" />
-              )}
-            </div>
-
-            {/* Text */}
-            <div className="flex-1 min-w-0">
-              <p className="font-body text-sm font-medium text-foreground line-clamp-2 leading-snug">
-                {event.title}
-              </p>
-              <p className="font-body text-xs text-accent mt-1.5 flex items-center gap-0.5 group-hover:underline">
-                View Thread
-                <ChevronRight size={12} strokeWidth={2.5} />
-              </p>
-            </div>
-          </Link>
-
-          {/* Category badge */}
-          <span className="shrink-0 font-body text-xs text-foreground-muted border border-white/[0.12] rounded-full px-3 py-1 bg-surface-raised whitespace-nowrap">
-            {label}
-          </span>
-        </div>
-      </div>
-    </div>
+    <NotificationBubble
+      kind="thread"
+      title={event.title}
+      href={`/dashboard/communities/${communityId}/threads/${event.id}`}
+      createdAt={event.created_at}
+      // The avatar must always key off the real display name — "You" is only
+      // the label, both here and inside the bubble.
+      senderName={sender?.name ?? null}
+      senderId={event.user_id}
+      avatarUrl={sender?.avatar_url ?? null}
+      isMe={event.user_id === currentUserId}
+      subtitle={categoryLabel(event.category)}
+      thumbnailUrl={thumbnailUrl(event)}
+    />
   );
 }

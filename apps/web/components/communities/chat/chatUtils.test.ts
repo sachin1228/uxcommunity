@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  fmtEventWhen,
   pickOptimisticMatch,
   scrollChatToBottom,
   type OptimisticLike,
@@ -46,6 +47,22 @@ test("a chat shorter than its viewport lands at offset zero", () => {
 test("no-ops while the scroll container is not mounted", () => {
   assert.doesNotThrow(() => scrollChatToBottom(null));
   assert.doesNotThrow(() => scrollChatToBottom(undefined));
+});
+
+// ─── Event "when" line ────────────────────────────────────────────────────
+
+// The created-event card's second line reads like the design reference:
+// weekday, month, day, then the start time.
+test("an event's start reads as 'Thu, Oct 1, 1:30 AM'", () => {
+  // 2026-10-01T01:30 local time.
+  const iso = new Date(2026, 9, 1, 1, 30).toISOString();
+
+  assert.equal(fmtEventWhen(iso), "Thu, Oct 1, 1:30 AM");
+});
+
+// Rows without a usable date must drop the line rather than print junk.
+test("an unusable event date renders as empty", () => {
+  assert.equal(fmtEventWhen("not-a-date"), "");
 });
 
 // ─── Optimistic echo matching ─────────────────────────────────────────────

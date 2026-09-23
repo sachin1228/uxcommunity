@@ -75,6 +75,11 @@ export interface CachedContentEvent {
   kind: ContentEventKind;
   title: string;
   created_at: string;
+  /**
+   * Start date/time — set for `kind === "event"` only, where the timeline card
+   * shows it as the second line ("Thu, Oct 1, 1:30 AM").
+   */
+  event_date?: string | null;
   users: { name: string; avatar_url: string | null } | null;
 }
 
@@ -549,7 +554,7 @@ export const CONTENT_EVENT_CHANGED_EVENT = "uxcommunity:content-event-changed";
  */
 export function notifyContentEvent(
   detail:
-    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string } }
+    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string; event_date?: string | null } }
     | { kind: "delete"; event: { id: string; community_id: string; kind: ContentEventKind } },
 ): void {
   if (typeof window === "undefined") return;

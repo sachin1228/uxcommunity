@@ -105,6 +105,21 @@ export function pickOptimisticMatch<
   );
 }
 
+/**
+ * "Thu, Oct 1, 1:30 AM" — the when-line under a created event's card in the
+ * chat timeline. An unparseable date renders as an empty string so the card
+ * simply drops its second line instead of printing "Invalid Date".
+ */
+export function fmtEventWhen(iso: string): string {
+  if (Number.isNaN(new Date(iso).getTime())) return "";
+  const datePart = new Date(iso).toLocaleDateString(DATE_LOCALE, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+  return `${datePart}, ${fmtTime(iso)}`;
+}
+
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   const today = new Date();

@@ -161,6 +161,9 @@ export function EventsView({
         kind: "event",
         title: event.title,
         created_at: event.created_at,
+        // The card shows the event's start as its second line immediately —
+        // before the realtime echo of the create lands.
+        event_date: event.event_date,
       },
     });
   }

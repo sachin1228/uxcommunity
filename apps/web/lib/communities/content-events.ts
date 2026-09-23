@@ -9,6 +9,8 @@ export interface ContentEventRow {
   kind: ContentEventKind;
   title: string;
   created_at: string;
+  /** Start date/time — events only; the chat card shows it as a second line. */
+  event_date?: string | null;
   users: { name: string; avatar_url: string | null } | null;
 }
 
@@ -59,7 +61,7 @@ export async function loadCommunityContentEvents(
     limits.events
       ? db
           .from("community_events")
-          .select("id, community_id, user_id, title, created_at")
+          .select("id, community_id, user_id, title, created_at, event_date")
           .eq("community_id", communityId)
           .order("created_at", { ascending: false })
           .limit(perKind)
@@ -100,6 +102,8 @@ export async function loadCommunityContentEvents(
         kind: row.kind as ContentEventKind,
         title: row.title as string,
         created_at: row.created_at as string,
+        // Only the events list selects this column; the other three read as null.
+        event_date: (row.event_date as string | null | undefined) ?? null,
         users: name
           ? { name, avatar_url: avatarMap[authorId] ?? null }
           : null,
@@ -120,6 +124,9 @@ export function contentEventPayload(
     kind,
     title: row.title,
     created_at: row.created_at,
+    // Present on event rows only — the timeline card renders it as the
+    // "when" line under the event's title.
+    ...(typeof row.event_date === "string" ? { event_date: row.event_date } : {}),
   };
 }
 

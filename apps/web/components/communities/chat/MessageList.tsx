@@ -113,8 +113,8 @@ export const MessageList = memo(function MessageList({
   onImageClick,
 }: MessageListProps) {
   // Merge messages + content events into date-grouped timeline items. Threads
-  // still carry the richer legacy bubble (thumbnail, category badge); the other
-  // three areas use the shared compact card.
+  // that predate the content-event rows still arrive through the legacy thread
+  // list; every notification renders through the same bubble card.
   const mergedGroups = useMemo<MergedGroup[]>(() => {
     // Build a map of date → items so we can add thread events even on dates
     // that have no regular messages yet.

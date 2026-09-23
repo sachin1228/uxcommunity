@@ -402,7 +402,7 @@ export function CommunityChat({
     const onContentEvent = (change: Event) => {
       const detail = (change as CustomEvent<{
         kind: "insert" | "delete";
-        event: { id: string; community_id: string; user_id?: string; kind: CachedContentEvent["kind"]; title?: string; created_at?: string };
+        event: { id: string; community_id: string; user_id?: string; kind: CachedContentEvent["kind"]; title?: string; created_at?: string; event_date?: string | null };
       }>).detail;
       if (!detail || detail.event.community_id !== communityId) return;
       if (detail.kind === "delete") {
@@ -420,6 +420,7 @@ export function CommunityChat({
           kind: row.kind,
           title: row.title ?? "",
           created_at: row.created_at ?? new Date().toISOString(),
+          event_date: row.event_date ?? null,
           users: member?.users ?? null,
         };
         return [...prev, next].sort(
