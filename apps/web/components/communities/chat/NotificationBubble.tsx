@@ -131,8 +131,10 @@ export function NotificationBubble({
         {senderName && <ChatAvatar name={senderName} url={avatarUrl} size={7} />}
       </div>
 
-      {/* Content column */}
-      <div className="min-w-0 max-w-[26rem]">
+      {/* Content column. It hugs its content, but never below 13rem: a
+          three-word title used to produce a cramped stub of a card, and the
+          four kinds should look like one family down the timeline. */}
+      <div className="min-w-[13rem] max-w-[26rem]">
         <div
           className="relative select-none rounded-[14px] rounded-tl-none bg-surface-raised px-2.5 pt-2 pb-1.5"
           // Hairline ring in the kind's hue plus the bubble's usual lift. The
