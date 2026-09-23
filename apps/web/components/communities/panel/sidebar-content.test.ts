@@ -41,15 +41,15 @@ test("content preview uses the author's first name", () => {
 });
 
 test("own content previews as You with the kind noun", () => {
-  for (const [kind, noun] of [
-    ["thread", "thread"],
-    ["showcase", "showcase"],
-    ["resource", "resource"],
-    ["event", "event"],
+  for (const [kind, article, noun] of [
+    ["thread", "a", "thread"],
+    ["showcase", "a", "showcase"],
+    ["resource", "a", "resource"],
+    ["event", "an", "event"],
   ] as const) {
     assert.deepEqual(
       formatContentPreview(content({ kind, isOwn: true, firstName: "sachin" })),
-      { prefix: "You", text: `created a ${noun}` },
+      { prefix: "You", text: `created ${article} ${noun}` },
     );
   }
 });

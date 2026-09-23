@@ -427,6 +427,7 @@ export function useRealtimeChat({
           kind?: ContentEventKind;
           title?: string;
           created_at?: string;
+          meta?: CachedContentEvent["meta"];
         };
         if (!row.id || !row.user_id || !row.created_at || !row.kind) return;
         const senderMember = membersRef.current.find((m) => m.user_id === row.user_id);
@@ -437,6 +438,7 @@ export function useRealtimeChat({
           kind: row.kind,
           title: row.title ?? "",
           created_at: row.created_at,
+          meta: row.meta ?? null,
           users: senderMember?.users ?? null,
         };
         setContentEvents((prev) => {

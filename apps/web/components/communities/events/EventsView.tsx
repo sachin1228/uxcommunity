@@ -161,6 +161,14 @@ export function EventsView({
         kind: "event",
         title: event.title,
         created_at: event.created_at,
+        meta: {
+          image_url: event.cover_image_url,
+          description: event.description,
+          event_date: event.event_date,
+          end_date: event.end_date,
+          is_online: event.is_online,
+          rsvp_count: 0,
+        },
       },
     });
   }

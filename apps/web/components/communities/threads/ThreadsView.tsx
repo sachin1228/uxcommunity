@@ -187,6 +187,14 @@ export function ThreadsView({
         kind: "thread",
         title: thread.title,
         created_at: thread.created_at,
+        meta: {
+          image_url:
+            thread.attachments.find(
+              (a) => a.type.startsWith("image/") || /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name),
+            )?.url ?? null,
+          video_poster: thread.attachments.find((a) => a.type.startsWith("video/"))?.poster ?? null,
+          description: thread.title,
+        },
       },
     });
     // Tells the profile activity tabs (and the homepage feed) that a card they

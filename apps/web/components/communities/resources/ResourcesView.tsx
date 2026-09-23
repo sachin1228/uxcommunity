@@ -155,6 +155,11 @@ export function ResourcesView({
         kind: "resource",
         title: resource.title,
         created_at: resource.created_at,
+        meta: {
+          resource_type: resource.resource_type,
+          url: resource.url,
+          description: resource.description,
+        },
       },
     });
   }

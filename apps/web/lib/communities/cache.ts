@@ -10,6 +10,7 @@ import {
   setCachedRequest,
 } from "@/lib/request-cache";
 import type { MessageMention } from "./mentions";
+import type { ContentEventMeta } from "./content-notifications";
 
 export type { MessageMention } from "./mentions";
 
@@ -51,7 +52,7 @@ export interface CachedThreadEvent {
   user_id: string;
   title: string;
   category: string;
-  attachments: Array<{ name: string; url: string; type: string; size: number }>;
+  attachments: Array<{ name: string; url: string; type: string; size: number; poster?: string }>;
   created_at: string;
   users: { name: string; avatar_url: string | null } | null;
 }
@@ -76,6 +77,8 @@ export interface CachedContentEvent {
   title: string;
   created_at: string;
   users: { name: string; avatar_url: string | null } | null;
+  /** Optional rich fields (thumbnail, description, schedule…) the card renders. */
+  meta?: ContentEventMeta | null;
 }
 
 /** Effective community-management grants for the current user. */
@@ -549,7 +552,7 @@ export const CONTENT_EVENT_CHANGED_EVENT = "uxcommunity:content-event-changed";
  */
 export function notifyContentEvent(
   detail:
-    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string } }
+    | { kind: "insert"; event: { id: string; community_id: string; user_id: string; kind: ContentEventKind; title: string; created_at: string; meta?: ContentEventMeta | null } }
     | { kind: "delete"; event: { id: string; community_id: string; kind: ContentEventKind } },
 ): void {
   if (typeof window === "undefined") return;

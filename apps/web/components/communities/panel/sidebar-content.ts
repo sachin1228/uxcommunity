@@ -22,7 +22,8 @@ export function formatContentPreview(content: Content): {
   const prefix = content.isOwn
     ? "You"
     : (content.firstName ?? null)?.split(" ")[0] || "Someone";
-  return { prefix, text: `created a ${CONTENT_KIND_NOUN[content.kind]}` };
+  const noun = CONTENT_KIND_NOUN[content.kind];
+  return { prefix, text: /^[aeiou]/i.test(noun) ? `created an ${noun}` : `created a ${noun}` };
 }
 
 /**
