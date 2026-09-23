@@ -7,7 +7,6 @@ import {
   ChevronUp,
   MessageSquare,
   MoreVertical,
-  Plus,
   Smile,
   Trash2,
 } from "lucide-react";
@@ -254,7 +253,12 @@ function CommentRow<C extends CommunityComment>({
           <Avatar name={name} avatarUrl={comment.users?.avatar_url ?? null} size={isReply ? "md" : "lg"} />
           {showConnector && (
             <span aria-hidden="true" className="relative mt-1 w-4 flex-1">
-              <span className="absolute bottom-1 left-2 top-0 w-4 rounded-bl-2xl border-b border-l border-border-strong" />
+              {/* Border colour is expressed as alpha stops rather than the
+                  `border-strong` token: that token only exists inside the dark
+                  `:root`, and `border-border-strong` is not emitted by Tailwind
+                  at all — the declaration silently fell back to preflight's
+                  `#e5e7eb`, which is why the line read as white. */}
+              <span className="absolute bottom-1 left-2 top-0 w-4 rounded-bl-2xl border-b border-l border-black/10 dark:border-white/15" />
             </span>
           )}
         </div>
@@ -321,12 +325,11 @@ function CommentRow<C extends CommunityComment>({
                   <button
                     type="button"
                     onClick={() => setPickerOpen((p) => !p)}
-                    className="inline-flex h-7 items-center gap-0.5 rounded-md px-1.5 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                    className="inline-flex h-7 items-center rounded-md px-1.5 text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
                     aria-label="Add reaction"
                     aria-expanded={pickerOpen}
                   >
-                    <Smile strokeWidth={2} size={15} />
-                    <Plus strokeWidth={2.5} size={11} />
+                    <Smile strokeWidth={2} size={16} />
                   </button>
                   {pickerOpen && (
                     <div className="absolute bottom-9 left-0 z-20 flex items-center gap-0.5 rounded-xl border border-border bg-surface p-1 shadow-lg">
