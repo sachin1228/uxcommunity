@@ -15,21 +15,58 @@ import { fmtTime, fmtTimeAgo } from "./chatUtils";
 import { userColorVar } from "@/lib/communities/user-color";
 import type { ContentEventKind } from "@/lib/communities/cache";
 
+interface KindAccent {
+  icon: LucideIcon;
+  label: string;
+  /** Tile gradient — two vivid stops of the same hue from the design system. */
+  from: string;
+  to: string;
+  /** Ink for the small kind glyph on the card's label row. */
+  ink: string;
+  /** Ring tint for the bubble and its payload card, mixed down to a hairline. */
+  ring: string;
+}
+
 /**
- * Per-kind accent, taken from the design-system color scales. The -100 stop
- * tints the card's icon tile and the -900 stop inks the glyph and the kind
- * label. Those two stops are the light-mode / dark-mode pair of the same hue
- * (dark -100 is a deep tint, dark -900 a bright ink), so a single pair covers
- * both themes with no hard-coded hex and no `dark:` overrides.
+ * One accent per kind, taken from the design-system color scales rather than
+ * new colors: the tile is a gradient between two stops of the hue, and the
+ * ring is mixed from the same hue so the bubble itself is tinted to match.
+ * Threads ink blue, showcase pink, resources purple, events amber — so four
+ * created things never read as the same card.
  */
-const KIND_THEME: Record<
-  ContentEventKind,
-  { icon: LucideIcon; label: string; ink: string; tile: string }
-> = {
-  thread:   { icon: MessageCircle,  label: "Thread",   ink: "var(--ds-blue-900)",   tile: "var(--ds-blue-100)"   },
-  showcase: { icon: ImageIcon,      label: "Showcase", ink: "var(--ds-pink-900)",   tile: "var(--ds-pink-100)"   },
-  resource: { icon: LayoutTemplate, label: "Resource", ink: "var(--ds-purple-900)", tile: "var(--ds-purple-100)" },
-  event:    { icon: CalendarDays,   label: "Event",    ink: "var(--ds-amber-900)",  tile: "var(--ds-amber-100)"  },
+const KIND_ACCENT: Record<ContentEventKind, KindAccent> = {
+  thread: {
+    icon: MessageCircle,
+    label: "Thread",
+    from: "var(--ds-blue-600)",
+    to: "var(--ds-blue-800)",
+    ink: "var(--ds-blue-900)",
+    ring: "var(--ds-blue-700)",
+  },
+  showcase: {
+    icon: ImageIcon,
+    label: "Showcase",
+    from: "var(--ds-pink-600)",
+    to: "var(--ds-pink-800)",
+    ink: "var(--ds-pink-900)",
+    ring: "var(--ds-pink-700)",
+  },
+  resource: {
+    icon: LayoutTemplate,
+    label: "Resource",
+    from: "var(--ds-purple-600)",
+    to: "var(--ds-purple-800)",
+    ink: "var(--ds-purple-900)",
+    ring: "var(--ds-purple-700)",
+  },
+  event: {
+    icon: CalendarDays,
+    label: "Event",
+    from: "var(--ds-amber-700)",
+    to: "var(--ds-amber-900)",
+    ink: "var(--ds-amber-900)",
+    ring: "var(--ds-amber-700)",
+  },
 };
 
 interface NotificationBubbleProps {
@@ -52,14 +89,14 @@ interface NotificationBubbleProps {
 
 /**
  * A "John created a thread/resource/event/showcase" entry, rendered with the
- * same grammar as a chat message: avatar column, a raised bubble with a tail
- * on its first line, the sender's name in their per-user color, and the
- * timestamp inside the bubble's bottom-right corner.
+ * same grammar as a chat message: avatar column, a raised bubble with a tail on
+ * its first line, the sender's name in their per-user color, and the timestamp
+ * inside the bubble's bottom-right corner.
  *
- * The payload is one nested card that carries the kind's accent — a tinted
- * icon tile, an uppercase kind label, the title (plus an optional subtitle),
- * and a chevron — so a created resource reads differently from a created event
- * at a glance, the way the reference design does.
+ * The payload is one nested card inside the bubble — a gradient icon tile, the
+ * uppercase kind label, the title (plus an optional subtitle) and a chevron —
+ * with both the card and the bubble ringed in the kind's accent, so a created
+ * event reads differently from a created resource at a glance.
  *
  * The card is a Next <Link>, not a raw anchor: a raw anchor forces a full page
  * reload and throws away every module-level client cache.
@@ -76,8 +113,8 @@ export function NotificationBubble({
   subtitle = null,
   thumbnailUrl = null,
 }: NotificationBubbleProps) {
-  const theme = KIND_THEME[kind];
-  const Icon = theme.icon;
+  const accent = KIND_ACCENT[kind];
+  const Icon = accent.icon;
   // "You" is only the label — the avatar and its color still key off the real
   // name so the author's own cards don't render as "Y".
   const name = isMe ? "You" : senderName ?? "Someone";
@@ -91,7 +128,16 @@ export function NotificationBubble({
 
       {/* Content column */}
       <div className="min-w-0 max-w-[26rem]">
-        <div className="relative select-none rounded-[10px] rounded-tl-none bg-surface-raised px-2.5 pt-2 pb-1.5 shadow-sm">
+        <div
+          className="relative select-none rounded-[14px] rounded-tl-none bg-surface-raised px-2.5 pt-2 pb-1.5"
+          // Hairline ring in the kind's hue plus the bubble's usual lift. The
+          // ring is an inline color-mix() because Tailwind cannot apply an
+          // opacity modifier to a bare var() color (it would emit
+          // rgb(var(--x) / 0.26), which never resolves for a hex token).
+          style={{
+            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 26%, transparent), var(--shadow-sm)`,
+          }}
+        >
           <MessageBubbleTail side="left" className="text-surface-raised" />
 
           {/* Sender name, colored per user — same row as a message bubble */}
@@ -105,13 +151,20 @@ export function NotificationBubble({
           {/* Nested card — the notification's payload */}
           <Link
             href={href}
-            aria-label={`View ${theme.label.toLowerCase()}: ${title}`}
-            className="group/card mt-1.5 flex items-center gap-2.5 rounded-xl bg-accent-soft p-2 pr-2.5 shadow-xs transition-colors hover:bg-black/[0.06] dark:hover:bg-white/[0.08]"
+            aria-label={`View ${accent.label.toLowerCase()}: ${title}`}
+            className="group/card mt-1.5 flex items-center gap-2.5 rounded-[12px] bg-black/[0.02] p-1.5 pr-2.5 transition-colors hover:bg-black/[0.05] dark:bg-white/[0.04] dark:hover:bg-white/[0.08]"
+            style={{
+              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent.ring} 45%, transparent)`,
+            }}
           >
-            {/* Kind tile */}
+            {/* Kind tile — gradient of the kind's hue, glossy top edge */}
             <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[10px]"
-              style={{ backgroundColor: theme.tile, color: theme.ink }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[12px] text-white"
+              style={{
+                backgroundImage: `linear-gradient(145deg, ${accent.from}, ${accent.to})`,
+                boxShadow:
+                  "inset 0 1px 0 rgb(255 255 255 / 0.22), var(--shadow-xs)",
+              }}
             >
               {thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -121,30 +174,30 @@ export function NotificationBubble({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <Icon size={18} strokeWidth={2.5} />
+                <Icon size={20} strokeWidth={2.25} />
               )}
             </span>
 
             {/* Kind label + title + optional subtitle */}
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="flex items-center gap-1 font-body text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-foreground-muted">
-                <Icon size={11} strokeWidth={2.75} style={{ color: theme.ink }} />
-                {theme.label}
+              <span className="flex items-center gap-1 font-body text-[11px] font-semibold uppercase leading-none tracking-[0.14em] text-foreground-muted">
+                <Icon size={12} strokeWidth={2.75} style={{ color: accent.ink }} />
+                {accent.label}
               </span>
-              <span className="mt-1 font-body text-sm font-medium leading-snug text-foreground line-clamp-2">
+              <span className="mt-1.5 font-body text-sm font-medium leading-snug text-foreground line-clamp-2">
                 {title}
               </span>
               {subtitle && (
-                <span className="mt-0.5 truncate font-body text-[11px] leading-snug text-foreground-muted">
+                <span className="mt-0.5 truncate font-body text-xs leading-snug text-foreground-muted">
                   {subtitle}
                 </span>
               )}
             </span>
 
             <ChevronRight
-              size={15}
+              size={16}
               strokeWidth={2.5}
-              className="shrink-0 text-foreground-subtle transition-transform group-hover/card:translate-x-0.5"
+              className="shrink-0 text-foreground-muted transition-transform group-hover/card:translate-x-0.5"
             />
           </Link>
 
@@ -152,7 +205,7 @@ export function NotificationBubble({
               relative "6h ago" rides along as the tooltip. */}
           <div className="mt-0.5 flex items-center justify-end">
             <span
-              className="font-mono text-[10px] text-foreground-muted"
+              className="font-body text-[11px] text-foreground-muted"
               title={fmtTimeAgo(createdAt)}
             >
               {fmtTime(createdAt)}
