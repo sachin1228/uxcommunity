@@ -208,11 +208,12 @@ export function NotificationBubble({
             />
           </Link>
 
-          {/* Timestamp, message-bubble style. The exact time is the label; the
-              relative "6h ago" rides along as the tooltip. */}
-          <div className="mt-1 flex items-center justify-end">
+          {/* Timestamp — the exact mono style MessageBubble uses, so the row
+              is indistinguishable from a plain message's. The relative "6h ago"
+              rides along as the tooltip. */}
+          <div className="mt-0.5 flex items-center justify-end">
             <span
-              className="font-body text-xs text-foreground-muted"
+              className="font-mono text-[10px] text-foreground-muted"
               title={fmtTimeAgo(createdAt)}
             >
               {fmtTime(createdAt)}
