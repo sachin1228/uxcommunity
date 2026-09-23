@@ -6,7 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageSquare,
-  MoreVertical,
+  MoreHorizontal,
   Smile,
   Trash2,
 } from "lucide-react";
@@ -271,7 +271,9 @@ function CommentRow<C extends CommunityComment>({
               options button is kept out of the height by a negative block
               margin while keeping its full hit area. */}
           <header className="flex min-w-0 items-center gap-2 leading-5">
-            <span className="truncate font-body text-[13px] font-semibold text-foreground">{name}</span>
+            {/* Same name treatment as the members list (text-sm / semibold),
+                so an author reads the same in a comment as in the roster. */}
+            <span className="truncate font-body text-sm font-semibold text-foreground">{name}</span>
             <span aria-hidden="true" className="text-foreground-subtle">•</span>
             <time
               dateTime={comment.created_at}
@@ -289,7 +291,7 @@ function CommentRow<C extends CommunityComment>({
                   aria-label="Comment options"
                   aria-expanded={menuOpen}
                 >
-                  <MoreVertical strokeWidth={2} size={14} />
+                  <MoreHorizontal strokeWidth={2.5} size={16} />
                 </button>
                 {menuOpen && (
                   <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
