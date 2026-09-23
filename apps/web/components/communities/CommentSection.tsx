@@ -509,7 +509,9 @@ function CommentRow<C extends CommunityComment>({
                     parentId={comment.id}
                     initialBody={replyMention(activeReplyTarget, currentUserId)}
                     submitLabel="Reply"
-                    placeholder="Write a reply…"
+                    // Same prompt as every other comment field — the seeded
+                    // `@Name` already says who this reply is aimed at.
+                    placeholder="Add comment"
                     autoFocus
                     onPosted={onReplied}
                     onCancel={() => onReplyTargetChange?.(null)}

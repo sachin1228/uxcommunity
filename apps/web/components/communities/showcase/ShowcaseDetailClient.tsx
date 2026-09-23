@@ -141,7 +141,6 @@ export function ShowcaseDetailClient({
                 allowReplies={post.allow_replies !== false}
                 comments={comments}
                 currentUserId={currentUserId}
-                composerPlaceholder="Leave constructive feedback…"
                 composerMaxLength={1000}
                 onPosted={posted}
                 onDeleted={deleted}

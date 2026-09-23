@@ -219,7 +219,6 @@ export function EventDetailClient({
                   allowReplies
                   comments={commentTree}
                   currentUserId={currentUserId}
-                  composerPlaceholder="Write a comment…"
                   composerMaxLength={2000}
                   onPosted={handleCommentPosted}
                   onDeleted={handleDeleteComment}

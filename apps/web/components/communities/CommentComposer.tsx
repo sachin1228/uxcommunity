@@ -427,7 +427,7 @@ export function CommentComposer<C = unknown>({
               void submit(e as unknown as React.FormEvent);
             }
           }}
-          placeholder={placeholder ?? "Post your comment"}
+          placeholder={placeholder ?? "Add comment"}
           rows={1}
           maxLength={maxLength}
           className="max-h-36 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"
