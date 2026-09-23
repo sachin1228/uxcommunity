@@ -303,32 +303,30 @@ export function ThreadDetailClient({
         </div>
 
         {/* ── Comments section ── */}
+        {/* `aria-label` instead of `aria-labelledby`: the visible "Comments"
+            heading is gone, but the region still needs a name for screen
+            readers. */}
         <section
-          aria-labelledby="thread-comments-heading"
+          aria-label="Comments"
           className={`mt-6 rounded-xl border border-border bg-surface p-4 sm:p-5`}
         >
-          <h2 id="thread-comments-heading" className="font-display text-base font-semibold tracking-tight text-foreground">
-            Comments
-          </h2>
-          <div className="mt-3">
-            <CommentSection
-              communityId={communityId}
-              kind="threads"
-              targetId={thread.id}
-              allowReplies={thread.allow_replies}
-              comments={comments}
-              currentUserId={currentUserId}
-              onPosted={handleCommentPosted}
-              onDeleted={handleCommentDeleted}
-              onReactionToggled={handleReactionToggled}
-              emptyState={
-                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-                </div>
-              }
-            />
-          </div>
+          <CommentSection
+            communityId={communityId}
+            kind="threads"
+            targetId={thread.id}
+            allowReplies={thread.allow_replies}
+            comments={comments}
+            currentUserId={currentUserId}
+            onPosted={handleCommentPosted}
+            onDeleted={handleCommentDeleted}
+            onReactionToggled={handleReactionToggled}
+            emptyState={
+              <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
+              </div>
+            }
+          />
         </section>
       </div>
     </div>
