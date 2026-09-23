@@ -8,8 +8,7 @@
  *
  *   • nested vs. flat — threads/resources/showcase nest replies under their
  *     parent, events return a flat list that the client nests itself;
- *   • reactions — only thread comments accept the emoji reactions in
- *     `ALLOWED_COMMENT_REACTIONS`;
+ *   • reactions — every kind now stores them, each in its own table;
  *   • limits — showcase caps a comment at 1000 characters, everything else at
  *     5000 (events allow an optional image instead of text).
  *
@@ -40,7 +39,9 @@ export interface CommunityComment {
   body: string;
   created_at: string;
   updated_at: string;
-  users: { name: string; avatar_url: string | null } | null;
+  /** `designation` is the author's experience level ("Senior designer"), the
+   *  label the members list shows; null when the profile has none. */
+  users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies?: CommunityComment[];
   reactions?: CommentReactionSummary[];
   image_url?: string | null;
@@ -51,9 +52,13 @@ export function commentsSupported(kind: CommentKind): boolean {
   return kind === 'threads' || kind === 'resources' || kind === 'showcase' || kind === 'events';
 }
 
-/** Only thread comments can be reacted to on the web, so only they can here. */
+/**
+ * Every kind stores comment reactions in its own table (see the
+ * `*_comment_reactions` migrations), so the emoji picker is available on all
+ * four surfaces — matching the web app.
+ */
 export function commentReactionsSupported(kind: CommentKind): boolean {
-  return kind === 'threads';
+  return kind === 'threads' || kind === 'resources' || kind === 'showcase' || kind === 'events';
 }
 
 /** Max body length per content type, matching each POST route's validation. */
@@ -125,7 +130,7 @@ export async function deleteComment(
 }
 
 /**
- * Toggles the viewer's emoji reaction on a thread comment and returns the
+ * Toggles the viewer's emoji reaction on a comment and returns the
  * authoritative grouped state for that comment.
  */
 export async function toggleCommentReaction(
@@ -158,9 +163,48 @@ export function projectCommentReaction(
     .filter((reaction) => reaction.count > 0);
 }
 
-/** Total reactions across every emoji — the "most popular" sort key. */
+/** Total reactions across every emoji — half the "most popular" sort key. */
 export function totalCommentReactions(comment: CommunityComment): number {
   return (comment.reactions ?? []).reduce((total, reaction) => total + reaction.count, 0);
+}
+
+/** How the sort control orders a section. */
+export type CommentSortOrder = 'newest' | 'popular';
+
+/**
+ * Engagement of one comment: reactions plus the replies hanging off it, so a
+ * comment people answered outranks a bare one even before anyone reacts.
+ * Reaction totals alone left "Most popular" identical to "Most recent" on any
+ * section where nobody had reacted yet.
+ */
+function commentEngagement(comment: CommunityComment): number {
+  return totalCommentReactions(comment) + (comment.replies?.length ?? 0);
+}
+
+/**
+ * Orders a comment tree for display. The chosen order applies at *every* level,
+ * not only to the roots: a post whose comments all hang under a single root has
+ * nothing to reorder at the top, so the control used to look inert.
+ */
+export function sortComments(
+  comments: CommunityComment[],
+  order: CommentSortOrder,
+): CommunityComment[] {
+  const newestFirst = (a: CommunityComment, b: CommunityComment) =>
+    Date.parse(b.created_at) - Date.parse(a.created_at);
+  const compare =
+    order === 'popular'
+      ? (a: CommunityComment, b: CommunityComment) =>
+          commentEngagement(b) - commentEngagement(a) || newestFirst(a, b)
+      : newestFirst;
+
+  return [...comments]
+    .sort(compare)
+    .map((comment) =>
+      comment.replies?.length
+        ? { ...comment, replies: sortComments(comment.replies, order) }
+        : comment,
+    );
 }
 
 /** Re-export so screens can type their reaction arrays from one place. */
