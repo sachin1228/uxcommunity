@@ -39,6 +39,12 @@ interface ThreadCardProps {
   communityNamePlacement?: "header" | "below";
   /** When provided, the card is clickable and navigates via this callback. */
   onOpen?: () => void;
+  /**
+   * Rendered inside the card, under the engagement row (like · comments ·
+   * community). The detail page puts its comment thread here so the post and
+   * the discussion read as one card instead of two stacked ones.
+   */
+  commentSection?: React.ReactNode;
 }
 
 export function ThreadCard({
@@ -54,6 +60,7 @@ export function ThreadCard({
   communityImage,
   communityNamePlacement = "header",
   onOpen,
+  commentSection,
 }: ThreadCardProps) {
   const isDetail = !onOpen;
   const category = THREAD_CATEGORIES.find((item) => item.value === thread.category);
@@ -618,6 +625,9 @@ export function ThreadCard({
             />
           )}
         </div>
+
+        {/* ── Comment thread (detail page only) ── */}
+        {commentSection && <div className="mt-4">{commentSection}</div>}
       </article>
 
       {showEditModal && (
