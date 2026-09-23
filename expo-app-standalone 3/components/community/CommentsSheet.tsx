@@ -25,22 +25,43 @@ import {
   getComments,
   postComment,
   projectCommentReaction,
+  sortComments,
   toggleCommentReaction,
-  totalCommentReactions,
   type CommentKind,
   type CommentReactionEmoji,
+  type CommentSortOrder,
   type CommunityComment,
 } from '@/lib/comments';
+import { commentParticipantNames, splitCommentText } from '@/lib/commentText';
 import { resolveProfilePictureUri } from '@/lib/profilePicture';
 
 /**
  * The community comment section, ported from the web `CommentSection`.
  *
- * One modal serves every content type (threads, showcase, resources, events):
- * a composer, a count + sort toolbar, then a timeline of comments with one
- * level of replies, emoji reactions (threads only — the only kind the API
- * supports), and delete for your own comments.
+ * One modal serves every content type (threads, showcase, resources, events)
+ * and mirrors the web design: a 36px circular avatar in a gutter with a
+ * connector bracket dropping to a thread's replies, the author's name and
+ * relative time on one line with a `···` options menu on the right, their
+ * experience level under it, the body with `@mentions` painted blue, then one
+ * flat muted action strip — emoji reaction picker, reaction chips, Reply.
  */
+
+/** Matches the web `Avatar size="lg"`: one size for the whole thread. */
+const AVATAR_SIZE = 36;
+
+/** The sort control's two options, in the order the web `<select>` lists them. */
+const SORT_OPTIONS: Array<{ value: CommentSortOrder; label: string }> = [
+  { value: 'newest', label: 'Most recent' },
+  { value: 'popular', label: 'Most popular' },
+];
+
+/** Which floating layer is open. Lifted here so only one can be open at a time
+ *  and one tap anywhere else dismisses it. */
+type OpenLayer =
+  | { type: 'sort' }
+  | { type: 'menu'; commentId: string }
+  | { type: 'picker'; commentId: string }
+  | null;
 
 interface Props {
   visible: boolean;
@@ -56,8 +77,6 @@ interface Props {
   /** Reports the live comment total so the parent's counter stays correct. */
   onCountChange?: (total: number) => void;
 }
-
-type SortOrder = 'newest' | 'popular';
 
 function formatRelativeDate(value: string): string {
   const elapsed = Date.now() - new Date(value).getTime();
@@ -99,8 +118,9 @@ export function CommentsSheet({
   const [comments, setComments] = useState<CommunityComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortOrder>('newest');
+  const [sort, setSort] = useState<CommentSortOrder>('newest');
   const [replyTarget, setReplyTarget] = useState<CommunityComment | null>(null);
+  const [layer, setLayer] = useState<OpenLayer>(null);
 
   const canReact = commentReactionsSupported(kind);
   const maxLength = COMMENT_MAX_LENGTH[kind];
@@ -132,6 +152,11 @@ export function CommentsSheet({
     void load();
   }, [visible, load]);
 
+  // A fresh modal starts with nothing expanded.
+  useEffect(() => {
+    if (!visible) setLayer(null);
+  }, [visible]);
+
   const handlePosted = useCallback((comment: CommunityComment) => {
     setComments((previous) => {
       const next = comment.parent_id
@@ -159,6 +184,7 @@ export function CommentsSheet({
       onCountChangeRef.current?.(commentTotal(next));
       return next;
     });
+    setLayer(null);
   }, []);
 
   /** Patches one comment's reactions, whichever level of the thread it lives on. */
@@ -178,18 +204,17 @@ export function CommentsSheet({
     [],
   );
 
-  const sorted = useMemo(() => {
-    const list = [...comments];
-    list.sort((a, b) =>
-      sort === 'popular'
-        ? totalCommentReactions(b) - totalCommentReactions(a) ||
-          Date.parse(b.created_at) - Date.parse(a.created_at)
-        : Date.parse(b.created_at) - Date.parse(a.created_at),
-    );
-    return list;
-  }, [comments, sort]);
+  // Applies to every level of the tree, so the control still does something on
+  // a post whose comments all hang under one root.
+  const sorted = useMemo(() => sortComments(comments, sort), [comments, sort]);
+
+  // Author names in this thread, so reply mentions of them read as one blue tag
+  // — including multi-word names.
+  const mentionNames = useMemo(() => commentParticipantNames(comments), [comments]);
 
   const total = useMemo(() => commentTotal(comments), [comments]);
+  const activeSortLabel =
+    SORT_OPTIONS.find((option) => option.value === sort)?.label ?? 'Most recent';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -222,43 +247,82 @@ export function CommentsSheet({
           </Text>
         ) : null}
 
+        {/* Sort control: a select-style trigger on the left, in the comment
+            column, matching the web toolbar. */}
         <View style={[styles.toolbar, { borderBottomColor: colors.borderSubtle }]}>
-          <Text style={[styles.toolbarLabel, { color: colors.foregroundMuted }]}>
-            {total} {total === 1 ? 'comment' : 'comments'}
-          </Text>
-          <View style={styles.sortGroup}>
-            {(['newest', 'popular'] as SortOrder[]).map((option) => {
-              const active = sort === option;
-              return (
-                <Pressable
-                  key={option}
-                  onPress={() => {
-                    hapticSelection();
-                    setSort(option);
-                  }}
-                  style={[
-                    styles.sortChip,
-                    {
-                      backgroundColor: active ? colors.accentSoft : 'transparent',
-                      borderColor: active ? colors.borderStrong : 'transparent',
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                >
-                  <Text
-                    style={[
-                      styles.sortChipText,
-                      { color: active ? colors.foreground : colors.foregroundMuted },
-                    ]}
+          <Pressable
+            onPress={() => {
+              hapticSelection();
+              setLayer(layer?.type === 'sort' ? null : { type: 'sort' });
+            }}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort comments, ${activeSortLabel}`}
+            accessibilityState={{ expanded: layer?.type === 'sort' }}
+            style={styles.sortTrigger}
+          >
+            {/* Feather has no single up/down sort glyph, so the web control's
+                `ArrowUpDown` is drawn as its two halves. */}
+            <View style={styles.sortGlyph}>
+              <Feather name="arrow-up" size={12} color={colors.foreground} />
+              <Feather name="arrow-down" size={12} color={colors.foreground} style={styles.sortGlyphHalf} />
+            </View>
+            <Text style={[styles.sortTriggerText, { color: colors.foreground }]}>
+              {activeSortLabel}
+            </Text>
+            <Feather
+              name={layer?.type === 'sort' ? 'chevron-up' : 'chevron-down'}
+              size={12}
+              color={colors.foreground}
+            />
+          </Pressable>
+
+          {layer?.type === 'sort' ? (
+            <View
+              style={[
+                styles.sortMenu,
+                { backgroundColor: colors.overlayElevated, borderColor: colors.border },
+              ]}
+            >
+              {SORT_OPTIONS.map((option) => {
+                const active = option.value === sort;
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => {
+                      hapticSelection();
+                      setSort(option.value);
+                      setLayer(null);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={styles.sortMenuItem}
                   >
-                    {option === 'newest' ? 'Most recent' : 'Most popular'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+                    <Text
+                      style={[
+                        styles.sortMenuItemText,
+                        { color: active ? colors.accent : colors.foregroundMuted },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {active ? <Feather name="check" size={13} color={colors.accent} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
+
+        {/* One tap anywhere else dismisses the open menu, like clicking off a
+            web popover. Rows and the toolbar sit above it. */}
+        {layer ? (
+          <Pressable
+            style={styles.dismissLayer}
+            onPress={() => setLayer(null)}
+            accessibilityLabel="Dismiss menu"
+          />
+        ) : null}
 
         <KeyboardAvoidingView
           style={styles.flex}
@@ -284,9 +348,9 @@ export function CommentsSheet({
             <FlatList
               data={sorted}
               keyExtractor={(item) => item.id}
-              contentContainerStyle={[styles.list, { paddingBottom: 24 }]}
+              contentContainerStyle={styles.list}
               keyboardShouldPersistTaps="handled"
-              renderItem={({ item, index }) => (
+              renderItem={({ item }) => (
                 <CommentRow
                   comment={item}
                   communityId={communityId}
@@ -295,7 +359,9 @@ export function CommentsSheet({
                   currentUserId={currentUserId}
                   allowReplies={allowReplies}
                   canReact={canReact}
-                  isLast={index === sorted.length - 1}
+                  mentionNames={mentionNames}
+                  layer={layer}
+                  onLayerChange={setLayer}
                   replyTarget={replyTarget}
                   onReplyTargetChange={setReplyTarget}
                   onDeleted={handleDeleted}
@@ -323,13 +389,18 @@ export function CommentsSheet({
               kind={kind}
               targetId={targetId}
               maxLength={maxLength}
-              placeholder="Add a comment…"
+              placeholder="Add comment"
               submitLabel="Send"
               onPosted={handlePosted}
               bottomInset={insets.bottom}
             />
           ) : (
-            <View style={[styles.closed, { borderTopColor: colors.borderSubtle, paddingBottom: insets.bottom + 12 }]}>
+            <View
+              style={[
+                styles.closed,
+                { borderTopColor: colors.borderSubtle, paddingBottom: insets.bottom + 12 },
+              ]}
+            >
               <Text style={[styles.closedText, { color: colors.foregroundSubtle }]}>
                 Replies are closed.
               </Text>
@@ -380,6 +451,10 @@ function CommentComposer({
 
   const trimmed = body.trim();
   const canSend = trimmed.length > 0 && trimmed.length <= maxLength && !sending;
+  // The send pill only exists once there is something to send, like the web
+  // field — an empty composer should read as a prompt, not a form. It stays
+  // mounted while saving so the spinner has somewhere to live.
+  const showSend = trimmed.length > 0 || sending;
 
   const send = async () => {
     if (!canSend) return;
@@ -411,42 +486,39 @@ function CommentComposer({
         },
       ]}
     >
-      <View
-        style={[
-          styles.composerField,
-          { backgroundColor: colors.surfaceRaised, shadowColor: '#000' },
-        ]}
-      >
+      <View style={[styles.composerField, { backgroundColor: colors.surfaceRaised }]}>
         <TextInput
           value={body}
           onChangeText={setBody}
-          placeholder={placeholder ?? 'Add a comment…'}
+          placeholder={placeholder ?? 'Add comment'}
           placeholderTextColor={colors.foregroundSubtle}
           multiline
           autoFocus={autoFocus}
           maxLength={maxLength}
           style={[styles.composerInput, { color: colors.foreground }]}
         />
-        <Pressable
-          onPress={send}
-          disabled={!canSend}
-          accessibilityRole="button"
-          accessibilityLabel={submitLabel}
-          style={[
-            styles.composerSend,
-            { backgroundColor: canSend ? colors.accent : colors.accentSoft },
-          ]}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.accentForeground} />
-          ) : (
-            <Feather
-              name="arrow-up"
-              size={17}
-              color={canSend ? colors.accentForeground : colors.foregroundSubtle}
-            />
-          )}
-        </Pressable>
+        {showSend ? (
+          <Pressable
+            onPress={send}
+            disabled={!canSend}
+            accessibilityRole="button"
+            accessibilityLabel={submitLabel}
+            style={[
+              styles.composerSend,
+              { backgroundColor: canSend ? colors.accent : colors.accentSoft },
+            ]}
+          >
+            {sending ? (
+              <ActivityIndicator size="small" color={colors.accentForeground} />
+            ) : (
+              <Feather
+                name="arrow-up"
+                size={16}
+                color={canSend ? colors.accentForeground : colors.foregroundSubtle}
+              />
+            )}
+          </Pressable>
+        ) : null}
       </View>
       {compact && onCancel ? (
         <Pressable
@@ -476,8 +548,10 @@ function CommentRow({
   currentUserId,
   allowReplies,
   canReact,
+  mentionNames,
   isReply,
-  isLast,
+  layer,
+  onLayerChange,
   replyTarget,
   onReplyTargetChange,
   onDeleted,
@@ -491,8 +565,10 @@ function CommentRow({
   currentUserId: string;
   allowReplies: boolean;
   canReact: boolean;
+  mentionNames: readonly string[];
   isReply?: boolean;
-  isLast?: boolean;
+  layer: OpenLayer;
+  onLayerChange: (layer: OpenLayer) => void;
   replyTarget: CommunityComment | null;
   onReplyTargetChange: (target: CommunityComment | null) => void;
   onDeleted: (id: string, parentId: string | null) => void;
@@ -505,25 +581,48 @@ function CommentRow({
 }) {
   const colors = useColors();
   const [repliesOpen, setRepliesOpen] = useState(true);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [reacting, setReacting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Report is a signal, not a stored record — the option acknowledges the tap
+  // ("Reported") for a moment, exactly like the web comment menu.
+  const [reported, setReported] = useState(false);
   const reactPending = useRef(false);
+
+  const menuOpen = layer?.type === 'menu' && layer.commentId === comment.id;
+  const pickerOpen = layer?.type === 'picker' && layer.commentId === comment.id;
 
   const isOwner = comment.user_id === currentUserId;
   const name = comment.users?.name ?? 'Member';
+  const designation = comment.users?.designation ?? null;
   const replies = comment.replies ?? [];
   const hasReplies = !isReply && replies.length > 0;
   const hostsReplyComposer = Boolean(
     !isReply && replyTarget && (replyTarget.id === comment.id || replyTarget.parent_id === comment.id),
   );
+  // Top-level comments with a reply thread hang the connector bracket in the
+  // avatar gutter, spanning the replies below them.
+  const showConnector = !isReply && (hasReplies || hostsReplyComposer);
+  // The blue the web comment menus use for a selected reaction / Reply, and the
+  // wash behind it.
+  const accentText = colors.isDark ? colors.chatMentionOwn : colors.chatMention;
+  const accentWash = colors.isDark ? 'rgba(82, 168, 255, 0.14)' : 'rgba(0, 114, 245, 0.10)';
+  const connectorColor = colors.isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.10)';
+  const replyActive = replyTarget?.id === comment.id;
+  const activeReplyTarget = hostsReplyComposer ? replyTarget : null;
+  const avatarUri = resolveProfilePictureUri(comment.users?.avatar_url);
+  const bodySegments = useMemo(
+    () => splitCommentText(comment.body, mentionNames),
+    [comment.body, mentionNames],
+  );
 
   const confirmDelete = () => {
+    onLayerChange(null);
     Alert.alert('Delete comment?', 'This will permanently remove this comment. This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          setDeleting(true);
           try {
             await deleteComment(communityId, kind, targetId, comment.id);
             hapticSuccess();
@@ -531,10 +630,19 @@ function CommentRow({
           } catch (e) {
             hapticError();
             Alert.alert('Could not delete', e instanceof Error ? e.message : 'Please try again.');
+          } finally {
+            setDeleting(false);
           }
         },
       },
     ]);
+  };
+
+  const handleReport = () => {
+    hapticSelection();
+    onLayerChange(null);
+    setReported(true);
+    setTimeout(() => setReported(false), 3000);
   };
 
   const toggleReaction = async (emoji: CommentReactionEmoji) => {
@@ -543,10 +651,9 @@ function CommentRow({
     // Tapping your own emoji removes it, anything else adds — tick by direction.
     hapticToggle(!(current.find((reaction) => reaction.emoji === emoji)?.reacted ?? false));
     reactPending.current = true;
-    setReacting(true);
     // Paint the flip immediately, then reconcile with the authoritative list.
     onReactionToggled(comment.id, comment.parent_id, projectCommentReaction(current, emoji));
-    setPickerOpen(false);
+    onLayerChange(null);
     try {
       const reactions = await toggleCommentReaction(communityId, kind, targetId, comment.id, emoji);
       onReactionToggled(comment.id, comment.parent_id, reactions);
@@ -554,38 +661,40 @@ function CommentRow({
       onReactionToggled(comment.id, comment.parent_id, current);
     } finally {
       reactPending.current = false;
-      setReacting(false);
     }
   };
 
-  const avatarUri = resolveProfilePictureUri(comment.users?.avatar_url);
-  const activeReplyTarget = hostsReplyComposer ? replyTarget : null;
+  const startReply = () => {
+    hapticSelection();
+    onLayerChange(null);
+    onReplyTargetChange(replyActive ? null : comment);
+    setRepliesOpen(true);
+  };
 
   return (
-    <View style={[styles.timelineRow, !isReply && styles.timelineRowTop]}>
-      {!isReply ? (
-        <>
-          <View style={[styles.timelineDot, { backgroundColor: colors.foregroundMuted }]} />
-          <View
-            style={[
-              styles.timelineLine,
-              { backgroundColor: colors.borderSubtle, bottom: hasReplies || !isLast ? -18 : 6 },
-            ]}
-          />
-        </>
-      ) : null}
+    <View style={[styles.row, menuOpen ? styles.rowRaised : null]}>
+      {/* Avatar gutter: the circle pinned left, the thread's connector bracket
+          dropping from under it and curving right under the last reply. */}
+      <View style={styles.gutter}>
+        {avatarUri ? (
+          <Image source={{ uri: avatarUri }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.surfaceRaised }]}>
+            <Text style={[styles.avatarText, { color: colors.foregroundMuted }]}>
+              {name.slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        {showConnector ? (
+          <View style={styles.connector}>
+            <View style={[styles.connectorElbow, { borderColor: connectorColor }]} />
+          </View>
+        ) : null}
+      </View>
 
-      <View style={[styles.commentBody, isReply && styles.replyBody]}>
-        <View style={styles.commentHeader}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.surfaceRaised }]}>
-              <Text style={[styles.avatarText, { color: colors.foregroundMuted }]}>
-                {name.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-          )}
+      <View style={styles.content}>
+        {/* One line tall so the name sits level with the top of the avatar. */}
+        <View style={styles.nameRow}>
           <Text style={[styles.author, { color: colors.foreground }]} numberOfLines={1}>
             {name}
           </Text>
@@ -593,55 +702,110 @@ function CommentRow({
           <Text style={[styles.time, { color: colors.foregroundMuted }]}>
             {formatRelativeDate(comment.created_at)}
           </Text>
-          {isOwner ? (
-            <Pressable
-              onPress={() => {
-                hapticSelection();
-                confirmDelete();
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Delete comment"
-              style={styles.deleteButton}
+          {/* Every comment carries the menu: Report is open to everyone, Delete
+              only to the author. */}
+          <Pressable
+            onPress={() => {
+              hapticSelection();
+              onLayerChange(menuOpen ? null : { type: 'menu', commentId: comment.id });
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Comment options"
+            accessibilityState={{ expanded: menuOpen }}
+            style={styles.menuButton}
+          >
+            <Feather name="more-horizontal" size={16} color={colors.foregroundMuted} />
+          </Pressable>
+
+          {menuOpen ? (
+            <View
+              style={[
+                styles.menuPanel,
+                { backgroundColor: colors.overlayElevated, borderColor: colors.border },
+              ]}
             >
-              <Feather name="trash-2" size={14} color={colors.foregroundMuted} />
-            </Pressable>
+              {isOwner ? (
+                <Pressable
+                  onPress={confirmDelete}
+                  disabled={deleting}
+                  accessibilityRole="button"
+                  style={styles.menuItem}
+                >
+                  <Feather name="trash-2" size={12} color={colors.destructive} />
+                  <Text style={[styles.menuItemText, { color: colors.destructive }]}>
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={handleReport}
+                disabled={reported}
+                accessibilityRole="button"
+                style={styles.menuItem}
+              >
+                <Feather name="flag" size={12} color={colors.foregroundMuted} />
+                <Text
+                  style={[
+                    styles.menuItemText,
+                    { color: reported ? colors.foregroundSubtle : colors.foregroundMuted },
+                  ]}
+                >
+                  {reported ? 'Reported' : 'Report'}
+                </Text>
+              </Pressable>
+            </View>
           ) : null}
         </View>
 
-        <Text style={[styles.commentText, { color: colors.foreground }]}>{comment.body}</Text>
+        {/* The author's experience level, tracking the name on its own line. */}
+        {designation ? (
+          <Text style={[styles.designation, { color: colors.foregroundMuted }]}>{designation}</Text>
+        ) : null}
+
+        <Text style={[styles.commentText, { color: colors.foreground }]}>
+          {bodySegments.map((segment, index) =>
+            segment.mention ? (
+              <Text key={`m${index}`} style={[styles.mention, { color: accentText }]}>
+                {segment.text}
+              </Text>
+            ) : (
+              segment.text
+            ),
+          )}
+        </Text>
 
         {comment.image_url ? (
           <Image source={{ uri: comment.image_url }} style={styles.commentImage} resizeMode="cover" />
         ) : null}
 
-        <View style={styles.reactionRow}>
+        <View style={[styles.actionRow, pickerOpen ? styles.actionRowRaised : null]}>
           {canReact ? (
             <>
               <Pressable
                 onPress={() => {
                   hapticSelection();
-                  setPickerOpen((open) => !open);
+                  onLayerChange(pickerOpen ? null : { type: 'picker', commentId: comment.id });
                 }}
-                style={[styles.addReaction, { backgroundColor: colors.surfaceRaised }]}
+                style={[styles.actionButton, styles.actionEdge]}
                 accessibilityRole="button"
                 accessibilityLabel="Add reaction"
                 accessibilityState={{ expanded: pickerOpen }}
               >
-                <Feather name="smile" size={13} color={colors.foregroundMuted} />
-                <Feather name="plus" size={11} color={colors.foregroundMuted} />
+                <Feather
+                  name="smile"
+                  size={16}
+                  color={pickerOpen ? accentText : colors.foregroundMuted}
+                />
               </Pressable>
 
               {(comment.reactions ?? []).map((reaction) => (
                 <Pressable
                   key={reaction.emoji}
-                  disabled={reacting}
                   onPress={() => toggleReaction(reaction.emoji as CommentReactionEmoji)}
                   style={[
-                    styles.reactionPill,
-                    {
-                      backgroundColor: reaction.reacted ? colors.chatOwnBubble : colors.surfaceRaised,
-                    },
+                    styles.reactionChip,
+                    { backgroundColor: reaction.reacted ? accentWash : 'transparent' },
                   ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: reaction.reacted }}
@@ -651,7 +815,7 @@ function CommentRow({
                   <Text
                     style={[
                       styles.reactionCount,
-                      { color: reaction.reacted ? '#FFFFFF' : colors.foregroundMuted },
+                      { color: reaction.reacted ? accentText : colors.foregroundMuted },
                     ]}
                   >
                     {reaction.count}
@@ -663,28 +827,33 @@ function CommentRow({
 
           {allowReplies ? (
             <Pressable
-              onPress={() => {
-                hapticSelection();
-                onReplyTargetChange(replyTarget?.id === comment.id ? null : comment);
-                setRepliesOpen(true);
-              }}
+              onPress={startReply}
               style={[
                 styles.replyButton,
-                {
-                  backgroundColor:
-                    replyTarget?.id === comment.id ? colors.accentSoft : colors.surfaceRaised,
-                },
+                { backgroundColor: replyActive ? accentWash : 'transparent' },
               ]}
               accessibilityRole="button"
-              accessibilityState={{ selected: replyTarget?.id === comment.id }}
+              accessibilityState={{ selected: replyActive }}
             >
-              <Text style={[styles.replyButtonText, { color: colors.foreground }]}>Reply</Text>
+              <Text
+                style={[
+                  styles.replyButtonText,
+                  { color: replyActive ? accentText : colors.foregroundMuted },
+                ]}
+              >
+                Reply
+              </Text>
             </Pressable>
           ) : null}
         </View>
 
         {pickerOpen ? (
-          <View style={[styles.picker, { backgroundColor: colors.overlayElevated, shadowColor: '#000' }]}>
+          <View
+            style={[
+              styles.picker,
+              { backgroundColor: colors.overlayElevated, borderColor: colors.border },
+            ]}
+          >
             {ALLOWED_COMMENT_REACTIONS.map((emoji) => (
               <Pressable
                 key={emoji}
@@ -701,8 +870,9 @@ function CommentRow({
 
         {!isReply && (hasReplies || hostsReplyComposer) ? (
           <View style={styles.replyBlock}>
-            {hasReplies && repliesOpen
-              ? replies.map((reply) => (
+            {hasReplies && repliesOpen ? (
+              <View style={styles.replyList}>
+                {replies.map((reply) => (
                   <CommentRow
                     key={reply.id}
                     comment={reply}
@@ -712,15 +882,19 @@ function CommentRow({
                     currentUserId={currentUserId}
                     allowReplies={allowReplies}
                     canReact={canReact}
+                    mentionNames={mentionNames}
                     isReply
+                    layer={layer}
+                    onLayerChange={onLayerChange}
                     replyTarget={replyTarget}
                     onReplyTargetChange={onReplyTargetChange}
                     onDeleted={onDeleted}
                     onReplied={onReplied}
                     onReactionToggled={onReactionToggled}
                   />
-                ))
-              : null}
+                ))}
+              </View>
+            ) : null}
 
             {hasReplies ? (
               <Pressable
@@ -729,12 +903,20 @@ function CommentRow({
                   setRepliesOpen((open) => !open);
                 }}
                 hitSlop={6}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: repliesOpen }}
+                style={styles.hideReplies}
               >
-                <Text style={[styles.collapseText, { color: colors.foreground }]}>
+                <Text style={[styles.hideRepliesText, { color: colors.foreground }]}>
                   {repliesOpen
-                    ? 'Collapse replies'
+                    ? 'Hide replies'
                     : `View ${replies.length} ${replies.length === 1 ? 'reply' : 'replies'}`}
                 </Text>
+                <Feather
+                  name={repliesOpen ? 'chevron-up' : 'chevron-down'}
+                  size={14}
+                  color={colors.foreground}
+                />
               </Pressable>
             ) : null}
 
@@ -749,7 +931,9 @@ function CommentRow({
                   parentId={comment.id}
                   initialBody={replyMention(activeReplyTarget, currentUserId)}
                   maxLength={COMMENT_MAX_LENGTH[kind]}
-                  placeholder="Write a reply…"
+                  // Same prompt as every other comment field — the seeded
+                  // `@Name` already says who this reply is aimed at.
+                  placeholder="Add comment"
                   submitLabel="Reply"
                   autoFocus
                   compact
@@ -783,25 +967,54 @@ const styles = StyleSheet.create({
 
   context: { fontSize: 12, fontFamily: 'Geist_400Regular', paddingHorizontal: 16, paddingTop: 10 },
 
+  // Left-aligned, like the web toolbar: the sort control sits in the comment
+  // column rather than floating against the right edge.
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    zIndex: 20,
   },
-  toolbarLabel: { fontSize: 12, fontFamily: 'Geist_500Medium' },
-  sortGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sortChip: {
-    borderRadius: 999,
+  sortTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingRight: 2,
+  },
+  sortGlyph: { flexDirection: 'row', alignItems: 'center' },
+  sortGlyphHalf: { marginLeft: -7 },
+  sortTriggerText: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
+  sortMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 16,
+    minWidth: 168,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 4,
+    zIndex: 30,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
-  sortChipText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  sortMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  sortMenuItemText: { fontSize: 13, fontFamily: 'Geist_500Medium' },
 
-  list: { paddingHorizontal: 16, paddingTop: 16, gap: 18, flexGrow: 1 },
+  dismissLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
+
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, gap: 16, flexGrow: 1 },
   center: {
     flex: 1,
     minHeight: 220,
@@ -814,57 +1027,115 @@ const styles = StyleSheet.create({
   emptyBody: { fontSize: 13, fontFamily: 'Geist_400Regular', textAlign: 'center' },
   retry: { fontSize: 13, fontFamily: 'Geist_600SemiBold', marginTop: 4 },
 
-  timelineRow: { position: 'relative' },
-  timelineRowTop: { paddingLeft: 22 },
-  timelineDot: { position: 'absolute', left: 6, top: 8, width: 6, height: 6, borderRadius: 3 },
-  timelineLine: { position: 'absolute', left: 9.5, top: 16, width: StyleSheet.hairlineWidth },
-
-  commentBody: { flexShrink: 1 },
-  replyBody: { paddingLeft: 0 },
-  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  avatar: { width: 26, height: 26, borderRadius: 13, overflow: 'hidden' },
+  row: { flexDirection: 'row', gap: 12 },
+  // Lift the row carrying an open menu above the rows below it.
+  rowRaised: { zIndex: 30 },
+  gutter: { width: AVATAR_SIZE, alignItems: 'center' },
+  avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 11, fontFamily: 'Geist_600SemiBold' },
-  author: { flexShrink: 1, fontSize: 13, fontFamily: 'Geist_600SemiBold' },
-  dot: { fontSize: 11 },
-  time: { fontSize: 11, fontFamily: 'Geist_400Regular' },
-  deleteButton: { marginLeft: 'auto', paddingHorizontal: 4, paddingVertical: 4 },
+  avatarText: { fontSize: 13, fontFamily: 'Geist_600SemiBold' },
 
-  commentText: {
-    marginTop: 6,
-    fontSize: 14,
-    lineHeight: 21,
-    fontFamily: 'Geist_400Regular',
+  // The bracket drops from under the avatar and curves right under the last
+  // reply: left border on the avatar's centre line, bottom border curving out
+  // of it. Every width here is relative to the 16px wrapper, which is centred
+  // in the 36px gutter — so the vertical line lands on the avatar's centre.
+  connector: { marginTop: 4, alignSelf: 'stretch', flex: 1 },
+  connectorElbow: {
+    position: 'absolute',
+    // 18 = half the avatar, so the vertical line runs through its centre; the
+    // horizontal border reaches 34, two pixels short of the gutter's edge.
+    left: AVATAR_SIZE / 2,
+    right: 2,
+    top: 0,
+    bottom: 4,
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderBottomLeftRadius: 16,
   },
+
+  content: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 20 },
+  author: { flexShrink: 1, fontSize: 14, fontFamily: 'Geist_600SemiBold' },
+  dot: { fontSize: 12 },
+  time: { fontSize: 11, fontFamily: 'Geist_400Regular' },
+  menuButton: {
+    marginLeft: 'auto',
+    marginRight: -6,
+    // Cancels the button's own overflow so the name row stays exactly one line
+    // tall and the name lines up with the top of the avatar (web does the same
+    // with a negative block margin).
+    marginVertical: -4,
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuPanel: {
+    position: 'absolute',
+    top: 30,
+    right: 0,
+    minWidth: 132,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
+    zIndex: 30,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  menuItemText: { fontSize: 12, fontFamily: 'Geist_400Regular' },
+
+  designation: { fontSize: 12, fontFamily: 'Geist_400Regular', marginTop: 1 },
+  commentText: { marginTop: 4, fontSize: 14, lineHeight: 20, fontFamily: 'Geist_400Regular' },
+  mention: { fontFamily: 'Geist_500Medium' },
   commentImage: { marginTop: 8, width: '100%', height: 180, borderRadius: 12 },
 
-  reactionRow: {
-    marginTop: 8,
+  // One quiet strip: the emoji glyph, the chips and Reply all read muted, and
+  // only the emoji button's own padding is cancelled so its glyph — not its hit
+  // area — lines up with the comment text above.
+  actionRow: {
+    marginTop: 6,
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 4,
   },
-  addReaction: {
-    height: 30,
+  actionRowRaised: { zIndex: 30 },
+  actionEdge: { marginLeft: -8 },
+  actionButton: {
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    borderRadius: 999,
-    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 8,
   },
-  reactionPill: {
-    height: 30,
+  reactionChip: {
+    height: 32,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    borderRadius: 999,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingHorizontal: 8,
   },
   reactionEmoji: { fontSize: 13 },
   reactionCount: { fontSize: 12, fontFamily: 'Geist_500Medium', fontVariant: ['tabular-nums'] },
-  replyButton: { height: 30, borderRadius: 999, paddingHorizontal: 14, justifyContent: 'center' },
-  replyButtonText: { fontSize: 12, fontFamily: 'Geist_500Medium' },
+  replyButton: {
+    height: 32,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    justifyContent: 'center',
+  },
+  replyButtonText: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
 
   picker: {
     marginTop: 8,
@@ -873,17 +1144,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 2,
     borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     padding: 4,
-    elevation: 6,
-    shadowOpacity: 0.25,
+    zIndex: 30,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
   },
-  pickerItem: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
-  pickerEmoji: { fontSize: 19 },
+  pickerItem: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pickerEmoji: { fontSize: 20 },
 
-  replyBlock: { marginTop: 12, paddingLeft: 22, gap: 12 },
-  collapseText: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
+  replyBlock: { marginTop: 12, gap: 12 },
+  replyList: { gap: 12 },
+  hideReplies: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  hideRepliesText: { fontSize: 12, fontFamily: 'Geist_600SemiBold' },
   replyComposer: { marginTop: 2 },
 
   composer: {
@@ -896,28 +1172,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 8,
-    borderRadius: 18,
+    // 40px tall and a true pill: the radius is past half the height, so the
+    // ends are round without the field turning into a capsule as it grows.
+    minHeight: 40,
+    borderRadius: 20,
     paddingLeft: 14,
-    paddingRight: 6,
-    paddingVertical: 6,
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    paddingRight: 4,
+    paddingVertical: 4,
   },
   composerInput: {
     flex: 1,
-    minHeight: 34,
+    minHeight: 32,
     maxHeight: 120,
     fontSize: 14,
     lineHeight: 20,
     fontFamily: 'Geist_400Regular',
-    paddingTop: Platform.OS === 'ios' ? 8 : 4,
+    paddingTop: Platform.OS === 'ios' ? 6 : 4,
   },
   composerSend: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },

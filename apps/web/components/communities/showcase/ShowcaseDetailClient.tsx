@@ -12,6 +12,7 @@ import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
 export function ShowcaseDetailClient({
   initialPost,
@@ -129,29 +130,32 @@ export function ShowcaseDetailClient({
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}
           onDelete={() => setConfirmDeletePost(true)}
+          // The discussion lives inside the post card, under the engagement row.
+          commentSection={
+            /* `aria-label` names the region — there is no visible "Comments"
+               heading above it. */
+            <section aria-label="Comments">
+              <CommentSection
+                communityId={communityId}
+                kind="showcase"
+                targetId={post.id}
+                allowReplies={post.allow_replies !== false}
+                comments={comments}
+                currentUserId={currentUserId}
+                composerMaxLength={1000}
+                onPosted={posted}
+                onDeleted={deleted}
+                onReactionToggled={(commentId, _parentId, reactions) =>
+                  setComments((values) => updateCommentReactions(values, commentId, reactions))}
+                emptyState={
+                  <p className="text-center font-body text-sm text-foreground-muted">
+                    No comments yet. Be the first!
+                  </p>
+                }
+              />
+            </section>
+          }
         />
-        <section className={`mt-6 ${communityFeedLayout.card}`}>
-          <h2 className="mb-4 font-display text-sm font-semibold text-foreground">
-            Comments
-          </h2>
-          <CommentSection
-            communityId={communityId}
-            kind="showcase"
-            targetId={post.id}
-            allowReplies={post.allow_replies !== false}
-            comments={comments}
-            currentUserId={currentUserId}
-            composerPlaceholder="Leave constructive feedback…"
-            composerMaxLength={1000}
-            onPosted={posted}
-            onDeleted={deleted}
-            emptyState={
-              <p className="text-center font-body text-sm text-foreground-muted">
-                No comments yet. Be the first!
-              </p>
-            }
-          />
-        </section>
       </div>
       {editing && (
         <CreateShowcaseModal

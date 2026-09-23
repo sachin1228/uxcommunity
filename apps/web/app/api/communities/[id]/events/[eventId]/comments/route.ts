@@ -3,6 +3,8 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
+import { attachCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -31,24 +33,14 @@ export async function GET(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Enrich with user info
-  const userIds = [...new Set((data ?? []).map((c) => c.user_id))];
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds.length ? userIds : [""]),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds.length ? userIds : [""]),
-  ]);
+  // Author info — name, avatar, designation pill — from the shared resolver.
+  const comments = await attachCommentAuthors(db, (data ?? []) as Array<Record<string, unknown>>);
 
-  const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u]));
-  const profileMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p]));
+  // Grouped emoji reactions per comment, in the same flat list the page builds
+  // its reply tree from.
+  const withReactions = await attachCommentReactions(db, comments, session.userId!, "events");
 
-  const comments = (data ?? []).map((c) => ({
-    ...c,
-    users: userMap[c.user_id]
-      ? { name: userMap[c.user_id].name, avatar_url: profileMap[c.user_id]?.avatar_url ?? null }
-      : null,
-  }));
-
-  return NextResponse.json({ comments });
+  return NextResponse.json({ comments: withReactions });
 }
 
 export async function POST(
@@ -137,15 +129,12 @@ export async function POST(
     });
   }
 
-  const [{ data: userRow }, { data: profileRow }] = await Promise.all([
-    db.from("users").select("id, name").eq("id", userId).maybeSingle(),
-    db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", userId).maybeSingle(),
-  ]);
+  const [authored] = await attachCommentReactions(
+    db,
+    await attachCommentAuthors(db, [comment as unknown as Record<string, unknown>]),
+    userId,
+    "events",
+  );
 
-  return NextResponse.json({
-    comment: {
-      ...comment,
-      users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
-    },
-  }, { status: 201 });
+  return NextResponse.json({ comment: authored }, { status: 201 });
 }

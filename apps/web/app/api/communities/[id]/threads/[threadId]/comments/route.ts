@@ -6,6 +6,8 @@ import { deferNotification, threadHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
+import { attachCommentAuthors } from "@/lib/communities/comment-authors";
+import type { CommentAuthor } from "@/lib/communities/comment-authors";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -22,7 +24,7 @@ async function isMember(
 }
 
 type EnrichedRow = Record<string, unknown> & {
-  users: { name: string; avatar_url: string | null } | null;
+  users: CommentAuthor | null;
   replies: EnrichedRow[];
 };
 
@@ -30,21 +32,7 @@ async function attachUsers(
   db: ReturnType<typeof createServiceClient>,
   rows: Array<Record<string, unknown>>,
 ): Promise<EnrichedRow[]> {
-  if (!rows.length) return rows.map((r) => ({ ...r, users: null, replies: [] }));
-  const userIds = [...new Set(rows.map((r) => r.user_id).filter((id): id is string => typeof id === "string"))];
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-  ]);
-  const nameMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
-  const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
-  return rows.map((r) => ({
-    ...r,
-    users: nameMap[r.user_id as string]
-      ? { name: nameMap[r.user_id as string], avatar_url: avatarMap[r.user_id as string] ?? null }
-      : null,
-    replies: [],
-  }));
+  return (await attachCommentAuthors(db, rows)).map((row) => ({ ...row, replies: [] as EnrichedRow[] }));
 }
 
 export async function GET(
@@ -87,18 +75,19 @@ export async function GET(
 
   const withUsers = await attachUsers(db, (data ?? []) as Array<Record<string, unknown>>);
 
+  // Grouped emoji reactions per comment (empty lists when none / table missing),
+  // attached before nesting so replies carry their reactions too.
+  const withReactions = await attachCommentReactions(db, withUsers, session.userId!, "threads");
+
   // Nest replies under their parent
-  const topLevel = withUsers.filter((c) => !c.parent_id);
-  const replies = withUsers.filter((c) => c.parent_id);
+  const topLevel = withReactions.filter((c) => !c.parent_id);
+  const replies = withReactions.filter((c) => c.parent_id);
   for (const reply of replies) {
     const parent = topLevel.find((c) => c.id === reply.parent_id);
-    if (parent) (parent.replies as typeof withUsers).push(reply);
+    if (parent) (parent.replies as typeof withReactions).push(reply);
   }
 
-  // Grouped emoji reactions per comment (empty lists when none / table missing)
-  const withReactions = await attachCommentReactions(db, topLevel, session.userId!);
-
-  return NextResponse.json({ comments: withReactions });
+  return NextResponse.json({ comments: topLevel });
 }
 
 export async function POST(
@@ -209,6 +198,7 @@ export async function POST(
     db,
     await attachUsers(db, [inserted as Record<string, unknown>]),
     userId,
+    "threads",
   );
   return NextResponse.json({ comment: enriched }, { status: 201 });
 }

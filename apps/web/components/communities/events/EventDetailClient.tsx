@@ -11,6 +11,7 @@ import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest 
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ const AVATAR_PX = { sm: 24, md: 32, lg: 40 } as const;
 function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" | "lg" }) {
   const px = AVATAR_PX[size];
   return (
-    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 object-cover" />
+    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 rounded-full object-cover" />
   );
 }
 
@@ -147,7 +148,8 @@ export function EventDetailClient({
             className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
           />
         )}
-        {/* Event post */}
+        {/* Event post + its Discussion / Attendees panel: one card, with the
+            panel sitting under the engagement row. */}
         <section className={communityFeedLayout.detailCard}>
             <EventCard
               variant="detail"
@@ -174,10 +176,9 @@ export function EventDetailClient({
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
             />
-        </section>
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className={`mt-6 ${communityFeedLayout.detailCard}`}>
+        <div className="mt-4">
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
@@ -219,11 +220,13 @@ export function EventDetailClient({
                   allowReplies
                   comments={commentTree}
                   currentUserId={currentUserId}
-                  composerPlaceholder="Write a comment…"
-                  composerMaxLength={2000}
-                  onPosted={handleCommentPosted}
-                  onDeleted={handleDeleteComment}
-                  emptyState={
+                  composerMaxLength={2000}                          onPosted={handleCommentPosted}
+                          onDeleted={handleDeleteComment}
+                          // Parents and replies share one flat list here, so the
+                          // id-based helper reaches either.
+                          onReactionToggled={(commentId, _parentId, reactions) =>
+                            setComments((prev) => updateCommentReactions(prev, commentId, reactions))}
+                          emptyState={
                     <div className={`${communityFeedLayout.emptyState} min-h-40`}>
                       <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
                       <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>
@@ -255,6 +258,7 @@ export function EventDetailClient({
             </div>
           )}
         </div>
+        </section>
       </div>
 
     </div>

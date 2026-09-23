@@ -10,6 +10,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
@@ -254,12 +255,10 @@ export function ThreadDetailClient({
     changeCommentCount(-removed);
   }
 
-  function handleReactionToggled(commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) {
-    writeComments((current) => parentId
-      ? current.map((comment) => comment.id === parentId
-        ? { ...comment, replies: comment.replies.map((reply) => (reply.id === commentId ? { ...reply, reactions } : reply)) }
-        : comment)
-      : current.map((comment) => (comment.id === commentId ? { ...comment, reactions } : comment)));
+  function handleReactionToggled(commentId: string, _parentId: string | null, reactions: CommentReactionSummary[]) {
+    // One id-based helper for every comment surface — it finds the row whether
+    // it is a top-level comment or a reply.
+    writeComments((current) => updateCommentReactions(current, commentId, reactions));
   }
 
   const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);
@@ -286,6 +285,8 @@ export function ThreadDetailClient({
         )}
 
         {/* ── Thread card (shared component, detail variant) ── */}
+        {/* The discussion is handed to the card itself, so the post and its
+            comments render as one card instead of two stacked ones. */}
         <div className={communityFeedLayout.detailSection}>
             <ThreadCard
               thread={thread}
@@ -299,37 +300,32 @@ export function ThreadDetailClient({
               onPollVoteChanged={handlePollVoteChanged}
               onUpdated={handleUpdated}
               onDeleted={handleDeleted}
-            />
-        </div>
-
-        {/* ── Comments section ── */}
-        <section
-          aria-labelledby="thread-comments-heading"
-          className={`mt-6 rounded-xl border border-border bg-surface p-4 sm:p-5`}
-        >
-          <h2 id="thread-comments-heading" className="font-display text-base font-semibold tracking-tight text-foreground">
-            Comments
-          </h2>
-          <div className="mt-3">
-            <CommentSection
-              communityId={communityId}
-              kind="threads"
-              targetId={thread.id}
-              allowReplies={thread.allow_replies}
-              comments={comments}
-              currentUserId={currentUserId}
-              onPosted={handleCommentPosted}
-              onDeleted={handleCommentDeleted}
-              onReactionToggled={handleReactionToggled}
-              emptyState={
-                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
-                </div>
+              commentSection={
+                /* `aria-label` rather than `aria-labelledby`: the visible
+                   "Comments" heading is gone, but the region still needs a
+                   name for screen readers. */
+                <section aria-label="Comments">
+                  <CommentSection
+                    communityId={communityId}
+                    kind="threads"
+                    targetId={thread.id}
+                    allowReplies={thread.allow_replies}
+                    comments={comments}
+                    currentUserId={currentUserId}
+                    onPosted={handleCommentPosted}
+                    onDeleted={handleCommentDeleted}
+                    onReactionToggled={handleReactionToggled}
+                    emptyState={
+                      <div className={`${communityFeedLayout.emptyState} min-h-40`}>
+                        <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
+                        <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first!</p>
+                      </div>
+                    }
+                  />
+                </section>
               }
             />
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   );

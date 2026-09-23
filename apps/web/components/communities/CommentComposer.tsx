@@ -8,6 +8,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { NotoEmojiSvg } from "./chat/NotoEmojiSvg";
 import { NotoEmojiGrid } from "./chat/EmojiGifPicker";
 import { AvatarImg } from "@/components/ui/AvatarImg";
+import { splitCommentText } from "@/lib/communities/comment-text";
 
 /**
  * Matches a full emoji grapheme cluster (base + skin tone + keycap + ZWJ
@@ -18,32 +19,76 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 const EMOJI_CLUSTER =
   /(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\u20E3)?(?:\uFE0F)?(?:\u200D(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:[\u{1F3FB}-\u{1F3FF}])?(?:\uFE0F)?)*[\uFE0F\uFE0E]?/gu;
 
-/** Renders comment text with emoji shown as Noto SVGs, like chat bubbles. */
-export function renderEmojiText(text: string): ReactNode {
+/** An `@mention` inside comment text: the same blue the chat bubbles use for
+ *  mentions, without their chip background. */
+const MENTION_CLASS =
+  "font-medium text-[var(--ds-blue-700)] dark:text-[var(--ds-blue-900)]";
+
+/**
+ * Renders comment text: `@mentions` in blue, emoji as Noto SVGs, like chat
+ * bubbles.
+ *
+ * `knownNames` are the display names to highlight across spaces (longest wins)
+ * — the authors participating in this comment section — so a multi-word reply
+ * mention like `@Vishal Gn` reads as one tag instead of a tag plus a stray word.
+ * Names we don't know fall back to the bare `@token`.
+ */
+export function renderEmojiText(text: string, knownNames: readonly string[] = []): ReactNode {
   if (!text) return null;
   const parts: ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  EMOJI_CLUSTER.lastIndex = 0;
-  while ((m = EMOJI_CLUSTER.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(
-      <NotoEmojiSvg key={`e${m.index}`} emoji={m[0]} size={16} className="mx-0.5 align-middle" />,
-    );
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  // No emoji found — return the plain string to avoid an extra text node.
+
+  const pushPlain = (chunk: string, keyBase: string) => {
+    EMOJI_CLUSTER.lastIndex = 0;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = EMOJI_CLUSTER.exec(chunk)) !== null) {
+      if (m.index > last) parts.push(chunk.slice(last, m.index));
+      parts.push(
+        <NotoEmojiSvg key={`${keyBase}e${m.index}`} emoji={m[0]} size={16} className="mx-0.5 align-middle" />,
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < chunk.length) parts.push(chunk.slice(last));
+  };
+
+  splitCommentText(text, knownNames).forEach((segment, index) => {
+    if (segment.mention) {
+      parts.push(
+        <span key={`m${index}`} className={MENTION_CLASS}>
+          {segment.text}
+        </span>,
+      );
+    } else if (segment.text) {
+      pushPlain(segment.text, `s${index}-`);
+    }
+  });
+
+  // No mention and no emoji — return the plain string to avoid an extra text node.
   if (parts.length === 1 && typeof parts[0] === "string") return parts[0];
   return parts;
 }
 
-const AVATAR_PX = { xs: 20, sm: 24, md: 32 } as const;
+const AVATAR_PX = { xs: 20, sm: 24, md: 32, lg: 36 } as const;
 
-export function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "xs" | "sm" | "md" }) {
+export function Avatar({
+  name,
+  avatarUrl,
+  size = "md",
+}: {
+  name: string;
+  avatarUrl: string | null;
+  size?: "xs" | "sm" | "md" | "lg";
+}) {
   const px = AVATAR_PX[size];
   return (
-    <AvatarImg url={avatarUrl} name={name} size={px} className="shrink-0 object-cover" />
+    <AvatarImg
+      url={avatarUrl}
+      name={name}
+      size={px}
+      // Comment avatars are always circular — a stored picture would otherwise
+      // render as a square next to the name-initials fallback, which is round.
+      className="shrink-0 rounded-full object-cover"
+    />
   );
 }
 
@@ -269,8 +314,15 @@ export function CommentComposer<C = unknown>({
   if (variant === "inline") {
     return (
       <div className="relative w-full">
-        <div className="rounded-xl border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
-          <form onSubmit={submit} className="flex min-h-[52px] w-full items-center gap-1 px-2 py-1.5">
+        {/* `1.6rem` is the radius LinkedIn puts on its comment box: a pill at
+            this field's 52px height, and a soft rounded rectangle once the
+            input grows — rather than a stadium (`rounded-full`), which turns
+            into an ellipse-ended capsule on multiple lines. */}
+        <div className="rounded-[1.6rem] border border-border bg-background shadow-sm transition-shadow duration-200 focus-within:shadow-[0_0_0_3px_var(--color-field-halo)]">
+          {/* 40px tall: the 32px controls inside plus `py-1`. At this height the
+              1.6rem radius is wider than half the box, so it renders as a full
+              pill, like LinkedIn's 40px comment box. */}
+          <form onSubmit={submit} className="flex min-h-10 w-full items-center gap-1 px-2 py-1">
             <button
               ref={emojiBtnRef}
               type="button"
@@ -316,13 +368,18 @@ export function CommentComposer<C = unknown>({
                   Cancel
                 </button>
               )}
-              <button
-                type="submit"
-                disabled={saving || !body.trim()}
-                className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-              {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
-            </button>
+              {/* LinkedIn-style: the send pill appears once there is something
+                  to send, so an empty field is just the input. Kept while a
+                  post is in flight so the spinner has somewhere to live. */}
+              {(body.trim().length > 0 || saving) && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex h-8 min-w-16 items-center justify-center rounded-full bg-[var(--ds-blue-800)] px-4 font-body text-[13px] font-semibold text-white transition-colors hover:bg-[var(--ds-blue-900)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {saving ? <Spinner size={14} className="text-white" /> : submitLabel}
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -359,7 +416,7 @@ export function CommentComposer<C = unknown>({
 
   // ── Default variant (resources / showcase / events) ───────────────────────
   return (
-    <div className="relative w-full rounded-2xl border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
+    <div className="relative w-full rounded-[1.6rem] border border-border bg-background p-1.5 transition-colors duration-150 focus-within:bg-surface">
     <form onSubmit={submit} className="w-full">
       {/* ── Single row: avatar · input · cancel · actions ── */}
       <div className="flex w-full items-end gap-2">
@@ -382,7 +439,7 @@ export function CommentComposer<C = unknown>({
               void submit(e as unknown as React.FormEvent);
             }
           }}
-          placeholder={placeholder ?? "Post your comment"}
+          placeholder={placeholder ?? "Add comment"}
           rows={1}
           maxLength={maxLength}
           className="max-h-36 min-w-0 flex-1 resize-none overflow-y-auto break-words bg-transparent py-1.5 text-sm leading-relaxed text-foreground placeholder:text-foreground-subtle focus:outline-none"

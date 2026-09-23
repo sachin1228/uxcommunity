@@ -3,6 +3,7 @@ import "server-only"
 import type { CommunityThread, ThreadComment } from "@/components/communities/threads/types"
 import { attachPollVotes } from "@/lib/threads/poll-votes"
 import { createServiceClient } from "@/lib/supabase/service"
+import { loadCommentAuthors } from "@/lib/communities/comment-authors"
 
 type Database = ReturnType<typeof createServiceClient>
 
@@ -52,18 +53,15 @@ async function loadComments(db: Database, threadId: string): Promise<ThreadComme
 
   if (!data?.length) return []
 
-  const userIds = [...new Set(data.map((comment) => comment.user_id))]
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-  ])
-  const names = Object.fromEntries((users ?? []).map((user) => [user.id, user.name]))
-  const avatars = Object.fromEntries((profiles ?? []).map((profile) => [profile.user_id, profile.avatar_url]))
+  // Authors come from the shared resolver so the server-rendered comments match
+  // the members list, instead of the pill appearing only after the client fetch.
+  const authors = await loadCommentAuthors(
+    db,
+    data.map((comment) => comment.user_id as string),
+  )
   const enriched: ThreadComment[] = data.map((comment) => ({
     ...comment,
-    users: names[comment.user_id]
-      ? { name: names[comment.user_id], avatar_url: avatars[comment.user_id] ?? null }
-      : null,
+    users: authors[(comment as { user_id: string }).user_id] ?? null,
     replies: [],
   }))
   const roots = enriched.filter((comment) => !comment.parent_id)

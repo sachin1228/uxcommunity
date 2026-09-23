@@ -72,7 +72,13 @@ export function AvatarImg({
       height={size}
       loading="lazy"
       decoding="async"
-      className={className}
+      // `aspect-square` is load-bearing, not decoration. Preflight sets
+      // `img { height: auto }`, which overrides the height *attribute*, so a
+      // portrait photo rendered at a fixed width grows taller than it is wide —
+      // and `rounded-full` on a non-square box draws an *ellipse*, not a circle.
+      // aspect-ratio only applies while the height is otherwise auto, so callers
+      // that size themselves (`h-9 w-9`, `h-full w-full`) are unaffected.
+      className={`aspect-square ${className ?? ""}`}
       onError={() => setFailedUrl(url)}
     />
   );

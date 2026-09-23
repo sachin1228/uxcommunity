@@ -30,6 +30,12 @@ interface ShowcaseCardProps {
   onSaveChanged: (saved: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
+  /**
+   * Rendered inside the card, under the engagement row (like · comments ·
+   * community). The detail page puts its comment thread here so the post and
+   * the discussion read as one card instead of two stacked ones.
+   */
+  commentSection?: React.ReactNode;
 }
 
 /** Media list for a post: attachments when present, else the legacy cover image. */
@@ -50,6 +56,7 @@ export function ShowcaseCard({
   onSaveChanged,
   onEdit,
   onDelete,
+  commentSection,
 }: ShowcaseCardProps) {
   const { toggleLike, toggleSave, likePending, savePending, saved } = useShowcaseInteractions({
     communityId,
@@ -61,6 +68,9 @@ export function ShowcaseCard({
     onSaveChanged,
   });
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // Report is an acknowledgement, not a stored record — the menu item just
+  // flips to "Reported" for a moment, like the thread, resource and event menus.
+  const [reported, setReported] = useState(false);
 
   const categoryLabel = SHOWCASE_CATEGORIES.find((item) => item.value === post.category)?.label ?? post.category;
   const media = mediaForPost(post);
@@ -158,9 +168,14 @@ export function ShowcaseCard({
         role={onOpen ? "link" : undefined}
         onClick={handleCardClick}
         onKeyDown={handleCardKeyDown}
-        className={`${communityFeedLayout.card} ${onOpen ? communityFeedLayout.cardInteractive : ""} ${onOpen ? "cursor-pointer" : ""}`}
+        // Same shell rule as the thread card: a list card is clickable, the
+        // detail card (which now holds the discussion) is not and takes the
+        // roomier detail padding.
+        className={onOpen
+          ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
+          : communityFeedLayout.detailCard}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <PostAuthorMeta
             name={post.author.name}
             avatarUrl={post.author.avatar_url}
@@ -171,53 +186,61 @@ export function ShowcaseCard({
           <ShowcaseOptionsMenu
             saved={saved}
             canManage={post.user_id === currentUserId}
+            reported={reported}
             busy={savePending}
             onToggleSave={toggleSave}
             onEdit={onEdit}
             onDelete={onDelete}
+            onReport={() => setReported(true)}
           />
         </div>
 
-        <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal text-foreground">
+        <h2 className="mt-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">
           {post.title}
         </h2>
 
         {mediaBlock}
 
-        <div className="mt-3 flex items-center gap-4">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); toggleLike(); }}
-            aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
-            aria-pressed={post.user_liked}
-            aria-busy={likePending}
-            className="group/like inline-flex cursor-pointer items-center gap-2"
-          >
-            <HeartIcon
-              size={16}
-              active={post.user_liked}
-              fill="none"
-              className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
-            />
-            <span
-              className={`font-body text-sm font-semibold tabular-nums ${
-                post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
-              }`}
+        {/* Engagement row — the thread card's shape: actions left, community
+            attribution right. */}
+        <div className="mt-3 flex items-center justify-between gap-4">
+          <div className="flex shrink-0 items-center gap-4">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); toggleLike(); }}
+              aria-label={post.user_liked ? "Unlike showcase post" : "Like showcase post"}
+              aria-pressed={post.user_liked}
+              aria-busy={likePending}
+              className="group/like inline-flex cursor-pointer items-center gap-2"
             >
-              {post.like_count}
-            </span>
-          </button>
+              <HeartIcon
+                size={16}
+                active={post.user_liked}
+                fill="none"
+                className={`transition-transform duration-150 ease-out group-hover/like:scale-110 ${post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"}`}
+              />
+              <span
+                className={`font-body text-sm font-semibold tabular-nums ${
+                  post.user_liked ? "text-[var(--like)]" : "text-foreground-subtle group-hover/like:text-white"
+                }`}
+              >
+                {post.like_count}
+              </span>
+            </button>
 
-          {post.allow_replies !== false && (
-            <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
-              <CommentIcon />
-              {post.comment_count}
-            </span>
-          )}
+            {post.allow_replies !== false && (
+              <span className="inline-flex items-center gap-1.5 font-body text-xs font-semibold text-foreground-subtle transition-colors duration-150 hover:text-white">
+                <CommentIcon />
+                {post.comment_count}
+              </span>
+            )}
+          </div>
 
-          <div className="flex-1" />
           {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
         </div>
+
+        {/* ── Comment thread (detail page only) ── */}
+        {commentSection && <div className="mt-4">{commentSection}</div>}
       </article>
 
       {lightboxIndex !== null && (

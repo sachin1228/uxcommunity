@@ -63,6 +63,12 @@ interface ResourceCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
+  /**
+   * Rendered inside the card, under the engagement row (like · comments ·
+   * community). The detail page puts its comment thread here so the resource
+   * and the discussion read as one card instead of two stacked ones.
+   */
+  commentSection?: React.ReactNode;
 }
 
 export function ResourceCard({
@@ -76,6 +82,7 @@ export function ResourceCard({
   onOpen,
   communityName,
   communityImage,
+  commentSection,
 }: ResourceCardProps) {
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
   const isOwner = resource.user_id === currentUserId;
@@ -276,7 +283,12 @@ export function ResourceCard({
         role={onOpen ? "link" : undefined}
         onClick={onOpen ? onOpen : undefined}
         onKeyDown={onOpen ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
-        className={`group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`}
+        // Same shell rule as the thread card: a list card is clickable, the
+        // detail card (which now holds the discussion) is not and takes the
+        // roomier detail padding.
+        className={onOpen
+          ? `group cursor-pointer ${communityFeedLayout.card} ${communityFeedLayout.cardInteractive}`
+          : communityFeedLayout.detailCard}
       >
         <div className="flex items-start justify-between gap-3">
           <PostAuthorMeta
@@ -291,7 +303,7 @@ export function ResourceCard({
 
         <>
             {/* Card body → opens the resource view; only the link-preview block below is an external link. */}
-            <h3 className="mt-3 line-clamp-3 whitespace-pre-wrap font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
+            <h3 className="mt-3 line-clamp-3 text-pretty whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground">{resource.description || resource.title}</h3>
             {hasFigmaPrototype ? (
               <FigmaEmbed url={resource.url} compact className="mt-4" />
             ) : linkPreview && (linkPreview.title || linkPreview.description || linkPreview.image) ? (
@@ -356,6 +368,9 @@ export function ResourceCard({
               </div>
               {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
             </div>
+
+            {/* ── Comment thread (detail page only) ── */}
+            {commentSection && <div className="mt-4">{commentSection}</div>}
         </>
       </article>
       {showEditModal && (
