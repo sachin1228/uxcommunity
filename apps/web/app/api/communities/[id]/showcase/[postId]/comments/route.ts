@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/auth/rate-limit";
 import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
   const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
@@ -41,7 +42,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   if (!(await access(db, id, postId, session.userId!))) return NextResponse.json({ error: "Post not found." }, { status: 404 });
   const { data, error } = await db.from("showcase_comments").select("id, post_id, user_id, parent_id, body, created_at, updated_at").eq("post_id", postId).order("created_at");
   if (error) return NextResponse.json({ error: "Failed to load comments." }, { status: 500 });
-  const comments = await enrich(db, (data ?? []) as Array<Record<string, unknown>>); const top = comments.filter((comment) => !comment.parent_id);
+  // Grouped emoji reactions per comment, attached before nesting so replies
+  // carry their reactions too.
+  const comments = await attachCommentReactions(db, await enrich(db, (data ?? []) as Array<Record<string, unknown>>), session.userId!, "showcase"); const top = comments.filter((comment) => !comment.parent_id);
   for (const reply of comments.filter((comment) => comment.parent_id)) { const parent = top.find((comment) => comment.id === reply.parent_id); if (parent) parent.replies.push(reply); }
   return NextResponse.json({ comments: top });
 }
@@ -60,5 +63,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   after(() => {
     void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: userId } }]);
   });
-  const [comment] = await enrich(db, [data]); return NextResponse.json({ comment }, { status: 201 });
+  const [comment] = await attachCommentReactions(db, await enrich(db, [data]), userId, "showcase"); return NextResponse.json({ comment }, { status: 201 });
 }

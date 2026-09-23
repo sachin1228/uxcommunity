@@ -11,6 +11,7 @@ import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest 
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -219,10 +220,13 @@ export function EventDetailClient({
                   allowReplies
                   comments={commentTree}
                   currentUserId={currentUserId}
-                  composerMaxLength={2000}
-                  onPosted={handleCommentPosted}
-                  onDeleted={handleDeleteComment}
-                  emptyState={
+                  composerMaxLength={2000}                          onPosted={handleCommentPosted}
+                          onDeleted={handleDeleteComment}
+                          // Parents and replies share one flat list here, so the
+                          // id-based helper reaches either.
+                          onReactionToggled={(commentId, _parentId, reactions) =>
+                            setComments((prev) => updateCommentReactions(prev, commentId, reactions))}
+                          emptyState={
                     <div className={`${communityFeedLayout.emptyState} min-h-40`}>
                       <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
                       <p className={communityFeedLayout.emptyDescription}>No comments yet. Be the first to start the discussion!</p>

@@ -10,6 +10,7 @@ import { useDocumentVisible } from "@/lib/use-document-visible";
 import type { CommunityThread, ThreadComment } from "./types";
 import { ThreadCard } from "./ThreadCard";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 import { communityFeedLayout } from "../feed-layout";
 import { patchCachedRequest } from "@/lib/request-cache";
@@ -254,12 +255,10 @@ export function ThreadDetailClient({
     changeCommentCount(-removed);
   }
 
-  function handleReactionToggled(commentId: string, parentId: string | null, reactions: CommentReactionSummary[]) {
-    writeComments((current) => parentId
-      ? current.map((comment) => comment.id === parentId
-        ? { ...comment, replies: comment.replies.map((reply) => (reply.id === commentId ? { ...reply, reactions } : reply)) }
-        : comment)
-      : current.map((comment) => (comment.id === commentId ? { ...comment, reactions } : comment)));
+  function handleReactionToggled(commentId: string, _parentId: string | null, reactions: CommentReactionSummary[]) {
+    // One id-based helper for every comment surface — it finds the row whether
+    // it is a top-level comment or a reply.
+    writeComments((current) => updateCommentReactions(current, commentId, reactions));
   }
 
   const totalComments = comments.reduce((acc, c) => acc + 1 + c.replies.length, 0);

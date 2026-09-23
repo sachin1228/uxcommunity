@@ -2,6 +2,7 @@ import {
   SHOWCASE_CATEGORY_OPTIONS,
   type ShowcaseCategory,
 } from "@/lib/communities/showcase-categories";
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
 
 export { SHOWCASE_CATEGORY_OPTIONS };
 export type { ShowcaseCategory };
@@ -58,4 +59,6 @@ export interface ShowcaseComment {
   id: string; post_id: string; user_id: string; parent_id: string | null; body: string; created_at: string; updated_at: string;
   users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies: ShowcaseComment[];
+  /** Grouped emoji reactions on this comment (empty until the reactions migration is applied). */
+  reactions?: CommentReactionSummary[];
 }

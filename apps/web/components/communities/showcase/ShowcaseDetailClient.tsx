@@ -12,6 +12,7 @@ import { ShowcaseCard } from "./ShowcaseCard";
 import type { ShowcaseComment, ShowcasePost } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
 export function ShowcaseDetailClient({
   initialPost,
@@ -144,6 +145,8 @@ export function ShowcaseDetailClient({
                 composerMaxLength={1000}
                 onPosted={posted}
                 onDeleted={deleted}
+                onReactionToggled={(commentId, _parentId, reactions) =>
+                  setComments((values) => updateCommentReactions(values, commentId, reactions))}
                 emptyState={
                   <p className="text-center font-body text-sm text-foreground-muted">
                     No comments yet. Be the first!

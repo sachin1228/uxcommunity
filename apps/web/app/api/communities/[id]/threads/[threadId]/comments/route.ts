@@ -75,18 +75,19 @@ export async function GET(
 
   const withUsers = await attachUsers(db, (data ?? []) as Array<Record<string, unknown>>);
 
+  // Grouped emoji reactions per comment (empty lists when none / table missing),
+  // attached before nesting so replies carry their reactions too.
+  const withReactions = await attachCommentReactions(db, withUsers, session.userId!, "threads");
+
   // Nest replies under their parent
-  const topLevel = withUsers.filter((c) => !c.parent_id);
-  const replies = withUsers.filter((c) => c.parent_id);
+  const topLevel = withReactions.filter((c) => !c.parent_id);
+  const replies = withReactions.filter((c) => c.parent_id);
   for (const reply of replies) {
     const parent = topLevel.find((c) => c.id === reply.parent_id);
-    if (parent) (parent.replies as typeof withUsers).push(reply);
+    if (parent) (parent.replies as typeof withReactions).push(reply);
   }
 
-  // Grouped emoji reactions per comment (empty lists when none / table missing)
-  const withReactions = await attachCommentReactions(db, topLevel, session.userId!);
-
-  return NextResponse.json({ comments: withReactions });
+  return NextResponse.json({ comments: topLevel });
 }
 
 export async function POST(
@@ -197,6 +198,7 @@ export async function POST(
     db,
     await attachUsers(db, [inserted as Record<string, unknown>]),
     userId,
+    "threads",
   );
   return NextResponse.json({ comment: enriched }, { status: 201 });
 }

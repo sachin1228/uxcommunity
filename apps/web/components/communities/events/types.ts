@@ -1,3 +1,5 @@
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
+
 export interface CommunityEvent {
   id: string;
   community_id: string;
@@ -45,4 +47,6 @@ export interface EventComment {
   updated_at: string;
   users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies?: EventComment[];
+  /** Grouped emoji reactions on this comment (empty until the reactions migration is applied). */
+  reactions?: CommentReactionSummary[];
 }

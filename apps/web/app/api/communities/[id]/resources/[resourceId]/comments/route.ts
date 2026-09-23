@@ -7,6 +7,7 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -74,12 +75,16 @@ export async function GET(
 
   const withUsers = await attachUsers(db, (data ?? []) as Array<Record<string, unknown>>);
 
+  // Grouped emoji reactions per comment, attached before nesting so replies
+  // carry their reactions too.
+  const withReactions = await attachCommentReactions(db, withUsers, session.userId!, "resources");
+
   // Nest replies under their parent
-  const topLevel = withUsers.filter((c) => !c.parent_id);
-  const replies = withUsers.filter((c) => c.parent_id);
+  const topLevel = withReactions.filter((c) => !c.parent_id);
+  const replies = withReactions.filter((c) => c.parent_id);
   for (const reply of replies) {
     const parent = topLevel.find((c) => c.id === reply.parent_id);
-    if (parent) (parent.replies as typeof withUsers).push(reply);
+    if (parent) (parent.replies as typeof withReactions).push(reply);
   }
 
   return NextResponse.json({ comments: topLevel });
@@ -185,6 +190,11 @@ export async function POST(
     });
   }
 
-  const [enriched] = await attachUsers(db, [inserted as Record<string, unknown>]);
+  const [enriched] = await attachCommentReactions(
+    db,
+    await attachUsers(db, [inserted as Record<string, unknown>]),
+    userId,
+    "resources",
+  );
   return NextResponse.json({ comment: enriched }, { status: 201 });
 }

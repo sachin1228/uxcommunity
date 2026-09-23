@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { deferNotification, eventHref } from "@/lib/notifications";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
+import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 
 type Params = { params: Promise<{ id: string; eventId: string }> };
 
@@ -35,7 +36,11 @@ export async function GET(
   // Author info — name, avatar, designation pill — from the shared resolver.
   const comments = await attachCommentAuthors(db, (data ?? []) as Array<Record<string, unknown>>);
 
-  return NextResponse.json({ comments });
+  // Grouped emoji reactions per comment, in the same flat list the page builds
+  // its reply tree from.
+  const withReactions = await attachCommentReactions(db, comments, session.userId!, "events");
+
+  return NextResponse.json({ comments: withReactions });
 }
 
 export async function POST(
@@ -124,7 +129,12 @@ export async function POST(
     });
   }
 
-  const [authored] = await attachCommentAuthors(db, [comment as unknown as Record<string, unknown>]);
+  const [authored] = await attachCommentReactions(
+    db,
+    await attachCommentAuthors(db, [comment as unknown as Record<string, unknown>]),
+    userId,
+    "events",
+  );
 
   return NextResponse.json({ comment: authored }, { status: 201 });
 }

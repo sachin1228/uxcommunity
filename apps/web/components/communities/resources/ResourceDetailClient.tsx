@@ -11,6 +11,7 @@ import type { CommunityResource, ResourceComment } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { ResourceCard } from "./ResourceCard";
 import { CommentSection } from "../CommentSection";
+import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
 // ── Main component ─────────────────────────────────────────────────────────
 
@@ -138,6 +139,8 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
                   currentUserId={currentUserId}
                   onPosted={handleCommentPosted}
                   onDeleted={handleCommentDeleted}
+                  onReactionToggled={(commentId, _parentId, reactions) =>
+                    setComments((prev) => updateCommentReactions(prev, commentId, reactions))}
                   emptyState={
                     <div className={`${communityFeedLayout.emptyState} min-h-40`}>
                       <MessageSquare strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />

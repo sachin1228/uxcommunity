@@ -1,9 +1,24 @@
 import type { createServiceClient } from "@/lib/supabase/service";
 
 /**
- * Emoji reactions on thread comments. Writes go through the authenticated
- * Next.js API route; RLS keeps direct client access read-only.
+ * Emoji reactions on community comments. Writes go through the authenticated
+ * Next.js API routes; RLS keeps direct client access read-only.
  */
+
+/** Every comment section that carries reactions, keyed like the API routes. */
+export type CommentReactionKind = "threads" | "resources" | "showcase" | "events";
+
+/**
+ * One table per comment table, so each reaction keeps a real foreign key (see
+ * `20260923120000_comment_reactions_all_kinds.sql`). Threads shipped first with
+ * its own table; the others mirror it.
+ */
+const REACTION_TABLES: Record<CommentReactionKind, string> = {
+  threads: "thread_comment_reactions",
+  resources: "resource_comment_reactions",
+  showcase: "showcase_comment_reactions",
+  events: "event_comment_reactions",
+};
 
 export const ALLOWED_COMMENT_REACTIONS = ["👍", "❤️", "🎉", "💡", "👏"] as const;
 export type CommentReactionEmoji = (typeof ALLOWED_COMMENT_REACTIONS)[number];
@@ -24,20 +39,21 @@ export function isCommentReaction(value: unknown): value is CommentReactionEmoji
 /**
  * Groups all reactions for the given comment rows by emoji, in the fixed
  * ALLOWED_COMMENT_REACTIONS order. Rows without reactions get an empty list.
- * The table only exists once the thread_comment_reactions migration is
- * applied — on lookup failure comments still render, just without reactions.
+ * A kind's table only exists once its migration is applied — on lookup failure
+ * comments still render, just without reactions.
  */
 export async function attachCommentReactions<T>(
   db: Db,
   rows: T[],
   userId: string,
+  kind: CommentReactionKind = "threads",
 ): Promise<(T & { reactions: CommentReactionSummary[] })[]> {
   if (!rows.length) return [];
   const ids = rows.map((row) => String((row as { id: unknown }).id));
   // Generated Supabase types are updated after the repository migration runs.
   const reactionDb = db as any;
   const { data, error } = await reactionDb
-    .from("thread_comment_reactions")
+    .from(REACTION_TABLES[kind])
     .select("user_id, emoji, comment_id")
     .in("comment_id", ids);
 
@@ -61,15 +77,18 @@ export async function toggleCommentReaction({
   commentId,
   userId,
   emoji,
+  kind = "threads",
 }: {
   db: Db;
   commentId: string;
   userId: string;
   emoji: CommentReactionEmoji;
+  kind?: CommentReactionKind;
 }): Promise<boolean> {
+  const table = REACTION_TABLES[kind];
   const reactionDb = db as any;
   const { data: existing, error: lookupError } = await reactionDb
-    .from("thread_comment_reactions")
+    .from(table)
     .select("id")
     .eq("comment_id", commentId)
     .eq("user_id", userId)
@@ -79,7 +98,7 @@ export async function toggleCommentReaction({
 
   if (existing) {
     const { error } = await reactionDb
-      .from("thread_comment_reactions")
+      .from(table)
       .delete()
       .eq("id", existing.id)
       .eq("user_id", userId);
@@ -88,7 +107,7 @@ export async function toggleCommentReaction({
   }
 
   const { error } = await reactionDb
-    .from("thread_comment_reactions")
+    .from(table)
     .insert({ comment_id: commentId, user_id: userId, emoji });
   if (error) throw error;
   return true;

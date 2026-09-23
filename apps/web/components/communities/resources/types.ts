@@ -1,3 +1,5 @@
+import type { CommentReactionSummary } from "@/lib/communities/comment-reactions";
+
 export const RESOURCE_TYPES = [
   { value: "figma",       label: "Figma",        description: "Design files, prototypes, FigJam boards" },
   { value: "article",     label: "Article",       description: "Blog posts, tutorials, case studies" },
@@ -48,4 +50,6 @@ export interface ResourceComment {
   updated_at: string;
   users: { name: string; avatar_url: string | null; designation?: string | null } | null;
   replies: ResourceComment[];
+  /** Grouped emoji reactions on this comment (empty until the reactions migration is applied). */
+  reactions?: CommentReactionSummary[];
 }

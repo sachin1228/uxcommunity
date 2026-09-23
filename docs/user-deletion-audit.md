@@ -30,10 +30,10 @@ These FK rows are `on delete cascade`, so deleting the `users` row removes them:
   `thread_poll_votes`, `thread_comment_reactions`, and the persisted
   thread-interaction tables
 - Events: `community_events`, event RSVPs, `event_saves`, event likes,
-  `event_comments`
-- Showcase: posts, comments, reactions
+  `event_comments`, `event_comment_reactions`
+- Showcase: posts, comments, `showcase_comment_reactions`
 - Resources: `community_resources`, `resource_saves`, `resource_comments`,
-  `resource_bookmarks`
+  `resource_comment_reactions`, `resource_bookmarks`
 - Account: `password_resets`, `user_interests`, `notifications` (`user_id`),
   `community_admin_permissions`
 
