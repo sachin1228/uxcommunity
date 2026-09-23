@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
+  Flag,
   MessageSquare,
   MoreHorizontal,
   Smile,
@@ -176,6 +177,10 @@ function CommentRow<C extends CommunityComment>({
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Report is a signal to moderators, not a stored record — the option just
+  // acknowledges the tap ("Reported") for a moment, like the thread, resource
+  // and event menus do.
+  const [reported, setReported] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const reactionPending = useRef(false);
@@ -308,19 +313,21 @@ function CommentRow<C extends CommunityComment>({
             >
               {formatRelativeDate(comment.created_at)}
             </time>
-            {isOwner && (
-              <div className="relative -mr-1 -my-1.5 ml-auto shrink-0" ref={menuRef}>
-                <button
-                  type="button"
-                  onClick={() => setMenuOpen((p) => !p)}
-                  className="flex size-7 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
-                  aria-label="Comment options"
-                  aria-expanded={menuOpen}
-                >
-                  <MoreHorizontal strokeWidth={2.5} size={16} />
-                </button>
-                {menuOpen && (
-                  <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+            {/* Every comment carries the menu: Report is open to everyone,
+                Delete only to the author. */}
+            <div className="relative -mr-1 -my-1.5 ml-auto shrink-0" ref={menuRef}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((p) => !p)}
+                className="flex size-7 items-center justify-center rounded-full text-foreground-muted transition-colors hover:bg-surface-raised hover:text-foreground"
+                aria-label="Comment options"
+                aria-expanded={menuOpen}
+              >
+                <MoreHorizontal strokeWidth={2.5} size={16} />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-8 z-20 min-w-[110px] rounded-lg border border-border bg-surface py-1 shadow-lg">
+                  {isOwner && (
                     <button
                       type="button"
                       onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
@@ -328,12 +335,25 @@ function CommentRow<C extends CommunityComment>({
                       className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-red-400 hover:bg-surface-raised disabled:opacity-50"
                     >
                       <Trash2 strokeWidth={2.5} size={11} />
-                      Delete
+                      {deleting ? "Deleting…" : "Delete"}
                     </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setReported(true);
+                      setTimeout(() => setReported(false), 3000);
+                    }}
+                    disabled={reported}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 font-body text-xs text-foreground-muted hover:bg-surface-raised hover:text-foreground disabled:opacity-50"
+                  >
+                    <Flag strokeWidth={2.5} size={11} />
+                    {reported ? "Reported" : "Report"}
+                  </button>
+                </div>
+              )}
+            </div>
           </header>
 
           {/* The author's experience level, tracking the name on its own line.
