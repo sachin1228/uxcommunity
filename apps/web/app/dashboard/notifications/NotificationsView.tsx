@@ -218,7 +218,7 @@ export function NotificationsView({ userId }: { userId: string }) {
                         </span>
                       </span>
                       {item.body && (
-                        <span className="mt-0.5 line-clamp-2 block font-body text-xs leading-5 text-foreground-muted">
+                        <span className="mt-0.5 line-clamp-2 font-body text-xs leading-5 text-foreground-muted">
                           {item.body}
                         </span>
                       )}

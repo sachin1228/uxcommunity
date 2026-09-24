@@ -8,10 +8,13 @@ import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
+import type { HomeFeedScope } from "@/lib/feeds/home-feed-options";
 
 interface HomeFeedProps {
   currentUserId: string;
   refreshToken?: number;
+  /** Feed source — `all` (everything public) or `communities` (joined only). */
+  scope: HomeFeedScope;
 }
 
 /**
@@ -19,20 +22,27 @@ interface HomeFeedProps {
  * hands it to the shared CommunityFeedList, which renders the same cards (and
  * the same mutations) as the profile activity tabs.
  */
-export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
+export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedProps) {
   initRequestCache(currentUserId);
-  const cached = getCachedRequest<{ items?: FeedItem[] }>("/api/home/feed", currentUserId);
+  // Matches the fetch URL below for the default filter choice, so the first
+  // render of a revisit can hydrate straight from the request cache.
+  const cached = getCachedRequest<{ items?: FeedItem[] }>(
+    "/api/home/feed?scope=all",
+    currentUserId,
+  );
   const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  const feedUrl = `/api/home/feed?scope=${encodeURIComponent(scope)}`;
+
   const fetchFeed = useCallback(async (background = false, force = false) => {
     if (!background) setLoading(true);
     try {
       const data = await fetchJsonCached<{ items?: FeedItem[] }>(
-        "/api/home/feed",
+        feedUrl,
         { staleMs: 30_000, force },
         currentUserId,
       );
@@ -44,7 +54,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId]);
+  }, [currentUserId, feedUrl]);
 
   useEffect(() => {
     const initialFetch = window.setTimeout(() => void fetchFeed(true, refreshToken > 0), 0);
@@ -65,13 +75,13 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     setItems((current) => {
       const next = update(current);
       patchCachedRequest<{ items?: FeedItem[] }>(
-        "/api/home/feed",
+        feedUrl,
         (cachedFeed) => ({ ...cachedFeed, items: next }),
         currentUserId,
       );
       return next;
     });
-  }, [currentUserId]);
+  }, [currentUserId, feedUrl]);
 
   // Mutations made in a community tab, in the profile tabs or on a card detail
   // page (including the ones queued while this feed was unmounted) are merged
@@ -87,7 +97,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     setLoadingMore(true);
     try {
       const response = await fetch(
-        `/api/home/feed?before=${encodeURIComponent(last.created_at)}`,
+        `${feedUrl}&before=${encodeURIComponent(last.created_at)}`,
       );
       if (!response.ok) return;
       const data = await response.json() as { items?: FeedItem[] };
@@ -102,7 +112,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0 }: HomeFeedProps) {
     } finally {
       setLoadingMore(false);
     }
-  }, [items, loadingMore, updateItems]);
+  }, [items, loadingMore, updateItems, feedUrl]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 

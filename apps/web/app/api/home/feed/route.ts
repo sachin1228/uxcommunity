@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
+import { HOME_FEED_SCOPES, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
 import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
 import {
@@ -23,12 +24,17 @@ export const dynamic = "force-dynamic";
 // concurrent page loads into a single DB round-trip. 10s is short enough that
 // new posts / own likes appear almost immediately.
 const loadFeedPage = unstable_cache(
-  async (userId: string, before: string | null) => {
+  async (userId: string, before: string | null, scope: HomeFeedScope) => {
     const db = createServiceClient();
     const { data, error } = await callPerformanceRpc(
       db,
       "get_home_feed_page",
-      { p_user_id: userId, p_before: before, p_limit: PAGE_SIZE },
+      {
+        p_user_id: userId,
+        p_before: before,
+        p_limit: PAGE_SIZE,
+        p_member_only: scope === "communities",
+      },
     );
     if (error) throw error;
 
@@ -105,10 +111,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // Unknown values fall back to the default instead of erroring so stale
+  // clients keep working after a rename.
+  const rawScope = req.nextUrl.searchParams.get("scope") ?? "all";
+  const scope: HomeFeedScope = (HOME_FEED_SCOPES as readonly string[]).includes(rawScope)
+    ? (rawScope as HomeFeedScope)
+    : "all";
+
   let items: Json[];
   try {
     items = await timer.measure("feed_page_rpc", () =>
-      loadFeedPage(session.userId!, before),
+      loadFeedPage(session.userId!, before, scope),
     );
   } catch (error) {
     console.error("[GET home feed]", error);
