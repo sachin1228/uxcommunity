@@ -8,7 +8,7 @@ import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
-import { RsvpJoinDialog } from "./RsvpJoinDialog";
+import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
@@ -228,8 +228,12 @@ export function EventCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
-  /** The RSVP confirmation, open while deciding to go (see RsvpJoinDialog). */
-  const [confirmRsvp, setConfirmRsvp] = useState(false);
+  /**
+   * The RSVP confirmation, null while it is closed. Both directions are
+   * confirmed — going joins the event's group chat, and withdrawing leaves it
+   * (see RsvpConfirmDialog).
+   */
+  const [rsvpConfirm, setRsvpConfirm] = useState<RsvpConfirmMode | null>(null);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -266,17 +270,12 @@ export function EventCard({
     e?.stopPropagation();
     if (rsvpPending || past) return;
 
-    // The first RSVP is never sent straight off the button: it also puts the
-    // member in the event's group chat, so the dialog explains that and the
-    // confirm button inside it is what sends the RSVP. Backing out of an RSVP
-    // needs no explanation, so it stays a single tap.
-    if (!event.user_rsvped) {
-      setRsvpError(null);
-      setConfirmRsvp(true);
-      return;
-    }
-
-    await commitRsvp();
+    // Neither direction is sent straight off the button. Going also puts the
+    // member in the event's group chat, and withdrawing takes them back out of
+    // it and off their sidebar, so both open the dialog that says so and only
+    // its confirm button sends the request.
+    setRsvpError(null);
+    setRsvpConfirm(event.user_rsvped ? "leave" : "join");
   }
 
   async function commitRsvp() {
@@ -299,7 +298,7 @@ export function EventCard({
           if (data.rsvped) invalidateOnJoin(chatCommunityId);
           else invalidateOnLeave(chatCommunityId);
         }
-        setConfirmRsvp(false);
+        setRsvpConfirm(null);
         await onRsvpSettled?.();
       } else {
         const data = await response.json().catch(() => null);
@@ -695,12 +694,14 @@ export function EventCard({
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
       />
-      <RsvpJoinDialog
-        open={confirmRsvp}
-        onClose={() => setConfirmRsvp(false)}
+      <RsvpConfirmDialog
+        mode={rsvpConfirm ?? "join"}
+        open={rsvpConfirm !== null}
+        onClose={() => setRsvpConfirm(null)}
         onConfirm={() => void commitRsvp()}
         eventTitle={event.title}
         eventDate={event.event_date}
+        isOwner={isOwner}
         pending={rsvpPending}
         error={rsvpError}
       />
