@@ -1,6 +1,8 @@
 import "server-only";
 import type { createServiceClient } from "@/lib/supabase/service";
+import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
 import { canStoreShowcaseFlag } from "./showcase-flag";
+import { enrichEventCards, EVENT_CARD_COLUMNS, loadEventAttendeePreviews } from "./event-cards";
 import { EVENT_CHAT_COMMUNITY_TYPE, canJoinEventChatWith, eventChatName } from "./event-chat-rules";
 
 /**
@@ -237,6 +239,67 @@ export async function leaveEventChat(
     .eq("community_id", communityId)
     .eq("user_id", userId);
   if (error) console.error("[event-chat] membership removal failed:", error);
+}
+
+/**
+ * What the community page's info card needs about the event behind a group
+ * chat: the event itself, in the shape every other event surface renders (see
+ * enrichEventCards), and the people going — oldest RSVP first, so whoever
+ * joined the room first is the first face.
+ *
+ * `going` is a bounded preview, not the whole list: the card shows a handful of
+ * names and a count, and an event with hundreds of RSVPs must not hand a
+ * sidebar that many rows. `event.rsvp_count` remains the authoritative total.
+ */
+export interface EventRoomSection {
+  event: CommunityEvent;
+  going: EventRsvp[];
+}
+
+/** Enough rows for the card's list, its "+N more" and a little slack. */
+const GOING_PREVIEW_LIMIT = 24;
+
+/**
+ * The event a group chat belongs to, for the info card beside the chat. Returns
+ * null when this community is not an event's room (or the event is gone), which
+ * is how the card knows there is no section to draw.
+ *
+ * The link is read on its own instead of being added to the community read
+ * model's column list: an environment that has not applied the event-chat
+ * migration simply has no communities.event_id, and that must cost this one
+ * section rather than the whole page's read model.
+ */
+export async function loadEventRoomSection(
+  db: Db,
+  communityId: string,
+  userId: string,
+): Promise<EventRoomSection | null> {
+  const { data: link, error } = await db
+    .from("communities")
+    .select("event_id")
+    .eq("id", communityId)
+    .maybeSingle();
+  const eventId = (link as { event_id: string | null } | null)?.event_id ?? null;
+  if (error || !eventId) return null;
+
+  const { data: event } = await db
+    .from("community_events")
+    .select(EVENT_CARD_COLUMNS)
+    .eq("id", eventId)
+    .maybeSingle();
+  if (!event) return null;
+
+  // withRsvps: false — the preview below is fetched with a limit of its own, so
+  // letting the card attach its own five-face strip would be a second read.
+  const [card] = await enrichEventCards(
+    [event as unknown as Record<string, unknown>],
+    userId,
+    { withRsvps: false },
+  );
+  if (!card) return null;
+
+  const previews = await loadEventAttendeePreviews([eventId], GOING_PREVIEW_LIMIT);
+  return { event: card, going: previews.get(eventId) ?? [] };
 }
 
 /** Columns the gate/panel need to describe the event behind a group chat. */
