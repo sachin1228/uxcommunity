@@ -17,7 +17,8 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 
   const communityId = thread.community_id;
 
-  // Check membership
+  // The home feed surfaces public threads to every member, so any signed-in
+  // member may read one. Only community-private threads are gated to members.
   const { data: membership } = await db
     .from("community_members")
     .select("joined_at")
@@ -25,7 +26,7 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (!membership) redirect(`/dashboard/communities/${communityId}`);
+  if (!membership && !thread.is_public) redirect(`/dashboard/communities/${communityId}`);
 
   const { data: community } = await db
     .from("communities")

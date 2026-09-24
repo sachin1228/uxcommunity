@@ -110,7 +110,9 @@ export default async function ResourceDetailPage({ params }: Props) {
     db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ]);
 
-  if (!membership) redirect(`/dashboard/communities/${communityId}`);
+  // Public resources are on the home feed for every member, so any signed-in
+  // member may read one; community-private ones stay members-only.
+  if (!membership && resource?.is_public !== true) redirect(`/dashboard/communities/${communityId}`);
   if (!resource) redirect("/dashboard");
 
   return (

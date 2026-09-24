@@ -37,7 +37,11 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     loadEventRsvps(eventId),
   ]);
 
-  if (!membership) redirect(`/dashboard/communities/${communityId}`);
+  // Public events are on the home feed for every member, so any signed-in
+  // member may open the detail page — non-members get a read-only view. The
+  // detail client already hides the join-chat panel unless the event chat is
+  // open to them, and the API refuses non-members on private events.
+  if (!membership && (data as unknown as { is_public?: boolean } | null)?.is_public !== true) redirect(`/dashboard/communities/${communityId}`);
 
   // The event's group chat, when it exists — the page's Join/Open event chat
   // row hands off to it (see EventChatPanel).
