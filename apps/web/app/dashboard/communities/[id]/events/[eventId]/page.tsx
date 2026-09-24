@@ -49,9 +49,19 @@ export default async function EventDetailPage({ params }: Props) {
   // The event's group chat, when it exists, is what the page's Join/Open
   // event chat row offers — the room is where everybody going talks about it.
   const chatCommunity = await getEventChatCommunity(db, eventId).catch(() => null);
-  const chatCommunityJoined = chatCommunity
-    ? await isEventChatMember(db, chatCommunity.id, userId)
-    : false;
+  let chatCommunityJoined = false;
+  let chatMemberCount = 0;
+  if (chatCommunity) {
+    const [joined, { count }] = await Promise.all([
+      isEventChatMember(db, chatCommunity.id, userId),
+      db
+        .from("community_members")
+        .select("community_id", { count: "exact", head: true })
+        .eq("community_id", chatCommunity.id),
+    ]);
+    chatCommunityJoined = joined;
+    chatMemberCount = count ?? 0;
+  }
 
   return (
     <EventDetailClient
@@ -63,6 +73,9 @@ export default async function EventDetailPage({ params }: Props) {
       communityId={communityId}
       communityName={communityData.data?.name ?? "Community"}
       chatCommunityId={chatCommunity?.id ?? null}
+      chatCommunityName={chatCommunity?.name ?? null}
+      chatCommunityImage={chatCommunity?.image_url ?? null}
+      chatMemberCount={chatMemberCount}
       chatCommunityJoined={chatCommunityJoined}
       backHref={`/dashboard/communities/${communityId}?tab=events`}
       backLabel="Events"

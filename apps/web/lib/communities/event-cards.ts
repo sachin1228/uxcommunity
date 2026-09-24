@@ -50,8 +50,9 @@ export async function loadEventAttendeePreviews(
 }
 
 /**
- * The event's full attendee list, oldest RSVP first — the Attendees tab's data
- * (the card only ever shows the first few faces from `loadEventAttendeePreviews`).
+ * The event's full attendee list, oldest RSVP first — loaded by the detail
+ * pages for the card's avatar strip (feed surfaces use the limited
+ * `loadEventAttendeePreviews` instead).
  */
 export async function loadEventRsvps(eventId: string): Promise<EventRsvp[]> {
   const db = createServiceClient();
@@ -108,7 +109,7 @@ async function loadEventCommentCounts(eventIds: string[]): Promise<Map<string, n
  *   0 comments while the detail page showed the real number;
  * - `rsvps` previews are attached unless the caller passes `withRsvps: false`
  *   because it already loaded the full attendee list (the detail pages reuse
- *   that list for both the avatar strip and the Attendees tab).
+ *   that list for the avatar strip).
  */
 export async function enrichEventCards(
   rows: Array<Record<string, unknown>>,

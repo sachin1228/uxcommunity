@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { MessageSquare, Users } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { BackLink } from "@/components/ui/BackLink";
 import { Spinner } from "@/components/ui/Spinner";
-import { AvatarImg } from "@/components/ui/AvatarImg";
 import type { CommunityEvent, EventComment, EventRsvp } from "./types";
 import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
@@ -13,17 +12,6 @@ import { EventCard } from "./EventCard";
 import { EventChatPanel } from "./EventChatPanel";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";
-
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-const AVATAR_PX = { sm: 24, md: 32, lg: 40 } as const;
-
-function Avatar({ name, avatarUrl, size = "md" }: { name: string; avatarUrl: string | null; size?: "sm" | "md" | "lg" }) {
-  const px = AVATAR_PX[size];
-  return (
-    <AvatarImg url={avatarUrl} name={name || "Member"} size={px} className="shrink-0 rounded-full object-cover" />
-  );
-}
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -39,6 +27,12 @@ interface Props {
   showCommunityAttribution?: boolean;
   /** The event's group chat community, when one exists. */
   chatCommunityId?: string | null;
+  /** The group chat community's name. */
+  chatCommunityName?: string | null;
+  /** The group chat community's display picture. */
+  chatCommunityImage?: string | null;
+  /** How many people are in the event's group chat. */
+  chatMemberCount?: number;
   /** Whether the viewer is already in that group chat. */
   chatCommunityJoined?: boolean;
   /** When provided, renders a back link above the event (e.g. homepage context). */
@@ -57,6 +51,9 @@ export function EventDetailClient({
   communityImage,
   showCommunityAttribution = false,
   chatCommunityId = null,
+  chatCommunityName = null,
+  chatCommunityImage = null,
+  chatMemberCount,
   chatCommunityJoined = false,
   backHref,
   backLabel = "Home",
@@ -64,7 +61,6 @@ export function EventDetailClient({
   const router = useGuardedRouter();
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
-  const [activeTab, setActiveTab] = useState<"discussion" | "attendees">("discussion");
 
   // Comments (flat list, built into tree on render)
   const commentsUrl = `/api/communities/${communityId}/events/${initialEvent.id}/comments`;
@@ -140,10 +136,6 @@ export function EventDetailClient({
       }));
   }, [comments]);
 
-  const totalCommentCount = comments.length;
-  const topLevelCount = commentTree.length;
-
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
@@ -156,8 +148,8 @@ export function EventDetailClient({
           />
         )}
         {/* The event page renders the same card the feed does — one component,
-            one design — with the Discussion / Attendees panel handed to it so
-            post and discussion stay in a single card. */}
+            one design — with the Discussion panel handed to it so post and
+            discussion stay in a single card. */}
         <div className={communityFeedLayout.detailSection}>
             <EventCard
               variant="detail"
@@ -188,40 +180,15 @@ export function EventDetailClient({
         {/* ── Event chat — the room made for this event ───────────── */}
         <EventChatPanel
           chatCommunityId={chatCommunityId}
+          chatCommunityName={chatCommunityName}
+          chatCommunityImage={chatCommunityImage}
+          chatMemberCount={chatMemberCount}
           joined={chatCommunityJoined}
           eventTitle={event.title}
         />
 
-        {/* ── Tabs ────────────────────────────────────────────────── */}
-          <div className="flex border-b border-border">
-            {([
-              { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
-              { id: "attendees" as const, label: "Attendees", icon: <Users strokeWidth={2.5} size={14} />, count: event.rsvp_count },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 px-4 pb-3 font-body text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeTab === tab.id
-                    ? "border-accent text-foreground"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-                {tab.count > 0 && (
-                  <span className="inline-flex items-center justify-center rounded-full bg-surface-raised min-w-[1.25rem] h-5 px-1.5 font-body text-[10px] leading-none text-foreground-subtle">
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Discussion tab ──────────────────────────────────── */}
-          {activeTab === "discussion" && (
-            <div className="mt-5">
+        {/* ── Discussion ─────────────────────────────────────────── */}
+            <div className="mt-4">
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
                   <Spinner size={22} />
@@ -249,28 +216,7 @@ export function EventDetailClient({
                 />
               )}
             </div>
-          )}
 
-          {/* ── Attendees tab ──────────────────────────────────── */}
-          {activeTab === "attendees" && (
-            <div className="mt-5">
-              {rsvps.length === 0 ? (
-                <div className={`${communityFeedLayout.emptyState} min-h-40`}>
-                  <Users strokeWidth={2.5} size={22} className={communityFeedLayout.emptyIcon} />
-                  <p className={communityFeedLayout.emptyDescription}>No attendees yet. Be the first to join!</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {rsvps.map((r) => (
-                    <div key={r.user_id} className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5">
-                      <Avatar name={r.users?.name ?? "M"} avatarUrl={r.users?.avatar_url ?? null} size="sm" />
-                      <span className="truncate font-body text-xs text-foreground">{r.users?.name ?? "Member"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
             </EventCard>
         </div>
       </div>
