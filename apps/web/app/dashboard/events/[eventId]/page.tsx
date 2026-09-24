@@ -15,7 +15,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
   const { data } = await db
     .from("community_events")
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
     .eq("id", eventId)
     .maybeSingle();
 
@@ -35,17 +35,21 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     { data: allSaves },
     { data: mySave },
     { data: communityData },
+    { data: allComments },
   ] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
-    db.from("event_rsvps").select("event_id").eq("event_id", eventId),
+    // `user_id` is what the attendee strip needs to resolve each face — without
+    // it every avatar falls back to the "Member" placeholder.
+    db.from("event_rsvps").select("event_id, user_id").eq("event_id", eventId),
     db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_likes").select("event_id").eq("event_id", eventId),
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
+    db.from("event_comments").select("event_id").eq("event_id", eventId),
   ]);
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
@@ -59,6 +63,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     user_liked: Boolean(myLike),
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
+    comment_count: (allComments ?? []).length,
   };
 
   const userIds = (allRsvps ?? []).map((r) => r.user_id);

@@ -16,7 +16,7 @@ async function getEvent(
 ): Promise<CommunityEvent | null> {
   const { data } = await db
     .from("community_events")
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
     .eq("id", eventId)
     .eq("community_id", communityId)
     .maybeSingle();
@@ -33,15 +33,19 @@ async function getEvent(
     { data: myLike },
     { data: allSaves },
     { data: mySave },
+    { data: allComments },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
-    db.from("event_rsvps").select("event_id").eq("event_id", eventId),
+    // `user_id` is what the attendee strip needs to resolve each face — without
+    // it every avatar falls back to the "Member" placeholder.
+    db.from("event_rsvps").select("event_id, user_id").eq("event_id", eventId),
     db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_likes").select("event_id").eq("event_id", eventId),
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
     db.from("event_saves").select("event_id").eq("event_id", eventId),
     db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
+    db.from("event_comments").select("event_id").eq("event_id", eventId),
   ]);
 
   return {
@@ -53,6 +57,7 @@ async function getEvent(
     user_liked: Boolean(myLike),
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
+    comment_count: (allComments ?? []).length,
   };
 }
 

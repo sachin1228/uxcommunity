@@ -22,10 +22,12 @@ async function enrichOne(
     { data: myLike },
     { data: allSaves },
     { data: mySave },
+    { data: allComments },
   ] = await Promise.all([
     db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
     db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
     db.from("event_rsvps").select("user_id").eq("event_id", eventId),
+    db.from("event_comments").select("event_id").eq("event_id", eventId),
     db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
     db.from("event_likes").select("event_id").eq("event_id", eventId),
     db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
@@ -42,6 +44,7 @@ async function enrichOne(
     user_liked: Boolean(myLike),
     save_count: (allSaves ?? []).length,
     user_saved: Boolean(mySave),
+    comment_count: (allComments ?? []).length,
   };
 }
 
@@ -59,7 +62,7 @@ export async function GET(
 
   let eventQuery = db
     .from("community_events")
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
+    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
     .eq("id", eventId);
   eventQuery = publicScope
     ? eventQuery.eq("is_public", true).is("community_id", null)
