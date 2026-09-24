@@ -4,49 +4,7 @@ import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
-
-async function enrichOne(
-  db: ReturnType<typeof createServiceClient>,
-  row: Record<string, unknown>,
-  currentUserId: string,
-) {
-  const eventId = row.id as string;
-  const authorId = row.user_id as string;
-
-  const [
-    { data: userRow },
-    { data: profileRow },
-    { data: allRsvps },
-    { data: myRsvp },
-    { data: allLikes },
-    { data: myLike },
-    { data: allSaves },
-    { data: mySave },
-    { data: allComments },
-  ] = await Promise.all([
-    db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
-    db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
-    db.from("event_rsvps").select("user_id").eq("event_id", eventId),
-    db.from("event_comments").select("event_id").eq("event_id", eventId),
-    db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
-    db.from("event_likes").select("event_id").eq("event_id", eventId),
-    db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
-    db.from("event_saves").select("event_id").eq("event_id", eventId),
-    db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", currentUserId).maybeSingle(),
-  ]);
-
-  return {
-    ...row,
-    users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
-    rsvp_count: (allRsvps ?? []).length,
-    user_rsvped: Boolean(myRsvp),
-    like_count: (allLikes ?? []).length,
-    user_liked: Boolean(myLike),
-    save_count: (allSaves ?? []).length,
-    user_saved: Boolean(mySave),
-    comment_count: (allComments ?? []).length,
-  };
-}
+import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 
 export async function GET(
   _req: NextRequest,
@@ -62,7 +20,7 @@ export async function GET(
 
   let eventQuery = db
     .from("community_events")
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
+    .select(EVENT_CARD_COLUMNS)
     .eq("id", eventId);
   eventQuery = publicScope
     ? eventQuery.eq("is_public", true).is("community_id", null)
@@ -72,7 +30,7 @@ export async function GET(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Event not found." }, { status: 404 });
 
-  const enriched = await enrichOne(db, data as unknown as Record<string, unknown>, userId);
+  const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
   return NextResponse.json({ event: enriched });
 }
 
@@ -158,7 +116,7 @@ export async function PATCH(
     .from("community_events")
     .update(patch)
     .eq("id", eventId)
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, is_public, location, meet_link, max_attendees, cover_image_url, accent_color, created_at, updated_at")
+    .select(EVENT_CARD_COLUMNS)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -180,7 +138,7 @@ export async function PATCH(
     { room: realtimeRooms.events(communityId), topic: "event", data },
   ]);
 
-  const enriched = await enrichOne(db, data as unknown as Record<string, unknown>, userId);
+  const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
   return NextResponse.json({ event: enriched });
 }
 

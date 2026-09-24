@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc, isProfileFeedScope, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
 import {
   FEED_PAGE_SIZE,
   isFeedCard,
@@ -99,16 +100,12 @@ export async function GET(req: NextRequest) {
         isFeedCard(item) && item._type === "event" && typeof item.id === "string" ? [item.id] : [],
       );
       if (!eventIds.length) return items;
-      const previews = await callPerformanceRpc(db, "get_event_attendee_previews", {
-        p_event_ids: eventIds,
-        p_limit: 5,
-      });
-      if (previews.error) throw previews.error;
-      const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
+      // Same attendee previews every other event surface uses.
+      const previewMap = await loadEventAttendeePreviews(eventIds);
       return items.map((item) =>
         isFeedCard(item) && item._type === "event" && typeof item.id === "string"
-          ? { ...item, rsvps: previewMap.get(item.id) ?? [] }
-          : item,
+        ? { ...item, rsvps: (previewMap.get(item.id) ?? []) as unknown as Json }
+        : item,
       );
     });
   } catch (error) {

@@ -5,6 +5,7 @@ import { requireSession } from "@/lib/auth/session";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
+import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
 
 async function isMember(
@@ -19,62 +20,6 @@ async function isMember(
     .eq("user_id", userId)
     .maybeSingle();
   return Boolean(data);
-}
-
-async function enrichEvents(
-  db: ReturnType<typeof createServiceClient>,
-  rows: Array<Record<string, unknown>>,
-  currentUserId: string,
-) {
-  if (!rows.length) return [];
-
-  const eventIds = rows.map((r) => r.id as string);
-  const authorIds = [...new Set(rows.map((r) => r.user_id as string))];
-
-  const [{ data: users }, { data: profiles }, aggregatesResult, commentCountsResult] = await Promise.all([
-    db.from("users").select("id, name").in("id", authorIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
-    callPerformanceRpc(db, "get_event_list_aggregates", {
-      p_user_id: currentUserId,
-      p_event_ids: eventIds,
-    }),
-    db.from("event_comments").select("event_id").in("event_id", eventIds),
-  ]);
-
-  if (aggregatesResult.error) {
-    console.error("[event list aggregates]", aggregatesResult.error);
-    throw new Error("Failed to load event interaction aggregates.");
-  }
-
-  const nameMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
-  const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
-  const aggregateMap = new Map(
-    (aggregatesResult.data ?? []).map((aggregate) => [aggregate.id, aggregate]),
-  );
-
-  // Count comments per event
-  const commentCountMap = new Map<string, number>();
-  for (const row of (commentCountsResult.data ?? []) as Array<{ event_id: string }>) {
-    commentCountMap.set(row.event_id, (commentCountMap.get(row.event_id) ?? 0) + 1);
-  }
-
-  return rows.map((row) => {
-    const authorId = row.user_id as string;
-    const aggregate = aggregateMap.get(row.id as string);
-    return {
-      ...row,
-      users: nameMap[authorId]
-        ? { name: nameMap[authorId], avatar_url: avatarMap[authorId] ?? null }
-        : null,
-      rsvp_count: Number(aggregate?.rsvp_count ?? 0),
-      user_rsvped: aggregate?.user_rsvped === true,
-      like_count: Number(aggregate?.like_count ?? 0),
-      user_liked: aggregate?.user_liked === true,
-      save_count: Number(aggregate?.save_count ?? 0),
-      user_saved: aggregate?.user_saved === true,
-      comment_count: commentCountMap.get(row.id as string) ?? 0,
-    };
-  });
 }
 
 const EVENT_PAGE_SIZE = 25;
@@ -143,18 +88,17 @@ export async function GET(
 
   const data = (result.data ?? []).map(({ item }) => item as Record<string, unknown>);
   const page = data.slice(0, EVENT_PAGE_SIZE);
-  const previews = await timer.measure("attendee_previews_rpc", () =>
-    callPerformanceRpc(db, "get_event_attendee_previews", {
-      p_event_ids: page.map((event) => event.id as string),
-      p_limit: 5,
-    }),
-  );
-  if (previews.error) {
+  // The page RPC resolves the author and the like/RSVP/save counts; the shared
+  // serializer adds the two it can't supply (comment count and the attendee
+  // faces), so this feed hands EventCard the same complete row the event page does.
+  let enriched;
+  try {
+    enriched = await timer.measure("event_cards_enrich", () => enrichEventCards(page, userId));
+  } catch (error) {
+    console.error("[GET community events]", error);
     timer.finish({ status: 500 });
-    return NextResponse.json({ error: "Failed to fetch event attendees." }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch events." }, { status: 500 });
   }
-  const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
-  const enriched = page.map((event) => ({ ...event, rsvps: previewMap.get(event.id as string) ?? [] }));
   const last = page.at(-1);
   const hasMoreInPhase = (data?.length ?? 0) > EVENT_PAGE_SIZE;
   const nextCursor = hasMoreInPhase && last
@@ -248,7 +192,7 @@ export async function POST(
       accent_color: accentColor,
       is_public: isPublic,
     })
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, accent_color, is_public, created_at, updated_at")
+    .select(EVENT_CARD_COLUMNS)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -263,6 +207,6 @@ export async function POST(
     },
   ]);
 
-  const [enriched] = await enrichEvents(db, [data as unknown as Record<string, unknown>], userId);
+  const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
   return NextResponse.json({ event: enriched }, { status: 201 });
 }
