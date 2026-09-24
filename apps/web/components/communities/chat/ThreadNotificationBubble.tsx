@@ -11,7 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, formatCommenters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import {
   NotificationHoverActions,
@@ -86,6 +86,10 @@ export function ThreadNotificationBubble({
   const href    = `/dashboard/communities/${communityId}/threads/${event.id}`;
   const CatIcon = CATEGORY_ICON[event.category] ?? HelpCircle;
   const theme   = KIND_THEME.thread;
+  // Discussion on the thread's own page — the count and whoever spoke last,
+  // updating live as comments arrive (same footer as the other three kinds).
+  const commentCount = Math.max(0, event.meta?.comment_count ?? 0);
+  const commenterNames = formatCommenters(event.meta?.comment_users);
 
   return (
     <div
@@ -246,11 +250,32 @@ export function ThreadNotificationBubble({
             </span>
           </div>
 
-          {/* Timestamp inside the bubble, bottom-right — same row as normal
-              message bubbles (reactions reserve space below via the h-4 slot). */}
-          <div className="flex items-center justify-end gap-1 mt-0.5">
+          {/* Bottom row: the discussion sits bottom-LEFT of the bubble, the
+              timestamp bottom-right, exactly like a message bubble's footer. */}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {commentCount > 0 && (
+              <span
+                className={`flex min-w-0 items-center gap-1 font-body text-[10px] leading-none ${
+                  isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
+                }`}
+                title={
+                  commenterNames
+                    ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"} · ${commenterNames}`
+                    : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
+                }
+              >
+                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+                <span className="shrink-0 tabular-nums">{commentCount}</span>
+                {commenterNames && (
+                  <span className="truncate">
+                    <span className="opacity-60">·&nbsp;</span>
+                    {commenterNames}
+                  </span>
+                )}
+              </span>
+            )}
             <span
-              className={`font-mono text-[10px] ${
+              className={`ml-auto shrink-0 font-mono text-[10px] ${
                 isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"
               }`}
             >

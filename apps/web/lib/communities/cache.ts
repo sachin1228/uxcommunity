@@ -68,6 +68,9 @@ export interface CachedThreadEvent {
   attachments: Array<{ name: string; url: string; type: string; size: number; poster?: string }>;
   created_at: string;
   users: { name: string; avatar_url: string | null } | null;
+  /** Discussion on the thread's detail page (count + newest commenters), so
+   * the thread card can show it like the other three kinds. */
+  meta?: ContentEventMeta | null;
   /** Emoji reactions left on the card (grouped, message-reaction shape). */
   reactions?: MessageReaction[];
 }

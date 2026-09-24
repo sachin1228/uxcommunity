@@ -525,15 +525,34 @@ export function useRealtimeChat({
     );
 
     // ── Comment counts on the cards ────────────────────────────────────────
-    // Comment APIs recount the item and broadcast the absolute total into the
-    // chat room, so a card's "💬 n" grows (or shrinks) while members sit in
-    // the chat instead of waiting for the next page load.
+    // Comment APIs recount the item and broadcast the absolute total (plus the
+    // newest commenters) into the chat room, so a card's "💬 n" grows — and its
+    // byline changes hands — while members sit in the chat instead of waiting
+    // for the next page load.
     unsubscribes.push(
       realtimeClient.on(chatRoom, "content-comment", (data) => {
-        const row = data as { content_id?: string; comment_count?: number };
+        const row = data as {
+          content_id?: string;
+          kind?: ContentEventKind;
+          comment_count?: number;
+          comment_users?: string[];
+        };
         if (!row.content_id || typeof row.comment_count !== "number") return;
+        const id = row.content_id;
         const count = row.comment_count;
-        setContentEvents((prev) => applyContentCommentCount(prev, row.content_id!, count) ?? prev);
+        const commenters = Array.isArray(row.comment_users) ? row.comment_users : undefined;
+
+        setContentEvents(
+          (prev) => applyContentCommentCount(prev, id, count, commenters) ?? prev,
+        );
+        // Threads created while this client was connected live in the legacy
+        // thread array rather than the content-event one, so a thread card needs
+        // the same treatment (kind is the only way to tell them apart).
+        if (row.kind === "thread") {
+          setThreadEvents(
+            (prev) => applyContentCommentCount(prev, id, count, commenters) ?? prev,
+          );
+        }
       }),
     );
 

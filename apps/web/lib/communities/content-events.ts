@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { ContentEventKind } from "./cache";
 import type { ContentEventMeta } from "./content-notifications";
-import { loadCommentCounts, loadRsvpCounts } from "./content-notifications";
+import { loadCommentSummaries, loadRsvpCounts } from "./content-notifications";
 
 export interface ContentEventRow {
   id: string;
@@ -155,9 +155,9 @@ export async function loadCommunityContentEvents(
   // counts are computed per page the same way: they tell members how much
   // discussion each card has.
   const eventRows = rows.filter((row) => row.kind === "event");
-  const [rsvpCounts, commentCounts] = await Promise.all([
+  const [rsvpCounts, commentSummaries] = await Promise.all([
     loadRsvpCounts(db, eventRows.map((row) => row.id as string)),
-    loadCommentCounts(
+    loadCommentSummaries(
       db,
       rows.map((row) => ({ id: row.id as string, kind: row.kind as ContentEventKind })),
     ),
@@ -184,7 +184,9 @@ export async function loadCommunityContentEvents(
       const kind = row.kind as ContentEventKind;
       const meta = metaFor(kind, row);
       if (kind === "event") meta.rsvp_count = rsvpCounts.get(row.id as string) ?? 0;
-      meta.comment_count = commentCounts.get(row.id as string) ?? 0;
+      const comments = commentSummaries.get(row.id as string);
+      meta.comment_count = comments?.count ?? 0;
+      if (comments?.commenters.length) meta.comment_users = comments.commenters;
       const byEmoji = reactionMap.get(row.id as string);
       const reactions = byEmoji
         ? [...byEmoji.entries()].map(([emoji, user_ids]) => ({ emoji, user_ids }))

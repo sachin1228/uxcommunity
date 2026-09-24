@@ -28,6 +28,9 @@ export interface ContentEventMeta {
   /** Comments left on the item's own detail page, so the card can show how
    * much discussion it has. Enriched server-side per page load. */
   comment_count?: number | null;
+  /** Display names of the most recent commenters, newest first, so the card can
+   * show who is talking next to the count. Capped at COMMENTERS_SHOWN. */
+  comment_users?: string[] | null;
 }
 
 /**
@@ -42,16 +45,35 @@ export const CONTENT_COMMENT_SOURCES: Record<ContentEventKind, { table: string; 
   event:    { table: "event_comments",    column: "event_id" },
 };
 
+/** How many commenter names a card shows beside its comment count. */
+export const COMMENTERS_SHOWN = 3;
+
+export interface ContentCommentSummary {
+  /** Total comments on the item, replies included. */
+  count: number;
+  /** Most recent distinct commenters, newest first (≤ COMMENTERS_SHOWN). */
+  commenters: string[];
+}
+
 /**
- * Comment counts for a page of content cards. The four kinds keep their
- * comments in their own table with their own FK column, so this is one query
- * per kind (per page, not per card), tallied in memory.
+ * Who has been talking on a page of content cards, and how much.
+ *
+ * The four kinds keep their comments in their own table with their own FK
+ * column, so this is one query per kind (per page, not per card) plus a single
+ * name lookup — the row also carries `user_id`/`created_at`, which is what lets
+ * a card name its newest commenters instead of only counting them.
+ *
+ * A content item can be commented on before this page loads, so the summary is
+ * recomputed on every page load rather than trusted from the persisted event.
  */
-export async function loadCommentCounts(
+export async function loadCommentSummaries(
   db: { from: (table: string) => unknown },
   items: Array<{ id: string; kind: ContentEventKind }>,
-): Promise<Map<string, number>> {
+): Promise<Map<string, ContentCommentSummary>> {
   const counts = new Map<string, number>();
+  /** itemId → (userId → that user's newest comment time on the item). */
+  const authors = new Map<string, Map<string, string>>();
+
   const byKind: Record<ContentEventKind, { table: string; column: string; ids: string[] }> = {
     thread:   { ...CONTENT_COMMENT_SOURCES.thread,   ids: [] },
     showcase: { ...CONTENT_COMMENT_SOURCES.showcase, ids: [] },
@@ -70,16 +92,54 @@ export async function loadCommentCounts(
           }>;
         };
       })
-        .select(column)
+        .select(`${column}, user_id, created_at`)
         .in(column, ids)) as { data: Array<Record<string, string | null>> | null };
       for (const row of data ?? []) {
         const id = row[column];
         if (!id) continue;
         counts.set(id, (counts.get(id) ?? 0) + 1);
+        const author = row.user_id;
+        if (!author) continue;
+        const perItem = authors.get(id) ?? new Map<string, string>();
+        authors.set(id, perItem);
+        const at = row.created_at ?? "";
+        if (!perItem.has(author) || at > perItem.get(author)!) perItem.set(author, at);
       }
     }),
   );
-  return counts;
+
+  // One lookup for every commenter on the page; rows with a deleted author are
+  // simply left unnamed rather than dropped from the count.
+  const authorIds = [...new Set([...authors.values()].flatMap((perItem) => [...perItem.keys()]))];
+  const names = new Map<string, string>();
+  if (authorIds.length) {
+    const { data: users } = (await (db.from("users") as {
+      select: (cols: string) => {
+        in: (col: string, values: string[]) => Promise<{
+          data: Array<{ id: string; name: string | null }> | null;
+        }>;
+      };
+    })
+      .select("id, name")
+      .in("id", authorIds)) as { data: Array<{ id: string; name: string | null }> | null };
+    for (const user of users ?? []) {
+      if (user?.id && user.name) names.set(user.id, user.name);
+    }
+  }
+
+  const summaries = new Map<string, ContentCommentSummary>();
+  for (const [id, count] of counts) {
+    const perItem = authors.get(id);
+    const commenters = perItem
+      ? [...perItem.entries()]
+          .sort((a, b) => b[1].localeCompare(a[1]))
+          .slice(0, COMMENTERS_SHOWN)
+          .map(([userId]) => names.get(userId))
+          .filter((name): name is string => Boolean(name))
+      : [];
+    summaries.set(id, { count, commenters });
+  }
+  return summaries;
 }
 
 /**

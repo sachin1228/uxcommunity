@@ -21,7 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { ChatAvatar } from "./ChatAvatar";
-import { fmtTime } from "./chatUtils";
+import { fmtTime, formatCommenters } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
 import {
   NotificationHoverActions,
@@ -168,8 +168,10 @@ export function ContentNotificationBubble({
 
   const reactions = event.reactions ?? [];
   // How much discussion the card has on its own detail page — surfaced here so
-  // members can judge it without opening the item first.
+  // members can judge it without opening the item first, along with the people
+  // who spoke most recently.
   const commentCount = Math.max(0, meta?.comment_count ?? 0);
+  const commenterNames = formatCommenters(meta?.comment_users);
 
   return (
     <div
@@ -317,23 +319,32 @@ export function ContentNotificationBubble({
             </div>
           </Link>
 
-          {/* Timestamp inside the bubble, bottom-right — same row as normal
-              message bubbles (reactions reserve space below via the h-4 slot).
-              The comment count sits beside it while the item has discussion. */}
-          <div className="flex items-center justify-end gap-1.5 mt-0.5">
+          {/* Bottom row: the discussion sits bottom-LEFT of the bubble, the
+              timestamp bottom-right, exactly like a message bubble's footer. */}
+          <div className="flex items-center gap-1.5 mt-0.5">
             {commentCount > 0 && (
               <span
-                className={`flex items-center gap-1 font-body text-[10px] leading-none ${
+                className={`flex min-w-0 items-center gap-1 font-body text-[10px] leading-none ${
                   isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
                 }`}
-                title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+                title={
+                  commenterNames
+                    ? `${commentCount} ${commentCount === 1 ? "comment" : "comments"} · ${commenterNames}`
+                    : `${commentCount} ${commentCount === 1 ? "comment" : "comments"}`
+                }
               >
-                <MessageCircle size={10} strokeWidth={2.5} />
-                {commentCount}
+                <MessageCircle size={10} strokeWidth={2.5} className="shrink-0" />
+                <span className="shrink-0 tabular-nums">{commentCount}</span>
+                {commenterNames && (
+                  <span className="truncate">
+                    <span className="opacity-60">·&nbsp;</span>
+                    {commenterNames}
+                  </span>
+                )}
               </span>
             )}
             <span
-              className={`font-mono text-[10px] ${
+              className={`ml-auto shrink-0 font-mono text-[10px] ${
                 isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"
               }`}
             >

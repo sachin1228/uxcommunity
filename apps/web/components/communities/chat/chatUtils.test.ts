@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   applyContentCommentCount,
+  formatCommenters,
   pickOptimisticMatch,
   scrollChatToBottom,
   type OptimisticLike,
@@ -134,8 +135,15 @@ test("confirmed and failed rows are not replaced by a new echo", () => {
 
 // ─── Live comment counts on the "created a …" cards ──────────────────────
 
-function card(id: string, commentCount?: number | null) {
-  return { id, title: "card", meta: commentCount === undefined ? null : { comment_count: commentCount } };
+function card(id: string, commentCount?: number | null, commentUsers?: string[]) {
+  return {
+    id,
+    title: "card",
+    meta:
+      commentCount === undefined
+        ? null
+        : { comment_count: commentCount, ...(commentUsers ? { comment_users: commentUsers } : {}) },
+  };
 }
 
 test("a broadcast comment total lands on the card it belongs to", () => {
@@ -169,4 +177,38 @@ test("a count for a card outside the loaded window is ignored", () => {
   const events = [card("a", 1)];
 
   assert.equal(applyContentCommentCount(events, "missing", 5), null);
+});
+
+// ─── Newest commenters on the card ────────────────────────────────────────
+
+test("the newest commenters ride along with the broadcast total", () => {
+  const next = applyContentCommentCount([card("a", 1, ["Ava"])], "a", 2, ["John", "Ava"]);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 2);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["John", "Ava"]);
+});
+
+test("a broadcast without names keeps the ones already on the card", () => {
+  assert.equal(applyContentCommentCount([card("a", 1, ["Ava"])], "a", 1), null);
+
+  const next = applyContentCommentCount([card("a", 1, ["Ava"])], "a", 2);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["Ava"]);
+});
+
+test("a deleted comment drops the commenter who left it", () => {
+  const next = applyContentCommentCount([card("a", 2, ["Ava", "John"])], "a", 1, ["Ava"]);
+
+  assert.equal(next?.[0]?.meta?.comment_count, 1);
+  assert.deepEqual(next?.[0]?.meta?.comment_users, ["Ava"]);
+});
+
+test("renaming the same people does not re-render the card", () => {
+  assert.equal(applyContentCommentCount([card("a", 2, ["Ava", "John"])], "a", 2, ["Ava", "John"]), null);
+});
+
+test("the byline joins the names and blanks out when there are none", () => {
+  assert.equal(formatCommenters(["Ava", "John"]), "Ava, John");
+  assert.equal(formatCommenters([]), null);
+  assert.equal(formatCommenters(undefined), null);
+  assert.equal(formatCommenters(["  ", "Ava"]), "Ava");
 });
