@@ -7,6 +7,14 @@
  * member), so they live here as plain functions and are unit tested.
  */
 
+/**
+ * `communities.type` of an event's group chat. Rooms are created with a chat
+ * room's areas (see lib/communities/event-chat), which is what keeps Showcase
+ * — its own flag, defaulting to on — out of a brand-new event room until the
+ * owner switches it on there.
+ */
+export const EVENT_CHAT_COMMUNITY_TYPE = "event";
+
 /** Community names are capped the same way the Create Community form caps them. */
 export const EVENT_CHAT_NAME_MAX = 80;
 

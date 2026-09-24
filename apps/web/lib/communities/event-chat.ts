@@ -1,6 +1,7 @@
 import "server-only";
 import type { createServiceClient } from "@/lib/supabase/service";
-import { canJoinEventChatWith, eventChatName } from "./event-chat-rules";
+import { canStoreShowcaseFlag } from "./showcase-flag";
+import { EVENT_CHAT_COMMUNITY_TYPE, canJoinEventChatWith, eventChatName } from "./event-chat-rules";
 
 /**
  * The event group chat is an ordinary community of `type = 'event'` whose
@@ -53,12 +54,20 @@ export async function ensureEventChatCommunity(
   const existing = await getEventChatCommunity(db, event.id);
   if (existing) return existing.id;
 
+  // A fresh room starts without Showcase: that flag has its own column and
+  // defaults to ON, so it has to be written off here or every new room would
+  // offer a portfolio tab. Nothing else is touched — the owner can still turn
+  // Showcase on from the room's settings like any other community. Written
+  // only where the column exists, so creation still works in an environment
+  // that has not applied the showcase-toggle migration yet.
+  const showcaseInsert = (await canStoreShowcaseFlag(db)) ? { showcase_enabled: false } : {};
+
   const { data: community, error } = await db
     .from("communities")
     .insert({
       name: eventChatName(event.title),
       description: EVENT_CHAT_DESCRIPTION,
-      type: "event",
+      type: EVENT_CHAT_COMMUNITY_TYPE,
       reference_id: null,
       image_url: event.coverImageUrl,
       owner_id: creatorId,
@@ -67,6 +76,7 @@ export async function ensureEventChatCommunity(
       // A group chat: the event itself is the content, so no other areas.
       enabled_tabs: ["chat"],
       is_active: true,
+      ...showcaseInsert,
     })
     .select("id")
     .single();
