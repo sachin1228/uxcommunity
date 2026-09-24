@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(28);
 
 select has_function('public', 'get_community_message_page', array['uuid','uuid','timestamptz','timestamptz','timestamptz','integer']);
 select has_function('public', 'get_sidebar_activity', array['uuid']);
@@ -9,6 +9,7 @@ select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]
 select has_function('public', 'get_event_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_resource_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_showcase_list_page', array['uuid','uuid','timestamptz','uuid','integer']);
+select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer','text']);
 select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer','boolean']);
 select has_function('public', 'get_profile_feed_page', array['uuid','text','timestamptz','integer']);
 
@@ -68,63 +69,137 @@ select ok(
   'community explore RPC excludes empty communities'
 );
 
+-- Feed-scope fixtures. Every card lives in a community (standalone posts were
+-- removed), so the two scopes split on membership and visibility:
+--   * a joined community contributes public AND private posts to the member
+--     scope, and nothing to the public feed;
+--   * an unjoined community contributes its public posts to the public feed
+--     only.
 insert into public.community_showcase_posts
   (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
-select null, context.user_id, 'standalone showcase fixture', 'not shown on home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
+select null, context.user_id, 'standalone showcase fixture', 'no community', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
+from rpc_test_context as context;
+
+create temporary table rpc_test_other_community as
+select community.id as community_id
+from public.communities community
+where not exists (
+  select 1 from public.community_members member
+  where member.community_id = community.id
+    and member.user_id = (select user_id from rpc_test_context)
+)
+order by community.id
+limit 1;
+
+insert into public.community_threads
+  (community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at)
+select context.community_id, context.user_id, 'private joined-community thread fixture', 'member scope only', 'question', array['fixture'], '[]'::jsonb, array[]::text[], true, false, clock_timestamp()
+from rpc_test_context as context;
+
+insert into public.community_showcase_posts
+  (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
+select context.community_id, context.user_id, 'public joined-community showcase fixture', 'member scope only', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], true, clock_timestamp()
 from rpc_test_context as context;
 
 insert into public.community_threads
   (community_id, user_id, title, description, category, tags, attachments, links, allow_replies, is_public, created_at)
-select null, context.user_id, 'public thread fixture', 'shown on home feed', 'question', array['fixture'], '[]'::jsonb, array[]::text[], true, true, clock_timestamp()
-from rpc_test_context as context;
-
-insert into public.community_showcase_posts
-  (community_id, user_id, title, description, image_url, post_type, category, tags, is_public, created_at)
-select context.community_id, context.user_id, 'community showcase fixture', 'hidden from home feed', 'https://example.com/fixture.png', 'finished', 'ui_ux', array['fixture'], false, clock_timestamp()
-from rpc_test_context as context;
-
-update public.community_showcase_posts
-set is_public = true, description = 'shown on home feed'
-where title = 'community showcase fixture';
+select other.community_id, context.user_id, 'public unjoined-community thread fixture', 'public feed only', 'question', array['fixture'], '[]'::jsonb, array[]::text[], true, true, clock_timestamp()
+from rpc_test_context as context, rpc_test_other_community as other;
 
 select is(
   (select count(*)::integer
    from rpc_test_context context,
-     lateral public.get_home_feed_page(context.user_id, null, 100) feed
-   where feed.item->>'_type' = 'thread'
-     and feed.item->>'title' = 'public thread fixture'),
-  1,
-  'home feed includes public threads'
-);
-
-select is(
-  (select count(*)::integer
-   from rpc_test_context context,
-     lateral public.get_home_feed_page(context.user_id, null, 100) feed
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'public'::text) feed
    where feed.item->>'_type' = 'showcase'
      and feed.item->>'title' = 'standalone showcase fixture'),
   0,
-  'home feed excludes standalone showcase posts'
+  'public feed excludes posts with no community'
 );
 
 select is(
   (select count(*)::integer
    from rpc_test_context context,
-     lateral public.get_home_feed_page(context.user_id, null, 100) feed
-   where feed.item->>'_type' = 'showcase'
-     and feed.item->>'title' = 'community showcase fixture'),
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'public'::text) feed
+   where feed.item->>'title' = 'private joined-community thread fixture'),
+  0,
+  'public feed excludes private posts from joined communities'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'public'::text) feed
+   where feed.item->>'title' = 'public joined-community showcase fixture'),
+  0,
+  'public feed excludes public posts from joined communities'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'public'::text) feed
+   where feed.item->>'title' = 'public unjoined-community thread fixture'),
   1,
-  'home feed includes public community showcase posts'
+  'public feed includes public posts from communities the caller has not joined'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'communities'::text) feed
+   where feed.item->>'title' = 'private joined-community thread fixture'),
+  1,
+  'member feed includes private posts from joined communities'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'communities'::text) feed
+   where feed.item->>'title' = 'public joined-community showcase fixture'),
+  1,
+  'member feed includes public posts from joined communities'
+);
+
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'communities'::text) feed
+   where feed.item->>'title' = 'public unjoined-community thread fixture'),
+  0,
+  'member feed excludes communities the caller has not joined'
+);
+
+-- The legacy scope is what clients that send no scope still get, so its
+-- every-public-post behaviour must survive the split.
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'all'::text) feed
+   where feed.item->>'title' = 'public joined-community showcase fixture'),
+  1,
+  'legacy all scope still includes public posts from joined communities'
+);
+
+-- The pre-`p_scope` call shape delegates to the scoped function.
+select is(
+  (select count(*)::integer
+   from rpc_test_context context,
+     lateral public.get_home_feed_page(context.user_id, null, 100, true) feed
+   where feed.item->>'title' = 'private joined-community thread fixture'),
+  1,
+  'legacy boolean flag delegates to the member scope'
 );
 
 select is(
   (select feed.item->'users'->>'name' is not null
    from rpc_test_context context,
-     lateral public.get_home_feed_page(context.user_id, null, 100) feed
+     lateral public.get_home_feed_page(context.user_id, null, 100, 'communities'::text) feed
    where feed.item->>'_type' = 'thread'
+     and feed.item->>'title' = 'private joined-community thread fixture'
    limit 1),
   true,
-  'home feed thread items include author metadata'
+  'feed thread items include author metadata'
 );
 
 -- The profile activity tabs read the same card payloads as the homepage. A

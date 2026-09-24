@@ -33,7 +33,7 @@ const loadFeedPage = unstable_cache(
         p_user_id: userId,
         p_before: before,
         p_limit: PAGE_SIZE,
-        p_member_only: scope === "communities",
+        p_scope: scope,
       },
     );
     if (error) throw error;
@@ -111,8 +111,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Unknown values fall back to the default instead of erroring so stale
-  // clients keep working after a rename.
+  // Unknown or missing values fall back to `all`, the legacy every-public-post
+  // feed, so clients that send no scope (the Expo home feed) and stale clients
+  // keep working. The dashboard sends `public` or `communities` explicitly.
   const rawScope = req.nextUrl.searchParams.get("scope") ?? "all";
   const scope: HomeFeedScope = (HOME_FEED_SCOPES as readonly string[]).includes(rawScope)
     ? (rawScope as HomeFeedScope)

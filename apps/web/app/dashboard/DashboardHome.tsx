@@ -5,7 +5,8 @@ import { DashboardSingleColumn } from "./ContentLoader";
 import { HomeFeed } from "./HomeFeed";
 import { HomeFeedFilters } from "./HomeFeedFilters";
 import {
-  HOME_FEED_SCOPES,
+  DEFAULT_HOME_FEED_SCOPE,
+  HOME_FEED_TAB_SCOPES,
   type HomeFeedScope,
   readStoredHomeFeedScope,
   storeHomeFeedScope,
@@ -26,16 +27,17 @@ export function DashboardHome({ userId, rail }: DashboardHomeProps) {
   // Feed source choice. The server cannot see localStorage, so the scope
   // starts on the default and swaps to the stored choice right after
   // hydration — a hydration-safe pattern.
-  const [scope, setScope] = useState<HomeFeedScope>("all");
+  const [scope, setScope] = useState<HomeFeedScope>(DEFAULT_HOME_FEED_SCOPE);
 
   useEffect(() => {
-    setScope(readStoredHomeFeedScope() ?? "all");
+    setScope(readStoredHomeFeedScope() ?? DEFAULT_HOME_FEED_SCOPE);
   }, []);
 
   const handleScopeChange = useCallback((next: string) => {
-    if (!(HOME_FEED_SCOPES as readonly string[]).includes(next)) return;
-    setScope(next as HomeFeedScope);
-    storeHomeFeedScope(next as HomeFeedScope);
+    if (!(HOME_FEED_TAB_SCOPES as readonly string[]).includes(next)) return;
+    const scope = next as HomeFeedScope;
+    setScope(scope);
+    storeHomeFeedScope(scope);
   }, []);
 
   return (

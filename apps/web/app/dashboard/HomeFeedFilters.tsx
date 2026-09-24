@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useRef } from "react";
+import { HOME_FEED_TAB_SCOPES } from "@/lib/feeds/home-feed-options";
 
-/** Labels for the feed source selector. */
-const SCOPES = [
-  { value: "all", label: "Public Feed" },
-  { value: "communities", label: "Your Communities" },
-] as const;
+/** Labels for the feed source selector (see lib/feeds/home-feed-options). */
+const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
+  public: "Public Feed",
+  communities: "Your Communities",
+};
+const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({ value, label: SCOPE_LABELS[value] }));
 
 /** Shared classes that pull from the reference palette (see globals.css). */
 const SWITCHER_TRACK = "fb-filter-track";

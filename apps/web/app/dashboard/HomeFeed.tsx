@@ -9,14 +9,23 @@ import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest
 import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import { applyContentChanges } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
-import type { HomeFeedScope } from "@/lib/feeds/home-feed-options";
+import { DEFAULT_HOME_FEED_SCOPE, type HomeFeedScope } from "@/lib/feeds/home-feed-options";
 
 interface HomeFeedProps {
   currentUserId: string;
   refreshToken?: number;
-  /** Feed source — `all` (everything public) or `communities` (joined only). */
+  /** Feed source — `public` (public, unjoined communities) or `communities` (joined only). */
   scope: HomeFeedScope;
 }
+
+/** Empty-state copy per feed source — the two tabs show disjoint posts. */
+const EMPTY_STATE_DESCRIPTION: Record<HomeFeedScope, string> = {
+  public: "Posts that members share publicly — from communities you haven't joined — will appear here.",
+  communities:
+    "Everything posted in the communities you've joined will appear here, whether or not it was shared publicly.",
+  // Not reachable from the switcher; `all` is the server-side legacy default.
+  all: "Posts that members share publicly will appear here.",
+};
 
 /**
  * The homepage feed: fetches and paginates the cross-community card page, then
@@ -28,7 +37,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   // Matches the fetch URL below for the default filter choice, so the first
   // render of a revisit can hydrate straight from the request cache.
   const cached = getCachedRequest<{ items?: FeedItem[] }>(
-    "/api/home/feed?scope=all",
+    `/api/home/feed?scope=${DEFAULT_HOME_FEED_SCOPE}`,
     currentUserId,
   );
   const [items, setItems] = useState<FeedItem[]>(() => cached?.items ?? []);
@@ -153,8 +162,7 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>
             <p className="mt-1 max-w-xs font-body text-xs text-foreground-subtle">
-              When community members share threads, events, resources, or showcase
-              work publicly, they&apos;ll appear here.
+              {EMPTY_STATE_DESCRIPTION[scope]}
             </p>
           </div>
         )}
