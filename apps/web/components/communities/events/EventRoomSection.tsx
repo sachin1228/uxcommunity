@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
 import { CalendarDays, MapPin, Users, Video } from "lucide-react";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { fetchJsonCached } from "@/lib/request-cache";
@@ -17,8 +16,8 @@ import { goingPreview, toGoingEntries } from "./going-list";
  * A room's members are not the same list as the people going to its event: the
  * room is where they talk, the RSVPs are who is coming. This section answers the
  * two questions the chat itself can't — what the event is (when, where, how
- * full) and who is going — without making the reader leave the room to find out
- * (see /api/communities/[id]/event, which resolves the link server-side).
+ * full) and who is going — without making the reader leave the room (see
+ * /api/communities/[id]/event, which resolves that answer server-side).
  *
  * Rendered by CommunityRightSidebar, between Members and About, and only for
  * communities of type `event`: every other community answers null here and
@@ -237,13 +236,6 @@ export function EventRoomSection({
           </p>
         )}
       </div>
-
-      <Link
-        href={`/dashboard/communities/${communityId}/events/${event.id}`}
-        className="mt-4 inline-flex items-center gap-1.5 font-body text-sm font-medium text-accent transition-colors hover:text-accent/80"
-      >
-        View event
-      </Link>
     </section>
   );
 }
