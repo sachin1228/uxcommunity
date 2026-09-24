@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { loadJoinEligibility } from "./join-eligibility";
+import { resolveCommunityDp } from "./dp";
 
 type Db = ReturnType<typeof createServiceClient>;
 
@@ -70,23 +71,33 @@ export async function loadCommunityPreview(
     db.from("community_resources").select("id", { count: "exact", head: true }).eq("community_id", communityId).eq("is_public", true),
   ]);
 
-  const { canJoin, hasPendingRequest } = await loadJoinEligibility(
-    db,
-    {
-      id: communityId,
+  const [{ canJoin, hasPendingRequest }, dp] = await Promise.all([
+    loadJoinEligibility(
+      db,
+      {
+        id: communityId,
+        type: row.type,
+        reference_id: row.reference_id,
+        is_private: row.is_private ?? false,
+      },
+      userId,
+    ),
+    // The DP resolves like every other community surface: official
+    // (profile-derived) communities take the live master-data row's current
+    // picture via reference_id, with the stored communities column as fallback.
+    resolveCommunityDp({
       type: row.type,
       reference_id: row.reference_id,
-      is_private: row.is_private ?? false,
-    },
-    userId,
-  );
+      image_url: row.image_url,
+    }),
+  ]);
 
   return {
     id: row.id,
     name: row.name,
     type: row.type,
     is_private: row.is_private ?? false,
-    image_url: row.image_url,
+    image_url: dp.image_url,
     description: row.description,
     member_count: memberCount ?? 0,
     public_counts: {
