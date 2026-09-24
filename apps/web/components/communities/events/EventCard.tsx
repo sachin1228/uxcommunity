@@ -18,6 +18,7 @@ import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { useEventInteractions } from "./useEventInteractions";
 import { EventOptionsMenu } from "./EventOptionsMenu";
@@ -204,8 +205,10 @@ interface EventCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
-  /** Homepage only: opens the community preview popup instead of navigating. */
+  /** Opens the community preview popup in place (modal) instead of navigating. */
   onCommunityClick?: () => void;
+  /** Renders the label with the in-place preview modal when no callback is given. */
+  communityPreviewModal?: boolean;
   /**
    * Panel rendered inside the card, under the engagement row — the detail
    * page's Discussion tab. Holding it here is what keeps the event and its
@@ -239,6 +242,7 @@ export function EventCard({
   communityName,
   communityImage,
   onCommunityClick,
+  communityPreviewModal = false,
   children,
 }: EventCardProps) {
   const isDetail = variant === "detail";
@@ -728,7 +732,15 @@ export function EventCard({
           </span>
         </div>
 
-        {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
+        {communityName && (onCommunityClick || communityPreviewModal ? (
+          onCommunityClick ? (
+            <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />
+          ) : (
+            <CommunityLabelPreview communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+          )
+        ) : (
+          <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+        ))}
       </div>
 
       {/* Discussion panel (detail page) — in the card, so the post and its

@@ -13,6 +13,7 @@ import { ResourceFormModal } from "./ResourceFormModal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { FigmaEmbed } from "./FigmaEmbed";
 import { getFigmaEmbedUrl } from "@/lib/communities/figma";
@@ -63,8 +64,10 @@ interface ResourceCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
-  /** Homepage only: opens the community preview popup instead of navigating. */
+  /** Opens the community preview popup in place (modal) instead of navigating. */
   onCommunityClick?: () => void;
+  /** Renders the label with the in-place preview modal when no callback is given. */
+  communityPreviewModal?: boolean;
   /**
    * Rendered inside the card, under the engagement row (like · comments ·
    * community). The detail page puts its comment thread here so the resource
@@ -85,6 +88,7 @@ export function ResourceCard({
   communityName,
   communityImage,
   onCommunityClick,
+  communityPreviewModal = false,
   commentSection,
 }: ResourceCardProps) {
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
@@ -369,7 +373,15 @@ export function ResourceCard({
                   </span>
                 )}
               </div>
-              {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
+              {communityName && (onCommunityClick || communityPreviewModal ? (
+                onCommunityClick ? (
+                  <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />
+                ) : (
+                  <CommunityLabelPreview communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+                )
+              ) : (
+                <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+              ))}
             </div>
 
             {/* ── Comment thread (detail page only) ── */}

@@ -22,6 +22,7 @@ export function ShowcaseDetailClient({
   communityName,
   communityImage,
   showCommunityAttribution = false,
+  communityPreviewModal = false,
   backHref,
   backLabel,
 }: {
@@ -32,6 +33,8 @@ export function ShowcaseDetailClient({
   communityName?: string;
   communityImage?: string | null;
   showCommunityAttribution?: boolean;
+  /** Opens the "posted in" label's community preview popup in place (modal). */
+  communityPreviewModal?: boolean;
   backHref?: string;
   backLabel?: string;
 }) {
@@ -126,6 +129,7 @@ export function ShowcaseDetailClient({
           communityId={communityId}
           communityName={showCommunityAttribution ? communityName : undefined}
           communityImage={showCommunityAttribution ? communityImage : undefined}
+          communityPreviewModal={communityPreviewModal}
           onLikeChanged={(liked, count) => setPost((value) => ({ ...value, user_liked: liked, like_count: count }))}
           onSaveChanged={(saved) => setPost((value) => ({ ...value, user_saved: saved }))}
           onEdit={() => setEditing(true)}

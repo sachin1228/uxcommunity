@@ -7,6 +7,7 @@ import { CommentIcon } from "../CommentIcon";
 import { communityFeedLayout } from "../feed-layout";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { ShowcaseOptionsMenu } from "./ShowcaseOptionsMenu";
 import { FeedVideo } from "@/components/communities/FeedVideo";
 import { useShowcaseInteractions } from "./useShowcaseInteractions";
@@ -26,8 +27,10 @@ interface ShowcaseCardProps {
   communityName?: string;
   communityImage?: string | null;
   onOpen?: () => void;
-  /** Homepage only: opens the community preview popup instead of navigating. */
+  /** Opens the community preview popup in place (modal) instead of navigating. */
   onCommunityClick?: () => void;
+  /** Renders the label with the in-place preview modal when no callback is given. */
+  communityPreviewModal?: boolean;
   onLikeChanged: (liked: boolean, count: number) => void;
   onSaveChanged: (saved: boolean) => void;
   onEdit: () => void;
@@ -55,6 +58,7 @@ export function ShowcaseCard({
   communityImage,
   onOpen,
   onCommunityClick,
+  communityPreviewModal = false,
   onLikeChanged,
   onSaveChanged,
   onEdit,
@@ -239,7 +243,15 @@ export function ShowcaseCard({
             )}
           </div>
 
-          {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
+          {communityName && (onCommunityClick || communityPreviewModal ? (
+            onCommunityClick ? (
+              <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />
+            ) : (
+              <CommunityLabelPreview communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+            )
+          ) : (
+            <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+          ))}
         </div>
 
         {/* ── Comment thread (detail page only) ── */}

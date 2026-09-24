@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { loadThreadDetail } from "@/lib/threads/load-thread-detail";
 import { ThreadDetailClient } from "@/components/communities/threads/ThreadDetailClient";
 import { HomeRail } from "@/app/dashboard/HomeRail";
+import { resolveCommunityDp } from "@/lib/communities/dp";
 
 export default async function ThreadDetailPage({ params }: { params: Promise<{ threadId: string }> }) {
   const session = await getSession();
@@ -28,11 +29,27 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
 
   if (!membership && !thread.is_public) redirect(`/dashboard/communities/${communityId}`);
 
-  const { data: community } = await db
+  const { data: communityRow } = await db
     .from("communities")
-    .select("name, image_url")
+    .select("name, image_url, type, reference_id")
     .eq("id", communityId)
     .maybeSingle();
+  const community = communityRow as unknown as {
+    name: string;
+    image_url: string | null;
+    type: string;
+    reference_id: string | null;
+  } | null;
+
+  // Same DP rule as every other surface: app-created communities keep their
+  // live picture on the master-data row, so resolve through reference_id.
+  const communityDp = community
+    ? await resolveCommunityDp({
+        type: community.type,
+        reference_id: community.reference_id,
+        image_url: community.image_url,
+      })
+    : { image_url: null };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -44,8 +61,9 @@ export default async function ThreadDetailPage({ params }: { params: Promise<{ t
             currentUserId={userId}
             communityId={communityId}
             communityName={community?.name ?? "Community"}
-            communityImage={community?.image_url ?? null}
+            communityImage={communityDp.image_url}
             showCommunityAttribution
+            communityPreviewModal
             backHref="/dashboard"
             backLabel="Home"
           />
