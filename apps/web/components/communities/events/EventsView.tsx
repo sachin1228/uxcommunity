@@ -9,6 +9,7 @@ import { useHiddenCatchUp } from "@/lib/use-hidden-catchup";
 import type { CommunityEvent } from "./types";
 import { CreateEventModal } from "./CreateEventModal";
 import { EventCard } from "./EventCard";
+import { EventGroupCreatedModal } from "./EventGroupCreatedModal";
 import { communityFeedLayout } from "../feed-layout";
 import { filterChip } from "../filter-chip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -43,6 +44,12 @@ export function EventsView({
   const [events, setEvents] = useState<CommunityEvent[]>(() => cached?.events ?? []);
   const [loading, setLoading] = useState(() => !cached);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  /** The room a just-created event came with, announced once (see the modal). */
+  const [createdGroup, setCreatedGroup] = useState<{
+    title: string;
+    eventDate: string;
+    chatCommunityId: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(cached?.nextCursor ?? null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -146,7 +153,7 @@ export function EventsView({
     });
   }
 
-  function handleCreated(event: CommunityEvent) {
+  function handleCreated(event: CommunityEvent, chatCommunityId: string | null) {
     writeCache((prev) => [event, ...prev].sort(
       (a, b) => new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
     ));
@@ -173,8 +180,16 @@ export function EventsView({
     });
     // Creating an event also creates its group chat and puts the creator in it
     // (see lib/communities/event-chat), so the sidebar has to pick the new room
-    // up instead of waiting for its next refetch.
+    // up instead of waiting for its next refetch — it lands pinned at the top,
+    // which is exactly what the announcement below explains.
     invalidateCommunitiesList();
+    if (chatCommunityId) {
+      setCreatedGroup({
+        title: event.title,
+        eventDate: event.event_date,
+        chatCommunityId,
+      });
+    }
   }
 
   function handleUpdated(updated: CommunityEvent) {
@@ -318,6 +333,15 @@ export function EventsView({
           communityId={communityId}
           onClose={() => setShowCreateModal(false)}
           onCreated={handleCreated}
+        />
+      )}
+
+      {createdGroup && (
+        <EventGroupCreatedModal
+          eventTitle={createdGroup.title}
+          eventDate={createdGroup.eventDate}
+          chatCommunityId={createdGroup.chatCommunityId}
+          onClose={() => setCreatedGroup(null)}
         />
       )}
     </div>

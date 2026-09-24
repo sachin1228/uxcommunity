@@ -8,6 +8,7 @@ import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
+import { RsvpJoinDialog } from "./RsvpJoinDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
@@ -227,6 +228,8 @@ export function EventCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
+  /** The RSVP confirmation, open while deciding to go (see RsvpJoinDialog). */
+  const [confirmRsvp, setConfirmRsvp] = useState(false);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -258,9 +261,25 @@ export function EventCard({
     await runDelete();
   }
 
-  async function handleJoin(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  async function handleJoin(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (rsvpPending || past) return;
+
+    // The first RSVP is never sent straight off the button: it also puts the
+    // member in the event's group chat, so the dialog explains that and the
+    // confirm button inside it is what sends the RSVP. Backing out of an RSVP
+    // needs no explanation, so it stays a single tap.
+    if (!event.user_rsvped) {
+      setRsvpError(null);
+      setConfirmRsvp(true);
+      return;
+    }
+
+    await commitRsvp();
+  }
+
+  async function commitRsvp() {
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
     const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
@@ -280,6 +299,7 @@ export function EventCard({
           if (data.rsvped) invalidateOnJoin(chatCommunityId);
           else invalidateOnLeave(chatCommunityId);
         }
+        setConfirmRsvp(false);
         await onRsvpSettled?.();
       } else {
         const data = await response.json().catch(() => null);
@@ -674,6 +694,15 @@ export function EventCard({
         message="This will permanently remove this event. This cannot be undone."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
+      />
+      <RsvpJoinDialog
+        open={confirmRsvp}
+        onClose={() => setConfirmRsvp(false)}
+        onConfirm={() => void commitRsvp()}
+        eventTitle={event.title}
+        eventDate={event.event_date}
+        pending={rsvpPending}
+        error={rsvpError}
       />
     </div>
     </>

@@ -128,6 +128,59 @@ export async function syncEventChatCommunity(
   return id;
 }
 
+/**
+ * Which of these communities are event group chats that should still be pinned
+ * to the top of the sidebar, mapped to the deadline they stay there until —
+ * the event's end (or its start, when it has no end).
+ *
+ * Only future deadlines come back, so the client sort tests presence instead of
+ * carrying a clock. A lookup that fails (an environment that has not applied
+ * the event-chat migration has no such column) returns nothing to pin rather
+ * than breaking the sidebar.
+ */
+export async function loadEventPinDeadlines(
+  db: Db,
+  communityIds: string[],
+  now: Date = new Date(),
+): Promise<Map<string, string>> {
+  const pins = new Map<string, string>();
+  const ids = [...new Set(communityIds)];
+  if (!ids.length) return pins;
+
+  const { data: links, error } = await db
+    .from("communities")
+    .select("id, event_id")
+    .in("id", ids)
+    .not("event_id", "is", null);
+  if (error) return pins;
+
+  const eventRooms = (links ?? []) as Array<{ id: string; event_id: string | null }>;
+  const eventIds = [...new Set(eventRooms.flatMap((room) => room.event_id ?? []))];
+  if (!eventIds.length) return pins;
+
+  const { data: events } = await db
+    .from("community_events")
+    .select("id, event_date, end_date")
+    .in("id", eventIds);
+  const deadlines = new Map(
+    ((events ?? []) as Array<{ id: string; event_date: string; end_date: string | null }>).map(
+      (event) => [event.id, event.end_date ?? event.event_date],
+    ),
+  );
+
+  const nowMs = now.getTime();
+  for (const room of eventRooms) {
+    const deadline = room.event_id ? deadlines.get(room.event_id) : null;
+    if (!deadline) continue;
+    // An unparseable deadline is treated as still ahead: better to leave the
+    // room where the member expects it than to drop the pin over bad data.
+    const deadlineMs = Date.parse(deadline);
+    if (Number.isNaN(deadlineMs) || deadlineMs >= nowMs) pins.set(room.id, deadline);
+  }
+
+  return pins;
+}
+
 /** Whether this member is already in the event's group chat. */
 export async function isEventChatMember(
   db: Db,

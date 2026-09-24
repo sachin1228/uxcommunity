@@ -176,6 +176,12 @@ export interface CachedSidebarCommunity {
   unread_content_count?: number;
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
+  /**
+   * Set on an event's group chat while its event is still ahead: the room is
+   * pinned to the top of the sidebar until then. Absent once the event has
+   * passed, so ordering only has to test presence (see sidebar-order.ts).
+   */
+  pinned_until?: string | null;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;

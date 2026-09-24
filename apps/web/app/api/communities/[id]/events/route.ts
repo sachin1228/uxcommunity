@@ -209,11 +209,14 @@ export async function POST(
   ]);
 
   // Every event gets its own group chat, and the creator is in it from the
-  // start — that is the room the sidebar shows once the event exists. A
-  // failure here must not cost the event itself: log it and let the event
-  // page create the group on demand instead.
+  // start — that is the room the sidebar shows once the event exists, pinned
+  // there until the event date. A failure here must not cost the event itself:
+  // log it and let the event page create the group on demand instead.
+  // The id goes back with the event so the composer can hand the creator
+  // straight into the room it just made.
+  let chatCommunityId: string | null = null;
   try {
-    await ensureEventChatCommunity(
+    chatCommunityId = await ensureEventChatCommunity(
       db,
       {
         id: (data as { id: string }).id,
@@ -227,5 +230,8 @@ export async function POST(
   }
 
   const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
-  return NextResponse.json({ event: enriched }, { status: 201 });
+  return NextResponse.json(
+    { event: enriched, chat_community_id: chatCommunityId },
+    { status: 201 },
+  );
 }
