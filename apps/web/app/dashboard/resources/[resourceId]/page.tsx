@@ -2,8 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
-import { JoinCommunityBanner } from "@/components/communities/JoinCommunityBanner";
-import { loadJoinEligibility } from "@/lib/communities/join-eligibility";
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
@@ -109,7 +107,7 @@ export default async function ResourceDetailPage({ params }: Props) {
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     getResource(db, resourceId, userId),
     getComments(db, resourceId),
-    db.from("communities").select("id, name, image_url, type, reference_id, is_private").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
   ]);
 
   // Public resources are on the home feed for every member, so any signed-in
@@ -117,34 +115,10 @@ export default async function ResourceDetailPage({ params }: Props) {
   if (!membership && resource?.is_public !== true) redirect(`/dashboard/communities/${communityId}`);
   if (!resource) redirect("/dashboard");
 
-  // Non-members get the same Join offer the community page's preview shows.
-  const eligibility = !membership && community.data
-    ? await loadJoinEligibility(db, {
-        id: communityId,
-        type: (community.data as unknown as { type: string }).type,
-        reference_id: (community.data as unknown as { reference_id: string | null }).reference_id,
-        is_private: (community.data as unknown as { is_private: boolean | null }).is_private ?? false,
-      }, userId).then(
-        (result) => result,
-        () => null,
-      )
-    : null;
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
         <div className="mx-auto w-full max-w-[40rem]">
-          {!membership && community.data && (
-            <div className="mb-4">
-              <JoinCommunityBanner
-                communityId={communityId}
-                communityName={(community.data as unknown as { name: string }).name}
-                isPrivate={((community.data as unknown as { is_private: boolean | null }).is_private) ?? false}
-                canJoin={eligibility?.canJoin ?? false}
-                hasPendingRequest={eligibility?.hasPendingRequest ?? false}
-              />
-            </div>
-          )}
           <ResourceDetailClient
             resource={resource}
             initialComments={comments}
