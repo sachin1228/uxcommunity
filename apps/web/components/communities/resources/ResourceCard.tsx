@@ -63,6 +63,8 @@ interface ResourceCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
+  /** Homepage only: opens the community preview popup instead of navigating. */
+  onCommunityClick?: () => void;
   /**
    * Rendered inside the card, under the engagement row (like · comments ·
    * community). The detail page puts its comment thread here so the resource
@@ -82,6 +84,7 @@ export function ResourceCard({
   onOpen,
   communityName,
   communityImage,
+  onCommunityClick,
   commentSection,
 }: ResourceCardProps) {
   const typeInfo = RESOURCE_TYPES.find((type) => type.value === resource.resource_type);
@@ -366,7 +369,7 @@ export function ResourceCard({
                   </span>
                 )}
               </div>
-              {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
+              {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
             </div>
 
             {/* ── Comment thread (detail page only) ── */}

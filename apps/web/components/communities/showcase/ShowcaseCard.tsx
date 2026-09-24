@@ -26,6 +26,8 @@ interface ShowcaseCardProps {
   communityName?: string;
   communityImage?: string | null;
   onOpen?: () => void;
+  /** Homepage only: opens the community preview popup instead of navigating. */
+  onCommunityClick?: () => void;
   onLikeChanged: (liked: boolean, count: number) => void;
   onSaveChanged: (saved: boolean) => void;
   onEdit: () => void;
@@ -52,6 +54,7 @@ export function ShowcaseCard({
   communityName,
   communityImage,
   onOpen,
+  onCommunityClick,
   onLikeChanged,
   onSaveChanged,
   onEdit,
@@ -236,7 +239,7 @@ export function ShowcaseCard({
             )}
           </div>
 
-          {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
+          {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
         </div>
 
         {/* ── Comment thread (detail page only) ── */}

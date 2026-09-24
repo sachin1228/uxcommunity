@@ -37,6 +37,11 @@ interface CommunityFeedListProps {
    * activity tabs, where the Events tab is the member's event history.
    */
   showPastEvents?: boolean;
+  /**
+   * Homepage only: clicking a card's "posted in …" label opens the
+   * community preview popup here instead of navigating to the community.
+   */
+  onOpenCommunityPreview?: (communityId: string) => void;
 }
 
 /**
@@ -58,11 +63,21 @@ export function CommunityFeedList({
   onChange,
   emptyState,
   showPastEvents = false,
+  onOpenCommunityPreview,
 }: CommunityFeedListProps) {
   const router = useGuardedRouter();
   const [editingShowcase, setEditingShowcase] = useState<FeedShowcase | null>(null);  const [deletingShowcase, setDeletingShowcase] = useState<FeedShowcase | null>(null);
 
   const updateItems = onChange;
+
+  const openCommunity = useCallback(
+    (communityId: string | null | undefined) => {
+      if (!communityId) return;
+      if (onOpenCommunityPreview) onOpenCommunityPreview(communityId);
+      else router.push(`/dashboard/communities/${communityId}`);
+    },
+    [onOpenCommunityPreview, router],
+  );
 
   // ── Card callbacks: patch locally, then announce ─────────────────────────
 
@@ -188,11 +203,9 @@ export function CommunityFeedList({
 
   const handleResourceSaveChanged = useCallback((id: string, saved: boolean, count: number) => {
     updateItems((prev) => prev.map((it) =>
-      it._type === "resource" && it.id === id
-        ? { ...it, user_saved: saved, save_count: count }
-        : it
+      it._type === "resource" && it.id === id ? { ...it, user_saved: saved } : it
     ));
-    publishContentChange({ kind: "resource", id, patch: { user_saved: saved, save_count: count } });
+    publishContentChange({ kind: "resource", id, patch: { user_saved: saved } });
   }, [updateItems]);
 
   const handleResourceBookmarkChanged = useCallback((id: string, bookmarked: boolean, count: number) => {
@@ -293,6 +306,7 @@ export function CommunityFeedList({
                   onPollVoteChanged={handleThreadPollVoted}
                   onDeleted={handleThreadDeleted}
                   onOpen={() => router.push(`/dashboard/threads/${group.item.id}`)}
+                  onCommunityClick={() => openCommunity(group.item.community_id)}
                 />
               </li>
             );
@@ -315,6 +329,7 @@ export function CommunityFeedList({
                   onRsvpSettled={() => handleEventRsvpSettled(group.item)}
                   onLikeChanged={handleEventLikeChanged}
                   onSaveChanged={handleEventSaveChanged}
+                  onCommunityClick={() => openCommunity(group.item.community_id)}
                 />
               </li>
             );
@@ -357,6 +372,7 @@ export function CommunityFeedList({
                   }}
                   onEdit={() => setEditingShowcase(group.item)}
                   onDelete={() => setDeletingShowcase(group.item)}
+                  onCommunityClick={() => openCommunity(group.item.community_id)}
                 />
               </li>
             );
@@ -378,6 +394,7 @@ export function CommunityFeedList({
                 onBookmarkChanged={handleResourceBookmarkChanged}
                 onDeleted={handleResourceDeleted}
                 onOpen={() => router.push(`/dashboard/resources/${resource.id}`)}
+                onCommunityClick={() => openCommunity(resource.community_id)}
               />
             </li>
           ));

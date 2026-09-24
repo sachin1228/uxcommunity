@@ -38,6 +38,8 @@ interface ThreadCardProps {
   communityName?: string;
   communityImage?: string | null;
   communityNamePlacement?: "header" | "below";
+  /** Homepage only: opens the community preview popup instead of navigating. */
+  onCommunityClick?: () => void;
   /** When provided, the card is clickable and navigates via this callback. */
   onOpen?: () => void;
   /**
@@ -60,6 +62,7 @@ export function ThreadCard({
   communityName,
   communityImage,
   communityNamePlacement = "header",
+  onCommunityClick,
   onOpen,
   commentSection,
 }: ThreadCardProps) {
@@ -627,6 +630,7 @@ export function ThreadCard({
               communityName={communityName}
               communityImage={communityImage}
               className="min-w-0 justify-end text-right"
+              onOpenPreview={onCommunityClick}
             />
           )}
         </div>

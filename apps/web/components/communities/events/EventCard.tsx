@@ -204,6 +204,8 @@ interface EventCardProps {
   onOpen?: () => void;
   communityName?: string;
   communityImage?: string | null;
+  /** Homepage only: opens the community preview popup instead of navigating. */
+  onCommunityClick?: () => void;
   /**
    * Panel rendered inside the card, under the engagement row — the detail
    * page's Discussion tab. Holding it here is what keeps the event and its
@@ -236,6 +238,7 @@ export function EventCard({
   onOpen,
   communityName,
   communityImage,
+  onCommunityClick,
   children,
 }: EventCardProps) {
   const isDetail = variant === "detail";
@@ -725,7 +728,7 @@ export function EventCard({
           </span>
         </div>
 
-        {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
+        {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />}
       </div>
 
       {/* Discussion panel (detail page) — in the card, so the post and its
