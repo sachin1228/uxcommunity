@@ -189,8 +189,8 @@ interface EventCardProps {
   communityImage?: string | null;
   /**
    * Panel rendered inside the card, under the engagement row — the detail
-   * page's Discussion / Attendees tabs. Holding it here is what keeps the event
-   * and its discussion in one card, the shape `ThreadCard` gets from its
+   * page's Discussion tab. Holding it here is what keeps the event and its
+   * discussion in one card, the shape `ThreadCard` gets from its
    * `commentSection` prop.
    */
   children?: ReactNode;
@@ -707,8 +707,8 @@ export function EventCard({
         {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
 
-      {/* Discussion / Attendees panel (detail page) — in the card, so the post
-          and its discussion read as one card rather than two stacked ones. */}
+      {/* Discussion panel (detail page) — in the card, so the post and its
+          discussion read as one card rather than two stacked ones. */}
       {children && <div className="mt-4">{children}</div>}
     </article>
 
