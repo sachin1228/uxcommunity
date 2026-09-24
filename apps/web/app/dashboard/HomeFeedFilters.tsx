@@ -5,7 +5,7 @@ import { HOME_FEED_TAB_SCOPES } from "@/lib/feeds/home-feed-options";
 
 /** Labels for the feed source selector (see lib/feeds/home-feed-options). */
 const SCOPE_LABELS: Record<(typeof HOME_FEED_TAB_SCOPES)[number], string> = {
-  public: "Public Feed",
+  public: "For You",
   communities: "Your Communities",
 };
 const SCOPES = HOME_FEED_TAB_SCOPES.map((value) => ({ value, label: SCOPE_LABELS[value] }));

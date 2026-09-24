@@ -5,7 +5,7 @@
  * scope — which cards are eligible. The two tabs are disjoint:
  *   `communities` ("Your Communities") — every card from the communities the
  *      member has joined, whether or not it was shared publicly;
- *   `public` ("Public Feed") — cards shared publicly, and only from
+ *   `public` ("For You") — cards shared publicly, and only from
  *      communities the member has *not* joined (those have their own tab).
  *
  * `all` is the legacy scope: every public card, no membership filter. It is the
