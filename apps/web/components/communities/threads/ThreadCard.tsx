@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useId } from "react";
 import TruncateMarkup from "react-truncate-markup";
+import { flattenPreviewText } from "@/lib/communities/preview-text";
 import {
   Bookmark, Flag,
   MoreHorizontal, Paperclip, Pencil, Trash2,
@@ -337,6 +338,10 @@ export function ThreadCard({
   const images = attachments.filter((a) => a.type.startsWith("image/"));
   const files  = attachments.filter((a) => !a.type.startsWith("image/"));
   const collapsedTitleLines = attachments.length === 0 && !thread.poll ? 5 : 2;
+  // Collapsed preview: paragraph breaks are flattened so the title always fills
+  // its line clamp and "… Read more" trails the text instead of landing alone
+  // under an empty line. The expanded state below keeps the stored formatting.
+  const collapsedTitle = flattenPreviewText(thread.title);
 
   const pollOptionCount = thread.poll?.options.length ?? 0;
   const pollBaseCounts = Array.isArray(thread.poll_vote_counts) && thread.poll_vote_counts.length === pollOptionCount
@@ -503,7 +508,7 @@ export function ThreadCard({
               tabIndex={-1}
               className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
             >
-              {renderWithLinks(thread.title, true)}
+              {renderWithLinks(collapsedTitle, true)}
             </h3>
           </TruncateMarkup>
         )}

@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import TruncateMarkup from "react-truncate-markup";
+import { flattenPreviewText } from "@/lib/communities/preview-text";
 import { Calendar, Clock, ExternalLink, MapPin, MoveRight, Users, Video } from "lucide-react";
 import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
@@ -170,16 +171,34 @@ interface EventCardProps {
   onRsvpChanged: (eventId: string, rsvped: boolean, count: number) => void;
   onLikeChanged: (eventId: string, liked: boolean, count: number) => void;
   onSaveChanged: (eventId: string, saved: boolean, count: number) => void;
+  /**
+   * `list` shapes the card for the feed (clickable, icon-sized title); `detail`
+   * for the event page. The two share the same shell, type scale and rows — the
+   * variant only turns off the feed-only affordances (whole-card link, clamped
+   * description), never the design.
+   */
   variant?: "list" | "detail";
   rsvps?: EventRsvp[];
   error?: string | null;
   onRsvpSettled?: () => void | Promise<void>;
   onOpen?: () => void;
-  edgeToEdgeDivider?: boolean;
-  menuInPostHeader?: boolean;
   communityName?: string;
   communityImage?: string | null;
+  /**
+   * Panel rendered inside the card, under the engagement row — the detail
+   * page's Discussion / Attendees tabs. Holding it here is what keeps the event
+   * and its discussion in one card, the shape `ThreadCard` gets from its
+   * `commentSection` prop.
+   */
+  children?: ReactNode;
 }
+
+/**
+ * Title typography. Shared by both variants so the feed card and the event page
+ * can't drift apart — `text-base` here is the design, not a feed-only override.
+ */
+const EVENT_TITLE_CLASS =
+  "text-balance font-display text-base font-bold leading-snug text-stone-50";
 
 export function EventCard({
   event,
@@ -195,10 +214,9 @@ export function EventCard({
   error,
   onRsvpSettled,
   onOpen,
-  edgeToEdgeDivider = false,
-  menuInPostHeader = false,
   communityName,
   communityImage,
+  children,
 }: EventCardProps) {
   const isDetail = variant === "detail";
   const attendeePreviews = rsvps ?? event.rsvps;
@@ -214,6 +232,11 @@ export function EventCard({
   const descriptionId = useId();
   const descriptionRef = useRef<HTMLParagraphElement | null>(null);
   const description = event.description?.trim();
+  // Collapsed preview: paragraph breaks are flattened so the description always
+  // fills its two-line clamp and "… Read more" trails the text instead of
+  // landing alone under an empty line. The expanded branch below keeps the
+  // stored formatting.
+  const collapsedDescription = description ? flattenPreviewText(description) : "";
   const { toggleLike, toggleSave, savePending, saved } = useEventInteractions({
     eventId: event.id,
     communityId,
@@ -409,10 +432,12 @@ export function EventCard({
         <div className="relative flex min-w-0 flex-1 flex-col px-4 py-4">
           {/* Title */}
           <div className="relative min-w-0">
+            {/* Same typography in both variants; only the feed clamps, so a long
+                title can't grow the feed card without hiding anything here. */}
             {isDetail ? (
-              <h1 className="text-balance font-display text-lg font-bold leading-snug text-stone-50">{event.title}</h1>
+              <h1 className={EVENT_TITLE_CLASS}>{event.title}</h1>
             ) : (
-              <h3 className="line-clamp-2 text-balance font-display text-base font-bold leading-snug text-stone-50">{event.title}</h3>
+              <h3 className={`line-clamp-2 ${EVENT_TITLE_CLASS}`}>{event.title}</h3>
             )}
           </div>
 
@@ -424,7 +449,7 @@ export function EventCard({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock strokeWidth={2} size={13} className="shrink-0 text-stone-400" aria-hidden="true" />
-              {fmtTime(event.event_date)}{isDetail && event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
+              {fmtTime(event.event_date)}{event.end_date ? ` – ${fmtTime(event.end_date)}` : ""}
             </span>
             {(event.is_online || event.location) && (
               <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -435,7 +460,7 @@ export function EventCard({
                 )}
                 <span className="truncate">
                   {event.is_online
-                    ? isDetail && event.meet_link
+                    ? event.meet_link
                       ? <a href={event.meet_link} target="_blank" rel="noopener noreferrer" className="text-stone-200 underline decoration-stone-200/40 underline-offset-2 hover:decoration-stone-200">Online (Google Meet)</a>
                       : "Online"
                     : event.location}
@@ -516,35 +541,39 @@ export function EventCard({
       role={onOpen && !isDetail ? "link" : undefined}
       onClick={onOpen && !isDetail ? onOpen : undefined}
       onKeyDown={onOpen && !isDetail ? (event) => { if (event.key === "Enter") onOpen(); } : undefined}
-      className={`${isDetail || menuInPostHeader ? "group" : `${communityFeedLayout.card} ${onOpen ? communityFeedLayout.cardInteractive : ""} ${onOpen ? "cursor-pointer" : ""}`}`}
+      // One shell for both surfaces: the event page renders the same card the
+      // feed does, so the two can't look like different components.
+      className={`${communityFeedLayout.card} ${isDetail ? "group" : ""} ${
+        !isDetail && onOpen ? `${communityFeedLayout.cardInteractive} cursor-pointer` : ""
+      }`}
     >
-      {(isDetail || (!menuInPostHeader && !isDetail)) && (
-        <div className="flex items-start justify-between gap-3">
-          <PostAuthorMeta
-            name={event.users?.name}
-            avatarUrl={event.users?.avatar_url}
-            createdAt={event.created_at}
-            dateInline
-            secondaryLabel={event.is_online ? "Event · Online" : event.location ? `Event · ${event.location}` : "Event"}
+      {/* Author row — both variants render it, so the card reads the same in
+          the feed and on the event page. */}
+      <div className="flex items-start justify-between gap-3">
+        <PostAuthorMeta
+          name={event.users?.name}
+          avatarUrl={event.users?.avatar_url}
+          createdAt={event.created_at}
+          dateInline
+          secondaryLabel={event.is_online ? "Event · Online" : event.location ? `Event · ${event.location}` : "Event"}
+        />
+        <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <EventOptionsMenu
+            saved={saved}
+            shared={shared}
+            reported={reported}
+            isOwner={isOwner}
+            past={past}
+            deleting={deleting}
+            saving={savePending}
+            onSave={toggleSave}
+            onShare={() => void handleShare()}
+            onEdit={() => setShowEditModal(true)}
+            onDelete={() => isDetail ? void handleDelete() : setConfirmDelete(true)}
+            onReport={() => setReported(true)}
           />
-          <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <EventOptionsMenu
-              saved={saved}
-              shared={shared}
-              reported={reported}
-              isOwner={isOwner}
-              past={past}
-              deleting={deleting}
-              saving={savePending}
-              onSave={toggleSave}
-              onShare={() => void handleShare()}
-              onEdit={() => setShowEditModal(true)}
-              onDelete={() => isDetail ? void handleDelete() : setConfirmDelete(true)}
-              onReport={() => setReported(true)}
-            />
-          </div>
         </div>
-      )}
+      </div>
       {/* ── Description — rendered like a thread card body ── */}
       {description && (
         isDetail || descriptionExpanded ? (
@@ -585,7 +614,7 @@ export function EventCard({
               tabIndex={-1}
               className="mt-3 whitespace-pre-wrap break-words font-display text-sm font-normal leading-snug text-foreground outline-none"
             >
-              {description}
+              {collapsedDescription}
             </p>
           </TruncateMarkup>
         )
@@ -617,6 +646,9 @@ export function EventCard({
         {communityName && <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />}
       </div>
 
+      {/* Discussion / Attendees panel (detail page) — in the card, so the post
+          and its discussion read as one card rather than two stacked ones. */}
+      {children && <div className="mt-4">{children}</div>}
     </article>
 
     {/* Rendered outside the clickable card: the modal portals to document.body,
