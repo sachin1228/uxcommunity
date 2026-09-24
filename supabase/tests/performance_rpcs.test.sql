@@ -9,7 +9,7 @@ select has_function('public', 'get_thread_list_aggregates', array['uuid','uuid[]
 select has_function('public', 'get_event_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_resource_list_aggregates', array['uuid','uuid[]']);
 select has_function('public', 'get_showcase_list_page', array['uuid','uuid','timestamptz','uuid','integer']);
-select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer']);
+select has_function('public', 'get_home_feed_page', array['uuid','timestamptz','integer','boolean']);
 select has_function('public', 'get_profile_feed_page', array['uuid','text','timestamptz','integer']);
 
 create temporary table rpc_test_context as
@@ -142,6 +142,15 @@ select is(
    from public.get_profile_feed_page('00000000-0000-0000-0000-000000000000'::uuid, 'saved', null, 30)),
   0,
   'profile saved scope returns nothing for a member with no saves'
+);
+
+-- Scope: a member who belongs to no communities gets nothing from the
+-- member-only feed.
+select is(
+  (select count(*)::integer
+   from public.get_home_feed_page('00000000-0000-0000-0000-000000000000'::uuid, null, 100, true)),
+  0,
+  'member-only home feed excludes communities the caller has not joined'
 );
 
 select * from finish();

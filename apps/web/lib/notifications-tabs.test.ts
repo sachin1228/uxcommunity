@@ -33,9 +33,27 @@ const ALL_TYPES: NotificationType[] = [
   "event_rsvp",
 ];
 
-test("every generated notification type lands in the activity tab", () => {
+test("every generated notification type lands in a tab", () => {
   for (const type of ALL_TYPES) {
+    assert.notEqual(notificationTabFor(type), null, type);
+  }
+});
+
+test("likes and comments on threads/resources render under the activity tab", () => {
+  for (const type of [
+    "thread_like",
+    "thread_comment",
+    "thread_reply",
+    "resource_comment",
+    "resource_reply",
+  ] as NotificationType[]) {
     assert.equal(notificationTabFor(type), "activity", type);
+  }
+});
+
+test("all event types render under the events tab", () => {
+  for (const type of ["event_comment", "event_reply", "event_rsvp"] as NotificationType[]) {
+    assert.equal(notificationTabFor(type), "events", type);
   }
 });
 
@@ -57,20 +75,23 @@ test("a type no tab declares stays invisible", () => {
 });
 
 test("splitting keeps order and counts only the unread items it shows", () => {
-  const { activity, other, unreadByTab } = splitNotificationsByTab([
+  const { activity, events, other, unreadByTab } = splitNotificationsByTab([
     item("n1", "thread_like", "2026-09-15T09:00:00Z", "2026-09-15T09:30:00Z"),
-    item("n2", "thread_comment", "2026-09-15T08:00:00Z"),
-    item("n3", "event_rsvp", "2026-09-15T07:00:00Z"),
+    item("n2", "event_rsvp", "2026-09-15T08:00:00Z"),
+    item("n3", "event_comment", "2026-09-15T07:00:00Z"),
+    item("n4", "thread_comment", "2026-09-15T06:00:00Z"),
   ]);
 
-  assert.deepEqual(activity.map((n) => n.id), ["n1", "n2", "n3"]);
+  assert.deepEqual(activity.map((n) => n.id), ["n1", "n4"]);
+  assert.deepEqual(events.map((n) => n.id), ["n2", "n3"]);
   assert.deepEqual(other, []);
-  assert.deepEqual(unreadByTab, { activity: 2, other: 0 });
+  assert.deepEqual(unreadByTab, { activity: 1, events: 2, other: 0 });
 });
 
-test("an empty page yields two empty tabs", () => {
-  const { activity, other, unreadByTab } = splitNotificationsByTab([]);
+test("an empty page yields three empty tabs", () => {
+  const { activity, events, other, unreadByTab } = splitNotificationsByTab([]);
   assert.deepEqual(activity, []);
+  assert.deepEqual(events, []);
   assert.deepEqual(other, []);
-  assert.deepEqual(unreadByTab, { activity: 0, other: 0 });
+  assert.deepEqual(unreadByTab, { activity: 0, events: 0, other: 0 });
 });
