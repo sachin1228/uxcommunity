@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { callPerformanceRpc } from "@/lib/supabase/performance-rpcs";
 import { getMasterImageMap, getMasterNameMap, TABLE_LOOKUP } from "@/lib/master-data-cache";
 import { withShowcaseColumn } from "./showcase-flag";
+import { loadEventPinDeadlines } from "./event-chat";
 
 type ActivityRow = {
   community_id: string;
@@ -55,6 +56,26 @@ type ActivityRow = {
   };
 };
 
+/**
+ * The community columns this projection reads. Spelled out locally because the
+ * query's own generics collapse to `never` in an environment without generated
+ * database types (the same reason the surrounding calls need the shapes they
+ * pass spelled out).
+ */
+type SidebarCommunityRow = {
+  id: string;
+  name: string;
+  type: string;
+  image_url: string | null;
+  reference_id: string | null;
+  is_private: boolean | null;
+  enabled_tabs: string[] | null;
+  owner_id: string | null;
+  created_at: string | null;
+  /** Appended only once the showcase-toggle migration has added the column. */
+  showcase_enabled?: boolean | null;
+};
+
 export async function getSidebarCommunities(userId: string) {
   const db = createServiceClient();
   const { data: activity, error: activityError } = await callPerformanceRpc(db, "get_sidebar_activity", {
@@ -85,8 +106,10 @@ export async function getSidebarCommunities(userId: string) {
     .or("type.neq.user,owner_id.not.is.null");
   if (error) return NextResponse.json({ error: "Failed to fetch communities." }, { status: 500 });
 
-  const byType: Record<string, { id: string; reference_id: string }[]> = {};
-  for (const community of communities ?? []) {
+  const communityRows = (communities ?? []) as SidebarCommunityRow[];
+
+  const byType: Record<string, { id: string; reference_id: string | null }[]> = {};
+  for (const community of communityRows) {
     if (!byType[community.type]) byType[community.type] = [];
     byType[community.type].push({ id: community.id, reference_id: community.reference_id });
   }
@@ -103,14 +126,25 @@ export async function getSidebarCommunities(userId: string) {
       getMasterNameMap(type),
     ]);
     for (const item of items) {
-      if (!(item.reference_id in imageMap)) continue;
+      // Only master-data-backed communities carry a reference; anything else
+      // (a member-led "user" community, an event's chat) has none to resolve.
+      const referenceId = item.reference_id;
+      if (!referenceId || !(referenceId in imageMap)) continue;
       validIds.add(item.id);
-      images[item.id] = imageMap[item.reference_id] ?? null;
-      names[item.id] = nameMap[item.reference_id] ?? null;
+      images[item.id] = imageMap[referenceId] ?? null;
+      names[item.id] = nameMap[referenceId] ?? null;
     }
   }));
 
-  const result = (communities ?? []).filter((community) => validIds.has(community.id)).map((community) => {
+  // An event's group chat stays pinned to the top of the sidebar until its
+  // event date; only the rooms still ahead of that door come back, so the
+  // client orders on the presence of `pinned_until` alone.
+  const pinnedUntil = await loadEventPinDeadlines(
+    db,
+    communityRows.filter((community) => community.type === "event").map((community) => community.id),
+  );
+
+  const result = communityRows.filter((community) => validIds.has(community.id)).map((community) => {
     const row = activityById.get(community.id)!;
     const message = row.last_message;
     const reaction = row.last_reaction;
@@ -118,6 +152,7 @@ export async function getSidebarCommunities(userId: string) {
       ...community,
       image_url: images[community.id] ?? community.image_url ?? null,
       reference_name: names[community.id] ?? null,
+      pinned_until: pinnedUntil.get(community.id) ?? null,
       member_count: row.member_count,
       message_count: row.unread_count,
       mention_count: row.unread_mention_count ?? 0,

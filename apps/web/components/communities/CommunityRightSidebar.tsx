@@ -4,9 +4,10 @@
  * CommunityRightSidebar
  *
  * Floating info card on the right of every community page: member avatar
- * stack + online count, About (description / created date / type tag) and the
- * numbered Rules list. Lives in the communities layout so it persists across
- * chat, threads, events, resources and detail routes.
+ * stack + online count, the event this room is about (only for an event's
+ * group chat), About (description / created date / type tag) and the numbered
+ * Rules list. Lives in the communities layout so it persists across chat,
+ * threads, events, resources and detail routes.
  *
  * Data strategy mirrors CommunityPageShell: pre-seed from the shared
  * metaCache, fall back to the sidebarStore for a fast first paint, then fetch
@@ -30,6 +31,7 @@ import { realtimeRooms } from "@/lib/realtime/rooms";
 import { useDocumentVisible } from "@/lib/use-document-visible";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 import { useOnlinePresence } from "./chat/useOnlinePresence";
+import { EventRoomSection } from "./events/EventRoomSection";
 
 type Community = CachedMeta["community"] & {
   reference_name?: string | null;
@@ -330,6 +332,11 @@ export function CommunityRightSidebar({ currentUserId }: Props) {
             )}
           </div>
         </section>
+
+        {/* ── Event (an event's group chat only) ──────────────────────── */}
+        {type === "event" && (
+          <EventRoomSection communityId={communityId} currentUserId={currentUserId} />
+        )}
 
         {/* ── About ───────────────────────────────────────────────────── */}
         <section

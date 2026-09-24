@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import { HomeRail } from "@/app/dashboard/HomeRail";
 import { enrichEventCards, loadEventRsvps, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
+import { getEventChatCommunity, isEventChatMember } from "@/lib/communities/event-chat";
 
 export default async function EventDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
   const session = await getSession();
@@ -38,6 +39,13 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
 
+  // The event's group chat, when it exists — the page's Join/Open event chat
+  // row hands off to it (see EventChatPanel).
+  const chatCommunity = await getEventChatCommunity(db, eventId).catch(() => null);
+  const chatCommunityJoined = chatCommunity
+    ? await isEventChatMember(db, chatCommunity.id, userId)
+    : false;
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
@@ -51,6 +59,8 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             communityId={communityId}
             communityName={communityData?.name ?? "Community"}
             communityImage={communityData?.image_url ?? null}
+            chatCommunityId={chatCommunity?.id ?? null}
+            chatCommunityJoined={chatCommunityJoined}
             showCommunityAttribution
             backHref="/dashboard"
             backLabel="Home"

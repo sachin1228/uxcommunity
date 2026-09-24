@@ -12,7 +12,11 @@ import { compressImage, compressedFile } from "@/lib/image-client";
 interface CreateEventModalProps {
   communityId?: string;
   onClose: () => void;
-  onCreated: (event: CommunityEvent) => void;
+  /**
+   * The created event, plus the group chat that came with it (null when the
+   * room could not be created — the event itself is never lost over that).
+   */
+  onCreated: (event: CommunityEvent, chatCommunityId: string | null) => void;
   initialIsPublic?: boolean;
 }
 
@@ -103,7 +107,7 @@ export function CreateEventModal({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to create event.");
-      onCreated(data.event as CommunityEvent);
+      onCreated(data.event as CommunityEvent, (data.chat_community_id as string | null) ?? null);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create event.");

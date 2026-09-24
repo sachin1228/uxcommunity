@@ -7,6 +7,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { normalizeUtcCursor, toUtcCursor } from "@/lib/communities/read-models";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { contentEventPayload } from "@/lib/communities/content-events";
+import { ensureEventChatCommunity } from "@/lib/communities/event-chat";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -207,6 +208,30 @@ export async function POST(
     },
   ]);
 
+  // Every event gets its own group chat, and the creator is in it from the
+  // start — that is the room the sidebar shows once the event exists, pinned
+  // there until the event date. A failure here must not cost the event itself:
+  // log it and let the event page create the group on demand instead.
+  // The id goes back with the event so the composer can hand the creator
+  // straight into the room it just made.
+  let chatCommunityId: string | null = null;
+  try {
+    chatCommunityId = await ensureEventChatCommunity(
+      db,
+      {
+        id: (data as { id: string }).id,
+        title,
+        coverImageUrl: rawCoverImageUrl,
+      },
+      userId,
+    );
+  } catch (error) {
+    console.error("[POST community events] group chat creation failed:", error);
+  }
+
   const [enriched] = await enrichEventCards([data as unknown as Record<string, unknown>], userId);
-  return NextResponse.json({ event: enriched }, { status: 201 });
+  return NextResponse.json(
+    { event: enriched, chat_community_id: chatCommunityId },
+    { status: 201 },
+  );
 }

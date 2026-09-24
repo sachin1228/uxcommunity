@@ -157,7 +157,8 @@ export interface SidebarLastReaction {
 export interface CachedSidebarCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
+  /** `event` rows are an event's group chat (see lib/communities/event-chat). */
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user" | "event";
   image_url: string | null;
   reference_name?: string | null;
   is_private?: boolean;
@@ -175,6 +176,12 @@ export interface CachedSidebarCommunity {
   unread_content_count?: number;
   /** Hidden by this user until a new message arrives. */
   is_archived?: boolean;
+  /**
+   * Set on an event's group chat while its event is still ahead: the room is
+   * pinned to the top of the sidebar until then. Absent once the event has
+   * passed, so ordering only has to test presence (see sidebar-order.ts).
+   */
+  pinned_until?: string | null;
   last_read_at?: string | null;
   /** Most recent reaction event — shown in the preview instead of last_message when set. Cleared when a new message arrives. */
   lastReaction?: SidebarLastReaction | null;
@@ -226,7 +233,7 @@ export const SIDEBAR_STALE_MS = 60_000;
 export interface CachedExploreCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user" | "event";
   image_url: string | null;
   description: string | null;
   is_private?: boolean;

@@ -8,10 +8,13 @@ import { HeartIcon } from "../HeartIcon";
 import { CommentIcon } from "../CommentIcon";
 import type { CommunityEvent, EventRsvp } from "./types";
 import { EditEventModal } from "./EditEventModal";
+import { RsvpConfirmDialog, type RsvpConfirmMode } from "./RsvpConfirmDialog";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
+import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -226,6 +229,12 @@ export function EventCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [rsvpPending, setRsvpPending] = useState(false);
   const [rsvpError, setRsvpError] = useState<string | null>(null);
+  /**
+   * The RSVP confirmation, null while it is closed. Both directions are
+   * confirmed — going joins the event's group chat, and withdrawing leaves it
+   * (see RsvpConfirmDialog).
+   */
+  const [rsvpConfirm, setRsvpConfirm] = useState<RsvpConfirmMode | null>(null);
   const [shared, setShared] = useState(false);
   const [reported, setReported] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
@@ -257,9 +266,42 @@ export function EventCard({
     await runDelete();
   }
 
-  async function handleJoin(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  async function handleJoin(e?: React.MouseEvent) {
+    e?.preventDefault();
+    e?.stopPropagation();
+    if (rsvpPending || past) return;
+
+    // Neither direction is sent straight off the button. Going also puts the
+    // member in the event's group chat, and withdrawing takes them back out of
+    // it and off their sidebar, so both open the dialog that says so and only
+    // its confirm button sends the request.
+    setRsvpError(null);
+    setRsvpConfirm(event.user_rsvped ? "leave" : "join");
+  }
+
+  /**
+   * Put a withdrawn RSVP back — what the undo offer runs.
+   *
+   * Deliberately not a toggle, and with no optimistic update: the offer can be
+   * taken after this card has re-rendered or unmounted, so there is no current
+   * prop worth reasoning from and nothing safely revertable. The server's
+   * answer is adopted instead, and a failure is thrown rather than reported
+   * here so the toast can keep the offer on screen.
+   */
+  async function restoreRsvp() {
+    const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error ?? "Failed to RSVP.");
+
+    onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
+    // RSVP-ing again is also what re-joins the group chat and re-pins the room
+    // in the sidebar, so the same invalidation as the dialog path applies.
+    const chatCommunityId: string | null = data.chat_community_id ?? null;
+    if (chatCommunityId && data.rsvped) invalidateOnJoin(chatCommunityId);
+    await onRsvpSettled?.();
+  }
+
+  async function commitRsvp() {
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
     const newCount = Math.max(0, event.rsvp_count + (newRsvped ? 1 : -1));
@@ -271,6 +313,25 @@ export function EventCard({
       if (response.ok) {
         const data = await response.json();
         onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
+        // Confirming "I'm going" is also how you join the event's group chat
+        // (and stepping out of the RSVP leaves it), so the sidebar has to
+        // reflect the change right away instead of at its next refetch.
+        const chatCommunityId: string | null = data.chat_community_id ?? null;
+        if (chatCommunityId) {
+          if (data.rsvped) invalidateOnJoin(chatCommunityId);
+          else invalidateOnLeave(chatCommunityId);
+        }
+        setRsvpConfirm(null);
+        // Withdrawing did two things the member would have to rebuild by hand:
+        // it removed the room from their sidebar (and its pin) and dropped
+        // them out of the chat. Offer the way back while the decision is still
+        // fresh — taking it RSVPs again, which is what re-joins the room.
+        if (!data.rsvped && chatCommunityId) {
+          showUndoToast({
+            message: `You're no longer going to ${event.title}, and you left its chat.`,
+            onAction: restoreRsvp,
+          });
+        }
         await onRsvpSettled?.();
       } else {
         const data = await response.json().catch(() => null);
@@ -665,6 +726,17 @@ export function EventCard({
         message="This will permanently remove this event. This cannot be undone."
         onClose={() => setConfirmDelete(false)}
         onConfirm={handleDelete}
+      />
+      <RsvpConfirmDialog
+        mode={rsvpConfirm ?? "join"}
+        open={rsvpConfirm !== null}
+        onClose={() => setRsvpConfirm(null)}
+        onConfirm={() => void commitRsvp()}
+        eventTitle={event.title}
+        eventDate={event.event_date}
+        isOwner={isOwner}
+        pending={rsvpPending}
+        error={rsvpError}
       />
     </div>
     </>

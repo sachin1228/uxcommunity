@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useRef, useCallback } from "react";
+import { Pin } from "lucide-react";
 import { CommunityNameBadges } from "../CommunityBadges";
 import { CommunityAvatar } from "./CommunityAvatar";
 import { SidebarTimestamp } from "./SidebarTimestamp";
@@ -119,6 +120,19 @@ export const CommunityRow = memo(function CommunityRow({
               {c.name}
             </span>
             <CommunityNameBadges type={c.type} isPrivate={c.is_private} />
+            {/* An event's chat stays pinned to the top of the list until its
+                event date (see sidebar-order); the mark says why it's up
+                there instead of leaving it a mystery. */}
+            {c.pinned_until && (
+              <span
+                role="img"
+                aria-label="Pinned until the event"
+                title="Pinned until the event"
+                className="inline-flex shrink-0 items-center text-foreground-muted"
+              >
+                <Pin strokeWidth={2.5} size={11} aria-hidden="true" />
+              </span>
+            )}
             {(c.last_message || lastContent) && !typingText && (
               <SidebarTimestamp
                 iso={

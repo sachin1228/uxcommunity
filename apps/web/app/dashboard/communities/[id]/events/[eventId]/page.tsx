@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import { enrichEventCards, loadEventRsvps, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
+import { getEventChatCommunity, isEventChatMember } from "@/lib/communities/event-chat";
 
 interface Props {
   params: Promise<{ id: string; eventId: string }>;
@@ -45,6 +46,13 @@ export default async function EventDetailPage({ params }: Props) {
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
   ]);
 
+  // The event's group chat, when it exists, is what the page's Join/Open
+  // event chat row offers — the room is where everybody going talks about it.
+  const chatCommunity = await getEventChatCommunity(db, eventId).catch(() => null);
+  const chatCommunityJoined = chatCommunity
+    ? await isEventChatMember(db, chatCommunity.id, userId)
+    : false;
+
   return (
     <EventDetailClient
       event={event}
@@ -54,6 +62,8 @@ export default async function EventDetailPage({ params }: Props) {
       currentUserAvatar={profileRow.data?.avatar_url ?? null}
       communityId={communityId}
       communityName={communityData.data?.name ?? "Community"}
+      chatCommunityId={chatCommunity?.id ?? null}
+      chatCommunityJoined={chatCommunityJoined}
       backHref={`/dashboard/communities/${communityId}?tab=events`}
       backLabel="Events"
     />
