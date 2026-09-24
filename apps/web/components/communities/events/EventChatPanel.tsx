@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, MessageSquare } from "lucide-react";
 import { Spinner } from "@/components/ui/Spinner";
 import { Modal } from "@/components/ui/Modal";
+import { AvatarImg } from "@/components/ui/AvatarImg";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
 
@@ -16,11 +17,14 @@ import { joinEventChatFromClient } from "@/lib/communities/event-chat-client";
  */
 export function EventChatPanel({
   chatCommunityId,
+  chatCommunityImage,
   joined,
   eventTitle,
 }: {
   /** Null while the group has not been created yet (it is created on demand). */
   chatCommunityId: string | null;
+  /** The group's display picture — the chat community's image. */
+  chatCommunityImage?: string | null;
   joined: boolean;
   eventTitle: string;
 }) {
@@ -54,9 +58,7 @@ export function EventChatPanel({
   return (
     <>
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
-          <MessageSquare strokeWidth={2.5} size={15} />
-        </span>
+        <AvatarImg url={chatCommunityImage ?? null} name={eventTitle} size={32} className="shrink-0 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="font-body text-sm font-medium text-foreground">Event chat</p>
           <p className="text-pretty font-body text-xs text-foreground-muted">

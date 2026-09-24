@@ -60,6 +60,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             communityName={communityData?.name ?? "Community"}
             communityImage={communityData?.image_url ?? null}
             chatCommunityId={chatCommunity?.id ?? null}
+            chatCommunityImage={chatCommunity?.image_url ?? null}
             chatCommunityJoined={chatCommunityJoined}
             showCommunityAttribution
             backHref="/dashboard"
