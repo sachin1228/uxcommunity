@@ -10,6 +10,12 @@ import { CommunityRow } from "@/components/communities/panel/CommunityRow";
 import { useSidebarCommunities } from "@/components/communities/panel/useSidebarCommunities";
 import { compareByRecentActivity } from "@/components/communities/panel/sidebar-order";
 import { CreateCommunityModal } from "@/components/communities/CreateCommunityModal";
+import {
+  closeCreateCommunityDialog,
+  isCreateCommunityDialogOpen,
+  openCreateCommunityDialog,
+  subscribeCreateCommunityDialog,
+} from "@/lib/communities/create-community-dialog";
 import { invalidateCommunitiesList } from "@/lib/communities/cache";
 import { useNotifications } from "@/lib/use-notifications";
 import { useGuardedRouter } from "@/lib/navigation-guard";
@@ -49,7 +55,13 @@ function isMatch(href: string, pathname: string) {
 
 export function GlobalSidebar({ userId, user, mobile = false }: Props) {
   const pathname = usePathname();
-  const [createOpen, setCreateOpen] = useState(false);
+  // One dialog for every trigger: the sidebar's "+" and the homepage rail's
+  // create card both flip this store (see lib/communities/create-community-dialog.ts).
+  const createOpen = useSyncExternalStore(
+    subscribeCreateCommunityDialog,
+    isCreateCommunityDialogOpen,
+    () => false,
+  );
   const { unreadCount: notificationCount } = useNotifications(userId);
 
   // The server renders the notice (it cannot see localStorage); the client
@@ -107,7 +119,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
       {createOpen && (
         <CreateCommunityModal
           open
-          onClose={() => setCreateOpen(false)}
+          onClose={closeCreateCommunityDialog}
           onCreated={(community) => {
             invalidateCommunitiesList();
             router.push(`/dashboard/communities/${community.id}`);
@@ -244,7 +256,7 @@ export function GlobalSidebar({ userId, user, mobile = false }: Props) {
           </span>
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={openCreateCommunityDialog}
             className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-raised text-foreground-muted transition-colors hover:text-foreground"
             aria-label="Create community"
             title="Create community"
