@@ -201,7 +201,7 @@ export function EventRoomSection({
       </div>
 
       {/* ── Who is going ─────────────────────────────────────────────── */}
-      <div className="mt-4 border-t border-border pt-4">
+      <div className="mt-4">
         <p className="font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-foreground-subtle">
           Going · {attended}
         </p>
