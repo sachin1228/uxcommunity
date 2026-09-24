@@ -23,6 +23,10 @@ import {
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
+import {
+  NotificationHoverActions,
+  NotificationReactionPills,
+} from "./NotificationHoverActions";
 import { userColorVar } from "@/lib/communities/user-color";
 import { RESOURCE_TYPES } from "../resources/types";
 import type { CachedContentEvent, ContentEventKind } from "@/lib/communities/cache";
@@ -38,6 +42,10 @@ interface ContentNotificationBubbleProps {
   event: CachedContentEvent;
   communityId: string;
   currentUserId: string;
+  /** Toggle/replace the current user's emoji reaction on this card. */
+  onReaction?: (emoji: string) => void;
+  /** Open the composer with this card as the reply anchor. */
+  onReply?: () => void;
 }
 
 /** Eyebrow / fallback tile icon per content kind. */
@@ -116,6 +124,8 @@ export function ContentNotificationBubble({
   event,
   communityId,
   currentUserId,
+  onReaction,
+  onReply,
 }: ContentNotificationBubbleProps) {
   const sender = event.users;
   // The avatar must key off the real display name — "You" is only the label.
@@ -156,8 +166,14 @@ export function ContentNotificationBubble({
         : "Be the first to go"
       : null;
 
+  const reactions = event.reactions ?? [];
+  // How much discussion the card has on its own detail page — surfaced here so
+  // members can judge it without opening the item first.
+  const commentCount = Math.max(0, meta?.comment_count ?? 0);
+
   return (
     <div
+      data-content-id={event.id}
       className={`group flex w-full items-start gap-2 px-5 mt-2 ${
         isMe ? "justify-end" : "justify-start"
       }`}
@@ -171,8 +187,12 @@ export function ContentNotificationBubble({
         </div>
       )}
 
-      {/* Bubble column */}
+      {/* Bubble column — bubble + hover actions live in one inner row, exactly
+          like MessageBubble: actions sit to the RIGHT of other members'
+          bubbles and to the LEFT of own (right-aligned) bubbles. */}
       <div className="min-w-0 max-w-[65%]">
+        <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+          <div className="relative min-w-0">
         <div
           className={`relative select-none rounded-[10px] px-3 pt-2 pb-1.5 shadow-sm ${
             isMe
@@ -298,8 +318,20 @@ export function ContentNotificationBubble({
           </Link>
 
           {/* Timestamp inside the bubble, bottom-right — same row as normal
-              message bubbles (reactions reserve space below via the h-5 slot). */}
-          <div className="flex items-center justify-end gap-1 mt-0.5">
+              message bubbles (reactions reserve space below via the h-4 slot).
+              The comment count sits beside it while the item has discussion. */}
+          <div className="flex items-center justify-end gap-1.5 mt-0.5">
+            {commentCount > 0 && (
+              <span
+                className={`flex items-center gap-1 font-body text-[10px] leading-none ${
+                  isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"
+                }`}
+                title={`${commentCount} ${commentCount === 1 ? "comment" : "comments"}`}
+              >
+                <MessageCircle size={10} strokeWidth={2.5} />
+                {commentCount}
+              </span>
+            )}
             <span
               className={`font-mono text-[10px] ${
                 isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"
@@ -308,7 +340,29 @@ export function ContentNotificationBubble({
               {fmtTime(event.created_at)}
             </span>
           </div>
+
+          {/* Reaction pills overlap the bubble's bottom edge, like messages */}
+          <NotificationReactionPills
+            reactions={reactions}
+            currentUserId={currentUserId}
+            onReaction={(emoji) => onReaction?.(emoji)}
+          />
+            </div>
+          </div>
+
+            {/* Hover actions — emoji reaction + reply only (no delete/edit:
+                the content is managed in its own tab). */}
+            {onReaction && onReply ? (
+              <NotificationHoverActions
+                reactions={reactions}
+                currentUserId={currentUserId}
+                onReaction={onReaction}
+                onReply={onReply}
+                isOwn={isMe}
+              />
+            ) : null}
         </div>
+        {reactions.length > 0 && <div className="h-4" />}
       </div>
     </div>
   );

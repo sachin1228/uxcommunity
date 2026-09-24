@@ -13,6 +13,10 @@ import {
 import { ChatAvatar } from "./ChatAvatar";
 import { fmtTime } from "./chatUtils";
 import { MessageBubbleTail } from "./MessageBubbleTail";
+import {
+  NotificationHoverActions,
+  NotificationReactionPills,
+} from "./NotificationHoverActions";
 import { userColorVar } from "@/lib/communities/user-color";
 import type { CachedThreadEvent } from "@/lib/communities/cache";
 import { THREAD_CATEGORIES } from "@/components/communities/threads/types";
@@ -25,6 +29,10 @@ interface ThreadNotificationBubbleProps {
   event: CachedThreadEvent;
   communityId: string;
   currentUserId: string;
+  /** Toggle/replace the current user's emoji reaction on this card. */
+  onReaction?: (emoji: string) => void;
+  /** Open the composer with this card as the reply anchor. */
+  onReply?: () => void;
 }
 
 function categoryLabel(value: string): string {
@@ -62,6 +70,8 @@ export function ThreadNotificationBubble({
   event,
   communityId,
   currentUserId,
+  onReaction,
+  onReply,
 }: ThreadNotificationBubbleProps) {
   const sender  = event.users;
   const isMe    = event.user_id === currentUserId;
@@ -79,6 +89,7 @@ export function ThreadNotificationBubble({
 
   return (
     <div
+      data-content-id={event.id}
       className={`group flex w-full items-start gap-2 px-5 mt-2 ${
         isMe ? "justify-end" : "justify-start"
       }`}
@@ -92,8 +103,12 @@ export function ThreadNotificationBubble({
         </div>
       )}
 
-      {/* Bubble column */}
+      {/* Bubble column — bubble + hover actions live in one inner row, exactly
+          like MessageBubble: actions sit to the RIGHT of other members'
+          bubbles and to the LEFT of own (right-aligned) bubbles. */}
       <div className="min-w-0 max-w-[65%]">
+        <div className={`flex items-center gap-1 ${isMe ? "flex-row-reverse" : ""}`}>
+          <div className="relative min-w-0">
         <div
           className={`relative select-none rounded-[10px] px-3 pt-2 pb-1.5 shadow-sm ${
             isMe
@@ -232,7 +247,7 @@ export function ThreadNotificationBubble({
           </div>
 
           {/* Timestamp inside the bubble, bottom-right — same row as normal
-              message bubbles. */}
+              message bubbles (reactions reserve space below via the h-4 slot). */}
           <div className="flex items-center justify-end gap-1 mt-0.5">
             <span
               className={`font-mono text-[10px] ${
@@ -242,7 +257,28 @@ export function ThreadNotificationBubble({
               {fmtTime(event.created_at)}
             </span>
           </div>
+
+          {/* Reaction pills overlap the bubble's bottom edge, like messages */}
+          <NotificationReactionPills
+            reactions={event.reactions ?? []}
+            currentUserId={currentUserId}
+            onReaction={(emoji) => onReaction?.(emoji)}
+          />
+            </div>
+          </div>
+
+            {/* Hover actions — emoji reaction + reply only (no delete/edit). */}
+            {onReaction && onReply ? (
+              <NotificationHoverActions
+                reactions={event.reactions ?? []}
+                currentUserId={currentUserId}
+                onReaction={onReaction}
+                onReply={onReply}
+                isOwn={isMe}
+              />
+            ) : null}
         </div>
+        {(event.reactions?.length ?? 0) > 0 && <div className="h-4" />}
       </div>
     </div>
   );

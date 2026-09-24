@@ -279,6 +279,39 @@ export function CommunityChat({
     setContentEvents((prev) => prev.filter((event) => event.id !== id));
   }, []);
 
+  // Reaction groups that arrive with each message page (the RPC attaches them
+  // for the timeline's notification cards) are folded into the content events.
+  const mergeContentReactions = useCallback(
+    (rows: Array<{ content_id: string; kind: string; reactions: MessageReaction[] }>) => {
+      setContentEvents((prev) => {
+        const byId = new Map(rows.map((row) => [row.content_id, row.reactions]));
+        let changed = false;
+        const next = prev.map((event) => {
+          const reactions = byId.get(event.id);
+          if (!reactions) return event;
+          const current = event.reactions ?? [];
+          // Compare the reactors too, not just the emoji: the same emoji gaining
+          // another member changes the pill's count.
+          if (
+            current.length === reactions.length &&
+            current.every(
+              (r, i) =>
+                r.emoji === reactions[i].emoji &&
+                r.user_ids.length === reactions[i].user_ids.length &&
+                r.user_ids.every((id, j) => id === reactions[i].user_ids[j]),
+            )
+          ) {
+            return event;
+          }
+          changed = true;
+          return { ...event, reactions };
+        });
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
   // Prime only first-render data. Secondary tabs fetch from their own cached
   // endpoints when mounted, so their work cannot delay the chat shell.
   useEffect(() => {
@@ -393,6 +426,7 @@ export function CommunityChat({
     initialMessages,
     onLoadError: chatLoadError.reportError,
     retryToken: chatLoadError.retryToken,
+    onContentReactions: mergeContentReactions,
   });
 
   // Local creates/deletes from the mounted tabs (Threads/Showcase/Resources/
@@ -564,6 +598,135 @@ export function CommunityChat({
       coordinator.toggle(emoji);
     },
     [communityId, currentUserId, handleReactionToggled, projectOwnReaction],
+  );
+
+  // ── Notification-card reactions ("created a …" content events) ────────────
+  // Same optimistic coordinator as message reactions, but persisting through
+  // the content-events reactions endpoint (keyed by content id + kind).
+  const contentReactionCoordinatorsRef = useRef(
+    new Map<string, ReactionIntentCoordinator<MessageReaction[]>>(),
+  );
+
+  const applyContentReactions = useCallback(
+    (contentId: string, reactions: MessageReaction[]) => {
+      setContentEvents((prev) => {
+        let changed = false;
+        const next = prev.map((event) => {
+          if (event.id !== contentId) return event;
+          changed = true;
+          return { ...event, reactions };
+        });
+        // Keep the previous array when the card isn't in the loaded window (or
+        // already carries this state) so nothing re-renders needlessly.
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const coordinators = contentReactionCoordinatorsRef.current;
+    return () => {
+      for (const coordinator of coordinators.values()) coordinator.dispose();
+      coordinators.clear();
+    };
+  }, []);
+
+  const handleContentReaction = useCallback(
+    (event: CachedContentEvent, emoji: string) => {
+      const contentId = event.id;
+      const kind = event.kind;
+
+      // The sidebar confirms the reaction in the same frame, exactly like a
+      // message reaction — previewing the card's title ("You reacted 🔥 to:
+      // \"ui vs ux\""). Only a newer message takes that line back, so the patch
+      // survives the refetch that follows.
+      const cardTitle = (event.title || "").split("\n")[0].trim();
+      const contentPreview = cardTitle
+        ? `"${cardTitle.slice(0, 40)}${cardTitle.length > 40 ? "…" : ""}"`
+        : `${/^[aeiou]/i.test(kind) ? "an" : "a"} ${kind}`;
+
+      const paintIntent = (desiredEmoji: ReactionIntent) => {
+        applyContentReactions(
+          contentId,
+          projectOwnReaction(event.reactions ?? [], desiredEmoji),
+        );
+        if (desiredEmoji === null) markSidebarReactionRemoved(communityId, contentId);
+        patchSidebarReaction(
+          communityId,
+          desiredEmoji === null
+            ? null
+            : {
+                messageId: contentId,
+                emoji: desiredEmoji,
+                createdAt: new Date().toISOString(),
+                firstName: "You",
+                isOwn: true,
+                contentKind: kind,
+                messagePreview: contentPreview,
+              },
+        );
+      };
+
+      let coordinator = contentReactionCoordinatorsRef.current.get(contentId);
+      if (!coordinator) {
+        const initialEmoji =
+          event.reactions?.find((r) => r.user_ids.includes(currentUserId))?.emoji ?? null;
+
+        coordinator = new ReactionIntentCoordinator<MessageReaction[]>({
+          initialValue: initialEmoji,
+          onOptimisticChange: paintIntent,
+          onIntentChange: (value, pending) => {
+            trackReactionIntent(communityId, contentId, currentUserId, value, pending);
+          },
+          persist: async (desiredEmoji) => {
+            const res = await fetch(
+              `/api/communities/${communityId}/content-events/${contentId}/reactions`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ kind, desiredEmoji }),
+              },
+            );
+            if (!res.ok) throw new Error("Unable to update reaction");
+            const data = await res.json() as {
+              reactions: MessageReaction[];
+              currentUserEmoji: ReactionIntent;
+            };
+            return { value: data.currentUserEmoji, data: data.reactions };
+          },
+          onConfirmed: ({ value, data }) => {
+            applyContentReactions(contentId, data);
+            paintIntent(value);
+          },
+        });
+        contentReactionCoordinatorsRef.current.set(contentId, coordinator);
+      }
+
+      coordinator.toggle(emoji);
+    },
+    [applyContentReactions, communityId, currentUserId, projectOwnReaction],
+  );
+
+  // ── Reply-to-notification: anchor the composer to a content event ─────────
+  const handleContentReply = useCallback(
+    (event: CachedContentEvent) => {
+      // Cards carry their body in `title`, so the composer's chip quotes the
+      // headline and falls back to the kind's noun when the card is empty.
+      const firstLine = (event.title || event.kind).split("\n")[0];
+      setReplyTo({
+        id: event.id,
+        content: firstLine,
+        user_name: event.users?.name ?? "Unknown",
+        user_id: event.user_id,
+        content_kind: event.kind,
+        content_title: firstLine,
+      });
+      setTimeout(() => {
+        document.querySelector<HTMLTextAreaElement>("[data-chat-input]")?.focus();
+      }, 50);
+    },
+    [],
   );
 
   // ── Top-sentinel ref — observed by IntersectionObserver to load older messages.
@@ -778,9 +941,14 @@ export function CommunityChat({
   // ── Row focus flash — shared by reply clicks and @ pill jumps ────────────
   const flashMessage = useCallback(
     (messageId: string, durationMs: number): boolean => {
-      const el = scrollContainerRef.current?.querySelector<HTMLElement>(
-        `[data-message-id="${messageId}"]`,
-      );
+      // Reply anchors can be a chat message OR a "created a …" content card.
+      const el =
+        scrollContainerRef.current?.querySelector<HTMLElement>(
+          `[data-message-id="${messageId}"]`,
+        ) ??
+        scrollContainerRef.current?.querySelector<HTMLElement>(
+          `[data-content-id="${messageId}"]`,
+        );
       if (!el) return false;
       el.scrollIntoView({ behavior: "instant", block: "center" });
       if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
@@ -1420,6 +1588,8 @@ export function CommunityChat({
               onRetrySend={handleRetrySend}
               onReaction={handleReaction}
               onReply={handleReply}
+              onContentReaction={handleContentReaction}
+              onContentReply={handleContentReply}
               onEdit={handleEdit}
               onCopy={handleCopy}
               onDelete={handleDelete}

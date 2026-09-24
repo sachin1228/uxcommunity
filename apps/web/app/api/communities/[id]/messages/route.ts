@@ -13,6 +13,28 @@ import { sendChatMessagePush } from "@/lib/push/chat";
 import { createServerTimer } from "@/lib/server-timing";
 import { MENTION_MAX_PER_MESSAGE } from "@/lib/communities/mentions";
 
+/**
+ * Ids of the community's recent content items (threads / showcase posts /
+ * resources / events) — the chat timeline's permanent "created a …" cards.
+ * Their emoji reactions ride along with each message page so the cards stay
+ * current without a separate fetch.
+ */
+async function loadContentEventIds(communityId: string): Promise<string[]> {
+  const db = createServiceClient();
+  const [threads, showcase, resources, events] = await Promise.all([
+    db.from("community_threads").select("id").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+    db.from("community_showcase_posts").select("id").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+    db.from("community_resources").select("id").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+    db.from("community_events").select("id").eq("community_id", communityId).order("created_at", { ascending: false }).limit(50),
+  ]);
+  return [
+    ...(threads.data ?? []),
+    ...(showcase.data ?? []),
+    ...(resources.data ?? []),
+    ...(events.data ?? []),
+  ].map((row) => (row as { id: string }).id);
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,10 +47,22 @@ export async function GET(
   }
 
   const { id: communityId } = await params;
-  const result = await loadCommunityMessagePage(communityId, session.userId!, {
-    before: req.nextUrl.searchParams.get("before"),
-    after: req.nextUrl.searchParams.get("after"),
-  });
+  // Content-reaction groups (for the timeline's "created a …" cards) are
+  // opt-in: only the chat timeline asks for them, so every other caller of this
+  // endpoint skips the extra content-id lookup.
+  const contentIds =
+    req.nextUrl.searchParams.get("withContentReactions") === "1"
+      ? await loadContentEventIds(communityId)
+      : [];
+  const result = await loadCommunityMessagePage(
+    communityId,
+    session.userId!,
+    {
+      before: req.nextUrl.searchParams.get("before"),
+      after: req.nextUrl.searchParams.get("after"),
+    },
+    contentIds,
+  );
 
   return result.ok
     ? NextResponse.json(result.data)
@@ -114,14 +148,35 @@ export async function POST(
     return NextResponse.json({ error: "Not a member of this community." }, { status: 403 });
   }
 
+  const CONTENT_TABLES: Record<string, string> = {
+    thread: "community_threads",
+    showcase: "community_showcase_posts",
+    resource: "community_resources",
+    event: "community_events",
+  };
+
   let content: string;
   let reply_to_id: string | null = null;
+  let replyToContent: { id: string; kind: string } | null = null;
+  let replyContentTitle: string | null = null;
   let image_url: string | null = null;
   let mentionUserIds: string[] = [];
   try {
     const body = await req.json();
     content     = (body.content ?? "").trim();
     reply_to_id = body.reply_to_id ?? null;
+    // Replies can anchor to a content item (thread/showcase/resource/event —
+    // the chat timeline's "created a …" cards) instead of a chat message. A
+    // message anchor always wins, so this is only read when reply_to_id is
+    // absent; the anchor is validated against the community below.
+    if (
+      !reply_to_id &&
+      typeof body.reply_to_content?.id === "string" &&
+      typeof body.reply_to_content?.kind === "string" &&
+      ["thread", "showcase", "resource", "event"].includes(body.reply_to_content.kind)
+    ) {
+      replyToContent = { id: body.reply_to_content.id, kind: body.reply_to_content.kind };
+    }
     image_url   = body.image_url   ?? null;
     // Mentions are sent as opaque member ids picked from the client roster;
     // names are resolved server-side below so storage never trusts the client.
@@ -170,6 +225,23 @@ export async function POST(
     if (!parent) reply_to_id = null; // silently ignore invalid reply
   }
 
+  // Validate the content-reply anchor: the item must exist in this community.
+  // A message anchors to EITHER a message or a content item — message wins.
+  let reply_to_content_id: string | null = null;
+  if (replyToContent && !reply_to_id) {
+    const table = CONTENT_TABLES[replyToContent.kind];
+    const { data: contentRow } = await db
+      .from(table)
+      .select("id, title")
+      .eq("id", replyToContent.id)
+      .eq("community_id", communityId)
+      .maybeSingle();
+    if (contentRow) {
+      reply_to_content_id = replyToContent.id;
+      replyContentTitle = (contentRow as { title?: string }).title ?? null;
+    }
+  }
+
   // ── Resolve mentions: only members of this community, names from the DB ──
   let mentions: Array<{ user_id: string; name: string }> = [];
   if (mentionUserIds.length) {
@@ -204,8 +276,8 @@ export async function POST(
   const { data: inserted, error: insertErr } = (await timer.measure("message_insert", async () =>
     await db
       .from("community_messages")
-      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, image_url, mentions })
-      .select("id, content, created_at, user_id, reply_to_id, image_url, mentions")
+      .insert({ community_id: communityId, user_id: userId, content: content || null, reply_to_id, reply_to_content_id, image_url, mentions })
+      .select("id, content, created_at, user_id, reply_to_id, reply_to_content_id, image_url, mentions")
       .single(),
   )) as unknown as {
     data: {
@@ -214,6 +286,8 @@ export async function POST(
       created_at: string;
       user_id: string;
       reply_to_id: string | null;
+      /** Set when the message anchors to a "created a …" card. */
+      reply_to_content_id: string | null;
       image_url: string | null;
       mentions: Array<{ user_id: string; name: string }>;
     } | null;
@@ -311,6 +385,10 @@ export async function POST(
           created_at: inserted.created_at,
           reply_to_id: inserted.reply_to_id ?? null,
           reply_sender_name: replySenderName,
+          // Content-anchored replies carry their own preview fields.
+          reply_to_content_id: inserted.reply_to_content_id ?? null,
+          reply_content_kind: reply_to_content_id ? replyToContent!.kind : null,
+          reply_content_title: reply_to_content_id ? replyContentTitle : null,
           image_url: inserted.image_url ?? null,
           mentions: inserted.mentions ?? [],
         },
@@ -353,6 +431,9 @@ export async function POST(
         users:     null,
         reactions: [],
         reply_to:  null,
+        reply_to_content_id,
+        reply_content_kind: reply_to_content_id ? replyToContent!.kind : null,
+        reply_content_title: reply_to_content_id ? replyContentTitle : null,
         image_url: inserted.image_url ?? null,
         mentions:  inserted.mentions ?? [],
       },

@@ -105,6 +105,30 @@ export function pickOptimisticMatch<
   );
 }
 
+/**
+ * Applies a broadcast comment total to the timeline card it belongs to.
+ *
+ * Counts are always absolute (never deltas): a comment API recounts the item
+ * before publishing, so a dropped, replayed, or out-of-order event can never
+ * drift the number, and deleting a parent comment (which cascades to its
+ * replies) stays correct.
+ *
+ * Returns `null` when nothing would change, so callers can keep the previous
+ * array identity and skip a re-render.
+ */
+export function applyContentCommentCount<
+  T extends { id: string; meta?: { comment_count?: number | null } | null },
+>(events: readonly T[], contentId: string, count: number): T[] | null {
+  let changed = false;
+  const next = events.map((event) => {
+    if (event.id !== contentId) return event;
+    if ((event.meta?.comment_count ?? 0) === count) return event;
+    changed = true;
+    return { ...event, meta: { ...(event.meta ?? {}), comment_count: count } };
+  });
+  return changed ? next : null;
+}
+
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   const today = new Date();

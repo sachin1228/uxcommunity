@@ -9,6 +9,7 @@ import { emojiToCodepoint, svgUrlForCodepoint } from "@/lib/noto-emoji";
 import {
   contentIsNewerThanLastMessage,
   formatContentPreview,
+  formatMessagePreview as formatPreview,
 } from "./sidebar-content";
 import type { CachedSidebarCommunity } from "@/lib/communities/cache";
 
@@ -46,28 +47,6 @@ function renderTextWithEmoji(text: string) {
     parts.push(<span key={`t${lastIndex}`}>{text.slice(lastIndex)}</span>);
   }
   return parts;
-}
-
-/** Formats the last-message text shown below the community name. */
-function formatPreview(msg: NonNullable<Community["last_message"]>): {
-  prefix?: string;
-  text: string;
-} {
-  const sender = msg.is_own
-    ? "You"
-    : msg.user?.name
-      ? msg.user.name.split(" ")[0]
-      : "Someone";
-  if (msg.is_deleted) return { prefix: sender, text: "Message deleted" };
-  if (msg.has_image && !msg.content) return { prefix: sender, text: "📷 Photo" };
-  if (msg.is_reply) {
-    const to = msg.reply_to_user ?? null;
-    return {
-      prefix: sender,
-      text: to ? `replied to ${to}: ${msg.content}` : `replied: ${msg.content}`,
-    };
-  }
-  return { prefix: sender, text: msg.content ?? "" };
 }
 
 interface CommunityRowProps {

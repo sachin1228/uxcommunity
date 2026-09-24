@@ -2,7 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { ContentEventKind } from "./cache";
 import type { ContentEventMeta } from "./content-notifications";
-import { loadRsvpCounts } from "./content-notifications";
+import { loadCommentCounts, loadRsvpCounts } from "./content-notifications";
 
 export interface ContentEventRow {
   id: string;
@@ -14,6 +14,8 @@ export interface ContentEventRow {
   users: { name: string; avatar_url: string | null } | null;
   /** Rich fields (thumbnail, description, schedule…) the chat card renders. */
   meta?: ContentEventMeta | null;
+  /** Emoji reactions left on the card (grouped, message-reaction shape). */
+  reactions?: Array<{ emoji: string; user_ids: string[] }>;
 }
 
 /** First image attachment (or null) from a thread/showcase attachment list. */
@@ -134,23 +136,46 @@ export async function loadCommunityContentEvents(
   if (!rows.length) return [];
 
   const authorIds = [...new Set(rows.map((row) => row.user_id).filter((id): id is string => typeof id === "string"))];
-  const [{ data: users }, { data: profiles }] = authorIds.length
-    ? await Promise.all([
-        db.from("users").select("id, name").in("id", authorIds),
-        db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
-      ])
-    : [{ data: [] }, { data: [] }];
+  const contentIds = rows.map((row) => row.id as string);
+  const [{ data: users }, { data: profiles }, { data: reactionRows }] = await Promise.all([
+    db.from("users").select("id, name").in("id", authorIds),
+    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", authorIds),
+    contentIds.length
+      ? (db.from("content_reactions").select("content_id, emoji, user_id").in("content_id", contentIds) as unknown as Promise<{
+          data: Array<{ content_id: string; emoji: string; user_id: string }> | null;
+        }>)
+      : Promise.resolve({ data: [] as Array<{ content_id: string; emoji: string; user_id: string }> | null }),
+  ]);
 
   const nameMap = Object.fromEntries((users ?? []).map((u) => [(u as { id: string }).id, (u as { name: string }).name]));
   const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [(p as { user_id: string }).user_id, (p as { avatar_url: string | null }).avatar_url]));
 
   // RSVPs change independently of the event row, so the embedded count goes
-  // stale — refresh it for the events on this page in one query.
+  // stale — refresh it for the events on this page in one query. Comment
+  // counts are computed per page the same way: they tell members how much
+  // discussion each card has.
   const eventRows = rows.filter((row) => row.kind === "event");
-  const rsvpCounts = await loadRsvpCounts(
-    db,
-    eventRows.map((row) => row.id as string),
-  );
+  const [rsvpCounts, commentCounts] = await Promise.all([
+    loadRsvpCounts(db, eventRows.map((row) => row.id as string)),
+    loadCommentCounts(
+      db,
+      rows.map((row) => ({ id: row.id as string, kind: row.kind as ContentEventKind })),
+    ),
+  ]);
+
+  // Group content reactions per item — the chat cards render them like
+  // message-reaction pills.
+  const reactionMap = new Map<string, Map<string, string[]>>();
+  for (const reaction of reactionRows ?? []) {
+    let byEmoji = reactionMap.get(reaction.content_id);
+    if (!byEmoji) {
+      byEmoji = new Map();
+      reactionMap.set(reaction.content_id, byEmoji);
+    }
+    const ids = byEmoji.get(reaction.emoji) ?? [];
+    ids.push(reaction.user_id);
+    byEmoji.set(reaction.emoji, ids);
+  }
 
   return rows
     .map((row) => {
@@ -159,6 +184,11 @@ export async function loadCommunityContentEvents(
       const kind = row.kind as ContentEventKind;
       const meta = metaFor(kind, row);
       if (kind === "event") meta.rsvp_count = rsvpCounts.get(row.id as string) ?? 0;
+      meta.comment_count = commentCounts.get(row.id as string) ?? 0;
+      const byEmoji = reactionMap.get(row.id as string);
+      const reactions = byEmoji
+        ? [...byEmoji.entries()].map(([emoji, user_ids]) => ({ emoji, user_ids }))
+        : [];
       return {
         id: row.id as string,
         community_id: row.community_id as string,
@@ -167,6 +197,7 @@ export async function loadCommunityContentEvents(
         title: row.title as string,
         created_at: row.created_at as string,
         meta,
+        reactions,
         users: name
           ? { name, avatar_url: avatarMap[authorId] ?? null }
           : null,

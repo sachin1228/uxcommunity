@@ -8,6 +8,7 @@ import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommentAuthor } from "@/lib/communities/comment-authors";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 async function isMember(
   db: ReturnType<typeof createServiceClient>,
@@ -166,6 +167,11 @@ export async function POST(
       data: { user_id: userId },
     },
   ]);
+
+  // The chat timeline's permanent "created a thread" card shows this thread's
+  // comment count — broadcast the new total so members sitting in the chat
+  // see the discussion grow without reloading.
+  void publishContentCommentCount(db, communityId, threadId, "thread");
 
   const href = threadHref(communityId, threadId);
   deferNotification({

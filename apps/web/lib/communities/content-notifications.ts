@@ -25,6 +25,61 @@ export interface ContentEventMeta {
   is_online?: boolean | null;
   /** RSVP count snapshot — a local seed; history re-enriches server-side. */
   rsvp_count?: number | null;
+  /** Comments left on the item's own detail page, so the card can show how
+   * much discussion it has. Enriched server-side per page load. */
+  comment_count?: number | null;
+}
+
+/**
+ * Where each content kind keeps its own comments. The four kinds have their
+ * own table with their own FK column; both the page reader below and the
+ * realtime republisher use this one map so the two can never disagree.
+ */
+export const CONTENT_COMMENT_SOURCES: Record<ContentEventKind, { table: string; column: string }> = {
+  thread:   { table: "thread_comments",   column: "thread_id" },
+  showcase: { table: "showcase_comments", column: "post_id" },
+  resource: { table: "resource_comments", column: "resource_id" },
+  event:    { table: "event_comments",    column: "event_id" },
+};
+
+/**
+ * Comment counts for a page of content cards. The four kinds keep their
+ * comments in their own table with their own FK column, so this is one query
+ * per kind (per page, not per card), tallied in memory.
+ */
+export async function loadCommentCounts(
+  db: { from: (table: string) => unknown },
+  items: Array<{ id: string; kind: ContentEventKind }>,
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const byKind: Record<ContentEventKind, { table: string; column: string; ids: string[] }> = {
+    thread:   { ...CONTENT_COMMENT_SOURCES.thread,   ids: [] },
+    showcase: { ...CONTENT_COMMENT_SOURCES.showcase, ids: [] },
+    resource: { ...CONTENT_COMMENT_SOURCES.resource, ids: [] },
+    event:    { ...CONTENT_COMMENT_SOURCES.event,    ids: [] },
+  };
+  for (const item of items) byKind[item.kind]?.ids.push(item.id);
+
+  await Promise.all(
+    Object.values(byKind).map(async ({ table, column, ids }) => {
+      if (!ids.length) return;
+      const { data } = (await (db.from(table) as {
+        select: (cols: string) => {
+          in: (col: string, values: string[]) => Promise<{
+            data: Array<Record<string, string | null>> | null;
+          }>;
+        };
+      })
+        .select(column)
+        .in(column, ids)) as { data: Array<Record<string, string | null>> | null };
+      for (const row of data ?? []) {
+        const id = row[column];
+        if (!id) continue;
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+    }),
+  );
+  return counts;
 }
 
 /**

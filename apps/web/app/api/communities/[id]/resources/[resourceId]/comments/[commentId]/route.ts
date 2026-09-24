@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 export async function DELETE(
   _req: NextRequest,
@@ -51,6 +52,8 @@ export async function DELETE(
   void publishRealtimeBatch([
     { room: realtimeRooms.resourceComments(resourceId), topic: "comment", data: { user_id: (existing as { user_id: string }).user_id } },
   ]);
+  // Republish the remaining total so the chat card's "💬 n" shrinks too.
+  void publishContentCommentCount(db, communityId, resourceId, "resource");
 
   return new NextResponse(null, { status: 204 });
 }

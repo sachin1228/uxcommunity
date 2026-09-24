@@ -16,6 +16,7 @@ import { DropdownMenu } from "@/components/ui/DropdownMenu";
 import { ModalPortal } from "@/components/ui/Modal";
 import { canEditMessage, MESSAGE_EDIT_WINDOW_MS } from "@/lib/communities/message-edit";
 import { userColorVar } from "@/lib/communities/user-color";
+import { KIND_THEME } from "@/lib/communities/content-notifications";
 
 
 interface MessageBubbleProps {
@@ -82,6 +83,43 @@ function ReplyBubble({
       </p>
       <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
         {reply.content || "📷 Image"}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Reply preview for a "created a …" notification card (thread / showcase /
+ * resource / event). Rendering matches ReplyBubble; the label makes the
+ * anchor obvious, and clicking jumps to the card (data-content-id).
+ */
+function ContentReplyBubble({
+  reply,
+  isMe,
+  onReplyClick,
+}: {
+  reply: NonNullable<CachedMessage["reply_to_content"]>;
+  isMe: boolean;
+  onReplyClick: (replyId: string) => void;
+}) {
+  // Same eyebrow label the card itself shows ("Thread", "Resource", …).
+  const label = KIND_THEME[reply.kind].label;
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onReplyClick(reply.id); }}
+      className={`mt-1 mb-1 px-2.5 py-1.5 rounded-md border-l-2 text-left max-w-full cursor-pointer
+        ${isMe
+          ? "bg-black/20 border-white/20 hover:bg-black/30"
+          : "bg-black/10 border-white/15 hover:bg-black/20"
+        } transition-colors`}
+    >
+      <p
+        className={`font-body text-[10px] font-semibold line-clamp-1 break-words ${isMe ? "text-accent-foreground opacity-80" : "text-foreground-muted"}`}
+      >
+        {label}
+      </p>
+      <p className={`font-body text-[11px] line-clamp-2 break-words ${isMe ? "text-accent-foreground opacity-70" : "text-foreground-muted"}`}>
+        {reply.title || label}
       </p>
     </div>
   );
@@ -881,17 +919,19 @@ export const MessageBubble = memo(function MessageBubble({
   const sender    = msg.users;
   const reactions = msg.reactions ?? [];
   const replyTo   = msg.reply_to ?? null;
+  const replyToContent = msg.reply_to_content ?? null;
   const imageUrl  = msg.image_url ?? null;
   const uploading = msg.status === "sending" && !!imageUrl;
   const failed    = msg.status === "failed";
   const isDeleted = !!msg.deleted_at;
-  const imageOnly = !!imageUrl && !msg.content && !replyTo;
+  const imageOnly = !!imageUrl && !msg.content && !replyTo && !replyToContent;
 
   // Show as a large bubble-free emoji when the entire message is 1–3 emoji glyphs.
   const isEmojiMsg =
     !isDeleted &&
     !imageUrl &&
     !replyTo &&
+    !replyToContent &&
     !!msg.content &&
     isEmojiOnly(msg.content);
 
@@ -1090,6 +1130,9 @@ export const MessageBubble = memo(function MessageBubble({
                     />
                   )}
                   {replyTo && <ReplyBubble reply={replyTo} isMe={isMe} onReplyClick={onReplyClick} />}
+                  {!replyTo && replyToContent && (
+                    <ContentReplyBubble reply={replyToContent} isMe={isMe} onReplyClick={onReplyClick} />
+                  )}
                   {imageUrl && (
                     <BubbleImage
                       url={imageUrl}

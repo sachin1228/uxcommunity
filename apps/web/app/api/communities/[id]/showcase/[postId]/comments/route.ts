@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { attachCommentAuthors } from "@/lib/communities/comment-authors";
 import { attachCommentReactions } from "@/lib/communities/comment-reactions";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 async function access(db: ReturnType<typeof createServiceClient>, communityId: string, postId: string, userId: string, requireRepliesEnabled = false) {
   const postQuery = db.from("community_showcase_posts").select("id, is_public, allow_replies").eq("id", postId).eq("community_id", communityId);
@@ -62,6 +63,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (error || !data) return NextResponse.json({ error: "Failed to post comment." }, { status: 500 });
   after(() => {
     void publishRealtimeBatch([{ room: realtimeRooms.showcase(postId), topic: "comment", data: { user_id: userId } }]);
+    // The chat timeline's "created a showcase" card shows this post's comment
+    // count — broadcast the new total so open chats update without a reload.
+    void publishContentCommentCount(db, id, postId, "showcase");
   });
   const [comment] = await attachCommentReactions(db, await enrich(db, [data]), userId, "showcase"); return NextResponse.json({ comment }, { status: 201 });
 }

@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { deleteR2AssetIfUnreferenced } from "@/lib/r2";
 import { ALL_MEDIA_LOOKUPS } from "@/lib/r2-cleanup";
+import { publishContentCommentCount } from "@/lib/communities/content-comment-counts";
 
 type Params = { params: Promise<{ id: string; eventId: string; commentId: string }> };
 
@@ -13,7 +14,7 @@ export async function DELETE(
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
 
-  const { eventId, commentId } = await params;
+  const { id: communityId, eventId, commentId } = await params;
   const userId = (session as { userId: string }).userId;
   const db = createServiceClient();
 
@@ -29,6 +30,9 @@ export async function DELETE(
 
   const { error } = await db.from("event_comments").delete().eq("id", commentId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Republish the remaining total so the chat card's "💬 n" shrinks too.
+  void publishContentCommentCount(db, communityId, eventId, "event");
 
   // Reclaim the comment's image now that the row is gone. Checked against
   // every media column, so an object still used elsewhere is kept. Non-fatal:

@@ -252,7 +252,12 @@ export function useSendMessage({
       is_own: true,
       has_image: !!imagePreviewUrl && !content,
       is_reply: !!msgReplyTo,
-      reply_to_user: msgReplyTo ? msgReplyTo.user_name.split(" ")[0] : null,
+      // A reply anchored to a "created a …" card names the kind, not a person.
+      reply_to_user:
+        msgReplyTo && !msgReplyTo.content_kind
+          ? msgReplyTo.user_name.split(" ")[0]
+          : null,
+      reply_to_content_kind: msgReplyTo?.content_kind ?? null,
       is_deleted: false,
       reactions: [],
     });
@@ -342,7 +347,17 @@ export function useSendMessage({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             content,
-            reply_to_id: msgReplyTo?.id ?? null,
+            // Message replies and content replies are mutually exclusive: a
+            // content reply's id is a thread/showcase/resource/event id, not a
+            // message id — sending it as reply_to_id would make the API try
+            // (and fail) to validate it as a message and drop the anchor.
+            reply_to_id: msgReplyTo?.content_kind ? null : msgReplyTo?.id ?? null,
+            // Replies anchored to a content item (a "created a …" card) ride
+            // alongside; the API ignores it when reply_to_id is set.
+            reply_to_content:
+              msgReplyTo?.content_kind
+                ? { id: msgReplyTo.id, kind: msgReplyTo.content_kind }
+                : null,
             image_url: uploadedImageUrl,
             mentions: mentions.map((m) => ({ user_id: m.user_id })),
             // Each send carries its own nonce, so two identical messages ("ok",
