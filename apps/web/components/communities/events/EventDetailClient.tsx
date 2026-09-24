@@ -25,6 +25,8 @@ interface Props {
   communityName: string;
   communityImage?: string | null;
   showCommunityAttribution?: boolean;
+  /** Opens the "posted in" label's community preview popup in place (modal). */
+  communityPreviewModal?: boolean;
   /** The event's group chat community, when one exists. */
   chatCommunityId?: string | null;
   /** The group chat community's name. */
@@ -50,6 +52,7 @@ export function EventDetailClient({
   communityName,
   communityImage,
   showCommunityAttribution = false,
+  communityPreviewModal = false,
   chatCommunityId = null,
   chatCommunityName = null,
   chatCommunityImage = null,
@@ -159,6 +162,7 @@ export function EventDetailClient({
               rsvps={rsvps}
               communityName={showCommunityAttribution ? communityName : undefined}
               communityImage={communityImage}
+              communityPreviewModal={communityPreviewModal}
               onUpdated={setEvent}
               onDeleted={() => {
                 invalidateRequest(commentsUrl, currentUserId);

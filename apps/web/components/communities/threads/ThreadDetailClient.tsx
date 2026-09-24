@@ -31,6 +31,8 @@ interface Props {
   communityName: string;
   communityImage?: string | null;
   showCommunityAttribution?: boolean;
+  /** Opens the "posted in" label's community preview popup in place (modal). */
+  communityPreviewModal?: boolean;
   /** When provided, renders a back link above the post (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -46,6 +48,7 @@ export function ThreadDetailClient({
   communityName,
   communityImage,
   showCommunityAttribution = false,
+  communityPreviewModal = false,
   backHref,
   backLabel = "Home",
   flushLayout = false,
@@ -295,6 +298,7 @@ export function ThreadDetailClient({
               communityName={showCommunityAttribution ? communityName : undefined}
               communityImage={showCommunityAttribution ? communityImage : undefined}
               communityNamePlacement="below"
+              communityPreviewModal={communityPreviewModal}
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
               onPollVoteChanged={handlePollVoteChanged}

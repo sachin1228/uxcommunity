@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ResourceDetailClient } from "@/components/communities/resources/ResourceDetailClient";
 import { HomeRail } from "@/app/dashboard/HomeRail";
+import { resolveCommunityDp } from "@/lib/communities/dp";
 import { loadCommentAuthors } from "@/lib/communities/comment-authors";
 import type { CommunityResource, ResourceComment } from "@/components/communities/resources/types";
 
@@ -107,13 +108,29 @@ export default async function ResourceDetailPage({ params }: Props) {
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
     getResource(db, resourceId, userId),
     getComments(db, resourceId),
-    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url, type, reference_id").eq("id", communityId).maybeSingle(),
   ]);
 
   // Public resources are on the home feed for every member, so any signed-in
   // member may read one; community-private ones stay members-only.
   if (!membership && resource?.is_public !== true) redirect(`/dashboard/communities/${communityId}`);
   if (!resource) redirect("/dashboard");
+
+  // Same DP rule as every other surface: app-created communities keep their
+  // live picture on the master-data row, so resolve through reference_id.
+  const communityRow = community.data as unknown as {
+    name: string;
+    image_url: string | null;
+    type: string;
+    reference_id: string | null;
+  } | null;
+  const communityDp = communityRow
+    ? await resolveCommunityDp({
+        type: communityRow.type,
+        reference_id: communityRow.reference_id,
+        image_url: communityRow.image_url,
+      })
+    : { image_url: null };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -125,8 +142,9 @@ export default async function ResourceDetailPage({ params }: Props) {
             currentUserId={userId}
             communityId={communityId}
             communityName={community.data?.name ?? "Community"}
-            communityImage={community.data?.image_url ?? null}
+            communityImage={communityDp.image_url}
             showCommunityAttribution
+            communityPreviewModal
             backHref="/dashboard"
             backLabel="Home"
           />

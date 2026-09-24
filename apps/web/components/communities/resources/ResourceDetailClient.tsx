@@ -24,12 +24,14 @@ interface Props {
   communityImage?: string | null;
   /** Shows "in <community>" under the resource — used on the top-level (home) view. */
   showCommunityAttribution?: boolean;
+  /** Opens the "posted in" label's community preview popup in place (modal). */
+  communityPreviewModal?: boolean;
   /** When provided, renders a back link above the resource (e.g. community tab context). */
   backHref?: string;
   backLabel?: string;
 }
 
-export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, backHref, backLabel = "Resources" }: Props) {
+export function ResourceDetailClient({ resource: initialResource, initialComments, currentUserId, communityId, communityName, communityImage, showCommunityAttribution = false, communityPreviewModal = false, backHref, backLabel = "Resources" }: Props) {
   const router = useGuardedRouter();
   const [resource, setResource] = useState(initialResource);
   const [comments, setComments] = useState(initialComments);
@@ -120,6 +122,7 @@ export function ResourceDetailClient({ resource: initialResource, initialComment
             communityId={communityId}
             communityName={showCommunityAttribution ? communityName : undefined}
             communityImage={communityImage}
+            communityPreviewModal={communityPreviewModal}
             onUpdated={(updated) => setResource((current) => ({ ...current, ...updated }))}
             onSaveChanged={(_, saved, count) => setResource((current) => ({ ...current, user_saved: saved, save_count: count }))}
             onBookmarkChanged={(_, bookmarked, count) => setResource((current) => ({ ...current, user_bookmarked: bookmarked, bookmark_count: count }))}

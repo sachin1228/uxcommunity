@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { loadCommunityManagerStatus } from "@/lib/communities/manager-role";
+import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 
 /**
  * GET /api/communities/[id]/requests
@@ -27,9 +28,13 @@ export async function GET(
     return NextResponse.json({ error: "Owner or community admin only." }, { status: 403 });
   }
 
+  // The optional request note ships only once its migration is applied.
+  const columns = (await canStoreJoinRequestMessage(db))
+    ? "id, user_id, requested_at, request_message"
+    : "id, user_id, requested_at";
   const { data: requests, error } = await db
     .from("community_join_requests")
-    .select("id, user_id, requested_at")
+    .select(columns)
     .eq("community_id", communityId)
     .eq("status", "pending")
     .order("requested_at", { ascending: true });
@@ -48,11 +53,12 @@ export async function GET(
 
   return NextResponse.json({
     requests: requests.map((r) => ({
-      id:           r.id,
-      user_id:      r.user_id,
-      requested_at: r.requested_at,
-      name:         userMap[r.user_id]    ?? "Unknown",
-      avatar_url:   profileMap[r.user_id] ?? null,
+      id:              r.id,
+      user_id:         r.user_id,
+      requested_at:    r.requested_at,
+      name:            userMap[r.user_id]    ?? "Unknown",
+      avatar_url:      profileMap[r.user_id] ?? null,
+      request_message: (r as { request_message?: string | null }).request_message ?? null,
     })),
   });
 }

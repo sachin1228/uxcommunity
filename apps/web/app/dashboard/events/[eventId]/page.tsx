@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
 import { HomeRail } from "@/app/dashboard/HomeRail";
+import { resolveCommunityDp } from "@/lib/communities/dp";
 import { enrichEventCards, loadEventRsvps, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 import { getEventChatCommunity, isEventChatMember } from "@/lib/communities/event-chat";
 
@@ -33,7 +34,7 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
 
   const [{ data: membership }, { data: communityData }, initialRsvps] = await Promise.all([
     db.from("community_members").select("joined_at").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
-    db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
+    db.from("communities").select("name, image_url, type, reference_id").eq("id", communityId).maybeSingle(),
     loadEventRsvps(eventId),
   ]);
 
@@ -60,6 +61,22 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
     chatMemberCount = count ?? 0;
   }
 
+  // Same DP rule as every other surface: app-created communities keep their
+  // live picture on the master-data row, so resolve through reference_id.
+  const community = communityData as unknown as {
+    name: string;
+    image_url: string | null;
+    type: string;
+    reference_id: string | null;
+  } | null;
+  const communityDp = community
+    ? await resolveCommunityDp({
+        type: community.type,
+        reference_id: community.reference_id,
+        image_url: community.image_url,
+      })
+    : { image_url: null };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-6xl items-start justify-center gap-6 px-4 lg:px-6">
@@ -71,14 +88,15 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             currentUserName={event.users?.name ?? ""}
             currentUserAvatar={event.users?.avatar_url ?? null}
             communityId={communityId}
-            communityName={communityData?.name ?? "Community"}
-            communityImage={communityData?.image_url ?? null}
+            communityName={community?.name ?? "Community"}
+            communityImage={communityDp.image_url}
             chatCommunityId={chatCommunity?.id ?? null}
             chatCommunityName={chatCommunity?.name ?? null}
             chatCommunityImage={chatCommunity?.image_url ?? null}
             chatMemberCount={chatMemberCount}
             chatCommunityJoined={chatCommunityJoined}
             showCommunityAttribution
+            communityPreviewModal
             backHref="/dashboard"
             backLabel="Home"
           />

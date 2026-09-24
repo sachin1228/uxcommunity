@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { CommunityFeedList } from "@/components/feeds/CommunityFeedList";
+import { CommunityPreviewModal } from "@/components/communities/CommunityPreviewModal";
 import { FEED_PAGE_SIZE, feedItemKind, type FeedItem } from "@/components/feeds/types";
 import { Spinner } from "@/components/ui/Spinner";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
@@ -35,6 +36,8 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(() => (cached?.items?.length ?? 0) >= FEED_PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  /** Non-member community preview popup, opened from a card's "posted in …" label. */
+  const [previewCommunityId, setPreviewCommunityId] = useState<string | null>(null);
 
   const feedUrl = `/api/home/feed?scope=${encodeURIComponent(scope)}`;
 
@@ -135,10 +138,17 @@ export function HomeFeed({ currentUserId, refreshToken = 0, scope }: HomeFeedPro
 
   return (
     <>
+      {previewCommunityId && (
+        <CommunityPreviewModal
+          communityId={previewCommunityId}
+          onClose={() => setPreviewCommunityId(null)}
+        />
+      )}
       <CommunityFeedList
         items={items}
         currentUserId={currentUserId}
         onChange={updateItems}
+        onOpenCommunityPreview={setPreviewCommunityId}
         emptyState={(
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="font-body text-sm font-medium text-foreground-muted">No posts yet</p>

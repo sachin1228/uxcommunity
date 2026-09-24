@@ -24,6 +24,7 @@ import { formatRelativeDate, isThreadEdited } from "./threadShared";
 import { BooleanIntentCoalescer } from "@/lib/boolean-intent-coalescer";
 import { dedupeFetch, TOGGLE_FETCH_OPTIONS } from "@/lib/dedupe-fetch";
 import { CommunityPostLabel } from "../CommunityPostLabel";
+import { CommunityLabelPreview } from "../CommunityLabelPreview";
 import { PostAuthorMeta } from "../PostAuthorMeta";
 
 interface ThreadCardProps {
@@ -38,6 +39,10 @@ interface ThreadCardProps {
   communityName?: string;
   communityImage?: string | null;
   communityNamePlacement?: "header" | "below";
+  /** Homepage only: opens the community preview popup instead of navigating. */
+  onCommunityClick?: () => void;
+  /** Renders the label with the in-place preview modal when no callback is given. */
+  communityPreviewModal?: boolean;
   /** When provided, the card is clickable and navigates via this callback. */
   onOpen?: () => void;
   /**
@@ -60,6 +65,8 @@ export function ThreadCard({
   communityName,
   communityImage,
   communityNamePlacement = "header",
+  onCommunityClick,
+  communityPreviewModal = false,
   onOpen,
   commentSection,
 }: ThreadCardProps) {
@@ -622,12 +629,20 @@ export function ThreadCard({
           </div>
 
           {communityName && communityNamePlacement === "below" && (
-            <CommunityPostLabel
-              communityId={communityId}
-              communityName={communityName}
-              communityImage={communityImage}
-              className="min-w-0 justify-end text-right"
-            />
+            onCommunityClick || communityPreviewModal ? (
+              onCommunityClick ? (
+                <CommunityPostLabel communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" onOpenPreview={onCommunityClick} />
+              ) : (
+                <CommunityLabelPreview communityId={communityId} communityName={communityName} communityImage={communityImage} className="min-w-0 justify-end text-right" />
+              )
+            ) : (
+              <CommunityPostLabel
+                communityId={communityId}
+                communityName={communityName}
+                communityImage={communityImage}
+                className="min-w-0 justify-end text-right"
+              />
+            )
           )}
         </div>
 
