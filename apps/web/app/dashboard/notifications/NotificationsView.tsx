@@ -38,6 +38,7 @@ function iconFor(type: NotificationType) {
 /** Icons are a view concern; the tab keys/labels come from the shared module. */
 const TAB_ICONS: Record<NotificationTab, typeof Bell> = {
   activity: MessageCircle,
+  events: CalendarDays,
   other: Bell,
 };
 
@@ -81,12 +82,13 @@ export function NotificationsView({ userId }: { userId: string }) {
 
   // Unread counts are derived from the loaded page — the server total
   // (`unreadCount`) is not split by type.
-  const { activity, other, unreadByTab } = useMemo(
+  const { activity, events, other, unreadByTab } = useMemo(
     () => splitNotificationsByTab(notifications),
     [notifications],
   );
 
-  const visible = tab === "activity" ? activity : other;
+  const visible =
+    tab === "activity" ? activity : tab === "events" ? events : other;
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
@@ -167,14 +169,20 @@ export function NotificationsView({ userId }: { userId: string }) {
           <EmptyNotifications
             icon={Bell}
             title="No notifications yet"
-            hint="Likes, comments and RSVPs on your posts will appear here."
+            hint="Likes, comments and event RSVPs on your posts will appear here."
           />
         ) : visible.length === 0 ? (
           tab === "activity" ? (
             <EmptyNotifications
               icon={MessageCircle}
               title="No likes or comments yet"
-              hint="Likes, comments and RSVPs on your threads, resources and events will appear here."
+              hint="Likes and comments on your threads and resources will appear here."
+            />
+          ) : tab === "events" ? (
+            <EmptyNotifications
+              icon={CalendarDays}
+              title="No event activity yet"
+              hint="RSVPs and comments on your events will appear here."
             />
           ) : (
             /* The Other tab renders nothing yet on purpose — see
