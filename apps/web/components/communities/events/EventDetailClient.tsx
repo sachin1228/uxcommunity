@@ -52,7 +52,6 @@ export function EventDetailClient({
   const router = useGuardedRouter();
   const [event, setEvent] = useState(initialEvent);
   const [rsvps, setRsvps] = useState<EventRsvp[]>(initialRsvps);
-  const [activeTab, setActiveTab] = useState<"discussion">("discussion");
 
   // Comments (flat list, built into tree on render)
   const commentsUrl = `/api/communities/${communityId}/events/${initialEvent.id}/comments`;
@@ -128,10 +127,6 @@ export function EventDetailClient({
       }));
   }, [comments]);
 
-  const totalCommentCount = comments.length;
-  const topLevelCount = commentTree.length;
-
-
   return (
     <div className="flex-1 overflow-y-auto">
       <div className={`${communityFeedLayout.detailContent} ${communityFeedLayout.detailPage}`}>
@@ -180,34 +175,7 @@ export function EventDetailClient({
           eventTitle={event.title}
         />
 
-        {/* ── Tabs ────────────────────────────────────────────────── */}
-          <div className="flex border-b border-border">
-            {([
-              { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
-            ]).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-2 px-4 pb-3 font-body text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  activeTab === tab.id
-                    ? "border-accent text-foreground"
-                    : "border-transparent text-foreground-muted hover:text-foreground"
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-                {tab.count > 0 && (
-                  <span className="inline-flex items-center justify-center rounded-full bg-surface-raised min-w-[1.25rem] h-5 px-1.5 font-body text-[10px] leading-none text-foreground-subtle">
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Discussion tab ──────────────────────────────────── */}
-          {activeTab === "discussion" && (
+        {/* ── Discussion ─────────────────────────────────────────── */}
             <div className="mt-5">
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
@@ -236,7 +204,6 @@ export function EventDetailClient({
                 />
               )}
             </div>
-          )}
 
             </EventCard>
         </div>
