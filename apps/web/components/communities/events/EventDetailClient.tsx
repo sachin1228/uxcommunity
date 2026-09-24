@@ -148,9 +148,10 @@ export function EventDetailClient({
             className={`mb-5 inline-flex items-center gap-1.5 font-body text-sm text-foreground-muted transition-colors hover:text-foreground ${communityFeedLayout.detailSection}`}
           />
         )}
-        {/* Event post + its Discussion / Attendees panel: one card, with the
-            panel sitting under the engagement row. */}
-        <section className={communityFeedLayout.detailCard}>
+        {/* The event page renders the same card the feed does — one component,
+            one design — with the Discussion / Attendees panel handed to it so
+            post and discussion stay in a single card. */}
+        <div className={communityFeedLayout.detailSection}>
             <EventCard
               variant="detail"
               event={event}
@@ -175,10 +176,9 @@ export function EventDetailClient({
               }}
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
-            />
+            >
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
-        <div className="mt-4">
           <div className="flex border-b border-border">
             {([
               { id: "discussion" as const, label: "Discussion", icon: <MessageSquare strokeWidth={2.5} size={14} />, count: topLevelCount },
@@ -257,8 +257,8 @@ export function EventDetailClient({
               )}
             </div>
           )}
+            </EventCard>
         </div>
-        </section>
       </div>
 
     </div>

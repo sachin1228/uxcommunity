@@ -6,6 +6,7 @@ import { callPerformanceRpc, type Json } from "@/lib/supabase/performance-rpcs";
 import { createServerTimer, estimateJsonBytes } from "@/lib/server-timing";
 import { HOME_FEED_TAG } from "@/lib/home-feed-cache";
 import { attachPollVotes } from "@/lib/threads/poll-votes";
+import { loadEventAttendeePreviews } from "@/lib/communities/event-cards";
 import {
   FEED_PAGE_SIZE as PAGE_SIZE,
   isFeedCard,
@@ -69,17 +70,13 @@ const loadFeedPage = unstable_cache(
     );
     if (!eventIds.length) return items;
 
-    const previews = await callPerformanceRpc(db, "get_event_attendee_previews", {
-      p_event_ids: eventIds,
-      p_limit: 5,
-    });
-    if (previews.error) throw previews.error;
-    const previewMap = new Map((previews.data ?? []).map((preview) => [preview.id, preview.rsvps]));
+    // Same attendee previews every other event surface uses.
+    const previewMap = await loadEventAttendeePreviews(eventIds);
 
     return items.map((item) =>
       typeof item === "object" && item !== null && !Array.isArray(item)
         && item._type === "event" && typeof item.id === "string"
-        ? { ...item, rsvps: previewMap.get(item.id) ?? [] }
+        ? { ...item, rsvps: (previewMap.get(item.id) ?? []) as unknown as Json }
         : item,
     );
   },

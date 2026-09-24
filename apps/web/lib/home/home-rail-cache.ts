@@ -1,14 +1,10 @@
 /**
- * Cache tags for the homepage rail's two lists (see
- * lib/home/home-sidebar-server.ts).
+ * Cache tag for the homepage rail's list (see lib/home/home-sidebar-server.ts).
  *
- * They live in their own module, like the home feed's tag, because route
- * handlers may only export HTTP handlers — a tag that mutations need to
- * revalidate has to be importable from somewhere else.
+ * It lives in its own module, like the home feed's tag, because route handlers
+ * may only export HTTP handlers — a tag that mutations need to revalidate has to
+ * be importable from somewhere else.
  */
-
-/** The week's post-engagement build. Rebuilt by TTL; nothing revalidates it. */
-export const TRENDING_POSTS_TAG = "home-trending-posts";
 
 /**
  * The per-member suggestion list. `POST /api/communities/[id]/join` revalidates

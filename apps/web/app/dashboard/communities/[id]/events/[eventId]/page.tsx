@@ -2,85 +2,10 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { EventDetailClient } from "@/components/communities/events/EventDetailClient";
-import type { CommunityEvent, EventRsvp } from "@/components/communities/events/types";
+import { enrichEventCards, loadEventRsvps, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
 
 interface Props {
   params: Promise<{ id: string; eventId: string }>;
-}
-
-async function getEvent(
-  db: ReturnType<typeof createServiceClient>,
-  communityId: string,
-  eventId: string,
-  userId: string,
-): Promise<CommunityEvent | null> {
-  const { data } = await db
-    .from("community_events")
-    .select("id, community_id, user_id, title, description, event_date, end_date, is_online, location, meet_link, max_attendees, cover_image_url, created_at, updated_at")
-    .eq("id", eventId)
-    .eq("community_id", communityId)
-    .maybeSingle();
-
-  if (!data) return null;
-
-  const authorId = data.user_id;
-  const [
-    { data: userRow },
-    { data: profileRow },
-    { data: allRsvps },
-    { data: myRsvp },
-    { data: allLikes },
-    { data: myLike },
-    { data: allSaves },
-    { data: mySave },
-  ] = await Promise.all([
-    db.from("users").select("id, name").eq("id", authorId).maybeSingle(),
-    db.from("designer_profiles").select("user_id, avatar_url").eq("user_id", authorId).maybeSingle(),
-    db.from("event_rsvps").select("event_id").eq("event_id", eventId),
-    db.from("event_rsvps").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-    db.from("event_likes").select("event_id").eq("event_id", eventId),
-    db.from("event_likes").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-    db.from("event_saves").select("event_id").eq("event_id", eventId),
-    db.from("event_saves").select("event_id").eq("event_id", eventId).eq("user_id", userId).maybeSingle(),
-  ]);
-
-  return {
-    ...(data as unknown as CommunityEvent),
-    users: userRow ? { name: userRow.name, avatar_url: profileRow?.avatar_url ?? null } : null,
-    rsvp_count: (allRsvps ?? []).length,
-    user_rsvped: Boolean(myRsvp),
-    like_count: (allLikes ?? []).length,
-    user_liked: Boolean(myLike),
-    save_count: (allSaves ?? []).length,
-    user_saved: Boolean(mySave),
-  };
-}
-
-async function getRsvps(
-  db: ReturnType<typeof createServiceClient>,
-  eventId: string,
-): Promise<EventRsvp[]> {
-  const { data } = await db
-    .from("event_rsvps")
-    .select("event_id, user_id, created_at")
-    .eq("event_id", eventId)
-    .order("created_at", { ascending: true });
-
-  if (!data?.length) return [];
-
-  const userIds = data.map((r) => r.user_id);
-  const [{ data: users }, { data: profiles }] = await Promise.all([
-    db.from("users").select("id, name").in("id", userIds),
-    db.from("designer_profiles").select("user_id, avatar_url").in("user_id", userIds),
-  ]);
-
-  const nameMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
-  const avatarMap = Object.fromEntries((profiles ?? []).map((p) => [p.user_id, p.avatar_url]));
-
-  return data.map((r) => ({
-    ...r,
-    users: nameMap[r.user_id] ? { name: nameMap[r.user_id], avatar_url: avatarMap[r.user_id] ?? null } : null,
-  }));
 }
 
 export default async function EventDetailPage({ params }: Props) {
@@ -101,15 +26,24 @@ export default async function EventDetailPage({ params }: Props) {
 
   if (!membership) redirect(`/dashboard/communities/${communityId}`);
 
-  const [event, initialRsvps, communityData, userRow, profileRow] = await Promise.all([
-    getEvent(db, communityId, eventId, userId),
-    getRsvps(db, eventId),
+  const { data } = await db
+    .from("community_events")
+    .select(EVENT_CARD_COLUMNS)
+    .eq("id", eventId)
+    .eq("community_id", communityId)
+    .maybeSingle();
+
+  if (!data) redirect(`/dashboard/communities/${communityId}`);
+
+  // Shared serializer + shared attendee loader: this page and the feed card
+  // render the same payload, built in one place.
+  const [[event], initialRsvps, communityData, userRow, profileRow] = await Promise.all([
+    enrichEventCards([data as unknown as Record<string, unknown>], userId),
+    loadEventRsvps(eventId),
     db.from("communities").select("name, image_url").eq("id", communityId).maybeSingle(),
     db.from("users").select("name").eq("id", userId).maybeSingle(),
     db.from("designer_profiles").select("avatar_url").eq("user_id", userId).maybeSingle(),
   ]);
-
-  if (!event) redirect(`/dashboard/communities/${communityId}`);
 
   return (
     <EventDetailClient
