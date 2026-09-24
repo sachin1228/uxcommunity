@@ -112,6 +112,23 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true }).toUpperCase();
 }
 
+/**
+ * True when an accent is so light that white text on it would wash out — the
+ * white and near-white picks (Silver, a custom #fff). WCAG relative luminance,
+ * gamma-corrected, with 0.8 as the washout line: everything below takes white
+ * text, everything above takes dark.
+ */
+function accentNeedsDarkText(hex: string): boolean {
+  const m = hex.replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(m)) return false;
+  const channel = (i: number) => {
+    const c = parseInt(m.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  return luminance > 0.8;
+}
+
 /** Uppercase micro-label used across the event ticket fields (ink on paper). */
 function TicketLabel({ icon, children }: { icon?: ReactNode; children: ReactNode }) {
   return (
@@ -379,6 +396,10 @@ export function EventCard({
     ["--accent-tint" as string]: `${accent}1f`,
   } as React.CSSProperties;
 
+  // Ink for text sitting on the solid accent: white on every color that can
+  // carry it, dark on the washed-out light ones (see accentNeedsDarkText).
+  const onAccentText = accentNeedsDarkText(accent) ? "text-stone-950" : "text-white";
+
   const rsvpButton = !past ? (
     <button
       type="button"
@@ -389,7 +410,7 @@ export function EventCard({
           ? "bg-[var(--accent)]/20 text-[var(--accent)] hover:bg-[var(--accent)]/30"
           : full
             ? "border border-white/20 text-stone-500"
-            : "bg-[var(--accent)] text-stone-950 shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]"
+            : `bg-[var(--accent)] ${onAccentText} shadow-[0_2px_8px_var(--accent-glow)] hover:bg-[var(--accent-hover)]`
       }`}
     >
       {rsvpPending ? "Updating…" : event.user_rsvped ? "Going ✓" : full ? "Event Full" : <>I'm Going <MoveRight strokeWidth={2.5} size={14} aria-hidden="true" /></>}
