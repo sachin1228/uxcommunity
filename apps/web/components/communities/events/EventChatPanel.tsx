@@ -53,7 +53,7 @@ export function EventChatPanel({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-5 py-4 md:px-8">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 md:px-5">
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-raised text-foreground-muted">
           <MessageSquare strokeWidth={2.5} size={15} />
         </span>

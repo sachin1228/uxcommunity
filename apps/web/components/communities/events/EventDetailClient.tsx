@@ -176,7 +176,7 @@ export function EventDetailClient({
         />
 
         {/* ── Discussion ─────────────────────────────────────────── */}
-            <div className="mt-5">
+            <div className="mt-4">
               {commentsLoading ? (
                 <div className="flex items-center justify-center border-t border-border py-12">
                   <Spinner size={22} />
