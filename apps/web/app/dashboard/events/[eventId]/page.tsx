@@ -42,9 +42,19 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
   // The event's group chat, when it exists — the page's Join/Open event chat
   // row hands off to it (see EventChatPanel).
   const chatCommunity = await getEventChatCommunity(db, eventId).catch(() => null);
-  const chatCommunityJoined = chatCommunity
-    ? await isEventChatMember(db, chatCommunity.id, userId)
-    : false;
+  let chatCommunityJoined = false;
+  let chatMemberCount = 0;
+  if (chatCommunity) {
+    const [joined, { count }] = await Promise.all([
+      isEventChatMember(db, chatCommunity.id, userId),
+      db
+        .from("community_members")
+        .select("community_id", { count: "exact", head: true })
+        .eq("community_id", chatCommunity.id),
+    ]);
+    chatCommunityJoined = joined;
+    chatMemberCount = count ?? 0;
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -60,7 +70,9 @@ export default async function EventDetailPage({ params }: { params: Promise<{ ev
             communityName={communityData?.name ?? "Community"}
             communityImage={communityData?.image_url ?? null}
             chatCommunityId={chatCommunity?.id ?? null}
+            chatCommunityName={chatCommunity?.name ?? null}
             chatCommunityImage={chatCommunity?.image_url ?? null}
+            chatMemberCount={chatMemberCount}
             chatCommunityJoined={chatCommunityJoined}
             showCommunityAttribution
             backHref="/dashboard"

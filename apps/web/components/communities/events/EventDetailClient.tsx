@@ -27,8 +27,12 @@ interface Props {
   showCommunityAttribution?: boolean;
   /** The event's group chat community, when one exists. */
   chatCommunityId?: string | null;
+  /** The group chat community's name. */
+  chatCommunityName?: string | null;
   /** The group chat community's display picture. */
   chatCommunityImage?: string | null;
+  /** How many people are in the event's group chat. */
+  chatMemberCount?: number;
   /** Whether the viewer is already in that group chat. */
   chatCommunityJoined?: boolean;
   /** When provided, renders a back link above the event (e.g. homepage context). */
@@ -47,7 +51,9 @@ export function EventDetailClient({
   communityImage,
   showCommunityAttribution = false,
   chatCommunityId = null,
+  chatCommunityName = null,
   chatCommunityImage = null,
+  chatMemberCount,
   chatCommunityJoined = false,
   backHref,
   backLabel = "Home",
@@ -174,7 +180,9 @@ export function EventDetailClient({
         {/* ── Event chat — the room made for this event ───────────── */}
         <EventChatPanel
           chatCommunityId={chatCommunityId}
+          chatCommunityName={chatCommunityName}
           chatCommunityImage={chatCommunityImage}
+          chatMemberCount={chatMemberCount}
           joined={chatCommunityJoined}
           eventTitle={event.title}
         />
