@@ -78,6 +78,7 @@ export default async function CommunityPage({ params, searchParams }: Props) {
           publicCounts={preview.public_counts}
           canJoin={preview.can_join}
           hasPendingRequest={preview.has_pending_request}
+          joined={preview.joined}
         />
       );
     }

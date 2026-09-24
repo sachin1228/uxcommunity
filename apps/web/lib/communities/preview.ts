@@ -18,6 +18,8 @@ export interface CommunityPreviewData {
   public_counts: { threads?: number; events?: number; resources?: number; showcase?: number };
   can_join: boolean;
   has_pending_request: boolean;
+  /** True when the viewer already belongs to this community. */
+  joined: boolean;
 }
 
 /**
@@ -35,7 +37,7 @@ export async function loadCommunityPreview(
   communityId: string,
   userId: string,
 ): Promise<CommunityPreviewData | null> {
-  const [{ data: community }, { count: memberCount }] = await Promise.all([
+  const [{ data: community }, { count: memberCount }, { data: membership }] = await Promise.all([
     db
       .from("communities")
       .select("id, name, type, reference_id, image_url, description, is_private")
@@ -43,6 +45,7 @@ export async function loadCommunityPreview(
       .eq("is_active", true)
       .maybeSingle(),
     db.from("community_members").select("community_id", { count: "exact", head: true }).eq("community_id", communityId),
+    db.from("community_members").select("community_id").eq("community_id", communityId).eq("user_id", userId).maybeSingle(),
   ]);
 
   if (!community) return null;
@@ -94,5 +97,6 @@ export async function loadCommunityPreview(
     },
     can_join: canJoin,
     has_pending_request: hasPendingRequest,
+    joined: Boolean(membership),
   };
 }

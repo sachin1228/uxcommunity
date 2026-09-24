@@ -40,3 +40,28 @@ export async function withShowcaseColumn(
 ): Promise<string> {
   return (await canStoreShowcaseFlag(db)) ? `${baseColumns}, showcase_enabled` : baseColumns;
 }
+
+// ── community_join_requests.request_message ───────────────────────────────────
+
+/**
+ * Same pattern for community_join_requests.request_message (see the
+ * join-request-message migration): the homepage preview attaches an optional
+ * note to a private-community request, and admins read it in the members tab.
+ * Environments without the column still take the plain request.
+ */
+let joinMessageSupported: boolean | null = null;
+
+export async function canStoreJoinRequestMessage(
+  db: ReturnType<typeof createServiceClient>,
+): Promise<boolean> {
+  if (joinMessageSupported !== null) return joinMessageSupported;
+
+  const { error } = await db.from("community_join_requests").select("request_message").limit(1);
+  joinMessageSupported = !error;
+  if (error) {
+    console.warn(
+      "[communities] community_join_requests.request_message is missing — apply the join-request-message migration for request notes to persist.",
+    );
+  }
+  return joinMessageSupported;
+}

@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
 import { canJoinEventChat } from "@/lib/communities/event-chat";
+import { canStoreJoinRequestMessage } from "@/lib/communities/showcase-flag";
 
 /**
  * POST /api/communities/[id]/join
@@ -18,13 +19,19 @@ import { canJoinEventChat } from "@/lib/communities/event-chat";
  * For private communities, a join request is created instead of direct membership.
  */
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   let session;
   try { session = await requireSession("user"); } catch (e) { return e as Response; }
   const userId = session.userId!;
   const { id: communityId } = await params;
+
+  // Optional note accompanying a private-community request (the homepage
+  // preview asks for one). Ignored everywhere else.
+  const body = (await req.json().catch(() => null)) as { message?: unknown } | null;
+  const rawMessage = typeof body?.message === "string" ? body.message.trim() : "";
+  const requestMessage = rawMessage ? rawMessage.slice(0, 500) : null;
 
   const db = createServiceClient();
 
@@ -135,13 +142,21 @@ export async function POST(
       .eq("user_id", userId)
       .eq("status", "declined");
 
-    // Upsert a join request (idempotent — resets to pending if previous was declined)
+    // Upsert a join request (idempotent — resets to pending if previous was declined).
+    // The request_message column only exists once its migration is applied, so the
+    // write mentions it only there and falls back to a plain request otherwise.
+    const payload: Record<string, unknown> = {
+      community_id: communityId,
+      user_id: userId,
+      status: "pending",
+    };
+    if (requestMessage && (await canStoreJoinRequestMessage(db))) {
+      payload.request_message = requestMessage;
+    }
+    // Cast matches the repo-wide untyped supabase-js baseline (see next.config.js).
     const { error: reqErr } = await db
       .from("community_join_requests")
-      .upsert(
-        { community_id: communityId, user_id: userId, status: "pending" },
-        { onConflict: "community_id,user_id", ignoreDuplicates: true },
-      );
+      .upsert(payload as never, { onConflict: "community_id,user_id", ignoreDuplicates: true });
 
     if (reqErr) {
       return NextResponse.json({ error: "Failed to submit join request." }, { status: 500 });

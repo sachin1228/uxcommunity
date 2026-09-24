@@ -17,11 +17,13 @@ interface CommunityMember {
 }
 
 interface PendingRequest {
-  id:           string;
-  user_id:      string;
-  name:         string;
-  avatar_url:   string | null;
-  requested_at: string;
+  id:              string;
+  user_id:         string;
+  name:            string;
+  avatar_url:      string | null;
+  requested_at:    string;
+  /** Optional note the requester sent with the ask (homepage preview flow). */
+  request_message: string | null;
 }
 
 interface MembersViewProps {
@@ -277,13 +279,18 @@ export function MembersView({ communityId, currentUserId, isOwner = false, canMa
             ) : (
               <ul className="space-y-1">
                 {requests.map((req) => (
-                  <li key={req.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-surface-raised/50">
+                  <li key={req.id} className="flex items-start gap-3 rounded-lg px-3 py-2.5 bg-surface-raised/50">
                     <ChatAvatar name={req.name} url={req.avatar_url} size={9} />
                     <div className="min-w-0 flex-1">
                       <p className="font-body text-sm font-semibold text-foreground truncate leading-none">{req.name}</p>
                       <p className="font-body text-xs text-foreground-muted mt-0.5">
                         Requested to join {timeAgo(req.requested_at)}
                       </p>
+                      {req.request_message && (
+                        <blockquote className="mt-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 font-body text-xs leading-relaxed text-foreground-muted">
+                          “{req.request_message}”
+                        </blockquote>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button

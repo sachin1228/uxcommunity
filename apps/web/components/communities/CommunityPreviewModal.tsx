@@ -69,7 +69,7 @@ export function CommunityPreviewModal({
       ) : preview ? (
         <div className="px-4 pb-4 pt-7">
           <CommunityPreviewCard
-            key={`${communityId}:${preview.has_pending_request}`}
+            key={`${communityId}:${preview.has_pending_request}:${preview.joined}`}
             communityId={preview.id}
             name={preview.name}
             type={preview.type}
@@ -80,6 +80,7 @@ export function CommunityPreviewModal({
             publicCounts={preview.public_counts}
             canJoin={preview.can_join}
             hasPendingRequest={preview.has_pending_request}
+            joined={preview.joined}
             footerNote="You're seeing this community's public posts from the home feed. Joining adds the community's chat and every post to your sidebar."
           />
         </div>
