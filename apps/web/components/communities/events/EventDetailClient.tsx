@@ -10,6 +10,7 @@ import { communityFeedLayout } from "../feed-layout";
 import { fetchJsonCached, getCachedRequest, invalidateRequest, setCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
 import { EventCard } from "./EventCard";
+import { EventChatPanel } from "./EventChatPanel";
 import { CommentSection } from "../CommentSection";
 import { updateCommentReactions } from "@/lib/communities/comment-tree";
 
@@ -36,6 +37,10 @@ interface Props {
   communityName: string;
   communityImage?: string | null;
   showCommunityAttribution?: boolean;
+  /** The event's group chat community, when one exists. */
+  chatCommunityId?: string | null;
+  /** Whether the viewer is already in that group chat. */
+  chatCommunityJoined?: boolean;
   /** When provided, renders a back link above the event (e.g. homepage context). */
   backHref?: string;
   backLabel?: string;
@@ -51,6 +56,8 @@ export function EventDetailClient({
   communityName,
   communityImage,
   showCommunityAttribution = false,
+  chatCommunityId = null,
+  chatCommunityJoined = false,
   backHref,
   backLabel = "Home",
 }: Props) {
@@ -177,6 +184,13 @@ export function EventDetailClient({
               onLikeChanged={handleLikeChanged}
               onSaveChanged={handleSaveChanged}
             >
+
+        {/* ── Event chat — the room made for this event ───────────── */}
+        <EventChatPanel
+          chatCommunityId={chatCommunityId}
+          joined={chatCommunityJoined}
+          eventTitle={event.title}
+        />
 
         {/* ── Tabs ────────────────────────────────────────────────── */}
           <div className="flex border-b border-border">

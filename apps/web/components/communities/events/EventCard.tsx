@@ -12,6 +12,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
+import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -271,6 +272,14 @@ export function EventCard({
       if (response.ok) {
         const data = await response.json();
         onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
+        // Confirming "I'm going" is also how you join the event's group chat
+        // (and stepping out of the RSVP leaves it), so the sidebar has to
+        // reflect the change right away instead of at its next refetch.
+        const chatCommunityId: string | null = data.chat_community_id ?? null;
+        if (chatCommunityId) {
+          if (data.rsvped) invalidateOnJoin(chatCommunityId);
+          else invalidateOnLeave(chatCommunityId);
+        }
         await onRsvpSettled?.();
       } else {
         const data = await response.json().catch(() => null);

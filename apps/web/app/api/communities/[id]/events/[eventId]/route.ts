@@ -5,6 +5,7 @@ import { isPublicContentScope } from "@/lib/content-scope";
 import { realtimeRooms, publishRealtimeBatch } from "@/lib/realtime/publish";
 import { deleteR2AssetIfUnreferenced, deleteOwnedR2AssetIfUnique, shouldDeletePreviousR2Asset } from "@/lib/r2";
 import { enrichEventCards, EVENT_CARD_COLUMNS } from "@/lib/communities/event-cards";
+import { syncEventChatCommunity } from "@/lib/communities/event-chat";
 
 export async function GET(
   _req: NextRequest,
@@ -120,6 +121,25 @@ export async function PATCH(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Keep the event's group chat in step with the event it belongs to: the room
+  // is named after the event and wears the same cover, so it has to follow a
+  // rename or a new cover. Runs before the R2 cleanup below so the group never
+  // points at an image the cleanup is about to delete.
+  const updatedRow = data as unknown as { title: string; cover_image_url: string | null };
+  try {
+    await syncEventChatCommunity(
+      db,
+      {
+        id: eventId,
+        title: updatedRow.title,
+        coverImageUrl: updatedRow.cover_image_url ?? null,
+      },
+      (existing as unknown as { user_id: string }).user_id,
+    );
+  } catch (chatError) {
+    console.error("[PATCH community events] group chat sync failed:", chatError);
+  }
 
   // Casts match the repo-wide untyped supabase-js baseline (see next.config.js).
   const previousUrl = (existing as unknown as { cover_image_url?: string | null } | null)?.cover_image_url ?? null;

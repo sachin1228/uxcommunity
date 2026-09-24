@@ -157,7 +157,8 @@ export interface SidebarLastReaction {
 export interface CachedSidebarCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
+  /** `event` rows are an event's group chat (see lib/communities/event-chat). */
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user" | "event";
   image_url: string | null;
   reference_name?: string | null;
   is_private?: boolean;
@@ -226,7 +227,7 @@ export const SIDEBAR_STALE_MS = 60_000;
 export interface CachedExploreCommunity {
   id: string;
   name: string;
-  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user";
+  type: "city" | "sector" | "interest" | "experience_level" | "job_title" | "general" | "user" | "event";
   image_url: string | null;
   description: string | null;
   is_private?: boolean;

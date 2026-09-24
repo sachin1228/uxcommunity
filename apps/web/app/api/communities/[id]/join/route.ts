@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireSession } from "@/lib/auth/session";
 import { SUGGESTED_COMMUNITIES_TAG } from "@/lib/home/home-rail-cache";
+import { canJoinEventChat } from "@/lib/communities/event-chat";
 
 /**
  * POST /api/communities/[id]/join
@@ -30,13 +31,49 @@ export async function POST(
   // 1. Load community
   const { data: community } = await db
     .from("communities")
-    .select("id, type, reference_id, is_private")
+    .select("id, type, reference_id, is_private, event_id")
     .eq("id", communityId)
     .eq("is_active", true)
     .maybeSingle();
 
   if (!community) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
+  }
+
+  // 1b. An event's group chat: joining it is the confirmation. It is open to
+  // everyone who can see the event — the members of the event's own community,
+  // and everybody when the event is public. There is no approval step: the
+  // caller has already confirmed in the UI (RSVP, or the group's join gate).
+  if (community.type === "event") {
+    const { data: eventRow } = await db
+      .from("community_events")
+      .select("id, community_id, is_public")
+      .eq("id", community.event_id)
+      .maybeSingle();
+
+    if (!eventRow) {
+      return NextResponse.json({ error: "Event not found." }, { status: 404 });
+    }
+
+    if (!(await canJoinEventChat(db, eventRow, userId))) {
+      return NextResponse.json(
+        { error: "Only members of this event's community can join its chat." },
+        { status: 403 },
+      );
+    }
+
+    const { error } = await db
+      .from("community_members")
+      .upsert(
+        { community_id: communityId, user_id: userId },
+        { onConflict: "community_id,user_id", ignoreDuplicates: true },
+      );
+
+    if (error) {
+      return NextResponse.json({ error: "Failed to join the event chat." }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
   }
 
   // 2. Interest / general / user communities are open to all

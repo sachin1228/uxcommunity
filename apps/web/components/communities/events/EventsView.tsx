@@ -15,7 +15,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { fetchJsonCached, getCachedRequest, initRequestCache, patchCachedRequest } from "@/lib/request-cache";
 import { useGuardedRouter } from "@/lib/navigation-guard";
-import { notifyContentEvent } from "@/lib/communities/cache";
+import { invalidateCommunitiesList, notifyContentEvent } from "@/lib/communities/cache";
 import { applyContentChanges, publishContentChange } from "@/lib/communities/content-sync";
 import { useContentChanges } from "@/lib/communities/use-content-changes";
 
@@ -171,6 +171,10 @@ export function EventsView({
         },
       },
     });
+    // Creating an event also creates its group chat and puts the creator in it
+    // (see lib/communities/event-chat), so the sidebar has to pick the new room
+    // up instead of waiting for its next refetch.
+    invalidateCommunitiesList();
   }
 
   function handleUpdated(updated: CommunityEvent) {
