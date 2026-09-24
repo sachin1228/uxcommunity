@@ -4,7 +4,7 @@
 
 import type { NotificationType } from "./use-notifications";
 
-export type NotificationTab = "activity" | "other";
+export type NotificationTab = "activity" | "events" | "other";
 
 /** Tab order and labels — the view supplies the icons. */
 export const NOTIFICATION_TABS: ReadonlyArray<{
@@ -12,14 +12,24 @@ export const NOTIFICATION_TABS: ReadonlyArray<{
   label: string;
 }> = [
   { key: "activity", label: "Likes and comments" },
+  { key: "events", label: "Events" },
   { key: "other", label: "Other" },
 ];
+
+/** Types that concern events — everything here renders under the Events tab. */
+const EVENT_TYPES: ReadonlySet<NotificationType> = new Set([
+  "event_comment",
+  "event_reply",
+  "event_rsvp",
+]);
 
 /**
  * Which types each tab renders.
  *
- * - `activity` — engagement on the user's own content: a like, an RSVP, or a
+ * - `activity` — engagement on the user's own content: a like or a
  *   comment/reply anywhere in the thread under what they posted.
+ * - `events` — everything about the user's events: RSVPs plus the
+ *   comments/replies posted on them.
  * - `other` — intentionally EMPTY. The tab is a visible placeholder; add the
  *   types that belong in it here (and update the tab's empty-state copy in
  *   NotificationsView) to populate it.
@@ -34,45 +44,50 @@ const TAB_TYPES: Record<NotificationTab, ReadonlySet<NotificationType>> = {
     "thread_reply",
     "resource_comment",
     "resource_reply",
-    "event_comment",
-    "event_reply",
-    "event_rsvp",
   ]),
+  events: EVENT_TYPES,
   other: new Set(),
 };
 
 /** The tab a type renders under, or null while no tab claims it yet. */
 export function notificationTabFor(type: NotificationType): NotificationTab | null {
   if (TAB_TYPES.activity.has(type)) return "activity";
+  if (TAB_TYPES.events.has(type)) return "events";
   if (TAB_TYPES.other.has(type)) return "other";
   return null;
 }
 
 /**
- * Splits a newest-first notification page into its two tabs, counting unread
+ * Splits a newest-first notification page into its tabs, counting unread
  * items per tab along the way. Order inside each tab is preserved, so the
- * realtime path's prepends keep both lists sorted.
+ * realtime path's prepends keep all lists sorted.
  *
- * Types no tab claims are dropped from both lists (and from the counts) — they
+ * Types no tab claims are dropped from every list (and from the counts) — they
  * stay invisible until a tab declares them.
  */
 export function splitNotificationsByTab<
   T extends { type: NotificationType; read_at: string | null },
 >(items: readonly T[]): {
   activity: T[];
+  events: T[];
   other: T[];
   unreadByTab: Record<NotificationTab, number>;
 } {
   const activity: T[] = [];
+  const events: T[] = [];
   const other: T[] = [];
-  const unreadByTab: Record<NotificationTab, number> = { activity: 0, other: 0 };
+  const unreadByTab: Record<NotificationTab, number> = {
+    activity: 0,
+    events: 0,
+    other: 0,
+  };
 
   for (const item of items) {
     const tab = notificationTabFor(item.type);
     if (!tab) continue;
-    (tab === "activity" ? activity : other).push(item);
+    (tab === "activity" ? activity : tab === "events" ? events : other).push(item);
     if (!item.read_at) unreadByTab[tab] += 1;
   }
 
-  return { activity, other, unreadByTab };
+  return { activity, events, other, unreadByTab };
 }
