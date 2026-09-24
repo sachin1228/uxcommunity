@@ -4,7 +4,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 
 /** Labels for the feed source selector. */
 const SCOPES = [
-  { value: "all", label: "For You" },
+  { value: "all", label: "Public Feed" },
   { value: "communities", label: "Your Communities" },
 ] as const;
 
