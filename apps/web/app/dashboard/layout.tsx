@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { autoJoinCommunities } from "@/lib/communities/auto-join";
 import { GlobalSidebar } from "@/components/sidebar/GlobalSidebar";
 import { MobileSidebar } from "@/components/sidebar/MobileSidebar";
+import { UndoToast } from "@/components/ui/UndoToast";
 
 
 export default async function DashboardLayout({
@@ -79,6 +80,10 @@ export default async function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Undo offers for actions that are awkward to rebuild by hand — owned by
+          the shell so the offer outlives the card that raised it. */}
+      <UndoToast />
     </div>
   );
 }

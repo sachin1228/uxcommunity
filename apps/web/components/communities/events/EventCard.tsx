@@ -14,6 +14,7 @@ import { AvatarImg } from "@/components/ui/AvatarImg";
 
 import { dedupeFetch } from "@/lib/dedupe-fetch";
 import { invalidateOnJoin, invalidateOnLeave } from "@/lib/communities/cache";
+import { showUndoToast } from "@/lib/undo-toast";
 import { usePendingMutation } from "@/lib/use-mutation";
 import { communityFeedLayout } from "../feed-layout";
 import { CommunityPostLabel } from "../CommunityPostLabel";
@@ -278,6 +279,28 @@ export function EventCard({
     setRsvpConfirm(event.user_rsvped ? "leave" : "join");
   }
 
+  /**
+   * Put a withdrawn RSVP back — what the undo offer runs.
+   *
+   * Deliberately not a toggle, and with no optimistic update: the offer can be
+   * taken after this card has re-rendered or unmounted, so there is no current
+   * prop worth reasoning from and nothing safely revertable. The server's
+   * answer is adopted instead, and a failure is thrown rather than reported
+   * here so the toast can keep the offer on screen.
+   */
+  async function restoreRsvp() {
+    const response = await dedupeFetch(`/api/communities/${communityId}/events/${event.id}/rsvp`, { method: "POST" });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error ?? "Failed to RSVP.");
+
+    onRsvpChanged(event.id, data.rsvped, data.rsvp_count);
+    // RSVP-ing again is also what re-joins the group chat and re-pins the room
+    // in the sidebar, so the same invalidation as the dialog path applies.
+    const chatCommunityId: string | null = data.chat_community_id ?? null;
+    if (chatCommunityId && data.rsvped) invalidateOnJoin(chatCommunityId);
+    await onRsvpSettled?.();
+  }
+
   async function commitRsvp() {
     if (rsvpPending || past) return;
     const newRsvped = !event.user_rsvped;
@@ -299,6 +322,16 @@ export function EventCard({
           else invalidateOnLeave(chatCommunityId);
         }
         setRsvpConfirm(null);
+        // Withdrawing did two things the member would have to rebuild by hand:
+        // it removed the room from their sidebar (and its pin) and dropped
+        // them out of the chat. Offer the way back while the decision is still
+        // fresh — taking it RSVPs again, which is what re-joins the room.
+        if (!data.rsvped && chatCommunityId) {
+          showUndoToast({
+            message: `You're no longer going to ${event.title}, and you left its chat.`,
+            onAction: restoreRsvp,
+          });
+        }
         await onRsvpSettled?.();
       } else {
         const data = await response.json().catch(() => null);
